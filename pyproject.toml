@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "draive"
+version = "0.1.0"
+maintainers = [
+  {name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com"}
+]
+requires-python = "~=3.11"
+classifiers = [
+    "Intended Audience :: Developers",
+    "Programming Language :: Python",
+    "License :: MIT License",
+    "Topic :: Software Development",
+    "Topic :: AI :: LLM",
+    "Typing :: Typed",
+]
+license = {file = "LICENSE"}
+dependencies = [
+    "numpy~=1.26",
+    "openai~=1.12",
+    "tiktoken~=0.6.0",
+    "pydantic~=2.6",
+    "httpx~=0.25.0",
+]
+
+[project.urls]
+Homepage = "https://miquido.com"
+
+[project.optional-dependencies]
+dev = [
+    "ruff~=0.2.0",
+    "pyright~=1.1.0",
+    "bandit~=1.7.0",
+    "pytest~=7.4.0",
+    "pytest-cov~=4.1.0",
+    "pytest-asyncio~=0.23.0",
+    "python-dotenv~=1.0.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = [".venv", ".git", ".cache"]
+lint.select = ["E", "F", "A", "I", "B", "PL", "W", "C", "RUF", "UP"]
+lint.ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "E402"]
+"./tests/*.py" = ["PLR2004"]
+
+[tool.pyright]
+pythonVersion = "3.11"
+venvPath = "./.venv"
+include = [
+  "./src",
+]
+exclude = [
+  "**/__pycache__",
+]
+ignore = []
+reportMissingImports = true
+reportMissingTypeStubs = true
+typeCheckingMode = "strict"
