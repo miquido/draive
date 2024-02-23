@@ -7,7 +7,7 @@ SHELL := sh
 -include .env
 
 ifndef PYTHON_ALIAS
-	PYTHON_ALIAS := /Library/Frameworks/Python.framework/Versions/3.12/bin/python3
+	PYTHON_ALIAS := python
 endif
 
 SOURCES_PATH := src
