@@ -39,6 +39,7 @@ class ScopeStates:
         self._state: dict[type[ScopeState], ScopeState] = {
             type(element): element for element in state
         }
+        self._token: Token[ScopeStates] | None = None
 
     def __copy__(self) -> Self:
         return self.__class__(*self._state.values())
@@ -69,8 +70,8 @@ class ScopeStates:
             return self
 
     def __enter__(self) -> None:
-        assert not hasattr(self, "_token"), "Reentrance is not allowed"  # nosec: B101
-        self._token: Token[ScopeStates] = _ScopeState_Var.set(self)
+        assert self._token is None, "Reentrance is not allowed"  # nosec: B101
+        self._token = _ScopeState_Var.set(self)
 
     def __exit__(
         self,
@@ -78,8 +79,10 @@ class ScopeStates:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
+        if self._token is None:
+            raise AttributeError("Can't exit scope without entering")
+
         _ScopeState_Var.reset(self._token)
-        del self._token
 
 
 _ScopeState_Var = ContextVar[ScopeStates]("_ScopeState_Var")

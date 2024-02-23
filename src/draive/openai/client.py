@@ -1,13 +1,14 @@
 from asyncio import gather
 from collections.abc import Iterable
 from os import getenv
-from typing import Self, final
+from typing import Literal, Self, final, overload
 
-from openai import AsyncAzureOpenAI, AsyncOpenAI
+from openai import AsyncAzureOpenAI, AsyncOpenAI, AsyncStream
 from openai._types import NOT_GIVEN
 from openai.types import Moderation, ModerationCreateResponse
 from openai.types.chat import (
     ChatCompletion,
+    ChatCompletionChunk,
     ChatCompletionMessageParam,
     ChatCompletionToolParam,
 )
@@ -60,12 +61,32 @@ class OpenAIClient(ScopeDependency):
     def client(self) -> AsyncOpenAI:
         return self._client
 
+    @overload
+    async def chat_completion(
+        self,
+        config: OpenAIChatConfig,
+        messages: list[ChatCompletionMessageParam],
+        tools: list[ChatCompletionToolParam],
+        stream: Literal[True],
+    ) -> AsyncStream[ChatCompletionChunk]:
+        ...
+
+    @overload
     async def chat_completion(
         self,
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
         tools: list[ChatCompletionToolParam],
     ) -> ChatCompletion:
+        ...
+
+    async def chat_completion(
+        self,
+        config: OpenAIChatConfig,
+        messages: list[ChatCompletionMessageParam],
+        tools: list[ChatCompletionToolParam],
+        stream: bool = False,
+    ) -> AsyncStream[ChatCompletionChunk] | ChatCompletion:
         return await self._client.chat.completions.create(
             messages=messages,
             model=config.model,
@@ -74,7 +95,7 @@ class OpenAIClient(ScopeDependency):
             n=1,
             response_format=config.response_format or NOT_GIVEN,
             seed=config.seed or NOT_GIVEN,
-            stream=False,
+            stream=stream,
             temperature=config.temperature,
             tools=tools or NOT_GIVEN,
             top_p=config.top_p or NOT_GIVEN,

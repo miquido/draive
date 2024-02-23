@@ -1,4 +1,3 @@
-import json
 from dataclasses import Field, asdict, dataclass, field
 from typing import Any, Self, dataclass_transform, final
 
@@ -20,6 +19,9 @@ class StateMeta(type):
         classdict: dict[str, Any],
         **kwargs: Any,
     ) -> type[Any]:
+        # TODO: ensure properties belong to supported types:
+        # bool, int, float, str, list[bool|int|float|str], dict[str, bool|int|float|str]
+        # or other instances of State, additionally we need to support functions in state
         return final(  # pyright: ignore[reportUnknownVariableType]
             dataclass(  # pyright: ignore[reportGeneralTypeIssues, reportUnknownArgumentType, reportCallIssue]
                 type.__new__(
@@ -37,51 +39,29 @@ class StateMeta(type):
 
 class State(metaclass=StateMeta):
     @classmethod
-    def from_json(
-        cls,
-        value: str | bytes,
-    ) -> Self:
-        try:
-            return cls.from_dict(values=json.loads(value))
-
-        except Exception as exc:
-            raise ValueError(f"Failed to decode {cls.__name__} from json:\n{value}") from exc
-
-    @classmethod
     def from_dict(
         cls,
-        values: dict[str, object],
+        value: dict[str, Any],
     ) -> Self:
         try:
             # TODO: add data validation step here
-            return cls(**values)
+            # TODO: ensure nested objects conversion
+            return cls(**value)
 
         except Exception as exc:
-            raise ValueError(f"Failed to decode {cls.__name__} from dict:\n{values}") from exc
+            raise ValueError(f"Failed to decode {cls.__name__} from dict:\n{value}") from exc
 
-    def as_json(self) -> str:
-        try:
-            return json.dumps(asdict(self))
-        except Exception as exc:
-            raise ValueError(
-                f"Failed to encode {self.__class__.__name__} to json:\n{self}"
-            ) from exc
-
-    def as_dict(self) -> dict[str, object]:
+    def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     def __str__(self) -> str:
-        return self.as_json()
+        return str(asdict(self))
 
     def __repr__(self) -> str:
-        try:
-            return f"{self.__class__.__name__} {json.dumps(asdict(self), indent=2)}"
-
-        except Exception:
-            return f"{self.__class__.__name__} {asdict(self)}"
+        return self.__str__()
 
     def metric_summary(self) -> str:
-        return self.__repr__()
+        return self.__str__()
 
     # TODO: find a way to generate signature similar to dataclass __init__
     def updated(

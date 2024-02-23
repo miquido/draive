@@ -45,6 +45,7 @@ class ScopeDependencies:
                 self._dependencies[type(dependency).interface()] = dependency
             else:
                 self._dependencies[dependency.interface()] = dependency.prepare()
+        self._token: Token[ScopeDependencies] | None = None
 
     def dependency(
         self,
@@ -63,8 +64,8 @@ class ScopeDependencies:
         await gather(*[dependency.dispose() for dependency in self._dependencies.values()])
 
     def __enter__(self) -> None:
-        assert not hasattr(self, "_token"), "Reentrance is not allowed"  # nosec: B101
-        self._token: Token[ScopeDependencies] = _ScopeDependencies_Var.set(self)
+        assert self._token is None, "Reentrance is not allowed"  # nosec: B101
+        self._token = _ScopeDependencies_Var.set(self)
 
     def __exit__(
         self,
@@ -72,12 +73,13 @@ class ScopeDependencies:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
+        if self._token is None:
+            raise AttributeError("Can't exit scope without entering")
         _ScopeDependencies_Var.reset(self._token)
-        del self._token
 
     async def __aenter__(self) -> None:
-        assert not hasattr(self, "_token"), "Reentrance is not allowed"  # nosec: B101
-        self._token: Token[ScopeDependencies] = _ScopeDependencies_Var.set(self)
+        assert self._token is None, "Reentrance is not allowed"  # nosec: B101
+        self._token = _ScopeDependencies_Var.set(self)
 
     async def __aexit__(
         self,
@@ -85,8 +87,9 @@ class ScopeDependencies:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
+        if self._token is None:
+            raise AttributeError("Can't exit scope without entering")
         _ScopeDependencies_Var.reset(self._token)
-        del self._token
         await self.dispose()
 
 

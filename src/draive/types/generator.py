@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from typing import Protocol, TypeVar
 
-from draive.types.generated import Generated
+from draive.types.model import Model
 from draive.types.string import StringConvertible
 from draive.types.toolset import Toolset
 
@@ -13,7 +13,7 @@ __all__ = [
 
 _Generated = TypeVar(
     "_Generated",
-    bound=Generated,
+    bound=Model,
 )
 
 

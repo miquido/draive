@@ -1,22 +1,43 @@
-from asyncio import gather
-from typing import cast
+from typing import Literal, overload
 
-from openai.types.chat import (
-    ChatCompletion,
-    ChatCompletionMessage,
-    ChatCompletionMessageParam,
-    ChatCompletionToolParam,
+from openai.types.chat import ChatCompletionMessageParam
+
+from draive.openai.chat_response import _chat_completion  # pyright: ignore[reportPrivateUsage]
+from draive.openai.chat_stream import (
+    OpenAIChatStream,
+    _chat_stream,  # pyright: ignore[reportPrivateUsage]
 )
-
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
-from draive.scope import ArgumentsTrace, ResultTrace, TokenUsage, ctx
-from draive.tools import ToolException
+from draive.scope import ArgumentsTrace, ctx
 from draive.types import ConversationMessage, StringConvertible, Toolset
 
 __all__ = [
     "openai_chat_completion",
 ]
+
+
+@overload
+async def openai_chat_completion(
+    *,
+    instruction: str,
+    input: StringConvertible,  # noqa: A002
+    history: list[ConversationMessage] | None = None,
+    toolset: Toolset | None = None,
+    stream: Literal[True],
+) -> OpenAIChatStream:
+    ...
+
+
+@overload
+async def openai_chat_completion(
+    *,
+    instruction: str,
+    input: StringConvertible,  # noqa: A002
+    history: list[ConversationMessage] | None = None,
+    toolset: Toolset | None = None,
+) -> str:
+    ...
 
 
 async def openai_chat_completion(
@@ -25,25 +46,37 @@ async def openai_chat_completion(
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-) -> str:
+    stream: bool = False,
+) -> OpenAIChatStream | str:
     config: OpenAIChatConfig = ctx.state(OpenAIChatConfig)
     async with ctx.nested(
         "openai_chat_completion",
-        ArgumentsTrace(message=input, history=history),
-        config,
+        ArgumentsTrace(message=input),
     ):
-        result: str = await _chat_completion(
-            client=ctx.dependency(OpenAIClient),
-            config=config,
-            messages=_prepare_messages(
-                instruction=instruction,
-                history=history or [],
-                input=input,
-            ),
-            toolset=toolset,
-        )
-        await ctx.record(ResultTrace(result))
-        return result
+        client: OpenAIClient = ctx.dependency(OpenAIClient)
+        if stream:
+            return await _chat_stream(
+                client=client,
+                config=config,
+                messages=_prepare_messages(
+                    instruction=instruction,
+                    history=history or [],
+                    input=input,
+                ),
+                toolset=toolset,
+            )
+
+        else:
+            return await _chat_completion(
+                client=client,
+                config=config,
+                messages=_prepare_messages(
+                    instruction=instruction,
+                    history=history or [],
+                    input=input,
+                ),
+                toolset=toolset,
+            )
 
 
 def _prepare_messages(
@@ -56,11 +89,11 @@ def _prepare_messages(
         "content": str(input),
     }
 
-    openai_messages: list[ChatCompletionMessageParam] = []
+    messages: list[ChatCompletionMessageParam] = []
     for message in history:
         match message.author:
             case "user":
-                openai_messages.append(
+                messages.append(
                     {
                         "role": "user",
                         "content": str(message.content),
@@ -68,7 +101,7 @@ def _prepare_messages(
                 )
 
             case "assistant":
-                openai_messages.append(
+                messages.append(
                     {
                         "role": "assistant",
                         "content": str(message.content),
@@ -93,111 +126,6 @@ def _prepare_messages(
             "role": "system",
             "content": instruction,
         },
-        *openai_messages,
+        *messages,
         input_message,
     ]
-
-
-async def _chat_completion(
-    *,
-    client: OpenAIClient,
-    config: OpenAIChatConfig,
-    messages: list[ChatCompletionMessageParam],
-    toolset: Toolset | None,
-) -> str:
-    async with ctx.nested("chat_completion"):
-        completion: ChatCompletion = await client.chat_completion(
-            config=config,
-            messages=messages,
-            tools=cast(
-                list[ChatCompletionToolParam],
-                toolset.available_tools if toolset else [],
-            ),
-        )
-
-        if usage := completion.usage:
-            await ctx.record(
-                TokenUsage(
-                    input_tokens=usage.prompt_tokens,
-                    output_tokens=usage.completion_tokens,
-                ),
-            )
-
-        if not completion.choices:
-            raise ToolException("Invalid OpenAI completion - missing messages!", completion)
-
-        completion_message: ChatCompletionMessage = completion.choices[0].message
-
-        if (tool_calls := completion_message.tool_calls) and (toolset := toolset):
-            messages.append(
-                {
-                    "role": "assistant",
-                    "tool_calls": [
-                        {
-                            "id": call.id,
-                            "type": "function",
-                            "function": {
-                                "name": call.function.name,
-                                "arguments": call.function.arguments,
-                            },
-                        }
-                        for call in tool_calls
-                    ],
-                }
-            )
-            messages.extend(
-                await gather(
-                    *[
-                        _chat_tool_call(
-                            call_id=call.id,
-                            name=call.function.name,
-                            arguments=call.function.arguments,
-                            toolset=toolset,
-                        )
-                        for call in tool_calls
-                    ],
-                    return_exceptions=False,
-                ),
-            )
-
-        elif message := completion_message.content:
-            return message
-
-        else:
-            raise ToolException("Invalid OpenAI completion", completion)
-
-    # recursion outside of context
-    return await _chat_completion(
-        client=client,
-        config=config,
-        messages=messages,
-        toolset=toolset,
-    )
-
-
-async def _chat_tool_call(
-    *,
-    call_id: str,
-    name: str,
-    arguments: str,
-    toolset: Toolset,
-) -> ChatCompletionMessageParam:
-    try:  # make sure that tool error won't blow up whole chain
-        return {
-            "role": "tool",
-            "tool_call_id": call_id,
-            "content": str(
-                await toolset.call_tool(
-                    name,
-                    arguments=arguments,
-                )
-            ),
-        }
-
-    # error should be already logged by ScopeContext
-    except BaseException:
-        return {
-            "role": "tool",
-            "tool_call_id": call_id,
-            "content": "Error",  # TODO: refine error result message
-        }
