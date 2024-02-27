@@ -90,6 +90,7 @@ class ScopeDependencies:
         if self._token is None:
             raise AttributeError("Can't exit scope without entering")
         _ScopeDependencies_Var.reset(self._token)
+        self._token = None
         await self.dispose()
 
 

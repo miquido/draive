@@ -5,6 +5,7 @@ from typing import Literal, cast, overload
 from draive.openai.chat import openai_chat_completion
 from draive.openai.chat_stream import OpenAIChatStreamingMessagePart
 from draive.openai.chat_tools import OpenAIChatStreamingToolStatus
+from draive.scope import ArgumentsTrace, ResultTrace, ctx
 from draive.types import (
     ConversationMessage,
     ConversationResponseStream,
@@ -69,44 +70,48 @@ async def openai_conversation_completion(
         )
 
     else:
-        user_message: ConversationMessage
-        if isinstance(input, ConversationMessage):
-            user_message = input
+        async with ctx.nested(
+            "openai_conversation_stream",
+            ArgumentsTrace(message=input),
+        ):
+            user_message: ConversationMessage
+            if isinstance(input, ConversationMessage):
+                user_message = input
 
-        else:
-            user_message = ConversationMessage(
+            else:
+                user_message = ConversationMessage(
+                    timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    author="user",
+                    content=input,
+                )
+
+            history: list[ConversationMessage]
+
+            if memory:
+                history = await memory.recall()
+            else:
+                history = []
+
+            response: ConversationMessage = ConversationMessage(
                 timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                author="user",
-                content=input,
+                author="assistant",
+                content=await openai_chat_completion(
+                    instruction=instruction,
+                    input=user_message.content,
+                    history=history,
+                    toolset=toolset,
+                ),
             )
 
-        history: list[ConversationMessage]
-
-        if memory:
-            history = await memory.recall()
-        else:
-            history = []
-
-        response: ConversationMessage = ConversationMessage(
-            timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-            author="assistant",
-            content=await openai_chat_completion(
-                instruction=instruction,
-                input=user_message.content,
-                history=history,
-                toolset=toolset,
-            ),
-        )
-
-        if memory:
-            await memory.remember(
-                [
-                    *history,
-                    user_message,
-                    response,
-                ],
-            )
-        return response
+            if memory:
+                await memory.remember(
+                    [
+                        *history,
+                        user_message,
+                        response,
+                    ],
+                )
+            return response
 
 
 class _ResponseStream(ConversationResponseStream):
@@ -120,7 +125,7 @@ class _ResponseStream(ConversationResponseStream):
         self._queue: Queue[ConversationStreamingPart | BaseException | None] = queue
 
     async def __anext__(self) -> ConversationStreamingPart:
-        if self._task.done():
+        if self._task.done() and self._queue.empty():
             if error := self._task.exception():
                 raise error
             else:
@@ -154,63 +159,69 @@ async def _openai_conversation_stream(
     toolset: Toolset | None = None,
     progress: StreamingProgressUpdate[ConversationStreamingPart],
 ) -> None:
-    user_message: ConversationMessage
-    if isinstance(input, ConversationMessage):
-        user_message = input
-
-    else:
-        user_message = ConversationMessage(
-            timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-            author="user",
-            content=input,
-        )
-
-    history: list[ConversationMessage]
-
-    if memory:
-        history = await memory.recall()
-    else:
-        history = []
-
-    actions: dict[str, ConversationStreamingAction] = {}
-    response: ConversationMessage = ConversationMessage(
-        author="assistant",
-        content="",
-        timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-    )
-
-    async for part in await openai_chat_completion(
-        instruction=instruction,
-        input=user_message.content,
-        history=history,
-        toolset=toolset,
-        stream=True,
+    async with ctx.nested(
+        "openai_conversation_stream",
+        ArgumentsTrace(message=input),
     ):
-        match part:
-            case OpenAIChatStreamingMessagePart(content=content):
-                response = response.updated(content=response.content_str + content.__str__())
+        user_message: ConversationMessage
+        if isinstance(input, ConversationMessage):
+            user_message = input
 
-            case OpenAIChatStreamingToolStatus(id=tool_id, name=tool_name, status=status):
-                actions[tool_id] = ConversationStreamingAction(
-                    id=tool_id,
-                    action="TOOL_CALL",
-                    name=tool_name,
-                    status=ConversationStreamingActionStatus(
-                        current=status,
-                    ),
-                )
-        progress(
-            ConversationStreamingPart(
-                actions=list(actions.values()),
-                message=response,
+        else:
+            user_message = ConversationMessage(
+                timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                author="user",
+                content=input,
             )
+
+        history: list[ConversationMessage]
+
+        if memory:
+            history = await memory.recall()
+        else:
+            history = []
+
+        actions: dict[str, ConversationStreamingAction] = {}
+        response: ConversationMessage = ConversationMessage(
+            author="assistant",
+            content="",
+            timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
 
-    if memory:
-        await memory.remember(
-            [
-                *history,
-                user_message,
-                response,
-            ],
-        )
+        async for part in await openai_chat_completion(
+            instruction=instruction,
+            input=user_message.content,
+            history=history,
+            toolset=toolset,
+            stream=True,
+        ):
+            match part:
+                case OpenAIChatStreamingMessagePart(content=content):
+                    response = response.updated(content=response.content_str + content.__str__())
+
+                case OpenAIChatStreamingToolStatus(id=tool_id, name=tool_name, status=status):
+                    actions[tool_id] = ConversationStreamingAction(
+                        id=tool_id,
+                        action="TOOL_CALL",
+                        name=tool_name,
+                        status=ConversationStreamingActionStatus(
+                            current=status,
+                        ),
+                    )
+            progress(
+                ConversationStreamingPart(
+                    actions=list(actions.values()),
+                    message=response,
+                )
+            )
+
+        await ctx.record(ResultTrace(response))
+
+        if memory:
+            await memory.remember(
+                [
+                    *history,
+                    user_message,
+                    response,
+                ],
+            )
