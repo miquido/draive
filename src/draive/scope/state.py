@@ -83,6 +83,7 @@ class ScopeStates:
             raise AttributeError("Can't exit scope without entering")
 
         _ScopeState_Var.reset(self._token)
+        self._token = None
 
 
 _ScopeState_Var = ContextVar[ScopeStates]("_ScopeState_Var")

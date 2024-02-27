@@ -9,7 +9,7 @@ from draive.openai.chat_stream import (
 )
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
-from draive.scope import ArgumentsTrace, ctx
+from draive.scope import ctx
 from draive.types import ConversationMessage, StringConvertible, Toolset
 
 __all__ = [
@@ -49,10 +49,7 @@ async def openai_chat_completion(
     stream: bool = False,
 ) -> OpenAIChatStream | str:
     config: OpenAIChatConfig = ctx.state(OpenAIChatConfig)
-    async with ctx.nested(
-        "openai_chat_completion",
-        ArgumentsTrace(message=input),
-    ):
+    async with ctx.nested("openai_chat_completion"):
         client: OpenAIClient = ctx.dependency(OpenAIClient)
         if stream:
             return await _chat_stream(

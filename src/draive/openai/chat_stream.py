@@ -18,7 +18,7 @@ from draive.openai.chat_tools import (
 )
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
-from draive.scope import ArgumentsTrace, ctx
+from draive.scope import ArgumentsTrace, ResultTrace, ctx
 from draive.tools import ToolException
 from draive.types import Model, StreamingProgressUpdate, StringConvertible, Toolset
 
@@ -50,7 +50,7 @@ class _QueueStream(OpenAIChatStream):
         self._queue: Queue[OpenAIChatStreamingPart | BaseException | None] = queue
 
     async def __anext__(self) -> OpenAIChatStreamingPart:
-        if self._task.done():
+        if self._task.done() and self._queue.empty():
             if error := self._task.exception():
                 raise error
             else:
@@ -108,7 +108,6 @@ async def _chat_streaming_completion(
 ) -> None:
     async with ctx.nested(
         "chat_stream",
-        # TODO: add result trace
         ArgumentsTrace(messages=messages),
     ):
         completion_stream: AsyncStream[ChatCompletionChunk] = await client.chat_completion(
@@ -170,6 +169,7 @@ async def _stream_completion(
     tail: AsyncStream[ChatCompletionChunk],
     progress: StreamingProgressUpdate[OpenAIChatStreamingPart],
 ) -> None:
+    result: str = head
     if head:  # provide head / first part if not empty
         progress(update=OpenAIChatStreamingMessagePart(content=head))
 
@@ -179,3 +179,6 @@ async def _stream_completion(
         if not part_text:
             continue  # skip empty parts
         progress(update=OpenAIChatStreamingMessagePart(content=part_text))
+        result += part_text
+
+    await ctx.record(ResultTrace(result))
