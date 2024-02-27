@@ -3,7 +3,7 @@ from typing import TypeVar
 
 from draive.generation.state import ModelGeneration, TextGeneration
 from draive.scope import ctx
-from draive.types import Generated, StringConvertible, Toolset
+from draive.types import Model, StringConvertible, Toolset
 
 __all__ = [
     "generate_text",
@@ -29,7 +29,7 @@ async def generate_text(
 
 _Generated = TypeVar(
     "_Generated",
-    bound=Generated,
+    bound=Model,
 )
 
 

@@ -151,6 +151,7 @@ class ScopeMetrics:
             parent._logger if parent else Logger(name=label or "metrics")
         )
         self._log_summary: bool = log_summary
+        self._token: Token[ScopeMetrics] | None = None
 
     # - STATE -
 
@@ -172,13 +173,17 @@ class ScopeMetrics:
         *,
         metrics: Iterable[ScopeMetric] | None = None,
     ) -> Self:
-        return self.__class__(
+        # TODO: should not nest when already completed
+
+        child: Self = self.__class__(
             label=label,
             logger=self._logger,
             parent=self,
             metrics=metrics,
             log_summary=False,  # only root should log summary
         )
+        self._child_traces.append(child)
+        return child
 
     # - METRICS -
 
@@ -273,20 +278,16 @@ class ScopeMetrics:
         return f"{self._trace_id}|{self._label}"
 
     async def __aenter__(self) -> None:
-        start_time: float = time()
-        assert not hasattr(self, "_token"), "Reentrance is not allowed"  # nosec: B101
-        self._token: Token[ScopeMetrics] = _ScopeMetrics_Var.set(self)
-        if self._parent:
-            await self._parent._register_child(self)
-
         async with self._lock:
+            assert self._token is None, "Reentrance is not allowed"  # nosec: B101
+            self._token = _ScopeMetrics_Var.set(self)
             if self._start is not None:
-                raise ValueError("Metrics has already stated!")
+                return  # already started
 
-            self._start = start_time
+            self._start = time()
 
-        if self.is_root:  # do not log on each nesting
-            self.log_info("Metrics recording has started")
+            if self.is_root:  # do not log on each nesting
+                self.log_info("Metrics recording has started")
 
     async def __aexit__(
         self,
@@ -297,51 +298,44 @@ class ScopeMetrics:
         async with self._lock:
             if self._start is None:
                 raise ValueError("Metrics has never stated!")
+            if self._token is None:
+                raise AttributeError("Can't exit scope without entering")
 
-            if self._end is not None:
-                raise ValueError("Metrics has already ended!")
+            try:
+                # TODO: should not end before all child metrics end
+                if self._end is not None:
+                    raise ValueError("Metrics has already ended!")
 
-            self._exception = exc_val
-            self._end = time()
-            duration: float = self._end - self._start
+                self._exception = exc_val
+                self._end = time()
+                duration: float = self._end - self._start
 
-            if self._log_summary:
-                self.log_debug(
-                    "%s",
-                    await self._summary(),
+                if exception := exc_val:
+                    self.log_error(
+                        "Metrics recording has failed after %.2fs with exception: %s\n%s",
+                        duration,
+                        type(exception).__name__,
+                        exception,
+                    )
+
+                if not self.is_root:
+                    return  # we want to wait until everything finishes
+
+                self.log_info(
+                    "Metrics recording has finished after %.2fs",
+                    duration,
                 )
 
-        _ScopeMetrics_Var.reset(self._token)
-        del self._token
+                if self._log_summary:
+                    self.log_debug(
+                        "%s",
+                        await self._summary(),
+                    )
 
-        if exception := exc_val:
-            self.log_error(
-                "Metrics recording has failed after %.2fs with exception: %s\n%s",
-                duration,
-                type(exception).__name__,
-                exception,
-            )
-
-        if not self.is_root:
-            return  # we want to wait until everything finishes
-
-        self.log_info(
-            "Metrics recording has finished after %.2fs",
-            duration,
-        )
+            finally:
+                _ScopeMetrics_Var.reset(self._token)
 
     # - PRIVATE -
-
-    async def _register_child(
-        self,
-        child: Self,
-        /,
-    ) -> None:
-        async with self._lock:
-            if self._end is not None:
-                raise ValueError("ScopeMetrics has already ended!")
-
-            self._child_traces.append(child)
 
     # Warning: this method is not using lock
     async def _summary(self) -> str:

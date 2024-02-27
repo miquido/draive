@@ -4,8 +4,7 @@ from typing import TypeVar
 from draive.openai.chat import openai_chat_completion
 from draive.openai.config import OpenAIChatConfig
 from draive.scope import ctx
-from draive.types import ConversationMessage, StringConvertible, Toolset
-from draive.types.generated import Generated
+from draive.types import ConversationMessage, Model, StringConvertible, Toolset
 
 __all__ = [
     "openai_generate",
@@ -14,13 +13,13 @@ __all__ = [
 
 _Generated = TypeVar(
     "_Generated",
-    bound=Generated,
+    bound=Model,
 )
 
 INSTRUCTION: str = """\
 {instruction}
 
-Please respond using only a JSON with following structure:
+Respond using ONLY a JSON with following schema:
 {format}
 """
 

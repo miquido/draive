@@ -3,7 +3,7 @@ import types
 import typing
 from collections import abc as collections_abc
 from collections.abc import Callable
-from inspect import signature
+from inspect import _empty, signature  # pyright: ignore[reportPrivateUsage]
 from typing import (
     Any,
     Literal,
@@ -295,14 +295,20 @@ def extract_parameters_specification(
     parameters: ParametersSpecification = {}
 
     for parameter in signature(function).parameters.values():
-        if get_origin(parameter.annotation) is Unpack:
-            # this is a bit fragile - checking TypedDict seems to be hard?
-            for unpacked in get_args(parameter.annotation):
-                for key, annotation in unpacked.__annotations__.items():
-                    parameters[key] = _parameter_specification(_extract_argument(annotation))
-        else:
-            parameters[parameter.name] = _parameter_specification(
-                _extract_argument(parameter.annotation)
-            )
+        try:
+            if parameter.annotation is _empty and parameter.name == "self":
+                continue
+
+            if get_origin(parameter.annotation) is Unpack:
+                # this is a bit fragile - checking TypedDict seems to be hard?
+                for unpacked in get_args(parameter.annotation):
+                    for key, annotation in unpacked.__annotations__.items():
+                        parameters[key] = _parameter_specification(_extract_argument(annotation))
+            else:
+                parameters[parameter.name] = _parameter_specification(
+                    _extract_argument(parameter.annotation)
+                )
+        except Exception as exc:
+            raise TypeError("Failed to extract parameter", parameter.name) from exc
 
     return parameters
