@@ -2,15 +2,18 @@ from typing import Literal, overload
 
 from openai.types.chat import ChatCompletionMessageParam
 
-from draive.openai.chat_response import _chat_completion  # pyright: ignore[reportPrivateUsage]
+# from draive.helpers import AsyncStream
+from draive.openai.chat_response import _chat_response  # pyright: ignore[reportPrivateUsage]
 from draive.openai.chat_stream import (
     OpenAIChatStream,
+    OpenAIChatStreamingPart,
     _chat_stream,  # pyright: ignore[reportPrivateUsage]
 )
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
 from draive.scope import ctx
-from draive.types import ConversationMessage, StringConvertible, Toolset
+from draive.types import ConversationMessage, StreamingProgressUpdate, StringConvertible, Toolset
+from draive.utils import AsyncStreamTask
 
 __all__ = [
     "openai_chat_completion",
@@ -36,6 +39,18 @@ async def openai_chat_completion(
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
+    stream: StreamingProgressUpdate[OpenAIChatStreamingPart],
+) -> str:
+    ...
+
+
+@overload
+async def openai_chat_completion(
+    *,
+    instruction: str,
+    input: StringConvertible,  # noqa: A002
+    history: list[ConversationMessage] | None = None,
+    toolset: Toolset | None = None,
 ) -> str:
     ...
 
@@ -46,34 +61,59 @@ async def openai_chat_completion(
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-    stream: bool = False,
-) -> OpenAIChatStream | str:
+    stream: StreamingProgressUpdate[OpenAIChatStreamingPart] | bool = False,
+) -> OpenAIChatStream | str | None:
     config: OpenAIChatConfig = ctx.state(OpenAIChatConfig)
     async with ctx.nested("openai_chat_completion"):
         client: OpenAIClient = ctx.dependency(OpenAIClient)
-        if stream:
-            return await _chat_stream(
-                client=client,
-                config=config,
-                messages=_prepare_messages(
-                    instruction=instruction,
-                    history=history or [],
-                    input=input,
-                ),
-                toolset=toolset,
-            )
+        match stream:
+            case False:
+                return await _chat_response(
+                    client=client,
+                    config=config,
+                    messages=_prepare_messages(
+                        instruction=instruction,
+                        history=history or [],
+                        input=input,
+                    ),
+                    toolset=toolset,
+                )
 
-        else:
-            return await _chat_completion(
-                client=client,
-                config=config,
-                messages=_prepare_messages(
-                    instruction=instruction,
-                    history=history or [],
-                    input=input,
-                ),
-                toolset=toolset,
-            )
+            case True:
+
+                @ctx.with_current
+                async def stream_task(
+                    progress: StreamingProgressUpdate[OpenAIChatStreamingPart],
+                ) -> None:
+                    await _chat_stream(
+                        client=client,
+                        config=config,
+                        messages=_prepare_messages(
+                            instruction=instruction,
+                            history=history or [],
+                            input=input,
+                        ),
+                        toolset=toolset,
+                        progress=progress,
+                    )
+
+                return AsyncStreamTask(
+                    job=stream_task,
+                    task_spawn=ctx.spawn_task,
+                )
+
+            case progress:
+                return await _chat_stream(
+                    client=client,
+                    config=config,
+                    messages=_prepare_messages(
+                        instruction=instruction,
+                        history=history or [],
+                        input=input,
+                    ),
+                    toolset=toolset,
+                    progress=progress,
+                )
 
 
 def _prepare_messages(

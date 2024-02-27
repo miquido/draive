@@ -75,13 +75,11 @@ class ScopeStates:
 
     def __exit__(
         self,
-        exc_type: BaseException | None,
+        exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        if self._token is None:
-            raise AttributeError("Can't exit scope without entering")
-
+        assert self._token is not None, "Can't exit scope without entering"  # nosec: B101
         _ScopeState_Var.reset(self._token)
         self._token = None
 

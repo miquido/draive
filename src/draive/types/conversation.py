@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterator
-from typing import Literal, Protocol, overload
+from typing import Literal, Protocol, Self, overload
 
 from draive.types.memory import Memory
 from draive.types.message import ConversationMessage
@@ -16,8 +16,7 @@ __all__ = [
 ]
 
 
-class ConversationStreamingActionStatus(Model):
-    current: Literal["STARTED", "PROGRESS", "FINISHED", "FAILED"]
+ConversationStreamingActionStatus = Literal["STARTED", "PROGRESS", "FINISHED", "FAILED"]
 
 
 class ConversationStreamingAction(Model):
@@ -32,7 +31,15 @@ class ConversationStreamingPart(Model):
     message: ConversationMessage
 
 
-ConversationResponseStream = AsyncIterator[ConversationStreamingPart]
+class ConversationResponseStream(Protocol):
+    def as_json(self) -> AsyncIterator[str]:
+        ...
+
+    def __aiter__(self) -> Self:
+        ...
+
+    async def __anext__(self) -> ConversationStreamingPart:
+        ...
 
 
 class ConversationCompletion(Protocol):

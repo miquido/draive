@@ -1,8 +1,7 @@
-from asyncio import CancelledError, Queue, QueueEmpty, Task, create_task
 from collections.abc import AsyncIterator
-from typing import cast
+from typing import Protocol, Self, cast
 
-from openai import AsyncStream
+from openai import AsyncStream as OpenAIAsyncStream
 from openai.types.chat import (
     ChatCompletionChunk,
     ChatCompletionMessageParam,
@@ -36,44 +35,16 @@ class OpenAIChatStreamingMessagePart(Model):
 
 OpenAIChatStreamingPart = OpenAIChatStreamingToolStatus | OpenAIChatStreamingMessagePart
 
-OpenAIChatStream = AsyncIterator[OpenAIChatStreamingPart]
 
+class OpenAIChatStream(Protocol):
+    def as_json(self) -> AsyncIterator[str]:
+        ...
 
-class _QueueStream(OpenAIChatStream):
-    def __init__(
-        self,
-        task: Task[None],
-        queue: Queue[OpenAIChatStreamingPart | BaseException | None],
-    ):
-        self._task: Task[None] = task
-        self._task.add_done_callback(lambda task: queue.put_nowait(task.exception()))
-        self._queue: Queue[OpenAIChatStreamingPart | BaseException | None] = queue
+    def __aiter__(self) -> Self:
+        ...
 
     async def __anext__(self) -> OpenAIChatStreamingPart:
-        if self._task.done() and self._queue.empty():
-            if error := self._task.exception():
-                raise error
-            else:
-                raise StopAsyncIteration
-        try:
-            match await self._queue.get():
-                case None:
-                    self._queue.task_done()
-                    raise StopAsyncIteration
-
-                case exception if isinstance(exception, BaseException):
-                    self._queue.task_done()
-                    raise exception
-
-                case element:
-                    self._queue.task_done()
-                    return cast(OpenAIChatStreamingPart, element)
-
-        except CancelledError as exc:
-            self._task.cancel()
-            raise exc
-        except QueueEmpty:
-            raise StopAsyncIteration from None
+        ...
 
 
 async def _chat_stream(
@@ -82,35 +53,13 @@ async def _chat_stream(
     config: OpenAIChatConfig,
     messages: list[ChatCompletionMessageParam],
     toolset: Toolset | None,
-) -> OpenAIChatStream:
-    progress_queue: Queue[OpenAIChatStreamingPart | BaseException | None] = Queue()
-    return _QueueStream(
-        task=create_task(
-            _chat_streaming_completion(
-                client=client,
-                config=config,
-                messages=messages,
-                toolset=toolset,
-                progress=lambda update: progress_queue.put_nowait(item=update),
-            )
-        ),
-        queue=progress_queue,
-    )
-
-
-async def _chat_streaming_completion(
-    *,
-    client: OpenAIClient,
-    config: OpenAIChatConfig,
-    messages: list[ChatCompletionMessageParam],
-    toolset: Toolset | None,
     progress: StreamingProgressUpdate[OpenAIChatStreamingPart],
-) -> None:
+) -> str:
     async with ctx.nested(
         "chat_stream",
-        ArgumentsTrace(messages=messages),
+        ArgumentsTrace(messages=messages.copy()),
     ):
-        completion_stream: AsyncStream[ChatCompletionChunk] = await client.chat_completion(
+        completion_stream: OpenAIAsyncStream[ChatCompletionChunk] = await client.chat_completion(
             config=config,
             messages=messages,
             tools=cast(
@@ -120,67 +69,62 @@ async def _chat_streaming_completion(
             stream=True,
         )
 
-        completion_head: ChoiceDelta = ChoiceDelta()
-        # load first chunk to decide what to do next
-        while completion_head.content is None and completion_head.tool_calls is None:
-            head: ChatCompletionChunk = await anext(completion_stream)
+        while True:  # load chunks to decide what to do next
+            head: ChatCompletionChunk
+            try:
+                head = await anext(completion_stream)
+
+            except StopAsyncIteration as exc:
+                # could not decide what to do before stream end
+                raise ToolException("Invalid OpenAI completion stream") from exc
 
             if not head.choices:
                 raise ToolException("Invalid OpenAI completion - missing deltas!", head)
 
-            completion_head = head.choices[0].delta
+            completion_head: ChoiceDelta = head.choices[0].delta
 
-        # TODO: record token usage - openAI does not provide usage insight when streaming
-        # (or makes it differently than when using regular response and couldn't find it)
+            # TODO: record token usage - openAI does not provide usage insight when streaming
+            # (or makes it differently than when using regular response and couldn't find it)
 
-        if completion_head.tool_calls is not None and (toolset := toolset):
-            tool_calls: list[ChatCompletionMessageToolCall] = await _flush_chat_tool_calls(
-                tool_calls=completion_head.tool_calls,
-                completion_stream=completion_stream,
-            )
-            messages.extend(
-                await _execute_chat_tool_calls(
-                    tool_calls=tool_calls,
-                    toolset=toolset,
-                    progress=lambda update: progress(update),
+            if completion_head.tool_calls is not None and (toolset := toolset):
+                tool_calls: list[ChatCompletionMessageToolCall] = await _flush_chat_tool_calls(
+                    tool_calls=completion_head.tool_calls,
+                    completion_stream=completion_stream,
                 )
-            )
+                messages.extend(
+                    await _execute_chat_tool_calls(
+                        tool_calls=tool_calls,
+                        toolset=toolset,
+                        progress=lambda update: progress(update),
+                    )
+                )
+                await ctx.record(ResultTrace(tool_calls))
+                break  # after processing tool calls continue with recursion in outer context
 
-        elif completion_head.content is not None:
-            return await _stream_completion(
-                head=completion_head.content,
-                tail=completion_stream,
-                progress=progress,
-            )
+            elif completion_head.content is not None:
+                result: str = completion_head.content
+                if result:  # provide head / first part if not empty
+                    progress(update=OpenAIChatStreamingMessagePart(content=result))
 
-        else:
-            raise ToolException("Invalid OpenAI completion", completion_head)
+                async for part in completion_stream:
+                    # we are always requesting single result - no need to take care of indices
+                    part_text: str = part.choices[0].delta.content or ""
+                    if not part_text:
+                        continue  # skip empty parts
+                    progress(update=OpenAIChatStreamingMessagePart(content=part_text))
+                    result += part_text
+
+                await ctx.record(ResultTrace(result))
+                return result  # we hav final result here
+
+            else:
+                continue  # iterate over the stream until can decide what to do or reach the end
 
     # recursion outside of context
-    await _chat_streaming_completion(
+    return await _chat_stream(
         client=client,
         config=config,
         messages=messages,
         toolset=toolset,
         progress=progress,
     )
-
-
-async def _stream_completion(
-    head: str,
-    tail: AsyncStream[ChatCompletionChunk],
-    progress: StreamingProgressUpdate[OpenAIChatStreamingPart],
-) -> None:
-    result: str = head
-    if head:  # provide head / first part if not empty
-        progress(update=OpenAIChatStreamingMessagePart(content=head))
-
-    async for part in tail:
-        # we are always requesting single result - no need to take care of indices
-        part_text: str = part.choices[0].delta.content or ""
-        if not part_text:
-            continue  # skip empty parts
-        progress(update=OpenAIChatStreamingMessagePart(content=part_text))
-        result += part_text
-
-    await ctx.record(ResultTrace(result))
