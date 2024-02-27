@@ -120,13 +120,15 @@ async def _chat_streaming_completion(
             stream=True,
         )
 
+        completion_head: ChoiceDelta = ChoiceDelta()
         # load first chunk to decide what to do next
-        head: ChatCompletionChunk = await anext(completion_stream)
+        while completion_head.content is None and completion_head.tool_calls is None:
+            head: ChatCompletionChunk = await anext(completion_stream)
 
-        if not head.choices:
-            raise ToolException("Invalid OpenAI completion - missing deltas!", head)
+            if not head.choices:
+                raise ToolException("Invalid OpenAI completion - missing deltas!", head)
 
-        completion_head: ChoiceDelta = head.choices[0].delta
+            completion_head = head.choices[0].delta
 
         # TODO: record token usage - openAI does not provide usage insight when streaming
         # (or makes it differently than when using regular response and couldn't find it)
