@@ -106,13 +106,13 @@ class AsyncStreamTask(Generic[_Element], AsyncIterator[_Element]):
         return self
 
     async def __anext__(self) -> _Element:
-        if self._stream.finished and self._task.done():
-            if error := self._task.exception():
-                raise error
-            else:
-                raise StopAsyncIteration
         try:
             return await self._stream.__anext__()
         except CancelledError as exc:
             self._task.cancel()
             raise exc
+        except StopAsyncIteration as exc:
+            if error := self._task.exception():
+                raise error from None
+            else:
+                raise exc
