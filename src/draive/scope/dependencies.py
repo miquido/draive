@@ -60,6 +60,14 @@ class ScopeDependencies:
                 f"{_type} is not defined! You have to define it when creating context."
             )
 
+    def copy(self) -> Self:
+        return self.__copy__()
+
+    def __copy__(self) -> Self:
+        copy: Self = self.__class__()
+        copy._dependencies = self._dependencies.copy()
+        return copy
+
     async def dispose(self) -> None:
         await gather(*[dependency.dispose() for dependency in self._dependencies.values()])
 
