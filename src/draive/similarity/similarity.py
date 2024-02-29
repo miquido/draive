@@ -16,6 +16,9 @@ def similarity(
     limit: int,
     score_threshold: float,
 ) -> list[int]:
+    assert limit > 0  # nosec: B101
+    if not alternatives_embeddings:
+        return []
     query: NDArray[Any] = np.array(query_embedding)
     if query.ndim == 1:
         query = np.expand_dims(query_embedding, axis=0)
