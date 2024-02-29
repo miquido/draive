@@ -22,11 +22,11 @@ from draive.tools import ToolException
 from draive.types import Toolset
 
 __all__ = [
-    "_chat_completion",
+    "_chat_response",
 ]
 
 
-async def _chat_completion(
+async def _chat_response(
     *,
     client: OpenAIClient,
     config: OpenAIChatConfig,
@@ -35,7 +35,7 @@ async def _chat_completion(
 ) -> str:
     async with ctx.nested(
         "chat_response",
-        ArgumentsTrace(messages=messages),
+        ArgumentsTrace(messages=messages.copy()),
     ):
         completion: ChatCompletion = await client.chat_completion(
             config=config,
@@ -66,6 +66,7 @@ async def _chat_completion(
                     toolset=toolset,
                 )
             )
+            await ctx.record(ResultTrace(tool_calls))
 
         elif message := completion_message.content:
             await ctx.record(ResultTrace(message))
@@ -75,7 +76,7 @@ async def _chat_completion(
             raise ToolException("Invalid OpenAI completion", completion)
 
     # recursion outside of context
-    return await _chat_completion(
+    return await _chat_response(
         client=client,
         config=config,
         messages=messages,

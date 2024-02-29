@@ -1,7 +1,7 @@
 from asyncio import Lock
 from collections.abc import Iterable
 from contextvars import ContextVar, Token
-from logging import Logger
+from logging import Logger, getLogger
 from time import time
 from types import TracebackType
 from typing import Any, Protocol, Self, TypeVar, cast, final, runtime_checkable
@@ -125,7 +125,7 @@ _ScopeMetric_T = TypeVar(
 )
 
 
-@final  # assuming no background tasks spawning - otherwise results might not be correct
+@final  # unstructured background tasks spawning may result in corrupted data
 class ScopeMetrics:
     def __init__(  # noqa: PLR0913
         self,
@@ -136,22 +136,22 @@ class ScopeMetrics:
         metrics: Iterable[ScopeMetric] | None,
         log_summary: bool,
     ) -> None:
+        self._start: float = time()
+        self._end: float | None = None
+        self._exception: BaseException | None = None
+        self._pending_tasks: int = 0
         self._lock: Lock = Lock()
         self._trace_id: str = parent._trace_id if parent else uuid4().hex
-        self._label: str = label or ("metrics" if parent else "root")
+        self._label: str = label or "metrics"
+        self._parent: Self | None = parent
+        self._logger: Logger = logger or (parent._logger if parent else getLogger(name=self._label))
         self._metrics: dict[type[ScopeMetric], ScopeMetric] = {
             type(metric): metric for metric in metrics or []
         }
-        self._parent: Self | None = parent
-        self._start: float | None = None
-        self._end: float | None = None
-        self._exception: BaseException | None = None
-        self._child_traces: list[ScopeMetrics] = []
-        self._logger: Logger = logger or (
-            parent._logger if parent else Logger(name=label or "metrics")
-        )
-        self._log_summary: bool = log_summary
+        self._nested_traces: list[ScopeMetrics] = []
+        self._log_summary: bool = log_summary and parent is None  # only root can do summary
         self._token: Token[ScopeMetrics] | None = None
+        self.log_info("%s started", self)
 
     # - STATE -
 
@@ -164,8 +164,8 @@ class ScopeMetrics:
         return self._parent is None
 
     @property
-    def is_running(self) -> bool:
-        return self._start is not None and self._end is None
+    def is_finished(self) -> bool:
+        return self._end is not None
 
     def nested(
         self,
@@ -173,16 +173,17 @@ class ScopeMetrics:
         *,
         metrics: Iterable[ScopeMetric] | None = None,
     ) -> Self:
-        # TODO: should not nest when already completed
-
+        if self.is_finished:
+            raise ValueError("Attempting to use already finished metrics")
+        self._enter_task()
         child: Self = self.__class__(
             label=label,
             logger=self._logger,
             parent=self,
             metrics=metrics,
-            log_summary=False,  # only root should log summary
+            log_summary=False,
         )
-        self._child_traces.append(child)
+        self._nested_traces.append(child)
         return child
 
     # - METRICS -
@@ -192,6 +193,9 @@ class ScopeMetrics:
         *metrics: ScopeMetric,
     ) -> None:
         try:  # catch exceptions - we don't wan't to blow up on metrics
+            if self.is_finished:
+                raise ValueError("Attempting to use already finished metrics")
+
             async with self._lock:
                 for metric in metrics:
                     metric_type: type[ScopeMetric] = type(metric)
@@ -274,66 +278,72 @@ class ScopeMetrics:
 
     # - INTERNAL -
 
+    def _enter_task(self) -> None:
+        if self.is_finished:
+            raise ValueError("Attempting to use already finished metrics")
+        self._pending_tasks += 1
+
+    async def _exit_task(self) -> None:
+        assert self._pending_tasks > 0, "Unbalanced metrics task exit"  # nosec: B101
+        self._pending_tasks -= 1
+
+        if self._pending_tasks > 0:
+            return  # can't finish yet
+
+        async with self._lock:
+            self._end = time()
+
+            if self._log_summary:
+                self.log_debug(
+                    "%s",
+                    await self._summary(),
+                )
+
+            duration: float = self._end - (self._start or self._end)
+
+            if exception := self._exception:
+                self.log_error(
+                    "%s finished after %.2fs with exception: %s\n%s",
+                    self,
+                    duration,
+                    type(exception).__name__,
+                    exception,
+                )
+            else:
+                self.log_info(
+                    "%s finished after %.2fs",
+                    self,
+                    duration,
+                )
+
+        # exit out of lock to avoid deadlock on summary
+        if parent := self._parent:
+            await parent._exit_task()
+
     def __str__(self) -> str:
         return f"{self._trace_id}|{self._label}"
 
     async def __aenter__(self) -> None:
-        async with self._lock:
-            assert self._token is None, "Reentrance is not allowed"  # nosec: B101
-            self._token = _ScopeMetrics_Var.set(self)
-            if self._start is not None:
-                return  # already started
-
-            self._start = time()
-
-            if self.is_root:  # do not log on each nesting
-                self.log_info("Metrics recording has started")
+        assert not self.is_finished, "Attempting to use already finished metrics"  # nosec: B101
+        assert self._token is None, "Reentrance is not allowed"  # nosec: B101
+        self._token = _ScopeMetrics_Var.set(self)
+        self._enter_task()
 
     async def __aexit__(
         self,
-        exc_type: BaseException | None,
+        exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        async with self._lock:
-            if self._start is None:
-                raise ValueError("Metrics has never stated!")
-            if self._token is None:
-                raise AttributeError("Can't exit scope without entering")
+        assert self._token is not None, "Can't exit scope without entering"  # nosec: B101
+        assert not self.is_finished, "Attempting to use already finished metrics"  # nosec: B101
 
-            try:
-                # TODO: should not end before all child metrics end
-                if self._end is not None:
-                    raise ValueError("Metrics has already ended!")
+        try:
+            self._exception = exc_val
+            await self._exit_task()
 
-                self._exception = exc_val
-                self._end = time()
-                duration: float = self._end - self._start
-
-                if exception := exc_val:
-                    self.log_error(
-                        "Metrics recording has failed after %.2fs with exception: %s\n%s",
-                        duration,
-                        type(exception).__name__,
-                        exception,
-                    )
-
-                if not self.is_root:
-                    return  # we want to wait until everything finishes
-
-                self.log_info(
-                    "Metrics recording has finished after %.2fs",
-                    duration,
-                )
-
-                if self._log_summary:
-                    self.log_debug(
-                        "%s",
-                        await self._summary(),
-                    )
-
-            finally:
-                _ScopeMetrics_Var.reset(self._token)
+        finally:
+            _ScopeMetrics_Var.reset(self._token)
 
     # - PRIVATE -
 
@@ -359,7 +369,7 @@ class ScopeMetrics:
             if metric_summary := metric.metric_summary():
                 summary += f"\n- {metric_summary}"
 
-        for child in self._child_traces:
+        for child in self._nested_traces:
             child_summary: str = (await child._summary()).replace("\n", "\n|   ")
             summary += f"\n{child_summary}"
 
@@ -375,7 +385,7 @@ class ScopeMetrics:
             case _:
                 pass
 
-        for child in self._child_traces:
+        for child in self._nested_traces:
             total_usage.combine_metric(child._total_tokens_usage())
 
         return total_usage
