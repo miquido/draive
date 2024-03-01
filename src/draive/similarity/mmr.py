@@ -16,6 +16,10 @@ def mmr_similarity(
     limit: int,
     lambda_multiplier: float = 0.5,
 ) -> list[int]:
+    assert limit > 0  # nosec: B101
+    if not alternatives_embeddings:
+        return []
+
     query: NDArray[Any] = np.array(query_embedding)
     if query.ndim == 1:
         query = np.expand_dims(query_embedding, axis=0)
