@@ -41,6 +41,9 @@ class ScopeStates:
         }
         self._token: Token[ScopeStates] | None = None
 
+    def copy(self) -> Self:
+        return self.__copy__()
+
     def __copy__(self) -> Self:
         return self.__class__(*self._state.values())
 
