@@ -95,7 +95,7 @@ async def _chat_stream(
                     await _execute_chat_tool_calls(
                         tool_calls=tool_calls,
                         toolset=toolset,
-                        progress=lambda update: progress(update),
+                        progress=progress,
                     )
                 )
                 await ctx.record(ResultTrace(tool_calls))

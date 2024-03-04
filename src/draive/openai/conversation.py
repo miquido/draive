@@ -190,13 +190,20 @@ async def _openai_conversation_stream(  # noqa: PLR0913
                 case OpenAIChatStreamingMessagePart(content=content):
                     response = response.updated(content=response.content_str + content.__str__())
 
-                case OpenAIChatStreamingToolStatus(id=tool_id, name=tool_name, status=status):
+                case OpenAIChatStreamingToolStatus(
+                    id=tool_id,
+                    name=tool_name,
+                    status=status,
+                    data=data,
+                ):
                     actions[tool_id] = ConversationStreamingAction(
                         id=tool_id,
                         action="TOOL_CALL",
                         name=tool_name,
                         status=status,
+                        data=data,
                     )
+
             progress(
                 ConversationStreamingPart(
                     actions=list(actions.values()),

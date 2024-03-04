@@ -1,5 +1,7 @@
 from typing import Protocol
 
+from draive.types.model import Model
+from draive.types.streaming import StreamingProgressUpdate
 from draive.types.string import StringConvertible
 from draive.types.tool import ToolSpecification
 
@@ -16,7 +18,9 @@ class Toolset(Protocol):
     async def call_tool(
         self,
         name: str,
-        *,
+        /,
+        call_id: str,
         arguments: str | bytes | None,
+        progress: StreamingProgressUpdate[Model] | None = None,
     ) -> StringConvertible:
         ...

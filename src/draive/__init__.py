@@ -40,13 +40,7 @@ from draive.scope import (
 from draive.similarity import mmr_similarity, similarity
 from draive.splitters import split_text
 from draive.tokenization import TextTokenCounter, Tokenization, count_text_tokens
-from draive.tools import (
-    Tool,
-    Toolbox,
-    ToolException,
-    redefine_tool,
-    tool,
-)
+from draive.tools import Tool, Toolbox, ToolCallContext, ToolException, redefine_tool, tool
 from draive.types import (
     ConversationMessage,
     ConversationResponseStream,
@@ -104,6 +98,7 @@ __all__ = [
     "Tool",
     "ToolException",
     "Toolbox",
+    "ToolCallContext",
     "Toolset",
     "autoretry",
     "cache",
