@@ -96,7 +96,6 @@ class Tool(Generic[ToolArgs, ToolResult_co]):
         **kwargs: ToolArgs.kwargs,
     ) -> ToolResult_co:
         assert not args, "Positional unkeyed arguments are not supported"  # nosec: B101
-
         async with ctx.nested(
             self._name,
             ArgumentsTrace(**kwargs),

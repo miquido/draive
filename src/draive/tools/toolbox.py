@@ -1,8 +1,15 @@
 from json import loads
 from typing import Any, final
 
+from draive.scope import ctx
 from draive.tools import Tool, ToolException
-from draive.types import StringConvertible, ToolSpecification
+from draive.tools.state import ToolCallContext
+from draive.types import (
+    Model,
+    StreamingProgressUpdate,
+    StringConvertible,
+    ToolSpecification,
+)
 
 __all__ = [
     "Toolbox",
@@ -26,16 +33,24 @@ class Toolbox:
     async def call_tool(
         self,
         name: str,
-        *,
+        /,
+        call_id: str,
         arguments: str | bytes | None,
+        progress: StreamingProgressUpdate[Model] | None = None,
     ) -> StringConvertible:
         if tool := self._tools[name]:
-            return await tool(
-                **self._validated_call_arguments(
-                    tool,
-                    **loads(arguments) if arguments else {},
-                ),
-            )
+            with ctx.updated(
+                ToolCallContext(
+                    call_id=call_id,
+                    progress=progress or (lambda update: None),
+                )
+            ):
+                return await tool(
+                    **self._validated_call_arguments(
+                        tool,
+                        **loads(arguments) if arguments else {},
+                    ),
+                )
 
         else:
             raise ToolException("Requested tool is not defined", name)

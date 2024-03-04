@@ -26,6 +26,7 @@ class OpenAIChatStreamingToolStatus(Model):
     id: str
     name: str
     status: Literal["STARTED", "PROGRESS", "FINISHED", "FAILED"]
+    data: Model | None = None
 
 
 async def _execute_chat_tool_calls(
@@ -86,10 +87,18 @@ async def _execute_chat_tool_call(
             )
         )
 
-        # TODO: allow tools to stream their progress as well
         result = await toolset.call_tool(
             name,
+            call_id=call_id,
             arguments=arguments,
+            progress=lambda update: progress(
+                OpenAIChatStreamingToolStatus(
+                    id=call_id,
+                    name=name,
+                    status="PROGRESS",
+                    data=update,
+                )
+            ),
         )
         progress(
             OpenAIChatStreamingToolStatus(

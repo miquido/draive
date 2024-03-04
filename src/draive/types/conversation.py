@@ -25,6 +25,7 @@ class ConversationStreamingAction(Model):
     action: Literal["TOOL_CALL"]
     name: str
     status: ConversationStreamingActionStatus
+    data: Model | None = None
 
 
 class ConversationStreamingPart(Model):
