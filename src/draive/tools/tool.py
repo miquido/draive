@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Generic, ParamSpec, Protocol, TypeVar, final, overload
 
-from draive.helpers import extract_parameters_specification
+from draive.helpers import extract_specification
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
 from draive.tools.errors import ToolException
 from draive.types import StringConvertible, ToolSpecification
@@ -72,10 +72,7 @@ class Tool(Generic[ToolArgs, ToolResult_co]):
             "type": "function",
             "function": {
                 "name": name,
-                "parameters": {
-                    "type": "object",
-                    "properties": extract_parameters_specification(function),
-                },
+                "parameters": extract_specification(function),
             },
         }
         if description:

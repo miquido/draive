@@ -1,16 +1,16 @@
 import builtins
+import inspect
 import types
 import typing
 from collections import abc as collections_abc
 from collections.abc import Callable
-from inspect import _empty, signature  # pyright: ignore[reportPrivateUsage]
+from dataclasses import is_dataclass
 from typing import (
     Any,
     Literal,
     NotRequired,
     Required,
     TypedDict,
-    Unpack,
     final,
     get_args,
     get_origin,
@@ -18,13 +18,14 @@ from typing import (
 
 __all__ = [
     "ParametersSpecification",
-    "extract_parameters_specification",
+    "extract_specification",
 ]
 
 
 @final
 class ParameterNoneSpecification(TypedDict, total=False):
     type: Required[Literal["null"]]
+    description: NotRequired[str]
 
 
 @final
@@ -46,64 +47,32 @@ class ParameterStringSpecification(TypedDict, total=False):
 
 
 @final
-class ParameterEnumSpecification(TypedDict, total=False):
+class ParameterStringEnumSpecification(TypedDict, total=False):
     type: Required[Literal["string"]]
     enum: Required[list[str]]
     description: NotRequired[str]
 
 
 @final
-class ParameterNestedBoolSpecification(TypedDict, total=False):
-    type: Required[Literal["boolean"]]
-
-
-@final
-class ParameterNestedNumberSpecification(TypedDict, total=False):
+class ParameterNumberEnumSpecification(TypedDict, total=False):
     type: Required[Literal["number"]]
+    enum: Required[list[int | float]]
+    description: NotRequired[str]
 
 
-@final
-class ParameterNestedStringSpecification(TypedDict, total=False):
-    type: Required[Literal["string"]]
-
-
-@final
-class ParameterNestedEnumSpecification(TypedDict, total=False):
-    type: Required[Literal["string"]]
-    enum: Required[list[str]]
-
-
-@final
-class ParameterNestedArraySpecification(TypedDict, total=False):
-    type: Required[Literal["array"]]
-    items: NotRequired["ParameterNestedSpecification"]
-
-
-@final
-class ParameterNestedObjectSpecification(TypedDict, total=False):
-    type: Required[Literal["object"]]
-    properties: Required[dict[str, "ParameterSpecification"]]
-
-
-ParameterNestedSpecification = (
-    ParameterNestedBoolSpecification
-    | ParameterNestedNumberSpecification
-    | ParameterNestedStringSpecification
-    | ParameterNestedEnumSpecification
-    | ParameterNestedArraySpecification
-    | ParameterNestedObjectSpecification
-)
+ParameterEnumSpecification = ParameterStringEnumSpecification | ParameterNumberEnumSpecification
 
 
 @final
 class ParameterUnionSpecification(TypedDict, total=False):
-    oneOf: Required[list[ParameterNoneSpecification | ParameterNestedSpecification]]
+    oneOf: Required[list["ParameterSpecification"]]
+    description: NotRequired[str]
 
 
 @final
 class ParameterArraySpecification(TypedDict, total=False):
     type: Required[Literal["array"]]
-    items: NotRequired[ParameterNestedSpecification]
+    items: NotRequired["ParameterSpecification"]
     description: NotRequired[str]
 
 
@@ -112,6 +81,7 @@ class ParameterObjectSpecification(TypedDict, total=False):
     type: Required[Literal["object"]]
     properties: Required[dict[str, "ParameterSpecification"]]
     description: NotRequired[str]
+    required: NotRequired[list[str]]
 
 
 ParameterSpecification = (
@@ -125,104 +95,42 @@ ParameterSpecification = (
     | ParameterObjectSpecification
 )
 
-ParametersSpecification = dict[str, ParameterSpecification]
+ParametersSpecification = ParameterObjectSpecification
 
 
+@final
 class ToolFunctionParametersSpecification(TypedDict, total=False):
     type: Required[Literal["object"]]
     properties: Required[ParametersSpecification]
 
 
+@final
 class ToolFunctionSpecification(TypedDict, total=False):
     name: Required[str]
     description: NotRequired[str]
     parameters: Required[ToolFunctionParametersSpecification]
+    required: NotRequired[list[str]]
 
 
+@final
 class ToolSpecification(TypedDict, total=False):
     type: Required[Literal["function"]]
     function: Required[ToolFunctionSpecification]
 
 
-def _extract_type(
-    __annotation: Any,
-) -> type[Any]:
-    match get_origin(__annotation):
-        case typing.Annotated:
-            raise TypeError("Unexpected Annotated")
-
-        case types.UnionType | typing.Union:
-            # allowing only "optional" union - type and None
-            match get_args(__annotation):
-                case (
-                    (
-                        optional_type,
-                        types.NoneType,
-                    )
-                    | (
-                        types.NoneType,
-                        optional_type,
-                    )
-                ):
-                    # TODO: it might be beneficial to express optional arguments
-                    # as type unions in specification (which is json schema)
-                    return optional_type
-
-                case other:
-                    raise TypeError("Unsupported union type annotation", other)
-
-        case typing.Literal:
-            return __annotation
-
-        case (
-            builtins.list  # pyright: ignore[reportUnknownMemberType]
-            | typing.List  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
-            | collections_abc.Sequence  # pyright: ignore[reportUnknownMemberType]
-            | collections_abc.Iterable  # pyright: ignore[reportUnknownMemberType]
-        ):
-            return __annotation
-
-        case None:  # no origin is a type itself
-            return __annotation
-
-        # TODO: add support for objects/Mapping
-        case other:
-            raise TypeError("Unsupported type annotation", other)
-
-
-def _extract_argument(
-    __annotation: Any,
-) -> tuple[type[Any], str | None]:
-    match get_origin(__annotation):
-        case typing.Annotated:
-            match get_args(__annotation):
-                case [other, str() as description, *_tail]:
-                    return (_extract_type(other), description)
-
-                case [other, *_tail]:
-                    return (_extract_type(other), None)
-
-                case other:
-                    raise TypeError("Unsupported annotated type annotation", other)
-
-        case typing.Required | typing.NotRequired:
-            match get_args(__annotation):
-                case [other, *_tail]:
-                    return _extract_argument(other)
-
-                case other:
-                    raise TypeError("Unsupported required type annotation", other)
-
-        case other:
-            return _extract_type(__annotation), None
-
-
 def _parameter_specification(
-    __argument: tuple[type[Any], str | None],
+    annotation: type[Any],
+    origin: type[Any] | None,
+    description: str | None,
 ) -> ParameterSpecification:
     # allowing only selected types - available to use with AI
     specification: ParameterSpecification
-    match get_origin(__argument[0]) or __argument[0]:
+    match origin or annotation:
+        case types.NoneType:
+            specification = {
+                "type": "null",
+            }
+
         case builtins.str:
             specification = {
                 "type": "string",
@@ -239,10 +147,21 @@ def _parameter_specification(
             }
 
         case typing.Literal:
-            specification = {
-                "type": "string",
-                "enum": list(get_args(__argument[0])),
-            }
+            options: tuple[Any, ...] = get_args(annotation)
+            if all(isinstance(option, str) for option in options):
+                specification = {
+                    "type": "string",
+                    "enum": list(get_args(annotation)),
+                }
+
+            elif all(isinstance(option, int | float) for option in options):
+                specification = {
+                    "type": "number",
+                    "enum": list(get_args(annotation)),
+                }
+
+            else:
+                raise TypeError("Unsupported literal type annotation", annotation)
 
         case (
             builtins.list  # pyright: ignore[reportUnknownMemberType]
@@ -250,24 +169,15 @@ def _parameter_specification(
             | collections_abc.Sequence  # pyright: ignore[reportUnknownMemberType]
             | collections_abc.Iterable  # pyright: ignore[reportUnknownMemberType]
         ):
-            match get_args(__argument[0]):
-                # allowing only str, int, float and bool lists or untyped
-                case (builtins.str,):
+            match get_args(annotation):
+                case (list_annotation,):
                     specification = {
                         "type": "array",
-                        "items": {"type": "string"},
-                    }
-
-                case (builtins.int,) | (builtins.float,):
-                    specification = {
-                        "type": "array",
-                        "items": {"type": "number"},
-                    }
-
-                case (builtins.bool,):
-                    specification = {
-                        "type": "array",
-                        "items": {"type": "boolean"},
+                        "items": _parameter_specification(
+                            annotation=list_annotation,
+                            origin=get_origin(list_annotation),
+                            description=None,
+                        ),
                     }
 
                 case ():  # pyright: ignore[reportUnnecessaryComparison] fallback to untyped list
@@ -275,40 +185,109 @@ def _parameter_specification(
                         "type": "array",
                     }
 
-                case other:
+                case other:  # pyright: ignore[reportUnnecessaryComparison]
                     raise TypeError("Unsupported iterable type annotation", other)
 
-        # TODO: add support for objects
-        case other:
-            raise TypeError("Unsupported type annotation", other)
+        case typing.Annotated:
+            match get_args(annotation):
+                case [other, str() as other_description, *_]:
+                    return _parameter_specification(
+                        annotation=other,
+                        origin=get_origin(other),
+                        description=other_description or description,
+                    )
 
-    if description := __argument[1]:
+                case [other, *_]:
+                    return _parameter_specification(
+                        annotation=other,
+                        origin=get_origin(other),
+                        description=None,
+                    )
+
+                case other:
+                    raise TypeError("Unsupported annotated type annotation", other)
+
+        case typing.Required | typing.NotRequired:
+            match get_args(annotation):
+                case [other, *_]:
+                    return _parameter_specification(
+                        annotation=other,
+                        origin=get_origin(other),
+                        description=None,
+                    )
+
+                case other:
+                    raise TypeError("Unsupported required type annotation", other)
+
+        case types.UnionType | typing.Union:
+            specification = {
+                "oneOf": [
+                    _parameter_specification(
+                        annotation=arg,
+                        origin=get_origin(arg),
+                        description=description,
+                    )
+                    for arg in get_args(annotation)
+                ]
+            }
+
+        case other:
+            if is_dataclass(other):
+                specification = extract_specification(annotation.__init__)
+
+            # TODO: add support for typed dicts
+            else:
+                raise TypeError("Unsupported type annotation", other)
+
+    if description := description:
         specification["description"] = description
 
     return specification
 
 
-def extract_parameters_specification(
+def extract_specification(
     function: Callable[..., Any],
     /,
 ) -> ParametersSpecification:
-    parameters: ParametersSpecification = {}
+    parameters: dict[str, ParameterSpecification] = {}
+    required: list[str] = []
 
-    for parameter in signature(function).parameters.values():
+    for parameter in inspect.signature(function).parameters.values():
         try:
-            if parameter.annotation is _empty and parameter.name == "self":
-                continue
+            match (parameter.annotation, get_origin(parameter.annotation)):
+                case (inspect._empty, _):  # pyright: ignore[reportPrivateUsage]
+                    if parameter.name == "self":
+                        continue  # skip object method "self" argument
+                    else:
+                        raise TypeError(
+                            "Untyped argument %s",
+                            parameter.name,
+                        )
 
-            if get_origin(parameter.annotation) is Unpack:
-                # this is a bit fragile - checking TypedDict seems to be hard?
-                for unpacked in get_args(parameter.annotation):
-                    for key, annotation in unpacked.__annotations__.items():
-                        parameters[key] = _parameter_specification(_extract_argument(annotation))
-            else:
-                parameters[parameter.name] = _parameter_specification(
-                    _extract_argument(parameter.annotation)
-                )
+                case (annotation, typing.Unpack):
+                    # this is a bit fragile - checking TypedDict seems to be hard?
+                    for unpacked in get_args(annotation):
+                        for key, annotation in unpacked.__annotations__.items():
+                            parameters[key] = _parameter_specification(
+                                annotation=annotation,
+                                origin=get_origin(annotation),
+                                description=None,
+                            )
+
+                case (annotation, origin):
+                    parameters[parameter.name] = _parameter_specification(
+                        annotation=annotation,
+                        origin=origin,
+                        description=None,
+                    )
+                    if parameter.default is inspect._empty:  # pyright: ignore[reportPrivateUsage]
+                        required.append(parameter.name)
+
         except Exception as exc:
             raise TypeError("Failed to extract parameter", parameter.name) from exc
 
-    return parameters
+    return {
+        "type": "object",
+        "properties": parameters,
+        "required": required,
+    }
