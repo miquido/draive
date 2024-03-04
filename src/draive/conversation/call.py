@@ -5,7 +5,9 @@ from draive.scope import ctx
 from draive.types import (
     ConversationMessage,
     ConversationResponseStream,
+    ConversationStreamingPart,
     Memory,
+    StreamingProgressUpdate,
     StringConvertible,
     Toolset,
 )
@@ -34,6 +36,18 @@ async def conversation_completion(
     input: ConversationMessage | StringConvertible,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
+    stream: StreamingProgressUpdate[ConversationStreamingPart],
+) -> ConversationMessage:
+    ...
+
+
+@overload
+async def conversation_completion(
+    *,
+    instruction: str,
+    input: ConversationMessage | StringConvertible,  # noqa: A002
+    memory: Memory[ConversationMessage] | None = None,
+    toolset: Toolset | None = None,
 ) -> ConversationMessage:
     ...
 
@@ -44,23 +58,31 @@ async def conversation_completion(
     input: ConversationMessage | StringConvertible,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-    stream: bool = False,
+    stream: StreamingProgressUpdate[ConversationStreamingPart] | bool = False,
 ) -> ConversationResponseStream | ConversationMessage:
     conversation: Conversation = ctx.state(Conversation)
 
-    if stream:  # pyright does not get the type right here, have to use literals
-        return await conversation.completion(
-            instruction=instruction,
-            input=input,
-            memory=memory or conversation.memory,
-            toolset=toolset or conversation.toolset,
-            stream=True,
-        )
-
-    else:
-        return await conversation.completion(
-            instruction=instruction,
-            input=input,
-            memory=memory or conversation.memory,
-            toolset=toolset or conversation.toolset,
-        )
+    match stream:
+        case False:
+            return await conversation.completion(
+                instruction=instruction,
+                input=input,
+                memory=memory or conversation.memory,
+                toolset=toolset or conversation.toolset,
+            )
+        case True:
+            return await conversation.completion(
+                instruction=instruction,
+                input=input,
+                memory=memory or conversation.memory,
+                toolset=toolset or conversation.toolset,
+                stream=True,
+            )
+        case progress:
+            return await conversation.completion(
+                instruction=instruction,
+                input=input,
+                memory=memory or conversation.memory,
+                toolset=toolset or conversation.toolset,
+                stream=progress,
+            )

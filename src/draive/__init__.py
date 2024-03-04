@@ -34,6 +34,7 @@ from draive.scope import (
     ScopeDependency,
     ScopeMetric,
     ScopeState,
+    TokenUsage,
     ctx,
 )
 from draive.similarity import mmr_similarity, similarity
@@ -99,6 +100,7 @@ __all__ = [
     "TextGenerator",
     "TextTokenCounter",
     "Tokenization",
+    "TokenUsage",
     "Tool",
     "ToolException",
     "Toolbox",

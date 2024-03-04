@@ -42,6 +42,18 @@ async def openai_conversation_completion(
     input: ConversationMessage | StringConvertible,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
+    stream: StreamingProgressUpdate[ConversationStreamingPart],
+) -> ConversationMessage:
+    ...
+
+
+@overload
+async def openai_conversation_completion(
+    *,
+    instruction: str,
+    input: ConversationMessage | StringConvertible,  # noqa: A002
+    memory: Memory[ConversationMessage] | None = None,
+    toolset: Toolset | None = None,
 ) -> ConversationMessage:
     ...
 
@@ -52,7 +64,7 @@ async def openai_conversation_completion(
     input: ConversationMessage | StringConvertible,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-    stream: bool = False,
+    stream: StreamingProgressUpdate[ConversationStreamingPart] | bool = False,
 ) -> ConversationResponseStream | ConversationMessage:
     async with ctx.nested(
         "openai_conversation",
@@ -105,6 +117,18 @@ async def openai_conversation_completion(
                     history=history,
                     toolset=toolset,
                     remember=memory.remember if memory else None,
+                )
+                await ctx.record(ResultTrace(response))
+                return response
+
+            case progress:
+                response: ConversationMessage = await _openai_conversation_stream(
+                    instruction=instruction,
+                    user_message=user_message,
+                    history=history,
+                    toolset=toolset,
+                    remember=memory.remember if memory else None,
+                    progress=progress,
                 )
                 await ctx.record(ResultTrace(response))
                 return response
