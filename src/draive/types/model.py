@@ -2,7 +2,7 @@ import json
 from dataclasses import asdict
 from typing import Self
 
-from draive.helpers import extract_parameters_specification
+from draive.helpers import extract_specification
 from draive.types.state import State
 
 __all__ = [
@@ -15,7 +15,7 @@ class Model(State):
     def specification(cls) -> str:
         if not hasattr(cls, "_specification"):
             cls._specification: str = json.dumps(
-                extract_parameters_specification(cls.__init__),
+                extract_specification(cls.__init__),
                 indent=2,
             )
 

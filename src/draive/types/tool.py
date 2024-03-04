@@ -7,15 +7,10 @@ __all__ = [
 ]
 
 
-class ToolFunctionParametersSpecification(TypedDict, total=False):
-    type: Required[Literal["object"]]
-    properties: Required[ParametersSpecification]
-
-
 class ToolFunctionSpecification(TypedDict, total=False):
     name: Required[str]
     description: NotRequired[str]
-    parameters: Required[ToolFunctionParametersSpecification]
+    parameters: Required[ParametersSpecification]
 
 
 class ToolSpecification(TypedDict, total=False):
