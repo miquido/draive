@@ -9,7 +9,7 @@ from asyncio import (
 )
 from collections import deque
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Coroutine
-from typing import Generic, Self, TypeVar
+from typing import Any, Generic, Self, TypeVar
 
 from draive.types import Model, StreamingProgressUpdate
 
@@ -86,8 +86,8 @@ class AsyncStream(Generic[_Element], AsyncIterator[_Element]):
 class AsyncStreamTask(Generic[_Element], AsyncIterator[_Element]):
     def __init__(
         self,
-        job: Callable[[StreamingProgressUpdate[_Element]], Coroutine[None, None, None]],
-        task_spawn: Callable[[Coroutine[None, None, None]], Task[None]] | None = None,
+        job: Callable[[StreamingProgressUpdate[_Element]], Coroutine[Any, Any, None]],
+        task_spawn: Callable[[Coroutine[Any, Any, None]], Task[None]] | None = None,
     ) -> None:
         stream: AsyncStream[_Element] = AsyncStream()
         self._stream: AsyncStream[_Element] = stream

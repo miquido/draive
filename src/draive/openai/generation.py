@@ -19,8 +19,10 @@ _Generated = TypeVar(
 INSTRUCTION: str = """\
 {instruction}
 
-Respond using ONLY a JSON with following schema:
+The output have to be formatted as a JSON object that conforms to the following JSON Schema:
+```
 {format}
+```
 """
 
 

@@ -61,7 +61,7 @@ from draive.types import (
     TextGenerator,
     Toolset,
 )
-from draive.utils import autoretry, cache
+from draive.utils import allowing_early_exit, autoretry, cache, with_early_exit
 
 __all__ = [
     "Conversation",
@@ -126,4 +126,6 @@ __all__ = [
     "tool",
     "DictionaryConvertible",
     "JSONConvertible",
+    "allowing_early_exit",
+    "with_early_exit",
 ]
