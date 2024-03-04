@@ -1,8 +1,8 @@
 from asyncio import sleep
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable, Coroutine
 from functools import wraps
 from random import uniform
-from typing import ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 from draive.scope import ctx
 
@@ -19,12 +19,15 @@ def autoretry(
     limit: int,
     delay: tuple[float, float] | float | None = None,
     fallback: _Result_T | None = None,
-) -> Callable[[Callable[_Args_T, Awaitable[_Result_T]]], Callable[_Args_T, Awaitable[_Result_T]]]:
+) -> Callable[
+    [Callable[_Args_T, Coroutine[Any, Any, _Result_T]]],
+    Callable[_Args_T, Coroutine[Any, Any, _Result_T]],
+]:
     assert limit > 0, "Retries limit has to be at least one"  # nosec: B101
 
     def wrapped(
-        function: Callable[_Args_T, Awaitable[_Result_T]],
-    ) -> Callable[_Args_T, Awaitable[_Result_T]]:
+        function: Callable[_Args_T, Coroutine[Any, Any, _Result_T]],
+    ) -> Callable[_Args_T, Coroutine[Any, Any, _Result_T]]:
         @wraps(function)
         async def with_autoretry(*args: _Args_T.args, **kwargs: _Args_T.kwargs) -> _Result_T:
             attempt: int = 0
