@@ -90,8 +90,8 @@ class _RootContext:
         )
 
 
-_Args = ParamSpec("_Args")
-_Result = TypeVar("_Result")
+_Args_T = ParamSpec("_Args_T")
+_Result_T = TypeVar("_Result_T")
 
 
 @final
@@ -120,16 +120,16 @@ class ctx:
 
     @staticmethod
     def with_current(
-        function: Callable[_Args, Coroutine[None, None, _Result]],
+        function: Callable[_Args_T, Coroutine[Any, Any, _Result_T]],
         /,
-    ) -> Callable[_Args, Coroutine[None, None, _Result]]:
+    ) -> Callable[_Args_T, Coroutine[Any, Any, _Result_T]]:
         # capture current context
         current_metrics: ScopeMetrics = ctx.current_metrics()
         current_metrics._enter_task()  # pyright: ignore[reportPrivateUsage]
         current: Context = copy_context()
 
         @wraps(function)
-        async def wrapped(*args: _Args.args, **kwargs: _Args.kwargs) -> _Result:
+        async def wrapped(*args: _Args_T.args, **kwargs: _Args_T.kwargs) -> _Result_T:
             try:
                 return await current.run(function, *args, **kwargs)
             finally:
@@ -167,7 +167,7 @@ class ctx:
 
     @staticmethod
     def spawn_task(
-        coro: Coroutine[None, None, None],
+        coro: Coroutine[Any, Any, None],
         /,
     ) -> Task[None]:
         return ctx.current_task_group().create_task(coro)
