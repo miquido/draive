@@ -2,7 +2,6 @@ import json
 from dataclasses import asdict
 from typing import Self
 
-from draive.helpers import extract_specification
 from draive.types.state import State
 
 __all__ = [
@@ -12,22 +11,26 @@ __all__ = [
 
 class Model(State):
     @classmethod
-    def specification(cls) -> str:
-        if not hasattr(cls, "_specification"):
-            cls._specification: str = json.dumps(
-                extract_specification(cls.__init__),
+    def specification_json(cls) -> str:
+        if not hasattr(cls, "_specification_json"):
+            cls._specification_json: str = json.dumps(
+                cls.specification(),
                 indent=2,
             )
 
-        return cls._specification
+        return cls._specification_json
 
     @classmethod
     def from_json(
         cls,
         value: str | bytes,
+        strict: bool = False,
     ) -> Self:
         try:
-            return cls.from_dict(value=json.loads(value))
+            return cls.from_dict(
+                value=json.loads(value),
+                strict=strict,
+            )
 
         except Exception as exc:
             raise ValueError(f"Failed to decode {cls.__name__} from json:\n{value}") from exc

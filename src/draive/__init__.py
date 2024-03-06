@@ -16,6 +16,18 @@ from draive.helpers import (
     getenv_str,
     split_sequence,
 )
+from draive.mistral import (
+    MistralChatConfig,
+    MistralChatStream,
+    MistralChatStreamingMessagePart,
+    MistralChatStreamingPart,
+    MistralChatStreamingToolStatus,
+    MistralClient,
+    mistral_chat_completion,
+    mistral_conversation_completion,
+    mistral_generate,
+    mistral_generate_text,
+)
 from draive.openai import (
     OpenAIChatConfig,
     OpenAIChatStreamingPart,
@@ -128,4 +140,14 @@ __all__ = [
     "JSONConvertible",
     "allowing_early_exit",
     "with_early_exit",
+    "mistral_chat_completion",
+    "MistralClient",
+    "MistralChatConfig",
+    "MistralChatStream",
+    "MistralChatStreamingMessagePart",
+    "MistralChatStreamingPart",
+    "MistralChatStreamingToolStatus",
+    "mistral_generate",
+    "mistral_generate_text",
+    "mistral_conversation_completion",
 ]

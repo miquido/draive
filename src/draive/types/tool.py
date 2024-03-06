@@ -1,6 +1,6 @@
-from typing import Literal, NotRequired, Required, TypedDict, final
+from typing import Literal, Required, TypedDict, final
 
-from draive.helpers import ParametersSpecification
+from draive.types.parameters import ParametersSpecification
 
 __all__ = [
     "ToolSpecification",
@@ -10,7 +10,7 @@ __all__ = [
 @final
 class ToolFunctionSpecification(TypedDict, total=False):
     name: Required[str]
-    description: NotRequired[str]
+    description: Required[str]
     parameters: Required[ParametersSpecification]
 
 

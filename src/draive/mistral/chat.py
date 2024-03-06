@@ -1,51 +1,51 @@
 from typing import Literal, overload
 
-from openai.types.chat import ChatCompletionMessageParam
+from mistralai.models.chat_completion import ChatMessage
 
 # from draive.helpers import AsyncStream
-from draive.openai.chat_response import _chat_response  # pyright: ignore[reportPrivateUsage]
-from draive.openai.chat_stream import (
-    OpenAIChatStream,
-    OpenAIChatStreamingPart,
+from draive.mistral.chat_response import _chat_response  # pyright: ignore[reportPrivateUsage]
+from draive.mistral.chat_stream import (
+    MistralChatStream,
+    MistralChatStreamingPart,
     _chat_stream,  # pyright: ignore[reportPrivateUsage]
 )
-from draive.openai.client import OpenAIClient
-from draive.openai.config import OpenAIChatConfig
+from draive.mistral.client import MistralClient
+from draive.mistral.config import MistralChatConfig
 from draive.scope import ctx
 from draive.types import ConversationMessage, StreamingProgressUpdate, StringConvertible, Toolset
 from draive.utils import AsyncStreamTask
 
 __all__ = [
-    "openai_chat_completion",
+    "mistral_chat_completion",
 ]
 
 
 @overload
-async def openai_chat_completion(
+async def mistral_chat_completion(
     *,
     instruction: str,
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: Literal[True],
-) -> OpenAIChatStream:
+) -> MistralChatStream:
     ...
 
 
 @overload
-async def openai_chat_completion(
+async def mistral_chat_completion(
     *,
     instruction: str,
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-    stream: StreamingProgressUpdate[OpenAIChatStreamingPart],
+    stream: StreamingProgressUpdate[MistralChatStreamingPart],
 ) -> str:
     ...
 
 
 @overload
-async def openai_chat_completion(
+async def mistral_chat_completion(
     *,
     instruction: str,
     input: StringConvertible,  # noqa: A002
@@ -55,17 +55,17 @@ async def openai_chat_completion(
     ...
 
 
-async def openai_chat_completion(
+async def mistral_chat_completion(
     *,
     instruction: str,
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-    stream: StreamingProgressUpdate[OpenAIChatStreamingPart] | bool = False,
-) -> OpenAIChatStream | str | None:
-    config: OpenAIChatConfig = ctx.state(OpenAIChatConfig)
-    async with ctx.nested("openai_chat_completion", config):
-        client: OpenAIClient = ctx.dependency(OpenAIClient)
+    stream: StreamingProgressUpdate[MistralChatStreamingPart] | bool = False,
+) -> MistralChatStream | str | None:
+    config: MistralChatConfig = ctx.state(MistralChatConfig)
+    async with ctx.nested("mistral_chat_completion", config):
+        client: MistralClient = ctx.dependency(MistralClient)
         match stream:
             case False:
                 return await _chat_response(
@@ -80,10 +80,13 @@ async def openai_chat_completion(
                 )
 
             case True:
+                assert (  # nosec: B101
+                    toolset is None
+                ), "Mistral streaming api is broken - can't properly call tools"
 
                 @ctx.with_current
                 async def stream_task(
-                    progress: StreamingProgressUpdate[OpenAIChatStreamingPart],
+                    progress: StreamingProgressUpdate[MistralChatStreamingPart],
                 ) -> None:
                     await _chat_stream(
                         client=client,
@@ -103,6 +106,9 @@ async def openai_chat_completion(
                 )
 
             case progress:
+                assert (  # nosec: B101
+                    toolset is None
+                ), "Mistral streaming api is broken - can't properly call tools"
                 return await _chat_stream(
                     client=client,
                     config=config,
@@ -120,29 +126,29 @@ def _prepare_messages(
     instruction: str,
     history: list[ConversationMessage],
     input: StringConvertible,  # noqa: A002
-) -> list[ChatCompletionMessageParam]:
-    input_message: ChatCompletionMessageParam = {
-        "role": "user",
-        "content": str(input),
-    }
+) -> list[ChatMessage]:
+    input_message: ChatMessage = ChatMessage(
+        role="user",
+        content=str(input),
+    )
 
-    messages: list[ChatCompletionMessageParam] = []
+    messages: list[ChatMessage] = []
     for message in history:
         match message.author:
             case "user":
                 messages.append(
-                    {
-                        "role": "user",
-                        "content": str(message.content),
-                    },
+                    ChatMessage(
+                        role="user",
+                        content=str(message.content),
+                    ),
                 )
 
             case "assistant":
                 messages.append(
-                    {
-                        "role": "assistant",
-                        "content": str(message.content),
-                    },
+                    ChatMessage(
+                        role="assistant",
+                        content=str(message.content),
+                    ),
                 )
 
             case other:
@@ -151,18 +157,18 @@ def _prepare_messages(
                     other,
                 )
                 return [
-                    {
-                        "role": "system",
-                        "content": instruction,
-                    },
+                    ChatMessage(
+                        role="system",
+                        content=instruction,
+                    ),
                     input_message,
                 ]
 
     return [
-        {
-            "role": "system",
-            "content": instruction,
-        },
+        ChatMessage(
+            role="system",
+            content=instruction,
+        ),
         *messages,
         input_message,
     ]
