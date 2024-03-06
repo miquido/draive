@@ -1,6 +1,5 @@
 from asyncio import gather
 from collections.abc import Iterable
-from os import getenv
 from typing import Literal, Self, final, overload
 
 from openai import AsyncAzureOpenAI, AsyncOpenAI, AsyncStream
@@ -13,6 +12,7 @@ from openai.types.chat import (
     ChatCompletionToolParam,
 )
 
+from draive.helpers import getenv_str
 from draive.openai.config import OpenAIChatConfig, OpenAIEmbeddingConfig
 from draive.scope import ScopeDependency
 
@@ -26,11 +26,11 @@ class OpenAIClient(ScopeDependency):
     @classmethod
     def prepare(cls) -> Self:
         return cls(
-            api_key=getenv("AZURE_API_KEY") or getenv("OPENAI_API_KEY"),
-            organization=getenv("OPENAI_ORGANIZATION"),
-            azure_api_endpoint=getenv("AZURE_API_BASE"),
-            azure_api_version=getenv("AZURE_API_VERSION"),
-            azure_deployment=getenv("AZURE_DEPLOYMENT_NAME"),
+            api_key=getenv_str("AZURE_OPENAI_API_KEY") or getenv_str("OPENAI_API_KEY"),
+            organization=getenv_str("OPENAI_ORGANIZATION"),
+            azure_api_endpoint=getenv_str("AZURE_OPENAI_API_BASE"),
+            azure_api_version=getenv_str("AZURE_OPENAI_API_VERSION"),
+            azure_deployment=getenv_str("AZURE_OPENAI_DEPLOYMENT_NAME"),
         )
 
     def __init__(  # noqa: PLR0913
@@ -40,7 +40,7 @@ class OpenAIClient(ScopeDependency):
         azure_api_endpoint: str | None = None,
         azure_api_version: str | None = None,
         azure_deployment: str | None = None,
-    ):
+    ) -> None:
         # if all AZURE settings provided use it as provider
         if azure_api_endpoint and azure_deployment and azure_api_version:
             self._client: AsyncOpenAI = AsyncAzureOpenAI(
@@ -50,7 +50,7 @@ class OpenAIClient(ScopeDependency):
                 api_version=azure_api_version,
                 organization=organization,
             )
-        # otherwise try using OpenAI
+        # otherwise try using OpenAI default
         else:
             self._client: AsyncOpenAI = AsyncOpenAI(
                 api_key=api_key,
@@ -134,5 +134,5 @@ class OpenAIClient(ScopeDependency):
         )
         return response.results[0]  # TODO: check API about multiple results
 
-    async def close(self):
+    async def dispose(self):
         await self._client.close()

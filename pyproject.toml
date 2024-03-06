@@ -19,8 +19,9 @@ classifiers = [
 ]
 license = {file = "LICENSE"}
 dependencies = [
-    "numpy~=1.26",
     "openai~=1.12",
+    "mistralai~=0.1.3",
+    "numpy~=1.26",
     "tiktoken~=0.6.0",
     "pydantic~=2.6",
     "httpx~=0.25.0",

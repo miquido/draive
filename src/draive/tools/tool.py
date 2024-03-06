@@ -1,10 +1,9 @@
 from collections.abc import Callable
-from typing import Generic, ParamSpec, Protocol, TypeVar, final, overload
+from typing import Any, Generic, ParamSpec, Protocol, TypeVar, final, overload
 
-from draive.helpers import extract_specification
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
 from draive.tools.errors import ToolException
-from draive.types import StringConvertible, ToolSpecification
+from draive.types import StringConvertible, ToolSpecification, extract_specification
 
 __all__ = [
     "Tool",
@@ -68,15 +67,15 @@ class Tool(Generic[ToolArgs, ToolResult_co]):
             lambda: True  # available by default
         )
         self._function_call: ToolFunction[ToolArgs, ToolResult_co] = function
+        self._call_annotations: dict[str, Any] = function.__annotations__
         self._specification: ToolSpecification = {
             "type": "function",
             "function": {
                 "name": name,
                 "parameters": extract_specification(function),
+                "description": description or "",
             },
         }
-        if description:
-            self._specification["function"]["description"] = description
 
     @property
     def name(self) -> str:
