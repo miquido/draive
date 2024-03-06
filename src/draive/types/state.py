@@ -1,15 +1,22 @@
 import types
 import typing
-from dataclasses import Field, asdict, dataclass, field
-from typing import (
-    Any,
-    Self,
-    cast,
-    dataclass_transform,
-    final,
-    get_args,
-    get_origin,
+from collections.abc import Callable
+from dataclasses import (
+    _MISSING_TYPE,  # pyright: ignore[reportPrivateUsage]
+    MISSING,
+    asdict,
+    dataclass,
 )
+from dataclasses import (
+    Field as DataclassField,
+)
+from dataclasses import (
+    field as dataclass_field,
+)
+from dataclasses import (
+    fields as dataclass_fields,
+)
+from typing import Any, Self, TypeVar, cast, dataclass_transform, final, get_args, get_origin
 
 from draive.types.parameters import (
     ParametersSpecification,
@@ -18,13 +25,36 @@ from draive.types.parameters import (
 
 __all__ = [
     "State",
+    "Field",
 ]
+
+_FieldType_T = TypeVar("_FieldType_T")
+
+
+def Field(
+    *,
+    alias: str | None = None,
+    default: _FieldType_T | _MISSING_TYPE = MISSING,
+    validator: Callable[[_FieldType_T], None] | None = None,
+) -> _FieldType_T:  # it is actually a dataclass.Field, but type checker has to be fooled
+    metadata: dict[str, Any] = {}
+    if alias:
+        metadata["alias"] = alias
+    if validator:
+        metadata["validator"] = validator
+    return cast(
+        _FieldType_T,
+        dataclass_field(
+            default=default,
+            metadata=metadata,
+        ),
+    )
 
 
 @dataclass_transform(
     kw_only_default=True,
     frozen_default=True,
-    field_specifiers=(Field, field),  # pyright: ignore[reportUnknownArgumentType]
+    field_specifiers=(DataclassField, dataclass_field),  # pyright: ignore[reportUnknownArgumentType]
 )
 class StateMeta(type):
     def __new__(
@@ -78,21 +108,36 @@ class State(metaclass=StateMeta):
             raise ValueError(f"Failed to decode {cls.__name__} from dict:\n{value}") from exc
 
     @classmethod
-    def validated(
+    def validated(  # noqa: C901, PLR0912
         cls,
         values: dict[str, Any],
         strict: bool = False,
     ) -> dict[str, Any]:
-        annotations: dict[str, Any] = cls.__annotations__
-        # TODO: allow alternative names / aliases through Annotated
+        if not hasattr(cls, "_fields_dict"):
+            cls._fields_dict: dict[str, DataclassField[Any]] = {}
+            for field in dataclass_fields(cls):
+                cls._fields_dict[field.name] = field
+                if alias := field.metadata.get("alias"):
+                    cls._fields_dict[alias] = field
+
+        fields: dict[str, DataclassField[Any]] = cls._fields_dict
+
         for key, value in values.items():
-            if annotation := annotations.get(key):
+            if field := fields.get(key):
                 try:
                     if validated := _validated(
-                        annotation=annotation,
+                        annotation=field.type,
                         value=value,
                     ):
-                        values[key] = validated
+                        if validator := field.metadata.get("validator"):
+                            validator(validated)
+                        del values[key]  # remove previous value
+                        values[field.name] = validated
+                    elif key != field.name:
+                        if validator := field.metadata.get("validator"):
+                            validator(value)
+                        del values[key]  # remove previous value
+                        values[field.name] = value
                     else:
                         continue  # keep it as is
                 except TypeError as exc:
