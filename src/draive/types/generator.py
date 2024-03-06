@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import Protocol, TypeVar
+from typing import Protocol, TypeVar, runtime_checkable
 
 from draive.types.model import Model
 from draive.types.string import StringConvertible
@@ -17,6 +17,7 @@ _Generated = TypeVar(
 )
 
 
+@runtime_checkable
 class ModelGenerator(Protocol):
     async def __call__(  # noqa: PLR0913
         self,
@@ -30,6 +31,7 @@ class ModelGenerator(Protocol):
         ...
 
 
+@runtime_checkable
 class TextGenerator(Protocol):
     async def __call__(
         self,

@@ -1,6 +1,7 @@
 import types
 import typing
 from collections.abc import Callable
+from copy import copy
 from dataclasses import (
     _MISSING_TYPE,  # pyright: ignore[reportPrivateUsage]
     MISSING,
@@ -67,6 +68,7 @@ class StateMeta(type):
         # TODO: ensure properties belong to supported types:
         # bool, int, float, str, list[bool|int|float|str], dict[str, bool|int|float|str]
         # or other instances of State, additionally we need to support functions in state
+        # TODO: trigger validation from fields on init
         return final(  # pyright: ignore[reportUnknownVariableType]
             dataclass(  # pyright: ignore[reportGeneralTypeIssues, reportUnknownArgumentType, reportCallIssue]
                 type.__new__(
@@ -86,9 +88,30 @@ class State(metaclass=StateMeta):
     @classmethod
     def specification(cls) -> ParametersSpecification:
         if not hasattr(cls, "_specification"):
+            # TODO: allow aliases in specification?
             cls._specification: ParametersSpecification = extract_specification(cls.__init__)
 
         return cls._specification
+
+    @classmethod
+    def _fields_dict(cls) -> dict[str, DataclassField[Any]]:
+        if not hasattr(cls, "_fields_dictionary"):
+            cls._fields_dictionary: dict[str, DataclassField[Any]] = {}
+            cls._fields_aliases: list[tuple[str, str]] = []
+            for field in dataclass_fields(cls):
+                cls._fields_dictionary[field.name] = field
+                if (alias := field.metadata.get("alias")) and alias != field.name:
+                    assert alias not in cls._fields_dictionary, "Field name duplicated by alias"  # nosec: B101
+                    cls._fields_dictionary[alias] = field
+                    cls._fields_aliases.append((field.name, alias))
+
+        return cls._fields_dictionary
+
+    @classmethod
+    def _aliases(cls) -> list[tuple[str, str]]:
+        if not hasattr(cls, "_fields_aliases"):
+            cls._fields_dict()  # initialize when needed
+        return cls._fields_aliases
 
     @classmethod
     def from_dict(
@@ -108,21 +131,14 @@ class State(metaclass=StateMeta):
             raise ValueError(f"Failed to decode {cls.__name__} from dict:\n{value}") from exc
 
     @classmethod
-    def validated(  # noqa: C901, PLR0912
+    def validated(
         cls,
         values: dict[str, Any],
         strict: bool = False,
     ) -> dict[str, Any]:
-        if not hasattr(cls, "_fields_dict"):
-            cls._fields_dict: dict[str, DataclassField[Any]] = {}
-            for field in dataclass_fields(cls):
-                cls._fields_dict[field.name] = field
-                if alias := field.metadata.get("alias"):
-                    cls._fields_dict[alias] = field
+        fields: dict[str, DataclassField[Any]] = cls._fields_dict()
 
-        fields: dict[str, DataclassField[Any]] = cls._fields_dict
-
-        for key, value in values.items():
+        for key, value in copy(values).items():
             if field := fields.get(key):
                 try:
                     if validated := _validated(
@@ -133,12 +149,14 @@ class State(metaclass=StateMeta):
                             validator(validated)
                         del values[key]  # remove previous value
                         values[field.name] = validated
-                    elif key != field.name:
+                    elif key != field.name:  # handle aliases
                         if validator := field.metadata.get("validator"):
                             validator(value)
                         del values[key]  # remove previous value
                         values[field.name] = value
                     else:
+                        if validator := field.metadata.get("validator"):
+                            validator(value)
                         continue  # keep it as is
                 except TypeError as exc:
                     raise ValueError("Invalid value", key, value) from exc
@@ -150,7 +168,12 @@ class State(metaclass=StateMeta):
         return values
 
     def as_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        values: dict[str, Any] = asdict(self)
+        for field, alias in self.__class__._aliases():
+            values[alias] = values[field]
+            del values[field]  # remove previous value
+
+        return values
 
     def __str__(self) -> str:
         return str(asdict(self))
@@ -166,15 +189,19 @@ class State(metaclass=StateMeta):
         self,
         **kwargs: Any,
     ) -> Self:
-        return self.__class__(**{**vars(self), **kwargs})
+        return self.__class__(
+            **self.__class__.validated(
+                values={**vars(self), **kwargs},
+                strict=True,
+            ),
+        )
 
 
-def _validated(  # noqa: PLR0911
+def _validated(  # noqa: PLR0911, C901, PLR0912
     annotation: Any,
     value: Any,
 ) -> Any | None:
     # TODO: validate function/callable values
-    # TODO: allow custom validations through Annotated
     match get_origin(annotation) or annotation:
         case typing.Annotated:
             match get_args(annotation):
@@ -211,5 +238,7 @@ def _validated(  # noqa: PLR0911
                 return int(value)  # auto convert float to int
             elif isinstance(value, int) and expected_type == float:
                 return float(value)  # auto convert int to float
+            elif callable(expected_type):  # check functions
+                return None  # TODO: add function signature validation
             else:
                 raise TypeError("Invalid value", expected_type, value)  # pyright: ignore[reportUnknownArgumentType]

@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterator
-from typing import Literal, Protocol, Self, overload
+from typing import Literal, Protocol, Self, overload, runtime_checkable
 
 from draive.types.memory import Memory
 from draive.types.message import ConversationMessage
@@ -44,6 +44,7 @@ class ConversationResponseStream(Protocol):
         ...
 
 
+@runtime_checkable
 class ConversationCompletion(Protocol):
     @overload
     async def __call__(

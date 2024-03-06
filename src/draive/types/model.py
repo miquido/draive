@@ -37,7 +37,7 @@ class Model(State):
 
     def as_json(self) -> str:
         try:
-            return json.dumps(asdict(self))
+            return json.dumps(self.as_dict())
         except Exception as exc:
             raise ValueError(
                 f"Failed to encode {self.__class__.__name__} to json:\n{self}"

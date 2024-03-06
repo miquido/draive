@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from draive.types.model import Model
 from draive.types.streaming import StreamingProgressUpdate
@@ -10,6 +10,7 @@ __all__ = [
 ]
 
 
+@runtime_checkable
 class Toolset(Protocol):
     @property
     def available_tools(self) -> list[ToolSpecification]:
