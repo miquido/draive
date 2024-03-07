@@ -363,7 +363,8 @@ class ScopeMetrics:
             summary += f"\n- exception: {type(exception).__name__}s"
 
         if self.is_root:
-            summary += f"\n- total {self._total_tokens_usage().metric_summary()}"
+            for combined_metric in self._combine_metrics():
+                summary += f"\n- total {combined_metric.metric_summary()}"
 
         for metric in self._metrics.values():
             if metric_summary := metric.metric_summary():
@@ -375,20 +376,32 @@ class ScopeMetrics:
 
         return summary
 
-    # TODO: combine all combinable metrics this way
-    # Warning: this method is not using lock
-    def _total_tokens_usage(self) -> TokenUsage:
-        total_usage: TokenUsage = TokenUsage()
-        match self._metrics.get(TokenUsage):
-            case TokenUsage() as usage:
-                total_usage.combine_metric(usage)
+    def _combine_metric(self, metric: type[CombinableScopeMetric]) -> CombinableScopeMetric:
+        combined_metric = metric()
+        match self._metrics.get(metric):
+            case metric() as usage:
+                combined_metric.combine_metric(usage)
             case _:
                 pass
 
         for child in self._nested_traces:
-            total_usage.combine_metric(child._total_tokens_usage())
+            combined_metric.combine_metric(child._combine_metric(metric))
 
-        return total_usage
+        return combined_metric
 
+    def _combine_metrics(
+            self,
+            metrics: None | Iterable[type[CombinableScopeMetric]] = None
+        ) -> Iterable[CombinableScopeMetric]:
+            selected_metrics: Iterable[type[CombinableScopeMetric]]
+            if metrics is None:
+                selected_metrics = [
+                    metric for metric in self._metrics.keys()
+                    if isinstance(metric, CombinableScopeMetric)
+                ]
+            else:
+                selected_metrics = metrics
+
+            return [self._combine_metric(metric) for metric in selected_metrics]
 
 _ScopeMetrics_Var = ContextVar[ScopeMetrics]("_ScopeMetrics_Var")
