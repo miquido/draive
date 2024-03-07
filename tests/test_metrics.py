@@ -44,7 +44,7 @@ async def scope_metrics() -> ScopeMetrics:
 
 @pytest.mark.asyncio
 async def test_combinable_metrics(scope_metrics: ScopeMetrics) -> None:
-    combined_metrics = list(scope_metrics._combine_metrics())
+    combined_metrics = list(await scope_metrics._combine_metrics())
     assert len(combined_metrics) == 2
     assert isinstance(combined_metrics[0], TokenUsage)
     assert isinstance(combined_metrics[1], ExpMetric)

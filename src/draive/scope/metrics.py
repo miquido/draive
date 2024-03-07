@@ -363,7 +363,7 @@ class ScopeMetrics:
             summary += f"\n- exception: {type(exception).__name__}s"
 
         if self.is_root:
-            for combined_metric in self._combine_metrics():
+            for combined_metric in await self._combine_metrics():
                 summary += f"\n- total {combined_metric.metric_summary()}"
 
         for metric in self._metrics.values():
@@ -376,7 +376,7 @@ class ScopeMetrics:
 
         return summary
 
-    def _combine_metric(self, metric: type[CombinableScopeMetric]) -> CombinableScopeMetric:
+    async def _combine_metric(self, metric: type[CombinableScopeMetric]) -> CombinableScopeMetric:
         combined_metric = metric()
         match self._metrics.get(metric):
             case metric() as usage:
@@ -385,11 +385,11 @@ class ScopeMetrics:
                 pass
 
         for child in self._nested_traces:
-            combined_metric.combine_metric(child._combine_metric(metric))
+            combined_metric.combine_metric(await child._combine_metric(metric))
 
         return combined_metric
 
-    def _combine_metrics(
+    async def _combine_metrics(
             self,
             metrics: None | Iterable[type[CombinableScopeMetric]] = None
         ) -> Iterable[CombinableScopeMetric]:
@@ -402,6 +402,6 @@ class ScopeMetrics:
             else:
                 selected_metrics = metrics
 
-            return [self._combine_metric(metric) for metric in selected_metrics]
+            return [await self._combine_metric(metric) for metric in selected_metrics]
 
 _ScopeMetrics_Var = ContextVar[ScopeMetrics]("_ScopeMetrics_Var")
