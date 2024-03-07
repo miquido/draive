@@ -52,6 +52,9 @@ lint.ignore = []
 "__init__.py" = ["F401", "E402"]
 "./tests/*.py" = ["PLR2004"]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["Parameter", "draive.Parameter"]
+
 [tool.pyright]
 pythonVersion = "3.11"
 venvPath = "./.venv"

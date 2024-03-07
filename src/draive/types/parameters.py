@@ -5,11 +5,12 @@ import typing
 from collections import abc as collections_abc
 from collections.abc import Callable
 from dataclasses import is_dataclass
-from typing import Any, Literal, NotRequired, Required, TypedDict, final, get_args, get_origin
+from typing import Any, Literal, NotRequired, Required, TypedDict, cast, final, get_args, get_origin
 
 __all__ = [
     "ParametersSpecification",
-    "extract_specification",
+    "parameter_specification",
+    "function_specification",
 ]
 
 
@@ -109,9 +110,9 @@ class ToolSpecification(TypedDict, total=False):
     function: Required[ToolFunctionSpecification]
 
 
-def _parameter_specification(
-    annotation: type[Any],
-    origin: type[Any] | None,
+def parameter_specification(
+    annotation: Any,
+    origin: Any | None,
     description: str | None,
 ) -> ParameterSpecification:
     # allowing only selected types - available to use with AI
@@ -164,7 +165,7 @@ def _parameter_specification(
                 case (list_annotation,):
                     specification = {
                         "type": "array",
-                        "items": _parameter_specification(
+                        "items": parameter_specification(
                             annotation=list_annotation,
                             origin=get_origin(list_annotation),
                             description=None,
@@ -182,14 +183,14 @@ def _parameter_specification(
         case typing.Annotated:
             match get_args(annotation):
                 case [other, str() as other_description, *_]:
-                    return _parameter_specification(
+                    return parameter_specification(
                         annotation=other,
                         origin=get_origin(other),
                         description=other_description or description,
                     )
 
                 case [other, *_]:
-                    return _parameter_specification(
+                    return parameter_specification(
                         annotation=other,
                         origin=get_origin(other),
                         description=None,
@@ -201,7 +202,7 @@ def _parameter_specification(
         case typing.Required | typing.NotRequired:
             match get_args(annotation):
                 case [other, *_]:
-                    return _parameter_specification(
+                    return parameter_specification(
                         annotation=other,
                         origin=get_origin(other),
                         description=None,
@@ -213,7 +214,7 @@ def _parameter_specification(
         case types.UnionType | typing.Union:
             specification = {
                 "oneOf": [
-                    _parameter_specification(
+                    parameter_specification(
                         annotation=arg,
                         origin=get_origin(arg),
                         description=description,
@@ -223,8 +224,11 @@ def _parameter_specification(
             }
 
         case other:
-            if is_dataclass(other):
-                specification = extract_specification(annotation.__init__)
+            if hasattr(other, "specification") and isinstance(other.specification, dict):
+                specification = cast(ParameterSpecification, other.specification)  # pyright: ignore[reportUnknownMemberType]
+
+            elif is_dataclass(other):
+                specification = function_specification(annotation.__init__)
 
             # TODO: add support for typed dicts
             else:
@@ -236,7 +240,7 @@ def _parameter_specification(
     return specification
 
 
-def extract_specification(
+def function_specification(
     function: Callable[..., Any],
     /,
 ) -> ParametersSpecification:
@@ -259,14 +263,14 @@ def extract_specification(
                     # this is a bit fragile - checking TypedDict seems to be hard?
                     for unpacked in get_args(annotation):
                         for key, annotation in unpacked.__annotations__.items():
-                            parameters[key] = _parameter_specification(
+                            parameters[key] = parameter_specification(
                                 annotation=annotation,
                                 origin=get_origin(annotation),
                                 description=None,
                             )
 
                 case (annotation, origin):
-                    parameters[parameter.name] = _parameter_specification(
+                    parameters[parameter.name] = parameter_specification(
                         annotation=annotation,
                         origin=origin,
                         description=None,

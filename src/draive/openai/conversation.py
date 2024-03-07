@@ -78,7 +78,7 @@ async def openai_conversation_completion(
             user_message = ConversationMessage(
                 timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
                 author="user",
-                content=input,
+                content=str(input),
             )
 
         history: list[ConversationMessage]
@@ -148,7 +148,7 @@ async def _openai_conversation_response(
             author="assistant",
             content=await openai_chat_completion(
                 instruction=instruction,
-                input=user_message.content,
+                input=user_message,
                 history=history,
                 toolset=toolset,
             ),
@@ -188,7 +188,7 @@ async def _openai_conversation_stream(  # noqa: PLR0913
             nonlocal actions  # capture actions state
             match update:
                 case OpenAIChatStreamingMessagePart(content=content):
-                    response = response.updated(content=response.content_str + content.__str__())
+                    response = response.updated(content=response.content + content)
 
                 case OpenAIChatStreamingToolStatus(
                     id=tool_id,
@@ -213,7 +213,7 @@ async def _openai_conversation_stream(  # noqa: PLR0913
 
         await openai_chat_completion(
             instruction=instruction,
-            input=user_message.content,
+            input=user_message,
             history=history,
             toolset=toolset,
             stream=progress_update,

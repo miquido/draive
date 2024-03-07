@@ -1,5 +1,6 @@
 from draive.types.conversation import (
     ConversationCompletion,
+    ConversationMessage,
     ConversationResponseStream,
     ConversationStreamingAction,
     ConversationStreamingActionStatus,
@@ -11,9 +12,13 @@ from draive.types.embedder import Embedder
 from draive.types.generator import ModelGenerator, TextGenerator
 from draive.types.json import JSONConvertible
 from draive.types.memory import Memory, ReadOnlyMemory
-from draive.types.message import ConversationMessage
+from draive.types.missing import MISSING, MissingValue
 from draive.types.model import Model
-from draive.types.parameters import ParametersSpecification, extract_specification
+from draive.types.parameters import (
+    ParameterSpecification,
+    ParametersSpecification,
+    parameter_specification,
+)
 from draive.types.state import Field, State
 from draive.types.streaming import StreamingProgressUpdate
 from draive.types.string import StringConvertible
@@ -42,6 +47,9 @@ __all__ = [
     "Field",
     "DictionaryConvertible",
     "JSONConvertible",
+    "ParameterSpecification",
     "ParametersSpecification",
-    "extract_specification",
+    "parameter_specification",
+    "MissingValue",
+    "MISSING",
 ]

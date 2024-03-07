@@ -19,7 +19,7 @@ from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
 from draive.tools import ToolException
-from draive.types import Model, StreamingProgressUpdate, StringConvertible, Toolset
+from draive.types import Model, StreamingProgressUpdate, Toolset
 
 __all__ = [
     "OpenAIChatStream",
@@ -30,7 +30,7 @@ __all__ = [
 
 
 class OpenAIChatStreamingMessagePart(Model):
-    content: StringConvertible
+    content: str
 
 
 OpenAIChatStreamingPart = OpenAIChatStreamingToolStatus | OpenAIChatStreamingMessagePart

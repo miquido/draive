@@ -17,7 +17,7 @@ from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralChatConfig
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
 from draive.tools import ToolException
-from draive.types import Model, StreamingProgressUpdate, StringConvertible, Toolset
+from draive.types import Model, StreamingProgressUpdate, Toolset
 
 __all__ = [
     "MistralChatStream",
@@ -28,7 +28,7 @@ __all__ = [
 
 
 class MistralChatStreamingMessagePart(Model):
-    content: StringConvertible
+    content: str
 
 
 MistralChatStreamingPart = MistralChatStreamingToolStatus | MistralChatStreamingMessagePart
