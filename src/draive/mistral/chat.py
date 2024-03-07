@@ -127,10 +127,19 @@ def _prepare_messages(
     history: list[ConversationMessage],
     input: StringConvertible,  # noqa: A002
 ) -> list[ChatMessage]:
-    input_message: ChatMessage = ChatMessage(
-        role="user",
-        content=str(input),
-    )
+    input_message: ChatMessage
+    if isinstance(input, ConversationMessage):
+        input_message = ChatMessage(
+            role="user",
+            content=f"{input.author_name}:\n{input.content}"
+            if input.author_name
+            else input.content,
+        )
+    else:
+        input_message = ChatMessage(
+            role="user",
+            content=str(input),
+        )
 
     messages: list[ChatMessage] = []
     for message in history:
@@ -139,7 +148,9 @@ def _prepare_messages(
                 messages.append(
                     ChatMessage(
                         role="user",
-                        content=str(message.content),
+                        content=f"{message.author_name}:\n{message.content}"
+                        if message.author_name
+                        else message.content,
                     ),
                 )
 
@@ -147,7 +158,9 @@ def _prepare_messages(
                 messages.append(
                     ChatMessage(
                         role="assistant",
-                        content=str(message.content),
+                        content=f"{message.author_name}:\n{message.content}"
+                        if message.author_name
+                        else message.content,
                     ),
                 )
 

@@ -2,19 +2,26 @@ from collections.abc import AsyncIterator
 from typing import Literal, Protocol, Self, overload, runtime_checkable
 
 from draive.types.memory import Memory
-from draive.types.message import ConversationMessage
 from draive.types.model import Model
 from draive.types.streaming import StreamingProgressUpdate
 from draive.types.string import StringConvertible
 from draive.types.toolset import Toolset
 
 __all__ = [
+    "ConversationMessage",
     "ConversationCompletion",
     "ConversationResponseStream",
     "ConversationStreamingActionStatus",
     "ConversationStreamingAction",
     "ConversationStreamingPart",
 ]
+
+
+class ConversationMessage(Model):
+    author: str
+    author_name: str | None = None
+    content: str
+    timestamp: str | None = None
 
 
 ConversationStreamingActionStatus = Literal["STARTED", "PROGRESS", "FINISHED", "FAILED"]

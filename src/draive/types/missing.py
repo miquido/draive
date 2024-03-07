@@ -1,0 +1,28 @@
+__all__ = [
+    "MissingValue",
+    "MISSING",
+]
+
+
+from typing import Any
+
+
+class MissingValue:
+    def __bool__(self) -> bool:
+        return False
+
+    def __str__(self) -> str:
+        return ""
+
+    def __repr__(self) -> str:
+        return "MISSING"
+
+    def __setattr__(
+        self,
+        __name: str,
+        __value: Any,
+    ) -> None:
+        raise RuntimeError("MissingValue can't be modified")
+
+
+MISSING = MissingValue()

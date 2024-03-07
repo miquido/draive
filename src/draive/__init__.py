@@ -14,6 +14,8 @@ from draive.helpers import (
     getenv_float,
     getenv_int,
     getenv_str,
+    load_env,
+    setup_logging,
     split_sequence,
 )
 from draive.mistral import (
@@ -52,8 +54,9 @@ from draive.scope import (
 from draive.similarity import mmr_similarity, similarity
 from draive.splitters import split_text
 from draive.tokenization import TextTokenCounter, Tokenization, count_text_tokens
-from draive.tools import Tool, Toolbox, ToolCallContext, ToolException, redefine_tool, tool
+from draive.tools import Parameter, Tool, Toolbox, ToolCallContext, ToolException, tool
 from draive.types import (
+    MISSING,
     ConversationMessage,
     ConversationResponseStream,
     ConversationStreamingAction,
@@ -65,6 +68,7 @@ from draive.types import (
     Field,
     JSONConvertible,
     Memory,
+    MissingValue,
     Model,
     ModelGenerator,
     ReadOnlyMemory,
@@ -133,7 +137,6 @@ __all__ = [
     "openai_embed_text",
     "openai_generate",
     "openai_generate_text",
-    "redefine_tool",
     "similarity",
     "split_sequence",
     "split_text",
@@ -152,4 +155,9 @@ __all__ = [
     "mistral_generate",
     "mistral_generate_text",
     "mistral_conversation_completion",
+    "setup_logging",
+    "load_env",
+    "MissingValue",
+    "MISSING",
+    "Parameter",
 ]
