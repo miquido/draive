@@ -75,6 +75,7 @@ async def openai_chat_completion(
                         instruction=instruction,
                         history=history or [],
                         input=input,
+                        limit=config.context_messages_limit,
                     ),
                     toolset=toolset,
                 )
@@ -92,6 +93,7 @@ async def openai_chat_completion(
                             instruction=instruction,
                             history=history or [],
                             input=input,
+                            limit=config.context_messages_limit,
                         ),
                         toolset=toolset,
                         progress=progress,
@@ -110,6 +112,7 @@ async def openai_chat_completion(
                         instruction=instruction,
                         history=history or [],
                         input=input,
+                        limit=config.context_messages_limit,
                     ),
                     toolset=toolset,
                     progress=progress,
@@ -120,14 +123,13 @@ def _prepare_messages(
     instruction: str,
     history: list[ConversationMessage],
     input: StringConvertible,  # noqa: A002
+    limit: int,
 ) -> list[ChatCompletionMessageParam]:
     input_message: ChatCompletionMessageParam
     if isinstance(input, ConversationMessage):
         input_message = {
             "role": "user",
-            "content": f"{input.author_name}:\n{input.content}"
-            if input.author_name
-            else input.content,
+            "content": f"{input.author}:\n{input.content}" if input.author else input.content,
         }
     else:
         input_message = {
@@ -137,13 +139,13 @@ def _prepare_messages(
 
     messages: list[ChatCompletionMessageParam] = []
     for message in history:
-        match message.author:
+        match message.role:
             case "user":
                 messages.append(
                     {
                         "role": "user",
-                        "content": f"{message.author_name}:\n{message.content}"
-                        if message.author_name
+                        "content": f"{message.author}:\n{message.content}"
+                        if message.author
                         else message.content,
                     },
                 )
@@ -152,8 +154,8 @@ def _prepare_messages(
                 messages.append(
                     {
                         "role": "assistant",
-                        "content": f"{message.author_name}:\n{message.content}"
-                        if message.author_name
+                        "content": f"{message.author}:\n{message.content}"
+                        if message.author
                         else message.content,
                     },
                 )
@@ -176,6 +178,6 @@ def _prepare_messages(
             "role": "system",
             "content": instruction,
         },
-        *messages,
+        *messages[-limit:],
         input_message,
     ]

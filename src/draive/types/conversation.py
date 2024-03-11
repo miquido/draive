@@ -18,8 +18,8 @@ __all__ = [
 
 
 class ConversationMessage(Model):
-    author: str
-    author_name: str | None = None
+    role: str
+    author: str | None = None
     content: str
     timestamp: str | None = None
 

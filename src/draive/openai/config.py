@@ -41,6 +41,7 @@ class OpenAIChatConfig(ScopeState):
     timeout: float | None = None
     seed: int | None = getenv_int("OPENAI_SEED")
     response_format: ResponseFormat | None = None
+    context_messages_limit: int = 16
 
     def metric_summary(self) -> str:
         result: str = f"openai config:\n+ model: {self.model}\n+ temperature: {self.temperature}"
@@ -56,6 +57,7 @@ class OpenAIChatConfig(ScopeState):
             result += f"\n+ seed: {self.seed}"
         if self.response_format:
             result += f"\n+ response_format: {self.response_format.get('type', 'text')}"
+        result += f"\n+ context_messages_limit: {self.context_messages_limit}"
 
         return result.replace("\n", "\n|   ")
 

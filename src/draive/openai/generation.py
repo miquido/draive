@@ -42,11 +42,11 @@ async def openai_generate_text(
                 for example in examples
                 for message in [
                     ConversationMessage(
-                        author="user",
+                        role="user",
                         content=example[0],
                     ),
                     ConversationMessage(
-                        author="assistant",
+                        role="assistant",
                         content=example[1],
                     ),
                 ]
@@ -84,11 +84,11 @@ async def openai_generate(
                         for example in examples
                         for message in [
                             ConversationMessage(
-                                author="user",
+                                role="user",
                                 content=example[0],
                             ),
                             ConversationMessage(
-                                author="assistant",
+                                role="assistant",
                                 content=example[1].__str__(),
                             ),
                         ]
