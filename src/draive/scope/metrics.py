@@ -31,7 +31,7 @@ class CombinableScopeMetric(Protocol):
         self,
         other: Self,
         /,
-    ) -> None:
+    ) -> Self:
         ...
 
 
@@ -52,9 +52,11 @@ class TokenUsage(CombinableScopeMetric):
         self,
         other: Self,
         /,
-    ) -> None:
-        self._input_tokens += other._input_tokens
-        self._output_tokens += other._output_tokens
+    ) -> Self:
+        return self.__class__(
+            input_tokens=self._input_tokens + other._input_tokens,
+            output_tokens=self._output_tokens + other._output_tokens
+        )
 
     def metric_summary(self) -> str | None:
         return (
@@ -363,7 +365,7 @@ class ScopeMetrics:
             summary += f"\n- exception: {type(exception).__name__}s"
 
         if self.is_root:
-            for combined_metric in await self._combine_metrics():
+            for combined_metric in (await self._combine_metrics()).values():
                 summary += f"\n- total {combined_metric.metric_summary()}"
 
         for metric in self._metrics.values():
@@ -376,32 +378,24 @@ class ScopeMetrics:
 
         return summary
 
-    async def _combine_metric(self, metric: type[CombinableScopeMetric]) -> CombinableScopeMetric:
-        combined_metric = metric()
-        match self._metrics.get(metric):
-            case metric() as usage:
-                combined_metric.combine_metric(usage)
-            case _:
-                pass
-
-        for child in self._nested_traces:
-            combined_metric.combine_metric(await child._combine_metric(metric))
-
-        return combined_metric
 
     async def _combine_metrics(
-            self,
-            metrics: None | Iterable[type[CombinableScopeMetric]] = None
-        ) -> Iterable[CombinableScopeMetric]:
-            selected_metrics: Iterable[type[CombinableScopeMetric]]
-            if metrics is None:
-                selected_metrics = [
-                    metric for metric in self._metrics.keys()
-                    if isinstance(metric, CombinableScopeMetric)
-                ]
-            else:
-                selected_metrics = metrics
+        self,
+    ) -> dict[type[CombinableScopeMetric], CombinableScopeMetric]:
+        metrics: dict[type[CombinableScopeMetric], CombinableScopeMetric] = {
+            metric_type: metric for metric_type, metric in self._metrics.items()
+            if isinstance(metric_type, CombinableScopeMetric)
+            and isinstance(metric, CombinableScopeMetric)
+        }
 
-            return [await self._combine_metric(metric) for metric in selected_metrics]
+        for child in self._nested_traces:
+            child_metrics = await child._combine_metrics()
+            for metric_type, child_metric in child_metrics.items():
+                if metric_type in metrics:
+                    metrics[metric_type] = metrics[metric_type].combine_metric(child_metric)
+                else:
+                    metrics[metric_type] = child_metric
+
+        return metrics
 
 _ScopeMetrics_Var = ContextVar[ScopeMetrics]("_ScopeMetrics_Var")
