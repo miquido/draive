@@ -10,7 +10,7 @@ class ExpMetric(CombinableScopeMetric):
     def __init__(self, value: float = 1) -> None:
         self._value = value
 
-    def combine_metric(
+    def combined_metric(
         self,
         other: Self,
         /,
@@ -42,7 +42,7 @@ async def scope_metrics() -> ScopeMetrics:
 
 @pytest.mark.asyncio
 async def test_combinable_metrics(scope_metrics: ScopeMetrics) -> None:
-    combined_metrics = await scope_metrics._combine_metrics()
+    combined_metrics = await scope_metrics._combined_metrics()
     assert len(combined_metrics) == 2
     assert TokenUsage in combined_metrics
     assert ExpMetric in combined_metrics

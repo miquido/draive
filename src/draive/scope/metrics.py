@@ -27,7 +27,7 @@ class CombinableScopeMetric(Protocol):
     def metric_summary(self) -> str | None:
         ...
 
-    def combine_metric(
+    def combined_metric(
         self,
         other: Self,
         /,
@@ -48,7 +48,7 @@ class TokenUsage(CombinableScopeMetric):
         self._input_tokens: int = input_tokens or 0
         self._output_tokens: int = output_tokens or 0
 
-    def combine_metric(
+    def combined_metric(
         self,
         other: Self,
         /,
@@ -365,7 +365,7 @@ class ScopeMetrics:
             summary += f"\n- exception: {type(exception).__name__}s"
 
         if self.is_root:
-            for combined_metric in (await self._combine_metrics()).values():
+            for combined_metric in (await self._combined_metrics()).values():
                 summary += f"\n- total {combined_metric.metric_summary()}"
 
         for metric in self._metrics.values():
@@ -379,7 +379,7 @@ class ScopeMetrics:
         return summary
 
 
-    async def _combine_metrics(
+    async def _combined_metrics(
         self,
     ) -> dict[type[CombinableScopeMetric], CombinableScopeMetric]:
         metrics: dict[type[CombinableScopeMetric], CombinableScopeMetric] = {
@@ -389,10 +389,10 @@ class ScopeMetrics:
         }
 
         for child in self._nested_traces:
-            child_metrics = await child._combine_metrics()
+            child_metrics = await child._combined_metrics()
             for metric_type, child_metric in child_metrics.items():
                 if metric_type in metrics:
-                    metrics[metric_type] = metrics[metric_type].combine_metric(child_metric)
+                    metrics[metric_type] = metrics[metric_type].combined_metric(child_metric)
                 else:
                     metrics[metric_type] = child_metric
 
