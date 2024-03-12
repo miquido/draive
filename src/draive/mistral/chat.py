@@ -131,6 +131,7 @@ def _prepare_messages(
     input: StringConvertible,  # noqa: A002
     limit: int,
 ) -> list[ChatMessage]:
+    assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
     input_message: ChatMessage
     if isinstance(input, ConversationMessage):
         input_message = ChatMessage(
