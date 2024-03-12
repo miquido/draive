@@ -1,5 +1,5 @@
 from collections.abc import Awaitable, Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal, overload
 
 from draive.mistral.chat import mistral_chat_completion
@@ -76,7 +76,7 @@ async def mistral_conversation_completion(
 
         else:
             user_message = ConversationMessage(
-                timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S%z"),
                 role="user",
                 content=str(input),
             )
@@ -144,7 +144,7 @@ async def _mistral_conversation_response(
 ) -> ConversationMessage:
     async with ctx.nested("mistral_conversation_response"):
         response: ConversationMessage = ConversationMessage(
-            timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S%z"),
             role="assistant",
             content=await mistral_chat_completion(
                 instruction=instruction,
@@ -178,7 +178,7 @@ async def _mistral_conversation_stream(  # noqa: PLR0913
         response: ConversationMessage = ConversationMessage(
             role="assistant",
             content="",
-            timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S%z"),
         )
         actions: dict[str, ConversationStreamingAction] = {}
 
