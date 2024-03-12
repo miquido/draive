@@ -77,7 +77,7 @@ async def mistral_conversation_completion(
         else:
             user_message = ConversationMessage(
                 timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                author="user",
+                role="user",
                 content=str(input),
             )
 
@@ -145,7 +145,7 @@ async def _mistral_conversation_response(
     async with ctx.nested("mistral_conversation_response"):
         response: ConversationMessage = ConversationMessage(
             timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-            author="assistant",
+            role="assistant",
             content=await mistral_chat_completion(
                 instruction=instruction,
                 input=user_message,
@@ -157,7 +157,6 @@ async def _mistral_conversation_response(
         if remember := remember:
             await remember(
                 [
-                    *history,
                     user_message,
                     response,
                 ],
@@ -177,7 +176,7 @@ async def _mistral_conversation_stream(  # noqa: PLR0913
 ) -> ConversationMessage:
     async with ctx.nested("mistral_conversation_stream"):
         response: ConversationMessage = ConversationMessage(
-            author="assistant",
+            role="assistant",
             content="",
             timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
@@ -222,7 +221,6 @@ async def _mistral_conversation_stream(  # noqa: PLR0913
         if remember := remember:
             await remember(
                 [
-                    *history,
                     user_message,
                     response,
                 ],

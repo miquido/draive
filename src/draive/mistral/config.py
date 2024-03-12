@@ -30,6 +30,7 @@ class MistralChatConfig(ScopeState):
     max_tokens: int | None = None
     timeout: float | None = None
     response_format: dict[Literal["type"], Literal["text", "json"]] | None = None
+    context_messages_limit: int = 16
 
     def metric_summary(self) -> str:
         result: str = f"mistral config:\n+ model: {self.model}\n+ temperature: {self.temperature}"
@@ -43,5 +44,6 @@ class MistralChatConfig(ScopeState):
             result += f"\n+ timeout: {self.timeout}"
         if self.response_format:
             result += f"\n+ response_format: {self.response_format.get('type', 'text')}"
+        result += f"\n+ context_messages_limit: {self.context_messages_limit}"
 
         return result.replace("\n", "\n|   ")
