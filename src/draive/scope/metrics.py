@@ -27,11 +27,11 @@ class CombinableScopeMetric(Protocol):
     def metric_summary(self) -> str | None:
         ...
 
-    def combine_metric(
+    def combined_metric(
         self,
         other: Self,
         /,
-    ) -> None:
+    ) -> Self:
         ...
 
 
@@ -48,13 +48,15 @@ class TokenUsage(CombinableScopeMetric):
         self._input_tokens: int = input_tokens or 0
         self._output_tokens: int = output_tokens or 0
 
-    def combine_metric(
+    def combined_metric(
         self,
         other: Self,
         /,
-    ) -> None:
-        self._input_tokens += other._input_tokens
-        self._output_tokens += other._output_tokens
+    ) -> Self:
+        return self.__class__(
+            input_tokens=self._input_tokens + other._input_tokens,
+            output_tokens=self._output_tokens + other._output_tokens
+        )
 
     def metric_summary(self) -> str | None:
         return (
@@ -363,7 +365,8 @@ class ScopeMetrics:
             summary += f"\n- exception: {type(exception).__name__}s"
 
         if self.is_root:
-            summary += f"\n- total {self._total_tokens_usage().metric_summary()}"
+            for combined_metric in (await self._combined_metrics()).values():
+                summary += f"\n- total {combined_metric.metric_summary()}"
 
         for metric in self._metrics.values():
             if metric_summary := metric.metric_summary():
@@ -375,20 +378,24 @@ class ScopeMetrics:
 
         return summary
 
-    # TODO: combine all combinable metrics this way
-    # Warning: this method is not using lock
-    def _total_tokens_usage(self) -> TokenUsage:
-        total_usage: TokenUsage = TokenUsage()
-        match self._metrics.get(TokenUsage):
-            case TokenUsage() as usage:
-                total_usage.combine_metric(usage)
-            case _:
-                pass
+
+    async def _combined_metrics(
+        self,
+    ) -> dict[type[CombinableScopeMetric], CombinableScopeMetric]:
+        metrics: dict[type[CombinableScopeMetric], CombinableScopeMetric] = {
+            metric_type: metric for metric_type, metric in self._metrics.items()
+            if isinstance(metric_type, CombinableScopeMetric)
+            and isinstance(metric, CombinableScopeMetric)
+        }
 
         for child in self._nested_traces:
-            total_usage.combine_metric(child._total_tokens_usage())
+            child_metrics = await child._combined_metrics()
+            for metric_type, child_metric in child_metrics.items():
+                if metric_type in metrics:
+                    metrics[metric_type] = metrics[metric_type].combined_metric(child_metric)
+                else:
+                    metrics[metric_type] = child_metric
 
-        return total_usage
-
+        return metrics
 
 _ScopeMetrics_Var = ContextVar[ScopeMetrics]("_ScopeMetrics_Var")

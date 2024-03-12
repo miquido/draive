@@ -38,3 +38,5 @@ lint:
 # Run tests suite.
 test:
 	@$(PYTHON_ALIAS) -B -m pytest -v --cov=$(SOURCES_PATH) --rootdir=$(TESTS_PATH)
+
+build: format lint test
