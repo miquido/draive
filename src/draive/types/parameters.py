@@ -7,6 +7,8 @@ from collections.abc import Callable
 from dataclasses import is_dataclass
 from typing import Any, Literal, NotRequired, Required, TypedDict, cast, final, get_args, get_origin
 
+import typing_extensions
+
 __all__ = [
     "ParametersSpecification",
     "parameter_specification",
@@ -230,7 +232,7 @@ def parameter_specification(  # noqa: C901
             elif is_dataclass(other):
                 specification = _function_specification(annotation.__init__)
 
-            elif typing.is_typeddict(other):
+            elif typing.is_typeddict(other) or typing_extensions.is_typeddict(other):
                 specification = _annotations_specification(other.__annotations__)
 
             else:

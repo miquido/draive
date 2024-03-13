@@ -16,6 +16,8 @@ from typing import (
 )
 from uuid import uuid4
 
+import typing_extensions
+
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
 from draive.tools.state import ToolCallContext, ToolsProgressContext
 from draive.types import (
@@ -384,7 +386,9 @@ def _prepare_validator(  # noqa: C901
 
             return validated
 
-        case typed_dict_type if typing.is_typeddict(typed_dict_type):
+        case typed_dict_type if typing.is_typeddict(
+            typed_dict_type
+        ) or typing_extensions.is_typeddict(typed_dict_type):
 
             def validated(value: Any) -> Any:
                 typed_dict: dict[Any, Any]
