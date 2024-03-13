@@ -1,5 +1,4 @@
-from collections.abc import AsyncIterator
-from typing import Protocol, Self, cast
+from typing import cast
 
 from openai import AsyncStream as OpenAIAsyncStream
 from openai.types.chat import (
@@ -11,40 +10,23 @@ from openai.types.chat import (
 from openai.types.chat.chat_completion_chunk import ChoiceDelta
 
 from draive.openai.chat_tools import (
-    OpenAIChatStreamingToolStatus,
     _execute_chat_tool_calls,  # pyright: ignore[reportPrivateUsage]
     _flush_chat_tool_calls,  # pyright: ignore[reportPrivateUsage]
 )
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
-from draive.tools import ToolException
-from draive.types import Model, StreamingProgressUpdate, Toolset
+from draive.types import (
+    ConversationStreamingPartialMessage,
+    ConversationStreamingUpdate,
+    ProgressUpdate,
+    ToolException,
+    Toolset,
+)
 
 __all__ = [
-    "OpenAIChatStream",
-    "OpenAIChatStreamingMessagePart",
-    "OpenAIChatStreamingPart",
     "_chat_stream",
 ]
-
-
-class OpenAIChatStreamingMessagePart(Model):
-    content: str
-
-
-OpenAIChatStreamingPart = OpenAIChatStreamingToolStatus | OpenAIChatStreamingMessagePart
-
-
-class OpenAIChatStream(Protocol):
-    def as_json(self) -> AsyncIterator[str]:
-        ...
-
-    def __aiter__(self) -> Self:
-        ...
-
-    async def __anext__(self) -> OpenAIChatStreamingPart:
-        ...
 
 
 async def _chat_stream(
@@ -53,7 +35,7 @@ async def _chat_stream(
     config: OpenAIChatConfig,
     messages: list[ChatCompletionMessageParam],
     toolset: Toolset | None,
-    progress: StreamingProgressUpdate[OpenAIChatStreamingPart],
+    progress: ProgressUpdate[ConversationStreamingUpdate],
 ) -> str:
     async with ctx.nested(
         "chat_stream",
@@ -104,15 +86,15 @@ async def _chat_stream(
             elif completion_head.content is not None:
                 result: str = completion_head.content
                 if result:  # provide head / first part if not empty
-                    progress(update=OpenAIChatStreamingMessagePart(content=result))
+                    progress(update=ConversationStreamingPartialMessage(content=result))
 
                 async for part in completion_stream:
                     # we are always requesting single result - no need to take care of indices
                     part_text: str = part.choices[0].delta.content or ""
                     if not part_text:
                         continue  # skip empty parts
-                    progress(update=OpenAIChatStreamingMessagePart(content=part_text))
                     result += part_text
+                    progress(update=ConversationStreamingPartialMessage(content=result))
 
                 await ctx.record(ResultTrace(result))
                 return result  # we hav final result here

@@ -11,7 +11,7 @@ from collections import deque
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Coroutine
 from typing import Any, Generic, Self, TypeVar
 
-from draive.types import Model, StreamingProgressUpdate
+from draive.types import Model, ProgressUpdate
 
 __all__ = [
     "AsyncStream",
@@ -86,7 +86,7 @@ class AsyncStream(Generic[_Element], AsyncIterator[_Element]):
 class AsyncStreamTask(Generic[_Element], AsyncIterator[_Element]):
     def __init__(
         self,
-        job: Callable[[StreamingProgressUpdate[_Element]], Coroutine[Any, Any, None]],
+        job: Callable[[ProgressUpdate[_Element]], Coroutine[Any, Any, None]],
         task_spawn: Callable[[Coroutine[Any, Any, None]], Task[None]] | None = None,
     ) -> None:
         stream: AsyncStream[_Element] = AsyncStream()

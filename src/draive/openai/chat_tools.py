@@ -1,6 +1,6 @@
 from asyncio import gather
 from collections.abc import Awaitable
-from typing import Literal, cast
+from typing import cast
 
 from openai import AsyncStream
 from openai.types.chat import (
@@ -13,50 +13,48 @@ from openai.types.chat.chat_completion_chunk import (
     ChoiceDeltaToolCall,
 )
 
-from draive.types import Model, StreamingProgressUpdate, Toolset
+from draive.scope import ctx
+from draive.tools import ToolsProgressContext
+from draive.types import ProgressUpdate, ToolCallProgress, Toolset
 
 __all__ = [
-    "OpenAIChatStreamingToolStatus",
     "_execute_chat_tool_calls",
     "_flush_chat_tool_calls",
 ]
-
-
-class OpenAIChatStreamingToolStatus(Model):
-    id: str
-    name: str
-    status: Literal["STARTED", "PROGRESS", "FINISHED", "FAILED"]
-    data: Model | None = None
 
 
 async def _execute_chat_tool_calls(
     *,
     tool_calls: list[ChatCompletionMessageToolCall],
     toolset: Toolset,
-    progress: StreamingProgressUpdate[OpenAIChatStreamingToolStatus] | None = None,
+    progress: ProgressUpdate[ToolCallProgress] | None = None,
 ) -> list[ChatCompletionMessageParam]:
     tool_call_params: list[ChatCompletionMessageToolCallParam] = []
     tool_call_results: list[Awaitable[ChatCompletionMessageParam]] = []
-    for call in tool_calls:
-        tool_call_results.append(
-            _execute_chat_tool_call(
-                call_id=call.id,
-                name=call.function.name,
-                arguments=call.function.arguments,
-                toolset=toolset,
-                progress=progress or (lambda update: None),
+    with ctx.updated(
+        ToolsProgressContext(
+            progress=progress or ctx.state(ToolsProgressContext).progress,
+        ),
+    ):
+        for call in tool_calls:
+            tool_call_results.append(
+                _execute_chat_tool_call(
+                    call_id=call.id,
+                    name=call.function.name,
+                    arguments=call.function.arguments,
+                    toolset=toolset,
+                )
             )
-        )
-        tool_call_params.append(
-            {
-                "id": call.id,
-                "type": "function",
-                "function": {
-                    "name": call.function.name,
-                    "arguments": call.function.arguments,
-                },
-            }
-        )
+            tool_call_params.append(
+                {
+                    "id": call.id,
+                    "type": "function",
+                    "function": {
+                        "name": call.function.name,
+                        "arguments": call.function.arguments,
+                    },
+                }
+            )
 
     return [
         {
@@ -76,36 +74,12 @@ async def _execute_chat_tool_call(
     name: str,
     arguments: str,
     toolset: Toolset,
-    progress: StreamingProgressUpdate[OpenAIChatStreamingToolStatus],
 ) -> ChatCompletionMessageParam:
     try:  # make sure that tool error won't blow up whole chain
-        progress(
-            OpenAIChatStreamingToolStatus(
-                id=call_id,
-                name=name,
-                status="STARTED",
-            )
-        )
-
         result = await toolset.call_tool(
             name,
             call_id=call_id,
             arguments=arguments,
-            progress=lambda update: progress(
-                OpenAIChatStreamingToolStatus(
-                    id=call_id,
-                    name=name,
-                    status="PROGRESS",
-                    data=update,
-                )
-            ),
-        )
-        progress(
-            OpenAIChatStreamingToolStatus(
-                id=call_id,
-                name=name,
-                status="FINISHED",
-            )
         )
         return {
             "role": "tool",
@@ -115,13 +89,6 @@ async def _execute_chat_tool_call(
 
     # error should be already logged by ScopeContext
     except BaseException:
-        progress(
-            OpenAIChatStreamingToolStatus(
-                id=call_id,
-                name=name,
-                status="FAILED",
-            )
-        )
         return {
             "role": "tool",
             "tool_call_id": call_id,

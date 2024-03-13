@@ -5,9 +5,9 @@ from draive.scope import ctx
 from draive.types import (
     ConversationMessage,
     ConversationResponseStream,
-    ConversationStreamingPart,
+    ConversationStreamingUpdate,
     Memory,
-    StreamingProgressUpdate,
+    ProgressUpdate,
     StringConvertible,
     Toolset,
 )
@@ -36,7 +36,7 @@ async def conversation_completion(
     input: ConversationMessage | StringConvertible,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-    stream: StreamingProgressUpdate[ConversationStreamingPart],
+    stream: ProgressUpdate[ConversationStreamingUpdate],
 ) -> ConversationMessage:
     ...
 
@@ -58,7 +58,7 @@ async def conversation_completion(
     input: ConversationMessage | StringConvertible,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-    stream: StreamingProgressUpdate[ConversationStreamingPart] | bool = False,
+    stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
 ) -> ConversationResponseStream | ConversationMessage:
     conversation: Conversation = ctx.state(Conversation)
 

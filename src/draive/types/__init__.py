@@ -2,9 +2,8 @@ from draive.types.conversation import (
     ConversationCompletion,
     ConversationMessage,
     ConversationResponseStream,
-    ConversationStreamingAction,
-    ConversationStreamingActionStatus,
-    ConversationStreamingPart,
+    ConversationStreamingPartialMessage,
+    ConversationStreamingUpdate,
 )
 from draive.types.dictionary import DictionaryConvertible
 from draive.types.embedded import Embedded
@@ -19,19 +18,18 @@ from draive.types.parameters import (
     ParametersSpecification,
     parameter_specification,
 )
+from draive.types.progress import ProgressUpdate
 from draive.types.state import Field, State
-from draive.types.streaming import StreamingProgressUpdate
 from draive.types.string import StringConvertible
-from draive.types.tool import ToolSpecification
+from draive.types.tool import ToolCallProgress, ToolCallStatus, ToolException, ToolSpecification
 from draive.types.toolset import Toolset
 
 __all__ = [
     "ConversationMessage",
-    "ConversationStreamingActionStatus",
-    "ConversationStreamingAction",
-    "ConversationStreamingPart",
+    "ConversationStreamingUpdate",
     "ConversationResponseStream",
-    "StreamingProgressUpdate",
+    "ConversationStreamingPartialMessage",
+    "ProgressUpdate",
     "Embedded",
     "Embedder",
     "Model",
@@ -42,6 +40,9 @@ __all__ = [
     "Memory",
     "ConversationCompletion",
     "ToolSpecification",
+    "ToolCallStatus",
+    "ToolCallProgress",
+    "ToolException",
     "Toolset",
     "State",
     "Field",

@@ -1,42 +1,39 @@
 from asyncio import gather
 from collections.abc import AsyncIterable, Awaitable
-from typing import Literal
 
 from mistralai.models.chat_completion import ChatCompletionStreamResponse, ChatMessage, ToolCall
 
-from draive.types import Model, StreamingProgressUpdate, Toolset
+from draive.scope import ctx
+from draive.tools import ToolsProgressContext
+from draive.types import ProgressUpdate, ToolCallProgress, Toolset
 
 __all__ = [
-    "MistralChatStreamingToolStatus",
     "_execute_chat_tool_calls",
     "_flush_chat_tool_calls",
 ]
-
-
-class MistralChatStreamingToolStatus(Model):
-    id: str
-    name: str
-    status: Literal["STARTED", "PROGRESS", "FINISHED", "FAILED"]
-    data: Model | None = None
 
 
 async def _execute_chat_tool_calls(
     *,
     tool_calls: list[ToolCall],
     toolset: Toolset,
-    progress: StreamingProgressUpdate[MistralChatStreamingToolStatus] | None = None,
+    progress: ProgressUpdate[ToolCallProgress] | None = None,
 ) -> list[ChatMessage]:
     tool_call_results: list[Awaitable[ChatMessage]] = []
-    for call in tool_calls:
-        tool_call_results.append(
-            _execute_chat_tool_call(
-                call_id=call.id,
-                name=call.function.name,
-                arguments=call.function.arguments,
-                toolset=toolset,
-                progress=progress or (lambda update: None),
+    with ctx.updated(
+        ToolsProgressContext(
+            progress=progress or ctx.state(ToolsProgressContext).progress,
+        ),
+    ):
+        for call in tool_calls:
+            tool_call_results.append(
+                _execute_chat_tool_call(
+                    call_id=call.id,
+                    name=call.function.name,
+                    arguments=call.function.arguments,
+                    toolset=toolset,
+                )
             )
-        )
 
     return [
         ChatMessage(
@@ -57,36 +54,12 @@ async def _execute_chat_tool_call(
     name: str,
     arguments: str,
     toolset: Toolset,
-    progress: StreamingProgressUpdate[MistralChatStreamingToolStatus],
 ) -> ChatMessage:
     try:  # make sure that tool error won't blow up whole chain
-        progress(
-            MistralChatStreamingToolStatus(
-                id=call_id,
-                name=name,
-                status="STARTED",
-            )
-        )
-
         result = await toolset.call_tool(
             name,
             call_id=call_id,
             arguments=arguments,
-            progress=lambda update: progress(
-                MistralChatStreamingToolStatus(
-                    id=call_id,
-                    name=name,
-                    status="PROGRESS",
-                    data=update,
-                )
-            ),
-        )
-        progress(
-            MistralChatStreamingToolStatus(
-                id=call_id,
-                name=name,
-                status="FINISHED",
-            )
         )
         return ChatMessage(
             role="tool",
@@ -96,13 +69,6 @@ async def _execute_chat_tool_call(
 
     # error should be already logged by ScopeContext
     except BaseException:
-        progress(
-            MistralChatStreamingToolStatus(
-                id=call_id,
-                name=name,
-                status="FAILED",
-            )
-        )
         return ChatMessage(
             role="tool",
             name=name,

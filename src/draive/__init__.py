@@ -20,10 +20,6 @@ from draive.helpers import (
 )
 from draive.mistral import (
     MistralChatConfig,
-    MistralChatStream,
-    MistralChatStreamingMessagePart,
-    MistralChatStreamingPart,
-    MistralChatStreamingToolStatus,
     MistralClient,
     mistral_chat_completion,
     mistral_conversation_completion,
@@ -32,8 +28,6 @@ from draive.mistral import (
 )
 from draive.openai import (
     OpenAIChatConfig,
-    OpenAIChatStreamingPart,
-    OpenAIChatStreamingToolStatus,
     OpenAIClient,
     OpenAIEmbeddingConfig,
     openai_chat_completion,
@@ -54,14 +48,12 @@ from draive.scope import (
 from draive.similarity import mmr_similarity, similarity
 from draive.splitters import split_text
 from draive.tokenization import TextTokenCounter, Tokenization, count_text_tokens
-from draive.tools import Parameter, Tool, Toolbox, ToolCallContext, ToolException, tool
+from draive.tools import Parameter, Tool, Toolbox, ToolCallContext, tool
 from draive.types import (
     MISSING,
     ConversationMessage,
     ConversationResponseStream,
-    ConversationStreamingAction,
-    ConversationStreamingActionStatus,
-    ConversationStreamingPart,
+    ConversationStreamingUpdate,
     DictionaryConvertible,
     Embedded,
     Embedder,
@@ -71,11 +63,12 @@ from draive.types import (
     MissingValue,
     Model,
     ModelGenerator,
+    ProgressUpdate,
     ReadOnlyMemory,
     State,
-    StreamingProgressUpdate,
     StringConvertible,
     TextGenerator,
+    ToolException,
     Toolset,
 )
 from draive.utils import allowing_early_exit, autoretry, cache, with_early_exit
@@ -83,11 +76,9 @@ from draive.utils import allowing_early_exit, autoretry, cache, with_early_exit
 __all__ = [
     "Conversation",
     "ConversationMessage",
-    "ConversationStreamingActionStatus",
-    "ConversationStreamingAction",
-    "ConversationStreamingPart",
+    "ConversationStreamingUpdate",
     "ConversationResponseStream",
-    "StreamingProgressUpdate",
+    "ProgressUpdate",
     "Embedded",
     "Embedder",
     "Embedding",
@@ -98,8 +89,6 @@ __all__ = [
     "OpenAIChatConfig",
     "OpenAIClient",
     "OpenAIEmbeddingConfig",
-    "OpenAIChatStreamingPart",
-    "OpenAIChatStreamingToolStatus",
     "ReadOnlyMemory",
     "ScopeDependencies",
     "ScopeDependency",
@@ -148,10 +137,6 @@ __all__ = [
     "mistral_chat_completion",
     "MistralClient",
     "MistralChatConfig",
-    "MistralChatStream",
-    "MistralChatStreamingMessagePart",
-    "MistralChatStreamingPart",
-    "MistralChatStreamingToolStatus",
     "mistral_generate",
     "mistral_generate_text",
     "mistral_conversation_completion",

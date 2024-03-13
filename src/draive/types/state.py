@@ -268,6 +268,20 @@ def _prepare_validator(  # noqa: C901
 
             return validated
 
+        case typed_dict_type if typing.is_typeddict(typed_dict_type):
+
+            def validated(value: Any) -> Any:
+                typed_dict: dict[Any, Any]
+                if isinstance(value, dict):
+                    typed_dict = typed_dict_type(**value)
+                else:
+                    raise TypeError("Invalid value", annotation, value)
+                if validate := additional:
+                    validate(typed_dict)
+                return typed_dict
+
+            return validated
+
         case other_type:
 
             def validated(value: Any) -> Any:

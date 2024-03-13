@@ -18,8 +18,7 @@ from draive.scope import (
     TokenUsage,
     ctx,
 )
-from draive.tools import ToolException
-from draive.types import Toolset
+from draive.types import ToolException, Toolset
 
 __all__ = [
     "_chat_response",

@@ -3,17 +3,17 @@ from typing import Literal, Protocol, Self, overload, runtime_checkable
 
 from draive.types.memory import Memory
 from draive.types.model import Model
-from draive.types.streaming import StreamingProgressUpdate
+from draive.types.progress import ProgressUpdate
 from draive.types.string import StringConvertible
+from draive.types.tool import ToolCallProgress
 from draive.types.toolset import Toolset
 
 __all__ = [
     "ConversationMessage",
     "ConversationCompletion",
     "ConversationResponseStream",
-    "ConversationStreamingActionStatus",
-    "ConversationStreamingAction",
-    "ConversationStreamingPart",
+    "ConversationStreamingPartialMessage",
+    "ConversationStreamingUpdate",
 ]
 
 
@@ -24,20 +24,11 @@ class ConversationMessage(Model):
     timestamp: str | None = None
 
 
-ConversationStreamingActionStatus = Literal["STARTED", "PROGRESS", "FINISHED", "FAILED"]
+class ConversationStreamingPartialMessage(Model):
+    content: str
 
 
-class ConversationStreamingAction(Model):
-    id: str
-    action: Literal["TOOL_CALL"]
-    name: str
-    status: ConversationStreamingActionStatus
-    data: Model | None = None
-
-
-class ConversationStreamingPart(Model):
-    actions: list[ConversationStreamingAction]
-    message: ConversationMessage
+ConversationStreamingUpdate = ConversationStreamingPartialMessage | ToolCallProgress
 
 
 class ConversationResponseStream(Protocol):
@@ -47,7 +38,7 @@ class ConversationResponseStream(Protocol):
     def __aiter__(self) -> Self:
         ...
 
-    async def __anext__(self) -> ConversationStreamingPart:
+    async def __anext__(self) -> ConversationStreamingUpdate:
         ...
 
 
@@ -73,7 +64,7 @@ class ConversationCompletion(Protocol):
         input: ConversationMessage | StringConvertible,  # noqa: A002
         memory: Memory[ConversationMessage] | None = None,
         toolset: Toolset | None = None,
-        stream: StreamingProgressUpdate[ConversationStreamingPart],
+        stream: ProgressUpdate[ConversationStreamingUpdate],
     ) -> ConversationMessage:
         ...
 
@@ -95,6 +86,6 @@ class ConversationCompletion(Protocol):
         input: ConversationMessage | StringConvertible,  # noqa: A002
         memory: Memory[ConversationMessage] | None = None,
         toolset: Toolset | None = None,
-        stream: StreamingProgressUpdate[ConversationStreamingPart] | bool = False,
+        stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
     ) -> ConversationResponseStream | ConversationMessage:
         ...

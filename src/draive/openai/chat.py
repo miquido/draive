@@ -2,17 +2,20 @@ from typing import Literal, overload
 
 from openai.types.chat import ChatCompletionMessageParam
 
-# from draive.helpers import AsyncStream
 from draive.openai.chat_response import _chat_response  # pyright: ignore[reportPrivateUsage]
-from draive.openai.chat_stream import (
-    OpenAIChatStream,
-    OpenAIChatStreamingPart,
-    _chat_stream,  # pyright: ignore[reportPrivateUsage]
-)
+from draive.openai.chat_stream import _chat_stream  # pyright: ignore[reportPrivateUsage]
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
 from draive.scope import ctx
-from draive.types import ConversationMessage, StreamingProgressUpdate, StringConvertible, Toolset
+from draive.tools import ToolsProgressContext
+from draive.types import (
+    ConversationMessage,
+    ConversationResponseStream,
+    ConversationStreamingUpdate,
+    ProgressUpdate,
+    StringConvertible,
+    Toolset,
+)
 from draive.utils import AsyncStreamTask
 
 __all__ = [
@@ -28,7 +31,7 @@ async def openai_chat_completion(
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: Literal[True],
-) -> OpenAIChatStream:
+) -> ConversationResponseStream:
     ...
 
 
@@ -39,7 +42,7 @@ async def openai_chat_completion(
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-    stream: StreamingProgressUpdate[OpenAIChatStreamingPart],
+    stream: ProgressUpdate[ConversationStreamingUpdate],
 ) -> str:
     ...
 
@@ -61,8 +64,8 @@ async def openai_chat_completion(
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-    stream: StreamingProgressUpdate[OpenAIChatStreamingPart] | bool = False,
-) -> OpenAIChatStream | str | None:
+    stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
+) -> ConversationResponseStream | str:
     config: OpenAIChatConfig = ctx.state(OpenAIChatConfig)
     async with ctx.nested("openai_chat_completion", config):
         client: OpenAIClient = ctx.dependency(OpenAIClient)
@@ -84,9 +87,38 @@ async def openai_chat_completion(
 
                 @ctx.with_current
                 async def stream_task(
-                    progress: StreamingProgressUpdate[OpenAIChatStreamingPart],
+                    progress: ProgressUpdate[ConversationStreamingUpdate],
                 ) -> None:
-                    await _chat_stream(
+                    with ctx.updated(
+                        ToolsProgressContext(
+                            progress=progress or (lambda update: None),
+                        ),
+                    ):
+                        await _chat_stream(
+                            client=client,
+                            config=config,
+                            messages=_prepare_messages(
+                                instruction=instruction,
+                                history=history or [],
+                                input=input,
+                                limit=config.context_messages_limit,
+                            ),
+                            toolset=toolset,
+                            progress=progress,
+                        )
+
+                return AsyncStreamTask(
+                    job=stream_task,
+                    task_spawn=ctx.spawn_task,
+                )
+
+            case progress:
+                with ctx.updated(
+                    ToolsProgressContext(
+                        progress=progress or (lambda update: None),
+                    ),
+                ):
+                    return await _chat_stream(
                         client=client,
                         config=config,
                         messages=_prepare_messages(
@@ -98,25 +130,6 @@ async def openai_chat_completion(
                         toolset=toolset,
                         progress=progress,
                     )
-
-                return AsyncStreamTask(
-                    job=stream_task,
-                    task_spawn=ctx.spawn_task,
-                )
-
-            case progress:
-                return await _chat_stream(
-                    client=client,
-                    config=config,
-                    messages=_prepare_messages(
-                        instruction=instruction,
-                        history=history or [],
-                        input=input,
-                        limit=config.context_messages_limit,
-                    ),
-                    toolset=toolset,
-                    progress=progress,
-                )
 
 
 def _prepare_messages(
@@ -130,7 +143,7 @@ def _prepare_messages(
     if isinstance(input, ConversationMessage):
         input_message = {
             "role": "user",
-            "content": f"{input.author}:\n{input.content}" if input.author else input.content,
+            "content": input.content,
         }
     else:
         input_message = {
@@ -145,9 +158,7 @@ def _prepare_messages(
                 messages.append(
                     {
                         "role": "user",
-                        "content": f"{message.author}:\n{message.content}"
-                        if message.author
-                        else message.content,
+                        "content": message.content,
                     },
                 )
 
@@ -155,9 +166,7 @@ def _prepare_messages(
                 messages.append(
                     {
                         "role": "assistant",
-                        "content": f"{message.author}:\n{message.content}"
-                        if message.author
-                        else message.content,
+                        "content": message.content,
                     },
                 )
 

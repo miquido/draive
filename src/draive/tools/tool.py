@@ -14,14 +14,18 @@ from typing import (
     get_origin,
     overload,
 )
+from uuid import uuid4
 
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
-from draive.tools.errors import ToolException
+from draive.tools.state import ToolCallContext, ToolsProgressContext
 from draive.types import (
     MISSING,
     MissingValue,
     Model,
+    ProgressUpdate,
     StringConvertible,
+    ToolCallProgress,
+    ToolException,
     ToolSpecification,
     parameter_specification,
 )
@@ -148,53 +152,93 @@ class Tool(Generic[ToolArgs, ToolResult_co]):
 
     def validated(
         self,
-        values: dict[str, Any],
+        *,
+        arguments: dict[str, Any],
         strict: bool = False,
     ) -> dict[str, Any]:
         for argument in self._arguments.values():
-            if value := values.get(argument.name):
-                values[argument.name] = argument.validated(value)
-            elif (alias := argument.alias) and (value := values.get(alias)):
-                del values[alias]  # remove aliased value
-                values[argument.name] = argument.validated(value)
+            if value := arguments.get(argument.name):
+                arguments[argument.name] = argument.validated(value)
+            elif (alias := argument.alias) and (value := arguments.get(alias)):
+                del arguments[alias]  # remove aliased value
+                arguments[argument.name] = argument.validated(value)
             elif argument.default is not MISSING:
-                values[argument.name] = argument.default
+                arguments[argument.name] = argument.default
             else:
                 raise ValueError("Missing required argument", argument.name)
-        unexpected: set[str] = set(self._arguments.keys()).difference(values.keys())
+        unexpected: set[str] = set(self._arguments.keys()).difference(arguments.keys())
         if strict and unexpected:
             raise ValueError("Unexpected arguments provided", unexpected)
         else:
             for key in unexpected:
-                del values[key]
-        return values
+                del arguments[key]
+        return arguments
 
     async def __call__(
         self,
+        tool_call_id: str | None = None,
         *args: ToolArgs.args,
         **kwargs: ToolArgs.kwargs,
     ) -> ToolResult_co:
         assert not args, "Positional unkeyed arguments are not supported"  # nosec: B101
-        arguments: dict[str, Any]
-        try:
-            arguments = self.validated(values=kwargs)
-        except (ValueError, TypeError) as exc:
-            raise ToolException("Tool arguments invalid", self.name) from exc
+        call_context: ToolCallContext = ToolCallContext(
+            call_id=tool_call_id or uuid4().hex,
+            tool=self._name,
+        )
+        progress: ProgressUpdate[ToolCallProgress] = ctx.state(ToolsProgressContext).progress
         async with ctx.nested(
             self._name,
-            ArgumentsTrace(**arguments),
+            ArgumentsTrace(call_id=call_context.call_id, **kwargs),
         ):
-            if not self.available:
-                raise ToolException("Attempting to use unavailable tool")
+            with ctx.updated(call_context):
+                progress(
+                    ToolCallProgress(
+                        call_id=call_context.call_id,
+                        tool=call_context.tool,
+                        status="STARTED",
+                        content=None,
+                    )
+                )
+                if not self.available:
+                    progress(
+                        ToolCallProgress(
+                            call_id=call_context.call_id,
+                            tool=call_context.tool,
+                            status="FAILED",
+                            content=None,
+                        )
+                    )
+                    raise ToolException("Attempting to use unavailable tool")
 
-            result: ToolResult_co = await self._function_call(
-                *args,
-                **arguments,
-            )
+                arguments: dict[str, Any]
+                try:
+                    arguments = self.validated(arguments=kwargs)
+                except (ValueError, TypeError) as exc:
+                    progress(
+                        ToolCallProgress(
+                            call_id=call_context.call_id,
+                            tool=call_context.tool,
+                            status="FAILED",
+                            content=None,
+                        )
+                    )
+                    raise ToolException("Tool arguments invalid", self.name) from exc
 
-            await ctx.record(ResultTrace(result))
+                result: ToolResult_co = await self._function_call(
+                    *args,
+                    **arguments,
+                )
+                await ctx.record(ResultTrace(result))
+                progress(
+                    ToolCallProgress(
+                        call_id=call_context.call_id,
+                        tool=call_context.tool,
+                        status="FINISHED",
+                        content=None,
+                    )
+                )
 
-            return result
+                return result
 
 
 @overload
@@ -337,6 +381,20 @@ def _prepare_validator(  # noqa: C901
                 if validate := additional:
                     validate(model)
                 return model
+
+            return validated
+
+        case typed_dict_type if typing.is_typeddict(typed_dict_type):
+
+            def validated(value: Any) -> Any:
+                typed_dict: dict[Any, Any]
+                if isinstance(value, dict):
+                    typed_dict = typed_dict_type(**value)
+                else:
+                    raise TypeError("Invalid value", annotation, value)
+                if validate := additional:
+                    validate(typed_dict)
+                return typed_dict
 
             return validated
 
