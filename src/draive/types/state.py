@@ -19,6 +19,8 @@ from dataclasses import (
 )
 from typing import Any, Self, TypeVar, cast, dataclass_transform, final, get_args, get_origin
 
+import typing_extensions
+
 __all__ = [
     "State",
     "Field",
@@ -268,7 +270,9 @@ def _prepare_validator(  # noqa: C901
 
             return validated
 
-        case typed_dict_type if typing.is_typeddict(typed_dict_type):
+        case typed_dict_type if typing.is_typeddict(
+            typed_dict_type
+        ) or typing_extensions.is_typeddict(typed_dict_type):
 
             def validated(value: Any) -> Any:
                 typed_dict: dict[Any, Any]
