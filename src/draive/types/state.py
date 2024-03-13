@@ -1,5 +1,7 @@
+import builtins
 import types
 import typing
+from collections import abc as collections_abc
 from collections.abc import Callable
 from copy import copy
 from dataclasses import (
@@ -207,7 +209,7 @@ class State(metaclass=StateMeta):
         )
 
 
-def _prepare_validator(  # noqa: C901
+def _prepare_validator(  # noqa: C901, PLR0911, PLR0915
     annotation: Any,
     additional: Callable[[Any], None] | None,
 ) -> Callable[[Any], Any]:
@@ -251,6 +253,38 @@ def _prepare_validator(  # noqa: C901
                         continue  # check next alternative
 
                 raise TypeError("Invalid value", annotation, value)
+
+            return validated
+
+        case (
+            builtins.list  # pyright: ignore[reportUnknownMemberType]
+            | typing.List  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
+            | collections_abc.Sequence  # pyright: ignore[reportUnknownMemberType]
+            | collections_abc.Iterable  # pyright: ignore[reportUnknownMemberType]
+        ):
+            validate_element: Callable[[Any], Any]
+            match get_args(annotation):
+                case (list_annotation,):
+                    validate_element = _prepare_validator(
+                        annotation=list_annotation,
+                        additional=None,
+                    )
+
+                case ():  # pyright: ignore[reportUnnecessaryComparison] fallback to untyped list
+                    validate_element = lambda value: value  # noqa: E731
+
+                case other:  # pyright: ignore[reportUnnecessaryComparison]
+                    raise TypeError("Unsupported iterable type annotation", other)
+
+            def validated(value: Any) -> Any:
+                values_list: list[Any]
+                if isinstance(value, collections_abc.Iterable):
+                    values_list = [validate_element(element) for element in value]  # pyright: ignore[reportUnknownVariableType]
+                else:
+                    raise TypeError("Invalid value", annotation, value)
+                if validate := additional:
+                    validate(values_list)
+                return values_list
 
             return validated
 
