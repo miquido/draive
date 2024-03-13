@@ -4,15 +4,19 @@ from mistralai.models.chat_completion import ChatMessage
 
 # from draive.helpers import AsyncStream
 from draive.mistral.chat_response import _chat_response  # pyright: ignore[reportPrivateUsage]
-from draive.mistral.chat_stream import (
-    MistralChatStream,
-    MistralChatStreamingPart,
-    _chat_stream,  # pyright: ignore[reportPrivateUsage]
-)
+from draive.mistral.chat_stream import _chat_stream  # pyright: ignore[reportPrivateUsage]
 from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralChatConfig
 from draive.scope import ctx
-from draive.types import ConversationMessage, StreamingProgressUpdate, StringConvertible, Toolset
+from draive.tools import ToolsProgressContext
+from draive.types import (
+    ConversationMessage,
+    ConversationResponseStream,
+    ConversationStreamingUpdate,
+    ProgressUpdate,
+    StringConvertible,
+    Toolset,
+)
 from draive.utils import AsyncStreamTask
 
 __all__ = [
@@ -28,7 +32,7 @@ async def mistral_chat_completion(
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: Literal[True],
-) -> MistralChatStream:
+) -> ConversationResponseStream:
     ...
 
 
@@ -39,7 +43,7 @@ async def mistral_chat_completion(
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-    stream: StreamingProgressUpdate[MistralChatStreamingPart],
+    stream: ProgressUpdate[ConversationStreamingUpdate],
 ) -> str:
     ...
 
@@ -61,8 +65,8 @@ async def mistral_chat_completion(
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-    stream: StreamingProgressUpdate[MistralChatStreamingPart] | bool = False,
-) -> MistralChatStream | str | None:
+    stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
+) -> ConversationResponseStream | str:
     config: MistralChatConfig = ctx.state(MistralChatConfig)
     async with ctx.nested("mistral_chat_completion", config):
         client: MistralClient = ctx.dependency(MistralClient)
@@ -81,15 +85,41 @@ async def mistral_chat_completion(
                 )
 
             case True:
-                assert (  # nosec: B101
-                    toolset is None
-                ), "Mistral streaming api is broken - can't properly call tools"
 
                 @ctx.with_current
                 async def stream_task(
-                    progress: StreamingProgressUpdate[MistralChatStreamingPart],
+                    progress: ProgressUpdate[ConversationStreamingUpdate],
                 ) -> None:
-                    await _chat_stream(
+                    with ctx.updated(
+                        ToolsProgressContext(
+                            progress=progress or (lambda update: None),
+                        ),
+                    ):
+                        await _chat_stream(
+                            client=client,
+                            config=config,
+                            messages=_prepare_messages(
+                                instruction=instruction,
+                                history=history or [],
+                                input=input,
+                                limit=config.context_messages_limit,
+                            ),
+                            toolset=toolset,
+                            progress=progress,
+                        )
+
+                return AsyncStreamTask(
+                    job=stream_task,
+                    task_spawn=ctx.spawn_task,
+                )
+
+            case progress:
+                with ctx.updated(
+                    ToolsProgressContext(
+                        progress=progress or (lambda update: None),
+                    ),
+                ):
+                    return await _chat_stream(
                         client=client,
                         config=config,
                         messages=_prepare_messages(
@@ -101,28 +131,6 @@ async def mistral_chat_completion(
                         toolset=toolset,
                         progress=progress,
                     )
-
-                return AsyncStreamTask(
-                    job=stream_task,
-                    task_spawn=ctx.spawn_task,
-                )
-
-            case progress:
-                assert (  # nosec: B101
-                    toolset is None
-                ), "Mistral streaming api is broken - can't properly call tools"
-                return await _chat_stream(
-                    client=client,
-                    config=config,
-                    messages=_prepare_messages(
-                        instruction=instruction,
-                        history=history or [],
-                        input=input,
-                        limit=config.context_messages_limit,
-                    ),
-                    toolset=toolset,
-                    progress=progress,
-                )
 
 
 def _prepare_messages(
@@ -151,9 +159,7 @@ def _prepare_messages(
                 messages.append(
                     ChatMessage(
                         role="user",
-                        content=f"{message.author}:\n{message.content}"
-                        if message.author
-                        else message.content,
+                        content=message.content,
                     ),
                 )
 
@@ -161,9 +167,7 @@ def _prepare_messages(
                 messages.append(
                     ChatMessage(
                         role="assistant",
-                        content=f"{message.author}:\n{message.content}"
-                        if message.author
-                        else message.content,
+                        content=message.content,
                     ),
                 )
 

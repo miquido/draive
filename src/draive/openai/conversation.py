@@ -3,16 +3,14 @@ from datetime import UTC, datetime
 from typing import Literal, overload
 
 from draive.openai.chat import openai_chat_completion
-from draive.openai.chat_stream import OpenAIChatStreamingMessagePart, OpenAIChatStreamingPart
-from draive.openai.chat_tools import OpenAIChatStreamingToolStatus
+from draive.openai.config import OpenAIChatConfig
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
 from draive.types import (
     ConversationMessage,
     ConversationResponseStream,
-    ConversationStreamingAction,
-    ConversationStreamingPart,
+    ConversationStreamingUpdate,
     Memory,
-    StreamingProgressUpdate,
+    ProgressUpdate,
     StringConvertible,
     Toolset,
 )
@@ -42,7 +40,7 @@ async def openai_conversation_completion(
     input: ConversationMessage | StringConvertible,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-    stream: StreamingProgressUpdate[ConversationStreamingPart],
+    stream: ProgressUpdate[ConversationStreamingUpdate],
 ) -> ConversationMessage:
     ...
 
@@ -64,7 +62,7 @@ async def openai_conversation_completion(
     input: ConversationMessage | StringConvertible,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
-    stream: StreamingProgressUpdate[ConversationStreamingPart] | bool = False,
+    stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
 ) -> ConversationResponseStream | ConversationMessage:
     async with ctx.nested(
         "openai_conversation",
@@ -93,7 +91,7 @@ async def openai_conversation_completion(
 
                 @ctx.with_current
                 async def stream_task(
-                    progress: StreamingProgressUpdate[ConversationStreamingPart],
+                    progress: ProgressUpdate[ConversationStreamingUpdate],
                 ) -> None:
                     response: ConversationMessage = await _openai_conversation_stream(
                         instruction=instruction,
@@ -143,15 +141,17 @@ async def _openai_conversation_response(
     remember: Callable[[list[ConversationMessage]], Awaitable[None]] | None,
 ) -> ConversationMessage:
     async with ctx.nested("openai_conversation_response"):
+        response_content: str = await openai_chat_completion(
+            instruction=instruction,
+            input=user_message,
+            history=history,
+            toolset=toolset,
+        )
         response: ConversationMessage = ConversationMessage(
-            timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S%z"),
             role="assistant",
-            content=await openai_chat_completion(
-                instruction=instruction,
-                input=user_message,
-                history=history,
-                toolset=toolset,
-            ),
+            author=ctx.state(OpenAIChatConfig).model,
+            content=response_content,
+            timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S%z"),
         )
 
         if remember := remember:
@@ -172,50 +172,22 @@ async def _openai_conversation_stream(  # noqa: PLR0913
     history: list[ConversationMessage],
     toolset: Toolset | None = None,
     remember: Callable[[list[ConversationMessage]], Awaitable[None]] | None,
-    progress: StreamingProgressUpdate[ConversationStreamingPart],
+    progress: ProgressUpdate[ConversationStreamingUpdate],
 ) -> ConversationMessage:
     async with ctx.nested("openai_conversation_stream"):
-        response: ConversationMessage = ConversationMessage(
-            role="assistant",
-            content="",
-            timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S%z"),
-        )
-        actions: dict[str, ConversationStreamingAction] = {}
-
-        def progress_update(update: OpenAIChatStreamingPart) -> None:
-            nonlocal response  # capture response state
-            nonlocal actions  # capture actions state
-            match update:
-                case OpenAIChatStreamingMessagePart(content=content):
-                    response = response.updated(content=response.content + content)
-
-                case OpenAIChatStreamingToolStatus(
-                    id=tool_id,
-                    name=tool_name,
-                    status=status,
-                    data=data,
-                ):
-                    actions[tool_id] = ConversationStreamingAction(
-                        id=tool_id,
-                        action="TOOL_CALL",
-                        name=tool_name,
-                        status=status,
-                        data=data,
-                    )
-
-            progress(
-                ConversationStreamingPart(
-                    actions=list(actions.values()),
-                    message=response,
-                )
-            )
-
-        await openai_chat_completion(
+        response_content: str = await openai_chat_completion(
             instruction=instruction,
             input=user_message,
             history=history,
             toolset=toolset,
-            stream=progress_update,
+            stream=progress,
+        )
+
+        response: ConversationMessage = ConversationMessage(
+            role="assistant",
+            author=ctx.state(OpenAIChatConfig).model,
+            content=response_content,
+            timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S%z"),
         )
 
         if remember := remember:

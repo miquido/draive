@@ -10,7 +10,7 @@ from typing import Any, Literal, NotRequired, Required, TypedDict, cast, final, 
 __all__ = [
     "ParametersSpecification",
     "parameter_specification",
-    "function_specification",
+    "_function_specification",
 ]
 
 
@@ -110,7 +110,7 @@ class ToolSpecification(TypedDict, total=False):
     function: Required[ToolFunctionSpecification]
 
 
-def parameter_specification(
+def parameter_specification(  # noqa: C901
     annotation: Any,
     origin: Any | None,
     description: str | None,
@@ -228,9 +228,11 @@ def parameter_specification(
                 specification = cast(ParameterSpecification, other.specification)  # pyright: ignore[reportUnknownMemberType]
 
             elif is_dataclass(other):
-                specification = function_specification(annotation.__init__)
+                specification = _function_specification(annotation.__init__)
 
-            # TODO: add support for typed dicts
+            elif typing.is_typeddict(other):
+                specification = _annotations_specification(other.__annotations__)
+
             else:
                 raise TypeError("Unsupported type annotation", other)
 
@@ -240,7 +242,7 @@ def parameter_specification(
     return specification
 
 
-def function_specification(
+def _function_specification(
     function: Callable[..., Any],
     /,
 ) -> ParametersSpecification:
@@ -280,6 +282,35 @@ def function_specification(
 
         except Exception as exc:
             raise TypeError("Failed to extract parameter", parameter.name) from exc
+
+    return {
+        "type": "object",
+        "properties": parameters,
+        "required": required,
+    }
+
+
+def _annotations_specification(
+    annotations: dict[str, Any],
+    /,
+) -> ParametersSpecification:
+    parameters: dict[str, ParameterSpecification] = {}
+    required: list[str] = []
+
+    for name, annotation in annotations.items():
+        try:
+            origin: type[Any] = get_origin(annotation)
+            parameters[name] = parameter_specification(
+                annotation=annotation,
+                origin=origin,
+                description=None,
+            )
+            # assuming total=True or explicitly annotated
+            if origin != typing.NotRequired:
+                required.append(name)
+
+        except Exception as exc:
+            raise TypeError("Failed to extract parameter", name) from exc
 
     return {
         "type": "object",
