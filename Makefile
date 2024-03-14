@@ -25,6 +25,14 @@ venv:
 	@. ./.venv/bin/activate && pip install --upgrade pip && pip install --editable .[dev] --require-virtualenv 
 	@echo '...development environment ready! Activate venv using `. ./.venv/bin/activate`.'
 
+# sync environment with uv based on requirements (uv pip compile pyproject.toml -o requirements.txt --all-extras)
+sync:
+	@uv pip sync requirements.txt
+
+# Generate a set of locked dependencies from pyproject.toml
+lock:
+	uv pip compile pyproject.toml -o requirements.txt
+
 # Run formatter.
 format:
 	@ruff --quiet --fix $(SOURCES_PATH) $(TESTS_PATH)
