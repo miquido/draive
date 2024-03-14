@@ -24,6 +24,8 @@ venv:
 	@$(PYTHON_ALIAS) -m venv .venv --prompt="VENV[DEV]" --clear --upgrade-deps
 	@. ./.venv/bin/activate && pip install --upgrade pip && pip install --editable .[dev] --require-virtualenv 
 	@echo '...development environment ready! Activate venv using `. ./.venv/bin/activate`.'
+	@echo '...cloning .env...'
+	@cp -n ./config/.env.example ./.env || :
 
 # sync environment with uv based on requirements.txt
 sync:
