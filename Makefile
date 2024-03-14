@@ -18,12 +18,22 @@ TESTS_PATH := tests
 # Setup virtual environment for local development.
 venv:
 	@echo '# Preparing development environment...'
+	@echo '...cloning .env...'
+	@cp -n ./config/.env.example ./.env || :
 	@echo '...preparing git hooks...'
 	@cp -n ./config/pre-push ./.git/hooks/pre-push || :
 	@echo '...preparing venv...'
 	@$(PYTHON_ALIAS) -m venv .venv --prompt="VENV[DEV]" --clear --upgrade-deps
 	@. ./.venv/bin/activate && pip install --upgrade pip && pip install --editable .[dev] --require-virtualenv 
 	@echo '...development environment ready! Activate venv using `. ./.venv/bin/activate`.'
+
+# sync environment with uv based on requirements.txt
+sync:
+	@uv pip sync requirements.txt
+
+# Generate a set of locked dependencies from pyproject.toml
+lock:
+	uv pip compile pyproject.toml -o requirements.txt --all-extras
 
 # Run formatter.
 format:
