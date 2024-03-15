@@ -142,6 +142,7 @@ async def _mistral_conversation_response(
 ) -> ConversationMessage:
     async with ctx.nested("mistral_conversation_response"):
         response_content: str = await mistral_chat_completion(
+            config=ctx.state(MistralChatConfig),
             instruction=instruction,
             input=user_message,
             history=history,
@@ -176,6 +177,7 @@ async def _mistral_conversation_stream(  # noqa: PLR0913
 ) -> ConversationMessage:
     async with ctx.nested("mistral_conversation_stream"):
         response_content: str = await mistral_chat_completion(
+            config=ctx.state(MistralChatConfig),
             instruction=instruction,
             input=user_message,
             history=history,

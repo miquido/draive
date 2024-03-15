@@ -23,7 +23,7 @@ from draive.mistral import (
     MistralClient,
     mistral_chat_completion,
     mistral_conversation_completion,
-    mistral_generate,
+    mistral_generate_model,
     mistral_generate_text,
 )
 from draive.openai import (
@@ -34,7 +34,7 @@ from draive.openai import (
     openai_conversation_completion,
     openai_count_text_tokens,
     openai_embed_text,
-    openai_generate,
+    openai_generate_model,
     openai_generate_text,
 )
 from draive.scope import (
@@ -128,7 +128,7 @@ __all__ = [
     "openai_conversation_completion",
     "openai_count_text_tokens",
     "openai_embed_text",
-    "openai_generate",
+    "openai_generate_model",
     "openai_generate_text",
     "similarity",
     "split_sequence",
@@ -141,7 +141,7 @@ __all__ = [
     "mistral_chat_completion",
     "MistralClient",
     "MistralChatConfig",
-    "mistral_generate",
+    "mistral_generate_model",
     "mistral_generate_text",
     "mistral_conversation_completion",
     "setup_logging",

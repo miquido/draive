@@ -142,6 +142,7 @@ async def _openai_conversation_response(
 ) -> ConversationMessage:
     async with ctx.nested("openai_conversation_response"):
         response_content: str = await openai_chat_completion(
+            config=ctx.state(OpenAIChatConfig),
             instruction=instruction,
             input=user_message,
             history=history,
@@ -176,6 +177,7 @@ async def _openai_conversation_stream(  # noqa: PLR0913
 ) -> ConversationMessage:
     async with ctx.nested("openai_conversation_stream"):
         response_content: str = await openai_chat_completion(
+            config=ctx.state(OpenAIChatConfig),
             instruction=instruction,
             input=user_message,
             history=history,

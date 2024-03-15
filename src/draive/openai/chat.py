@@ -26,6 +26,7 @@ __all__ = [
 @overload
 async def openai_chat_completion(
     *,
+    config: OpenAIChatConfig,
     instruction: str,
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
@@ -38,6 +39,7 @@ async def openai_chat_completion(
 @overload
 async def openai_chat_completion(
     *,
+    config: OpenAIChatConfig,
     instruction: str,
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
@@ -50,6 +52,7 @@ async def openai_chat_completion(
 @overload
 async def openai_chat_completion(
     *,
+    config: OpenAIChatConfig,
     instruction: str,
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
@@ -58,15 +61,15 @@ async def openai_chat_completion(
     ...
 
 
-async def openai_chat_completion(
+async def openai_chat_completion(  # noqa: PLR0913
     *,
+    config: OpenAIChatConfig,
     instruction: str,
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
 ) -> ConversationResponseStream | str:
-    config: OpenAIChatConfig = ctx.state(OpenAIChatConfig)
     async with ctx.nested("openai_chat_completion", config):
         client: OpenAIClient = ctx.dependency(OpenAIClient)
         match stream:
