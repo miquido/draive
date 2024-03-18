@@ -27,6 +27,7 @@ __all__ = [
 @overload
 async def mistral_chat_completion(
     *,
+    config: MistralChatConfig,
     instruction: str,
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
@@ -39,6 +40,7 @@ async def mistral_chat_completion(
 @overload
 async def mistral_chat_completion(
     *,
+    config: MistralChatConfig,
     instruction: str,
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
@@ -51,6 +53,7 @@ async def mistral_chat_completion(
 @overload
 async def mistral_chat_completion(
     *,
+    config: MistralChatConfig,
     instruction: str,
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
@@ -59,15 +62,15 @@ async def mistral_chat_completion(
     ...
 
 
-async def mistral_chat_completion(
+async def mistral_chat_completion(  # noqa: PLR0913
     *,
+    config: MistralChatConfig,
     instruction: str,
     input: StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
 ) -> ConversationResponseStream | str:
-    config: MistralChatConfig = ctx.state(MistralChatConfig)
     async with ctx.nested("mistral_chat_completion", config):
         client: MistralClient = ctx.dependency(MistralClient)
         match stream:

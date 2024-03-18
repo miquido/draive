@@ -1,4 +1,4 @@
-from draive.openai import openai_generate, openai_generate_text
+from draive.openai import openai_generate_model, openai_generate_text
 from draive.scope import ScopeState
 from draive.types import ModelGenerator, TextGenerator, Toolset
 
@@ -14,5 +14,5 @@ class TextGeneration(ScopeState):
 
 
 class ModelGeneration(ScopeState):
-    generate: ModelGenerator = openai_generate
+    generate: ModelGenerator = openai_generate_model
     toolset: Toolset | None = None
