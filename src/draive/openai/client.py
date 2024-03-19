@@ -1,8 +1,10 @@
-from asyncio import gather
+from asyncio import gather, sleep
 from collections.abc import Iterable
+from itertools import chain
+from random import uniform
 from typing import Literal, Self, final, overload
 
-from openai import AsyncAzureOpenAI, AsyncOpenAI, AsyncStream
+from openai import AsyncAzureOpenAI, AsyncOpenAI, AsyncStream, RateLimitError
 from openai._types import NOT_GIVEN
 from openai.types import Moderation, ModerationCreateResponse
 from openai.types.chat import (
@@ -11,6 +13,7 @@ from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionToolParam,
 )
+from openai.types.create_embedding_response import CreateEmbeddingResponse
 
 from draive.helpers import getenv_str
 from draive.openai.config import OpenAIChatConfig, OpenAIEmbeddingConfig
@@ -108,22 +111,51 @@ class OpenAIClient(ScopeDependency):
         inputs: Iterable[str],
     ) -> list[list[float]]:
         inputs_list: list[str] = list(inputs)
-        return [
-            embeddings.embedding
-            for response in await gather(
-                *[
-                    self._client.embeddings.create(
-                        input=list(inputs_list[index : index + config.batch_size]),
-                        model=config.model,
-                        dimensions=config.dimensions or NOT_GIVEN,
-                        encoding_format=config.encoding_format or NOT_GIVEN,
-                        timeout=config.timeout or NOT_GIVEN,
-                    )
-                    for index in range(0, len(inputs_list), config.batch_size)
-                ]
+        return list(
+            chain(
+                *await gather(
+                    *[
+                        self._create_text_embedding(
+                            texts=list(inputs_list[index : index + config.batch_size]),
+                            model=config.model,
+                            dimensions=config.dimensions,
+                            encoding_format=config.encoding_format,
+                            timeout=config.timeout,
+                        )
+                        for index in range(0, len(inputs_list), config.batch_size)
+                    ]
+                )
             )
-            for embeddings in response.data
-        ]
+        )
+
+    async def _create_text_embedding(  # noqa: PLR0913
+        self,
+        texts: list[str],
+        model: str,
+        dimensions: int | None,
+        encoding_format: Literal["float", "base64"] | None,
+        timeout: float | None,
+    ) -> list[list[float]]:
+        try:
+            response: CreateEmbeddingResponse = await self._client.embeddings.create(
+                input=texts,
+                model=model,
+                dimensions=dimensions or NOT_GIVEN,
+                encoding_format=encoding_format or NOT_GIVEN,
+                timeout=timeout or NOT_GIVEN,
+            )
+            return [element.embedding for element in response.data]
+
+        except RateLimitError:  # always retry on rate limit
+            # wait between 0.1s and 1s before next attempt
+            await sleep(delay=uniform(0.1, 1))  # nosec: B311
+            return await self._create_text_embedding(
+                texts=texts,
+                model=model,
+                dimensions=dimensions,
+                encoding_format=encoding_format,
+                timeout=timeout,
+            )
 
     async def moderation_check(
         self,
