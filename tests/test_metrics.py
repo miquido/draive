@@ -17,10 +17,12 @@ class ExpMetric(CombinableScopeMetric):
     ) -> Self:
         return self.__class__(value=self._value * other._value)
 
-    def metric_summary(self) -> str | None:
-        return (
-            f"exp value: {self._value}"
-        )
+    def metric_summary(
+        self,
+        trimmed: bool,
+    ) -> str | None:
+        return f"exp value: {self._value}"
+
 
 @pytest_asyncio.fixture
 async def scope_metrics() -> ScopeMetrics:
@@ -39,6 +41,7 @@ async def scope_metrics() -> ScopeMetrics:
                 await ctx.record(ExpMetric(value=7))
 
         return ctx.current_metrics()
+
 
 @pytest.mark.asyncio
 async def test_combinable_metrics(scope_metrics: ScopeMetrics) -> None:

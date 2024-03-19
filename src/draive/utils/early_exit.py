@@ -9,7 +9,7 @@ from collections.abc import Callable, Coroutine
 from contextvars import ContextVar, Token
 from typing import Any, ParamSpec, Protocol, TypeVar, cast
 
-from draive.scope import ctx
+from draive.scope import ScopeMetrics, ctx
 from draive.types import State
 
 __all__ = [
@@ -93,8 +93,19 @@ class _EarlyExitResult:
         ) -> None:
             self._result: Any = __result
 
-        def metric_summary(self) -> str | None:
-            return f"early exit result: {self._result}".replace("\n", "\n|  ")
+        def metric_summary(
+            self,
+            trimmed: bool,
+        ) -> str | None:
+            result_str: str = str(self._result)
+            if trimmed and len(result_str) > ScopeMetrics.TRIMMING_CHARACTER_LIMIT:
+                result_str = f"{result_str[:ScopeMetrics.TRIMMING_CHARACTER_LIMIT]}...".replace(
+                    "\n", " "
+                )
+            else:
+                result_str = result_str.replace("\n", "\n|  ")
+
+            return f"early exit result: {result_str}"
 
     else:  # in non debug builds redact the values
 
@@ -104,7 +115,10 @@ class _EarlyExitResult:
         ) -> None:
             pass
 
-        def metric_summary(self) -> str | None:
+        def metric_summary(
+            self,
+            trimmed: bool,
+        ) -> str | None:
             return None
 
 

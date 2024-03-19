@@ -44,7 +44,10 @@ class OpenAIChatConfig(ScopeState):
     vision_details: Literal["auto", "low", "high"] = "auto"
     context_messages_limit: int = 16
 
-    def metric_summary(self) -> str:
+    def metric_summary(
+        self,
+        trimmed: bool,
+    ) -> str:
         result: str = f"openai config:\n+ model: {self.model}\n+ temperature: {self.temperature}"
         if self.top_p:
             result += f"\n+ top_p: {self.top_p}"
@@ -77,7 +80,10 @@ class OpenAIEmbeddingConfig(ScopeState):
     timeout: float | None = None
     encoding_format: Literal["float", "base64"] | None = None
 
-    def metric_summary(self) -> str:
+    def metric_summary(
+        self,
+        trimmed: bool,
+    ) -> str:
         result: str = f"openai config\n+ model: {self.model}"
         if self.dimensions:
             result += f"\n+ dimensions: {self.dimensions}"

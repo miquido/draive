@@ -32,7 +32,10 @@ class MistralChatConfig(ScopeState):
     response_format: dict[Literal["type"], Literal["text", "json"]] | None = None
     context_messages_limit: int = 16
 
-    def metric_summary(self) -> str:
+    def metric_summary(
+        self,
+        trimmed: bool,
+    ) -> str:
         result: str = f"mistral config:\n+ model: {self.model}\n+ temperature: {self.temperature}"
         if self.top_p:
             result += f"\n+ top_p: {self.top_p}"
