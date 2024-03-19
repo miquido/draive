@@ -1,6 +1,6 @@
 from typing import Literal, overload
 
-from openai.types.chat import ChatCompletionMessageParam
+from openai.types.chat import ChatCompletionContentPartParam, ChatCompletionMessageParam
 
 from draive.openai.chat_response import _chat_response  # pyright: ignore[reportPrivateUsage]
 from draive.openai.chat_stream import _chat_stream  # pyright: ignore[reportPrivateUsage]
@@ -10,6 +10,7 @@ from draive.scope import ctx
 from draive.tools import ToolsProgressContext
 from draive.types import (
     ConversationMessage,
+    ConversationMessageImageReferenceContent,
     ConversationResponseStream,
     ConversationStreamingUpdate,
     ProgressUpdate,
@@ -28,7 +29,7 @@ async def openai_chat_completion(
     *,
     config: OpenAIChatConfig,
     instruction: str,
-    input: StringConvertible,  # noqa: A002
+    input: ConversationMessage | StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: Literal[True],
@@ -41,7 +42,7 @@ async def openai_chat_completion(
     *,
     config: OpenAIChatConfig,
     instruction: str,
-    input: StringConvertible,  # noqa: A002
+    input: ConversationMessage | StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate],
@@ -54,7 +55,7 @@ async def openai_chat_completion(
     *,
     config: OpenAIChatConfig,
     instruction: str,
-    input: StringConvertible,  # noqa: A002
+    input: ConversationMessage | StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
 ) -> str:
@@ -65,24 +66,26 @@ async def openai_chat_completion(  # noqa: PLR0913
     *,
     config: OpenAIChatConfig,
     instruction: str,
-    input: StringConvertible,  # noqa: A002
+    input: ConversationMessage | StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
 ) -> ConversationResponseStream | str:
     async with ctx.nested("openai_chat_completion", config):
         client: OpenAIClient = ctx.dependency(OpenAIClient)
+        messages: list[ChatCompletionMessageParam] = _prepare_messages(
+            config=config,
+            instruction=instruction,
+            history=history or [],
+            input=input,
+            limit=config.context_messages_limit,
+        )
         match stream:
             case False:
                 return await _chat_response(
                     client=client,
                     config=config,
-                    messages=_prepare_messages(
-                        instruction=instruction,
-                        history=history or [],
-                        input=input,
-                        limit=config.context_messages_limit,
-                    ),
+                    messages=messages,
                     toolset=toolset,
                 )
 
@@ -100,12 +103,7 @@ async def openai_chat_completion(  # noqa: PLR0913
                         await _chat_stream(
                             client=client,
                             config=config,
-                            messages=_prepare_messages(
-                                instruction=instruction,
-                                history=history or [],
-                                input=input,
-                                limit=config.context_messages_limit,
-                            ),
+                            messages=messages,
                             toolset=toolset,
                             progress=progress,
                         )
@@ -124,30 +122,26 @@ async def openai_chat_completion(  # noqa: PLR0913
                     return await _chat_stream(
                         client=client,
                         config=config,
-                        messages=_prepare_messages(
-                            instruction=instruction,
-                            history=history or [],
-                            input=input,
-                            limit=config.context_messages_limit,
-                        ),
+                        messages=messages,
                         toolset=toolset,
                         progress=progress,
                     )
 
 
 def _prepare_messages(
+    config: OpenAIChatConfig,
     instruction: str,
     history: list[ConversationMessage],
-    input: StringConvertible,  # noqa: A002
+    input: ConversationMessage | StringConvertible,  # noqa: A002
     limit: int,
 ) -> list[ChatCompletionMessageParam]:
-    assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
+    assert limit > 0, "Messages limit has to be greater than zero"  # nosec: B101
     input_message: ChatCompletionMessageParam
     if isinstance(input, ConversationMessage):
-        input_message = {
-            "role": "user",
-            "content": input.content,
-        }
+        input_message = _convert_message(
+            config=config,
+            message=input,
+        )
     else:
         input_message = {
             "role": "user",
@@ -156,36 +150,25 @@ def _prepare_messages(
 
     messages: list[ChatCompletionMessageParam] = []
     for message in history:
-        match message.role:
-            case "user":
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": message.content,
-                    },
+        try:
+            messages.append(
+                _convert_message(
+                    config=config,
+                    message=message,
                 )
-
-            case "assistant":
-                messages.append(
-                    {
-                        "role": "assistant",
-                        "content": message.content,
-                    },
-                )
-
-            case other:
-                ctx.log_error(
-                    "Invalid message author: %s Ignoring conversation memory.",
-                    other,
-                )
-                return [
-                    {
-                        "role": "system",
-                        "content": instruction,
-                    },
-                    input_message,
-                ]
-
+            )
+        except ValueError:
+            ctx.log_error(
+                "Invalid message: %s Ignoring memory.",
+                message,
+            )
+            return [
+                {
+                    "role": "system",
+                    "content": instruction,
+                },
+                input_message,
+            ]
     return [
         {
             "role": "system",
@@ -194,3 +177,48 @@ def _prepare_messages(
         *messages[-limit:],
         input_message,
     ]
+
+
+def _convert_message(
+    config: OpenAIChatConfig,
+    message: ConversationMessage,
+) -> ChatCompletionMessageParam:
+    match message.role:
+        case "user":
+            if isinstance(message.content, str):
+                return {
+                    "role": "user",
+                    "content": message.content,
+                }
+            else:
+                content_parts: list[ChatCompletionContentPartParam] = []
+                for part in message.content:
+                    if isinstance(part, ConversationMessageImageReferenceContent):
+                        content_parts.append(
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": part.url,
+                                    "detail": config.vision_details,
+                                },
+                            }
+                        )
+                    else:
+                        content_parts.append({"type": "text", "text": part.text})
+
+                return {
+                    "role": "user",
+                    "content": content_parts,
+                }
+
+        case "assistant":
+            if isinstance(message.content, str):
+                return {
+                    "role": "assistant",
+                    "content": message.content,
+                }
+            else:
+                raise ValueError("Invalid assistant message", message)
+
+        case other:
+            raise ValueError("Invalid message role", other)

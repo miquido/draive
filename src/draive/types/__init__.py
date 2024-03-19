@@ -1,6 +1,9 @@
 from draive.types.conversation import (
     ConversationCompletion,
     ConversationMessage,
+    ConversationMessageContent,
+    ConversationMessageImageReferenceContent,
+    ConversationMessageTextContent,
     ConversationResponseStream,
     ConversationStreamingPartialMessage,
     ConversationStreamingUpdate,
@@ -25,6 +28,9 @@ from draive.types.tool import ToolCallProgress, ToolCallStatus, ToolException, T
 from draive.types.toolset import Toolset
 
 __all__ = [
+    "ConversationMessageTextContent",
+    "ConversationMessageImageReferenceContent",
+    "ConversationMessageContent",
     "ConversationMessage",
     "ConversationStreamingUpdate",
     "ConversationResponseStream",

@@ -19,8 +19,10 @@ _Generated = TypeVar(
 INSTRUCTION: str = """\
 {instruction}
 
-The output have to be formatted as a single, raw JSON object \
-that conforms to the following JSON Schema:
+
+IMPORTANT!
+The result have to be a single, valid JSON without any comments or additions. \
+The result have to conform to the following JSON Schema:
 ```
 {format}
 ```
@@ -30,7 +32,7 @@ that conforms to the following JSON Schema:
 async def openai_generate_text(
     *,
     instruction: str,
-    input: StringConvertible,  # noqa: A002
+    input: ConversationMessage | StringConvertible,  # noqa: A002
     toolset: Toolset | None = None,
     examples: Iterable[tuple[str, str]] | None = None,
 ) -> str:
@@ -64,7 +66,7 @@ async def openai_generate_model(
     model: type[_Generated],
     *,
     instruction: str,
-    input: StringConvertible,  # noqa: A002
+    input: ConversationMessage | StringConvertible,  # noqa: A002
     toolset: Toolset | None = None,
     examples: Iterable[tuple[str, _Generated]] | None = None,
 ) -> _Generated:
@@ -89,7 +91,7 @@ async def openai_generate_model(
                         ),
                         ConversationMessage(
                             role="assistant",
-                            content=example[1].__str__(),
+                            content=str(example[1]),
                         ),
                     ]
                 ]

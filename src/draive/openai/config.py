@@ -41,6 +41,7 @@ class OpenAIChatConfig(ScopeState):
     timeout: float | None = None
     seed: int | None = getenv_int("OPENAI_SEED")
     response_format: ResponseFormat | None = None
+    vision_details: Literal["auto", "low", "high"] = "auto"
     context_messages_limit: int = 16
 
     def metric_summary(self) -> str:
