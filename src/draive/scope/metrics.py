@@ -4,7 +4,7 @@ from contextvars import ContextVar, Token
 from logging import Logger, getLogger
 from time import time
 from types import TracebackType
-from typing import Any, Protocol, Self, TypeVar, cast, final, runtime_checkable
+from typing import Any, Literal, Protocol, Self, TypeVar, cast, final, runtime_checkable
 from uuid import uuid4
 
 __all__ = [
@@ -18,13 +18,19 @@ __all__ = [
 
 @runtime_checkable
 class ScopeMetric(Protocol):
-    def metric_summary(self) -> str | None:
+    def metric_summary(
+        self,
+        trimmed: bool,
+    ) -> str | None:
         ...
 
 
 @runtime_checkable
 class CombinableScopeMetric(Protocol):
-    def metric_summary(self) -> str | None:
+    def metric_summary(
+        self,
+        trimmed: bool,
+    ) -> str | None:
         ...
 
     def combined_metric(
@@ -55,14 +61,21 @@ class TokenUsage(CombinableScopeMetric):
     ) -> Self:
         return self.__class__(
             input_tokens=self._input_tokens + other._input_tokens,
-            output_tokens=self._output_tokens + other._output_tokens
+            output_tokens=self._output_tokens + other._output_tokens,
         )
 
-    def metric_summary(self) -> str | None:
-        return (
-            f"token usage: {self._input_tokens + self._output_tokens}"
-            f" (in:{self._input_tokens} out:{self._output_tokens})"
-        )
+    def metric_summary(
+        self,
+        trimmed: bool,
+    ) -> str | None:
+        if trimmed:
+            return f"token usage: {self._input_tokens + self._output_tokens}"
+
+        else:
+            return (
+                f"token usage: {self._input_tokens + self._output_tokens}"
+                f" (in:{self._input_tokens} out:{self._output_tokens})"
+            )
 
 
 class ArgumentsTrace(ScopeMetric):
@@ -74,13 +87,27 @@ class ArgumentsTrace(ScopeMetric):
         ) -> None:
             self._kwargs: dict[str, Any] = kwargs
 
-        def metric_summary(self) -> str | None:
+        def metric_summary(
+            self,
+            trimmed: bool,
+        ) -> str | None:
             if self._kwargs:
-                arguments_description: str = "\n".join(
-                    f"|   - {key}: {value}".replace("\n", "\n|   ")
-                    for key, value in self._kwargs.items()
-                )
-                return f"arguments:\n{arguments_description}"
+                arguments_description: str = ""
+                for key, value in self._kwargs.items():
+                    value_str: str = str(value)
+                    if trimmed and len(value_str) > ScopeMetrics.TRIMMING_CHARACTER_LIMIT:
+                        value_str = (
+                            f"{value_str[:ScopeMetrics.TRIMMING_CHARACTER_LIMIT]}...".replace(
+                                "\n", " "
+                            )
+                        )
+
+                    else:
+                        value_str = value_str.replace("\n", "\n|   ")
+
+                    arguments_description += f"\n|   - {key}: {value_str}"
+
+                return f"arguments:{arguments_description}"
 
             else:
                 return "arguments: None"
@@ -93,7 +120,10 @@ class ArgumentsTrace(ScopeMetric):
         ) -> None:
             pass
 
-        def metric_summary(self) -> str | None:
+        def metric_summary(
+            self,
+            trimmed: bool,
+        ) -> str | None:
             return None
 
 
@@ -106,8 +136,19 @@ class ResultTrace(ScopeMetric):
         ) -> None:
             self._result: Any = __result
 
-        def metric_summary(self) -> str | None:
-            return f"result: {self._result}".replace("\n", "\n|  ")
+        def metric_summary(
+            self,
+            trimmed: bool,
+        ) -> str | None:
+            result_str: str = str(self._result)
+            if trimmed and len(result_str) > ScopeMetrics.TRIMMING_CHARACTER_LIMIT:
+                result_str = (f"{result_str[:ScopeMetrics.TRIMMING_CHARACTER_LIMIT]}...").replace(
+                    "\n", " "
+                )
+            else:
+                result_str = result_str.replace("\n", "\n|  ")
+
+            return f"result: {result_str}"
 
     else:  # in non debug builds redact the values
 
@@ -117,7 +158,10 @@ class ResultTrace(ScopeMetric):
         ) -> None:
             pass
 
-        def metric_summary(self) -> str | None:
+        def metric_summary(
+            self,
+            trimmed: bool,
+        ) -> str | None:
             return None
 
 
@@ -129,6 +173,8 @@ _ScopeMetric_T = TypeVar(
 
 @final  # unstructured background tasks spawning may result in corrupted data
 class ScopeMetrics:
+    TRIMMING_CHARACTER_LIMIT: int = 64
+
     def __init__(  # noqa: PLR0913
         self,
         *,
@@ -136,7 +182,7 @@ class ScopeMetrics:
         logger: Logger | None,
         parent: Self | None,
         metrics: Iterable[ScopeMetric] | None,
-        log_summary: bool,
+        log_summary: Literal["full", "trimmed", "none"],
     ) -> None:
         self._start: float = time()
         self._end: float | None = None
@@ -151,7 +197,7 @@ class ScopeMetrics:
             type(metric): metric for metric in metrics or []
         }
         self._nested_traces: list[ScopeMetrics] = []
-        self._log_summary: bool = log_summary and parent is None  # only root can do summary
+        self._log_summary: Literal["full", "trimmed", "none"] = log_summary
         self._token: Token[ScopeMetrics] | None = None
         self.log_info("%s started", self)
 
@@ -183,7 +229,7 @@ class ScopeMetrics:
             logger=self._logger,
             parent=self,
             metrics=metrics,
-            log_summary=False,
+            log_summary="none",
         )
         self._nested_traces.append(child)
         return child
@@ -295,11 +341,19 @@ class ScopeMetrics:
         async with self._lock:
             self._end = time()
 
-            if self._log_summary:
-                self.log_debug(
-                    "%s",
-                    await self._summary(),
-                )
+            match self._log_summary:
+                case "none":
+                    pass
+                case "trimmed":
+                    self.log_debug(
+                        "%s",
+                        await self._summary(trimmed=True),
+                    )
+                case "full":
+                    self.log_debug(
+                        "%s",
+                        await self._summary(trimmed=False),
+                    )
 
             duration: float = self._end - (self._start or self._end)
 
@@ -350,7 +404,10 @@ class ScopeMetrics:
     # - PRIVATE -
 
     # Warning: this method is not using lock
-    async def _summary(self) -> str:
+    async def _summary(
+        self,
+        trimmed: bool,
+    ) -> str:
         summary: str
         if self.is_root:
             summary = f"[{self._trace_id}] Summary:\n• {self._label}:"
@@ -366,24 +423,24 @@ class ScopeMetrics:
 
         if self.is_root:
             for combined_metric in (await self._combined_metrics()).values():
-                summary += f"\n- total {combined_metric.metric_summary()}"
+                summary += f"\n- total {combined_metric.metric_summary(trimmed=trimmed)}"
 
         for metric in self._metrics.values():
-            if metric_summary := metric.metric_summary():
+            if metric_summary := metric.metric_summary(trimmed=trimmed):
                 summary += f"\n- {metric_summary}"
 
         for child in self._nested_traces:
-            child_summary: str = (await child._summary()).replace("\n", "\n|   ")
+            child_summary: str = (await child._summary(trimmed=trimmed)).replace("\n", "\n|   ")
             summary += f"\n{child_summary}"
 
         return summary
-
 
     async def _combined_metrics(
         self,
     ) -> dict[type[CombinableScopeMetric], CombinableScopeMetric]:
         metrics: dict[type[CombinableScopeMetric], CombinableScopeMetric] = {
-            metric_type: metric for metric_type, metric in self._metrics.items()
+            metric_type: metric
+            for metric_type, metric in self._metrics.items()
             if isinstance(metric_type, CombinableScopeMetric)
             and isinstance(metric, CombinableScopeMetric)
         }
@@ -397,5 +454,6 @@ class ScopeMetrics:
                     metrics[metric_type] = child_metric
 
         return metrics
+
 
 _ScopeMetrics_Var = ContextVar[ScopeMetrics]("_ScopeMetrics_Var")

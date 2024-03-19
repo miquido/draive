@@ -4,7 +4,7 @@ from contextvars import Context, ContextVar, Token, copy_context
 from functools import wraps
 from logging import Logger
 from types import TracebackType
-from typing import Any, ParamSpec, TypeVar, final
+from typing import Any, Literal, ParamSpec, TypeVar, final
 
 from draive.scope.dependencies import (
     ScopeDependencies,
@@ -103,7 +103,7 @@ class ctx:
         logger: Logger | None = None,
         state: Iterable[ScopeState] | None = None,
         dependencies: ScopeDependencies | None = None,
-        log_summary: bool = __debug__,
+        log_summary: Literal["full", "trimmed", "none"] | None = None,
     ) -> _RootContext:
         return _RootContext(
             task_group=TaskGroup(),
@@ -112,7 +112,7 @@ class ctx:
                 logger=logger,
                 parent=None,
                 metrics=None,
-                log_summary=log_summary,
+                log_summary=log_summary or ("trimmed" if __debug__ else "none"),
             ),
             state=ScopeStates(*state or []),
             dependencies=dependencies or ScopeDependencies(),
