@@ -20,9 +20,10 @@ _Embeddable = TypeVar(
 async def openai_embed_text(
     values: Iterable[_Embeddable],
 ) -> list[Embedded[_Embeddable]]:
-    async with ctx.nested("text_embedding", ctx.state(OpenAIEmbeddingConfig)):
+    config: OpenAIEmbeddingConfig = ctx.state(OpenAIEmbeddingConfig)
+    async with ctx.nested("text_embedding", config):
         results: list[list[float]] = await ctx.dependency(OpenAIClient).embedding(
-            config=ctx.state(OpenAIEmbeddingConfig),
+            config=config,
             inputs=[str(value) for value in values],
         )
 

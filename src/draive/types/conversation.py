@@ -9,6 +9,9 @@ from draive.types.tool import ToolCallProgress
 from draive.types.toolset import Toolset
 
 __all__ = [
+    "ConversationMessageTextContent",
+    "ConversationMessageImageReferenceContent",
+    "ConversationMessageContent",
     "ConversationMessage",
     "ConversationCompletion",
     "ConversationResponseStream",
@@ -17,10 +20,23 @@ __all__ = [
 ]
 
 
+class ConversationMessageTextContent(Model):
+    text: str
+
+
+class ConversationMessageImageReferenceContent(Model):
+    url: str
+
+
+ConversationMessageContent = (
+    ConversationMessageTextContent | ConversationMessageImageReferenceContent
+)
+
+
 class ConversationMessage(Model):
     role: str
     author: str | None = None
-    content: str
+    content: list[ConversationMessageContent] | str
     timestamp: str | None = None
 
 

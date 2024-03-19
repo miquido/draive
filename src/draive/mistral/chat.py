@@ -11,6 +11,7 @@ from draive.scope import ctx
 from draive.tools import ToolsProgressContext
 from draive.types import (
     ConversationMessage,
+    ConversationMessageImageReferenceContent,
     ConversationResponseStream,
     ConversationStreamingUpdate,
     ProgressUpdate,
@@ -29,7 +30,7 @@ async def mistral_chat_completion(
     *,
     config: MistralChatConfig,
     instruction: str,
-    input: StringConvertible,  # noqa: A002
+    input: ConversationMessage | StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: Literal[True],
@@ -42,7 +43,7 @@ async def mistral_chat_completion(
     *,
     config: MistralChatConfig,
     instruction: str,
-    input: StringConvertible,  # noqa: A002
+    input: ConversationMessage | StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate],
@@ -55,7 +56,7 @@ async def mistral_chat_completion(
     *,
     config: MistralChatConfig,
     instruction: str,
-    input: StringConvertible,  # noqa: A002
+    input: ConversationMessage | StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
 ) -> str:
@@ -66,24 +67,25 @@ async def mistral_chat_completion(  # noqa: PLR0913
     *,
     config: MistralChatConfig,
     instruction: str,
-    input: StringConvertible,  # noqa: A002
+    input: ConversationMessage | StringConvertible,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
 ) -> ConversationResponseStream | str:
     async with ctx.nested("mistral_chat_completion", config):
         client: MistralClient = ctx.dependency(MistralClient)
+        messages: list[ChatMessage] = _prepare_messages(
+            instruction=instruction,
+            history=history or [],
+            input=input,
+            limit=config.context_messages_limit,
+        )
         match stream:
             case False:
                 return await _chat_response(
                     client=client,
                     config=config,
-                    messages=_prepare_messages(
-                        instruction=instruction,
-                        history=history or [],
-                        input=input,
-                        limit=config.context_messages_limit,
-                    ),
+                    messages=messages,
                     toolset=toolset,
                 )
 
@@ -101,12 +103,7 @@ async def mistral_chat_completion(  # noqa: PLR0913
                         await _chat_stream(
                             client=client,
                             config=config,
-                            messages=_prepare_messages(
-                                instruction=instruction,
-                                history=history or [],
-                                input=input,
-                                limit=config.context_messages_limit,
-                            ),
+                            messages=messages,
                             toolset=toolset,
                             progress=progress,
                         )
@@ -125,12 +122,7 @@ async def mistral_chat_completion(  # noqa: PLR0913
                     return await _chat_stream(
                         client=client,
                         config=config,
-                        messages=_prepare_messages(
-                            instruction=instruction,
-                            history=history or [],
-                            input=input,
-                            limit=config.context_messages_limit,
-                        ),
+                        messages=messages,
                         toolset=toolset,
                         progress=progress,
                     )
@@ -139,16 +131,13 @@ async def mistral_chat_completion(  # noqa: PLR0913
 def _prepare_messages(
     instruction: str,
     history: list[ConversationMessage],
-    input: StringConvertible,  # noqa: A002
+    input: ConversationMessage | StringConvertible,  # noqa: A002
     limit: int,
 ) -> list[ChatMessage]:
-    assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
+    assert limit > 0, "Messages limit has to be greater than zero"  # nosec: B101
     input_message: ChatMessage
     if isinstance(input, ConversationMessage):
-        input_message = ChatMessage(
-            role="user",
-            content=f"{input.author}:\n{input.content}" if input.author else input.content,
-        )
+        input_message = _convert_message(message=input)
     else:
         input_message = ChatMessage(
             role="user",
@@ -157,36 +146,20 @@ def _prepare_messages(
 
     messages: list[ChatMessage] = []
     for message in history:
-        match message.role:
-            case "user":
-                messages.append(
-                    ChatMessage(
-                        role="user",
-                        content=message.content,
-                    ),
-                )
-
-            case "assistant":
-                messages.append(
-                    ChatMessage(
-                        role="assistant",
-                        content=message.content,
-                    ),
-                )
-
-            case other:
-                ctx.log_error(
-                    "Invalid message author: %s Ignoring conversation memory.",
-                    other,
-                )
-                return [
-                    ChatMessage(
-                        role="system",
-                        content=instruction,
-                    ),
-                    input_message,
-                ]
-
+        try:
+            messages.append(_convert_message(message=message))
+        except ValueError:
+            ctx.log_error(
+                "Invalid message: %s Ignoring memory.",
+                message,
+            )
+            return [
+                ChatMessage(
+                    role="system",
+                    content=instruction,
+                ),
+                input_message,
+            ]
     return [
         ChatMessage(
             role="system",
@@ -195,3 +168,40 @@ def _prepare_messages(
         *messages[-limit:],
         input_message,
     ]
+
+
+def _convert_message(
+    message: ConversationMessage,
+) -> ChatMessage:
+    match message.role:
+        case "user":
+            if isinstance(message.content, str):
+                return ChatMessage(
+                    role="user",
+                    content=message.content,
+                )
+            else:
+                content_parts: list[str] = []
+                for part in message.content:
+                    if isinstance(part, ConversationMessageImageReferenceContent):
+                        ValueError("Mistral can't handle ImageReferenceContent")
+
+                    else:
+                        content_parts.append(part.text)
+
+                return ChatMessage(
+                    role="user",
+                    content="\n".join(content_parts),
+                )
+
+        case "assistant":
+            if isinstance(message.content, str):
+                return ChatMessage(
+                    role="assistant",
+                    content=message.content,
+                )
+            else:
+                raise ValueError("Invalid assistant message", message)
+
+        case other:
+            raise ValueError("Invalid message role", other)

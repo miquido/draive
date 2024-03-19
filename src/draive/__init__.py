@@ -52,6 +52,9 @@ from draive.tools import Parameter, Tool, Toolbox, ToolCallContext, tool
 from draive.types import (
     MISSING,
     ConversationMessage,
+    ConversationMessageContent,
+    ConversationMessageImageReferenceContent,
+    ConversationMessageTextContent,
     ConversationResponseStream,
     ConversationStreamingPartialMessage,
     ConversationStreamingUpdate,
@@ -77,6 +80,9 @@ from draive.utils import allowing_early_exit, autoretry, cache, with_early_exit
 
 __all__ = [
     "Conversation",
+    "ConversationMessageTextContent",
+    "ConversationMessageImageReferenceContent",
+    "ConversationMessageContent",
     "ConversationMessage",
     "ConversationStreamingUpdate",
     "ConversationResponseStream",
