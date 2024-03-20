@@ -190,7 +190,7 @@ class Tool(Generic[ToolArgs, ToolResult_co]):
             tool=self._name,
         )
         progress: ProgressUpdate[ToolCallProgress] = ctx.state(ToolsProgressContext).progress
-        async with ctx.nested(
+        with ctx.nested(
             self._name,
             ArgumentsTrace(call_id=call_context.call_id, **kwargs),
         ):
@@ -232,7 +232,7 @@ class Tool(Generic[ToolArgs, ToolResult_co]):
                     *args,
                     **arguments,
                 )
-                await ctx.record(ResultTrace(result))
+                ctx.record(ResultTrace(result))
                 progress(
                     ToolCallProgress(
                         call_id=call_context.call_id,

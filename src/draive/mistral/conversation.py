@@ -64,7 +64,7 @@ async def mistral_conversation_completion(
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
 ) -> ConversationResponseStream | ConversationMessage:
-    async with ctx.nested(
+    with ctx.nested(
         "mistral_conversation",
         ArgumentsTrace(message=input),
     ):
@@ -101,7 +101,7 @@ async def mistral_conversation_completion(
                         remember=memory.remember if memory else None,
                         progress=progress,
                     )
-                    await ctx.record(ResultTrace(response))
+                    ctx.record(ResultTrace(response))
 
                 return AsyncStreamTask(
                     job=stream_task,
@@ -116,7 +116,7 @@ async def mistral_conversation_completion(
                     toolset=toolset,
                     remember=memory.remember if memory else None,
                 )
-                await ctx.record(ResultTrace(response))
+                ctx.record(ResultTrace(response))
                 return response
 
             case progress:
@@ -128,7 +128,7 @@ async def mistral_conversation_completion(
                     remember=memory.remember if memory else None,
                     progress=progress,
                 )
-                await ctx.record(ResultTrace(response))
+                ctx.record(ResultTrace(response))
                 return response
 
 
@@ -140,7 +140,7 @@ async def _mistral_conversation_response(
     toolset: Toolset | None = None,
     remember: Callable[[list[ConversationMessage]], Awaitable[None]] | None,
 ) -> ConversationMessage:
-    async with ctx.nested("mistral_conversation_response"):
+    with ctx.nested("mistral_conversation_response"):
         response_content: str = await mistral_chat_completion(
             config=ctx.state(MistralChatConfig),
             instruction=instruction,
@@ -175,7 +175,7 @@ async def _mistral_conversation_stream(  # noqa: PLR0913
     remember: Callable[[list[ConversationMessage]], Awaitable[None]] | None,
     progress: ProgressUpdate[ConversationStreamingUpdate],
 ) -> ConversationMessage:
-    async with ctx.nested("mistral_conversation_stream"):
+    with ctx.nested("mistral_conversation_stream"):
         response_content: str = await mistral_chat_completion(
             config=ctx.state(MistralChatConfig),
             instruction=instruction,

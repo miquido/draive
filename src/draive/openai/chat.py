@@ -71,7 +71,7 @@ async def openai_chat_completion(  # noqa: PLR0913
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
 ) -> ConversationResponseStream | str:
-    async with ctx.nested("openai_chat_completion", config):
+    with ctx.nested("openai_chat_completion", config):
         client: OpenAIClient = ctx.dependency(OpenAIClient)
         messages: list[ChatCompletionMessageParam] = _prepare_messages(
             config=config,

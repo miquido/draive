@@ -27,18 +27,18 @@ class ExpMetric(CombinableScopeMetric):
 @pytest_asyncio.fixture
 async def scope_metrics() -> ScopeMetrics:
     async with ctx.new():
-        await ctx.record(ExpMetric(value=1))
+        ctx.record(ExpMetric(value=1))
 
         async with ctx.nested("child"):
-            await ctx.record(TokenUsage(input_tokens=44, output_tokens=55))
+            ctx.record(TokenUsage(input_tokens=44, output_tokens=55))
 
             async with ctx.nested("grandchild_1"):
-                await ctx.record(TokenUsage(input_tokens=444, output_tokens=555))
-                await ctx.record(ExpMetric(value=5))
+                ctx.record(TokenUsage(input_tokens=444, output_tokens=555))
+                ctx.record(ExpMetric(value=5))
 
             async with ctx.nested("grandchild_2"):
-                await ctx.record(TokenUsage(input_tokens=222, output_tokens=333))
-                await ctx.record(ExpMetric(value=7))
+                ctx.record(TokenUsage(input_tokens=222, output_tokens=333))
+                ctx.record(ExpMetric(value=7))
 
         return ctx.current_metrics()
 

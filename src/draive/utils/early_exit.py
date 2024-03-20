@@ -43,7 +43,7 @@ async def allowing_early_exit(
                     type(early_result),
                 )
             early_exit_future.set_result(early_result)
-            await ctx.record(_EarlyExitResult(early_result))
+            ctx.record(_EarlyExitResult(early_result))
         except InvalidStateError as exc:
             ctx.log_debug("Ignored redundant attempt to early exit: %s", exc)
         except TypeError as exc:

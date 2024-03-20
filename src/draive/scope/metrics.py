@@ -1,4 +1,3 @@
-from asyncio import Lock
 from collections.abc import Iterable
 from contextvars import ContextVar, Token
 from logging import Logger, getLogger
@@ -188,7 +187,6 @@ class ScopeMetrics:
         self._end: float | None = None
         self._exception: BaseException | None = None
         self._pending_tasks: int = 0
-        self._lock: Lock = Lock()
         self._trace_id: str = parent._trace_id if parent else uuid4().hex
         self._label: str = label or "metrics"
         self._parent: Self | None = parent
@@ -236,7 +234,7 @@ class ScopeMetrics:
 
     # - METRICS -
 
-    async def record(
+    def record(
         self,
         *metrics: ScopeMetric,
     ) -> None:
@@ -244,31 +242,29 @@ class ScopeMetrics:
             if self.is_finished:
                 raise ValueError("Attempting to use already finished metrics")
 
-            async with self._lock:
-                for metric in metrics:
-                    metric_type: type[ScopeMetric] = type(metric)
-                    if metric_type in self._metrics:
-                        if isinstance(metric, CombinableScopeMetric):
-                            self._metrics[metric_type].combine_metric(  # pyright: ignore[reportUnknownMemberType, reportGeneralTypeIssues, reportAttributeAccessIssue]
-                                metric
-                            )
-                        else:
-                            raise NotImplementedError(f"{type(self)} can't be combined!")
-
+            for metric in metrics:
+                metric_type: type[ScopeMetric] = type(metric)
+                if metric_type in self._metrics:
+                    if isinstance(metric, CombinableScopeMetric):
+                        self._metrics[metric_type].combine_metric(  # pyright: ignore[reportUnknownMemberType, reportGeneralTypeIssues, reportAttributeAccessIssue]
+                            metric
+                        )
                     else:
-                        self._metrics[metric_type] = metric
+                        raise NotImplementedError(f"{type(self)} can't be combined!")
+
+                else:
+                    self._metrics[metric_type] = metric
 
         except Exception as exc:
             self.log_error("Failed to record metrics caused by %s", exc)
 
-    async def read(
+    def read(
         self,
         _type: type[_ScopeMetric_T],
         /,
     ) -> _ScopeMetric_T | None:
         try:  # catch all exceptions - we don't wan't to blow up on metrics
-            async with self._lock:
-                return cast(_ScopeMetric_T, self._metrics.get(_type))
+            return cast(_ScopeMetric_T, self._metrics.get(_type))
 
         except Exception as exc:
             self.log_error("Failed to read metrics caused by %s", exc)
@@ -331,61 +327,60 @@ class ScopeMetrics:
             raise ValueError("Attempting to use already finished metrics")
         self._pending_tasks += 1
 
-    async def _exit_task(self) -> None:
+    def _exit_task(self) -> None:
         assert self._pending_tasks > 0, "Unbalanced metrics task exit"  # nosec: B101
         self._pending_tasks -= 1
 
         if self._pending_tasks > 0:
             return  # can't finish yet
 
-        async with self._lock:
-            self._end = time()
+        self._end = time()
 
-            match self._log_summary:
-                case "none":
-                    pass
-                case "trimmed":
-                    self.log_debug(
-                        "%s",
-                        await self._summary(trimmed=True),
-                    )
-                case "full":
-                    self.log_debug(
-                        "%s",
-                        await self._summary(trimmed=False),
-                    )
-
-            duration: float = self._end - (self._start or self._end)
-
-            if exception := self._exception:
-                self.log_error(
-                    "%s finished after %.2fs with exception: %s\n%s",
-                    self,
-                    duration,
-                    type(exception).__name__,
-                    exception,
+        match self._log_summary:
+            case "none":
+                pass
+            case "trimmed":
+                self.log_debug(
+                    "%s",
+                    self._summary(trimmed=True),
                 )
-            else:
-                self.log_info(
-                    "%s finished after %.2fs",
-                    self,
-                    duration,
+            case "full":
+                self.log_debug(
+                    "%s",
+                    self._summary(trimmed=False),
                 )
+
+        duration: float = self._end - (self._start or self._end)
+
+        if exception := self._exception:
+            self.log_error(
+                "%s finished after %.2fs with exception: %s\n%s",
+                self,
+                duration,
+                type(exception).__name__,
+                exception,
+            )
+        else:
+            self.log_info(
+                "%s finished after %.2fs",
+                self,
+                duration,
+            )
 
         # exit out of lock to avoid deadlock on summary
         if parent := self._parent:
-            await parent._exit_task()
+            parent._exit_task()
 
     def __str__(self) -> str:
         return f"{self._trace_id}|{self._label}"
 
-    async def __aenter__(self) -> None:
+    def __enter__(self) -> None:
         assert not self.is_finished, "Attempting to use already finished metrics"  # nosec: B101
         assert self._token is None, "Reentrance is not allowed"  # nosec: B101
         self._token = _ScopeMetrics_Var.set(self)
         self._enter_task()
 
-    async def __aexit__(
+    def __exit__(
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
@@ -396,7 +391,7 @@ class ScopeMetrics:
 
         try:
             self._exception = exc_val
-            await self._exit_task()
+            self._exit_task()
 
         finally:
             _ScopeMetrics_Var.reset(self._token)
@@ -404,7 +399,7 @@ class ScopeMetrics:
     # - PRIVATE -
 
     # Warning: this method is not using lock
-    async def _summary(
+    def _summary(
         self,
         trimmed: bool,
     ) -> str:
@@ -422,7 +417,7 @@ class ScopeMetrics:
             summary += f"\n- exception: {type(exception).__name__}s"
 
         if self.is_root:
-            for combined_metric in (await self._combined_metrics()).values():
+            for combined_metric in self._combined_metrics().values():
                 summary += f"\n- total {combined_metric.metric_summary(trimmed=trimmed)}"
 
         for metric in self._metrics.values():
@@ -430,12 +425,12 @@ class ScopeMetrics:
                 summary += f"\n- {metric_summary}"
 
         for child in self._nested_traces:
-            child_summary: str = (await child._summary(trimmed=trimmed)).replace("\n", "\n|   ")
+            child_summary: str = child._summary(trimmed=trimmed).replace("\n", "\n|   ")
             summary += f"\n{child_summary}"
 
         return summary
 
-    async def _combined_metrics(
+    def _combined_metrics(
         self,
     ) -> dict[type[CombinableScopeMetric], CombinableScopeMetric]:
         metrics: dict[type[CombinableScopeMetric], CombinableScopeMetric] = {
@@ -446,7 +441,7 @@ class ScopeMetrics:
         }
 
         for child in self._nested_traces:
-            child_metrics = await child._combined_metrics()
+            child_metrics = child._combined_metrics()
             for metric_type, child_metric in child_metrics.items():
                 if metric_type in metrics:
                     metrics[metric_type] = metrics[metric_type].combined_metric(child_metric)

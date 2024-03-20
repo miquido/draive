@@ -21,7 +21,7 @@ async def openai_embed_text(
     values: Iterable[_Embeddable],
 ) -> list[Embedded[_Embeddable]]:
     config: OpenAIEmbeddingConfig = ctx.state(OpenAIEmbeddingConfig)
-    async with ctx.nested("text_embedding", config):
+    with ctx.nested("text_embedding", config):
         results: list[list[float]] = await ctx.dependency(OpenAIClient).embedding(
             config=config,
             inputs=[str(value) for value in values],
