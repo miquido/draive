@@ -50,7 +50,7 @@ class _RootContext:
         # start the task group first
         await self._task_group.__aenter__()
         # then begin metrics capture
-        await self._metrics.__aenter__()
+        self._metrics.__enter__()
         # prepare state next
         self._state.__enter__()
         # finally initialize dependencies
@@ -71,7 +71,7 @@ class _RootContext:
             tb=exc_tb,
         )
         # then end metrics capture
-        await self._metrics.__aexit__(
+        self._metrics.__exit__(
             exc_type=exc_type,
             exc_val=exc_val,
             exc_tb=exc_tb,
@@ -133,7 +133,7 @@ class ctx:
             try:
                 return await current.run(function, *args, **kwargs)
             finally:
-                await current_metrics._exit_task()  # pyright: ignore[reportPrivateUsage]
+                current_metrics._exit_task()  # pyright: ignore[reportPrivateUsage]
 
         return wrapped
 
@@ -208,17 +208,17 @@ class ctx:
         return ctx.current_dependencies().dependency(_type)
 
     @staticmethod
-    async def read(
+    def read(
         _type: type[_ScopeMetric_T],
         /,
     ) -> _ScopeMetric_T | None:
-        return await ctx.current_metrics().read(_type)
+        return ctx.current_metrics().read(_type)
 
     @staticmethod
-    async def record(
+    def record(
         *metrics: ScopeMetric,
     ) -> None:
-        await ctx.current_metrics().record(*metrics)
+        ctx.current_metrics().record(*metrics)
 
     @staticmethod
     def log_error(

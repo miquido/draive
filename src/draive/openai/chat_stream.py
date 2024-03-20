@@ -37,7 +37,7 @@ async def _chat_stream(
     toolset: Toolset | None,
     progress: ProgressUpdate[ConversationStreamingUpdate],
 ) -> str:
-    async with ctx.nested(
+    with ctx.nested(
         "chat_stream",
         ArgumentsTrace(messages=messages.copy()),
     ):
@@ -80,7 +80,7 @@ async def _chat_stream(
                         progress=progress,
                     )
                 )
-                await ctx.record(ResultTrace(tool_calls))
+                ctx.record(ResultTrace(tool_calls))
                 break  # after processing tool calls continue with recursion in outer context
 
             elif completion_head.content is not None:
@@ -96,7 +96,7 @@ async def _chat_stream(
                     result += part_text
                     progress(update=ConversationStreamingPartialMessage(content=result))
 
-                await ctx.record(ResultTrace(result))
+                ctx.record(ResultTrace(result))
                 return result  # we hav final result here
 
             else:

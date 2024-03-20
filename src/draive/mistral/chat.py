@@ -72,7 +72,7 @@ async def mistral_chat_completion(  # noqa: PLR0913
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
 ) -> ConversationResponseStream | str:
-    async with ctx.nested("mistral_chat_completion", config):
+    with ctx.nested("mistral_chat_completion", config):
         client: MistralClient = ctx.dependency(MistralClient)
         messages: list[ChatMessage] = _prepare_messages(
             instruction=instruction,

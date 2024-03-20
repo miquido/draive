@@ -32,7 +32,7 @@ async def _chat_response(
     messages: list[ChatCompletionMessageParam],
     toolset: Toolset | None,
 ) -> str:
-    async with ctx.nested(
+    with ctx.nested(
         "chat_response",
         ArgumentsTrace(messages=messages.copy()),
     ):
@@ -46,7 +46,7 @@ async def _chat_response(
         )
 
         if usage := completion.usage:
-            await ctx.record(
+            ctx.record(
                 TokenUsage(
                     input_tokens=usage.prompt_tokens,
                     output_tokens=usage.completion_tokens,
@@ -65,10 +65,10 @@ async def _chat_response(
                     toolset=toolset,
                 )
             )
-            await ctx.record(ResultTrace(tool_calls))
+            ctx.record(ResultTrace(tool_calls))
 
         elif message := completion_message.content:
-            await ctx.record(ResultTrace(message))
+            ctx.record(ResultTrace(message))
             return message
 
         else:
