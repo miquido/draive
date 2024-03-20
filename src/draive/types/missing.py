@@ -1,10 +1,9 @@
+from typing import Any
+
 __all__ = [
     "MissingValue",
     "MISSING",
 ]
-
-
-from typing import Any
 
 
 class MissingValue:

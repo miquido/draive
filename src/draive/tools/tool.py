@@ -27,7 +27,6 @@ from draive.types import (
     MissingValue,
     Model,
     ProgressUpdate,
-    StringConvertible,
     ToolCallProgress,
     ToolException,
     ToolSpecification,
@@ -53,7 +52,7 @@ ToolArgs = ParamSpec(
 
 ToolResult_co = TypeVar(
     name="ToolResult_co",
-    bound=StringConvertible,
+    bound=Model | str,
     covariant=True,
 )
 

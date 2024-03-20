@@ -2,7 +2,7 @@ from json import loads
 from typing import Any, final
 
 from draive.tools import Tool
-from draive.types import StringConvertible, ToolException, ToolSpecification
+from draive.types import Model, ToolException, ToolSpecification
 
 __all__ = [
     "Toolbox",
@@ -29,7 +29,7 @@ class Toolbox:
         /,
         call_id: str,
         arguments: str | bytes | None,
-    ) -> StringConvertible:
+    ) -> Model | str:
         if tool := self._tools[name]:
             return await tool(
                 tool_call_id=call_id,

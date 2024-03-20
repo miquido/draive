@@ -2,7 +2,6 @@ from typing import Literal, overload
 
 from mistralai.models.chat_completion import ChatMessage
 
-# from draive.helpers import AsyncStream
 from draive.mistral.chat_response import _chat_response  # pyright: ignore[reportPrivateUsage]
 from draive.mistral.chat_stream import _chat_stream  # pyright: ignore[reportPrivateUsage]
 from draive.mistral.client import MistralClient
@@ -11,11 +10,10 @@ from draive.scope import ctx
 from draive.tools import ToolsProgressContext
 from draive.types import (
     ConversationMessage,
-    ConversationMessageImageReferenceContent,
+    ConversationMessageContent,
     ConversationResponseStream,
     ConversationStreamingUpdate,
     ProgressUpdate,
-    StringConvertible,
     Toolset,
 )
 from draive.utils import AsyncStreamTask
@@ -30,7 +28,7 @@ async def mistral_chat_completion(
     *,
     config: MistralChatConfig,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: Literal[True],
@@ -43,7 +41,7 @@ async def mistral_chat_completion(
     *,
     config: MistralChatConfig,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate],
@@ -56,7 +54,7 @@ async def mistral_chat_completion(
     *,
     config: MistralChatConfig,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
 ) -> str:
@@ -67,7 +65,7 @@ async def mistral_chat_completion(  # noqa: PLR0913
     *,
     config: MistralChatConfig,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
@@ -131,7 +129,7 @@ async def mistral_chat_completion(  # noqa: PLR0913
 def _prepare_messages(
     instruction: str,
     history: list[ConversationMessage],
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     limit: int,
 ) -> list[ChatMessage]:
     assert limit > 0, "Messages limit has to be greater than zero"  # nosec: B101
@@ -139,9 +137,11 @@ def _prepare_messages(
     if isinstance(input, ConversationMessage):
         input_message = _convert_message(message=input)
     else:
-        input_message = ChatMessage(
-            role="user",
-            content=str(input),
+        input_message = _convert_message(
+            message=ConversationMessage(
+                role="user",
+                content=input,
+            )
         )
 
     messages: list[ChatMessage] = []
@@ -180,19 +180,19 @@ def _convert_message(
                     role="user",
                     content=message.content,
                 )
-            else:
+            elif isinstance(message.content, list):
                 content_parts: list[str] = []
                 for part in message.content:
-                    if isinstance(part, ConversationMessageImageReferenceContent):
-                        ValueError("Mistral can't handle ImageReferenceContent")
-
+                    if isinstance(part, str):
+                        content_parts.append(part)
                     else:
-                        content_parts.append(part.text)
-
+                        raise ValueError("Unsupported message content", message)
                 return ChatMessage(
                     role="user",
                     content="\n".join(content_parts),
                 )
+            else:
+                raise ValueError("Unsupported message content", message)
 
         case "assistant":
             if isinstance(message.content, str):

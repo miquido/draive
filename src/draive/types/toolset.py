@@ -1,6 +1,6 @@
 from typing import Protocol, runtime_checkable
 
-from draive.types.string import StringConvertible
+from draive.types.model import Model
 from draive.types.tool import ToolSpecification
 
 __all__ = [
@@ -20,5 +20,5 @@ class Toolset(Protocol):
         /,
         call_id: str,
         arguments: str | bytes | None,
-    ) -> StringConvertible:
+    ) -> Model | str:
         ...

@@ -10,11 +10,11 @@ from draive.scope import ctx
 from draive.tools import ToolsProgressContext
 from draive.types import (
     ConversationMessage,
-    ConversationMessageImageReferenceContent,
+    ConversationMessageContent,
     ConversationResponseStream,
     ConversationStreamingUpdate,
+    ImageURLContent,
     ProgressUpdate,
-    StringConvertible,
     Toolset,
 )
 from draive.utils import AsyncStreamTask
@@ -29,7 +29,7 @@ async def openai_chat_completion(
     *,
     config: OpenAIChatConfig,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: Literal[True],
@@ -42,7 +42,7 @@ async def openai_chat_completion(
     *,
     config: OpenAIChatConfig,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate],
@@ -55,7 +55,7 @@ async def openai_chat_completion(
     *,
     config: OpenAIChatConfig,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
 ) -> str:
@@ -66,7 +66,7 @@ async def openai_chat_completion(  # noqa: PLR0913
     *,
     config: OpenAIChatConfig,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     history: list[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
@@ -132,7 +132,7 @@ def _prepare_messages(
     config: OpenAIChatConfig,
     instruction: str,
     history: list[ConversationMessage],
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     limit: int,
 ) -> list[ChatCompletionMessageParam]:
     assert limit > 0, "Messages limit has to be greater than zero"  # nosec: B101
@@ -143,10 +143,13 @@ def _prepare_messages(
             message=input,
         )
     else:
-        input_message = {
-            "role": "user",
-            "content": str(input),
-        }
+        input_message = _convert_message(
+            config=config,
+            message=ConversationMessage(
+                role="user",
+                content=input,
+            ),
+        )
 
     messages: list[ChatCompletionMessageParam] = []
     for message in history:
@@ -190,26 +193,48 @@ def _convert_message(
                     "role": "user",
                     "content": message.content,
                 }
-            else:
+            elif isinstance(message.content, ImageURLContent):
+                return {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": message.content.url,
+                                "detail": config.vision_details,
+                            },
+                        }
+                    ],
+                }
+            elif isinstance(message.content, list):
                 content_parts: list[ChatCompletionContentPartParam] = []
                 for part in message.content:
-                    if isinstance(part, ConversationMessageImageReferenceContent):
-                        content_parts.append(
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": part.url,
-                                    "detail": config.vision_details,
-                                },
-                            }
-                        )
+                    if isinstance(part, str):
+                        return {
+                            "role": "user",
+                            "content": part,
+                        }
+                    elif isinstance(part, ImageURLContent):
+                        return {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": part.url,
+                                        "detail": config.vision_details,
+                                    },
+                                }
+                            ],
+                        }
                     else:
-                        content_parts.append({"type": "text", "text": part.text})
-
+                        raise ValueError("Unsupported message content", message)
                 return {
                     "role": "user",
                     "content": content_parts,
                 }
+            else:
+                raise ValueError("Unsupported message content", message)
 
         case "assistant":
             if isinstance(message.content, str):
