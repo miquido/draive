@@ -1,6 +1,5 @@
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
-from draive.types.model import Model
 from draive.types.tool import ToolSpecification
 
 __all__ = [
@@ -20,5 +19,5 @@ class Toolset(Protocol):
         /,
         call_id: str,
         arguments: str | bytes | None,
-    ) -> Model | str:
+    ) -> Any:
         ...

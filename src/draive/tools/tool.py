@@ -52,7 +52,6 @@ ToolArgs = ParamSpec(
 
 ToolResult_co = TypeVar(
     name="ToolResult_co",
-    bound=Model | str,
     covariant=True,
 )
 
