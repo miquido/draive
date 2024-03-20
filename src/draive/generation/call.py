@@ -3,7 +3,7 @@ from typing import TypeVar
 
 from draive.generation.state import ModelGeneration, TextGeneration
 from draive.scope import ctx
-from draive.types import Model, StringConvertible, Toolset
+from draive.types import Model, MultimodalContent, Toolset
 
 __all__ = [
     "generate_text",
@@ -14,9 +14,9 @@ __all__ = [
 async def generate_text(
     *,
     instruction: str,
-    input: StringConvertible,  # noqa: A002
+    input: MultimodalContent,  # noqa: A002
     toolset: Toolset | None = None,
-    examples: Iterable[tuple[str, str]] | None = None,
+    examples: Iterable[tuple[MultimodalContent, str]] | None = None,
 ) -> str:
     text_generation: TextGeneration = ctx.state(TextGeneration)
     return await text_generation.generate(
@@ -37,9 +37,9 @@ async def generate_model(
     model: type[_Generated],
     *,
     instruction: str,
-    input: StringConvertible,  # noqa: A002
+    input: MultimodalContent,  # noqa: A002
     toolset: Toolset | None = None,
-    examples: Iterable[tuple[str, _Generated]] | None = None,
+    examples: Iterable[tuple[MultimodalContent, _Generated]] | None = None,
 ) -> _Generated:
     model_generation: ModelGeneration = ctx.state(ModelGeneration)
     return await model_generation.generate(

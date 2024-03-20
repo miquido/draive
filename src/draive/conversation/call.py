@@ -4,11 +4,11 @@ from draive.conversation.state import Conversation
 from draive.scope import ctx
 from draive.types import (
     ConversationMessage,
+    ConversationMessageContent,
     ConversationResponseStream,
     ConversationStreamingUpdate,
     Memory,
     ProgressUpdate,
-    StringConvertible,
     Toolset,
 )
 
@@ -21,7 +21,7 @@ __all__ = [
 async def conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: Literal[True],
@@ -33,7 +33,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate],
@@ -45,7 +45,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
 ) -> ConversationMessage:
@@ -55,7 +55,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,

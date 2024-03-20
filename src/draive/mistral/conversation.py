@@ -7,11 +7,11 @@ from draive.mistral.config import MistralChatConfig
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
 from draive.types import (
     ConversationMessage,
+    ConversationMessageContent,
     ConversationResponseStream,
     ConversationStreamingUpdate,
     Memory,
     ProgressUpdate,
-    StringConvertible,
     Toolset,
 )
 from draive.utils import AsyncStreamTask
@@ -25,7 +25,7 @@ __all__ = [
 async def mistral_conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: Literal[True],
@@ -37,7 +37,7 @@ async def mistral_conversation_completion(
 async def mistral_conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate],
@@ -49,7 +49,7 @@ async def mistral_conversation_completion(
 async def mistral_conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
 ) -> ConversationMessage:
@@ -59,7 +59,7 @@ async def mistral_conversation_completion(
 async def mistral_conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | StringConvertible,  # noqa: A002
+    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     toolset: Toolset | None = None,
     stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
@@ -76,7 +76,7 @@ async def mistral_conversation_completion(
             user_message = ConversationMessage(
                 timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S%z"),
                 role="user",
-                content=str(input),
+                content=input,
             )
 
         history: list[ConversationMessage]
