@@ -29,14 +29,14 @@ async def scope_metrics() -> ScopeMetrics:
     async with ctx.new():
         ctx.record(ExpMetric(value=1))
 
-        async with ctx.nested("child"):
+        with ctx.nested("child"):
             ctx.record(TokenUsage(input_tokens=44, output_tokens=55))
 
-            async with ctx.nested("grandchild_1"):
+            with ctx.nested("grandchild_1"):
                 ctx.record(TokenUsage(input_tokens=444, output_tokens=555))
                 ctx.record(ExpMetric(value=5))
 
-            async with ctx.nested("grandchild_2"):
+            with ctx.nested("grandchild_2"):
                 ctx.record(TokenUsage(input_tokens=222, output_tokens=333))
                 ctx.record(ExpMetric(value=7))
 
@@ -45,7 +45,7 @@ async def scope_metrics() -> ScopeMetrics:
 
 @pytest.mark.asyncio
 async def test_combinable_metrics(scope_metrics: ScopeMetrics) -> None:
-    combined_metrics = await scope_metrics._combined_metrics()
+    combined_metrics = scope_metrics._combined_metrics()
     assert len(combined_metrics) == 2
     assert TokenUsage in combined_metrics
     assert ExpMetric in combined_metrics

@@ -2,7 +2,7 @@ from asyncio import AbstractEventLoop, Task, get_running_loop, iscoroutinefuncti
 from collections import OrderedDict
 from collections.abc import Callable, Coroutine, Hashable
 from functools import _make_key, wraps  # pyright: ignore[reportPrivateUsage]
-from time import CLOCK_MONOTONIC_RAW, clock_gettime
+from time import monotonic
 from typing import Any, Generic, NamedTuple, ParamSpec, TypeVar, cast, overload
 
 __all__ = [
@@ -132,7 +132,7 @@ def _wrap_sync(
                 pass
 
             case entry:
-                if (expire := entry[1]) and expire < clock_gettime(CLOCK_MONOTONIC_RAW):
+                if (expire := entry[1]) and expire < monotonic():
                     del cached[key]  # continue the same way as if empty
                 else:
                     cached.move_to_end(key)
@@ -141,7 +141,7 @@ def _wrap_sync(
         result: _Result = function(*args, **kwargs)
         cached[key] = _CacheEntry(
             value=result,
-            expire=clock_gettime(CLOCK_MONOTONIC_RAW) + expiration if expiration else None,
+            expire=monotonic() + expiration if expiration else None,
         )
         if len(cached) > limit:
             _, entry = cached.popitem(last=False)
@@ -185,7 +185,7 @@ def _wrap_async(
                 pass
 
             case entry:
-                if (expire := entry[1]) and expire < clock_gettime(CLOCK_MONOTONIC_RAW):
+                if (expire := entry[1]) and expire < monotonic():
                     # if still running let it complete if able
                     del cached[key]  # continue the same way as if empty
                 else:
@@ -195,7 +195,7 @@ def _wrap_async(
         task: Task[_Result] = loop.create_task(function(*args, **kwargs))
         cached[key] = _CacheEntry(
             value=task,
-            expire=clock_gettime(CLOCK_MONOTONIC_RAW) + expiration if expiration else None,
+            expire=monotonic() + expiration if expiration else None,
         )
         if len(cached) > limit:
             # if still running let it complete if able
