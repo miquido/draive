@@ -45,6 +45,29 @@ def cache(
     expiration: float | None = None,
     make_key: Callable[_Args, Hashable] | None = None,
 ) -> Callable[[Callable[_Args, _Result]], Callable[_Args, _Result]] | Callable[_Args, _Result]:
+    """\
+    Simple lru function result cache with optional expire time. \
+    Works for both sync and async functions. \
+    It is not allowed to be used on class methods. \
+    This wrapper is not thread safe.
+
+    Parameters
+    ----------
+    function: Callable[_Args, _Result]
+        function to wrap in cache, either sync or async
+    limit: int
+        limit of cache entries to keep, default is 1
+    expiration: float | None
+        entries expiration time in seconds, default is None (not expiring)
+    make_key: Callable[_Args, Hashable] | None
+        optional custom function used to prepare cache keys from function arguments
+
+    Returns
+    -------
+    Callable[[Callable[_Args, _Result]], Callable[_Args, _Result]] | Callable[_Args, _Result]
+        provided function wrapped in cache
+    """
+
     def _wrap(function: Callable[_Args, _Result], /) -> Callable[_Args, _Result]:
         if iscoroutinefunction(function):
             return cast(
@@ -163,7 +186,7 @@ def _wrap_async(
 
             case entry:
                 if (expire := entry[1]) and expire < clock_gettime(CLOCK_MONOTONIC_RAW):
-                    # if still running let it complete
+                    # if still running let it complete if able
                     del cached[key]  # continue the same way as if empty
                 else:
                     cached.move_to_end(key)
@@ -175,7 +198,7 @@ def _wrap_async(
             expire=clock_gettime(CLOCK_MONOTONIC_RAW) + expiration if expiration else None,
         )
         if len(cached) > limit:
-            # if still running let it complete
+            # if still running let it complete if able
             cached.popitem(last=False)
         return await shield(task)
 

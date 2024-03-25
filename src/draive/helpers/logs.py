@@ -7,11 +7,21 @@ __all__ = [
 ]
 
 
-# NOTE: this function should be run only once on application start
 def setup_logging(
-    *__names: str,
+    *loggers: str,
     debug: bool = getenv_bool("DEBUG_LOGGING", __debug__),
-):
+) -> None:
+    """\
+    Setup logging configuration and prepare specified loggers.
+
+    Parameters
+    ----------
+    loggers: *str
+        names of additional loggers to configure
+
+    NOTE: this function should be run only once on application start
+    """
+
     dictConfig(
         config={
             "version": 1,
@@ -42,7 +52,7 @@ def setup_logging(
                         "level": "DEBUG" if debug else "INFO",
                         "propagate": False,
                     }
-                    for name in __names
+                    for name in loggers
                 },
             },
         },

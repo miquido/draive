@@ -1,8 +1,4 @@
-import builtins
 import inspect
-import types
-import typing
-from collections import abc as collections_abc
 from collections.abc import Callable
 from typing import (
     Any,
@@ -12,25 +8,21 @@ from typing import (
     TypeVar,
     cast,
     final,
-    get_args,
-    get_origin,
     overload,
 )
 from uuid import uuid4
-
-import typing_extensions
 
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
 from draive.tools.state import ToolCallContext, ToolsProgressContext
 from draive.types import (
     MISSING,
     MissingValue,
-    Model,
+    ParameterDefinition,
+    ParameterSpecification,
     ProgressUpdate,
     ToolCallProgress,
     ToolException,
     ToolSpecification,
-    parameter_specification,
 )
 
 __all__ = [
@@ -43,13 +35,10 @@ __all__ = [
     "Parameter",
 ]
 
-
 ToolArgs = ParamSpec(
     name="ToolArgs",
     # bound= - ideally it should be bound to allowed types, not implemented in python yet
 )
-
-
 ToolResult_co = TypeVar(
     name="ToolResult_co",
     covariant=True,
@@ -74,27 +63,40 @@ class ToolAvailability(Protocol):
         ...
 
 
+_ParameterType_T = TypeVar("_ParameterType_T")
+
+
+def Parameter(  # Ruff - noqa: B008
+    *,
+    alias: str | None = None,
+    description: str | None = None,
+    default: Callable[[], _ParameterType_T] | _ParameterType_T | MissingValue = MISSING,
+    validator: Callable[[_ParameterType_T], None] | None = None,
+) -> _ParameterType_T:  # it is actually a ToolParameter, but type checker has to be fooled
+    return cast(
+        _ParameterType_T,
+        ToolParameter(
+            alias=alias,
+            description=description,
+            default=default,
+            validator=validator,
+        ),
+    )
+
+
 @final
-class ToolArgument:
-    def __init__(  # noqa: PLR0913
+class ToolParameter:
+    def __init__(
         self,
-        name: str,
         alias: str | None,
         description: str | None,
-        annotation: Any,
-        default: Any | MissingValue,
-        validator: Callable[[Any], None] | None,
+        default: Callable[[], _ParameterType_T] | _ParameterType_T | MissingValue,
+        validator: Callable[[_ParameterType_T], None] | None,
     ) -> None:
-        self.name: str = name
         self.alias: str | None = alias
         self.description: str | None = description
-        self.annotation: Any = annotation
-        self.default: Any | MissingValue = default
-        self.required: bool = default is MISSING
-        self.validated: Callable[[Any], Any] = _prepare_validator(
-            annotation=annotation,
-            additional=validator,
-        )
+        self.default: Callable[[], _ParameterType_T] | _ParameterType_T | MissingValue = default
+        self.validator: Callable[[_ParameterType_T], None] | None = validator
 
 
 @final
@@ -110,35 +112,62 @@ class Tool(Generic[ToolArgs, ToolResult_co]):
     ):
         assert not isinstance(  # nosec: B101
             function, Tool
-        ), "Tools should not be used as functions for tools"
+        ), "Nested tool wrapping is not allowed"
+        # mimic function attributes if able
+        try:
+            self.__module__ = function.__module__
+        except AttributeError:
+            pass
+        try:
+            # python function name may differ from tool name
+            self.__name__ = function.__name__
+        except AttributeError:
+            pass
+        try:
+            self.__qualname__ = function.__qualname__
+        except AttributeError:
+            pass
+        try:
+            self.__doc__ = function.__doc__
+        except AttributeError:
+            pass
+        try:
+            self.__annotations__ = function.__annotations__
+        except AttributeError:
+            pass
+        try:
+            self.__dict__.update(function.__dict__)
+        except AttributeError:
+            pass
+
         self._name: str = name
         self._description: str | None = description
         self._availability: ToolAvailability = availability or (
             lambda: True  # available by default
         )
         self._function_call: ToolFunction[ToolArgs, ToolResult_co] = function
-        self._arguments: dict[str, ToolArgument] = _arguments(function)
+        parameters, parameters_specification, required_names = _function_parameters(function)
+        self._parameters: list[ParameterDefinition] = parameters
         self._specification: ToolSpecification = {
             "type": "function",
             "function": {
                 "name": name,
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                        argument.alias or argument.name: parameter_specification(
-                            annotation=argument.annotation,
-                            origin=get_origin(argument.annotation),
-                            description=argument.description,
-                        )
-                        for argument in self._arguments.values()
-                    },
-                    "required": [
-                        argument.alias or argument.name for argument in self._arguments.values()
-                    ],
+                    "properties": parameters_specification,
+                    "required": required_names,
                 },
                 "description": description or "",
             },
         }
+
+        def frozen(
+            __name: str,
+            __value: Any,
+        ) -> None:
+            raise RuntimeError("Tool can't be modified")
+
+        self.__setattr__ = frozen
 
     @property
     def name(self) -> str:
@@ -152,29 +181,25 @@ class Tool(Generic[ToolArgs, ToolResult_co]):
     def available(self) -> bool:
         return self._availability()
 
-    def validated(
+    def _validated(
         self,
         *,
         arguments: dict[str, Any],
-        strict: bool = False,
     ) -> dict[str, Any]:
-        for argument in self._arguments.values():
-            if value := arguments.get(argument.name):
-                arguments[argument.name] = argument.validated(value)
-            elif (alias := argument.alias) and (value := arguments.get(alias)):
-                del arguments[alias]  # remove aliased value
-                arguments[argument.name] = argument.validated(value)
-            elif argument.default is not MISSING:
-                arguments[argument.name] = argument.default
+        validated: dict[str, Any] = {}
+        for parameter in self._parameters:
+            if parameter.name in arguments:
+                validated[parameter.name] = parameter.validated_value(arguments.get(parameter.name))
+            elif (alias := parameter.alias) and (alias in arguments):
+                validated[parameter.name] = parameter.validated_value(arguments.get(alias))
             else:
-                raise ValueError("Missing required argument", argument.name)
-        unexpected: set[str] = set(self._arguments.keys()).difference(arguments.keys())
-        if strict and unexpected:
-            raise ValueError("Unexpected arguments provided", unexpected)
-        else:
-            for key in unexpected:
-                del arguments[key]
-        return arguments
+                default_value = parameter.default_value()
+                if default_value is MISSING:
+                    raise ValueError("Missing required argument", parameter.name)
+                else:
+                    validated[parameter.name] = default_value
+
+        return validated
 
     async def __call__(
         self,
@@ -193,7 +218,7 @@ class Tool(Generic[ToolArgs, ToolResult_co]):
             ArgumentsTrace(call_id=call_context.call_id, **kwargs),
         ):
             with ctx.updated(call_context):
-                progress(
+                progress(  # notify on start
                     ToolCallProgress(
                         call_id=call_context.call_id,
                         tool=call_context.tool,
@@ -202,7 +227,7 @@ class Tool(Generic[ToolArgs, ToolResult_co]):
                     )
                 )
                 if not self.available:
-                    progress(
+                    progress(  # notify on fail
                         ToolCallProgress(
                             call_id=call_context.call_id,
                             tool=call_context.tool,
@@ -214,9 +239,9 @@ class Tool(Generic[ToolArgs, ToolResult_co]):
 
                 arguments: dict[str, Any]
                 try:
-                    arguments = self.validated(arguments=kwargs)
+                    arguments = self._validated(arguments=kwargs)
                 except (ValueError, TypeError) as exc:
-                    progress(
+                    progress(  # notify on fail
                         ToolCallProgress(
                             call_id=call_context.call_id,
                             tool=call_context.tool,
@@ -231,7 +256,7 @@ class Tool(Generic[ToolArgs, ToolResult_co]):
                     **arguments,
                 )
                 ctx.record(ResultTrace(result))
-                progress(
+                progress(  # notify on finish
                     ToolCallProgress(
                         call_id=call_context.call_id,
                         tool=call_context.tool,
@@ -271,6 +296,10 @@ def tool(
     Callable[[ToolFunction[ToolArgs, ToolResult_co]], Tool[ToolArgs, ToolResult_co]]
     | Tool[ToolArgs, ToolResult_co]
 ):
+    """
+    Convert a function to a tool. Tool arguments support only limited types.
+    """
+
     def wrap(function: ToolFunction[ToolArgs, ToolResult_co]) -> Tool[ToolArgs, ToolResult_co]:
         return Tool(
             name=name or function.__name__,
@@ -287,216 +316,53 @@ def tool(
         return wrap
 
 
-_ParameterType_T = TypeVar("_ParameterType_T")
-
-
-def Parameter(  # Ruff - noqa: B008
-    *,
-    alias: str | None = None,
-    description: str | None = None,
-    default: _ParameterType_T | MissingValue = MISSING,
-    validator: Callable[[_ParameterType_T], None] | None = None,
-) -> _ParameterType_T:  # it is actually a ToolParameter, but type checker has to be fooled
-    return cast(
-        _ParameterType_T,
-        ToolParameter(
-            alias=alias,
-            description=description,
-            default=default,
-            validator=validator,
-        ),
-    )
-
-
-@final
-class ToolParameter:
-    def __init__(
-        self,
-        alias: str | None,
-        description: str | None,
-        default: Any | MissingValue,
-        validator: Callable[[Any], None] | None,
-    ) -> None:
-        self.alias: str | None = alias
-        self.description: str | None = description
-        self.default: Any | MissingValue = default
-        self.validator: Callable[[Any], None] | None = validator
-
-
-def _prepare_validator(  # noqa: C901, PLR0911, PLR0915
-    annotation: Any,
-    additional: Callable[[Any], None] | None,
-) -> Callable[[Any], Any]:
-    match get_origin(annotation) or annotation:
-        case typing.Annotated:
-            match get_args(annotation):
-                case [annotated, *_]:
-                    return _prepare_validator(
-                        annotation=annotated,
-                        additional=additional,
-                    )
-                case annotated:
-                    raise TypeError("Unsupported annotated type", annotated)
-
-        case typing.Literal:
-
-            def validated(value: Any) -> Any:
-                if value in get_args(annotation):
-                    if validate := additional:
-                        validate(value)
-                    return value
-                else:
-                    raise TypeError("Invalid value", annotation, value)
-
-            return validated
-
-        case types.UnionType | typing.Union:
-            validators: list[Callable[[Any], Any]] = [
-                _prepare_validator(
-                    annotation=alternative,
-                    additional=additional,
-                )
-                for alternative in get_args(annotation)
-            ]
-
-            def validated(value: Any) -> Any:
-                for validator in validators:
-                    try:
-                        return validator(value)
-                    except TypeError:
-                        continue  # check next alternative
-
-                raise TypeError("Invalid value", annotation, value)
-
-            return validated
-
-        case (
-            builtins.list  # pyright: ignore[reportUnknownMemberType]
-            | typing.List  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
-            | collections_abc.Sequence  # pyright: ignore[reportUnknownMemberType]
-            | collections_abc.Iterable  # pyright: ignore[reportUnknownMemberType]
-        ):
-            validate_element: Callable[[Any], Any]
-            match get_args(annotation):
-                case (list_annotation,):
-                    validate_element = _prepare_validator(
-                        annotation=list_annotation,
-                        additional=None,
-                    )
-
-                case ():  # pyright: ignore[reportUnnecessaryComparison] fallback to untyped list
-                    validate_element = lambda value: value  # noqa: E731
-
-                case other:  # pyright: ignore[reportUnnecessaryComparison]
-                    raise TypeError("Unsupported iterable type annotation", other)
-
-            def validated(value: Any) -> Any:
-                values_list: list[Any]
-                if isinstance(value, collections_abc.Iterable):
-                    values_list = [validate_element(element) for element in value]  # pyright: ignore[reportUnknownVariableType]
-                else:
-                    raise TypeError("Invalid value", annotation, value)
-                if validate := additional:
-                    validate(values_list)
-                return values_list
-
-            return validated
-
-        case model_type if issubclass(model_type, Model):
-
-            def validated(value: Any) -> Any:
-                model: Model
-                if isinstance(value, dict):
-                    model = model_type.from_dict(value=cast(dict[str, Any], value))
-                elif isinstance(value, model_type):
-                    model = value
-                else:
-                    raise TypeError("Invalid value", annotation, value)
-                if validate := additional:
-                    validate(model)
-                return model
-
-            return validated
-
-        case typed_dict_type if typing.is_typeddict(
-            typed_dict_type
-        ) or typing_extensions.is_typeddict(typed_dict_type):
-
-            def validated(value: Any) -> Any:
-                typed_dict: dict[Any, Any]
-                if isinstance(value, dict):
-                    typed_dict = typed_dict_type(**value)
-                else:
-                    raise TypeError("Invalid value", annotation, value)
-                if validate := additional:
-                    validate(typed_dict)
-                return typed_dict
-
-            return validated
-
-        case other_type:
-
-            def validated(value: Any) -> Any:
-                if isinstance(value, other_type):
-                    if validate := additional:
-                        validate(value)
-                    return value
-                elif isinstance(value, float) and other_type == int:
-                    # auto convert float to int - json does not distinguish those
-                    converted_int: int = int(value)
-                    if validate := additional:
-                        validate(converted_int)
-                    return converted_int
-                elif isinstance(value, int) and other_type == float:
-                    # auto convert int to float - json does not distinguish those
-                    converted_float: float = float(value)
-                    if validate := additional:
-                        validate(converted_float)
-                    return converted_float
-                # TODO: validate function/callable values
-                elif callable(value):
-                    if validate := additional:
-                        validate(value)
-                    return value
-                else:
-                    raise TypeError("Invalid value", annotation, value)
-
-            return validated
-
-
-def _arguments(
-    function: ToolFunction[ToolArgs, ToolResult_co],
+def _function_parameters(
+    function: Callable[..., Any],
     /,
-) -> dict[str, ToolArgument]:
-    arguments: dict[str, ToolArgument] = {}
-
-    for parameter in inspect.signature(function).parameters.values():
-        if parameter.annotation is inspect._empty:  # pyright: ignore[reportPrivateUsage]
+) -> tuple[list[ParameterDefinition], dict[str, ParameterSpecification], list[str]]:
+    parameters: list[ParameterDefinition] = []
+    specification: dict[str, ParameterSpecification] = {}
+    required: list[str] = []
+    # convert function signature to parameters
+    for function_parameter in inspect.signature(function).parameters.values():
+        if function_parameter.annotation is inspect._empty:  # pyright: ignore[reportPrivateUsage]
             # skip object method "self" argument
-            if parameter.name != "self":
+            if function_parameter.name != "self":
                 raise TypeError(
                     "Untyped argument %s",
-                    parameter.name,
+                    function_parameter.name,
                 )
-        elif isinstance(parameter.default, ToolParameter):
-            arguments[parameter.name] = ToolArgument(
-                name=parameter.name,
-                alias=parameter.default.alias,
-                description=parameter.default.description,
-                default=parameter.default.default,
-                annotation=parameter.annotation,
-                validator=parameter.default.validator,
+            else:
+                continue  # skip `self` argument
+
+        parameter: ParameterDefinition
+        if isinstance(function_parameter.default, ToolParameter):
+            parameter = ParameterDefinition(
+                name=function_parameter.name,
+                alias=function_parameter.default.alias,
+                description=function_parameter.default.description,
+                default=function_parameter.default.default,
+                annotation=function_parameter.annotation,
+                validator=function_parameter.default.validator,
             )
-        else:
-            arguments[parameter.name] = ToolArgument(
-                name=parameter.name,
+            if function_parameter.default.default is MISSING:
+                required.append(parameter.name)
+        else:  # use regular annotation
+            parameter = ParameterDefinition(
+                name=function_parameter.name,
                 alias=None,
                 description=None,
                 default=MISSING
-                if parameter.default is inspect._empty  # pyright: ignore[reportPrivateUsage]
-                else parameter.default,
-                annotation=parameter.annotation,
+                if function_parameter.default is inspect._empty  # pyright: ignore[reportPrivateUsage]
+                else function_parameter.default,
+                annotation=function_parameter.annotation,
                 validator=None,
             )
+            if function_parameter.default is inspect._empty:  # pyright: ignore[reportPrivateUsage]
+                required.append(parameter.name)
 
-    return arguments
+        assert parameter.name not in specification, f"Parameter duplicate: {parameter.name}"  # nosec: B101
+        assert parameter.alias not in specification, f"Parameter alias conflict: {parameter.name}"  # nosec: B101
+        parameters.append(parameter)
+        specification[parameter.name] = parameter.specification()
+    return (parameters, specification, required)

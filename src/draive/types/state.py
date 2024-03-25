@@ -1,32 +1,20 @@
-import builtins
-import types
-import typing
-from collections import abc as collections_abc
 from collections.abc import Callable
-from copy import copy
 from dataclasses import (
-    _MISSING_TYPE,  # pyright: ignore[reportPrivateUsage]
-    MISSING,
-    asdict,
-    dataclass,
+    _MISSING_TYPE as DATACLASS_MISSING_TYPE,  # pyright: ignore[reportPrivateUsage]
 )
-from dataclasses import (
-    Field as DataclassField,
-)
-from dataclasses import (
-    field as dataclass_field,
-)
-from dataclasses import (
-    fields as dataclass_fields,
-)
-from typing import Any, Self, TypeVar, cast, dataclass_transform, final, get_args, get_origin
+from dataclasses import MISSING as DATACLASS_MISSING
+from dataclasses import Field as DataclassField
+from dataclasses import asdict, dataclass
+from dataclasses import field as dataclass_field
+from dataclasses import fields as dataclass_fields
+from typing import Any, Self, TypeVar, cast, dataclass_transform, final
 
-import typing_extensions
+from draive.types.missing import MISSING
+from draive.types.parameters import ParameterDefinition
 
 __all__ = [
     "State",
     "Field",
-    "StateField",
 ]
 
 _FieldType_T = TypeVar("_FieldType_T")
@@ -36,7 +24,7 @@ def Field(
     *,
     alias: str | None = None,
     description: str | None = None,
-    default: _FieldType_T | _MISSING_TYPE = MISSING,
+    default: Callable[[], _FieldType_T] | _FieldType_T | DATACLASS_MISSING_TYPE = DATACLASS_MISSING,
     validator: Callable[[_FieldType_T], None] | None = None,
 ) -> _FieldType_T:  # it is actually a dataclass.Field, but type checker has to be fooled
     metadata: dict[str, Any] = {}
@@ -46,13 +34,19 @@ def Field(
         metadata["description"] = description
     if validator:
         metadata["validator"] = validator
-    return cast(
-        _FieldType_T,
-        dataclass_field(
-            default=default,
+    if callable(default):
+        return dataclass_field(
+            default_factory=default,
             metadata=metadata,
-        ),
-    )
+        )
+    else:
+        return cast(
+            _FieldType_T,
+            dataclass_field(
+                default=default,
+                metadata=metadata,
+            ),
+        )
 
 
 @dataclass_transform(
@@ -67,7 +61,7 @@ class StateMeta(type):
         bases: tuple[type, ...],
         classdict: dict[str, Any],
         **kwargs: Any,
-    ) -> type[Any]:
+    ) -> Any:
         # TODO: ensure properties belong to supported types:
         # bool, int, float, str, list[bool|int|float|str], dict[str, bool|int|float|str]
         # or other instances of State, additionally we need to support functions in state
@@ -87,114 +81,72 @@ class StateMeta(type):
         )
 
 
-@final
-class StateField:
-    def __init__(  # noqa: PLR0913
-        self,
-        name: str,
-        alias: str | None,
-        description: str | None,
-        annotation: Any,
-        required: bool,
-        validator: Callable[[Any], None] | None,
-    ) -> None:
-        self.name: str = name
-        self.alias: str | None = alias
-        self.description: str | None = description
-        self.annotation: Any = annotation
-        self.required: bool = required
-        self.validated: Callable[[Any], Any] = _prepare_validator(
-            annotation=annotation,
-            additional=validator,
-        )
-
-
 class State(metaclass=StateMeta):
+    @classmethod
+    def _parameters(cls) -> list[ParameterDefinition]:
+        if not hasattr(cls, "__parameters"):
+            cls.__parameters: list[ParameterDefinition] = []
+            for field in dataclass_fields(cls):
+                default: Any
+                if field.default is not DATACLASS_MISSING:
+                    default = field.default
+                elif field.default_factory is not DATACLASS_MISSING:
+                    default = field.default_factory
+                else:
+                    default = MISSING
+
+                cls.__parameters.append(
+                    ParameterDefinition(
+                        name=field.name,
+                        alias=field.metadata.get("alias"),
+                        description=field.metadata.get("description"),
+                        default=default,
+                        annotation=field.type,
+                        validator=field.metadata.get("validator"),
+                    )
+                )
+
+        return cls.__parameters
+
+    @classmethod
+    def _validated(
+        cls,
+        *,
+        values: dict[str, Any],
+    ) -> dict[str, Any]:
+        validated: dict[str, Any] = {}
+        for parameter in cls._parameters():
+            if parameter.name in values:
+                validated[parameter.name] = parameter.validated_value(values.get(parameter.name))
+            elif (alias := parameter.alias) and (alias in values):
+                validated[parameter.name] = parameter.validated_value(values.get(alias))
+            else:
+                default_value = parameter.default_value()
+                if default_value is MISSING:
+                    raise ValueError("Missing required value", parameter.name)
+                else:
+                    validated[parameter.name] = default_value
+
+        return validated
+
     @classmethod
     def from_dict(
         cls,
-        value: dict[str, Any],
-        strict: bool = False,
+        values: dict[str, Any],
     ) -> Self:
         try:
-            return cls(
-                **cls.validated(
-                    values=value,
-                    strict=strict,
-                )
-            )
+            return cls(**cls._validated(values=values))
         except Exception as exc:
-            raise ValueError(f"Failed to decode {cls.__name__} from dict:\n{value}") from exc
-
-    @classmethod
-    def validated(
-        cls,
-        values: dict[str, Any],
-        strict: bool = False,
-    ) -> dict[str, Any]:
-        fields: dict[str, StateField] = cls._fields()
-        aliases: dict[str, StateField] = cls._aliases()
-
-        for key, value in copy(values).items():
-            if field := fields.get(key):
-                try:
-                    values[field.name] = field.validated(value)
-                except TypeError as exc:
-                    raise ValueError("Invalid value", key, value) from exc
-            elif field := aliases.get(key):
-                try:
-                    del values[key]  # remove previous value
-                    values[field.name] = field.validated(value)
-                except TypeError as exc:
-                    raise ValueError("Invalid value", key, value) from exc
-            elif strict:
-                raise ValueError("Unexpected value", key, value)
-            else:
-                del values[key]  # remove unwanted values
-        # missing and default values are handled by init
-        return values
-
-    @classmethod
-    def _fields(cls) -> dict[str, StateField]:
-        if not hasattr(cls, "__fields"):
-            cls.__fields: dict[str, StateField] = {}
-            cls.__aliases: dict[str, StateField] = {}
-            for field in dataclass_fields(cls):
-                alias: str | None = field.metadata.get("alias")
-                cls.__fields[field.name] = StateField(
-                    name=field.name,
-                    alias=alias,
-                    description=field.metadata.get("description"),
-                    annotation=field.type,
-                    required=field.default is MISSING and field.default_factory is MISSING,
-                    validator=field.metadata.get("validator"),
-                )
-                if (alias := alias) and alias != field.name:
-                    assert alias not in cls.__fields, "Field name duplicated by alias"  # nosec: B101
-                    cls.__aliases[alias] = cls.__fields[field.name]
-
-        return cls.__fields
-
-    @classmethod
-    def _aliases(cls) -> dict[str, StateField]:
-        if not hasattr(cls, "__aliases"):
-            cls._fields()  # initialize when needed
-        return cls.__aliases
+            raise ValueError(f"Failed to decode {cls.__name__} from dict:\n{values}") from exc
 
     def as_dict(self) -> dict[str, Any]:
         values: dict[str, Any] = asdict(self)
-        for field in self.__class__._aliases().values():
-            assert field.alias  # nosec: B101
-            values[field.alias] = values[field.name]
-            del values[field.name]  # remove previous value
+        for parameter in self.__class__._parameters():
+            if alias := parameter.alias:
+                values[alias] = values[parameter.name]
+                del values[parameter.name]  # remove aliased value
 
         return values
-
-    def __str__(self) -> str:
-        return str(asdict(self))
-
-    def __repr__(self) -> str:
-        return self.__str__()
 
     # TODO: find a way to generate signature similar to dataclass __init__
     def updated(
@@ -202,149 +154,5 @@ class State(metaclass=StateMeta):
         **kwargs: Any,
     ) -> Self:
         return self.__class__(
-            **self.__class__.validated(
-                values={**vars(self), **kwargs},
-                strict=True,
-            ),
+            **self.__class__._validated(values={**vars(self), **kwargs}),
         )
-
-
-def _prepare_validator(  # noqa: C901, PLR0911, PLR0915
-    annotation: Any,
-    additional: Callable[[Any], None] | None,
-) -> Callable[[Any], Any]:
-    match get_origin(annotation) or annotation:
-        case typing.Annotated:
-            match get_args(annotation):
-                case [annotated, *_]:
-                    return _prepare_validator(
-                        annotation=annotated,
-                        additional=additional,
-                    )
-                case annotated:
-                    raise TypeError("Unsupported annotated type", annotated)
-
-        case typing.Literal:
-
-            def validated(value: Any) -> Any:
-                if value in get_args(annotation):
-                    if validate := additional:
-                        validate(value)
-                    return value
-                else:
-                    raise TypeError("Invalid value", annotation, value)
-
-            return validated
-
-        case types.UnionType | typing.Union:
-            validators: list[Callable[[Any], Any]] = [
-                _prepare_validator(
-                    annotation=alternative,
-                    additional=additional,
-                )
-                for alternative in get_args(annotation)
-            ]
-
-            def validated(value: Any) -> Any:
-                for validator in validators:
-                    try:
-                        return validator(value)
-                    except TypeError:
-                        continue  # check next alternative
-
-                raise TypeError("Invalid value", annotation, value)
-
-            return validated
-
-        case (
-            builtins.list  # pyright: ignore[reportUnknownMemberType]
-            | typing.List  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
-            | collections_abc.Sequence  # pyright: ignore[reportUnknownMemberType]
-            | collections_abc.Iterable  # pyright: ignore[reportUnknownMemberType]
-        ):
-            validate_element: Callable[[Any], Any]
-            match get_args(annotation):
-                case (list_annotation,):
-                    validate_element = _prepare_validator(
-                        annotation=list_annotation,
-                        additional=None,
-                    )
-
-                case ():  # pyright: ignore[reportUnnecessaryComparison] fallback to untyped list
-                    validate_element = lambda value: value  # noqa: E731
-
-                case other:  # pyright: ignore[reportUnnecessaryComparison]
-                    raise TypeError("Unsupported iterable type annotation", other)
-
-            def validated(value: Any) -> Any:
-                values_list: list[Any]
-                if isinstance(value, collections_abc.Iterable):
-                    values_list = [validate_element(element) for element in value]  # pyright: ignore[reportUnknownVariableType]
-                else:
-                    raise TypeError("Invalid value", annotation, value)
-                if validate := additional:
-                    validate(values_list)
-                return values_list
-
-            return validated
-
-        case state_type if issubclass(state_type, State):
-
-            def validated(value: Any) -> Any:
-                state: State
-                if isinstance(value, dict):
-                    state = state_type.from_dict(value=cast(dict[str, Any], value))
-                elif isinstance(value, state_type):
-                    state = value
-                else:
-                    raise TypeError("Invalid value", annotation, value)
-                if validate := additional:
-                    validate(state)
-                return state
-
-            return validated
-
-        case typed_dict_type if typing.is_typeddict(
-            typed_dict_type
-        ) or typing_extensions.is_typeddict(typed_dict_type):
-
-            def validated(value: Any) -> Any:
-                typed_dict: dict[Any, Any]
-                if isinstance(value, dict):
-                    typed_dict = typed_dict_type(**value)
-                else:
-                    raise TypeError("Invalid value", annotation, value)
-                if validate := additional:
-                    validate(typed_dict)
-                return typed_dict
-
-            return validated
-
-        case other_type:
-
-            def validated(value: Any) -> Any:
-                if isinstance(value, other_type):
-                    if validate := additional:
-                        validate(value)
-                    return value
-                elif isinstance(value, float) and other_type == int:
-                    # auto convert float to int - json does not distinguish those
-                    converted_int: int = int(value)
-                    if validate := additional:
-                        validate(converted_int)
-                    return converted_int
-                elif isinstance(value, int) and other_type == float:
-                    # auto convert int to float - json does not distinguish those
-                    converted_float: float = float(value)
-                    if validate := additional:
-                        validate(converted_float)
-                    return converted_float
-                # TODO: validate function/callable values
-                elif callable(value):
-                    if validate := additional:
-                        validate(value)
-                    return value
-                else:
-                    raise TypeError("Invalid value", annotation, value)
-
-            return validated

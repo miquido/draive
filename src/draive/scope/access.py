@@ -65,29 +65,31 @@ class _RootContext:
         assert self._token is not None, "Can't exit scope without entering"  # nosec: B101
         _TaskGroup_Var.reset(self._token)
         # finish task group - wait for completion
-        await self._task_group.__aexit__(
-            et=exc_type,
-            exc=exc_val,
-            tb=exc_tb,
-        )
-        # then end metrics capture
-        self._metrics.__exit__(
-            exc_type=exc_type,
-            exc_val=exc_val,
-            exc_tb=exc_tb,
-        )
-        # cleanup dependencies next
-        self._dependencies.__exit__(
-            exc_type=exc_type,
-            exc_val=exc_val,
-            exc_tb=exc_tb,
-        )
-        # finally reset state
-        self._state.__exit__(
-            exc_type=exc_type,
-            exc_val=exc_val,
-            exc_tb=exc_tb,
-        )
+        try:
+            await self._task_group.__aexit__(
+                et=exc_type,
+                exc=exc_val,
+                tb=exc_tb,
+            )
+        finally:
+            # then end metrics capture
+            self._metrics.__exit__(
+                exc_type=exc_type,
+                exc_val=exc_val,
+                exc_tb=exc_tb,
+            )
+            # cleanup dependencies next
+            self._dependencies.__exit__(
+                exc_type=exc_type,
+                exc_val=exc_val,
+                exc_tb=exc_tb,
+            )
+            # finally reset state
+            self._state.__exit__(
+                exc_type=exc_type,
+                exc_val=exc_val,
+                exc_tb=exc_tb,
+            )
 
 
 _Args_T = ParamSpec("_Args_T")
