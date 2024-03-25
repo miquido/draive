@@ -1,7 +1,8 @@
-from typing import Any, Protocol, Self
+from typing import Any, Protocol, Self, runtime_checkable
 
 __all__ = [
     "DictionaryConvertible",
+    "DictionaryRepresentable",
 ]
 
 
@@ -13,9 +14,10 @@ class _DictionaryConvertible(Protocol):
 DictionaryConvertible = _DictionaryConvertible | dict[str, Any]
 
 
+@runtime_checkable
 class DictionaryRepresentable(Protocol):
     @classmethod
-    def from_dict(cls, value: dict[str, Any]) -> Self:
+    def from_dict(cls, values: dict[str, Any]) -> Self:
         ...
 
     def as_dict(self) -> dict[str, Any]:

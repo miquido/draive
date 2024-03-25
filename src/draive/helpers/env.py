@@ -96,29 +96,44 @@ def load_env(
     path: str | None = None,
     override: bool = True,
 ) -> None:
-    # minimal implementation
-    # allowing only subset of formatting:
-    # lines starting with '#' are ignored
-    # other comments are not allowed
-    # each element must be a `key=value` pair
-    # without whitespaces or additional characters
-    # keys without values are ignored
-    with open(file=path or ".env") as file:
-        for line in file.readlines():
-            if line.startswith("#"):
-                continue  # ignore commented
+    """\
+    Minimalist implementation of environment variables file loader. \
+    When the file is not available configuration won't be loaded.
+    Allows only subset of formatting:
+    - lines starting with '#' are ignored
+    - other comments are not allowed
+    - each element is in a new line
+    - each element must be a `key=value` pair without whitespaces or additional characters
+    - keys without values are ignored
 
-            idx: int  # find where key ends
-            for element in enumerate(line):
-                if element[1] == "=":
-                    idx: int = element[0]
-                    break
-            else:  # ignore keys without assignment
-                continue
+    Parameters
+    ----------
+    path: str
+        custom path to load environment variables, default is '.env'
+    override: bool
+        override existing variables on conflict if True, otherwise keep existing
+    """
 
-            if idx >= len(line):
-                continue  # ignore keys without values
+    try:
+        with open(file=path or ".env") as file:
+            for line in file.readlines():
+                if line.startswith("#"):
+                    continue  # ignore commented
 
-            key: str = line[0:idx]
-            if key not in environ or override:
-                environ[key] = line[idx + 1 : -1].strip()
+                idx: int  # find where key ends
+                for element in enumerate(line):
+                    if element[1] == "=":
+                        idx: int = element[0]
+                        break
+                else:  # ignore keys without assignment
+                    continue
+
+                if idx >= len(line):
+                    continue  # ignore keys without values
+
+                key: str = line[0:idx]
+                value: str = line[idx + 1 :].strip()
+                if value and (override or key not in environ):
+                    environ[key] = value
+    except FileNotFoundError:
+        pass  # ignore loading if no .env available

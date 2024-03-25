@@ -3,15 +3,15 @@ SHELL := sh
 .SHELLFLAGS := -eu -c
 .DELETE_ON_ERROR:
 
+SOURCES_PATH := src
+TESTS_PATH := tests
+
 # load environment config from .env if able
 -include .env
 
 ifndef PYTHON_ALIAS
 	PYTHON_ALIAS := python
 endif
-
-SOURCES_PATH := src
-TESTS_PATH := tests
 
 .PHONY: install venv format lint test
 
@@ -27,13 +27,13 @@ venv:
 	@. ./.venv/bin/activate && pip install --upgrade pip && pip install --editable .[dev] --require-virtualenv 
 	@echo '...development environment ready! Activate venv using `. ./.venv/bin/activate`.'
 
-# sync environment with uv based on requirements.txt
+# Sync environment with uv based on requirements.txt
 sync:
 	@uv pip sync requirements.txt
 
 # Generate a set of locked dependencies from pyproject.toml
 lock:
-	uv pip compile pyproject.toml -o requirements.txt --all-extras
+	@uv pip compile pyproject.toml -o requirements.txt --all-extras
 
 # Run formatter.
 format:

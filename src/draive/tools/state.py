@@ -17,7 +17,7 @@ class ToolCallContext(ScopeState):
 
     def progress(
         self,
-        content: Model,
+        content: Model | None,
     ) -> None:
         ctx.state(ToolsProgressContext).progress(
             ToolCallProgress(

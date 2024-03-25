@@ -277,24 +277,36 @@ class ScopeMetrics:
         message: str,
         /,
         *args: Any,
+        exception: Exception | None = None,
     ) -> None:
         self._logger.error(
             f"[%s] {message}",
             self,
             *args,
         )
+        if exception := exception:
+            self._logger.error(
+                exception,
+                exc_info=True,
+            )
 
     def log_warning(
         self,
         message: str,
         /,
         *args: Any,
+        exception: Exception | None = None,
     ) -> None:
         self._logger.warning(
             f"[%s] {message}",
             self,
             *args,
         )
+        if exception := exception:
+            self._logger.warning(
+                exception,
+                exc_info=True,
+            )
 
     def log_info(
         self,
@@ -313,12 +325,18 @@ class ScopeMetrics:
         message: str,
         /,
         *args: Any,
+        exception: Exception | None = None,
     ) -> None:
         self._logger.debug(
             f"[%s] {message}",
             self,
             *args,
         )
+        if exception := exception:
+            self._logger.debug(
+                exception,
+                exc_info=True,
+            )
 
     # - INTERNAL -
 

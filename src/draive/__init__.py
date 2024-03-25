@@ -59,6 +59,7 @@ from draive.types import (
     ConversationStreamingPartialMessage,
     ConversationStreamingUpdate,
     DictionaryConvertible,
+    DictionaryRepresentable,
     Embedded,
     Embedder,
     Field,
@@ -66,6 +67,7 @@ from draive.types import (
     ImageContent,
     ImageURLContent,
     JSONConvertible,
+    JSONRepresentable,
     Memory,
     MissingValue,
     Model,
@@ -79,7 +81,7 @@ from draive.types import (
     ToolException,
     Toolset,
 )
-from draive.utils import allowing_early_exit, autoretry, cache, with_early_exit
+from draive.utils import allowing_early_exit, auto_retry, cache, with_early_exit
 
 __all__ = [
     "Conversation",
@@ -122,7 +124,7 @@ __all__ = [
     "Toolbox",
     "ToolCallContext",
     "Toolset",
-    "autoretry",
+    "auto_retry",
     "cache",
     "conversation_completion",
     "count_text_tokens",
@@ -146,7 +148,9 @@ __all__ = [
     "split_text",
     "tool",
     "DictionaryConvertible",
+    "DictionaryRepresentable",
     "JSONConvertible",
+    "JSONRepresentable",
     "allowing_early_exit",
     "with_early_exit",
     "mistral_chat_completion",

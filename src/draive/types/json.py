@@ -2,6 +2,7 @@ from typing import Protocol, Self
 
 __all__ = [
     "JSONConvertible",
+    "JSONRepresentable",
 ]
 
 

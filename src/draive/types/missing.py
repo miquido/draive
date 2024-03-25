@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Final, final
 
 __all__ = [
     "MissingValue",
@@ -6,6 +6,7 @@ __all__ = [
 ]
 
 
+@final
 class MissingValue:
     def __bool__(self) -> bool:
         return False
@@ -24,4 +25,4 @@ class MissingValue:
         raise RuntimeError("MissingValue can't be modified")
 
 
-MISSING = MissingValue()
+MISSING: Final[MissingValue] = MissingValue()

@@ -1,8 +1,9 @@
 import json
-from typing import Self, get_origin
+from typing import Self
 
-from draive.types.parameters import ParameterSpecification, parameter_specification
-from draive.types.state import State, StateField
+from draive.types.missing import MISSING
+from draive.types.parameters import ParameterSpecification
+from draive.types.state import State
 
 __all__ = [
     "Model",
@@ -13,19 +14,17 @@ class Model(State):
     @classmethod
     def specification(cls) -> ParameterSpecification:
         if not hasattr(cls, "_specification"):
-            fields: dict[str, StateField] = cls._fields()
-
             cls._specification: ParameterSpecification = {
                 "type": "object",
                 "properties": {
-                    field.alias or field.name: parameter_specification(
-                        annotation=field.annotation,
-                        origin=get_origin(field.annotation),
-                        description=field.description,
-                    )
-                    for field in fields.values()
+                    parameter.alias or parameter.name: parameter.specification()
+                    for parameter in cls._parameters()
                 },
-                "required": [field.alias or field.name for field in fields.values()],
+                "required": [
+                    parameter.alias or parameter.name
+                    for parameter in cls._parameters()
+                    if parameter.default is MISSING
+                ],
             }
 
         return cls._specification
@@ -44,13 +43,9 @@ class Model(State):
     def from_json(
         cls,
         value: str | bytes,
-        strict: bool = False,
     ) -> Self:
         try:
-            return cls.from_dict(
-                value=json.loads(value),
-                strict=strict,
-            )
+            return cls.from_dict(values=json.loads(value))
 
         except Exception as exc:
             raise ValueError(f"Failed to decode {cls.__name__} from json:\n{value}") from exc
@@ -65,4 +60,7 @@ class Model(State):
             ) from exc
 
     def __str__(self) -> str:
-        return json.dumps(self.as_dict(), indent=2)
+        return json.dumps(
+            self.as_dict(),
+            indent=2,
+        )
