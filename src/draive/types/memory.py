@@ -47,7 +47,6 @@ class ReadOnlyMemory(Generic[_MemoryElement]):
 
     async def remember(
         self,
-        elements: Iterable[_MemoryElement],
-        /,
+        *elements: _MemoryElement,
     ) -> None:
-        pass
+        pass  # ignore

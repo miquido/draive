@@ -12,7 +12,7 @@ class MissingValue:
         return False
 
     def __str__(self) -> str:
-        return ""
+        return "MISSING"
 
     def __repr__(self) -> str:
         return "MISSING"
