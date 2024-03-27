@@ -1,35 +1,16 @@
 import json
+from dataclasses import asdict
 from typing import Self
 
-from draive.types.missing import MISSING
-from draive.types.parameters import ParameterSpecification
-from draive.types.state import State
+from draive.types.specification import ParametrizedModel
 
 __all__ = [
     "Model",
 ]
 
 
-class Model(State):
-    @classmethod
-    def specification(cls) -> ParameterSpecification:
-        if not hasattr(cls, "_specification"):
-            cls._specification: ParameterSpecification = {
-                "type": "object",
-                "properties": {
-                    parameter.alias or parameter.name: parameter.specification()
-                    for parameter in cls._parameters()
-                },
-                "required": [
-                    parameter.alias or parameter.name
-                    for parameter in cls._parameters()
-                    if parameter.default is MISSING
-                ],
-            }
-
-        return cls._specification
-
-    @classmethod
+class Model(ParametrizedModel):
+    @classmethod  # avoid making json each time
     def specification_json(cls) -> str:
         if not hasattr(cls, "_specification_json"):
             cls._specification_json: str = json.dumps(
@@ -45,14 +26,20 @@ class Model(State):
         value: str | bytes,
     ) -> Self:
         try:
-            return cls.from_dict(values=json.loads(value))
+            return cls.validated(**json.loads(value))
 
         except Exception as exc:
             raise ValueError(f"Failed to decode {cls.__name__} from json:\n{value}") from exc
 
-    def as_json(self) -> str:
+    def as_json(
+        self,
+        indent: int | None = None,
+    ) -> str:
         try:
-            return json.dumps(self.as_dict())
+            return json.dumps(
+                self.__class__.aliased_parameters(asdict(self)),
+                indent=indent,
+            )
 
         except Exception as exc:
             raise ValueError(
@@ -60,7 +47,4 @@ class Model(State):
             ) from exc
 
     def __str__(self) -> str:
-        return json.dumps(
-            self.as_dict(),
-            indent=2,
-        )
+        return self.as_json(indent=2)

@@ -50,24 +50,21 @@ from draive.scope import (
 from draive.similarity import mmr_similarity, similarity
 from draive.splitters import split_text
 from draive.tokenization import TextTokenCounter, Tokenization, count_text_tokens
-from draive.tools import Parameter, Tool, Toolbox, ToolCallContext, tool
+from draive.tools import Tool, Toolbox, ToolCallContext, tool
 from draive.types import (
     MISSING,
+    Argument,
     ConversationMessage,
     ConversationMessageContent,
     ConversationResponseStream,
     ConversationStreamingPartialMessage,
     ConversationStreamingUpdate,
-    DictionaryConvertible,
-    DictionaryRepresentable,
     Embedded,
     Embedder,
     Field,
     ImageBase64Content,
     ImageContent,
     ImageURLContent,
-    JSONConvertible,
-    JSONRepresentable,
     Memory,
     MissingValue,
     Model,
@@ -147,10 +144,7 @@ __all__ = [
     "split_sequence",
     "split_text",
     "tool",
-    "DictionaryConvertible",
-    "DictionaryRepresentable",
-    "JSONConvertible",
-    "JSONRepresentable",
+    "Argument",
     "allowing_early_exit",
     "with_early_exit",
     "mistral_chat_completion",
@@ -163,6 +157,5 @@ __all__ = [
     "load_env",
     "MissingValue",
     "MISSING",
-    "Parameter",
     "MultimodalContent",
 ]

@@ -1,6 +1,6 @@
 from typing import Any, Protocol, runtime_checkable
 
-from draive.types.tool import ToolSpecification
+from draive.types.specification import ToolSpecification
 
 __all__ = [
     "Toolset",

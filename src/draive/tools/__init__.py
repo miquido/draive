@@ -2,7 +2,7 @@ from draive.tools.state import (
     ToolCallContext,
     ToolsProgressContext,
 )
-from draive.tools.tool import Parameter, Tool, tool
+from draive.tools.tool import Tool, tool
 from draive.tools.toolbox import Toolbox
 
 __all__ = [
@@ -11,5 +11,4 @@ __all__ = [
     "Toolbox",
     "ToolsProgressContext",
     "ToolCallContext",
-    "Parameter",
 ]
