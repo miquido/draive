@@ -9,7 +9,7 @@ from dataclasses import (
 )
 from dataclasses import MISSING as DATACLASS_MISSING
 from dataclasses import Field as DataclassField
-from dataclasses import dataclass, is_dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from dataclasses import field as dataclass_field
 from dataclasses import fields as dataclass_fields
 from typing import (
@@ -257,6 +257,19 @@ class ParametrizedState(metaclass=ParametrizedStateMeta):
     @classmethod
     def validated(cls, **kwargs: Any) -> Self:
         return cls(**cls.validated_parameters(values=kwargs))
+
+    @classmethod
+    def from_dict(
+        cls,
+        values: dict[str, Any],
+    ) -> Self:
+        try:
+            return cls.validated(**values)
+        except Exception as exc:
+            raise ValueError(f"Failed to decode {cls.__name__} from dict:\n{values}") from exc
+
+    def as_dict(self) -> dict[str, Any]:
+        return self.__class__.aliased_parameters(asdict(self))
 
 
 def Argument(  # Ruff - noqa: B008

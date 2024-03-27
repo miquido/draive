@@ -5,6 +5,7 @@ from logging import Logger
 from types import TracebackType
 from typing import Any, Literal, ParamSpec, TypeVar, final
 
+from draive.helpers import getenv_bool
 from draive.scope.dependencies import DependenciesScope, ScopeDependency
 from draive.scope.errors import MissingScopeContext
 from draive.scope.metrics import MetricsScope, ScopeMetric
@@ -174,7 +175,8 @@ class ctx:
                 logger=logger,
                 parent=None,
                 metrics=metrics,
-                log_summary=log_summary or ("trimmed" if __debug__ else "none"),
+                log_summary=log_summary
+                or ("trimmed" if getenv_bool("DEBUG_LOGGING", __debug__) else "none"),
             ),
             state=root_state,
             dependencies=root_dependencies,

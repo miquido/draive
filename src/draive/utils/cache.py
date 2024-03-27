@@ -9,22 +9,22 @@ __all__ = [
     "cache",
 ]
 
-_Args = ParamSpec(
-    name="_Args",
+_Args_T = ParamSpec(
+    name="_Args_T",
 )
-_Result = TypeVar(
-    name="_Result",
+_Result_T = TypeVar(
+    name="_Result_T",
 )
-_Entry = TypeVar(
-    name="_Entry",
+_Entry_T = TypeVar(
+    name="_Entry_T",
 )
 
 
 @overload
 def cache(
-    function: Callable[_Args, _Result],
+    function: Callable[_Args_T, _Result_T],
     /,
-) -> Callable[_Args, _Result]:
+) -> Callable[_Args_T, _Result_T]:
     ...
 
 
@@ -33,16 +33,19 @@ def cache(
     *,
     limit: int = 1,
     expiration: float | None = None,
-) -> Callable[[Callable[_Args, _Result]], Callable[_Args, _Result]]:
+) -> Callable[[Callable[_Args_T, _Result_T]], Callable[_Args_T, _Result_T]]:
     ...
 
 
 def cache(
-    function: Callable[_Args, _Result] | None = None,
+    function: Callable[_Args_T, _Result_T] | None = None,
     *,
     limit: int = 1,
     expiration: float | None = None,
-) -> Callable[[Callable[_Args, _Result]], Callable[_Args, _Result]] | Callable[_Args, _Result]:
+) -> (
+    Callable[[Callable[_Args_T, _Result_T]], Callable[_Args_T, _Result_T]]
+    | Callable[_Args_T, _Result_T]
+):
     """\
     Simple lru function result cache with optional expire time. \
     Works for both sync and async functions. \
@@ -64,13 +67,13 @@ def cache(
         provided function wrapped in cache
     """
 
-    def _wrap(function: Callable[_Args, _Result], /) -> Callable[_Args, _Result]:
+    def _wrap(function: Callable[_Args_T, _Result_T], /) -> Callable[_Args_T, _Result_T]:
         if hasattr(function, "__self__"):
             raise RuntimeError("Method cache is not supported yet")
 
         if iscoroutinefunction(function):
             return cast(
-                Callable[_Args, _Result],
+                Callable[_Args_T, _Result_T],
                 _wrap_async(
                     function,
                     limit=limit,
@@ -90,25 +93,25 @@ def cache(
         return _wrap
 
 
-class _CacheEntry(Generic[_Entry], NamedTuple):
-    value: _Entry
+class _CacheEntry(Generic[_Entry_T], NamedTuple):
+    value: _Entry_T
     expire: float | None
 
 
 def _wrap_sync(
-    function: Callable[_Args, _Result],
+    function: Callable[_Args_T, _Result_T],
     *,
     limit: int,
     expiration: float | None,
-) -> Callable[_Args, _Result]:
+) -> Callable[_Args_T, _Result_T]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
-    cached: OrderedDict[Hashable, _CacheEntry[_Result]] = OrderedDict()
+    cached: OrderedDict[Hashable, _CacheEntry[_Result_T]] = OrderedDict()
 
     @wraps(function)
     def wrapped(
-        *args: _Args.args,
-        **kwargs: _Args.kwargs,
-    ) -> _Result:
+        *args: _Args_T.args,
+        **kwargs: _Args_T.kwargs,
+    ) -> _Result_T:
         key: Hashable = _make_key(args=args, kwds=kwargs, typed=True)
         match cached.get(key):
             case None:
@@ -121,7 +124,7 @@ def _wrap_sync(
                     cached.move_to_end(key)
                     return entry[0]
 
-        result: _Result = function(*args, **kwargs)
+        result: _Result_T = function(*args, **kwargs)
         cached[key] = _CacheEntry(
             value=result,
             expire=monotonic() + expiration if expiration else None,
@@ -134,19 +137,19 @@ def _wrap_sync(
 
 
 def _wrap_async(
-    function: Callable[_Args, Coroutine[Any, Any, _Result]],
+    function: Callable[_Args_T, Coroutine[Any, Any, _Result_T]],
     *,
     limit: int = 1,
     expiration: float | None,
-) -> Callable[_Args, Coroutine[Any, Any, _Result]]:
+) -> Callable[_Args_T, Coroutine[Any, Any, _Result_T]]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
-    cached: OrderedDict[Hashable, _CacheEntry[Task[_Result]]] = OrderedDict()
+    cached: OrderedDict[Hashable, _CacheEntry[Task[_Result_T]]] = OrderedDict()
 
     @wraps(function)
     async def wrapped(
-        *args: _Args.args,
-        **kwargs: _Args.kwargs,
-    ) -> _Result:
+        *args: _Args_T.args,
+        **kwargs: _Args_T.kwargs,
+    ) -> _Result_T:
         loop: AbstractEventLoop = get_running_loop()
         key: Hashable = _make_key(args=args, kwds=kwargs, typed=True)
         match cached.get(key):
@@ -161,7 +164,7 @@ def _wrap_async(
                     cached.move_to_end(key)
                     return await shield(entry[0])
 
-        task: Task[_Result] = loop.create_task(function(*args, **kwargs))
+        task: Task[_Result_T] = loop.create_task(function(*args, **kwargs))
         cached[key] = _CacheEntry(
             value=task,
             expire=monotonic() + expiration if expiration else None,
