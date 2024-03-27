@@ -7,9 +7,9 @@ from asyncio import (
 )
 from collections.abc import Callable, Coroutine
 from contextvars import ContextVar, Token
-from typing import Any, ParamSpec, Protocol, TypeVar, cast
+from typing import Any, ParamSpec, Protocol, TypeVar
 
-from draive.scope import ScopeMetrics, ctx
+from draive.scope import MetricsScope, ctx
 from draive.types import State
 
 __all__ = [
@@ -53,7 +53,7 @@ async def allowing_early_exit(
     try:
         finished, running = await wait(
             [
-                ctx.current_task_group().create_task(ctx.with_current(call)(*args, **kwargs)),
+                ctx.spawn_task(call, *args, **kwargs),
                 early_exit_future,
             ],
             return_when=FIRST_COMPLETED,
@@ -62,7 +62,7 @@ async def allowing_early_exit(
         for task in running:  # pyright: ignore[reportUnknownVariableType]
             task.cancel()
 
-        return cast(_Result_T | _EarlyExitResult_T, finished.pop().result())
+        return finished.pop().result()
 
     finally:
         _EarlyExit_Var.reset(early_exit_token)
@@ -98,8 +98,8 @@ class _EarlyExitResult:
             trimmed: bool,
         ) -> str | None:
             result_str: str = str(self._result)
-            if trimmed and len(result_str) > ScopeMetrics.TRIMMING_CHARACTER_LIMIT:
-                result_str = f"{result_str[:ScopeMetrics.TRIMMING_CHARACTER_LIMIT]}...".replace(
+            if trimmed and len(result_str) > MetricsScope.TRIMMING_CHARACTER_LIMIT:
+                result_str = f"{result_str[:MetricsScope.TRIMMING_CHARACTER_LIMIT]}...".replace(
                     "\n", " "
                 )
             else:

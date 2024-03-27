@@ -1,8 +1,7 @@
 from collections.abc import Iterable
-from contextvars import ContextVar, Token
+from contextvars import Token
 from logging import Logger, getLogger
-from time import time
-from types import TracebackType
+from time import monotonic
 from typing import Any, Literal, Protocol, Self, TypeVar, cast, final, runtime_checkable
 from uuid import uuid4
 
@@ -11,7 +10,7 @@ __all__ = [
     "ArgumentsTrace",
     "ResultTrace",
     "TokenUsage",
-    "ScopeMetrics",
+    "MetricsScope",
 ]
 
 
@@ -94,9 +93,9 @@ class ArgumentsTrace(ScopeMetric):
                 arguments_description: str = ""
                 for key, value in self._kwargs.items():
                     value_str: str = str(value)
-                    if trimmed and len(value_str) > ScopeMetrics.TRIMMING_CHARACTER_LIMIT:
+                    if trimmed and len(value_str) > MetricsScope.TRIMMING_CHARACTER_LIMIT:
                         value_str = (
-                            f"{value_str[:ScopeMetrics.TRIMMING_CHARACTER_LIMIT]}...".replace(
+                            f"{value_str[:MetricsScope.TRIMMING_CHARACTER_LIMIT]}...".replace(
                                 "\n", " "
                             )
                         )
@@ -140,8 +139,8 @@ class ResultTrace(ScopeMetric):
             trimmed: bool,
         ) -> str | None:
             result_str: str = str(self._result)
-            if trimmed and len(result_str) > ScopeMetrics.TRIMMING_CHARACTER_LIMIT:
-                result_str = (f"{result_str[:ScopeMetrics.TRIMMING_CHARACTER_LIMIT]}...").replace(
+            if trimmed and len(result_str) > MetricsScope.TRIMMING_CHARACTER_LIMIT:
+                result_str = (f"{result_str[:MetricsScope.TRIMMING_CHARACTER_LIMIT]}...").replace(
                     "\n", " "
                 )
             else:
@@ -171,7 +170,7 @@ _ScopeMetric_T = TypeVar(
 
 
 @final  # unstructured background tasks spawning may result in corrupted data
-class ScopeMetrics:
+class MetricsScope:
     TRIMMING_CHARACTER_LIMIT: int = 64
 
     def __init__(  # noqa: PLR0913
@@ -183,9 +182,9 @@ class ScopeMetrics:
         metrics: Iterable[ScopeMetric] | None,
         log_summary: Literal["full", "trimmed", "none"],
     ) -> None:
-        self._start: float = time()
+        self._start: float = monotonic()
         self._end: float | None = None
-        self._exception: BaseException | None = None
+        self._exception: BaseExceptionGroup[Any] | BaseException | None = None
         self._pending_tasks: int = 0
         self._trace_id: str = parent._trace_id if parent else uuid4().hex
         self._label: str = label or "metrics"
@@ -194,9 +193,9 @@ class ScopeMetrics:
         self._metrics: dict[type[ScopeMetric], ScopeMetric] = {
             type(metric): metric for metric in metrics or []
         }
-        self._nested_traces: list[ScopeMetrics] = []
+        self._nested_traces: list[MetricsScope] = []
         self._log_summary: Literal["full", "trimmed", "none"] = log_summary
-        self._token: Token[ScopeMetrics] | None = None
+        self._token: Token[MetricsScope] | None = None
         self.log_info("%s started", self)
 
     # - STATE -
@@ -221,7 +220,7 @@ class ScopeMetrics:
     ) -> Self:
         if self.is_finished:
             raise ValueError("Attempting to use already finished metrics")
-        self._enter_task()
+        self.enter_task()
         child: Self = self.__class__(
             label=label,
             logger=self._logger,
@@ -340,19 +339,37 @@ class ScopeMetrics:
 
     # - INTERNAL -
 
-    def _enter_task(self) -> None:
-        if self.is_finished:
-            raise ValueError("Attempting to use already finished metrics")
+    def enter_task(self) -> None:
+        assert not self.is_finished, "Attempting to use already finished metrics"  # nosec: B101
         self._pending_tasks += 1
 
-    def _exit_task(self) -> None:
+    def exit_task(
+        self,
+        exception: BaseException | None,
+    ) -> None:
+        assert not self.is_finished, "Attempting to use already finished metrics"  # nosec: B101
         assert self._pending_tasks > 0, "Unbalanced metrics task exit"  # nosec: B101
         self._pending_tasks -= 1
+        if exception := exception:
+            # the code below does not keep proper exception semantics of BaseException/Exception
+            # however we are using it only for logging purposes at the moment
+            # because of that merging exceptions in groups is simplified under BaseExceptionGroup
+            if self._exception is None:
+                self._exception = exception
+            elif isinstance(self._exception, BaseExceptionGroup):
+                self._exception = BaseExceptionGroup(
+                    "Multiple errors",
+                    (*self._exception.exceptions, exception),  # pyright: ignore[reportUnknownMemberType]
+                )
+            else:
+                self._exception = BaseExceptionGroup(
+                    "Multiple errors", (self._exception, exception)
+                )
 
         if self._pending_tasks > 0:
             return  # can't finish yet
 
-        self._end = time()
+        self._end = monotonic()
 
         match self._log_summary:
             case "none":
@@ -385,34 +402,11 @@ class ScopeMetrics:
                 duration,
             )
 
-        # exit out of lock to avoid deadlock on summary
         if parent := self._parent:
-            parent._exit_task()
+            parent.exit_task(exception=None)
 
     def __str__(self) -> str:
         return f"{self._trace_id}|{self._label}"
-
-    def __enter__(self) -> None:
-        assert not self.is_finished, "Attempting to use already finished metrics"  # nosec: B101
-        assert self._token is None, "Reentrance is not allowed"  # nosec: B101
-        self._token = _ScopeMetrics_Var.set(self)
-        self._enter_task()
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        assert self._token is not None, "Can't exit scope without entering"  # nosec: B101
-        assert not self.is_finished, "Attempting to use already finished metrics"  # nosec: B101
-
-        try:
-            self._exception = exc_val
-            self._exit_task()
-
-        finally:
-            _ScopeMetrics_Var.reset(self._token)
 
     # - PRIVATE -
 
@@ -428,7 +422,7 @@ class ScopeMetrics:
             summary = f"• {self._label}:"
 
         if start := self._start:
-            duration: float = (self._end or time()) - start
+            duration: float = (self._end or monotonic()) - start
             summary += f"\n- duration: {duration:.2f}s"
 
         if exception := self._exception:
@@ -467,6 +461,3 @@ class ScopeMetrics:
                     metrics[metric_type] = child_metric
 
         return metrics
-
-
-_ScopeMetrics_Var = ContextVar[ScopeMetrics]("_ScopeMetrics_Var")

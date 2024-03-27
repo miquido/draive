@@ -89,7 +89,6 @@ async def openai_conversation_completion(
         match stream:
             case True:
 
-                @ctx.with_current
                 async def stream_task(
                     progress: ProgressUpdate[ConversationStreamingUpdate],
                 ) -> None:
@@ -103,10 +102,7 @@ async def openai_conversation_completion(
                     )
                     ctx.record(ResultTrace(response))
 
-                return AsyncStreamTask(
-                    job=stream_task,
-                    task_spawn=ctx.spawn_task,
-                )
+                return AsyncStreamTask(job=stream_task)
 
             case False:
                 response: ConversationMessage = await _openai_conversation_response(

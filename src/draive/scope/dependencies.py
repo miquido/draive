@@ -1,13 +1,12 @@
 from abc import ABC, abstractmethod
 from asyncio import gather
-from contextvars import ContextVar, Token
-from types import TracebackType
+from contextvars import Token
 from typing import Self, TypeVar, cast, final
 
 from draive.scope.errors import MissingScopeDependency
 
 __all__ = [
-    "ScopeDependencies",
+    "DependenciesScope",
     "ScopeDependency",
     "_ScopeDependency_T",
 ]
@@ -34,7 +33,7 @@ _ScopeDependency_T = TypeVar(
 
 
 @final
-class ScopeDependencies:
+class DependenciesScope:
     def __init__(
         self,
         *dependencies: ScopeDependency | type[ScopeDependency],
@@ -45,7 +44,7 @@ class ScopeDependencies:
                 self._dependencies[type(dependency).interface()] = dependency
             else:
                 self._dependencies[dependency.interface()] = dependency.prepare()
-        self._token: Token[ScopeDependencies] | None = None
+        self._token: Token[DependenciesScope] | None = None
 
     def dependency(
         self,
@@ -60,44 +59,5 @@ class ScopeDependencies:
                 f"{_type} is not defined! You have to define it when creating context."
             )
 
-    def copy(self) -> Self:
-        return self.__copy__()
-
-    def __copy__(self) -> Self:
-        copy: Self = self.__class__()
-        copy._dependencies = self._dependencies.copy()
-        return copy
-
     async def dispose(self) -> None:
         await gather(*[dependency.dispose() for dependency in self._dependencies.values()])
-
-    def __enter__(self) -> None:
-        assert self._token is None, "Reentrance is not allowed"  # nosec: B101
-        self._token = _ScopeDependencies_Var.set(self)
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        assert self._token is not None, "Can't exit scope without entering"  # nosec: B101
-        _ScopeDependencies_Var.reset(self._token)
-
-    async def __aenter__(self) -> None:
-        assert self._token is None, "Reentrance is not allowed"  # nosec: B101
-        self._token = _ScopeDependencies_Var.set(self)
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        assert self._token is not None, "Can't exit scope without entering"  # nosec: B101
-        _ScopeDependencies_Var.reset(self._token)
-        self._token = None
-        await self.dispose()
-
-
-_ScopeDependencies_Var = ContextVar[ScopeDependencies]("_ScopeDependencies_Var")

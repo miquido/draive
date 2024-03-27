@@ -3,7 +3,7 @@ from typing import Self
 import pytest
 import pytest_asyncio
 from draive import ctx
-from draive.scope.metrics import CombinableScopeMetric, ScopeMetrics, TokenUsage
+from draive.scope.metrics import CombinableScopeMetric, MetricsScope, TokenUsage
 
 
 class ExpMetric(CombinableScopeMetric):
@@ -25,7 +25,7 @@ class ExpMetric(CombinableScopeMetric):
 
 
 @pytest_asyncio.fixture
-async def scope_metrics() -> ScopeMetrics:
+async def metrics_scope() -> MetricsScope:
     async with ctx.new():
         ctx.record(ExpMetric(value=1))
 
@@ -40,12 +40,12 @@ async def scope_metrics() -> ScopeMetrics:
                 ctx.record(TokenUsage(input_tokens=222, output_tokens=333))
                 ctx.record(ExpMetric(value=7))
 
-        return ctx.current_metrics()
+        return ctx._current_metrics()
 
 
 @pytest.mark.asyncio
-async def test_combinable_metrics(scope_metrics: ScopeMetrics) -> None:
-    combined_metrics = scope_metrics._combined_metrics()
+async def test_combinable_metrics(metrics_scope: MetricsScope) -> None:
+    combined_metrics = metrics_scope._combined_metrics()
     assert len(combined_metrics) == 2
     assert TokenUsage in combined_metrics
     assert ExpMetric in combined_metrics

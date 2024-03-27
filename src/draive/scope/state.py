@@ -1,6 +1,5 @@
 from collections.abc import Iterable
-from contextvars import ContextVar, Token
-from types import TracebackType
+from contextvars import Token
 from typing import Self, TypeVar, cast, final
 
 from draive.scope.errors import MissingScopeState
@@ -9,7 +8,7 @@ from draive.types.state import State
 __all__ = [
     "ScopeState",
     "_ScopeState_T",
-    "ScopeStates",
+    "StateScope",
 ]
 
 
@@ -31,7 +30,7 @@ _ScopeState_T = TypeVar(
 
 
 @final
-class ScopeStates:
+class StateScope:
     def __init__(
         self,
         *state: ScopeState,
@@ -39,7 +38,7 @@ class ScopeStates:
         self._state: dict[type[ScopeState], ScopeState] = {
             type(element): element for element in state
         }
-        self._token: Token[ScopeStates] | None = None
+        self._token: Token[StateScope] | None = None
 
     def copy(self) -> Self:
         return self.__copy__()
@@ -60,7 +59,7 @@ class ScopeStates:
 
     def updated(
         self,
-        state: Iterable[ScopeState],
+        state: Iterable[ScopeState] | None,
     ) -> Self:
         if state:
             return self.__class__(
@@ -71,20 +70,3 @@ class ScopeStates:
             )
         else:
             return self
-
-    def __enter__(self) -> None:
-        assert self._token is None, "Reentrance is not allowed"  # nosec: B101
-        self._token = _ScopeState_Var.set(self)
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        assert self._token is not None, "Can't exit scope without entering"  # nosec: B101
-        _ScopeState_Var.reset(self._token)
-        self._token = None
-
-
-_ScopeState_Var = ContextVar[ScopeStates]("_ScopeState_Var")

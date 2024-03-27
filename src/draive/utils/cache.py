@@ -33,7 +33,6 @@ def cache(
     *,
     limit: int = 1,
     expiration: float | None = None,
-    make_key: Callable[_Args, Hashable] | None = None,
 ) -> Callable[[Callable[_Args, _Result]], Callable[_Args, _Result]]:
     ...
 
@@ -43,7 +42,6 @@ def cache(
     *,
     limit: int = 1,
     expiration: float | None = None,
-    make_key: Callable[_Args, Hashable] | None = None,
 ) -> Callable[[Callable[_Args, _Result]], Callable[_Args, _Result]] | Callable[_Args, _Result]:
     """\
     Simple lru function result cache with optional expire time. \
@@ -59,8 +57,6 @@ def cache(
         limit of cache entries to keep, default is 1
     expiration: float | None
         entries expiration time in seconds, default is None (not expiring)
-    make_key: Callable[_Args, Hashable] | None
-        optional custom function used to prepare cache keys from function arguments
 
     Returns
     -------
@@ -69,6 +65,9 @@ def cache(
     """
 
     def _wrap(function: Callable[_Args, _Result], /) -> Callable[_Args, _Result]:
+        if hasattr(function, "__self__"):
+            raise RuntimeError("Method cache is not supported yet")
+
         if iscoroutinefunction(function):
             return cast(
                 Callable[_Args, _Result],
@@ -76,7 +75,6 @@ def cache(
                     function,
                     limit=limit,
                     expiration=expiration,
-                    make_key=make_key,
                 ),
             )
         else:
@@ -84,7 +82,6 @@ def cache(
                 function,
                 limit=limit,
                 expiration=expiration,
-                make_key=make_key,
             )
 
     if function := function:
@@ -103,30 +100,16 @@ def _wrap_sync(
     *,
     limit: int,
     expiration: float | None,
-    make_key: Callable[_Args, Hashable] | None,
 ) -> Callable[_Args, _Result]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
     cached: OrderedDict[Hashable, _CacheEntry[_Result]] = OrderedDict()
-    compute_key: Callable[_Args, Hashable]
-    if make_key:
-        compute_key = make_key
-    else:
-
-        def default_key(*args: _Args.args, **kwargs: _Args.kwargs) -> Hashable:
-            return _make_key(
-                args=args,
-                kwds=kwargs,
-                typed=True,
-            )
-
-        compute_key = default_key
 
     @wraps(function)
     def wrapped(
         *args: _Args.args,
         **kwargs: _Args.kwargs,
     ) -> _Result:
-        key: Hashable = compute_key(*args, **kwargs)
+        key: Hashable = _make_key(args=args, kwds=kwargs, typed=True)
         match cached.get(key):
             case None:
                 pass
@@ -155,23 +138,9 @@ def _wrap_async(
     *,
     limit: int = 1,
     expiration: float | None,
-    make_key: Callable[_Args, Hashable] | None,
 ) -> Callable[_Args, Coroutine[Any, Any, _Result]]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
     cached: OrderedDict[Hashable, _CacheEntry[Task[_Result]]] = OrderedDict()
-    compute_key: Callable[_Args, Hashable]
-    if make_key:
-        compute_key = make_key
-    else:
-
-        def default_key(*args: _Args.args, **kwargs: _Args.kwargs) -> Hashable:
-            return _make_key(
-                args=args,
-                kwds=kwargs,
-                typed=True,
-            )
-
-        compute_key = default_key
 
     @wraps(function)
     async def wrapped(
@@ -179,7 +148,7 @@ def _wrap_async(
         **kwargs: _Args.kwargs,
     ) -> _Result:
         loop: AbstractEventLoop = get_running_loop()
-        key: Hashable = compute_key(*args, **kwargs)
+        key: Hashable = _make_key(args=args, kwds=kwargs, typed=True)
         match cached.get(key):
             case None:
                 pass

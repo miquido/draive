@@ -89,7 +89,6 @@ async def mistral_chat_completion(  # noqa: PLR0913
 
             case True:
 
-                @ctx.with_current
                 async def stream_task(
                     progress: ProgressUpdate[ConversationStreamingUpdate],
                 ) -> None:
@@ -106,10 +105,7 @@ async def mistral_chat_completion(  # noqa: PLR0913
                             progress=progress,
                         )
 
-                return AsyncStreamTask(
-                    job=stream_task,
-                    task_spawn=ctx.spawn_task,
-                )
+                return AsyncStreamTask(job=stream_task)
 
             case progress:
                 with ctx.updated(
