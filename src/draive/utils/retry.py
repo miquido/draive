@@ -10,15 +10,15 @@ __all__ = [
     "auto_retry",
 ]
 
-_Args = ParamSpec(name="_Args")
-_Result = TypeVar(name="_Result")
+_Args_T = ParamSpec(name="_Args_T")
+_Result_T = TypeVar(name="_Result_T")
 
 
 @overload
 def auto_retry(
-    function: Callable[_Args, _Result],
+    function: Callable[_Args_T, _Result_T],
     /,
-) -> Callable[_Args, _Result]:
+) -> Callable[_Args_T, _Result_T]:
     ...
 
 
@@ -27,18 +27,19 @@ def auto_retry(
     *,
     limit: int = 1,
     delay: tuple[float, float] | float | None = None,
-    fallback: _Result | None = None,
-) -> Callable[[Callable[_Args, _Result]], Callable[_Args, _Result]]:
+) -> Callable[[Callable[_Args_T, _Result_T]], Callable[_Args_T, _Result_T]]:
     ...
 
 
 def auto_retry(
-    function: Callable[_Args, _Result] | None = None,
+    function: Callable[_Args_T, _Result_T] | None = None,
     *,
     limit: int = 1,
     delay: tuple[float, float] | float | None = None,
-    fallback: _Result | None = None,
-) -> Callable[[Callable[_Args, _Result]], Callable[_Args, _Result]] | Callable[_Args, _Result]:
+) -> (
+    Callable[[Callable[_Args_T, _Result_T]], Callable[_Args_T, _Result_T]]
+    | Callable[_Args_T, _Result_T]
+):
     """\
     Simple on fail retry function wrapper. \
     Works for both sync and async functions. \
@@ -47,31 +48,35 @@ def auto_retry(
 
     Parameters
     ----------
-    function: Callable[_Args, _Result]
+    function: Callable[_Args_T, _Result_T]
         function to wrap in auto retry, either sync or async
     limit: int
         limit of retries, default is 1
     delay: tuple[float, float] | float | None
         retry delay time in seconds, tuple allows to provide time range to use, \
         default is None (no delay)
-    fallback: _Result | None
-        optional fallback result to use after all retry attempts failure
 
     Returns
     -------
-    Callable[[Callable[_Args, _Result]], Callable[_Args, _Result]] | Callable[_Args, _Result]
+    Callable[[Callable[_Args_T, _Result_T]], Callable[_Args_T, _Result_T]]
+    | Callable[_Args_T, _Result_T]
         provided function wrapped in auto retry
     """
 
-    def _wrap(function: Callable[_Args, _Result], /) -> Callable[_Args, _Result]:
+    def _wrap(
+        function: Callable[_Args_T, _Result_T],
+        /,
+    ) -> Callable[_Args_T, _Result_T]:
+        if hasattr(function, "__self__"):
+            raise RuntimeError("Method auto_retry is not supported yet")
+
         if iscoroutinefunction(function):
             return cast(
-                Callable[_Args, _Result],
+                Callable[_Args_T, _Result_T],
                 _wrap_async(
                     function,
                     limit=limit,
                     delay=delay,
-                    fallback=fallback,
                 ),
             )
         else:
@@ -79,7 +84,6 @@ def auto_retry(
                 function,
                 limit=limit,
                 delay=delay,
-                fallback=fallback,
             )
 
     if function := function:
@@ -89,20 +93,19 @@ def auto_retry(
 
 
 def _wrap_sync(
-    function: Callable[_Args, _Result],
+    function: Callable[_Args_T, _Result_T],
     *,
     limit: int,
     delay: tuple[float, float] | float | None,
-    fallback: _Result | None,
-) -> Callable[_Args, _Result]:
+) -> Callable[_Args_T, _Result_T]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
     assert delay is None, "Delay is not supported in sync wrapper"  # nosec: B101
 
     @wraps(function)
     def wrapped(
-        *args: _Args.args,
-        **kwargs: _Args.kwargs,
-    ) -> _Result:
+        *args: _Args_T.args,
+        **kwargs: _Args_T.kwargs,
+    ) -> _Result_T:
         attempt: int = 0
         while True:
             try:
@@ -116,14 +119,6 @@ def _wrap_sync(
                         exc,
                     )
 
-                elif result := fallback:
-                    ctx.log_error(
-                        "Using fallback value for %s which failed due to an error: %s",
-                        function.__name__,
-                        exc,
-                    )
-                    return result
-
                 else:
                     raise exc
 
@@ -131,19 +126,18 @@ def _wrap_sync(
 
 
 def _wrap_async(
-    function: Callable[_Args, Coroutine[Any, Any, _Result]],
+    function: Callable[_Args_T, Coroutine[Any, Any, _Result_T]],
     *,
     limit: int,
     delay: tuple[float, float] | float | None,
-    fallback: _Result | None,
-) -> Callable[_Args, Coroutine[Any, Any, _Result]]:
+) -> Callable[_Args_T, Coroutine[Any, Any, _Result_T]]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
 
     @wraps(function)
     async def wrapped(
-        *args: _Args.args,
-        **kwargs: _Args.kwargs,
-    ) -> _Result:
+        *args: _Args_T.args,
+        **kwargs: _Args_T.kwargs,
+    ) -> _Result_T:
         attempt: int = 0
         while True:
             try:
@@ -166,14 +160,6 @@ def _wrap_async(
 
                         case _:
                             continue
-
-                elif result := fallback:
-                    ctx.log_error(
-                        "Using fallback value for %s which failed due to an error: %s",
-                        function.__name__,
-                        exc,
-                    )
-                    return result
 
                 else:
                     raise exc

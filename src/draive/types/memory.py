@@ -1,5 +1,6 @@
+from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Iterable
-from typing import Generic, Protocol, TypeVar, final, runtime_checkable
+from typing import Generic, TypeVar, final
 
 __all__ = [
     "Memory",
@@ -12,11 +13,12 @@ _MemoryElement = TypeVar(
 )
 
 
-@runtime_checkable
-class Memory(Protocol, Generic[_MemoryElement]):
+class Memory(ABC, Generic[_MemoryElement]):
+    @abstractmethod
     async def recall(self) -> list[_MemoryElement]:
         ...
 
+    @abstractmethod
     async def remember(
         self,
         elements: Iterable[_MemoryElement],
@@ -26,7 +28,7 @@ class Memory(Protocol, Generic[_MemoryElement]):
 
 
 @final
-class ReadOnlyMemory(Generic[_MemoryElement]):
+class ReadOnlyMemory(Memory[_MemoryElement]):
     def __init__(
         self,
         elements: (Callable[[], Awaitable[list[_MemoryElement]]] | Iterable[_MemoryElement]),
@@ -47,6 +49,7 @@ class ReadOnlyMemory(Generic[_MemoryElement]):
 
     async def remember(
         self,
-        *elements: _MemoryElement,
+        elements: Iterable[_MemoryElement],
+        /,
     ) -> None:
         pass  # ignore
