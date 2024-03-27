@@ -1,16 +1,16 @@
 from draive.scope.access import ctx
-from draive.scope.dependencies import ScopeDependencies, ScopeDependency
-from draive.scope.metrics import ArgumentsTrace, ResultTrace, ScopeMetric, ScopeMetrics, TokenUsage
-from draive.scope.state import ScopeState, ScopeStates
+from draive.scope.dependencies import DependenciesScope, ScopeDependency
+from draive.scope.metrics import ArgumentsTrace, MetricsScope, ResultTrace, ScopeMetric, TokenUsage
+from draive.scope.state import ScopeState, StateScope
 
 __all__ = [
     "ctx",
     "ScopeState",
-    "ScopeStates",
-    "ScopeDependencies",
+    "StateScope",
+    "DependenciesScope",
     "ScopeDependency",
     "ScopeMetric",
-    "ScopeMetrics",
+    "MetricsScope",
     "TokenUsage",
     "ArgumentsTrace",
     "ResultTrace",

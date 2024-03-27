@@ -4,13 +4,13 @@ from asyncio import (
     Event,
     Future,
     Task,
-    create_task,
     get_running_loop,
 )
 from collections import deque
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Coroutine
 from typing import Any, Generic, Self, TypeVar
 
+from draive.scope import ctx
 from draive.types import Model, ProgressUpdate
 
 __all__ = [
@@ -87,15 +87,10 @@ class AsyncStreamTask(Generic[_Element], AsyncIterator[_Element]):
     def __init__(
         self,
         job: Callable[[ProgressUpdate[_Element]], Coroutine[Any, Any, None]],
-        task_spawn: Callable[[Coroutine[Any, Any, None]], Task[None]] | None = None,
     ) -> None:
         stream: AsyncStream[_Element] = AsyncStream()
         self._stream: AsyncStream[_Element] = stream
-        self._task: Task[None]
-        if spawn := task_spawn:
-            self._task = spawn(job(stream.send))
-        else:
-            self._task = create_task(job(stream.send))
+        self._task: Task[None] = ctx.spawn_task(job, stream.send)
         self._task.add_done_callback(lambda task: stream.finish(task.exception()))
 
     async def as_json(self) -> AsyncGenerator[str, None]:
