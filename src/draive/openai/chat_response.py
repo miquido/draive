@@ -18,7 +18,7 @@ from draive.scope import (
     TokenUsage,
     ctx,
 )
-from draive.types import ToolException, Toolset
+from draive.tools import Toolbox, ToolException
 
 __all__ = [
     "_chat_response",
@@ -30,18 +30,18 @@ async def _chat_response(
     client: OpenAIClient,
     config: OpenAIChatConfig,
     messages: list[ChatCompletionMessageParam],
-    toolset: Toolset | None,
+    tools: Toolbox | None,
 ) -> str:
     with ctx.nested(
         "chat_response",
-        ArgumentsTrace(messages=messages.copy()),
+        metrics=[ArgumentsTrace(messages=messages.copy())],
     ):
         completion: ChatCompletion = await client.chat_completion(
             config=config,
             messages=messages,
             tools=cast(
                 list[ChatCompletionToolParam],
-                toolset.available_tools if toolset else [],
+                tools.available_tools if tools else [],
             ),
         )
 
@@ -58,11 +58,11 @@ async def _chat_response(
 
         completion_message: ChatCompletionMessage = completion.choices[0].message
 
-        if (tool_calls := completion_message.tool_calls) and (toolset := toolset):
+        if (tool_calls := completion_message.tool_calls) and (tools := tools):
             messages.extend(
                 await _execute_chat_tool_calls(
                     tool_calls=tool_calls,
-                    toolset=toolset,
+                    tools=tools,
                 )
             )
             ctx.record(ResultTrace(tool_calls))
@@ -79,5 +79,5 @@ async def _chat_response(
         client=client,
         config=config,
         messages=messages,
-        toolset=toolset,
+        tools=tools,
     )

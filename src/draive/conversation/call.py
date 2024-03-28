@@ -1,16 +1,15 @@
 from typing import Literal, overload
 
-from draive.conversation.state import Conversation
-from draive.scope import ctx
-from draive.types import (
+from draive.conversation.completion import ConversationCompletionStream
+from draive.conversation.message import (
     ConversationMessage,
     ConversationMessageContent,
-    ConversationResponseStream,
     ConversationStreamingUpdate,
-    Memory,
-    ProgressUpdate,
-    Toolset,
 )
+from draive.conversation.state import Conversation
+from draive.scope import ctx
+from draive.tools import Toolbox
+from draive.types import Memory, UpdateSend
 
 __all__ = [
     "conversation_completion",
@@ -23,9 +22,9 @@ async def conversation_completion(
     instruction: str,
     input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
-    toolset: Toolset | None = None,
+    tools: Toolbox | None = None,
     stream: Literal[True],
-) -> ConversationResponseStream:
+) -> ConversationCompletionStream:
     ...
 
 
@@ -35,8 +34,8 @@ async def conversation_completion(
     instruction: str,
     input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
-    toolset: Toolset | None = None,
-    stream: ProgressUpdate[ConversationStreamingUpdate],
+    tools: Toolbox | None = None,
+    stream: UpdateSend[ConversationStreamingUpdate],
 ) -> ConversationMessage:
     ...
 
@@ -47,7 +46,7 @@ async def conversation_completion(
     instruction: str,
     input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
-    toolset: Toolset | None = None,
+    tools: Toolbox | None = None,
 ) -> ConversationMessage:
     ...
 
@@ -57,9 +56,9 @@ async def conversation_completion(
     instruction: str,
     input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
-    toolset: Toolset | None = None,
-    stream: ProgressUpdate[ConversationStreamingUpdate] | bool = False,
-) -> ConversationResponseStream | ConversationMessage:
+    tools: Toolbox | None = None,
+    stream: UpdateSend[ConversationStreamingUpdate] | bool = False,
+) -> ConversationCompletionStream | ConversationMessage:
     conversation: Conversation = ctx.state(Conversation)
 
     match stream:
@@ -68,14 +67,14 @@ async def conversation_completion(
                 instruction=instruction,
                 input=input,
                 memory=memory or conversation.memory,
-                toolset=toolset or conversation.toolset,
+                tools=tools or conversation.tools,
             )
         case True:
             return await conversation.completion(
                 instruction=instruction,
                 input=input,
                 memory=memory or conversation.memory,
-                toolset=toolset or conversation.toolset,
+                tools=tools or conversation.tools,
                 stream=True,
             )
         case progress:
@@ -83,6 +82,6 @@ async def conversation_completion(
                 instruction=instruction,
                 input=input,
                 memory=memory or conversation.memory,
-                toolset=toolset or conversation.toolset,
+                tools=tools or conversation.tools,
                 stream=progress,
             )
