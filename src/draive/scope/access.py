@@ -9,7 +9,8 @@ from draive.helpers import getenv_bool
 from draive.scope.dependencies import DependenciesScope, ScopeDependency
 from draive.scope.errors import MissingScopeContext
 from draive.scope.metrics import MetricsScope, ScopeMetric
-from draive.scope.state import ScopeState, StateScope
+from draive.scope.state import StateScope
+from draive.types.parameters import ParametrizedState
 
 __all__ = [
     "ctx",
@@ -23,7 +24,7 @@ _ScopeMetric_T = TypeVar(
 _MetricsScope_Var = ContextVar[MetricsScope]("_MetricsScope_Var")
 _ScopeState_T = TypeVar(
     "_ScopeState_T",
-    bound=ScopeState,
+    bound=ParametrizedState,
 )
 _StateScope_Var = ContextVar[StateScope]("_ScopeState_Var")
 _ScopeDependency_T = TypeVar(
@@ -147,7 +148,7 @@ class ctx:
         dependencies: DependenciesScope
         | Iterable[type[ScopeDependency] | ScopeDependency]
         | None = None,
-        state: StateScope | Iterable[ScopeState] | None = None,
+        state: StateScope | Iterable[ParametrizedState] | None = None,
         metrics: Iterable[ScopeMetric] | None = None,
         logger: Logger | None = None,
         log_summary: Literal["full", "trimmed", "none"] | None = None,
@@ -230,8 +231,8 @@ class ctx:
     def nested(
         label: str,
         /,
-        *metrics: ScopeMetric,
-        state: StateScope | Iterable[ScopeState] | None = None,
+        state: StateScope | Iterable[ParametrizedState] | None = None,
+        metrics: Iterable[ScopeMetric] | None = None,
     ) -> _PartialContext:
         nested_state: StateScope | None
         if isinstance(state, StateScope):
@@ -249,7 +250,7 @@ class ctx:
 
     @staticmethod
     def updated(
-        *state: ScopeState,
+        *state: ParametrizedState,
     ) -> _PartialContext:
         return _PartialContext(state=ctx._current_state().updated(state))
 

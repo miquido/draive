@@ -1,9 +1,11 @@
-from draive.generation.call import generate_model, generate_text
-from draive.generation.state import ModelGeneration, TextGeneration
+from draive.generation.model import ModelGeneration, ModelGenerator, generate_model
+from draive.generation.text import TextGeneration, TextGenerator, generate_text
 
 __all__ = [
+    "ModelGenerator",
     "ModelGeneration",
+    "generate_model",
+    "TextGenerator",
     "TextGeneration",
     "generate_text",
-    "generate_model",
 ]

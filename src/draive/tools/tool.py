@@ -10,13 +10,13 @@ from typing import (
 from uuid import uuid4
 
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
-from draive.tools.state import ToolCallContext, ToolsProgressContext
+from draive.tools.errors import ToolException
+from draive.tools.state import ToolCallContext, ToolsUpdatesContext
+from draive.tools.update import ToolCallUpdate
 from draive.types import (
     Function,
     ParametrizedTool,
-    ProgressUpdate,
-    ToolCallProgress,
-    ToolException,
+    UpdateSend,
 )
 
 __all__ = [
@@ -82,44 +82,46 @@ class Tool(ParametrizedTool[ToolArgs, Coroutine[None, None, ToolResult]]):
             call_id=tool_call_id or uuid4().hex,
             tool=self.name,
         )
-        progress: ProgressUpdate[ToolCallProgress] = ctx.state(ToolsProgressContext).progress
+        send_update: UpdateSend[ToolCallUpdate] = ctx.state(ToolsUpdatesContext).send_update or (
+            lambda update: None
+        )
         with ctx.nested(
             self.name,
-            ArgumentsTrace(call_id=call_context.call_id, **kwargs),
+            state=[call_context],
+            metrics=[ArgumentsTrace(call_id=call_context.call_id, **kwargs)],
         ):
             try:
-                with ctx.updated(call_context):
-                    progress(  # notify on start
-                        ToolCallProgress(
-                            call_id=call_context.call_id,
-                            tool=call_context.tool,
-                            status="STARTED",
-                            content=None,
-                        )
+                send_update(  # notify on start
+                    ToolCallUpdate(
+                        call_id=call_context.call_id,
+                        tool=call_context.tool,
+                        status="STARTED",
+                        content=None,
                     )
-                    if not self.available:
-                        raise ToolException("Attempting to use unavailable tool", self.name)
+                )
+                if not self.available:
+                    raise ToolException("Attempting to use unavailable tool", self.name)
 
-                    result: ToolResult = await super().__call__(
-                        *args,
-                        **kwargs,
+                result: ToolResult = await super().__call__(
+                    *args,
+                    **kwargs,
+                )
+
+                ctx.record(ResultTrace(result))
+                send_update(  # notify on finish
+                    ToolCallUpdate(
+                        call_id=call_context.call_id,
+                        tool=call_context.tool,
+                        status="FINISHED",
+                        content=None,
                     )
+                )
 
-                    ctx.record(ResultTrace(result))
-                    progress(  # notify on finish
-                        ToolCallProgress(
-                            call_id=call_context.call_id,
-                            tool=call_context.tool,
-                            status="FINISHED",
-                            content=None,
-                        )
-                    )
-
-                    return result
+                return result
 
             except Exception as exc:
-                progress(  # notify on fail
-                    ToolCallProgress(
+                send_update(  # notify on fail
+                    ToolCallUpdate(
                         call_id=call_context.call_id,
                         tool=call_context.tool,
                         status="FAILED",
@@ -127,9 +129,10 @@ class Tool(ParametrizedTool[ToolArgs, Coroutine[None, None, ToolResult]]):
                     )
                 )
                 raise ToolException(
-                    "Tool call failed",
+                    "Tool call %s of %s failed due to an error: %s",
                     call_context.call_id,
                     call_context.tool,
+                    exc,
                 ) from exc
 
 

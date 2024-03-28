@@ -1,7 +1,7 @@
 from typing import Literal, TypedDict
 
 from draive.helpers import getenv_float, getenv_int, getenv_str
-from draive.scope import ScopeState
+from draive.types import State
 
 __all__ = [
     "MistralChatConfig",
@@ -12,7 +12,7 @@ class ResponseFormat(TypedDict):
     type: Literal["text", "json"]
 
 
-class MistralChatConfig(ScopeState):
+class MistralChatConfig(State):
     model: (
         Literal[
             "mistral-large-latest",
@@ -34,7 +34,6 @@ class MistralChatConfig(ScopeState):
     max_tokens: int | None = None
     timeout: float | None = None
     response_format: ResponseFormat | None = None
-    context_messages_limit: int = 16
 
     def metric_summary(
         self,
@@ -51,6 +50,5 @@ class MistralChatConfig(ScopeState):
             result += f"\n+ timeout: {self.timeout}"
         if self.response_format:
             result += f"\n+ response_format: {self.response_format.get('type', 'text')}"
-        result += f"\n+ context_messages_limit: {self.context_messages_limit}"
 
         return result.replace("\n", "\n|   ")

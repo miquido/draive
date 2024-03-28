@@ -1,13 +1,17 @@
-from draive.openai import openai_conversation_completion
-from draive.scope import ScopeState
-from draive.types import ConversationCompletion, ConversationMessage, Memory, Toolset
+from draive.conversation.completion import ConversationCompletion
+from draive.conversation.lmm import lmm_conversation_completion
+from draive.conversation.message import (
+    ConversationMessage,
+)
+from draive.tools import Toolbox
+from draive.types import Memory, State
 
 __all__: list[str] = [
     "Conversation",
 ]
 
 
-class Conversation(ScopeState):
-    completion: ConversationCompletion = openai_conversation_completion
+class Conversation(State):
+    completion: ConversationCompletion = lmm_conversation_completion
     memory: Memory[ConversationMessage] | None = None
-    toolset: Toolset | None = None
+    tools: Toolbox | None = None

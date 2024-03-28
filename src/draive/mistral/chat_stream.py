@@ -16,13 +16,8 @@ from draive.mistral.chat_tools import (
 from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralChatConfig
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
-from draive.types import (
-    ConversationStreamingPartialMessage,
-    ConversationStreamingUpdate,
-    ProgressUpdate,
-    ToolException,
-    Toolset,
-)
+from draive.tools import Toolbox, ToolCallUpdate, ToolException
+from draive.types import UpdateSend
 
 __all__ = [
     "_chat_stream",
@@ -34,10 +29,10 @@ async def _chat_stream(
     client: MistralClient,
     config: MistralChatConfig,
     messages: list[ChatMessage],
-    toolset: Toolset | None,
-    progress: ProgressUpdate[ConversationStreamingUpdate],
+    tools: Toolbox | None,
+    send_update: UpdateSend[ToolCallUpdate | str],
 ) -> str:
-    if toolset is not None:
+    if tools is not None:
         ctx.log_warning(
             "Mistral streaming api is broken - can't properly call tools, waiting for full response"
         )
@@ -45,14 +40,14 @@ async def _chat_stream(
             client=client,
             config=config,
             messages=messages,
-            toolset=toolset,
+            tools=tools,
         )
-        progress(update=ConversationStreamingPartialMessage(content=message))
+        send_update(message)
         return message
 
     with ctx.nested(
         "chat_stream",
-        ArgumentsTrace(messages=messages.copy()),
+        metrics=[ArgumentsTrace(messages=messages.copy())],
     ):
         completion_stream: AsyncIterable[
             ChatCompletionStreamResponse
@@ -61,7 +56,7 @@ async def _chat_stream(
             messages=messages,
             tools=cast(
                 list[dict[str, object]],
-                toolset.available_tools if toolset else [],
+                tools.available_tools if tools else [],
             ),
             stream=True,
         )
@@ -84,7 +79,7 @@ async def _chat_stream(
 
             # TODO: record token usage
 
-            if completion_head.tool_calls is not None and (toolset := toolset):
+            if completion_head.tool_calls is not None and (tools := tools):
                 tool_calls: list[ToolCall] = await _flush_chat_tool_calls(
                     tool_calls=completion_head.tool_calls,
                     completion_stream=completion_stream_iterator,
@@ -92,8 +87,7 @@ async def _chat_stream(
                 messages.extend(
                     await _execute_chat_tool_calls(
                         tool_calls=tool_calls,
-                        toolset=toolset,
-                        progress=progress,
+                        tools=tools,
                     )
                 )
                 ctx.record(ResultTrace(tool_calls))
@@ -102,7 +96,7 @@ async def _chat_stream(
             elif completion_head.content is not None:
                 result: str = completion_head.content
                 if result:  # provide head / first part if not empty
-                    progress(update=ConversationStreamingPartialMessage(content=result))
+                    send_update(result)
 
                 async for part in completion_stream:
                     # we are always requesting single result - no need to take care of indices
@@ -110,7 +104,7 @@ async def _chat_stream(
                     if not part_text:
                         continue  # skip empty parts
                     result += part_text
-                    progress(update=ConversationStreamingPartialMessage(content=result))
+                    send_update(result)
 
                 ctx.record(ResultTrace(result))
                 return result  # we hav final result here
@@ -123,6 +117,6 @@ async def _chat_stream(
         client=client,
         config=config,
         messages=messages,
-        toolset=toolset,
-        progress=progress,
+        tools=tools,
+        send_update=send_update,
     )

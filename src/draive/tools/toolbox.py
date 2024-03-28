@@ -2,7 +2,8 @@ from json import loads
 from typing import Any, final
 
 from draive.tools import Tool
-from draive.types import ToolException, ToolSpecification
+from draive.tools.errors import ToolException
+from draive.types import ToolSpecification
 
 __all__ = [
     "Toolbox",

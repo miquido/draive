@@ -7,11 +7,11 @@ from asyncio import (
     get_running_loop,
 )
 from collections import deque
-from collections.abc import AsyncGenerator, AsyncIterator, Callable, Coroutine
+from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any, Generic, Self, TypeVar
 
 from draive.scope import ctx
-from draive.types import Model, ProgressUpdate
+from draive.types import Model, UpdateSend
 
 __all__ = [
     "AsyncStream",
@@ -20,7 +20,7 @@ __all__ = [
 
 _Element = TypeVar(
     "_Element",
-    bound=Model,
+    bound=Model | str,
 )
 
 
@@ -63,10 +63,6 @@ class AsyncStream(Generic[_Element], AsyncIterator[_Element]):
             waiting.set_exception(exception or StopAsyncIteration)
             self._waiting = None
 
-    async def as_json(self) -> AsyncGenerator[str, None]:
-        async for element in self:
-            yield element.as_json()
-
     def __aiter__(self) -> Self:
         return self
 
@@ -86,16 +82,12 @@ class AsyncStream(Generic[_Element], AsyncIterator[_Element]):
 class AsyncStreamTask(Generic[_Element], AsyncIterator[_Element]):
     def __init__(
         self,
-        job: Callable[[ProgressUpdate[_Element]], Coroutine[Any, Any, None]],
+        job: Callable[[UpdateSend[_Element]], Coroutine[Any, Any, None]],
     ) -> None:
         stream: AsyncStream[_Element] = AsyncStream()
         self._stream: AsyncStream[_Element] = stream
         self._task: Task[None] = ctx.spawn_task(job, stream.send)
         self._task.add_done_callback(lambda task: stream.finish(task.exception()))
-
-    async def as_json(self) -> AsyncGenerator[str, None]:
-        async for element in self:
-            yield element.as_json()
 
     def __aiter__(self) -> Self:
         return self

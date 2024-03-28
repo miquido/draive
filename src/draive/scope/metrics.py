@@ -276,7 +276,7 @@ class MetricsScope:
         message: str,
         /,
         *args: Any,
-        exception: Exception | None = None,
+        exception: BaseException | None = None,
     ) -> None:
         self._logger.error(
             f"[%s] {message}",
@@ -389,11 +389,10 @@ class MetricsScope:
 
         if exception := self._exception:
             self.log_error(
-                "%s finished after %.2fs with exception: %s\n%s",
+                "%s finished after %.2fs with exception",
                 self,
                 duration,
-                type(exception).__name__,
-                exception,
+                exception=exception,
             )
         else:
             self.log_info(
@@ -426,7 +425,7 @@ class MetricsScope:
             summary += f"\n- duration: {duration:.2f}s"
 
         if exception := self._exception:
-            summary += f"\n- exception: {type(exception).__name__}s"
+            summary += f"\n- exception: {type(exception).__name__}"
 
         if self.is_root:
             for combined_metric in self._combined_metrics().values():

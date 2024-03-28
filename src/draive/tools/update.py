@@ -4,20 +4,15 @@ from draive.types.model import Model
 
 __all__ = [
     "ToolCallStatus",
-    "ToolCallProgress",
-    "ToolException",
+    "ToolCallUpdate",
 ]
 
 
 ToolCallStatus = Literal["STARTED", "RUNNING", "FINISHED", "FAILED"]
 
 
-class ToolCallProgress(Model):
+class ToolCallUpdate(Model):
     call_id: str
     tool: str
     status: ToolCallStatus
     content: Model | None
-
-
-class ToolException(Exception):
-    pass

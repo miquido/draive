@@ -1,8 +1,8 @@
 from collections.abc import Iterable
 
+from draive.embedding.embedded import Embedded
 from draive.embedding.state import Embedding
 from draive.scope import ctx
-from draive.types import Embedded
 
 __all__ = [
     "embed_text",

@@ -3,9 +3,7 @@ from collections.abc import AsyncIterable, Awaitable
 
 from mistralai.models.chat_completion import ChatCompletionStreamResponse, ChatMessage, ToolCall
 
-from draive.scope import ctx
-from draive.tools import ToolsProgressContext
-from draive.types import ProgressUpdate, ToolCallProgress, Toolset
+from draive.tools import Toolbox
 
 __all__ = [
     "_execute_chat_tool_calls",
@@ -16,24 +14,18 @@ __all__ = [
 async def _execute_chat_tool_calls(
     *,
     tool_calls: list[ToolCall],
-    toolset: Toolset,
-    progress: ProgressUpdate[ToolCallProgress] | None = None,
+    tools: Toolbox,
 ) -> list[ChatMessage]:
     tool_call_results: list[Awaitable[ChatMessage]] = []
-    with ctx.updated(
-        ToolsProgressContext(
-            progress=progress or ctx.state(ToolsProgressContext).progress,
-        ),
-    ):
-        for call in tool_calls:
-            tool_call_results.append(
-                _execute_chat_tool_call(
-                    call_id=call.id,
-                    name=call.function.name,
-                    arguments=call.function.arguments,
-                    toolset=toolset,
-                )
+    for call in tool_calls:
+        tool_call_results.append(
+            _execute_chat_tool_call(
+                call_id=call.id,
+                name=call.function.name,
+                arguments=call.function.arguments,
+                tools=tools,
             )
+        )
 
     return [
         ChatMessage(
@@ -53,10 +45,10 @@ async def _execute_chat_tool_call(
     call_id: str,
     name: str,
     arguments: str,
-    toolset: Toolset,
+    tools: Toolbox,
 ) -> ChatMessage:
     try:  # make sure that tool error won't blow up whole chain
-        result = await toolset.call_tool(
+        result = await tools.call_tool(
             name,
             call_id=call_id,
             arguments=arguments,
