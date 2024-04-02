@@ -32,8 +32,8 @@ class MistralChatConfig(State):
     top_p: float | None = None
     seed: int | None = getenv_int("MISTRAL_SEED")
     max_tokens: int | None = None
-    timeout: float | None = None
     response_format: ResponseFormat | None = None
+    timeout: float | None = None
 
     def metric_summary(
         self,
@@ -46,9 +46,9 @@ class MistralChatConfig(State):
             result += f"\n+ max_tokens: {self.max_tokens}"
         if self.seed:
             result += f"\n+ seed: {self.seed}"
-        if self.timeout:
-            result += f"\n+ timeout: {self.timeout}"
         if self.response_format:
             result += f"\n+ response_format: {self.response_format.get('type', 'text')}"
+        if self.timeout:
+            result += f"\n+ timeout: {self.timeout}"
 
         return result.replace("\n", "\n|   ")

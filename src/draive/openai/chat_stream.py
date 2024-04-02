@@ -15,8 +15,9 @@ from draive.openai.chat_tools import (
 )
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
+from draive.openai.errors import OpenAIException
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
-from draive.tools import Toolbox, ToolCallUpdate, ToolException
+from draive.tools import Toolbox, ToolCallUpdate
 from draive.types import UpdateSend
 
 __all__ = [
@@ -53,10 +54,10 @@ async def _chat_stream(
 
             except StopAsyncIteration as exc:
                 # could not decide what to do before stream end
-                raise ToolException("Invalid OpenAI completion stream") from exc
+                raise OpenAIException("Invalid OpenAI completion stream") from exc
 
             if not head.choices:
-                raise ToolException("Invalid OpenAI completion - missing deltas!", head)
+                raise OpenAIException("Invalid OpenAI completion - missing deltas!", head)
 
             completion_head: ChoiceDelta = head.choices[0].delta
 

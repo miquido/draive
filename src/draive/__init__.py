@@ -9,10 +9,13 @@ from draive.conversation import (
 )
 from draive.embedding import Embedded, Embedder, Embedding, embed_text
 from draive.generation import (
+    ImageGeneration,
+    ImageGenerator,
     ModelGeneration,
     ModelGenerator,
     TextGeneration,
     TextGenerator,
+    generate_image,
     generate_model,
     generate_text,
 )
@@ -37,14 +40,18 @@ from draive.lmm import (
 from draive.mistral import (
     MistralChatConfig,
     MistralClient,
+    MistralException,
     mistral_lmm_completion,
 )
 from draive.openai import (
     OpenAIChatConfig,
     OpenAIClient,
     OpenAIEmbeddingConfig,
+    OpenAIException,
+    OpenAIImageGenerationConfig,
     openai_count_text_tokens,
     openai_embed_text,
+    openai_generate_image,
     openai_lmm_completion,
 )
 from draive.scope import (
@@ -109,6 +116,9 @@ __all__ = [
     "Field",
     "TextGeneration",
     "TextGenerator",
+    "ImageGeneration",
+    "ImageGenerator",
+    "generate_image",
     "TextTokenCounter",
     "TextTokenization",
     "TokenUsage",
@@ -159,12 +169,16 @@ __all__ = [
     "ConversationCompletion",
     "conversation_completion",
     "lmm_conversation_completion",
+    "OpenAIException",
     "OpenAIChatConfig",
     "OpenAIClient",
     "OpenAIEmbeddingConfig",
+    "OpenAIImageGenerationConfig",
     "openai_count_text_tokens",
     "openai_embed_text",
     "openai_lmm_completion",
+    "openai_generate_image",
+    "MistralException",
     "MistralClient",
     "MistralChatConfig",
     "mistral_lmm_completion",
