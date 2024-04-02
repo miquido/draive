@@ -12,13 +12,14 @@ from draive.openai.chat_tools import (
 )
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
+from draive.openai.errors import OpenAIException
 from draive.scope import (
     ArgumentsTrace,
     ResultTrace,
     TokenUsage,
     ctx,
 )
-from draive.tools import Toolbox, ToolException
+from draive.tools import Toolbox
 
 __all__ = [
     "_chat_response",
@@ -54,7 +55,7 @@ async def _chat_response(
             )
 
         if not completion.choices:
-            raise ToolException("Invalid OpenAI completion - missing messages!", completion)
+            raise OpenAIException("Invalid OpenAI completion - missing messages!", completion)
 
         completion_message: ChatCompletionMessage = completion.choices[0].message
 
@@ -72,7 +73,7 @@ async def _chat_response(
             return message
 
         else:
-            raise ToolException("Invalid OpenAI completion", completion)
+            raise OpenAIException("Invalid OpenAI completion", completion)
 
     # recursion outside of context
     return await _chat_response(

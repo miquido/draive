@@ -14,9 +14,15 @@ from openai.types.chat import (
     ChatCompletionToolParam,
 )
 from openai.types.create_embedding_response import CreateEmbeddingResponse
+from openai.types.image import Image
+from openai.types.images_response import ImagesResponse
 
 from draive.helpers import getenv_str
-from draive.openai.config import OpenAIChatConfig, OpenAIEmbeddingConfig
+from draive.openai.config import (
+    OpenAIChatConfig,
+    OpenAIEmbeddingConfig,
+    OpenAIImageGenerationConfig,
+)
 from draive.scope import ScopeDependency
 
 __all__ = [
@@ -165,6 +171,23 @@ class OpenAIClient(ScopeDependency):
             input=text,
         )
         return response.results[0]  # TODO: check API about multiple results
+
+    async def generate_image(
+        self,
+        config: OpenAIImageGenerationConfig,
+        instruction: str,
+    ) -> Image:
+        response: ImagesResponse = await self._client.images.generate(
+            model=config.model,
+            n=1,
+            prompt=instruction,
+            quality=config.quality,
+            size=config.size,
+            style=config.style,
+            timeout=config.timeout,
+            response_format=config.response_format,
+        )
+        return response.data[0]
 
     async def dispose(self):
         await self._client.close()

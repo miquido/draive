@@ -80,7 +80,7 @@ async def _execute_chat_tool_call(
         }
 
     # error should be already logged by ScopeContext
-    except BaseException:
+    except Exception:
         return {
             "role": "tool",
             "tool_call_id": call_id,

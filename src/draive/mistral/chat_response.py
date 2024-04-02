@@ -7,13 +7,14 @@ from draive.mistral.chat_tools import (
 )
 from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralChatConfig
+from draive.mistral.errors import MistralException
 from draive.scope import (
     ArgumentsTrace,
     ResultTrace,
     TokenUsage,
     ctx,
 )
-from draive.tools import Toolbox, ToolException
+from draive.tools import Toolbox
 
 __all__ = [
     "_chat_response",
@@ -49,7 +50,7 @@ async def _chat_response(
             )
 
         if not completion.choices:
-            raise ToolException("Invalid Mistral completion - missing messages!", completion)
+            raise MistralException("Invalid Mistral completion - missing messages!", completion)
 
         completion_message: ChatMessage = completion.choices[0].message
 
@@ -74,7 +75,7 @@ async def _chat_response(
                     return str(other)
 
         else:
-            raise ToolException("Invalid Mistral completion", completion)
+            raise MistralException("Invalid Mistral completion", completion)
 
     # recursion outside of context
     return await _chat_response(

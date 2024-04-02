@@ -9,6 +9,7 @@ from draive.types import State
 __all__ = [
     "OpenAIChatConfig",
     "OpenAIEmbeddingConfig",
+    "OpenAIImageGenerationConfig",
 ]
 
 
@@ -38,10 +39,10 @@ class OpenAIChatConfig(State):
     top_p: float | None = None
     frequency_penalty: float | None = None
     max_tokens: int | None = None
-    timeout: float | None = None
     seed: int | None = getenv_int("OPENAI_SEED")
     response_format: ResponseFormat | None = None
     vision_details: Literal["auto", "low", "high"] = "auto"
+    timeout: float | None = None
 
     def metric_summary(
         self,
@@ -54,12 +55,12 @@ class OpenAIChatConfig(State):
             result += f"\n+ frequency_penalty: {self.frequency_penalty}"
         if self.max_tokens:
             result += f"\n+ max_tokens: {self.max_tokens}"
-        if self.timeout:
-            result += f"\n+ timeout: {self.timeout}"
         if self.seed:
             result += f"\n+ seed: {self.seed}"
         if self.response_format:
             result += f"\n+ response_format: {self.response_format.get('type', 'text')}"
+        if self.timeout:
+            result += f"\n+ timeout: {self.timeout}"
 
         return result.replace("\n", "\n|   ")
 
@@ -75,8 +76,8 @@ class OpenAIEmbeddingConfig(State):
     ) = "text-embedding-3-small"
     dimensions: int | None = None
     batch_size: int = 32
-    timeout: float | None = None
     encoding_format: Literal["float", "base64"] | None = None
+    timeout: float | None = None
 
     def metric_summary(
         self,
@@ -86,9 +87,34 @@ class OpenAIEmbeddingConfig(State):
         if self.dimensions:
             result += f"\n+ dimensions: {self.dimensions}"
         result += f"\n+ batch_size: {self.batch_size}"
-        if self.timeout:
-            result += f"\n+ timeout: {self.timeout}"
         if self.encoding_format:
             result += f"\n+ encoding_format: {self.encoding_format}"
+        if self.timeout:
+            result += f"\n+ timeout: {self.timeout}"
+
+        return result.replace("\n", "\n|   ")
+
+
+class OpenAIImageGenerationConfig(State):
+    model: Literal["dall-e-2", "dall-e-3"] | str = "dall-e-2"
+    quality: Literal["standard", "hd"] = "standard"
+    size: Literal["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"] = "1024x1024"
+    style: Literal["vivid", "natural"] = "vivid"
+    timeout: float | None = None
+    response_format: Literal["url", "b64_json"] = "b64_json"
+
+    def metric_summary(
+        self,
+        trimmed: bool,
+    ) -> str:
+        result: str = (
+            f"openai config\n+ model: {self.model}"
+            f"\n+ quality: {self.quality}"
+            f"\n+ style: {self.style}"
+            f"\n+ size: {self.size}"
+            f"\n+ response_format: {self.response_format}"
+        )
+        if self.timeout:
+            result += f"\n+ timeout: {self.timeout}"
 
         return result.replace("\n", "\n|   ")

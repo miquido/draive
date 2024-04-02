@@ -15,8 +15,9 @@ from draive.mistral.chat_tools import (
 )
 from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralChatConfig
+from draive.mistral.errors import MistralException
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
-from draive.tools import Toolbox, ToolCallUpdate, ToolException
+from draive.tools import Toolbox, ToolCallUpdate
 from draive.types import UpdateSend
 
 __all__ = [
@@ -70,10 +71,10 @@ async def _chat_stream(
                 head = await anext(completion_stream_iterator)
             except StopAsyncIteration as exc:
                 # could not decide what to do before stream end
-                raise ToolException("Invalid Mistral completion stream") from exc
+                raise MistralException("Invalid Mistral completion stream") from exc
 
             if not head.choices:
-                raise ToolException("Invalid Mistral completion - missing deltas!", head)
+                raise MistralException("Invalid Mistral completion - missing deltas!", head)
 
             completion_head: DeltaMessage = head.choices[0].delta
 
