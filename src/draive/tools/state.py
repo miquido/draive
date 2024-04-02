@@ -1,29 +1,31 @@
-from draive.scope import ScopeState, ctx
-from draive.types import Model, ProgressUpdate, ToolCallProgress
+from draive.scope import ctx
+from draive.tools.update import ToolCallUpdate
+from draive.types import Model, State, UpdateSend
 
 __all__ = [
-    "ToolsProgressContext",
+    "ToolsUpdatesContext",
     "ToolCallContext",
 ]
 
 
-class ToolsProgressContext(ScopeState):
-    progress: ProgressUpdate[ToolCallProgress] = lambda update: None  # noqa: E731
+class ToolsUpdatesContext(State):
+    send_update: UpdateSend[ToolCallUpdate] | None = None
 
 
-class ToolCallContext(ScopeState):
+class ToolCallContext(State):
     call_id: str
     tool: str
 
-    def progress(
+    def send_update(
         self,
-        content: Model | None,
+        content: Model,
     ) -> None:
-        ctx.state(ToolsProgressContext).progress(
-            ToolCallProgress(
-                call_id=self.call_id,
-                tool=self.tool,
-                status="RUNNING",
-                content=content,
+        if send_update := ctx.state(ToolsUpdatesContext).send_update:
+            send_update(
+                ToolCallUpdate(
+                    call_id=self.call_id,
+                    tool=self.tool,
+                    status="RUNNING",
+                    content=content,
+                )
             )
-        )

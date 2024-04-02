@@ -4,7 +4,7 @@ from typing import Literal
 from openai.types.chat.completion_create_params import ResponseFormat
 
 from draive.helpers import getenv_float, getenv_int
-from draive.scope import ScopeState
+from draive.types import State
 
 __all__ = [
     "OpenAIChatConfig",
@@ -12,7 +12,7 @@ __all__ = [
 ]
 
 
-class OpenAIChatConfig(ScopeState):
+class OpenAIChatConfig(State):
     model: (
         Literal[
             "gpt-4-0125-preview",
@@ -42,7 +42,6 @@ class OpenAIChatConfig(ScopeState):
     seed: int | None = getenv_int("OPENAI_SEED")
     response_format: ResponseFormat | None = None
     vision_details: Literal["auto", "low", "high"] = "auto"
-    context_messages_limit: int = 16
 
     def metric_summary(
         self,
@@ -61,12 +60,11 @@ class OpenAIChatConfig(ScopeState):
             result += f"\n+ seed: {self.seed}"
         if self.response_format:
             result += f"\n+ response_format: {self.response_format.get('type', 'text')}"
-        result += f"\n+ context_messages_limit: {self.context_messages_limit}"
 
         return result.replace("\n", "\n|   ")
 
 
-class OpenAIEmbeddingConfig(ScopeState):
+class OpenAIEmbeddingConfig(State):
     model: (
         Literal[
             "text-embedding-ada-002",

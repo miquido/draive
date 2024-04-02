@@ -1,9 +1,8 @@
-from functools import cache
-
 from tiktoken import Encoding, encoding_for_model
 
 from draive.openai.config import OpenAIChatConfig
 from draive.scope import ctx
+from draive.utils import cache
 
 __all__ = [
     "openai_count_text_tokens",
@@ -20,6 +19,6 @@ def openai_count_text_tokens(
     )
 
 
-@cache
+@cache(limit=8)
 def _encoding(model_name: str) -> Encoding:
     return encoding_for_model(model_name=model_name)

@@ -16,13 +16,8 @@ from draive.openai.chat_tools import (
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
 from draive.scope import ArgumentsTrace, ResultTrace, ctx
-from draive.types import (
-    ConversationStreamingPartialMessage,
-    ConversationStreamingUpdate,
-    ProgressUpdate,
-    ToolException,
-    Toolset,
-)
+from draive.tools import Toolbox, ToolCallUpdate, ToolException
+from draive.types import UpdateSend
 
 __all__ = [
     "_chat_stream",
@@ -34,19 +29,19 @@ async def _chat_stream(
     client: OpenAIClient,
     config: OpenAIChatConfig,
     messages: list[ChatCompletionMessageParam],
-    toolset: Toolset | None,
-    progress: ProgressUpdate[ConversationStreamingUpdate],
+    tools: Toolbox | None,
+    send_update: UpdateSend[ToolCallUpdate | str],
 ) -> str:
     with ctx.nested(
         "chat_stream",
-        ArgumentsTrace(messages=messages.copy()),
+        metrics=[ArgumentsTrace(messages=messages.copy())],
     ):
         completion_stream: OpenAIAsyncStream[ChatCompletionChunk] = await client.chat_completion(
             config=config,
             messages=messages,
             tools=cast(
                 list[ChatCompletionToolParam],
-                toolset.available_tools if toolset else [],
+                tools.available_tools if tools else [],
             ),
             stream=True,
         )
@@ -68,7 +63,7 @@ async def _chat_stream(
             # TODO: record token usage - openAI does not provide usage insight when streaming
             # (or makes it differently than when using regular response and couldn't find it)
 
-            if completion_head.tool_calls is not None and (toolset := toolset):
+            if completion_head.tool_calls is not None and (tools := tools):
                 tool_calls: list[ChatCompletionMessageToolCall] = await _flush_chat_tool_calls(
                     tool_calls=completion_head.tool_calls,
                     completion_stream=completion_stream,
@@ -76,8 +71,7 @@ async def _chat_stream(
                 messages.extend(
                     await _execute_chat_tool_calls(
                         tool_calls=tool_calls,
-                        toolset=toolset,
-                        progress=progress,
+                        tools=tools,
                     )
                 )
                 ctx.record(ResultTrace(tool_calls))
@@ -86,7 +80,7 @@ async def _chat_stream(
             elif completion_head.content is not None:
                 result: str = completion_head.content
                 if result:  # provide head / first part if not empty
-                    progress(update=ConversationStreamingPartialMessage(content=result))
+                    send_update(result)
 
                 async for part in completion_stream:
                     # we are always requesting single result - no need to take care of indices
@@ -94,7 +88,7 @@ async def _chat_stream(
                     if not part_text:
                         continue  # skip empty parts
                     result += part_text
-                    progress(update=ConversationStreamingPartialMessage(content=result))
+                    send_update(result)
 
                 ctx.record(ResultTrace(result))
                 return result  # we hav final result here
@@ -107,6 +101,6 @@ async def _chat_stream(
         client=client,
         config=config,
         messages=messages,
-        toolset=toolset,
-        progress=progress,
+        tools=tools,
+        send_update=send_update,
     )
