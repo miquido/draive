@@ -1,7 +1,6 @@
 from collections.abc import Iterable
 
 from draive.lmm import LMMCompletionMessage, lmm_completion
-from draive.scope import ResultTrace, ctx
 from draive.tools import Toolbox
 from draive.types import MultimodalContent
 
@@ -61,5 +60,4 @@ async def lmm_generate_text(
     )
     generated: str = completion.content_string
 
-    ctx.record(ResultTrace(generated))
     return generated

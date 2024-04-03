@@ -2,7 +2,6 @@ from collections.abc import Iterable
 from typing import TypeVar
 
 from draive.lmm import LMMCompletionMessage, lmm_completion
-from draive.scope import ResultTrace, ctx
 from draive.tools import Toolbox
 from draive.types import Model, MultimodalContent
 
@@ -71,7 +70,6 @@ async def lmm_generate_model(
     )
     generated: _Generated = model.from_json(completion.content_string)
 
-    ctx.record(ResultTrace(generated))
     return generated
 
 
@@ -83,5 +81,5 @@ The result have to conform to the following JSON Schema:
 ```
 {format}
 ```
-Provide ONLY a single, raw, valid JSON without any comments of formatting.
+Provide ONLY a single, raw, valid JSON without any comments or formatting.
 """
