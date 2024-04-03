@@ -8,7 +8,6 @@ from draive.conversation.message import (
     ConversationStreamingUpdate,
 )
 from draive.lmm import LMMCompletionMessage, lmm_completion
-from draive.scope import ResultTrace, ctx
 from draive.tools import Toolbox
 from draive.types import Memory, UpdateSend
 from draive.utils import AsyncStreamTask
@@ -115,7 +114,6 @@ async def lmm_conversation_completion(
                             response_message,
                         ],
                     )
-                ctx.record(ResultTrace(response_message))
 
             return AsyncStreamTask(job=stream_task)
 
@@ -136,7 +134,7 @@ async def lmm_conversation_completion(
                         response_message,
                     ],
                 )
-            ctx.record(ResultTrace(response_message))
+
             return response_message
 
         case update:
@@ -157,5 +155,5 @@ async def lmm_conversation_completion(
                         response_message,
                     ],
                 )
-            ctx.record(ResultTrace(response_message))
+
             return response_message

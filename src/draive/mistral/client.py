@@ -87,6 +87,7 @@ class MistralClient(ScopeDependency):
                 random_seed=config.seed,
                 temperature=config.temperature,
                 tools=tools,
+                tool_choice="auto" if tools else "none",
                 top_p=config.top_p,
             )
 
