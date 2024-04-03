@@ -9,7 +9,7 @@ __all__ = [
 
 
 class ResponseFormat(TypedDict):
-    type: Literal["text", "json"]
+    type: Literal["text", "json_object"]
 
 
 class MistralChatConfig(State):

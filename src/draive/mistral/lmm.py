@@ -60,7 +60,7 @@ async def mistral_lmm_completion(
         case "text":
             config = ctx.state(MistralChatConfig).updated(response_format={"type": "text"})
         case "json":
-            config = ctx.state(MistralChatConfig).updated(response_format={"type": "json"})
+            config = ctx.state(MistralChatConfig).updated(response_format={"type": "json_object"})
     messages: list[ChatMessage] = [_convert_message(message=message) for message in context]
 
     match stream:
