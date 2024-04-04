@@ -1,14 +1,14 @@
 from typing import Protocol, runtime_checkable
 
 __all__ = [
-    "TextTokenCounter",
+    "TextTokenizer",
 ]
 
 
 @runtime_checkable
-class TextTokenCounter(Protocol):
+class TextTokenizer(Protocol):
     def __call__(
         self,
         text: str,
-    ) -> int:
+    ) -> list[int]:
         ...

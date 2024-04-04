@@ -5,18 +5,16 @@ from draive.scope import ctx
 from draive.utils import cache
 
 __all__ = [
-    "openai_count_text_tokens",
+    "openai_tokenize_text",
 ]
 
 
-def openai_count_text_tokens(
+def openai_tokenize_text(
     text: str,
-) -> int:
-    return len(
-        _encoding(
-            model_name=ctx.state(OpenAIChatConfig).model,
-        ).encode(text=text)
-    )
+) -> list[int]:
+    return _encoding(
+        model_name=ctx.state(OpenAIChatConfig).model,
+    ).encode(text=text)
 
 
 @cache(limit=8)

@@ -50,7 +50,7 @@ async def lmm_generate_model(
                     ),
                     LMMCompletionMessage(
                         role="assistant",
-                        content=example[1],
+                        content=example[1].as_json(indent=2),
                     ),
                 ]
             ],
