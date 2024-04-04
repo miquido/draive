@@ -2,7 +2,6 @@ import builtins
 import inspect
 import types
 import typing
-from collections import abc as collections_abc
 from collections.abc import Callable
 from dataclasses import is_dataclass
 from typing import (
@@ -91,6 +90,14 @@ class ParameterArraySpecification(TypedDict, total=False):
 
 
 @final
+class ParameterDictSpecification(TypedDict, total=False):
+    type: Required[Literal["object"]]
+    additionalProperties: Required["ParameterSpecification"]
+    description: NotRequired[str]
+    required: NotRequired[list[str]]
+
+
+@final
 class ParameterObjectSpecification(TypedDict, total=False):
     type: Required[Literal["object"]]
     properties: Required[dict[str, "ParameterSpecification"]]
@@ -106,6 +113,7 @@ ParameterSpecification = (
     | ParameterEnumSpecification
     | ParameterUnionSpecification
     | ParameterArraySpecification
+    | ParameterDictSpecification
     | ParameterObjectSpecification
 )
 
@@ -226,8 +234,6 @@ def _parameter_specification(
         case (
             builtins.list  # pyright: ignore[reportUnknownMemberType]
             | typing.List  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
-            | collections_abc.Sequence  # pyright: ignore[reportUnknownMemberType]
-            | collections_abc.Iterable  # pyright: ignore[reportUnknownMemberType]
         ):
             match get_args(annotation):
                 case (list_annotation,):
@@ -245,7 +251,7 @@ def _parameter_specification(
                     }
 
                 case other:  # pyright: ignore[reportUnnecessaryComparison]
-                    raise TypeError("Unsupported iterable type annotation", other)
+                    raise TypeError("Unsupported list type annotation", other)
 
         case typing.Literal:
             options: tuple[Any, ...] = get_args(annotation)
@@ -271,6 +277,23 @@ def _parameter_specification(
             typed_dict
         ):
             specification = _annotations_specification(typed_dict.__annotations__)
+
+        case (
+            builtins.dict  # pyright: ignore[reportUnknownMemberType]
+            | typing.Dict  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
+        ):
+            match get_args(annotation):
+                case (builtins.str, element_annotation):
+                    specification = {
+                        "type": "object",
+                        "additionalProperties": _parameter_specification(
+                            annotation=element_annotation,
+                            description=None,
+                        ),
+                    }
+
+                case other:  # pyright: ignore[reportUnnecessaryComparison]
+                    raise TypeError("Unsupported dict type annotation", other)
 
         case data_class if is_dataclass(data_class):
             specification = _function_specification(annotation.__init__)
