@@ -11,6 +11,7 @@ from openai.types.chat import (
     ChatCompletion,
     ChatCompletionChunk,
     ChatCompletionMessageParam,
+    ChatCompletionNamedToolChoiceParam,
     ChatCompletionToolParam,
 )
 from openai.types.create_embedding_response import CreateEmbeddingResponse
@@ -73,6 +74,7 @@ class OpenAIClient(ScopeDependency):
     @overload
     async def chat_completion(
         self,
+        *,
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
         tools: list[ChatCompletionToolParam],
@@ -83,17 +85,33 @@ class OpenAIClient(ScopeDependency):
     @overload
     async def chat_completion(
         self,
+        *,
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
         tools: list[ChatCompletionToolParam],
+        suggested_tool: ChatCompletionNamedToolChoiceParam | None,
+        stream: Literal[True],
+    ) -> AsyncStream[ChatCompletionChunk]:
+        ...
+
+    @overload
+    async def chat_completion(
+        self,
+        *,
+        config: OpenAIChatConfig,
+        messages: list[ChatCompletionMessageParam],
+        tools: list[ChatCompletionToolParam],
+        suggested_tool: ChatCompletionNamedToolChoiceParam | None = None,
     ) -> ChatCompletion:
         ...
 
-    async def chat_completion(
+    async def chat_completion(  # noqa: PLR0913
         self,
+        *,
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
         tools: list[ChatCompletionToolParam],
+        suggested_tool: ChatCompletionNamedToolChoiceParam | None = None,
         stream: bool = False,
     ) -> AsyncStream[ChatCompletionChunk] | ChatCompletion:
         return await self._client.chat.completions.create(
@@ -107,7 +125,7 @@ class OpenAIClient(ScopeDependency):
             stream=stream,
             temperature=config.temperature,
             tools=tools or NOT_GIVEN,
-            tool_choice="auto" if tools else "none",
+            tool_choice=suggested_tool or "auto" if tools else "none",
             top_p=config.top_p or NOT_GIVEN,
             timeout=config.timeout or NOT_GIVEN,
         )

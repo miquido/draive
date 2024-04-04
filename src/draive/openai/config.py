@@ -43,6 +43,7 @@ class OpenAIChatConfig(State):
     response_format: ResponseFormat | None = None
     vision_details: Literal["auto", "low", "high"] = "auto"
     timeout: float | None = None
+    recursion_limit: int = 4
 
     def metric_summary(
         self,
@@ -61,6 +62,7 @@ class OpenAIChatConfig(State):
             result += f"\n+ response_format: {self.response_format.get('type', 'text')}"
         if self.timeout:
             result += f"\n+ timeout: {self.timeout}"
+        result += f"\n+ recursion_limit: {self.recursion_limit}"
 
         return result.replace("\n", "\n|   ")
 
