@@ -53,6 +53,7 @@ class ParameterDefinition:
         alias: str | None,
         description: str | None,
         annotation: Any,
+        module: Any,
         default: _ArgumentType_T | MissingValue,
         validator: Callable[[_ArgumentType_T], None] | None,
     ) -> None:
@@ -65,6 +66,7 @@ class ParameterDefinition:
         self.validator: Callable[[_ArgumentType_T], _ArgumentType_T] = _parameter_validator(
             annotation,
             additional=validator,
+            module=module,
         )
 
         def frozen(
@@ -199,6 +201,7 @@ def Field(
 def _field_parameter(
     field: DataclassField[Any],
     /,
+    module: Any,
 ) -> ParameterDefinition:
     default: Any
     if field.default is not DATACLASS_MISSING:
@@ -214,6 +217,7 @@ def _field_parameter(
         description=field.metadata.get("description"),
         default=default,
         annotation=field.type,
+        module=module,
         validator=field.metadata.get("validator"),
     )
 
@@ -249,7 +253,13 @@ class ParametrizedState(metaclass=ParametrizedStateMeta):
     def parameters(cls) -> ParametersDefinition:
         if not hasattr(cls, "_parameters"):
             cls._parameters: ParametersDefinition = ParametersDefinition(
-                parameters=(_field_parameter(field) for field in dataclass_fields(cls))
+                parameters=(
+                    _field_parameter(
+                        field,
+                        module=cls.__module__,
+                    )
+                    for field in dataclass_fields(cls)
+                )
             )
 
         return cls._parameters
@@ -368,9 +378,8 @@ class ParametrizedFunction(Generic[FunctionArgs, FunctionResult]):
         self._call: Function[FunctionArgs, FunctionResult] = function
         self.parameters: ParametersDefinition = ParametersDefinition(
             parameters=(
-                _function_argument(argument)
+                _function_argument(argument, module=self.__module__)
                 for argument in inspect.signature(function).parameters.values()
-                # if argument.name != "self"
             )
         )
 
@@ -392,6 +401,7 @@ class ParametrizedFunction(Generic[FunctionArgs, FunctionResult]):
 def _function_argument(
     argument: Any,
     /,
+    module: Any,
 ) -> ParameterDefinition:
     if argument.annotation is inspect._empty:  # pyright: ignore[reportPrivateUsage]
         raise TypeError(
@@ -406,6 +416,7 @@ def _function_argument(
             description=argument.default.description,
             default=argument.default.default,
             annotation=argument.annotation,
+            module=module,
             validator=argument.default.validator,
         )
     else:  # use regular annotation
@@ -417,6 +428,7 @@ def _function_argument(
             if argument.default is inspect._empty  # pyright: ignore[reportPrivateUsage]
             else argument.default,
             annotation=argument.annotation,
+            module=module,
             validator=None,
         )
 
@@ -425,20 +437,21 @@ def _parameter_validator(  # noqa: PLR0915, PLR0912, PLR0911, C901
     parameter_annotation: Any,
     /,
     additional: Callable[[Any], None] | None,
+    module: Any,
 ) -> Callable[[Any], Any]:
     annotation: Any
     if isinstance(parameter_annotation, str):
-        # TODO: FIXME: resolve locals in valid context
-        annotation = ForwardRef(parameter_annotation)._evaluate(  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-            globalns=globals(),
-            localns=locals(),
+        # TODO: FIXME: resolve in valid context
+        annotation = ForwardRef(parameter_annotation, module=module)._evaluate(  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+            globalns=None,
+            localns=None,
             recursive_guard=frozenset(),
         )
     elif isinstance(parameter_annotation, ForwardRef):
-        # TODO: FIXME: resolve locals in valid context
+        # TODO: FIXME: resolve in valid context
         annotation = parameter_annotation._evaluate(  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-            globalns=globals(),
-            localns=locals(),
+            globalns=None,
+            localns=None,
             recursive_guard=frozenset(),
         )
     else:
@@ -561,6 +574,7 @@ def _parameter_validator(  # noqa: PLR0915, PLR0912, PLR0911, C901
                 _parameter_validator(
                     alternative,
                     additional=additional,
+                    module=module,
                 )
                 for alternative in get_args(annotation)
             ]
@@ -595,10 +609,11 @@ def _parameter_validator(  # noqa: PLR0915, PLR0912, PLR0911, C901
         ):
             validate_element: Callable[[Any], Any]
             match get_args(annotation):
-                case (list_annotation,):
+                case (element_annotation,):
                     validate_element = _parameter_validator(
-                        list_annotation,
+                        element_annotation,
                         additional=None,
+                        module=module,
                     )
 
                 case ():  # pyright: ignore[reportUnnecessaryComparison] fallback to untyped list
@@ -683,7 +698,7 @@ def _parameter_validator(  # noqa: PLR0915, PLR0912, PLR0911, C901
             # TODO: validate typed dict internals (i.e. nested typed dicts)
             if validate := additional:
 
-                def validated_dict(value: Any) -> dict[str, Any]:
+                def validated_typed_dict(value: Any) -> dict[str, Any]:
                     if isinstance(value, dict):
                         validated: Any = typed_dict(**value)
                         validate(validated)
@@ -692,9 +707,52 @@ def _parameter_validator(  # noqa: PLR0915, PLR0912, PLR0911, C901
                         raise TypeError("Invalid value", annotation, value)
             else:
 
-                def validated_dict(value: Any) -> dict[str, Any]:
+                def validated_typed_dict(value: Any) -> dict[str, Any]:
                     if isinstance(value, dict):
                         return typed_dict(**value)
+                    else:
+                        raise TypeError("Invalid value", annotation, value)
+
+            return validated_typed_dict
+
+        case (
+            builtins.dict  # pyright: ignore[reportUnknownMemberType]
+            | typing.Dict  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
+        ):
+            validate_element: Callable[[Any], Any]
+            match get_args(annotation):
+                case (builtins.str, element_annotation):
+                    validate_element = _parameter_validator(
+                        element_annotation,
+                        additional=None,
+                        module=module,
+                    )
+
+                case other:  # pyright: ignore[reportUnnecessaryComparison]
+                    raise TypeError("Unsupported dict type annotation", other)
+
+            if validate := additional:
+
+                def validated_dict(value: Any) -> dict[str, Any]:
+                    if isinstance(value, dict):
+                        values_dict: builtins.dict[str, Any] = {
+                            key: validate_element(element)
+                            for key, element in value.items()  # pyright: ignore[reportUnknownVariableType]
+                            if isinstance(key, str)
+                        }
+                        validate(values_dict)
+                        return values_dict
+                    else:
+                        raise TypeError("Invalid value", annotation, value)
+            else:
+
+                def validated_dict(value: Any) -> dict[str, Any]:
+                    if isinstance(value, dict):
+                        return {
+                            key: validate_element(element)
+                            for key, element in value.items()  # pyright: ignore[reportUnknownVariableType]
+                            if isinstance(key, str)
+                        }
                     else:
                         raise TypeError("Invalid value", annotation, value)
 
@@ -727,6 +785,7 @@ def _parameter_validator(  # noqa: PLR0915, PLR0912, PLR0911, C901
                     return _parameter_validator(
                         other,
                         additional=additional,
+                        module=module,
                     )
 
                 case other:
@@ -738,6 +797,7 @@ def _parameter_validator(  # noqa: PLR0915, PLR0912, PLR0911, C901
                     return _parameter_validator(
                         other,
                         additional=additional,
+                        module=module,
                     )
 
                 case other:
