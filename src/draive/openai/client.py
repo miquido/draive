@@ -125,7 +125,7 @@ class OpenAIClient(ScopeDependency):
             stream=stream,
             temperature=config.temperature,
             tools=tools or NOT_GIVEN,
-            tool_choice=suggested_tool or "auto" if tools else "none",
+            tool_choice=(suggested_tool or "auto") if tools else NOT_GIVEN,
             top_p=config.top_p or NOT_GIVEN,
             timeout=config.timeout or NOT_GIVEN,
         )
