@@ -89,7 +89,7 @@ async def openai_lmm_completion(
                     metrics=[config],
                 ):
 
-                    def send_update(update: ToolCallUpdate | str):
+                    def send_update(update: ToolCallUpdate | str) -> None:
                         if isinstance(update, str):
                             streaming_update(
                                 LMMCompletionMessage(
@@ -112,7 +112,7 @@ async def openai_lmm_completion(
 
         case streaming_update:
 
-            def send_update(update: ToolCallUpdate | str):
+            def send_update(update: ToolCallUpdate | str) -> None:
                 if isinstance(update, str):
                     streaming_update(
                         LMMCompletionMessage(

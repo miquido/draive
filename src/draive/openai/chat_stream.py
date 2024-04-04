@@ -25,14 +25,18 @@ __all__ = [
 ]
 
 
-async def _chat_stream(
+async def _chat_stream(  # noqa: PLR0913
     *,
     client: OpenAIClient,
     config: OpenAIChatConfig,
     messages: list[ChatCompletionMessageParam],
     tools: Toolbox | None,
     send_update: UpdateSend[ToolCallUpdate | str],
+    recursion_level: int = 0,
 ) -> str:
+    if recursion_level > config.recursion_limit:
+        raise OpenAIException("Reached limit of recursive calls of %d", config.recursion_limit)
+
     with ctx.nested(
         "chat_stream",
         metrics=[ArgumentsTrace(messages=messages.copy())],
@@ -44,6 +48,14 @@ async def _chat_stream(
                 list[ChatCompletionToolParam],
                 tools.available_tools if tools else [],
             ),
+            suggested_tool={
+                "type": "function",
+                "function": {
+                    "name": tools.suggested_tool_name,
+                },
+            }  # suggest/require tool call only initially
+            if recursion_level == 0 and tools is not None and tools.suggested_tool_name
+            else None,
             stream=True,
         )
 
@@ -104,4 +116,5 @@ async def _chat_stream(
         messages=messages,
         tools=tools,
         send_update=send_update,
+        recursion_level=recursion_level + 1,
     )

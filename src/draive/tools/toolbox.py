@@ -17,8 +17,19 @@ class Toolbox:
     def __init__(
         self,
         *tools: AnyTool,
+        suggested: AnyTool | None = None,
     ) -> None:
+        self._suggested_tool: AnyTool | None = suggested
         self._tools: dict[str, AnyTool] = {tool.name: tool for tool in tools}
+        if suggested := suggested:
+            self._tools[suggested.name] = suggested
+
+    @property
+    def suggested_tool_name(self) -> str | None:
+        if self._suggested_tool is None or not self._suggested_tool.available:
+            return None
+        elif self._suggested_tool.available:
+            return self._suggested_tool.name
 
     @property
     def available_tools(self) -> list[ToolSpecification]:

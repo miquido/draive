@@ -44,6 +44,7 @@ class MistralClient(ScopeDependency):
     @overload
     async def chat_completion(
         self,
+        *,
         config: MistralChatConfig,
         messages: list[ChatMessage],
         tools: list[dict[str, object]],
@@ -54,17 +55,33 @@ class MistralClient(ScopeDependency):
     @overload
     async def chat_completion(
         self,
+        *,
         config: MistralChatConfig,
         messages: list[ChatMessage],
         tools: list[dict[str, object]],
+        suggest_tools: bool,
+        stream: Literal[True],
+    ) -> AsyncIterable[ChatCompletionStreamResponse]:
+        ...
+
+    @overload
+    async def chat_completion(
+        self,
+        *,
+        config: MistralChatConfig,
+        messages: list[ChatMessage],
+        tools: list[dict[str, object]],
+        suggest_tools: bool = False,
     ) -> ChatCompletionResponse:
         ...
 
-    async def chat_completion(
+    async def chat_completion(  # noqa: PLR0913
         self,
+        *,
         config: MistralChatConfig,
         messages: list[ChatMessage],
         tools: list[dict[str, object]],
+        suggest_tools: bool = False,
         stream: bool = False,
     ) -> AsyncIterable[ChatCompletionStreamResponse] | ChatCompletionResponse:
         if stream:
@@ -87,7 +104,7 @@ class MistralClient(ScopeDependency):
                 random_seed=config.seed,
                 temperature=config.temperature,
                 tools=tools,
-                tool_choice="auto" if tools else "none",
+                tool_choice=("any" if suggest_tools else "auto") if tools else "none",
                 top_p=config.top_p,
             )
 

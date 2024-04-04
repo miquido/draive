@@ -34,6 +34,7 @@ class MistralChatConfig(State):
     max_tokens: int | None = None
     response_format: ResponseFormat | None = None
     timeout: float | None = None
+    recursion_limit: int = 4
 
     def metric_summary(
         self,
@@ -50,5 +51,6 @@ class MistralChatConfig(State):
             result += f"\n+ response_format: {self.response_format.get('type', 'text')}"
         if self.timeout:
             result += f"\n+ timeout: {self.timeout}"
+        result += f"\n+ recursion_limit: {self.recursion_limit}"
 
         return result.replace("\n", "\n|   ")

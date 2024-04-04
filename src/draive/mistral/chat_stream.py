@@ -25,23 +25,28 @@ __all__ = [
 ]
 
 
-async def _chat_stream(
+async def _chat_stream(  # noqa: C901, PLR0913
     *,
     client: MistralClient,
     config: MistralChatConfig,
     messages: list[ChatMessage],
     tools: Toolbox | None,
     send_update: UpdateSend[ToolCallUpdate | str],
+    recursion_level: int = 0,
 ) -> str:
+    if recursion_level > config.recursion_limit:
+        raise MistralException("Reached limit of recursive calls of %d", config.recursion_limit)
+
     if tools is not None:
         ctx.log_warning(
             "Mistral streaming api is broken - can't properly call tools, waiting for full response"
         )
-        message = await _chat_response(
+        message: str = await _chat_response(
             client=client,
             config=config,
             messages=messages,
             tools=tools,
+            recursion_level=recursion_level,
         )
         send_update(message)
         return message
@@ -59,6 +64,7 @@ async def _chat_stream(
                 list[dict[str, object]],
                 tools.available_tools if tools else [],
             ),
+            suggest_tools=False,  # type: ignore - no tools allowed in streaming
             stream=True,
         )
         completion_stream_iterator: AsyncIterator[
@@ -120,4 +126,5 @@ async def _chat_stream(
         messages=messages,
         tools=tools,
         send_update=send_update,
+        recursion_level=recursion_level + 1,
     )
