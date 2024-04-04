@@ -8,7 +8,7 @@ from draive.openai.embedding import openai_embed_text
 from draive.openai.errors import OpenAIException
 from draive.openai.images import openai_generate_image
 from draive.openai.lmm import openai_lmm_completion
-from draive.openai.tokenization import openai_count_text_tokens
+from draive.openai.tokenization import openai_tokenize_text
 
 __all__ = [
     "OpenAIException",
@@ -18,6 +18,6 @@ __all__ = [
     "OpenAIImageGenerationConfig",
     "openai_lmm_completion",
     "openai_embed_text",
-    "openai_count_text_tokens",
+    "openai_tokenize_text",
     "openai_generate_image",
 ]

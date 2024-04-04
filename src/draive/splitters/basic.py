@@ -92,9 +92,7 @@ def _merge(  # noqa: C901
                     part_size=part_size,
                     separators=("\n", " "),
                     part_overlap_size=part_overlap_size
-                    or int(
-                        part_size * 0.2
-                    ),  # if there was no overlap force at least 20%
+                    or int(part_size * 0.2),  # if there was no overlap force at least 20%
                     count_size=count_size,
                 ),
             )

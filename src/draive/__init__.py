@@ -49,10 +49,10 @@ from draive.openai import (
     OpenAIEmbeddingConfig,
     OpenAIException,
     OpenAIImageGenerationConfig,
-    openai_count_text_tokens,
     openai_embed_text,
     openai_generate_image,
     openai_lmm_completion,
+    openai_tokenize_text,
 )
 from draive.scope import (
     DependenciesScope,
@@ -65,7 +65,7 @@ from draive.scope import (
 )
 from draive.similarity import mmr_similarity, similarity
 from draive.splitters import split_text
-from draive.tokenization import TextTokenCounter, TextTokenization, count_text_tokens
+from draive.tokenization import TextTokenizer, Tokenization, count_text_tokens, tokenize_text
 from draive.tools import (
     Tool,
     Toolbox,
@@ -119,12 +119,13 @@ __all__ = [
     "ImageGeneration",
     "ImageGenerator",
     "generate_image",
-    "TextTokenCounter",
-    "TextTokenization",
+    "TextTokenizer",
+    "Tokenization",
     "TokenUsage",
     "auto_retry",
     "cache",
     "conversation_completion",
+    "tokenize_text",
     "count_text_tokens",
     "ctx",
     "embed_text",
@@ -174,7 +175,7 @@ __all__ = [
     "OpenAIClient",
     "OpenAIEmbeddingConfig",
     "OpenAIImageGenerationConfig",
-    "openai_count_text_tokens",
+    "openai_tokenize_text",
     "openai_embed_text",
     "openai_lmm_completion",
     "openai_generate_image",
