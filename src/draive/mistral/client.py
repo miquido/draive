@@ -104,7 +104,7 @@ class MistralClient(ScopeDependency):
                 random_seed=config.seed,
                 temperature=config.temperature,
                 tools=tools,
-                tool_choice=("any" if suggest_tools else "auto") if tools else "none",
+                tool_choice=("any" if suggest_tools else "auto") if tools else None,
                 top_p=config.top_p,
             )
 

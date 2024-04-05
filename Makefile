@@ -13,6 +13,10 @@ ifndef PYTHON_ALIAS
 	PYTHON_ALIAS := python
 endif
 
+ifndef INSTALL_OPTIONS
+	INSTALL_OPTIONS := .[dev]
+endif
+
 .PHONY: venv sync lock update format lint test
 
 # Setup virtual environment for local development.
@@ -24,12 +28,12 @@ venv:
 	@cp -n ./config/pre-push ./.git/hooks/pre-push || :
 	@echo '...preparing venv...'
 	@$(PYTHON_ALIAS) -m venv .venv --prompt="VENV[DEV]" --clear --upgrade-deps
-	@. ./.venv/bin/activate && pip install --upgrade pip && pip install --editable .[dev] --require-virtualenv -c constraints
+	@. ./.venv/bin/activate && pip install --upgrade pip && pip install --editable $(INSTALL_OPTIONS) --require-virtualenv -c constraints
 	@echo '...development environment ready! Activate venv using `. ./.venv/bin/activate`.'
 
 # Sync environment with uv based on constraints file
 sync:
-	@uv pip install --editable .[dev] --constraint constraints
+	@uv pip install --editable $(INSTALL_OPTIONS) --constraint constraints
 
 # Generate a set of locked dependencies from pyproject.toml
 lock:
@@ -38,7 +42,7 @@ lock:
 # Update and lock dependencies from pyproject.toml
 update:
 	@uv pip compile pyproject.toml -o constraints --all-extras --upgrade
-	@uv pip install --editable .[dev] --constraint constraints
+	@uv pip install --editable $(INSTALL_OPTIONS) --constraint constraints
 
 # Run formatter.
 format:
