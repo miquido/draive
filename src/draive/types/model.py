@@ -43,7 +43,7 @@ class Model(ParametrizedModel):
 
         except Exception as exc:
             raise ValueError(
-                f"Failed to encode {self.__class__.__name__} to json:\n{self}"
+                f"Failed to encode {self.__class__.__name__} to json:\n{asdict(self)}"
             ) from exc
 
     def __str__(self) -> str:
