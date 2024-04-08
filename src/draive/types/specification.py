@@ -1,7 +1,9 @@
 import builtins
+import datetime
 import inspect
 import types
 import typing
+import uuid
 from collections.abc import Callable
 from dataclasses import is_dataclass
 from typing import (
@@ -57,6 +59,12 @@ class ParameterNumberSpecification(TypedDict, total=False):
 class ParameterStringSpecification(TypedDict, total=False):
     type: Required[Literal["string"]]
     description: NotRequired[str]
+    format: NotRequired[
+        Literal[
+            "uuid",
+            "date-time",
+        ]
+    ]
 
 
 @final
@@ -269,6 +277,18 @@ def _parameter_specification(
 
             else:
                 raise TypeError("Unsupported literal type annotation", annotation)
+
+        case datetime.datetime:
+            specification = {
+                "type": "string",
+                "format": "date-time",
+            }
+
+        case uuid.UUID:
+            specification = {
+                "type": "string",
+                "format": "uuid",
+            }
 
         case parametrized if issubclass(parametrized, ParametrizedModel):
             specification = parametrized.specification()
