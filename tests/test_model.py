@@ -1,5 +1,7 @@
 import json
+from datetime import UTC, datetime
 from typing import Any, Literal
+from uuid import UUID
 
 from draive import Field, Model
 
@@ -45,3 +47,39 @@ def test_validated_passes_with_valid_values() -> None:
 
 def test_validated_passes_with_default_values() -> None:
     ExampleModel.validated()
+
+
+class DatetimeModel(Model):
+    value: datetime
+
+
+datetimeModelInstance: DatetimeModel = DatetimeModel(
+    value=datetime.fromtimestamp(0, UTC),
+)
+datetimeModelJSON: str = '{"value": "1970-01-01T00:00:00+00:00"}'
+
+
+def test_datetime_encoding() -> None:
+    assert datetimeModelInstance.as_json() == datetimeModelJSON
+
+
+def test_datetime_decoding() -> None:
+    assert DatetimeModel.from_json(datetimeModelJSON) == datetimeModelInstance
+
+
+class UUIDModel(Model):
+    value: UUID
+
+
+uuidModelInstance: UUIDModel = UUIDModel(
+    value=UUID(hex="0cf728c0369348e78552e8d86d35e8b0"),
+)
+uuidModelJSON: str = '{"value": "0cf728c0369348e78552e8d86d35e8b0"}'
+
+
+def test_uuid_encoding() -> None:
+    assert uuidModelInstance.as_json() == uuidModelJSON
+
+
+def test_uuid_decoding() -> None:
+    assert UUIDModel.from_json(uuidModelJSON) == uuidModelInstance

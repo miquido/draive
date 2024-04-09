@@ -1,7 +1,9 @@
 import builtins
+import datetime
 import inspect
 import types
 import typing
+import uuid
 from collections import abc as collections_abc
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import (
@@ -666,6 +668,74 @@ def _parameter_validator(  # noqa: PLR0915, PLR0912, PLR0911, C901
                         raise TypeError("Invalid value", annotation, value)
 
             return validated_literal
+
+        case uuid.UUID:
+            if validate := additional:
+
+                def validated_uuid(value: Any) -> Any:
+                    if isinstance(value, uuid.UUID):
+                        validate(value)
+                        return value
+                    elif isinstance(value, str):
+                        uuid_value: uuid.UUID = uuid.UUID(hex=value)
+                        validate(uuid_value)
+                        return uuid_value
+                    elif isinstance(value, bytes):
+                        uuid_value: uuid.UUID = uuid.UUID(bytes=value)
+                        validate(uuid_value)
+                        return uuid_value
+                    else:
+                        raise TypeError("Invalid value", annotation, value)
+            else:
+
+                def validated_uuid(value: Any) -> Any:
+                    if isinstance(value, uuid.UUID):
+                        return value
+                    elif isinstance(value, str):
+                        return uuid.UUID(hex=value)
+                    elif isinstance(value, bytes):
+                        return uuid.UUID(bytes=value)
+                    else:
+                        raise TypeError("Invalid value", annotation, value)
+
+            return validated_uuid
+
+        case datetime.datetime:
+            if validate := additional:
+
+                def validated_datetime(value: Any) -> Any:
+                    if isinstance(value, datetime.datetime):
+                        validate(value)
+                        return value
+                    elif isinstance(value, str):
+                        datetime_value: datetime.datetime = datetime.datetime.fromisoformat(value)
+                        validate(datetime_value)
+                        return datetime_value
+                    elif isinstance(value, float | int):
+                        datetime_value: datetime.datetime = datetime.datetime.fromtimestamp(
+                            value,
+                            datetime.UTC,
+                        )
+                        validate(datetime_value)
+                        return datetime_value
+                    else:
+                        raise TypeError("Invalid value", annotation, value)
+            else:
+
+                def validated_datetime(value: Any) -> Any:
+                    if isinstance(value, datetime.datetime):
+                        return value
+                    elif isinstance(value, str):
+                        return datetime.datetime.fromisoformat(value)
+                    elif isinstance(value, float | int):
+                        return datetime.datetime.fromtimestamp(
+                            value,
+                            datetime.UTC,
+                        )
+                    else:
+                        raise TypeError("Invalid value", annotation, value)
+
+            return validated_datetime
 
         case parametrized if issubclass(parametrized, ParametrizedState):
             if validate := additional:
