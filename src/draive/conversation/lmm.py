@@ -25,8 +25,7 @@ async def lmm_conversation_completion(
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
     stream: Literal[True],
-) -> ConversationCompletionStream:
-    ...
+) -> ConversationCompletionStream: ...
 
 
 @overload
@@ -37,8 +36,7 @@ async def lmm_conversation_completion(
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
     stream: UpdateSend[ConversationStreamingUpdate],
-) -> ConversationMessage:
-    ...
+) -> ConversationMessage: ...
 
 
 @overload
@@ -48,8 +46,7 @@ async def lmm_conversation_completion(
     input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
-) -> ConversationMessage:
-    ...
+) -> ConversationMessage: ...
 
 
 async def lmm_conversation_completion(
@@ -70,7 +67,7 @@ async def lmm_conversation_completion(
 
     else:
         user_message = ConversationMessage(
-            timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S%z"),
+            created=datetime.now(UTC),
             role="user",
             content=input,
         )
@@ -103,7 +100,7 @@ async def lmm_conversation_completion(
                     stream=update,
                 )
                 response_message: ConversationMessage = ConversationMessage(
-                    timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S%z"),
+                    created=datetime.now(UTC),
                     role=completion.role,
                     content=completion.content,
                 )
@@ -123,7 +120,7 @@ async def lmm_conversation_completion(
                 tools=tools,
             )
             response_message: ConversationMessage = ConversationMessage(
-                timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S%z"),
+                created=datetime.now(UTC),
                 role=completion.role,
                 content=completion.content,
             )
@@ -144,7 +141,7 @@ async def lmm_conversation_completion(
                 stream=update,
             )
             response_message: ConversationMessage = ConversationMessage(
-                timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S%z"),
+                created=datetime.now(UTC),
                 role=completion.role,
                 content=completion.content,
             )
