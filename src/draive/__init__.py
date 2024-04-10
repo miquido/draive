@@ -40,7 +40,9 @@ from draive.lmm import (
 from draive.mistral import (
     MistralChatConfig,
     MistralClient,
+    MistralEmbeddingConfig,
     MistralException,
+    mistral_embed_text,
     mistral_lmm_completion,
 )
 from draive.openai import (
@@ -182,5 +184,7 @@ __all__ = [
     "MistralException",
     "MistralClient",
     "MistralChatConfig",
+    "MistralEmbeddingConfig",
     "mistral_lmm_completion",
+    "mistral_embed_text",
 ]
