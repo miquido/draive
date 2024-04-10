@@ -18,8 +18,7 @@ _Result_T = TypeVar(name="_Result_T")
 def auto_retry(
     function: Callable[_Args_T, _Result_T],
     /,
-) -> Callable[_Args_T, _Result_T]:
-    ...
+) -> Callable[_Args_T, _Result_T]: ...
 
 
 @overload
@@ -27,8 +26,7 @@ def auto_retry(
     *,
     limit: int = 1,
     delay: tuple[float, float] | float | None = None,
-) -> Callable[[Callable[_Args_T, _Result_T]], Callable[_Args_T, _Result_T]]:
-    ...
+) -> Callable[[Callable[_Args_T, _Result_T]], Callable[_Args_T, _Result_T]]: ...
 
 
 def auto_retry(
@@ -67,9 +65,6 @@ def auto_retry(
         function: Callable[_Args_T, _Result_T],
         /,
     ) -> Callable[_Args_T, _Result_T]:
-        if hasattr(function, "__self__"):
-            raise RuntimeError("Method auto_retry is not supported yet")
-
         if iscoroutinefunction(function):
             return cast(
                 Callable[_Args_T, _Result_T],
