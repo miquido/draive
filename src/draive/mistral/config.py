@@ -5,6 +5,7 @@ from draive.types import State
 
 __all__ = [
     "MistralChatConfig",
+    "MistralEmbeddingConfig",
 ]
 
 
@@ -52,5 +53,19 @@ class MistralChatConfig(State):
         if self.timeout:
             result += f"\n+ timeout: {self.timeout}"
         result += f"\n+ recursion_limit: {self.recursion_limit}"
+
+        return result.replace("\n", "\n|   ")
+
+
+class MistralEmbeddingConfig(State):
+    model: (Literal["mistral-embed"] | str) = "mistral-embed"
+    batch_size: int = 32
+
+    def metric_summary(
+        self,
+        trimmed: bool,
+    ) -> str:
+        result: str = f"mistral config\n+ model: {self.model}"
+        result += f"\n+ batch_size: {self.batch_size}"
 
         return result.replace("\n", "\n|   ")

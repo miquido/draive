@@ -1,4 +1,6 @@
-from collections.abc import AsyncIterable
+from asyncio import gather
+from collections.abc import AsyncIterable, Iterable
+from itertools import chain
 from typing import Literal, Self, cast, final, overload
 
 from mistralai.async_client import MistralAsyncClient
@@ -7,9 +9,10 @@ from mistralai.models.chat_completion import (
     ChatCompletionStreamResponse,
     ChatMessage,
 )
+from mistralai.models.embeddings import EmbeddingResponse
 
 from draive.helpers import getenv_str
-from draive.mistral.config import MistralChatConfig
+from draive.mistral.config import MistralChatConfig, MistralEmbeddingConfig
 from draive.scope import ScopeDependency
 
 __all__ = [
@@ -107,6 +110,37 @@ class MistralClient(ScopeDependency):
                 tool_choice=("any" if suggest_tools else "auto") if tools else None,
                 top_p=config.top_p,
             )
+
+    async def embedding(
+        self,
+        config: MistralEmbeddingConfig,
+        inputs: Iterable[str],
+    ) -> list[list[float]]:
+        inputs_list: list[str] = list(inputs)
+        return list(
+            chain(
+                *await gather(
+                    *[
+                        self._create_text_embedding(
+                            model=config.model,
+                            texts=list(inputs_list[index : index + config.batch_size]),
+                        )
+                        for index in range(0, len(inputs_list), config.batch_size)
+                    ]
+                )
+            )
+        )
+
+    async def _create_text_embedding(
+        self,
+        model: str,
+        texts: list[str],
+    ) -> list[list[float]]:
+        response: EmbeddingResponse = await self._client.embeddings(
+            model=model,
+            input=texts,
+        )
+        return [element.embedding for element in response.data]
 
     async def dispose(self) -> None:
         await self._client.close()
