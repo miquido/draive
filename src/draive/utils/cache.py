@@ -6,6 +6,8 @@ from time import monotonic
 from typing import Any, Generic, NamedTuple, ParamSpec, TypeVar, cast, overload
 from weakref import ref
 
+from draive.helpers import mimic_function
+
 __all__ = [
     "cache",
 ]
@@ -120,7 +122,7 @@ class _SyncCache(Generic[_Args_T, _Result_T]):
         self._next_expire_time: Callable[[], float | None] = next_expire_time
 
         # mimic function attributes if able
-        _mimic(function, within=self)
+        mimic_function(function, within=self)
 
     def __get__(
         self,
@@ -131,7 +133,7 @@ class _SyncCache(Generic[_Args_T, _Result_T]):
         if owner is None:
             return self
         else:
-            return _mimic(
+            return mimic_function(
                 self._function,
                 within=partial(
                     self.__method_call__,
@@ -230,7 +232,7 @@ class _AsyncCache(Generic[_Args_T, _Result_T]):
         self._next_expire_time: Callable[[], float | None] = next_expire_time
 
         # mimic function attributes if able
-        _mimic(function, within=self)
+        mimic_function(function, within=self)
 
     def __get__(
         self,
@@ -241,7 +243,7 @@ class _AsyncCache(Generic[_Args_T, _Result_T]):
         if owner is None:
             return self
         else:
-            return _mimic(
+            return mimic_function(
                 self._function,
                 within=partial(
                     self.__method_call__,
@@ -319,39 +321,3 @@ class _AsyncCache(Generic[_Args_T, _Result_T]):
             # if still running let it complete if able
             self._cached.popitem(last=False)
         return await shield(task)
-
-
-def _mimic(
-    function: Callable[_Args_T, _Result_T],
-    *,
-    within: Callable[..., Any],
-) -> Callable[_Args_T, _Result_T]:
-    # mimic function attributes if able
-    for attribute in [
-        "__module__",
-        "__name__",
-        "__qualname__",
-        "__doc__",
-        "__annotations__",
-    ]:
-        try:
-            setattr(
-                within,
-                attribute,
-                getattr(
-                    function,
-                    attribute,
-                ),
-            )
-
-        except AttributeError:
-            pass
-    try:
-        within.__dict__.update(function.__dict__)
-    except AttributeError:
-        pass
-
-    return cast(
-        Callable[_Args_T, _Result_T],
-        within,
-    )

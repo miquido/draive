@@ -8,7 +8,6 @@ from draive.scope.errors import MissingScopeDependency
 __all__ = [
     "DependenciesScope",
     "ScopeDependency",
-    "_ScopeDependency_T",
 ]
 
 
@@ -19,8 +18,7 @@ class ScopeDependency(ABC):
 
     @classmethod
     @abstractmethod
-    def prepare(cls) -> Self:
-        ...
+    def prepare(cls) -> Self: ...
 
     async def dispose(self) -> None:  # noqa: B027
         pass

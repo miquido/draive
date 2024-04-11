@@ -6,11 +6,11 @@ from typing import Any, Literal, Protocol, Self, TypeVar, cast, final, runtime_c
 from uuid import uuid4
 
 __all__ = [
-    "ScopeMetric",
     "ArgumentsTrace",
-    "ResultTrace",
-    "TokenUsage",
     "MetricsScope",
+    "ResultTrace",
+    "ScopeMetric",
+    "TokenUsage",
 ]
 
 
@@ -19,8 +19,7 @@ class ScopeMetric(Protocol):
     def metric_summary(
         self,
         trimmed: bool,
-    ) -> str | None:
-        ...
+    ) -> str | None: ...
 
 
 @runtime_checkable
@@ -28,15 +27,13 @@ class CombinableScopeMetric(Protocol):
     def metric_summary(
         self,
         trimmed: bool,
-    ) -> str | None:
-        ...
+    ) -> str | None: ...
 
     def combined_metric(
         self,
         other: Self,
         /,
-    ) -> Self:
-        ...
+    ) -> Self: ...
 
 
 # TokenUsage is a bit of a special case, we might want to allow
@@ -81,8 +78,10 @@ class ArgumentsTrace(ScopeMetric):
 
         def __init__(
             self,
+            *args: Any,
             **kwargs: Any,
         ) -> None:
+            self._args: tuple[Any, ...] = args
             self._kwargs: dict[str, Any] = kwargs
 
         def metric_summary(
@@ -114,6 +113,7 @@ class ArgumentsTrace(ScopeMetric):
 
         def __init__(
             self,
+            *args: Any,
             **kwargs: Any,
         ) -> None:
             pass

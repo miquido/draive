@@ -6,7 +6,6 @@ from draive.scope.errors import MissingScopeState
 from draive.types.parameters import ParametrizedState
 
 __all__ = [
-    "_ScopeState_T",
     "StateScope",
 ]
 

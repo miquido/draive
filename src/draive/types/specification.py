@@ -32,8 +32,8 @@ __all__ = [
     "ParameterSpecification",
     "ParametersSpecification",
     "ParametrizedModel",
-    "ToolSpecification",
     "ParametrizedTool",
+    "ToolSpecification",
 ]
 
 

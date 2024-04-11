@@ -4,7 +4,7 @@ from draive.tokenization.text import TextTokenizer
 
 __all__ = [
     "count_text_tokens",
-    "tokenize_text",
-    "Tokenization",
     "TextTokenizer",
+    "Tokenization",
+    "tokenize_text",
 ]
