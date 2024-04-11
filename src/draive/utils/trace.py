@@ -3,7 +3,8 @@ from collections.abc import Callable, Coroutine
 from typing import Any, ParamSpec, TypeVar, cast
 
 from draive.helpers import mimic_function
-from draive.scope import ArgumentsTrace, ResultTrace, ctx
+from draive.metrics import ArgumentsTrace, ResultTrace
+from draive.scope import ctx
 
 __all__ = [
     "traced",
@@ -42,10 +43,10 @@ def _traced_sync(
     ) -> _Result_T:
         with ctx.nested(
             label,
-            metrics=[ArgumentsTrace(*args, **kwargs)],
+            metrics=[ArgumentsTrace.of(*args, **kwargs)],
         ):
             result: _Result_T = function(*args, **kwargs)
-            ctx.record(ResultTrace(result))
+            ctx.record(ResultTrace.of(result))
             return result
 
     return mimic_function(function, within=wrapped)
@@ -63,10 +64,10 @@ def _traced_async(
     ) -> _Result_T:
         with ctx.nested(
             label,
-            metrics=[ArgumentsTrace(*args, **kwargs)],
+            metrics=[ArgumentsTrace.of(*args, **kwargs)],
         ):
             result: _Result_T = await function(*args, **kwargs)
-            ctx.record(ResultTrace(result))
+            ctx.record(ResultTrace.of(result))
             return result
 
     return mimic_function(function, within=wrapped)

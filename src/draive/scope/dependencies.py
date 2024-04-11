@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
 from asyncio import gather
-from contextvars import Token
 from typing import Self, TypeVar, cast, final
 
 from draive.scope.errors import MissingScopeDependency
 
 __all__ = [
-    "DependenciesScope",
+    "ScopeDependencies",
     "ScopeDependency",
 ]
 
@@ -24,14 +23,14 @@ class ScopeDependency(ABC):
         pass
 
 
-_ScopeDependency_T = TypeVar(
-    "_ScopeDependency_T",
+_Dependency_T = TypeVar(
+    "_Dependency_T",
     bound=ScopeDependency,
 )
 
 
 @final
-class DependenciesScope:
+class ScopeDependencies:
     def __init__(
         self,
         *dependencies: ScopeDependency | type[ScopeDependency],
@@ -42,19 +41,19 @@ class DependenciesScope:
                 self._dependencies[type(dependency).interface()] = dependency
             else:
                 self._dependencies[dependency.interface()] = dependency.prepare()
-        self._token: Token[DependenciesScope] | None = None
 
     def dependency(
         self,
-        _type: type[_ScopeDependency_T],
+        dependency: type[_Dependency_T],
         /,
-    ) -> _ScopeDependency_T:
-        if _type in self._dependencies:
-            return cast(_ScopeDependency_T, self._dependencies[_type])
+    ) -> _Dependency_T:
+        if dependency in self._dependencies:
+            return cast(_Dependency_T, self._dependencies[dependency])
 
         else:
             raise MissingScopeDependency(
-                f"{_type} is not defined! You have to define it when creating context."
+                f"{dependency.__qualname__} is not defined!"
+                " You have to define it when creating a new context."
             )
 
     async def dispose(self) -> None:

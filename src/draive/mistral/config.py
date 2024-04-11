@@ -1,7 +1,7 @@
 from typing import Literal, TypedDict
 
 from draive.helpers import getenv_float, getenv_int, getenv_str
-from draive.types import State
+from draive.types import MISSING, MissingValue, State
 
 __all__ = [
     "MistralChatConfig",
@@ -30,42 +30,14 @@ class MistralChatConfig(State):
         | str
     ) = getenv_str("MISTRAL_MODEL", default="open-mistral-7b")
     temperature: float = getenv_float("MISTRAL_TEMPERATURE", 0.0)
-    top_p: float | None = None
-    seed: int | None = getenv_int("MISTRAL_SEED")
-    max_tokens: int | None = None
-    response_format: ResponseFormat | None = None
-    timeout: float | None = None
+    top_p: float | MissingValue = MISSING
+    seed: int | MissingValue = getenv_int("MISTRAL_SEED") or MISSING
+    max_tokens: int | MissingValue = MISSING
+    response_format: ResponseFormat | MissingValue = MISSING
+    timeout: float | MissingValue = MISSING
     recursion_limit: int = 4
-
-    def metric_summary(
-        self,
-        trimmed: bool,
-    ) -> str:
-        result: str = f"mistral config:\n+ model: {self.model}\n+ temperature: {self.temperature}"
-        if self.top_p:
-            result += f"\n+ top_p: {self.top_p}"
-        if self.max_tokens:
-            result += f"\n+ max_tokens: {self.max_tokens}"
-        if self.seed:
-            result += f"\n+ seed: {self.seed}"
-        if self.response_format:
-            result += f"\n+ response_format: {self.response_format.get('type', 'text')}"
-        if self.timeout:
-            result += f"\n+ timeout: {self.timeout}"
-        result += f"\n+ recursion_limit: {self.recursion_limit}"
-
-        return result.replace("\n", "\n|   ")
 
 
 class MistralEmbeddingConfig(State):
-    model: (Literal["mistral-embed"] | str) = "mistral-embed"
+    model: Literal["mistral-embed"] | str = "mistral-embed"
     batch_size: int = 32
-
-    def metric_summary(
-        self,
-        trimmed: bool,
-    ) -> str:
-        result: str = f"mistral config\n+ model: {self.model}"
-        result += f"\n+ batch_size: {self.batch_size}"
-
-        return result.replace("\n", "\n|   ")

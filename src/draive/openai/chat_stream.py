@@ -9,6 +9,7 @@ from openai.types.chat import (
 )
 from openai.types.chat.chat_completion_chunk import ChoiceDelta
 
+from draive.metrics import ArgumentsTrace, ResultTrace
 from draive.openai.chat_tools import (
     _execute_chat_tool_calls,  # pyright: ignore[reportPrivateUsage]
     _flush_chat_tool_calls,  # pyright: ignore[reportPrivateUsage]
@@ -16,7 +17,7 @@ from draive.openai.chat_tools import (
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
 from draive.openai.errors import OpenAIException
-from draive.scope import ArgumentsTrace, ResultTrace, ctx
+from draive.scope import ctx
 from draive.tools import Toolbox, ToolCallUpdate
 from draive.types import UpdateSend
 
@@ -39,7 +40,7 @@ async def _chat_stream(  # noqa: PLR0913
 
     with ctx.nested(
         "chat_stream",
-        metrics=[ArgumentsTrace(messages=messages.copy())],
+        metrics=[ArgumentsTrace.of(messages=messages.copy())],
     ):
         completion_stream: OpenAIAsyncStream[ChatCompletionChunk] = await client.chat_completion(
             config=config,
@@ -87,7 +88,7 @@ async def _chat_stream(  # noqa: PLR0913
                         tools=tools,
                     )
                 )
-                ctx.record(ResultTrace(tool_calls))
+                ctx.record(ResultTrace.of(tool_calls))
                 break  # after processing tool calls continue with recursion in outer context
 
             elif completion_head.content is not None:
@@ -103,7 +104,7 @@ async def _chat_stream(  # noqa: PLR0913
                     result += part_text
                     send_update(result)
 
-                ctx.record(ResultTrace(result))
+                ctx.record(ResultTrace.of(result))
                 return result  # we hav final result here
 
             else:

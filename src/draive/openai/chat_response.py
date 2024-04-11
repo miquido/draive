@@ -7,18 +7,14 @@ from openai.types.chat import (
     ChatCompletionToolParam,
 )
 
+from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.openai.chat_tools import (
     _execute_chat_tool_calls,  # pyright: ignore[reportPrivateUsage]
 )
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
 from draive.openai.errors import OpenAIException
-from draive.scope import (
-    ArgumentsTrace,
-    ResultTrace,
-    TokenUsage,
-    ctx,
-)
+from draive.scope import ctx
 from draive.tools import Toolbox
 
 __all__ = [
@@ -39,7 +35,7 @@ async def _chat_response(
 
     with ctx.nested(
         "chat_response",
-        metrics=[ArgumentsTrace(messages=messages.copy())],
+        metrics=[ArgumentsTrace.of(messages=messages.copy())],
     ):
         completion: ChatCompletion = await client.chat_completion(
             config=config,
@@ -60,7 +56,8 @@ async def _chat_response(
 
         if usage := completion.usage:
             ctx.record(
-                TokenUsage(
+                TokenUsage.for_model(
+                    config.model,
                     input_tokens=usage.prompt_tokens,
                     output_tokens=usage.completion_tokens,
                 ),
@@ -78,10 +75,10 @@ async def _chat_response(
                     tools=tools,
                 )
             )
-            ctx.record(ResultTrace(tool_calls))
+            ctx.record(ResultTrace.of(tool_calls))
 
         elif message := completion_message.content:
-            ctx.record(ResultTrace(message))
+            ctx.record(ResultTrace.of(message))
             return message
 
         else:

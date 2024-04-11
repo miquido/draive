@@ -2,18 +2,14 @@ from typing import cast
 
 from mistralai.models.chat_completion import ChatCompletionResponse, ChatMessage
 
+from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.mistral.chat_tools import (
     _execute_chat_tool_calls,  # pyright: ignore[reportPrivateUsage]
 )
 from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralChatConfig
 from draive.mistral.errors import MistralException
-from draive.scope import (
-    ArgumentsTrace,
-    ResultTrace,
-    TokenUsage,
-    ctx,
-)
+from draive.scope import ctx
 from draive.tools import Toolbox
 
 __all__ = [
@@ -34,7 +30,7 @@ async def _chat_response(
 
     with ctx.nested(
         "chat_response",
-        metrics=[ArgumentsTrace(messages=messages.copy())],
+        metrics=[ArgumentsTrace.of(messages=messages.copy())],
     ):
         completion: ChatCompletionResponse = await client.chat_completion(
             config=config,
@@ -48,7 +44,8 @@ async def _chat_response(
 
         if usage := completion.usage:
             ctx.record(
-                TokenUsage(
+                TokenUsage.for_model(
+                    config.model,
                     input_tokens=usage.prompt_tokens,
                     output_tokens=usage.completion_tokens,
                 ),
@@ -66,10 +63,10 @@ async def _chat_response(
                     tools=tools,
                 )
             )
-            ctx.record(ResultTrace(tool_calls))
+            ctx.record(ResultTrace.of(tool_calls))
 
         elif message := completion_message.content:
-            ctx.record(ResultTrace(message))
+            ctx.record(ResultTrace.of(message))
             match message:
                 case str() as content:
                     return content

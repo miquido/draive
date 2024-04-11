@@ -9,7 +9,7 @@ from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
 from draive.scope import ctx
 from draive.tools import Toolbox, ToolCallUpdate, ToolsUpdatesContext
-from draive.types import ImageBase64Content, ImageURLContent, Model, UpdateSend
+from draive.types import ImageBase64Content, ImageURLContent, Model, UpdateSend, when_missing
 from draive.utils import AsyncStreamTask
 
 __all__ = [
@@ -23,8 +23,7 @@ async def openai_lmm_completion(
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
     stream: Literal[True],
-) -> LMMCompletionStream:
-    ...
+) -> LMMCompletionStream: ...
 
 
 @overload
@@ -33,8 +32,7 @@ async def openai_lmm_completion(
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
     stream: UpdateSend[LMMCompletionStreamingUpdate],
-) -> LMMCompletionMessage:
-    ...
+) -> LMMCompletionMessage: ...
 
 
 @overload
@@ -43,8 +41,7 @@ async def openai_lmm_completion(
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
     output: Literal["text", "json"] = "text",
-) -> LMMCompletionMessage:
-    ...
+) -> LMMCompletionMessage: ...
 
 
 async def openai_lmm_completion(
@@ -159,7 +156,11 @@ def _convert_message(  # noqa: PLR0912, C901, PLR0911
                             "type": "image_url",
                             "image_url": {
                                 "url": message.content.url,
-                                "detail": config.vision_details,
+                                "detail": when_missing(
+                                    config.vision_details,
+                                    default="auto",
+                                    cast=Literal["auto", "low", "high"],
+                                ),
                             },
                         }
                     ],
@@ -187,7 +188,11 @@ def _convert_message(  # noqa: PLR0912, C901, PLR0911
                                 "type": "image_url",
                                 "image_url": {
                                     "url": part.url,
-                                    "detail": config.vision_details,
+                                    "detail": when_missing(
+                                        config.vision_details,
+                                        default="auto",
+                                        cast=Literal["auto", "low", "high"],
+                                    ),
                                 },
                             }
                         )

@@ -51,7 +51,7 @@ format:
 # Run linters and code checks.
 lint:
 	@bandit -r $(SOURCES_PATH)
-	@ruff $(SOURCES_PATH) $(TESTS_PATH)
+	@ruff check $(SOURCES_PATH) $(TESTS_PATH)
 	@pyright --project ./
 
 # Run tests suite.

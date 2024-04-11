@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
+from draive.types.missing import is_missing
 from draive.types.specification import ParametrizedModel
 
 __all__ = [
@@ -59,7 +60,9 @@ class Model(ParametrizedModel):
 
 class DefaultJSONEncoder(json.JSONEncoder):
     def default(self, o: object) -> Any:
-        if isinstance(o, datetime):
+        if is_missing(o):
+            return None
+        elif isinstance(o, datetime):
             return o.isoformat()
         elif isinstance(o, UUID):
             return o.hex

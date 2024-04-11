@@ -1,6 +1,6 @@
 from draive.types.images import ImageBase64Content, ImageContent, ImageURLContent
 from draive.types.memory import Memory, ReadOnlyMemory
-from draive.types.missing import MISSING, MissingValue
+from draive.types.missing import MISSING, MissingValue, is_missing, not_missing, when_missing
 from draive.types.model import Model
 from draive.types.multimodal import MultimodalContent
 from draive.types.parameters import (
@@ -14,6 +14,7 @@ from draive.types.specification import (
     ParameterSpecification,
     ParametersSpecification,
     ParametrizedModel,
+    ParametrizedState,
     ParametrizedTool,
     ToolSpecification,
 )
@@ -37,9 +38,13 @@ __all__ = [
     "ParametersSpecification",
     "ParametrizedFunction",
     "ParametrizedModel",
+    "ParametrizedState",
     "ParametrizedTool",
     "ReadOnlyMemory",
     "State",
     "ToolSpecification",
     "UpdateSend",
+    "when_missing",
+    "is_missing",
+    "not_missing",
 ]
