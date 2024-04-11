@@ -8,11 +8,11 @@ from draive.lmm.message import (
 from draive.lmm.state import LMM
 
 __all__ = [
+    "lmm_completion",
     "LMM",
     "LMMCompletion",
     "LMMCompletionContent",
     "LMMCompletionMessage",
-    "LMMCompletionStreamingUpdate",
     "LMMCompletionStream",
-    "lmm_completion",
+    "LMMCompletionStreamingUpdate",
 ]

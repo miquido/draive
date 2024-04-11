@@ -4,6 +4,6 @@ from draive.generation.image.state import ImageGeneration
 
 __all__ = [
     "generate_image",
-    "ImageGenerator",
     "ImageGeneration",
+    "ImageGenerator",
 ]

@@ -5,10 +5,10 @@ from draive.mistral.errors import MistralException
 from draive.mistral.lmm import mistral_lmm_completion
 
 __all__ = [
-    "MistralException",
-    "MistralClient",
-    "MistralChatConfig",
-    "MistralEmbeddingConfig",
-    "mistral_lmm_completion",
     "mistral_embed_text",
+    "mistral_lmm_completion",
+    "MistralChatConfig",
+    "MistralClient",
+    "MistralEmbeddingConfig",
+    "MistralException",
 ]

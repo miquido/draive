@@ -1,8 +1,8 @@
 from typing import Any, Final, final
 
 __all__ = [
-    "MissingValue",
     "MISSING",
+    "MissingValue",
 ]
 
 

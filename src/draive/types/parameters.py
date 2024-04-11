@@ -31,17 +31,18 @@ from typing import (
 
 import typing_extensions
 
+from draive.helpers import mimic_function
 from draive.types.missing import MISSING, MissingValue
 
 __all__ = [
+    "Argument",
+    "Field",
+    "Function",
     "ParameterDefinition",
     "ParametersDefinition",
-    "ParametrizedMeta",
-    "Field",
-    "ParametrizedState",
-    "Function",
-    "Argument",
     "ParametrizedFunction",
+    "ParametrizedMeta",
+    "ParametrizedState",
 ]
 
 _ArgumentType_T = TypeVar("_ArgumentType_T")
@@ -332,15 +333,13 @@ FunctionResult_co = TypeVar(
 
 class Function(Protocol[FunctionArgs, FunctionResult_co]):
     @property
-    def __name__(self) -> str:
-        ...
+    def __name__(self) -> str: ...
 
     def __call__(
         self,
         *args: FunctionArgs.args,
         **kwargs: FunctionArgs.kwargs,
-    ) -> FunctionResult_co:
-        ...
+    ) -> FunctionResult_co: ...
 
 
 class ParametrizedFunction(Generic[FunctionArgs, FunctionResult]):
@@ -351,31 +350,6 @@ class ParametrizedFunction(Generic[FunctionArgs, FunctionResult]):
         assert not isinstance(  # nosec: B101
             function, ParametrizedFunction
         ), "Nested function wrapping is not allowed"
-        # mimic function attributes if able
-        try:
-            self.__module__ = function.__module__
-        except AttributeError:
-            pass
-        try:
-            self.__name__ = function.__name__
-        except AttributeError:
-            pass
-        try:
-            self.__qualname__ = function.__qualname__
-        except AttributeError:
-            pass
-        try:
-            self.__doc__ = function.__doc__
-        except AttributeError:
-            pass
-        try:
-            self.__annotations__ = function.__annotations__
-        except AttributeError:
-            pass
-        try:
-            self.__dict__.update(function.__dict__)
-        except AttributeError:
-            pass
 
         self._call: Function[FunctionArgs, FunctionResult] = function
         self.parameters: ParametersDefinition = ParametersDefinition(
@@ -384,6 +358,7 @@ class ParametrizedFunction(Generic[FunctionArgs, FunctionResult]):
                 for argument in inspect.signature(function).parameters.values()
             )
         )
+        mimic_function(function, within=self)
 
     def validated_parameters(
         self,

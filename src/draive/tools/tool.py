@@ -20,15 +20,14 @@ from draive.types import (
 )
 
 __all__ = [
-    "ToolAvailability",
-    "Tool",
     "tool",
+    "Tool",
+    "ToolAvailability",
 ]
 
 
 class ToolAvailability(Protocol):
-    def __call__(self) -> bool:
-        ...
+    def __call__(self) -> bool: ...
 
 
 ToolArgs = ParamSpec(
@@ -88,7 +87,7 @@ class Tool(ParametrizedTool[ToolArgs, Coroutine[None, None, ToolResult]]):
         with ctx.nested(
             self.name,
             state=[call_context],
-            metrics=[ArgumentsTrace(call_id=call_context.call_id, **kwargs)],
+            metrics=[ArgumentsTrace(*args, call_id=call_context.call_id, **kwargs)],
         ):
             try:
                 send_update(  # notify on start
@@ -140,8 +139,7 @@ class Tool(ParametrizedTool[ToolArgs, Coroutine[None, None, ToolResult]]):
 def tool(
     function: Function[ToolArgs, Coroutine[None, None, ToolResult]],
     /,
-) -> Tool[ToolArgs, ToolResult]:
-    ...
+) -> Tool[ToolArgs, ToolResult]: ...
 
 
 @overload
@@ -150,8 +148,9 @@ def tool(
     name: str | None = None,
     description: str | None = None,
     availability: ToolAvailability | None = None,
-) -> Callable[[Function[ToolArgs, Coroutine[None, None, ToolResult]]], Tool[ToolArgs, ToolResult]]:
-    ...
+) -> Callable[
+    [Function[ToolArgs, Coroutine[None, None, ToolResult]]], Tool[ToolArgs, ToolResult]
+]: ...
 
 
 def tool(
