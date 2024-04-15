@@ -1,15 +1,21 @@
-from asyncio import Task, TaskGroup
+from asyncio import Task, TaskGroup, shield
 from collections.abc import Callable, Coroutine, Iterable
 from contextvars import Context, ContextVar, Token, copy_context
 from logging import Logger
 from types import TracebackType
-from typing import Any, Literal, ParamSpec, TypeVar, final
+from typing import Any, ParamSpec, TypeVar, final
 
 from draive.helpers import getenv_bool
-from draive.scope.dependencies import DependenciesScope, ScopeDependency
+from draive.metrics import (
+    ExceptionTrace,
+    Metric,
+    MetricsTrace,
+    MetricsTraceReporter,
+    metrics_trimmed_log_report,
+)
+from draive.scope.dependencies import ScopeDependencies, ScopeDependency
 from draive.scope.errors import MissingScopeContext
-from draive.scope.metrics import MetricsScope, ScopeMetric
-from draive.scope.state import StateScope
+from draive.scope.state import ScopeState
 from draive.types.parameters import ParametrizedState
 
 __all__ = [
@@ -19,55 +25,57 @@ __all__ = [
 _TaskGroup_Var = ContextVar[TaskGroup]("_TaskGroup_Var")
 _ScopeMetric_T = TypeVar(
     "_ScopeMetric_T",
-    bound=ScopeMetric,
+    bound=Metric,
 )
-_MetricsScope_Var = ContextVar[MetricsScope]("_MetricsScope_Var")
+_MetricsScope_Var = ContextVar[MetricsTrace]("_MetricsScope_Var")
 _ScopeState_T = TypeVar(
     "_ScopeState_T",
     bound=ParametrizedState,
 )
-_StateScope_Var = ContextVar[StateScope]("_ScopeState_Var")
+_StateScope_Var = ContextVar[ScopeState]("_ScopeState_Var")
 _ScopeDependency_T = TypeVar(
     "_ScopeDependency_T",
     bound=ScopeDependency,
 )
-_DependenciesScope_Var = ContextVar[DependenciesScope]("_DependenciesScope_Var")
+_DependenciesScope_Var = ContextVar[ScopeDependencies]("_DependenciesScope_Var")
 _Args_T = ParamSpec("_Args_T")
 _Result_T = TypeVar("_Result_T")
 
 
 class _RootContext:
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         task_group: TaskGroup,
-        metrics: MetricsScope,
-        state: StateScope,
-        dependencies: DependenciesScope,
+        dependencies: ScopeDependencies,
+        state: ScopeState,
+        metrics: MetricsTrace,
+        trace_reporting: MetricsTraceReporter | None,
     ) -> None:
         self._task_group: TaskGroup = task_group
         self._task_group_token: Token[TaskGroup] | None = None
-        self._metrics: MetricsScope = metrics
-        self._metrics_token: Token[MetricsScope] | None = None
-        self._state: StateScope = state
-        self._state_token: Token[StateScope] | None = None
-        self._dependencies: DependenciesScope = dependencies
-        self._dependencies_token: Token[DependenciesScope] | None = None
+        self._dependencies: ScopeDependencies = dependencies
+        self._dependencies_token: Token[ScopeDependencies] | None = None
+        self._state: ScopeState = state
+        self._state_token: Token[ScopeState] | None = None
+        self._metrics: MetricsTrace = metrics
+        self._metrics_token: Token[MetricsTrace] | None = None
+        self._report_trace: MetricsTraceReporter | None = trace_reporting
 
     async def __aenter__(self) -> None:
         # start the task group first
         assert self._task_group_token is None, "Reentrance is not allowed"  # nosec: B101
         self._task_group_token = _TaskGroup_Var.set(self._task_group)
         await self._task_group.__aenter__()
-        # then begin metrics capture
-        assert self._metrics_token is None, "Reentrance is not allowed"  # nosec: B101
-        self._metrics.enter_task()
-        self._metrics_token = _MetricsScope_Var.set(self._metrics)
-        # prepare state scope next
+        # prepare state scope
         assert self._state_token is None, "Reentrance is not allowed"  # nosec: B101
         self._state_token = _StateScope_Var.set(self._state)
-        # finally initialize dependencies
+        # then initialize dependencies
         assert self._dependencies_token is None, "Reentrance is not allowed"  # nosec: B101
         self._dependencies_token = _DependenciesScope_Var.set(self._dependencies)
+        # finally begin metrics capture
+        assert self._metrics_token is None, "Reentrance is not allowed"  # nosec: B101
+        self._metrics.enter()
+        self._metrics_token = _MetricsScope_Var.set(self._metrics)
 
     async def __aexit__(
         self,
@@ -85,16 +93,41 @@ class _RootContext:
                 tb=exc_tb,
             )
         except BaseException as exc:
-            # then end metrics capture with either context or task group error
-            assert self._metrics_token is not None, "Can't exit scope without entering"  # nosec: B101
-            _MetricsScope_Var.reset(self._metrics_token)
-            self._metrics.exit_task(exception=exc_val or exc)
+            # record task group exceptions
+            self._metrics.record(ExceptionTrace.of(exc_val or exc))
+
         else:
-            # or end metrics capture with context error
+            # or context exception
+            if exception := exc_val:
+                self._metrics.record(ExceptionTrace.of(exception))
+
+        finally:
+            # then end metrics capture
             assert self._metrics_token is not None, "Can't exit scope without entering"  # nosec: B101
             _MetricsScope_Var.reset(self._metrics_token)
-            self._metrics.exit_task(exception=exc_val)
-        finally:
+            self._metrics.exit()
+            assert (  # nosec: B101
+                self._metrics.is_finished
+            ), "Unbalanced metrics trace enter/exit calls, possibly an unstructured task running"
+            # report metrics trace
+            if report_trace := self._report_trace:
+                # it still have access to the dependencies and state
+                try:  # catch all exceptions - we don't wan't to blow up on metrics
+                    await shield(
+                        report_trace(
+                            trace_id=self._metrics.trace_id,
+                            logger=self._metrics._logger,  # pyright: ignore[reportPrivateUsage]
+                            report=self._metrics.report(),
+                        )
+                    )
+
+                except Exception as exc:
+                    self._metrics.log_error(
+                        "Failed to finish metrics trace report",
+                        exception=exc,
+                    )
+                    return None
+
             # cleanup dependencies next
             assert self._dependencies_token is not None, "Can't exit scope without entering"  # nosec: B101
             _DependenciesScope_Var.reset(self._dependencies_token)
@@ -106,18 +139,18 @@ class _RootContext:
 class _PartialContext:
     def __init__(
         self,
-        metrics: MetricsScope | None = None,
-        state: StateScope | None = None,
+        metrics: MetricsTrace | None = None,
+        state: ScopeState | None = None,
     ) -> None:
-        self._metrics: MetricsScope | None = metrics
-        self._metrics_token: Token[MetricsScope] | None = None
-        self._state: StateScope | None = state
-        self._state_token: Token[StateScope] | None = None
+        self._metrics: MetricsTrace | None = metrics
+        self._metrics_token: Token[MetricsTrace] | None = None
+        self._state: ScopeState | None = state
+        self._state_token: Token[ScopeState] | None = None
 
     def __enter__(self) -> None:
         if metrics := self._metrics:
             assert self._metrics_token is None, "Reentrance is not allowed"  # nosec: B101
-            metrics.enter_task()
+            metrics.enter()
             self._metrics_token = _MetricsScope_Var.set(metrics)
         if state := self._state:
             assert self._state_token is None, "Reentrance is not allowed"  # nosec: B101
@@ -129,12 +162,13 @@ class _PartialContext:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        if token := self._metrics_token:
+        if (token := self._metrics_token) and (metrics := self._metrics):
             _MetricsScope_Var.reset(self._metrics_token)
-            if metrics := self._metrics:
-                metrics.exit_task(exception=exc_val)
-            else:
-                raise RuntimeError("Can't exit metrics scope without valid reference to it")
+            if exception := exc_val:
+                metrics.record(ExceptionTrace.of(exception))
+
+            metrics.exit()
+
         if token := self._state_token:
             _StateScope_Var.reset(token)
 
@@ -145,42 +179,42 @@ class ctx:
     def new(  # noqa: PLR0913
         label: str | None = None,
         *,
-        dependencies: DependenciesScope
+        dependencies: ScopeDependencies
         | Iterable[type[ScopeDependency] | ScopeDependency]
         | None = None,
-        state: StateScope | Iterable[ParametrizedState] | None = None,
-        metrics: Iterable[ScopeMetric] | None = None,
+        state: ScopeState | Iterable[ParametrizedState] | None = None,
+        metrics: Iterable[Metric] | None = None,
         logger: Logger | None = None,
-        log_summary: Literal["full", "trimmed", "none"] | None = None,
+        trace_reporting: MetricsTraceReporter | None = None,
     ) -> _RootContext:
-        root_dependencies: DependenciesScope
+        root_dependencies: ScopeDependencies
         if dependencies is None:
-            root_dependencies = DependenciesScope()
-        elif isinstance(dependencies, DependenciesScope):
+            root_dependencies = ScopeDependencies()
+        elif isinstance(dependencies, ScopeDependencies):
             root_dependencies = dependencies
         else:
-            root_dependencies = DependenciesScope(*dependencies)
+            root_dependencies = ScopeDependencies(*dependencies)
 
-        root_state: StateScope
+        root_state: ScopeState
         if state is None:
-            root_state = StateScope()
-        elif isinstance(state, StateScope):
+            root_state = ScopeState()
+        elif isinstance(state, ScopeState):
             root_state = state
         else:
-            root_state = StateScope(*state)
+            root_state = ScopeState(*state)
 
         return _RootContext(
             task_group=TaskGroup(),
-            metrics=MetricsScope(
+            dependencies=root_dependencies,
+            state=root_state,
+            metrics=MetricsTrace(
                 label=label,
                 logger=logger,
                 parent=None,
                 metrics=metrics,
-                log_summary=log_summary
-                or ("trimmed" if getenv_bool("DEBUG_LOGGING", __debug__) else "none"),
             ),
-            state=root_state,
-            dependencies=root_dependencies,
+            trace_reporting=trace_reporting
+            or (metrics_trimmed_log_report if getenv_bool("DEBUG_LOGGING", __debug__) else None),
         )
 
     @staticmethod
@@ -191,21 +225,21 @@ class ctx:
             raise MissingScopeContext("TaskGroup requested but not defined!") from exc
 
     @staticmethod
-    def _current_metrics() -> MetricsScope:
+    def _current_metrics() -> MetricsTrace:
         try:
             return _MetricsScope_Var.get()
         except LookupError as exc:
             raise MissingScopeContext("MetricsScope requested but not defined!") from exc
 
     @staticmethod
-    def _current_dependencies() -> DependenciesScope:
+    def _current_dependencies() -> ScopeDependencies:
         try:
             return _DependenciesScope_Var.get()
         except LookupError as exc:
             raise MissingScopeContext("DependenciesScope requested but not defined!") from exc
 
     @staticmethod
-    def _current_state() -> StateScope:
+    def _current_state() -> ScopeState:
         try:
             return _StateScope_Var.get()
         except LookupError as exc:
@@ -231,11 +265,11 @@ class ctx:
     def nested(
         label: str,
         /,
-        state: StateScope | Iterable[ParametrizedState] | None = None,
-        metrics: Iterable[ScopeMetric] | None = None,
+        state: ScopeState | Iterable[ParametrizedState] | None = None,
+        metrics: Iterable[Metric] | None = None,
     ) -> _PartialContext:
-        nested_state: StateScope | None
-        if isinstance(state, StateScope):
+        nested_state: ScopeState | None
+        if isinstance(state, ScopeState):
             nested_state = state
         else:
             nested_state = ctx._current_state().updated(state)
@@ -260,28 +294,28 @@ class ctx:
 
     @staticmethod
     def state(
-        _type: type[_ScopeState_T],
+        state: type[_ScopeState_T],
         /,
     ) -> _ScopeState_T:
-        return ctx._current_state().state(_type)
+        return ctx._current_state().state(state)
 
     @staticmethod
     def dependency(
-        _type: type[_ScopeDependency_T],
+        dependency: type[_ScopeDependency_T],
         /,
     ) -> _ScopeDependency_T:
-        return ctx._current_dependencies().dependency(_type)
+        return ctx._current_dependencies().dependency(dependency)
 
     @staticmethod
     def read(
-        _type: type[_ScopeMetric_T],
+        metric: type[_ScopeMetric_T],
         /,
     ) -> _ScopeMetric_T | None:
-        return ctx._current_metrics().read(_type)
+        return ctx._current_metrics().read(metric)
 
     @staticmethod
     def record(
-        *metrics: ScopeMetric,
+        *metrics: Metric,
     ) -> None:
         ctx._current_metrics().record(*metrics)
 
@@ -290,10 +324,12 @@ class ctx:
         message: str,
         /,
         *args: Any,
+        exception: BaseException | None = None,
     ) -> None:
         ctx._current_metrics().log_error(
             message,
             *args,
+            exception=exception,
         )
 
     @staticmethod
@@ -301,10 +337,12 @@ class ctx:
         message: str,
         /,
         *args: Any,
+        exception: Exception | None = None,
     ) -> None:
         ctx._current_metrics().log_warning(
             message,
             *args,
+            exception=exception,
         )
 
     @staticmethod
@@ -323,8 +361,10 @@ class ctx:
         message: str,
         /,
         *args: Any,
+        exception: Exception | None = None,
     ) -> None:
         ctx._current_metrics().log_debug(
             message,
             *args,
+            exception=exception,
         )

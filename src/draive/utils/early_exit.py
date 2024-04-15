@@ -7,9 +7,10 @@ from asyncio import (
 )
 from collections.abc import Callable, Coroutine
 from contextvars import ContextVar, Token
-from typing import Any, ParamSpec, Protocol, TypeVar
+from typing import Any, ParamSpec, Protocol, Self, TypeVar
 
-from draive.scope import MetricsScope, ctx
+from draive.metrics import Metric
+from draive.scope import ctx
 from draive.types import State
 
 __all__ = [
@@ -43,7 +44,7 @@ async def allowing_early_exit(
                     type(early_result),
                 )
             early_exit_future.set_result(early_result)
-            ctx.record(_EarlyExitResult(early_result))
+            ctx.record(_EarlyExitResultTrace.of(early_result))
         except InvalidStateError as exc:
             ctx.log_debug("Ignored redundant attempt to early exit: %s", exc)
         except TypeError as exc:
@@ -80,46 +81,19 @@ class _RequestEarlyExit(Protocol):
     async def __call__(
         self,
         early_result: Any,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
-class _EarlyExitResult:
-    if __debug__:
+class _EarlyExitResultTrace(Metric):
+    @classmethod
+    def of(
+        cls,
+        value: Any,
+        /,
+    ) -> Self:
+        return cls(result=value)
 
-        def __init__(
-            self,
-            __result: Any,
-        ) -> None:
-            self._result: Any = __result
-
-        def metric_summary(
-            self,
-            trimmed: bool,
-        ) -> str | None:
-            result_str: str = str(self._result)
-            if trimmed and len(result_str) > MetricsScope.TRIMMING_CHARACTER_LIMIT:
-                result_str = f"{result_str[:MetricsScope.TRIMMING_CHARACTER_LIMIT]}...".replace(
-                    "\n", " "
-                )
-            else:
-                result_str = result_str.replace("\n", "\n|  ")
-
-            return f"early exit result: {result_str}"
-
-    else:  # in non debug builds redact the values
-
-        def __init__(
-            self,
-            __result: Any,
-        ) -> None:
-            pass
-
-        def metric_summary(
-            self,
-            trimmed: bool,
-        ) -> str | None:
-            return None
+    result: Any
 
 
 _EarlyExit_Var = ContextVar[_RequestEarlyExit]("_EarlyExit_Var")

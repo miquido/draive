@@ -20,11 +20,15 @@ def mimic_function(
 ) -> Callable[_Args_T, _Result_T]:
     # mimic function attributes if able
     for attribute in [
+        "__globals__",
         "__module__",
         "__name__",
         "__qualname__",
-        "__doc__",
         "__annotations__",
+        "__code__",
+        "__defaults__",
+        "__kwdefaults__",
+        "__doc__",
     ]:
         try:
             setattr(

@@ -14,6 +14,7 @@ from mistralai.models.embeddings import EmbeddingResponse
 from draive.helpers import getenv_str
 from draive.mistral.config import MistralChatConfig, MistralEmbeddingConfig
 from draive.scope import ScopeDependency
+from draive.types import when_missing
 
 __all__ = [
     "MistralClient",
@@ -52,8 +53,7 @@ class MistralClient(ScopeDependency):
         messages: list[ChatMessage],
         tools: list[dict[str, object]],
         stream: Literal[True],
-    ) -> AsyncIterable[ChatCompletionStreamResponse]:
-        ...
+    ) -> AsyncIterable[ChatCompletionStreamResponse]: ...
 
     @overload
     async def chat_completion(
@@ -64,8 +64,7 @@ class MistralClient(ScopeDependency):
         tools: list[dict[str, object]],
         suggest_tools: bool,
         stream: Literal[True],
-    ) -> AsyncIterable[ChatCompletionStreamResponse]:
-        ...
+    ) -> AsyncIterable[ChatCompletionStreamResponse]: ...
 
     @overload
     async def chat_completion(
@@ -75,8 +74,7 @@ class MistralClient(ScopeDependency):
         messages: list[ChatMessage],
         tools: list[dict[str, object]],
         suggest_tools: bool = False,
-    ) -> ChatCompletionResponse:
-        ...
+    ) -> ChatCompletionResponse: ...
 
     async def chat_completion(  # noqa: PLR0913
         self,
@@ -91,24 +89,24 @@ class MistralClient(ScopeDependency):
             return self._client.chat_stream(
                 messages=messages,
                 model=config.model,
-                max_tokens=config.max_tokens,
+                max_tokens=when_missing(config.max_tokens, default=None),
                 response_format=cast(dict[str, str], config.response_format),
-                random_seed=config.seed,
+                random_seed=when_missing(config.seed, default=None),
                 temperature=config.temperature,
                 tools=tools,
-                top_p=config.top_p,
+                top_p=when_missing(config.top_p, default=None),
             )
         else:
             return await self._client.chat(
                 messages=messages,
                 model=config.model,
-                max_tokens=config.max_tokens,
+                max_tokens=when_missing(config.max_tokens, default=None),
                 response_format=cast(dict[str, str], config.response_format),
-                random_seed=config.seed,
+                random_seed=when_missing(config.seed, default=None),
                 temperature=config.temperature,
                 tools=tools,
                 tool_choice=("any" if suggest_tools else "auto") if tools else None,
-                top_p=config.top_p,
+                top_p=when_missing(config.top_p, default=None),
             )
 
     async def embedding(

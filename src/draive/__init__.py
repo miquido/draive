@@ -37,6 +37,16 @@ from draive.lmm import (
     LMMCompletionStreamingUpdate,
     lmm_completion,
 )
+from draive.metrics import (
+    Metric,
+    MetricsTrace,
+    MetricsTraceReport,
+    MetricsTraceReporter,
+    SerializableMetric,
+    TokenUsage,
+    metrics_log_report,
+    metrics_trimmed_log_report,
+)
 from draive.mistral import (
     MistralChatConfig,
     MistralClient,
@@ -57,12 +67,9 @@ from draive.openai import (
     openai_tokenize_text,
 )
 from draive.scope import (
-    DependenciesScope,
-    MetricsScope,
+    ScopeDependencies,
     ScopeDependency,
-    ScopeMetric,
-    StateScope,
-    TokenUsage,
+    ScopeState,
     ctx,
 )
 from draive.similarity import mmr_similarity, similarity
@@ -92,6 +99,9 @@ from draive.types import (
     ReadOnlyMemory,
     State,
     UpdateSend,
+    is_missing,
+    not_missing,
+    when_missing,
 )
 from draive.utils import allowing_early_exit, auto_retry, cache, traced, with_early_exit
 
@@ -110,7 +120,6 @@ __all__ = [
     "ConversationMessageContent",
     "count_text_tokens",
     "ctx",
-    "DependenciesScope",
     "embed_text",
     "Embedded",
     "Embedder",
@@ -138,7 +147,12 @@ __all__ = [
     "LMMCompletionStreamingUpdate",
     "load_env",
     "Memory",
-    "MetricsScope",
+    "Metric",
+    "metrics_log_report",
+    "metrics_trimmed_log_report",
+    "MetricsTrace",
+    "MetricsTraceReport",
+    "MetricsTraceReporter",
     "MISSING",
     "MissingValue",
     "mistral_embed_text",
@@ -162,19 +176,21 @@ __all__ = [
     "OpenAIException",
     "OpenAIImageGenerationConfig",
     "ReadOnlyMemory",
+    "ScopeDependencies",
     "ScopeDependency",
-    "ScopeMetric",
+    "ScopeState",
+    "SerializableMetric",
     "setup_logging",
     "similarity",
     "split_sequence",
     "split_text",
     "State",
-    "StateScope",
     "TextGeneration",
     "TextGenerator",
     "TextTokenizer",
     "Tokenization",
     "tokenize_text",
+    "TokenUsage",
     "TokenUsage",
     "tool",
     "Tool",
@@ -188,4 +204,7 @@ __all__ = [
     "traced",
     "UpdateSend",
     "with_early_exit",
+    "when_missing",
+    "is_missing",
+    "not_missing",
 ]

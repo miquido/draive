@@ -16,6 +16,7 @@ from dataclasses import field as dataclass_field
 from dataclasses import fields as dataclass_fields
 from typing import (
     Any,
+    Final,
     ForwardRef,
     Generic,
     ParamSpec,
@@ -31,8 +32,10 @@ from typing import (
 
 import typing_extensions
 
+import draive.types.missing as draive_missing
 from draive.helpers import mimic_function
-from draive.types.missing import MISSING, MissingValue
+
+# from draive.types.missing import MISSING, MissingValue
 
 __all__ = [
     "Argument",
@@ -49,6 +52,28 @@ _ArgumentType_T = TypeVar("_ArgumentType_T")
 
 
 @final
+class Missing:
+    def __bool__(self) -> bool:
+        return False
+
+    def __str__(self) -> str:
+        return "MISSING"
+
+    def __repr__(self) -> str:
+        return "MISSING"
+
+    def __setattr__(
+        self,
+        __name: str,
+        __value: Any,
+    ) -> None:
+        raise RuntimeError("Missing can't be modified")
+
+
+MISSING: Final[Missing] = Missing()
+
+
+@final
 class ParameterDefinition:
     def __init__(  # noqa: PLR0913
         self,
@@ -57,7 +82,7 @@ class ParameterDefinition:
         description: str | None,
         annotation: Any,
         module: Any,
-        default: _ArgumentType_T | MissingValue,
+        default: _ArgumentType_T | Missing,
         validator: Callable[[_ArgumentType_T], None] | None,
     ) -> None:
         assert name != alias, "Alias can't be the same as name"  # nosec: B101
@@ -65,7 +90,7 @@ class ParameterDefinition:
         self.alias: str | None = alias
         self.description: str | None = description
         self.annotation: Any = annotation
-        self.default: _ArgumentType_T | MissingValue = default
+        self.default: _ArgumentType_T | Missing = default
         self.validator: Callable[[_ArgumentType_T], _ArgumentType_T] = _parameter_validator(
             annotation,
             additional=validator,
@@ -80,16 +105,16 @@ class ParameterDefinition:
 
         self.__setattr__ = frozen
 
-    def default_value(self) -> Any | MissingValue:
+    def default_value(self) -> Any | Missing:
         return self.default
 
     def validate_value(
         self,
-        value: Any | MissingValue,
+        value: Any | Missing,
         /,
     ) -> Any:
         if value is MISSING:
-            default: Any | MissingValue = self.default_value()
+            default: Any | Missing = self.default_value()
             if default is MISSING:
                 raise ValueError("Missing required value of %s", self.name)
             else:
@@ -289,7 +314,7 @@ def Argument(  # Ruff - noqa: B008
     *,
     alias: str | None = None,
     description: str | None = None,
-    default: _ArgumentType_T | MissingValue = MISSING,
+    default: _ArgumentType_T | Missing = MISSING,
     validator: Callable[[_ArgumentType_T], None] | None = None,
 ) -> _ArgumentType_T:  # it is actually a FunctionParameter, but type checker has to be fooled
     return cast(
@@ -309,12 +334,12 @@ class FunctionArgument:
         self,
         alias: str | None,
         description: str | None,
-        default: _ArgumentType_T | MissingValue,
+        default: _ArgumentType_T | Missing,
         validator: Callable[[_ArgumentType_T], None] | None,
     ) -> None:
         self.alias: str | None = alias
         self.description: str | None = description
-        self.default: _ArgumentType_T | MissingValue = default
+        self.default: _ArgumentType_T | Missing = default
         self.validator: Callable[[_ArgumentType_T], None] | None = validator
 
 
@@ -350,7 +375,6 @@ class ParametrizedFunction(Generic[FunctionArgs, FunctionResult]):
         assert not isinstance(  # nosec: B101
             function, ParametrizedFunction
         ), "Nested function wrapping is not allowed"
-
         self._call: Function[FunctionArgs, FunctionResult] = function
         self.parameters: ParametersDefinition = ParametersDefinition(
             parameters=(
@@ -372,7 +396,7 @@ class ParametrizedFunction(Generic[FunctionArgs, FunctionResult]):
         **kwargs: FunctionArgs.kwargs,
     ) -> FunctionResult:
         assert not args, "Positional unkeyed arguments are not supported"  # nosec: B101
-        return self._call(*args, **self.validated_parameters(values=kwargs))
+        return self._call(*args, **self.validated_parameters(values=kwargs))  # pyright: ignore[reportCallIssue]
 
 
 def _function_argument(
@@ -711,6 +735,17 @@ def _parameter_validator(  # noqa: PLR0915, PLR0912, PLR0911, C901
                         raise TypeError("Invalid value", annotation, value)
 
             return validated_datetime
+
+        case draive_missing.MissingValue:
+
+            def validated_missing(value: Any) -> Any:
+                if draive_missing.is_missing(value):
+                    return value
+
+                else:
+                    raise TypeError("Invalid value", annotation, value)
+
+            return validated_missing
 
         case parametrized if issubclass(parametrized, ParametrizedState):
             if validate := additional:

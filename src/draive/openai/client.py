@@ -25,6 +25,7 @@ from draive.openai.config import (
     OpenAIImageGenerationConfig,
 )
 from draive.scope import ScopeDependency
+from draive.types import when_missing
 
 __all__ = [
     "OpenAIClient",
@@ -79,8 +80,7 @@ class OpenAIClient(ScopeDependency):
         messages: list[ChatCompletionMessageParam],
         tools: list[ChatCompletionToolParam],
         stream: Literal[True],
-    ) -> AsyncStream[ChatCompletionChunk]:
-        ...
+    ) -> AsyncStream[ChatCompletionChunk]: ...
 
     @overload
     async def chat_completion(
@@ -91,8 +91,7 @@ class OpenAIClient(ScopeDependency):
         tools: list[ChatCompletionToolParam],
         suggested_tool: ChatCompletionNamedToolChoiceParam | None,
         stream: Literal[True],
-    ) -> AsyncStream[ChatCompletionChunk]:
-        ...
+    ) -> AsyncStream[ChatCompletionChunk]: ...
 
     @overload
     async def chat_completion(
@@ -102,8 +101,7 @@ class OpenAIClient(ScopeDependency):
         messages: list[ChatCompletionMessageParam],
         tools: list[ChatCompletionToolParam],
         suggested_tool: ChatCompletionNamedToolChoiceParam | None = None,
-    ) -> ChatCompletion:
-        ...
+    ) -> ChatCompletion: ...
 
     async def chat_completion(  # noqa: PLR0913
         self,
@@ -117,17 +115,17 @@ class OpenAIClient(ScopeDependency):
         return await self._client.chat.completions.create(
             messages=messages,
             model=config.model,
-            frequency_penalty=config.frequency_penalty or NOT_GIVEN,
-            max_tokens=config.max_tokens or NOT_GIVEN,
+            frequency_penalty=when_missing(config.frequency_penalty, default=NOT_GIVEN),
+            max_tokens=when_missing(config.max_tokens, default=NOT_GIVEN),
             n=1,
-            response_format=config.response_format or NOT_GIVEN,
-            seed=config.seed or NOT_GIVEN,
+            response_format=when_missing(config.response_format, default=NOT_GIVEN),
+            seed=when_missing(config.seed, default=NOT_GIVEN),
             stream=stream,
             temperature=config.temperature,
             tools=tools or NOT_GIVEN,
             tool_choice=(suggested_tool or "auto") if tools else NOT_GIVEN,
-            top_p=config.top_p or NOT_GIVEN,
-            timeout=config.timeout or NOT_GIVEN,
+            top_p=when_missing(config.top_p, default=NOT_GIVEN),
+            timeout=when_missing(config.timeout, default=NOT_GIVEN),
         )
 
     async def embedding(
@@ -143,9 +141,13 @@ class OpenAIClient(ScopeDependency):
                         self._create_text_embedding(
                             texts=list(inputs_list[index : index + config.batch_size]),
                             model=config.model,
-                            dimensions=config.dimensions,
-                            encoding_format=config.encoding_format,
-                            timeout=config.timeout,
+                            dimensions=when_missing(config.dimensions, default=None),
+                            encoding_format=when_missing(
+                                config.encoding_format,
+                                default=None,
+                                cast=Literal["float", "base64"],
+                            ),
+                            timeout=when_missing(config.timeout, default=None),
                         )
                         for index in range(0, len(inputs_list), config.batch_size)
                     ]
@@ -203,7 +205,7 @@ class OpenAIClient(ScopeDependency):
             quality=config.quality,
             size=config.size,
             style=config.style,
-            timeout=config.timeout,
+            timeout=when_missing(config.timeout, default=None),
             response_format=config.response_format,
         )
         return response.data[0]

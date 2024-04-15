@@ -9,7 +9,8 @@ from typing import (
 )
 from uuid import uuid4
 
-from draive.scope import ArgumentsTrace, ResultTrace, ctx
+from draive.metrics import ArgumentsTrace, ResultTrace
+from draive.scope import ctx
 from draive.tools.errors import ToolException
 from draive.tools.state import ToolCallContext, ToolsUpdatesContext
 from draive.tools.update import ToolCallUpdate
@@ -87,7 +88,7 @@ class Tool(ParametrizedTool[ToolArgs, Coroutine[None, None, ToolResult]]):
         with ctx.nested(
             self.name,
             state=[call_context],
-            metrics=[ArgumentsTrace(*args, call_id=call_context.call_id, **kwargs)],
+            metrics=[ArgumentsTrace.of(*args, call_id=call_context.call_id, **kwargs)],
         ):
             try:
                 send_update(  # notify on start
@@ -106,7 +107,7 @@ class Tool(ParametrizedTool[ToolArgs, Coroutine[None, None, ToolResult]]):
                     **kwargs,
                 )
 
-                ctx.record(ResultTrace(result))
+                ctx.record(ResultTrace.of(result))
                 send_update(  # notify on finish
                     ToolCallUpdate(
                         call_id=call_context.call_id,

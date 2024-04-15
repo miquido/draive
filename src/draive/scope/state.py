@@ -1,23 +1,22 @@
 from collections.abc import Iterable
-from contextvars import Token
 from typing import Self, TypeVar, cast, final
 
 from draive.scope.errors import MissingScopeState
 from draive.types.parameters import ParametrizedState
 
 __all__ = [
-    "StateScope",
+    "ScopeState",
 ]
 
 
-_ScopeState_T = TypeVar(
-    "_ScopeState_T",
+_State_T = TypeVar(
+    "_State_T",
     bound=ParametrizedState,
 )
 
 
 @final
-class StateScope:
+class ScopeState:
     def __init__(
         self,
         *state: ParametrizedState,
@@ -25,23 +24,23 @@ class StateScope:
         self._state: dict[type[ParametrizedState], ParametrizedState] = {
             type(element): element for element in state
         }
-        self._token: Token[StateScope] | None = None
 
     def state(
         self,
-        _type: type[_ScopeState_T],
+        state: type[_State_T],
         /,
-    ) -> _ScopeState_T:
-        if _type in self._state:
-            return cast(_ScopeState_T, self._state[_type])
+    ) -> _State_T:
+        if state in self._state:
+            return cast(_State_T, self._state[state])
         else:
             try:
-                default: _ScopeState_T = _type()
-                self._state[_type] = default
+                default: _State_T = state()
+                self._state[state] = default
                 return default
             except (TypeError, AttributeError) as exc:
                 raise MissingScopeState(
-                    f"{_type} is not defined in current scope and failed to provide a default value"
+                    f"{state.__qualname__} is not defined in the current scope"
+                    " and failed to provide a default value"
                 ) from exc
 
     def updated(

@@ -8,6 +8,7 @@ from mistralai.models.chat_completion import (
     ToolCall,
 )
 
+from draive.metrics import ArgumentsTrace, ResultTrace
 from draive.mistral.chat_response import _chat_response  # pyright: ignore[reportPrivateUsage]
 from draive.mistral.chat_tools import (
     _execute_chat_tool_calls,  # pyright: ignore[reportPrivateUsage]
@@ -16,7 +17,7 @@ from draive.mistral.chat_tools import (
 from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralChatConfig
 from draive.mistral.errors import MistralException
-from draive.scope import ArgumentsTrace, ResultTrace, ctx
+from draive.scope import ctx
 from draive.tools import Toolbox, ToolCallUpdate
 from draive.types import UpdateSend
 
@@ -53,7 +54,7 @@ async def _chat_stream(  # noqa: C901, PLR0913
 
     with ctx.nested(
         "chat_stream",
-        metrics=[ArgumentsTrace(messages=messages.copy())],
+        metrics=[ArgumentsTrace.of(messages=messages.copy())],
     ):
         completion_stream: AsyncIterable[
             ChatCompletionStreamResponse
@@ -67,9 +68,9 @@ async def _chat_stream(  # noqa: C901, PLR0913
             suggest_tools=False,  # type: ignore - no tools allowed in streaming
             stream=True,
         )
-        completion_stream_iterator: AsyncIterator[
-            ChatCompletionStreamResponse
-        ] = completion_stream.__aiter__()
+        completion_stream_iterator: AsyncIterator[ChatCompletionStreamResponse] = (
+            completion_stream.__aiter__()
+        )
 
         while True:  # load chunks to decide what to do next
             head: ChatCompletionStreamResponse
@@ -97,7 +98,7 @@ async def _chat_stream(  # noqa: C901, PLR0913
                         tools=tools,
                     )
                 )
-                ctx.record(ResultTrace(tool_calls))
+                ctx.record(ResultTrace.of(tool_calls))
                 break  # after processing tool calls continue with recursion in outer context
 
             elif completion_head.content is not None:
@@ -113,7 +114,7 @@ async def _chat_stream(  # noqa: C901, PLR0913
                     result += part_text
                     send_update(result)
 
-                ctx.record(ResultTrace(result))
+                ctx.record(ResultTrace.of(result))
                 return result  # we hav final result here
 
             else:

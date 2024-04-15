@@ -4,7 +4,7 @@ from typing import Literal
 from openai.types.chat.completion_create_params import ResponseFormat
 
 from draive.helpers import getenv_float, getenv_int
-from draive.types import State
+from draive.types import MISSING, MissingValue, State
 
 __all__ = [
     "OpenAIChatConfig",
@@ -36,35 +36,14 @@ class OpenAIChatConfig(State):
         | str
     ) = getenv("OPENAI_MODEL", default="gpt-3.5-turbo-0125")
     temperature: float = getenv_float("OPENAI_TEMPERATURE", 0.0)
-    top_p: float | None = None
-    frequency_penalty: float | None = None
-    max_tokens: int | None = None
-    seed: int | None = getenv_int("OPENAI_SEED")
-    response_format: ResponseFormat | None = None
-    vision_details: Literal["auto", "low", "high"] = "auto"
-    timeout: float | None = None
+    top_p: float | MissingValue = MISSING
+    frequency_penalty: float | MissingValue = MISSING
+    max_tokens: int | MissingValue = MISSING
+    seed: int | None | MissingValue = getenv_int("OPENAI_SEED") or MISSING
+    response_format: ResponseFormat | MissingValue = MISSING
+    vision_details: Literal["auto", "low", "high"] | MissingValue = MISSING
+    timeout: float | MissingValue = MISSING
     recursion_limit: int = 4
-
-    def metric_summary(
-        self,
-        trimmed: bool,
-    ) -> str:
-        result: str = f"openai config:\n+ model: {self.model}\n+ temperature: {self.temperature}"
-        if self.top_p:
-            result += f"\n+ top_p: {self.top_p}"
-        if self.frequency_penalty:
-            result += f"\n+ frequency_penalty: {self.frequency_penalty}"
-        if self.max_tokens:
-            result += f"\n+ max_tokens: {self.max_tokens}"
-        if self.seed:
-            result += f"\n+ seed: {self.seed}"
-        if self.response_format:
-            result += f"\n+ response_format: {self.response_format.get('type', 'text')}"
-        if self.timeout:
-            result += f"\n+ timeout: {self.timeout}"
-        result += f"\n+ recursion_limit: {self.recursion_limit}"
-
-        return result.replace("\n", "\n|   ")
 
 
 class OpenAIEmbeddingConfig(State):
@@ -76,25 +55,10 @@ class OpenAIEmbeddingConfig(State):
         ]
         | str
     ) = "text-embedding-3-small"
-    dimensions: int | None = None
+    dimensions: int | MissingValue = MISSING
     batch_size: int = 32
-    encoding_format: Literal["float", "base64"] | None = None
-    timeout: float | None = None
-
-    def metric_summary(
-        self,
-        trimmed: bool,
-    ) -> str:
-        result: str = f"openai config\n+ model: {self.model}"
-        if self.dimensions:
-            result += f"\n+ dimensions: {self.dimensions}"
-        result += f"\n+ batch_size: {self.batch_size}"
-        if self.encoding_format:
-            result += f"\n+ encoding_format: {self.encoding_format}"
-        if self.timeout:
-            result += f"\n+ timeout: {self.timeout}"
-
-        return result.replace("\n", "\n|   ")
+    encoding_format: Literal["float", "base64"] | MissingValue = MISSING
+    timeout: float | MissingValue = MISSING
 
 
 class OpenAIImageGenerationConfig(State):
@@ -102,21 +66,5 @@ class OpenAIImageGenerationConfig(State):
     quality: Literal["standard", "hd"] = "standard"
     size: Literal["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"] = "1024x1024"
     style: Literal["vivid", "natural"] = "vivid"
-    timeout: float | None = None
+    timeout: float | MissingValue = MISSING
     response_format: Literal["url", "b64_json"] = "b64_json"
-
-    def metric_summary(
-        self,
-        trimmed: bool,
-    ) -> str:
-        result: str = (
-            f"openai config\n+ model: {self.model}"
-            f"\n+ quality: {self.quality}"
-            f"\n+ style: {self.style}"
-            f"\n+ size: {self.size}"
-            f"\n+ response_format: {self.response_format}"
-        )
-        if self.timeout:
-            result += f"\n+ timeout: {self.timeout}"
-
-        return result.replace("\n", "\n|   ")
