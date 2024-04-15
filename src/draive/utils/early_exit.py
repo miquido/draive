@@ -7,48 +7,38 @@ from asyncio import (
 )
 from collections.abc import Callable, Coroutine
 from contextvars import ContextVar, Token
-from typing import Any, ParamSpec, Protocol, Self, TypeVar
+from typing import Any, Protocol, Self
 
-from draive.metrics import Metric
 from draive.scope import ctx
-from draive.types import State
+from draive.types import Model
 
 __all__ = [
     "allowing_early_exit",
     "with_early_exit",
 ]
 
-_Args_T = ParamSpec("_Args_T")
-_Result_T = TypeVar("_Result_T")
-_EarlyExitResult_T = TypeVar(
-    "_EarlyExitResult_T",
-    bound=State,
-)
 
-
-async def allowing_early_exit(
-    result: type[_EarlyExitResult_T],
-    call: Callable[_Args_T, Coroutine[Any, Any, _Result_T]],
+async def allowing_early_exit[**Args, Result, EarlyResult](
+    result: type[EarlyResult],
+    call: Callable[Args, Coroutine[Any, Any, Result]],
     /,
-    *args: _Args_T.args,
-    **kwargs: _Args_T.kwargs,
-) -> _Result_T | _EarlyExitResult_T:
-    early_exit_future: Future[_EarlyExitResult_T] = get_running_loop().create_future()
+    *args: Args.args,
+    **kwargs: Args.kwargs,
+) -> Result | EarlyResult:
+    early_exit_future: Future[EarlyResult] = get_running_loop().create_future()
 
-    async def exit_early(early_result: _Result_T) -> None:
+    async def exit_early(early_result: EarlyResult) -> None:
+        if not isinstance(early_result, result):
+            return ctx.log_debug(
+                "Ignored attempt to early exit with unexpected result: %s",
+                type(early_result),
+            )
+
         try:
-            if not isinstance(early_result, result):
-                raise TypeError(
-                    "Early exit result not matching expected",
-                    result,
-                    type(early_result),
-                )
             early_exit_future.set_result(early_result)
             ctx.record(_EarlyExitResultTrace.of(early_result))
         except InvalidStateError as exc:
             ctx.log_debug("Ignored redundant attempt to early exit: %s", exc)
-        except TypeError as exc:
-            ctx.log_debug("Ignored attempt to early exit with unexpected result: %s", exc)
 
     early_exit_token: Token[_RequestEarlyExit] = _EarlyExit_Var.set(exit_early)
     try:
@@ -69,7 +59,7 @@ async def allowing_early_exit(
         _EarlyExit_Var.reset(early_exit_token)
 
 
-async def with_early_exit(result: _EarlyExitResult_T) -> _EarlyExitResult_T:
+async def with_early_exit[Result](result: Result) -> Result:
     try:
         await _EarlyExit_Var.get()(early_result=result)
     except LookupError as exc:
@@ -84,7 +74,7 @@ class _RequestEarlyExit(Protocol):
     ) -> None: ...
 
 
-class _EarlyExitResultTrace(Metric):
+class _EarlyExitResultTrace(Model):
     @classmethod
     def of(
         cls,

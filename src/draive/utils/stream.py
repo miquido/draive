@@ -8,7 +8,7 @@ from asyncio import (
 )
 from collections import deque
 from collections.abc import AsyncIterator, Callable, Coroutine
-from typing import Any, Generic, Self, TypeVar
+from typing import Any, Self
 
 from draive.scope import ctx
 from draive.types import Model, UpdateSend
@@ -18,16 +18,11 @@ __all__ = [
     "AsyncStreamTask",
 ]
 
-_Element = TypeVar(
-    "_Element",
-    bound=Model | str,
-)
 
-
-class AsyncStream(Generic[_Element], AsyncIterator[_Element]):
+class AsyncStream[Element: Model | str](AsyncIterator[Element]):
     def __init__(self) -> None:
-        self._buffer: deque[_Element] = deque()
-        self._waiting: Future[_Element] | None = None
+        self._buffer: deque[Element] = deque()
+        self._waiting: Future[Element] | None = None
         self._finished: Event = Event()
         self._loop: AbstractEventLoop | None = None
 
@@ -37,7 +32,7 @@ class AsyncStream(Generic[_Element], AsyncIterator[_Element]):
 
     def send(
         self,
-        update: _Element,
+        update: Element,
     ) -> None:
         if self._finished.is_set():
             raise ValueError("AsyncStream has been already finished")
@@ -66,7 +61,7 @@ class AsyncStream(Generic[_Element], AsyncIterator[_Element]):
     def __aiter__(self) -> Self:
         return self
 
-    async def __anext__(self) -> _Element:
+    async def __anext__(self) -> Element:
         if self._waiting is not None:
             raise RuntimeError("AsyncStream reuse is forbidden")
         if self._buffer:
@@ -79,20 +74,20 @@ class AsyncStream(Generic[_Element], AsyncIterator[_Element]):
         return await self._waiting
 
 
-class AsyncStreamTask(Generic[_Element], AsyncIterator[_Element]):
+class AsyncStreamTask[Element: Model | str](AsyncIterator[Element]):
     def __init__(
         self,
-        job: Callable[[UpdateSend[_Element]], Coroutine[Any, Any, None]],
+        job: Callable[[UpdateSend[Element]], Coroutine[Any, Any, None]],
     ) -> None:
-        stream: AsyncStream[_Element] = AsyncStream()
-        self._stream: AsyncStream[_Element] = stream
+        stream: AsyncStream[Element] = AsyncStream()
+        self._stream: AsyncStream[Element] = stream
         self._task: Task[None] = ctx.spawn_task(job, stream.send)
         self._task.add_done_callback(lambda task: stream.finish(task.exception()))
 
     def __aiter__(self) -> Self:
         return self
 
-    async def __anext__(self) -> _Element:
+    async def __anext__(self) -> Element:
         try:
             return await self._stream.__anext__()
         except CancelledError as exc:

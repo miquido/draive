@@ -4,7 +4,7 @@ from time import monotonic
 from typing import Any, Self, cast, final
 from uuid import uuid4
 
-from draive.metrics.metric import Metric, Metric_T
+from draive.metrics.metric import Metric
 from draive.metrics.reporter import MetricsTraceReport
 
 __all__ = [
@@ -95,7 +95,7 @@ class MetricsTrace:
                     exception=exc,
                 )
 
-    def read(
+    def read[Metric_T: Metric](
         self,
         metric: type[Metric_T],
         /,
@@ -208,7 +208,7 @@ class MetricsTrace:
         return MetricsTraceReport(
             label=self._label,
             duration=(self._end or monotonic()) - self._start,
-            metrics=self._metrics.copy(),
+            metrics={key.__qualname__: value for key, value in self._metrics.items()},
             nested=[trace.report() for trace in self._nested_traces],
             combined=False,
         )

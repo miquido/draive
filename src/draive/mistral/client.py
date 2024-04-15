@@ -11,10 +11,9 @@ from mistralai.models.chat_completion import (
 )
 from mistralai.models.embeddings import EmbeddingResponse
 
-from draive.helpers import getenv_str
+from draive.helpers import getenv_str, when_missing
 from draive.mistral.config import MistralChatConfig, MistralEmbeddingConfig
 from draive.scope import ScopeDependency
-from draive.types import when_missing
 
 __all__ = [
     "MistralClient",

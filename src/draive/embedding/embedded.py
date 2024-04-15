@@ -1,5 +1,3 @@
-from typing import Generic, TypeVar
-
 from draive.types.state import State
 
 __all__ = [
@@ -7,12 +5,6 @@ __all__ = [
 ]
 
 
-_Embedded = TypeVar(
-    "_Embedded",
-    bound=object,
-)
-
-
-class Embedded(State, Generic[_Embedded]):
-    value: _Embedded
+class Embedded[Value](State):
+    value: Value
     vector: list[float]

@@ -1,23 +1,16 @@
 from collections.abc import Callable
-from typing import Any, ParamSpec, TypeVar, cast
+from typing import Any, cast
 
 __all__ = [
     "mimic_function",
 ]
 
-_Args_T = ParamSpec(
-    name="_Args_T",
-)
-_Result_T = TypeVar(
-    name="_Result_T",
-)
 
-
-def mimic_function(
-    function: Callable[_Args_T, _Result_T],
+def mimic_function[**Args, Result](
+    function: Callable[Args, Result],
     /,
     within: Callable[..., Any],
-) -> Callable[_Args_T, _Result_T]:
+) -> Callable[Args, Result]:
     # mimic function attributes if able
     for attribute in [
         "__globals__",
@@ -25,7 +18,6 @@ def mimic_function(
         "__name__",
         "__qualname__",
         "__annotations__",
-        "__code__",
         "__defaults__",
         "__kwdefaults__",
         "__doc__",
@@ -48,6 +40,6 @@ def mimic_function(
         pass
 
     return cast(
-        Callable[_Args_T, _Result_T],
+        Callable[Args, Result],
         within,
     )

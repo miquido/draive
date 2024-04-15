@@ -1,6 +1,6 @@
 from typing import Self, overload
 
-from draive.metrics.metric import SerializableMetric
+from draive.types import Model
 
 __all__ = [
     "ModelTokenUsage",
@@ -8,7 +8,7 @@ __all__ = [
 ]
 
 
-class ModelTokenUsage(SerializableMetric):
+class ModelTokenUsage(Model):
     input_tokens: int
     output_tokens: int
 
@@ -22,7 +22,7 @@ class ModelTokenUsage(SerializableMetric):
         )
 
 
-class TokenUsage(SerializableMetric):
+class TokenUsage(Model):
     @overload
     @classmethod
     def for_model(

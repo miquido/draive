@@ -2,6 +2,7 @@ from typing import Literal, overload
 
 from openai.types.chat import ChatCompletionContentPartParam, ChatCompletionMessageParam
 
+from draive.helpers import when_missing
 from draive.lmm import LMMCompletionMessage, LMMCompletionStream, LMMCompletionStreamingUpdate
 from draive.openai.chat_response import _chat_response  # pyright: ignore[reportPrivateUsage]
 from draive.openai.chat_stream import _chat_stream  # pyright: ignore[reportPrivateUsage]
@@ -9,7 +10,7 @@ from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
 from draive.scope import ctx
 from draive.tools import Toolbox, ToolCallUpdate, ToolsUpdatesContext
-from draive.types import ImageBase64Content, ImageURLContent, Model, UpdateSend, when_missing
+from draive.types import ImageBase64Content, ImageURLContent, Model, UpdateSend
 from draive.utils import AsyncStreamTask
 
 __all__ = [

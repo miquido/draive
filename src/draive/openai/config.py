@@ -3,8 +3,8 @@ from typing import Literal
 
 from openai.types.chat.completion_create_params import ResponseFormat
 
-from draive.helpers import getenv_float, getenv_int
-from draive.types import MISSING, MissingValue, State
+from draive.helpers import MISSING, Missing, getenv_float, getenv_int
+from draive.types import Model
 
 __all__ = [
     "OpenAIChatConfig",
@@ -13,7 +13,7 @@ __all__ = [
 ]
 
 
-class OpenAIChatConfig(State):
+class OpenAIChatConfig(Model):
     model: (
         Literal[
             "gpt-4-0125-preview",
@@ -36,17 +36,17 @@ class OpenAIChatConfig(State):
         | str
     ) = getenv("OPENAI_MODEL", default="gpt-3.5-turbo-0125")
     temperature: float = getenv_float("OPENAI_TEMPERATURE", 0.0)
-    top_p: float | MissingValue = MISSING
-    frequency_penalty: float | MissingValue = MISSING
-    max_tokens: int | MissingValue = MISSING
-    seed: int | None | MissingValue = getenv_int("OPENAI_SEED") or MISSING
-    response_format: ResponseFormat | MissingValue = MISSING
-    vision_details: Literal["auto", "low", "high"] | MissingValue = MISSING
-    timeout: float | MissingValue = MISSING
+    top_p: float | Missing = MISSING
+    frequency_penalty: float | Missing = MISSING
+    max_tokens: int | Missing = MISSING
+    seed: int | None | Missing = getenv_int("OPENAI_SEED") or MISSING
+    response_format: ResponseFormat | Missing = MISSING
+    vision_details: Literal["auto", "low", "high"] | Missing = MISSING
+    timeout: float | Missing = MISSING
     recursion_limit: int = 4
 
 
-class OpenAIEmbeddingConfig(State):
+class OpenAIEmbeddingConfig(Model):
     model: (
         Literal[
             "text-embedding-ada-002",
@@ -55,16 +55,16 @@ class OpenAIEmbeddingConfig(State):
         ]
         | str
     ) = "text-embedding-3-small"
-    dimensions: int | MissingValue = MISSING
+    dimensions: int | Missing = MISSING
     batch_size: int = 32
-    encoding_format: Literal["float", "base64"] | MissingValue = MISSING
-    timeout: float | MissingValue = MISSING
+    encoding_format: Literal["float", "base64"] | Missing = MISSING
+    timeout: float | Missing = MISSING
 
 
-class OpenAIImageGenerationConfig(State):
+class OpenAIImageGenerationConfig(Model):
     model: Literal["dall-e-2", "dall-e-3"] | str = "dall-e-2"
     quality: Literal["standard", "hd"] = "standard"
     size: Literal["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"] = "1024x1024"
     style: Literal["vivid", "natural"] = "vivid"
-    timeout: float | MissingValue = MISSING
+    timeout: float | Missing = MISSING
     response_format: Literal["url", "b64_json"] = "b64_json"

@@ -3,10 +3,10 @@ from typing import Self
 
 import pytest
 import pytest_asyncio
-from draive import Metric, MetricsTraceReport, TokenUsage, ctx
+from draive import MetricsTraceReport, Model, TokenUsage, ctx
 
 
-class ExpMetric(Metric):
+class ExpMetric(Model):
     value: float
 
     def __add__(
@@ -53,11 +53,11 @@ async def metrics_report() -> MetricsTraceReport:
 async def test_combinable_metrics(metrics_report: MetricsTraceReport) -> None:
     combined_metrics = metrics_report.with_combined_metrics().metrics
     assert len(combined_metrics) == 2
-    assert TokenUsage in combined_metrics
-    assert ExpMetric in combined_metrics
+    assert "TokenUsage" in combined_metrics
+    assert "ExpMetric" in combined_metrics
 
-    token_usage = combined_metrics[TokenUsage]
-    exp_metric = combined_metrics[ExpMetric]
+    token_usage = combined_metrics["TokenUsage"]
+    exp_metric = combined_metrics["ExpMetric"]
 
     assert exp_metric.value == 35
     assert token_usage.usage["test"].input_tokens == 710

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from asyncio import gather
-from typing import Self, TypeVar, cast, final
+from typing import Self, cast, final
 
 from draive.scope.errors import MissingScopeDependency
 
@@ -23,12 +23,6 @@ class ScopeDependency(ABC):
         pass
 
 
-_Dependency_T = TypeVar(
-    "_Dependency_T",
-    bound=ScopeDependency,
-)
-
-
 @final
 class ScopeDependencies:
     def __init__(
@@ -42,13 +36,13 @@ class ScopeDependencies:
             else:
                 self._dependencies[dependency.interface()] = dependency.prepare()
 
-    def dependency(
+    def dependency[Dependency_T: ScopeDependency](
         self,
-        dependency: type[_Dependency_T],
+        dependency: type[Dependency_T],
         /,
-    ) -> _Dependency_T:
+    ) -> Dependency_T:
         if dependency in self._dependencies:
-            return cast(_Dependency_T, self._dependencies[dependency])
+            return cast(Dependency_T, self._dependencies[dependency])
 
         else:
             raise MissingScopeDependency(
