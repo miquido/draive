@@ -91,6 +91,9 @@ from draive.tools import (
     tool,
 )
 from draive.types import (
+    AudioBase64Content,
+    AudioContent,
+    AudioURLContent,
     ImageBase64Content,
     ImageContent,
     ImageURLContent,
@@ -100,6 +103,9 @@ from draive.types import (
     ReadOnlyMemory,
     State,
     UpdateSend,
+    VideoBase64Content,
+    VideoContent,
+    VideoURLContent,
 )
 from draive.utils import (
     allowing_early_exit,
@@ -112,6 +118,9 @@ from draive.utils import (
 __all__ = [
     "allowing_early_exit",
     "Argument",
+    "AudioBase64Content",
+    "AudioContent",
+    "AudioURLContent",
     "auto_retry",
     "cache",
     "conversation_completion",
@@ -142,6 +151,7 @@ __all__ = [
     "ImageGeneration",
     "ImageGenerator",
     "ImageURLContent",
+    "is_missing",
     "lmm_completion",
     "lmm_conversation_completion",
     "LMM",
@@ -170,6 +180,7 @@ __all__ = [
     "ModelGeneration",
     "ModelGenerator",
     "MultimodalContent",
+    "not_missing",
     "openai_embed_text",
     "openai_generate_image",
     "openai_lmm_completion",
@@ -206,8 +217,9 @@ __all__ = [
     "ToolsUpdatesContext",
     "traced",
     "UpdateSend",
-    "with_early_exit",
+    "VideoBase64Content",
+    "VideoContent",
+    "VideoURLContent",
     "when_missing",
-    "is_missing",
-    "not_missing",
+    "with_early_exit",
 ]

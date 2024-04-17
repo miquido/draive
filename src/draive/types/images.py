@@ -8,11 +8,11 @@ __all__ = [
 
 
 class ImageURLContent(Model):
-    url: str
+    image_url: str
 
 
 class ImageBase64Content(Model):
-    base64: str
+    image_base64: str
 
 
 ImageContent = ImageURLContent | ImageBase64Content

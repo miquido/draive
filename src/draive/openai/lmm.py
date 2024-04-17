@@ -156,7 +156,7 @@ def _convert_message(  # noqa: PLR0912, C901, PLR0911
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": message.content.url,
+                                "url": message.content.image_url,
                                 "detail": when_missing(
                                     config.vision_details,
                                     default="auto",
@@ -188,7 +188,7 @@ def _convert_message(  # noqa: PLR0912, C901, PLR0911
                             {
                                 "type": "image_url",
                                 "image_url": {
-                                    "url": part.url,
+                                    "url": part.image_url,
                                     "detail": when_missing(
                                         config.vision_details,
                                         default="auto",
