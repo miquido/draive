@@ -4,4 +4,4 @@ __all__ = [
     "Metric",
 ]
 
-Metric = ParametrizedData
+type Metric = ParametrizedData
