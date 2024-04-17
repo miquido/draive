@@ -23,8 +23,8 @@ async def openai_generate_image(
             instruction=instruction,
         )
         if url := image.url:
-            return ImageURLContent(url=url)
+            return ImageURLContent(image_url=url)
         elif b64data := image.b64_json:
-            return ImageBase64Content(base64=b64data)
+            return ImageBase64Content(image_base64=b64data)
         else:
             raise OpenAIException("Invalid OpenAI response - missing image content")

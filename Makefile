@@ -41,7 +41,7 @@ lock:
 
 # Update and lock dependencies from pyproject.toml
 update:
-	@uv pip compile pyproject.toml -o constraints --all-extras --upgrade
+	@uv --no-cache pip compile pyproject.toml -o constraints --all-extras --upgrade
 	@uv pip install --editable $(INSTALL_OPTIONS) --constraint constraints
 
 # Run formatter.

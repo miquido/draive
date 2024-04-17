@@ -3,7 +3,15 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from draive import MISSING, Field, Missing, Model
+from draive import (
+    MISSING,
+    AudioURLContent,
+    Field,
+    ImageURLContent,
+    LMMCompletionMessage,
+    Missing,
+    Model,
+)
 
 
 def invalid(value: str) -> None:
@@ -52,54 +60,54 @@ class DatetimeModel(Model):
     value: datetime
 
 
-datetimeModelInstance: DatetimeModel = DatetimeModel(
+datetime_model_instance: DatetimeModel = DatetimeModel(
     value=datetime.fromtimestamp(0, UTC),
 )
-datetimeModelJSON: str = '{"value": "1970-01-01T00:00:00+00:00"}'
+datetime_model_json: str = '{"value": "1970-01-01T00:00:00+00:00"}'
 
 
 def test_datetime_encoding() -> None:
-    assert datetimeModelInstance.as_json() == datetimeModelJSON
+    assert datetime_model_instance.as_json() == datetime_model_json
 
 
 def test_datetime_decoding() -> None:
-    assert DatetimeModel.from_json(datetimeModelJSON) == datetimeModelInstance
+    assert DatetimeModel.from_json(datetime_model_json) == datetime_model_instance
 
 
 class UUIDModel(Model):
     value: UUID
 
 
-uuidModelInstance: UUIDModel = UUIDModel(
+uuid_model_instance: UUIDModel = UUIDModel(
     value=UUID(hex="0cf728c0369348e78552e8d86d35e8b0"),
 )
-uuidModelJSON: str = '{"value": "0cf728c0369348e78552e8d86d35e8b0"}'
+uuid_model_json: str = '{"value": "0cf728c0369348e78552e8d86d35e8b0"}'
 
 
 def test_uuid_encoding() -> None:
-    assert uuidModelInstance.as_json() == uuidModelJSON
+    assert uuid_model_instance.as_json() == uuid_model_json
 
 
 def test_uuid_decoding() -> None:
-    assert UUIDModel.from_json(uuidModelJSON) == uuidModelInstance
+    assert UUIDModel.from_json(uuid_model_json) == uuid_model_instance
 
 
 class MissingModel(Model):
     value: Missing = MISSING
 
 
-missingModelInstance: MissingModel = MissingModel(
+missing_model_instance: MissingModel = MissingModel(
     value=MISSING,
 )
-missingModelJSON: str = "{}"
+missing_model_json: str = "{}"
 
 
 def test_missing_encoding() -> None:
-    assert missingModelInstance.as_json() == missingModelJSON
+    assert missing_model_instance.as_json() == missing_model_json
 
 
 def test_missing_decoding() -> None:
-    assert MissingModel.from_json(missingModelJSON) == missingModelInstance
+    assert MissingModel.from_json(missing_model_json) == missing_model_instance
 
 
 class BasicsModel(Model):
@@ -113,7 +121,7 @@ class BasicsModel(Model):
     none: None
 
 
-basicModelInstance: BasicsModel = BasicsModel(
+basic_model_instance: BasicsModel = BasicsModel(
     string="test",
     string_list=["basic", "list"],
     integer=42,
@@ -123,7 +131,7 @@ basicModelInstance: BasicsModel = BasicsModel(
     optional="some",
     none=None,
 )
-basicModelJSON: str = (
+basic_model_json: str = (
     '{"string": "test",'
     ' "string_list": ["basic", "list"],'
     ' "integer": 42,'
@@ -136,8 +144,62 @@ basicModelJSON: str = (
 
 
 def test_basic_encoding() -> None:
-    assert basicModelInstance.as_json() == basicModelJSON
+    assert basic_model_instance.as_json() == basic_model_json
 
 
 def test_basic_decoding() -> None:
-    assert BasicsModel.from_json(basicModelJSON) == basicModelInstance
+    assert BasicsModel.from_json(basic_model_json) == basic_model_instance
+
+
+basic_lmm_message_instance: LMMCompletionMessage = LMMCompletionMessage(
+    role="assistant",
+    content="string",
+)
+basic_lmm_message_json: str = '{"role": "assistant", "content": "string"}'
+
+image_lmm_message_instance: LMMCompletionMessage = LMMCompletionMessage(
+    role="assistant",
+    content=ImageURLContent(image_url="https://miquido.com/image"),
+)
+image_lmm_message_json: str = (
+    '{"role": "assistant", "content": {"image_url": "https://miquido.com/image"}}'
+)
+audio_lmm_message_instance: LMMCompletionMessage = LMMCompletionMessage(
+    role="assistant",
+    content=AudioURLContent(audio_url="https://miquido.com/audio"),
+)
+audio_lmm_message_json: str = (
+    '{"role": "assistant", "content": {"audio_url": "https://miquido.com/audio"}}'
+)
+mixed_lmm_message_instance: LMMCompletionMessage = LMMCompletionMessage(
+    role="assistant",
+    content=[
+        AudioURLContent(audio_url="https://miquido.com/audio"),
+        "string",
+        ImageURLContent(image_url="https://miquido.com/image"),
+        "content",
+    ],
+)
+mixed_lmm_message_json: str = (
+    '{"role": "assistant",'
+    ' "content": ['
+    '{"audio_url": "https://miquido.com/audio"},'
+    ' "string",'
+    ' {"image_url": "https://miquido.com/image"},'
+    ' "content"'
+    "]}"
+)
+
+
+def test_llm_message_decoding() -> None:
+    assert LMMCompletionMessage.from_json(basic_lmm_message_json) == basic_lmm_message_instance
+    assert LMMCompletionMessage.from_json(image_lmm_message_json) == image_lmm_message_instance
+    assert LMMCompletionMessage.from_json(audio_lmm_message_json) == audio_lmm_message_instance
+    assert LMMCompletionMessage.from_json(mixed_lmm_message_json) == mixed_lmm_message_instance
+
+
+def test_llm_message_encoding() -> None:
+    assert basic_lmm_message_instance.as_json() == basic_lmm_message_json
+    assert image_lmm_message_instance.as_json() == image_lmm_message_json
+    assert audio_lmm_message_instance.as_json() == audio_lmm_message_json
+    assert mixed_lmm_message_instance.as_json() == mixed_lmm_message_json
