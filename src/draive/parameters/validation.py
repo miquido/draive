@@ -8,7 +8,7 @@ import uuid
 from collections import abc as collections_abc
 from collections.abc import Callable, Iterable
 from dataclasses import is_dataclass
-from typing import Any, ForwardRef, Protocol, TypeVar, get_args, get_origin
+from typing import Any, ForwardRef, Protocol, TypeAliasType, TypeVar, get_args, get_origin
 
 import typing_extensions
 
@@ -940,6 +940,12 @@ def parameter_validator[Value](  # noqa: PLR0911, C901
                 )
             else:
                 return _any_validator(verifier=verifier)
+
+        case type_alias if isinstance(type_alias, TypeAliasType):
+            return _class_instance_validator(
+                annotation=type_alias.__value__,
+                verifier=verifier,
+            )
 
         case class_type if inspect.isclass(class_type):
             return _class_instance_validator(
