@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "draive"
-version = "0.9.3"
+version = "0.10.0"
 readme = "README.md"
 maintainers = [
   {name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com"}
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python",
@@ -42,7 +42,7 @@ dev = [
 ]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 line-length = 100
 extend-exclude = [".venv", ".git", ".cache"]
 lint.select = ["E", "F", "A", "I", "B", "PL", "W", "C", "RUF", "UP"]
@@ -56,7 +56,7 @@ lint.ignore = []
 extend-immutable-calls = ["Argument", "draive.Argument"]
 
 [tool.pyright]
-pythonVersion = "3.11"
+pythonVersion = "3.12"
 venvPath = "./.venv"
 include = [
   "./src",

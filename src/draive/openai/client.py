@@ -18,14 +18,13 @@ from openai.types.create_embedding_response import CreateEmbeddingResponse
 from openai.types.image import Image
 from openai.types.images_response import ImagesResponse
 
-from draive.helpers import getenv_str
+from draive.helpers import getenv_str, when_missing
 from draive.openai.config import (
     OpenAIChatConfig,
     OpenAIEmbeddingConfig,
     OpenAIImageGenerationConfig,
 )
 from draive.scope import ScopeDependency
-from draive.types import when_missing
 
 __all__ = [
     "OpenAIClient",

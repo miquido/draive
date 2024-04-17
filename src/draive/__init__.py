@@ -20,13 +20,19 @@ from draive.generation import (
     generate_text,
 )
 from draive.helpers import (
+    MISSING,
+    Missing,
+    freeze,
     getenv_bool,
     getenv_float,
     getenv_int,
     getenv_str,
+    is_missing,
     load_env,
+    not_missing,
     setup_logging,
     split_sequence,
+    when_missing,
 )
 from draive.lmm import (
     LMM,
@@ -42,10 +48,8 @@ from draive.metrics import (
     MetricsTrace,
     MetricsTraceReport,
     MetricsTraceReporter,
-    SerializableMetric,
     TokenUsage,
-    metrics_log_report,
-    metrics_trimmed_log_report,
+    metrics_log_reporter,
 )
 from draive.mistral import (
     MistralChatConfig,
@@ -66,6 +70,7 @@ from draive.openai import (
     openai_lmm_completion,
     openai_tokenize_text,
 )
+from draive.parameters import Argument, Field
 from draive.scope import (
     ScopeDependencies,
     ScopeDependency,
@@ -86,24 +91,23 @@ from draive.tools import (
     tool,
 )
 from draive.types import (
-    MISSING,
-    Argument,
-    Field,
     ImageBase64Content,
     ImageContent,
     ImageURLContent,
     Memory,
-    MissingValue,
     Model,
     MultimodalContent,
     ReadOnlyMemory,
     State,
     UpdateSend,
-    is_missing,
-    not_missing,
-    when_missing,
 )
-from draive.utils import allowing_early_exit, auto_retry, cache, traced, with_early_exit
+from draive.utils import (
+    allowing_early_exit,
+    auto_retry,
+    cache,
+    traced,
+    with_early_exit,
+)
 
 __all__ = [
     "allowing_early_exit",
@@ -125,6 +129,7 @@ __all__ = [
     "Embedder",
     "Embedding",
     "Field",
+    "freeze",
     "generate_image",
     "generate_model",
     "generate_text",
@@ -148,13 +153,12 @@ __all__ = [
     "load_env",
     "Memory",
     "Metric",
-    "metrics_log_report",
-    "metrics_trimmed_log_report",
+    "metrics_log_reporter",
     "MetricsTrace",
     "MetricsTraceReport",
     "MetricsTraceReporter",
+    "Missing",
     "MISSING",
-    "MissingValue",
     "mistral_embed_text",
     "mistral_lmm_completion",
     "MistralChatConfig",
@@ -179,7 +183,6 @@ __all__ = [
     "ScopeDependencies",
     "ScopeDependency",
     "ScopeState",
-    "SerializableMetric",
     "setup_logging",
     "similarity",
     "split_sequence",

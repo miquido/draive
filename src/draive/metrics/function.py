@@ -1,7 +1,7 @@
 from typing import Any, Self
 
-from draive.metrics.metric import Metric
-from draive.types import MISSING, MissingValue
+from draive.helpers import MISSING, Missing
+from draive.types import State
 
 __all__ = [
     "ArgumentsTrace",
@@ -10,7 +10,7 @@ __all__ = [
 ]
 
 
-class ArgumentsTrace(Metric):
+class ArgumentsTrace(State):
     if __debug__:
 
         @classmethod
@@ -28,11 +28,11 @@ class ArgumentsTrace(Metric):
                 kwargs=MISSING,
             )
 
-    args: tuple[Any, ...] | MissingValue
-    kwargs: dict[str, Any] | MissingValue
+    args: tuple[Any, ...] | Missing
+    kwargs: dict[str, Any] | Missing
 
 
-class ResultTrace(Metric):
+class ResultTrace(State):
     @classmethod
     def of(
         cls,
@@ -44,7 +44,7 @@ class ResultTrace(Metric):
     result: Any
 
 
-class ExceptionTrace(Metric):
+class ExceptionTrace(State):
     @classmethod
     def of(
         cls,

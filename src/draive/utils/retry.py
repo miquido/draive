@@ -2,7 +2,7 @@ from asyncio import iscoroutinefunction, sleep
 from collections.abc import Callable, Coroutine
 from functools import wraps
 from random import uniform
-from typing import Any, ParamSpec, TypeVar, cast, overload
+from typing import Any, cast, overload
 
 from draive.scope import ctx
 
@@ -10,34 +10,28 @@ __all__ = [
     "auto_retry",
 ]
 
-_Args_T = ParamSpec(name="_Args_T")
-_Result_T = TypeVar(name="_Result_T")
-
 
 @overload
-def auto_retry(
-    function: Callable[_Args_T, _Result_T],
+def auto_retry[**Args, Result](
+    function: Callable[Args, Result],
     /,
-) -> Callable[_Args_T, _Result_T]: ...
+) -> Callable[Args, Result]: ...
 
 
 @overload
-def auto_retry(
+def auto_retry[**Args, Result](
     *,
     limit: int = 1,
     delay: tuple[float, float] | float | None = None,
-) -> Callable[[Callable[_Args_T, _Result_T]], Callable[_Args_T, _Result_T]]: ...
+) -> Callable[[Callable[Args, Result]], Callable[Args, Result]]: ...
 
 
-def auto_retry(
-    function: Callable[_Args_T, _Result_T] | None = None,
+def auto_retry[**Args, Result](
+    function: Callable[Args, Result] | None = None,
     *,
     limit: int = 1,
     delay: tuple[float, float] | float | None = None,
-) -> (
-    Callable[[Callable[_Args_T, _Result_T]], Callable[_Args_T, _Result_T]]
-    | Callable[_Args_T, _Result_T]
-):
+) -> Callable[[Callable[Args, Result]], Callable[Args, Result]] | Callable[Args, Result]:
     """\
     Simple on fail retry function wrapper. \
     Works for both sync and async functions. \
@@ -62,12 +56,12 @@ def auto_retry(
     """
 
     def _wrap(
-        function: Callable[_Args_T, _Result_T],
+        function: Callable[Args, Result],
         /,
-    ) -> Callable[_Args_T, _Result_T]:
+    ) -> Callable[Args, Result]:
         if iscoroutinefunction(function):
             return cast(
-                Callable[_Args_T, _Result_T],
+                Callable[Args, Result],
                 _wrap_async(
                     function,
                     limit=limit,
@@ -87,20 +81,20 @@ def auto_retry(
         return _wrap
 
 
-def _wrap_sync(
-    function: Callable[_Args_T, _Result_T],
+def _wrap_sync[**Args, Result](
+    function: Callable[Args, Result],
     *,
     limit: int,
     delay: tuple[float, float] | float | None,
-) -> Callable[_Args_T, _Result_T]:
+) -> Callable[Args, Result]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
     assert delay is None, "Delay is not supported in sync wrapper"  # nosec: B101
 
     @wraps(function)
     def wrapped(
-        *args: _Args_T.args,
-        **kwargs: _Args_T.kwargs,
-    ) -> _Result_T:
+        *args: Args.args,
+        **kwargs: Args.kwargs,
+    ) -> Result:
         attempt: int = 0
         while True:
             try:
@@ -120,19 +114,19 @@ def _wrap_sync(
     return wrapped
 
 
-def _wrap_async(
-    function: Callable[_Args_T, Coroutine[Any, Any, _Result_T]],
+def _wrap_async[**Args, Result](
+    function: Callable[Args, Coroutine[Any, Any, Result]],
     *,
     limit: int,
     delay: tuple[float, float] | float | None,
-) -> Callable[_Args_T, Coroutine[Any, Any, _Result_T]]:
+) -> Callable[Args, Coroutine[Any, Any, Result]]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
 
     @wraps(function)
     async def wrapped(
-        *args: _Args_T.args,
-        **kwargs: _Args_T.kwargs,
-    ) -> _Result_T:
+        *args: Args.args,
+        **kwargs: Args.kwargs,
+    ) -> Result:
         attempt: int = 0
         while True:
             try:

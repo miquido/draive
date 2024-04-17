@@ -3,7 +3,7 @@ from collections import OrderedDict
 from collections.abc import Callable, Coroutine, Hashable
 from functools import _make_key, partial  # pyright: ignore[reportPrivateUsage]
 from time import monotonic
-from typing import Any, Generic, NamedTuple, ParamSpec, TypeVar, cast, overload
+from typing import Any, NamedTuple, cast, overload
 from weakref import ref
 
 from draive.helpers import mimic_function
@@ -12,41 +12,28 @@ __all__ = [
     "cache",
 ]
 
-_Args_T = ParamSpec(
-    name="_Args_T",
-)
-_Result_T = TypeVar(
-    name="_Result_T",
-)
-_Entry_T = TypeVar(
-    name="_Entry_T",
-)
-
 
 @overload
-def cache(
-    function: Callable[_Args_T, _Result_T],
+def cache[**Args, Result](
+    function: Callable[Args, Result],
     /,
-) -> Callable[_Args_T, _Result_T]: ...
+) -> Callable[Args, Result]: ...
 
 
 @overload
-def cache(
+def cache[**Args, Result](
     *,
     limit: int = 1,
     expiration: float | None = None,
-) -> Callable[[Callable[_Args_T, _Result_T]], Callable[_Args_T, _Result_T]]: ...
+) -> Callable[[Callable[Args, Result]], Callable[Args, Result]]: ...
 
 
-def cache(
-    function: Callable[_Args_T, _Result_T] | None = None,
+def cache[**Args, Result](
+    function: Callable[Args, Result] | None = None,
     *,
     limit: int = 1,
     expiration: float | None = None,
-) -> (
-    Callable[[Callable[_Args_T, _Result_T]], Callable[_Args_T, _Result_T]]
-    | Callable[_Args_T, _Result_T]
-):
+) -> Callable[[Callable[Args, Result]], Callable[Args, Result]] | Callable[Args, Result]:
     """\
     Simple lru function result cache with optional expire time. \
     Works for both sync and async functions. \
@@ -68,10 +55,10 @@ def cache(
         provided function wrapped in cache
     """
 
-    def _wrap(function: Callable[_Args_T, _Result_T]) -> Callable[_Args_T, _Result_T]:
+    def _wrap(function: Callable[Args, Result]) -> Callable[Args, Result]:
         if iscoroutinefunction(function):
             return cast(
-                Callable[_Args_T, _Result_T],
+                Callable[Args, Result],
                 _AsyncCache(
                     function,
                     limit=limit,
@@ -80,7 +67,7 @@ def cache(
             )
         else:
             return cast(
-                Callable[_Args_T, _Result_T],
+                Callable[Args, Result],
                 _SyncCache(
                     function,
                     limit=limit,
@@ -94,21 +81,21 @@ def cache(
         return _wrap
 
 
-class _CacheEntry(Generic[_Entry_T], NamedTuple):
-    value: _Entry_T
+class _CacheEntry[Entry](NamedTuple):
+    value: Entry
     expire: float | None
 
 
-class _SyncCache(Generic[_Args_T, _Result_T]):
+class _SyncCache[**Args, Result]:
     def __init__(
         self,
-        function: Callable[_Args_T, _Result_T],
+        function: Callable[Args, Result],
         /,
         limit: int,
         expiration: float | None,
     ) -> None:
-        self._function: Callable[_Args_T, _Result_T] = function
-        self._cached: OrderedDict[Hashable, _CacheEntry[_Result_T]] = OrderedDict()
+        self._function: Callable[Args, Result] = function
+        self._cached: OrderedDict[Hashable, _CacheEntry[Result]] = OrderedDict()
         self._limit: int = limit
         if expiration := expiration:
 
@@ -129,7 +116,7 @@ class _SyncCache(Generic[_Args_T, _Result_T]):
         instance: object,
         owner: type | None = None,
         /,
-    ) -> Callable[_Args_T, _Result_T]:
+    ) -> Callable[Args, Result]:
         if owner is None:
             return self
         else:
@@ -143,9 +130,9 @@ class _SyncCache(Generic[_Args_T, _Result_T]):
 
     def __call__(
         self,
-        *args: _Args_T.args,
-        **kwargs: _Args_T.kwargs,
-    ) -> _Result_T:
+        *args: Args.args,
+        **kwargs: Args.kwargs,
+    ) -> Result:
         key: Hashable = _make_key(
             args=args,
             kwds=kwargs,
@@ -164,7 +151,7 @@ class _SyncCache(Generic[_Args_T, _Result_T]):
                     self._cached.move_to_end(key)
                     return entry[0]
 
-        result: _Result_T = self._function(*args, **kwargs)
+        result: Result = self._function(*args, **kwargs)
         self._cached[key] = _CacheEntry(
             value=result,
             expire=self._next_expire_time(),
@@ -177,9 +164,9 @@ class _SyncCache(Generic[_Args_T, _Result_T]):
     def __method_call__(
         self,
         __method_self: object,
-        *args: _Args_T.args,
-        **kwargs: _Args_T.kwargs,
-    ) -> _Result_T:
+        *args: Args.args,
+        **kwargs: Args.kwargs,
+    ) -> Result:
         key: Hashable = _make_key(
             args=(ref(__method_self), *args),
             kwds=kwargs,
@@ -198,7 +185,7 @@ class _SyncCache(Generic[_Args_T, _Result_T]):
                     self._cached.move_to_end(key)
                     return entry[0]
 
-        result: _Result_T = self._function(__method_self, *args, **kwargs)  # pyright: ignore[reportUnknownVariableType, reportCallIssue]
+        result: Result = self._function(__method_self, *args, **kwargs)  # pyright: ignore[reportUnknownVariableType, reportCallIssue]
         self._cached[key] = _CacheEntry(
             value=result,  # pyright: ignore[reportUnknownArgumentType]
             expire=self._next_expire_time(),
@@ -209,16 +196,16 @@ class _SyncCache(Generic[_Args_T, _Result_T]):
         return result  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
 
 
-class _AsyncCache(Generic[_Args_T, _Result_T]):
+class _AsyncCache[**Args, Result]:
     def __init__(
         self,
-        function: Callable[_Args_T, Coroutine[Any, Any, _Result_T]],
+        function: Callable[Args, Coroutine[Any, Any, Result]],
         /,
         limit: int,
         expiration: float | None,
     ) -> None:
-        self._function: Callable[_Args_T, Coroutine[Any, Any, _Result_T]] = function
-        self._cached: OrderedDict[Hashable, _CacheEntry[Task[_Result_T]]] = OrderedDict()
+        self._function: Callable[Args, Coroutine[Any, Any, Result]] = function
+        self._cached: OrderedDict[Hashable, _CacheEntry[Task[Result]]] = OrderedDict()
         self._limit: int = limit
         if expiration := expiration:
 
@@ -239,7 +226,7 @@ class _AsyncCache(Generic[_Args_T, _Result_T]):
         instance: object,
         owner: type | None = None,
         /,
-    ) -> Callable[_Args_T, Coroutine[Any, Any, _Result_T]]:
+    ) -> Callable[Args, Coroutine[Any, Any, Result]]:
         if owner is None:
             return self
         else:
@@ -253,9 +240,9 @@ class _AsyncCache(Generic[_Args_T, _Result_T]):
 
     async def __call__(
         self,
-        *args: _Args_T.args,
-        **kwargs: _Args_T.kwargs,
-    ) -> _Result_T:
+        *args: Args.args,
+        **kwargs: Args.kwargs,
+    ) -> Result:
         loop: AbstractEventLoop = get_running_loop()
         key: Hashable = _make_key(
             args=args,
@@ -275,7 +262,7 @@ class _AsyncCache(Generic[_Args_T, _Result_T]):
                     self._cached.move_to_end(key)
                     return await shield(entry[0])
 
-        task: Task[_Result_T] = loop.create_task(self._function(*args, **kwargs))  # pyright: ignore[reportCallIssue]
+        task: Task[Result] = loop.create_task(self._function(*args, **kwargs))  # pyright: ignore[reportCallIssue]
         self._cached[key] = _CacheEntry(
             value=task,
             expire=self._next_expire_time(),
@@ -288,9 +275,9 @@ class _AsyncCache(Generic[_Args_T, _Result_T]):
     async def __method_call__(
         self,
         __method_self: object,
-        *args: _Args_T.args,
-        **kwargs: _Args_T.kwargs,
-    ) -> _Result_T:
+        *args: Args.args,
+        **kwargs: Args.kwargs,
+    ) -> Result:
         loop: AbstractEventLoop = get_running_loop()
         key: Hashable = _make_key(
             args=(ref(__method_self), *args),
@@ -310,7 +297,7 @@ class _AsyncCache(Generic[_Args_T, _Result_T]):
                     self._cached.move_to_end(key)
                     return await shield(entry[0])
 
-        task: Task[_Result_T] = loop.create_task(
+        task: Task[Result] = loop.create_task(
             self._function(__method_self, *args, **kwargs),  # pyright: ignore[reportCallIssue, reportUnknownArgumentType]
         )
         self._cached[key] = _CacheEntry(

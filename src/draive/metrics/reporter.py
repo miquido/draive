@@ -14,7 +14,7 @@ __all__ = [
 class MetricsTraceReport(Model):
     label: str
     duration: float
-    metrics: dict[type[Metric], Metric]
+    metrics: dict[str, Metric]
     nested: list["MetricsTraceReport"]
     combined: bool
 
@@ -22,7 +22,7 @@ class MetricsTraceReport(Model):
         if self.combined:
             return self  # avoid combining multiple times
 
-        combined_metrics: dict[type[Metric], Metric] = self.metrics.copy()
+        combined_metrics: dict[str, Metric] = self.metrics.copy()
 
         nested_reports: list[MetricsTraceReport] = []
         for report in self.nested:

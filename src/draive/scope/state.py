@@ -1,40 +1,34 @@
 from collections.abc import Iterable
-from typing import Self, TypeVar, cast, final
+from typing import Self, cast, final
 
+from draive.parameters import ParametrizedData
 from draive.scope.errors import MissingScopeState
-from draive.types.parameters import ParametrizedState
 
 __all__ = [
     "ScopeState",
 ]
 
 
-_State_T = TypeVar(
-    "_State_T",
-    bound=ParametrizedState,
-)
-
-
 @final
 class ScopeState:
     def __init__(
         self,
-        *state: ParametrizedState,
+        *state: ParametrizedData,
     ) -> None:
-        self._state: dict[type[ParametrizedState], ParametrizedState] = {
+        self._state: dict[type[ParametrizedData], ParametrizedData] = {
             type(element): element for element in state
         }
 
-    def state(
+    def state[State_T: ParametrizedData](
         self,
-        state: type[_State_T],
+        state: type[State_T],
         /,
-    ) -> _State_T:
+    ) -> State_T:
         if state in self._state:
-            return cast(_State_T, self._state[state])
+            return cast(State_T, self._state[state])
         else:
             try:
-                default: _State_T = state()
+                default: State_T = state()
                 self._state[state] = default
                 return default
             except (TypeError, AttributeError) as exc:
@@ -45,7 +39,7 @@ class ScopeState:
 
     def updated(
         self,
-        state: Iterable[ParametrizedState] | None,
+        state: Iterable[ParametrizedData] | None,
     ) -> Self:
         if state:
             return self.__class__(

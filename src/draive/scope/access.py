@@ -3,7 +3,7 @@ from collections.abc import Callable, Coroutine, Iterable
 from contextvars import Context, ContextVar, Token, copy_context
 from logging import Logger
 from types import TracebackType
-from typing import Any, ParamSpec, TypeVar, final
+from typing import Any, final
 
 from draive.helpers import getenv_bool
 from draive.metrics import (
@@ -11,35 +11,21 @@ from draive.metrics import (
     Metric,
     MetricsTrace,
     MetricsTraceReporter,
-    metrics_trimmed_log_report,
+    metrics_log_reporter,
 )
+from draive.parameters import ParametrizedData
 from draive.scope.dependencies import ScopeDependencies, ScopeDependency
 from draive.scope.errors import MissingScopeContext
 from draive.scope.state import ScopeState
-from draive.types.parameters import ParametrizedState
 
 __all__ = [
     "ctx",
 ]
 
 _TaskGroup_Var = ContextVar[TaskGroup]("_TaskGroup_Var")
-_ScopeMetric_T = TypeVar(
-    "_ScopeMetric_T",
-    bound=Metric,
-)
 _MetricsScope_Var = ContextVar[MetricsTrace]("_MetricsScope_Var")
-_ScopeState_T = TypeVar(
-    "_ScopeState_T",
-    bound=ParametrizedState,
-)
 _StateScope_Var = ContextVar[ScopeState]("_ScopeState_Var")
-_ScopeDependency_T = TypeVar(
-    "_ScopeDependency_T",
-    bound=ScopeDependency,
-)
 _DependenciesScope_Var = ContextVar[ScopeDependencies]("_DependenciesScope_Var")
-_Args_T = ParamSpec("_Args_T")
-_Result_T = TypeVar("_Result_T")
 
 
 class _RootContext:
@@ -182,7 +168,7 @@ class ctx:
         dependencies: ScopeDependencies
         | Iterable[type[ScopeDependency] | ScopeDependency]
         | None = None,
-        state: ScopeState | Iterable[ParametrizedState] | None = None,
+        state: ScopeState | Iterable[ParametrizedData] | None = None,
         metrics: Iterable[Metric] | None = None,
         logger: Logger | None = None,
         trace_reporting: MetricsTraceReporter | None = None,
@@ -203,6 +189,17 @@ class ctx:
         else:
             root_state = ScopeState(*state)
 
+        trace_reporter: MetricsTraceReporter | None
+        if trace_reporting:
+            trace_reporter = trace_reporting
+        elif getenv_bool("DEBUG_LOGGING", __debug__):
+            trace_reporter = metrics_log_reporter(
+                list_items_limit=-4,
+                item_character_limit=64,
+            )
+        else:
+            trace_reporter = None
+
         return _RootContext(
             task_group=TaskGroup(),
             dependencies=root_dependencies,
@@ -213,8 +210,7 @@ class ctx:
                 parent=None,
                 metrics=metrics,
             ),
-            trace_reporting=trace_reporting
-            or (metrics_trimmed_log_report if getenv_bool("DEBUG_LOGGING", __debug__) else None),
+            trace_reporting=trace_reporter,
         )
 
     @staticmethod
@@ -246,16 +242,16 @@ class ctx:
             raise MissingScopeContext("StateScope requested but not defined!") from exc
 
     @staticmethod
-    def spawn_task(
-        function: Callable[_Args_T, Coroutine[Any, Any, _Result_T]],
+    def spawn_task[**Args, Result](
+        function: Callable[Args, Coroutine[Any, Any, Result]],
         /,
-        *args: _Args_T.args,
-        **kwargs: _Args_T.kwargs,
-    ) -> Task[_Result_T]:
+        *args: Args.args,
+        **kwargs: Args.kwargs,
+    ) -> Task[Result]:
         nested_context: _PartialContext = ctx.nested(function.__name__)
         current_context: Context = copy_context()
 
-        async def wrapped(*args: _Args_T.args, **kwargs: _Args_T.kwargs) -> _Result_T:
+        async def wrapped(*args: Args.args, **kwargs: Args.kwargs) -> Result:
             with nested_context:
                 return await function(*args, **kwargs)
 
@@ -265,7 +261,7 @@ class ctx:
     def nested(
         label: str,
         /,
-        state: ScopeState | Iterable[ParametrizedState] | None = None,
+        state: ScopeState | Iterable[ParametrizedData] | None = None,
         metrics: Iterable[Metric] | None = None,
     ) -> _PartialContext:
         nested_state: ScopeState | None
@@ -284,7 +280,7 @@ class ctx:
 
     @staticmethod
     def updated(
-        *state: ParametrizedState,
+        *state: ParametrizedData,
     ) -> _PartialContext:
         return _PartialContext(state=ctx._current_state().updated(state))
 
@@ -293,24 +289,24 @@ class ctx:
         return ctx._current_metrics().trace_id
 
     @staticmethod
-    def state(
-        state: type[_ScopeState_T],
+    def state[State_T: ParametrizedData](
+        state: type[State_T],
         /,
-    ) -> _ScopeState_T:
+    ) -> State_T:
         return ctx._current_state().state(state)
 
     @staticmethod
-    def dependency(
-        dependency: type[_ScopeDependency_T],
+    def dependency[Dependency_T: ScopeDependency](
+        dependency: type[Dependency_T],
         /,
-    ) -> _ScopeDependency_T:
+    ) -> Dependency_T:
         return ctx._current_dependencies().dependency(dependency)
 
     @staticmethod
-    def read(
-        metric: type[_ScopeMetric_T],
+    def read[Metric_T: Metric](
+        metric: type[Metric_T],
         /,
-    ) -> _ScopeMetric_T | None:
+    ) -> Metric_T | None:
         return ctx._current_metrics().read(metric)
 
     @staticmethod

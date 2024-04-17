@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from draive import Field, Model
+from draive import MISSING, Field, Missing, Model
 
 
 def invalid(value: str) -> None:
@@ -21,13 +21,12 @@ class ExampleModel(Model):
     number: int = Field(alias="alias", description="description", default=1)
     none_default: int | None = Field(default=None)
     value_default: int = Field(default=9)
-    invalid: str = Field(validator=invalid, default="valid")
+    invalid: str = Field(verifier=invalid, default="valid")
     nested: ExampleNestedModel = Field(alias="answer", default=ExampleNestedModel())
     full: Literal["A", "B"] | list[int] | str | bool | None = Field(
         alias="all",
         description="complex",
         default="",
-        validator=lambda value: None,
     )
 
 
@@ -83,3 +82,62 @@ def test_uuid_encoding() -> None:
 
 def test_uuid_decoding() -> None:
     assert UUIDModel.from_json(uuidModelJSON) == uuidModelInstance
+
+
+class MissingModel(Model):
+    value: Missing = MISSING
+
+
+missingModelInstance: MissingModel = MissingModel(
+    value=MISSING,
+)
+missingModelJSON: str = "{}"
+
+
+def test_missing_encoding() -> None:
+    assert missingModelInstance.as_json() == missingModelJSON
+
+
+def test_missing_decoding() -> None:
+    assert MissingModel.from_json(missingModelJSON) == missingModelInstance
+
+
+class BasicsModel(Model):
+    string: str
+    string_list: list[str]
+    integer: int
+    integer_or_float_list: list[int | float]
+    floating: float
+    floating_dict: dict[str, float]
+    optional: str | None
+    none: None
+
+
+basicModelInstance: BasicsModel = BasicsModel(
+    string="test",
+    string_list=["basic", "list"],
+    integer=42,
+    integer_or_float_list=[12, 3.14, 7],
+    floating=9.99,
+    floating_dict={"a": 65, "b": 66.0, "c": 67.5},
+    optional="some",
+    none=None,
+)
+basicModelJSON: str = (
+    '{"string": "test",'
+    ' "string_list": ["basic", "list"],'
+    ' "integer": 42,'
+    ' "integer_or_float_list": [12, 3.14, 7],'
+    ' "floating": 9.99,'
+    ' "floating_dict": {"a": 65, "b": 66.0, "c": 67.5},'
+    ' "optional": "some",'
+    ' "none": null}'
+)
+
+
+def test_basic_encoding() -> None:
+    assert basicModelInstance.as_json() == basicModelJSON
+
+
+def test_basic_decoding() -> None:
+    assert BasicsModel.from_json(basicModelJSON) == basicModelInstance

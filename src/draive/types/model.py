@@ -4,49 +4,63 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
-from draive.types.missing import is_missing
-from draive.types.specification import ParametrizedModel
+from draive.helpers import not_missing
+from draive.parameters import ParametrizedData
 
 __all__ = [
     "Model",
 ]
 
 
-class Model(ParametrizedModel):
-    @classmethod  # avoid making json each time
-    def specification_json(cls) -> str:
-        if not hasattr(cls, "_specification_json"):
-            cls._specification_json: str = json.dumps(
-                cls.specification(),
-                indent=2,
-            )
+class ModelJSONEncoder(json.JSONEncoder):
+    def default(self, o: object) -> Any:
+        if isinstance(o, datetime):
+            return o.isoformat()
+        elif isinstance(o, UUID):
+            return o.hex
+        else:
+            return json.JSONEncoder.default(self, o)
 
-        return cls._specification_json
+    def encode(self, o: object) -> Any:
+        if isinstance(o, dict):
+            return json.JSONEncoder.encode(self, {k: v for k, v in o.items() if not_missing(v)})  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
+        else:
+            return json.JSONEncoder.encode(self, o)
+
+
+class Model(ParametrizedData):
+    @classmethod
+    def specification(cls) -> str:
+        return cls.__parameters_definition__.specification
 
     @classmethod
     def from_json(
         cls,
         value: str | bytes,
+        decoder: type[json.JSONDecoder] = json.JSONDecoder,
     ) -> Self:
         try:
-            return cls.validated(**json.loads(value))
+            return cls.validated(
+                **json.loads(
+                    value,
+                    cls=decoder,
+                )
+            )
 
         except Exception as exc:
             raise ValueError(f"Failed to decode {cls.__name__} from json:\n{value}") from exc
 
-    @classmethod
-    def json_encoder_class(cls) -> type[json.JSONEncoder]:
-        return DefaultJSONEncoder
-
     def as_json(
         self,
+        aliased: bool = True,
         indent: int | None = None,
+        encoder_class: type[json.JSONEncoder] = ModelJSONEncoder,
     ) -> str:
         try:
             return json.dumps(
-                self.__class__.aliased_parameters(asdict(self)),
+                self.as_dict(aliased=aliased),
                 indent=indent,
-                cls=self.__class__.json_encoder_class(),
+                cls=encoder_class,
             )
 
         except Exception as exc:
@@ -55,16 +69,7 @@ class Model(ParametrizedModel):
             ) from exc
 
     def __str__(self) -> str:
-        return self.as_json(indent=2)
-
-
-class DefaultJSONEncoder(json.JSONEncoder):
-    def default(self, o: object) -> Any:
-        if is_missing(o):
-            return None
-        elif isinstance(o, datetime):
-            return o.isoformat()
-        elif isinstance(o, UUID):
-            return o.hex
-        else:
-            return json.JSONEncoder.default(self, o)
+        return self.as_json(
+            aliased=True,
+            indent=2,
+        )

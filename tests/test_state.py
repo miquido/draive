@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Any, Literal
 
-from draive import Field, State
+from draive import MISSING, Field, Missing, State
 
 
 def invalid(value: str) -> None:
@@ -23,13 +23,12 @@ class ExampleState(State):
     number: int = Field(alias="alias", description="description", default=1)
     none_default: int | None = Field(default=None)
     value_default: int = Field(default=9)
-    invalid: str = Field(validator=invalid, default="valid")
+    invalid: str = Field(verifier=invalid, default="valid")
     nested: ExampleNestedState = Field(alias="answer", default=ExampleNestedState())
     full: Literal["A", "B"] | list[int] | str | bool | None = Field(
         alias="all",
         description="complex",
         default="",
-        validator=lambda value: None,
     )
     function: Callable[..., Any] = dummy_callable
 
@@ -52,3 +51,62 @@ def test_validated_passes_with_valid_values() -> None:
 
 def test_validated_passes_with_default_values() -> None:
     ExampleState.validated()
+
+
+class MissingState(State):
+    value: Missing
+
+
+missingStateInstance: MissingState = MissingState(
+    value=MISSING,
+)
+missingStateDict: dict[str, Any] = {"value": MISSING}
+
+
+def test_missing_encoding() -> None:
+    assert missingStateInstance.as_dict() == missingStateDict
+
+
+def test_missing_decoding() -> None:
+    assert MissingState.from_dict(missingStateDict) == missingStateInstance
+
+
+class BasicsState(State):
+    string: str
+    string_list: list[str]
+    integer: int
+    integer_or_float_list: list[int | float]
+    floating: float
+    floating_dict: dict[str, float]
+    optional: str | None
+    none: None
+
+
+basicStateInstance: BasicsState = BasicsState(
+    string="test",
+    string_list=["basic", "list"],
+    integer=42,
+    integer_or_float_list=[12, 3.14, 7],
+    floating=9.99,
+    floating_dict={"a": 65, "b": 66.0, "c": 67.5},
+    optional="some",
+    none=None,
+)
+basicStateDict: dict[str, Any] = {
+    "string": "test",
+    "string_list": ["basic", "list"],
+    "integer": 42,
+    "integer_or_float_list": [12, 3.14, 7],
+    "floating": 9.99,
+    "floating_dict": {"a": 65, "b": 66.0, "c": 67.5},
+    "optional": "some",
+    "none": None,
+}
+
+
+def test_basic_encoding() -> None:
+    assert basicStateInstance.as_dict() == basicStateDict
+
+
+def test_basic_decoding() -> None:
+    assert BasicsState.from_dict(basicStateDict) == basicStateInstance

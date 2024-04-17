@@ -1,55 +1,48 @@
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Iterable
-from typing import Generic, TypeVar, final
+from typing import final
 
 __all__ = [
     "Memory",
     "ReadOnlyMemory",
 ]
 
-_MemoryElement = TypeVar(
-    "_MemoryElement",
-    bound=object,
-)
 
-
-class Memory(ABC, Generic[_MemoryElement]):
+class Memory[Element](ABC):
     @abstractmethod
-    async def recall(self) -> list[_MemoryElement]:
-        ...
+    async def recall(self) -> list[Element]: ...
 
     @abstractmethod
     async def remember(
         self,
-        elements: Iterable[_MemoryElement],
+        elements: Iterable[Element],
         /,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 @final
-class ReadOnlyMemory(Memory[_MemoryElement]):
+class ReadOnlyMemory[Element](Memory[Element]):
     def __init__(
         self,
-        elements: (Callable[[], Awaitable[list[_MemoryElement]]] | Iterable[_MemoryElement]),
+        elements: (Callable[[], Awaitable[list[Element]]] | Iterable[Element]),
     ) -> None:
-        self._elements: Callable[[], Awaitable[list[_MemoryElement]]]
+        self._elements: Callable[[], Awaitable[list[Element]]]
         if callable(elements):
             self._elements = elements
         else:
-            messages_list: list[_MemoryElement] = list(elements)
+            messages_list: list[Element] = list(elements)
 
-            async def constant() -> list[_MemoryElement]:
+            async def constant() -> list[Element]:
                 return messages_list
 
             self._elements = constant
 
-    async def recall(self) -> list[_MemoryElement]:
+    async def recall(self) -> list[Element]:
         return await self._elements()
 
     async def remember(
         self,
-        elements: Iterable[_MemoryElement],
+        elements: Iterable[Element],
         /,
     ) -> None:
         pass  # ignore

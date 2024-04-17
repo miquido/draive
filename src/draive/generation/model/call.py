@@ -1,5 +1,4 @@
 from collections.abc import Iterable
-from typing import TypeVar
 
 from draive.generation.model.state import ModelGeneration
 from draive.scope import ctx
@@ -10,20 +9,15 @@ __all__ = [
     "generate_model",
 ]
 
-_Generated = TypeVar(
-    "_Generated",
-    bound=Model,
-)
 
-
-async def generate_model(
-    model: type[_Generated],
+async def generate_model[Generated: Model](
+    model: type[Generated],
     *,
     instruction: str,
     input: MultimodalContent,  # noqa: A002
     tools: Toolbox | None = None,
-    examples: Iterable[tuple[MultimodalContent, _Generated]] | None = None,
-) -> _Generated:
+    examples: Iterable[tuple[MultimodalContent, Generated]] | None = None,
+) -> Generated:
     model_generation: ModelGeneration = ctx.state(ModelGeneration)
     return await model_generation.generate(
         model,
