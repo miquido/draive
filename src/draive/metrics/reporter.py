@@ -3,7 +3,7 @@ from typing import Protocol, Self
 
 from draive.metrics.function import ExceptionTrace
 from draive.metrics.metric import Metric
-from draive.types import Model
+from draive.types import State
 
 __all__ = [
     "MetricsTraceReport",
@@ -11,7 +11,7 @@ __all__ = [
 ]
 
 
-class MetricsTraceReport(Model):
+class MetricsTraceReport(State):
     label: str
     duration: float
     metrics: dict[str, Metric]
