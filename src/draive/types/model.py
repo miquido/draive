@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
-from draive.helpers import not_missing
+from draive.helpers import Missing
 from draive.parameters import ParametrizedData
 
 __all__ = [
@@ -14,18 +14,14 @@ __all__ = [
 
 class ModelJSONEncoder(json.JSONEncoder):
     def default(self, o: object) -> Any:
-        if isinstance(o, datetime):
+        if isinstance(o, Missing):
+            return None
+        elif isinstance(o, datetime):
             return o.isoformat()
         elif isinstance(o, UUID):
             return o.hex
         else:
             return json.JSONEncoder.default(self, o)
-
-    def encode(self, o: object) -> Any:
-        if isinstance(o, dict):
-            return json.JSONEncoder.encode(self, {k: v for k, v in o.items() if not_missing(v)})  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
-        else:
-            return json.JSONEncoder.encode(self, o)
 
 
 class Model(ParametrizedData):

@@ -68,7 +68,7 @@ class ExceptionTrace(State):
                 name="ExceptionGroup",
                 exception=BaseExceptionGroup(
                     "Multiple errors",
-                    (*self.exception.exceptions, other.exception),  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                    (*self.exception.exceptions, other.exception),  # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
                 ),
             )
         else:

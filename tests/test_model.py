@@ -99,7 +99,7 @@ class MissingModel(Model):
 missing_model_instance: MissingModel = MissingModel(
     value=MISSING,
 )
-missing_model_json: str = "{}"
+missing_model_json: str = '{"value": null}'
 
 
 def test_missing_encoding() -> None:
@@ -162,30 +162,34 @@ image_lmm_message_instance: LMMCompletionMessage = LMMCompletionMessage(
     content=ImageURLContent(image_url="https://miquido.com/image"),
 )
 image_lmm_message_json: str = (
-    '{"role": "assistant", "content": {"image_url": "https://miquido.com/image"}}'
+    '{"role": "assistant",'
+    ' "content": {"image_url": "https://miquido.com/image", "image_description": null}'
+    "}"
 )
 audio_lmm_message_instance: LMMCompletionMessage = LMMCompletionMessage(
     role="assistant",
     content=AudioURLContent(audio_url="https://miquido.com/audio"),
 )
 audio_lmm_message_json: str = (
-    '{"role": "assistant", "content": {"audio_url": "https://miquido.com/audio"}}'
+    '{"role": "assistant",'
+    ' "content": {"audio_url": "https://miquido.com/audio", "audio_transcription": null}'
+    "}"
 )
 mixed_lmm_message_instance: LMMCompletionMessage = LMMCompletionMessage(
     role="assistant",
-    content=[
+    content=(
         AudioURLContent(audio_url="https://miquido.com/audio"),
         "string",
         ImageURLContent(image_url="https://miquido.com/image"),
         "content",
-    ],
+    ),
 )
 mixed_lmm_message_json: str = (
     '{"role": "assistant",'
     ' "content": ['
-    '{"audio_url": "https://miquido.com/audio"},'
+    '{"audio_url": "https://miquido.com/audio", "audio_transcription": null},'
     ' "string",'
-    ' {"image_url": "https://miquido.com/image"},'
+    ' {"image_url": "https://miquido.com/image", "image_description": null},'
     ' "content"'
     "]}"
 )
