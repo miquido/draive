@@ -5,7 +5,7 @@ from logging import Logger
 from types import TracebackType
 from typing import Any, final
 
-from draive.helpers import getenv_bool
+from draive.helpers import getenv_bool, mimic_function
 from draive.metrics import (
     ExceptionTrace,
     Metric,
@@ -212,6 +212,39 @@ class ctx:
             ),
             trace_reporting=trace_reporter,
         )
+
+    @staticmethod
+    def wrap[**Args, Result](  # noqa: PLR0913
+        label: str | None = None,
+        *,
+        dependencies: ScopeDependencies
+        | Iterable[type[ScopeDependency] | ScopeDependency]
+        | None = None,
+        state: ScopeState | Iterable[ParametrizedData] | None = None,
+        metrics: Iterable[Metric] | None = None,
+        logger: Logger | None = None,
+        trace_reporting: MetricsTraceReporter | None = None,
+    ) -> Callable[
+        [Callable[Args, Coroutine[Any, Any, Result]]], Callable[Args, Coroutine[Any, Any, Result]]
+    ]:
+        def wrapper(
+            function: Callable[Args, Coroutine[Any, Any, Result]],
+            /,
+        ) -> Callable[Args, Coroutine[Any, Any, Result]]:
+            async def wrapped(*args: Args.args, **kwargs: Args.kwargs) -> Result:
+                async with ctx.new(
+                    label,
+                    dependencies=dependencies,
+                    state=state,
+                    metrics=metrics,
+                    logger=logger,
+                    trace_reporting=trace_reporting,
+                ):
+                    return await function(*args, **kwargs)
+
+            return mimic_function(function, within=wrapped)
+
+        return wrapper
 
     @staticmethod
     def _current_task_group() -> TaskGroup:
