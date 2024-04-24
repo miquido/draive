@@ -232,11 +232,11 @@ def parameter_specification(  # noqa: C901, PLR0912
             | typing.List  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
         ):
             match get_args(resolved_annotation):
-                case (list_annotation,):
+                case (tuple_annotation,):
                     specification = {
                         "type": "array",
                         "items": parameter_specification(
-                            annotation=list_annotation,
+                            annotation=tuple_annotation,
                             description=None,
                             globalns=globalns,
                             localns=localns,
@@ -244,6 +244,28 @@ def parameter_specification(  # noqa: C901, PLR0912
                         ),
                     }
 
+                case other:
+                    specification = {
+                        "type": "array",
+                    }
+        case (
+            builtins.tuple  # pyright: ignore[reportUnknownMemberType]
+            | typing.Tuple  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
+        ):
+            match get_args(resolved_annotation):
+                case (tuple_annotation, builtins.Ellipsis | types.EllipsisType):
+                    specification = {
+                        "type": "array",
+                        "items": parameter_specification(
+                            annotation=tuple_annotation,
+                            description=None,
+                            globalns=globalns,
+                            localns=localns,
+                            recursion_guard=recursion_guard,
+                        ),
+                    }
+
+                # TODO: represent element type for finite tuples
                 case other:
                     specification = {
                         "type": "array",

@@ -156,35 +156,81 @@ def _bool_validator(
     return validated
 
 
-def _tuple_validator(
+def _tuple_validator(  # noqa: C901
     options: tuple[Any, ...],
+    globalns: dict[str, Any] | None,
+    localns: dict[str, Any] | None,
+    recursion_guard: frozenset[type[Any]],
     verifier: ValueVerifier | None,
 ) -> ValueValidator:
-    # TODO: validate tuple elements
-    #  | types.EllipsisType
-    # element_validators: list[Callable[[Any], Any]] = [
-    #     parameter_validator(
-    #         option,
-    #         verifier=verifier,
-    #         module=module,
-    #     )
-    #     for option in options
-    # ]
-    if verify := verifier:
+    match options:
+        case [element_annotation, builtins.Ellipsis | types.EllipsisType]:
+            validate_element: Callable[[Any], Any] = parameter_validator(
+                element_annotation,
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
+                verifier=None,
+            )
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, tuple):
-                verify(value)
-                return value  # pyright: ignore[reportUnknownVariableType]
-            else:
-                raise TypeError("Invalid value", value)
-    else:
+            if verify := verifier:
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, tuple):
-                return value  # pyright: ignore[reportUnknownVariableType]
+                def validated(value: Any) -> Any:
+                    if isinstance(value, list | tuple):
+                        validated: tuple[Any, ...] = tuple(
+                            validate_element(element)
+                            for element in value  # pyright: ignore[reportUnknownVariableType]
+                        )
+                        verify(validated)
+                        return validated  # pyright: ignore[reportUnknownVariableType]
+                    else:
+                        raise TypeError("Invalid value", value)
             else:
-                raise TypeError("Invalid value", value)
+
+                def validated(value: Any) -> Any:
+                    if isinstance(value, list | tuple):
+                        validated: tuple[Any, ...] = tuple(
+                            validate_element(element)
+                            for element in value  # pyright: ignore[reportUnknownVariableType]
+                        )
+                        return validated  # pyright: ignore[reportUnknownVariableType]
+                    else:
+                        raise TypeError("Invalid value", value)
+
+        case [*annotations]:
+            element_validators: list[Callable[[Any], Any]] = [
+                parameter_validator(
+                    annotation,
+                    verifier=verifier,
+                    globalns=globalns,
+                    localns=localns,
+                    recursion_guard=recursion_guard,
+                )
+                for annotation in annotations
+            ]
+
+            if verify := verifier:
+
+                def validated(value: Any) -> Any:
+                    if isinstance(value, list | tuple):
+                        if len(value) != len(element_validators):  # pyright: ignore[reportUnknownArgumentType]
+                            raise TypeError("Invalid value", value)  # pyright: ignore[reportUnknownArgumentType]
+
+                        validated: tuple[Any, ...] = tuple(
+                            validation(value[idx])
+                            for idx, validation in enumerate(element_validators)
+                        )
+                        verify(validated)
+                        return validated  # pyright: ignore[reportUnknownVariableType]
+                    else:
+                        raise TypeError("Invalid value", value)
+            else:
+
+                def validated(value: Any) -> Any:
+                    if isinstance(value, tuple):
+                        return value  # pyright: ignore[reportUnknownVariableType]
+                    else:
+                        raise TypeError("Invalid value", value)
 
     return validated
 
@@ -831,6 +877,9 @@ def parameter_validator[Value](  # noqa: PLR0911, C901
         case builtins.tuple:
             return _tuple_validator(
                 options=get_args(annotation),
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
                 verifier=verifier,
             )
 
@@ -906,6 +955,9 @@ def parameter_validator[Value](  # noqa: PLR0911, C901
             def validated_missing(value: Any) -> Any:
                 if draive_missing.is_missing(value):
                     return value
+
+                elif value is None:
+                    return draive_missing.MISSING
 
                 else:
                     raise TypeError("Invalid value", value)

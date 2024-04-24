@@ -1,3 +1,11 @@
+from draive.agents import (
+    Agent,
+    AgentException,
+    AgentFlow,
+    AgentState,
+    BaseAgent,
+    agent,
+)
 from draive.conversation import (
     Conversation,
     ConversationCompletion,
@@ -105,6 +113,7 @@ from draive.types import (
     VideoBase64Content,
     VideoContent,
     VideoURLContent,
+    merge_multimodal_content,
 )
 from draive.utils import (
     AsyncStream,
@@ -119,12 +128,22 @@ from draive.utils import (
 __all__ = [
     "AsyncStream",
     "AsyncStreamTask",
+    "agent",
+    "agent",
+    "Agent",
+    "Agent",
+    "AgentException",
+    "AgentFlow",
+    "AgentState",
     "allowing_early_exit",
     "Argument",
+    "AsyncStream",
+    "AsyncStreamTask",
     "AudioBase64Content",
     "AudioContent",
     "AudioURLContent",
     "auto_retry",
+    "BaseAgent",
     "cache",
     "conversation_completion",
     "conversation_completion",
@@ -165,6 +184,7 @@ __all__ = [
     "LMMCompletionStreamingUpdate",
     "load_env",
     "Memory",
+    "merge_multimodal_content",
     "Metric",
     "metrics_log_reporter",
     "MetricsTrace",
