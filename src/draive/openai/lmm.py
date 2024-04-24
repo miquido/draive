@@ -73,7 +73,7 @@ async def openai_lmm_completion(
                         client=client,
                         config=config,
                         messages=messages,
-                        tools=tools,
+                        tools=tools or Toolbox(),
                     ),
                 )
 
@@ -103,7 +103,7 @@ async def openai_lmm_completion(
                         client=client,
                         config=config,
                         messages=messages,
-                        tools=tools,
+                        tools=tools or Toolbox(),
                         send_update=send_update,
                     )
 
@@ -133,7 +133,7 @@ async def openai_lmm_completion(
                         client=client,
                         config=config,
                         messages=messages,
-                        tools=tools,
+                        tools=tools or Toolbox(),
                         send_update=send_update,
                     ),
                 )

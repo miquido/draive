@@ -31,7 +31,7 @@ async def _chat_stream(  # noqa: PLR0913
     client: OpenAIClient,
     config: OpenAIChatConfig,
     messages: list[ChatCompletionMessageParam],
-    tools: Toolbox | None,
+    tools: Toolbox,
     send_update: Callable[[ToolCallUpdate | str], None],
     recursion_level: int = 0,
 ) -> str:
@@ -55,7 +55,7 @@ async def _chat_stream(  # noqa: PLR0913
                     "name": tools.suggested_tool_name,
                 },
             }  # suggest/require tool call only initially
-            if recursion_level == 0 and tools is not None and tools.suggested_tool_name
+            if recursion_level == 0 and tools.suggested_tool_name
             else None,
             stream=True,
         )
