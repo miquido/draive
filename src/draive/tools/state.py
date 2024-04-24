@@ -1,6 +1,8 @@
+from collections.abc import Callable
+
 from draive.scope import ctx
 from draive.tools.update import ToolCallUpdate
-from draive.types import Model, State, UpdateSend
+from draive.types import Model, State
 
 __all__ = [
     "ToolCallContext",
@@ -9,7 +11,7 @@ __all__ = [
 
 
 class ToolsUpdatesContext(State):
-    send_update: UpdateSend[ToolCallUpdate] | None = None
+    send_update: Callable[[ToolCallUpdate], None] | None = None
 
 
 class ToolCallContext(State):

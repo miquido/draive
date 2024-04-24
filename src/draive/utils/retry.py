@@ -1,7 +1,7 @@
 from asyncio import CancelledError, iscoroutinefunction, sleep
 from collections.abc import Callable, Coroutine
 from functools import wraps
-from typing import Any, cast, overload
+from typing import cast, overload
 
 from draive.scope import ctx
 
@@ -116,11 +116,11 @@ def _wrap_sync[**Args, Result](
 
 
 def _wrap_async[**Args, Result](
-    function: Callable[Args, Coroutine[Any, Any, Result]],
+    function: Callable[Args, Coroutine[None, None, Result]],
     *,
     limit: int,
     delay: Callable[[int], float] | float | None,
-) -> Callable[Args, Coroutine[Any, Any, Result]]:
+) -> Callable[Args, Coroutine[None, None, Result]]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
 
     @wraps(function)

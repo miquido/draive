@@ -3,7 +3,7 @@ from collections import OrderedDict
 from collections.abc import Callable, Coroutine, Hashable
 from functools import _make_key, partial  # pyright: ignore[reportPrivateUsage]
 from time import monotonic
-from typing import Any, NamedTuple, cast, overload
+from typing import NamedTuple, cast, overload
 from weakref import ref
 
 from draive.helpers import mimic_function
@@ -199,12 +199,12 @@ class _SyncCache[**Args, Result]:
 class _AsyncCache[**Args, Result]:
     def __init__(
         self,
-        function: Callable[Args, Coroutine[Any, Any, Result]],
+        function: Callable[Args, Coroutine[None, None, Result]],
         /,
         limit: int,
         expiration: float | None,
     ) -> None:
-        self._function: Callable[Args, Coroutine[Any, Any, Result]] = function
+        self._function: Callable[Args, Coroutine[None, None, Result]] = function
         self._cached: OrderedDict[Hashable, _CacheEntry[Task[Result]]] = OrderedDict()
         self._limit: int = limit
         if expiration := expiration:
@@ -226,7 +226,7 @@ class _AsyncCache[**Args, Result]:
         instance: object,
         owner: type | None = None,
         /,
-    ) -> Callable[Args, Coroutine[Any, Any, Result]]:
+    ) -> Callable[Args, Coroutine[None, None, Result]]:
         if owner is None:
             return self
         else:

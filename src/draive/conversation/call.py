@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Literal, overload
 
 from draive.conversation.completion import ConversationCompletionStream
@@ -9,7 +10,7 @@ from draive.conversation.message import (
 from draive.conversation.state import Conversation
 from draive.scope import ctx
 from draive.tools import Toolbox
-from draive.types import Memory, UpdateSend
+from draive.types import Memory
 
 __all__ = [
     "conversation_completion",
@@ -24,8 +25,7 @@ async def conversation_completion(
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
     stream: Literal[True],
-) -> ConversationCompletionStream:
-    ...
+) -> ConversationCompletionStream: ...
 
 
 @overload
@@ -35,9 +35,8 @@ async def conversation_completion(
     input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
-    stream: UpdateSend[ConversationStreamingUpdate],
-) -> ConversationMessage:
-    ...
+    stream: Callable[[ConversationStreamingUpdate], None],
+) -> ConversationMessage: ...
 
 
 @overload
@@ -47,8 +46,7 @@ async def conversation_completion(
     input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
-) -> ConversationMessage:
-    ...
+) -> ConversationMessage: ...
 
 
 async def conversation_completion(
@@ -57,7 +55,7 @@ async def conversation_completion(
     input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
-    stream: UpdateSend[ConversationStreamingUpdate] | bool = False,
+    stream: Callable[[ConversationStreamingUpdate], None] | bool = False,
 ) -> ConversationCompletionStream | ConversationMessage:
     conversation: Conversation = ctx.state(Conversation)
 

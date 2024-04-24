@@ -1,17 +1,9 @@
-from asyncio import (
-    AbstractEventLoop,
-    CancelledError,
-    Event,
-    Future,
-    Task,
-    get_running_loop,
-)
+from asyncio import AbstractEventLoop, CancelledError, Future, Task, get_running_loop
 from collections import deque
 from collections.abc import AsyncIterator, Callable, Coroutine
-from typing import Any, Self
+from typing import Self
 
 from draive.scope import ctx
-from draive.types import Model, UpdateSend
 
 __all__ = [
     "AsyncStream",
@@ -19,82 +11,106 @@ __all__ = [
 ]
 
 
-class AsyncStream[Element: Model | str](AsyncIterator[Element]):
-    def __init__(self) -> None:
+class AsyncStream[Element](AsyncIterator[Element]):
+    def __init__(
+        self,
+        loop: AbstractEventLoop | None = None,
+    ) -> None:
+        self._loop: AbstractEventLoop = loop or get_running_loop()
         self._buffer: deque[Element] = deque()
-        self._waiting: Future[Element] | None = None
-        self._finished: Event = Event()
-        self._loop: AbstractEventLoop | None = None
+        self._waiting_queue: deque[Future[Element]] = deque()
+        self._finish_exception: BaseException | None = None
+
+    def __del__(self) -> None:
+        while self._waiting_queue:
+            waiting: Future[Element] = self._waiting_queue.popleft()
+            if waiting.done():
+                continue
+            else:
+                waiting.set_exception(CancelledError())
 
     @property
     def finished(self) -> bool:
-        return self._finished.is_set()
+        return self._finish_exception is not None
 
     def send(
         self,
-        update: Element,
+        element: Element,
     ) -> None:
-        if self._finished.is_set():
-            raise ValueError("AsyncStream has been already finished")
-        if waiting := self._waiting:
+        if self.finished:
+            raise RuntimeError("AsyncStream has been already finished")
+
+        while self._waiting_queue:
             assert not self._buffer  # nosec: B101
-            waiting.set_result(update)
-            self._waiting = None
+            waiting: Future[Element] = self._waiting_queue.popleft()
+            if waiting.done():
+                continue
+            else:
+                waiting.set_result(element)
+                break
         else:
-            self._buffer.append(update)
+            self._buffer.append(element)
 
     def finish(
         self,
         exception: BaseException | None = None,
     ) -> None:
-        if self._finished.is_set():
-            raise ValueError("AsyncStream has been already finished")
-        self._finished.set()
+        if self.finished:
+            raise RuntimeError("AsyncStream has been already finished")
+        self._finish_exception = exception or StopAsyncIteration()
         if self._buffer:
-            if exception is None:
-                return  # allow consuming buffer to the end
-            self._buffer.clear()  # when failed propagate the issue
-        if waiting := self._waiting:
-            waiting.set_exception(exception or StopAsyncIteration)
-            self._waiting = None
+            assert self._waiting_queue is None  # nosec: B101
+            return  # allow consuming buffer to the end
+        while self._waiting_queue:
+            waiting: Future[Element] = self._waiting_queue.popleft()
+            if waiting.done():
+                continue
+            else:
+                waiting.set_exception(self._finish_exception)
 
     def __aiter__(self) -> Self:
         return self
 
     async def __anext__(self) -> Element:
-        if self._waiting is not None:
-            raise RuntimeError("AsyncStream reuse is forbidden")
-        if self._buffer:
+        if self._buffer:  # use buffer first
             return self._buffer.popleft()
-        if self._finished.is_set():
-            raise StopAsyncIteration
+        if finish_exception := self._finish_exception:  # check if finished
+            raise finish_exception
 
-        self._waiting = get_running_loop().create_future()
+        # create new waiting future
+        future: Future[Element] = self._loop.create_future()
+        self._waiting_queue.append(future)
 
-        return await self._waiting
+        # wait for the result
+        return await future
 
 
-class AsyncStreamTask[Element: Model | str](AsyncIterator[Element]):
+class AsyncStreamTask[Element](AsyncIterator[Element]):
     def __init__(
         self,
-        job: Callable[[UpdateSend[Element]], Coroutine[Any, Any, None]],
+        job: Callable[[Callable[[Element], None]], Coroutine[None, None, None]],
     ) -> None:
         stream: AsyncStream[Element] = AsyncStream()
         self._stream: AsyncStream[Element] = stream
-        self._task: Task[None] = ctx.spawn_task(job, stream.send)
-        self._task.add_done_callback(lambda task: stream.finish(task.exception()))
+
+        async def streaming_job() -> None:
+            try:
+                await job(stream.send)
+            except Exception as exc:
+                stream.finish(exc)
+            else:
+                stream.finish()
+
+        self._task: Task[None] = ctx.spawn_task(streaming_job)
+
+    def __del__(self) -> None:
+        self._task.cancel()
+
+    def cancel(self) -> None:
+        self._task.cancel()
 
     def __aiter__(self) -> Self:
         return self
 
     async def __anext__(self) -> Element:
-        try:
-            return await self._stream.__anext__()
-        except CancelledError as exc:
-            self._task.cancel()
-            raise exc
-        except StopAsyncIteration as exc:
-            if error := self._task.exception():
-                raise error from None
-            else:
-                raise exc
+        return await self._stream.__anext__()

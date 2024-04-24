@@ -20,7 +20,7 @@ __all__ = [
 
 async def allowing_early_exit[**Args, Result, EarlyResult](
     result: type[EarlyResult],
-    call: Callable[Args, Coroutine[Any, Any, Result]],
+    call: Callable[Args, Coroutine[None, None, Result]],
     /,
     *args: Args.args,
     **kwargs: Args.kwargs,
