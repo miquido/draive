@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Literal, overload
 
@@ -9,7 +10,7 @@ from draive.conversation.message import (
 )
 from draive.lmm import LMMCompletionMessage, lmm_completion
 from draive.tools import Toolbox
-from draive.types import Memory, UpdateSend
+from draive.types import Memory
 from draive.utils import AsyncStreamTask
 
 __all__: list[str] = [
@@ -35,7 +36,7 @@ async def lmm_conversation_completion(
     input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
-    stream: UpdateSend[ConversationStreamingUpdate],
+    stream: Callable[[ConversationStreamingUpdate], None],
 ) -> ConversationMessage: ...
 
 
@@ -55,7 +56,7 @@ async def lmm_conversation_completion(
     input: ConversationMessage | ConversationMessageContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
-    stream: UpdateSend[ConversationStreamingUpdate] | bool = False,
+    stream: Callable[[ConversationStreamingUpdate], None] | bool = False,
 ) -> ConversationCompletionStream | ConversationMessage:
     system_message: LMMCompletionMessage = LMMCompletionMessage(
         role="system",
@@ -91,7 +92,7 @@ async def lmm_conversation_completion(
         case True:
 
             async def stream_task(
-                update: UpdateSend[ConversationStreamingUpdate],
+                update: Callable[[ConversationStreamingUpdate], None],
             ) -> None:
                 nonlocal memory
                 completion: LMMCompletionMessage = await lmm_completion(

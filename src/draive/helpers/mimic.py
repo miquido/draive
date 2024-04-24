@@ -13,7 +13,6 @@ def mimic_function[**Args, Result](
 ) -> Callable[Args, Result]:
     # mimic function attributes if able
     for attribute in [
-        "__globals__",
         "__module__",
         "__name__",
         "__qualname__",

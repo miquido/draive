@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Literal, Protocol, Self, overload, runtime_checkable
 
 from draive.lmm.message import (
@@ -5,7 +6,6 @@ from draive.lmm.message import (
     LMMCompletionStreamingUpdate,
 )
 from draive.tools import Toolbox
-from draive.types import UpdateSend
 
 __all__ = [
     "LMMCompletion",
@@ -14,11 +14,9 @@ __all__ = [
 
 
 class LMMCompletionStream(Protocol):
-    def __aiter__(self) -> Self:
-        ...
+    def __aiter__(self) -> Self: ...
 
-    async def __anext__(self) -> LMMCompletionStreamingUpdate:
-        ...
+    async def __anext__(self) -> LMMCompletionStreamingUpdate: ...
 
 
 @runtime_checkable
@@ -30,8 +28,7 @@ class LMMCompletion(Protocol):
         context: list[LMMCompletionMessage],
         tools: Toolbox | None = None,
         stream: Literal[True],
-    ) -> LMMCompletionStream:
-        ...
+    ) -> LMMCompletionStream: ...
 
     @overload
     async def __call__(
@@ -39,9 +36,8 @@ class LMMCompletion(Protocol):
         *,
         context: list[LMMCompletionMessage],
         tools: Toolbox | None = None,
-        stream: UpdateSend[LMMCompletionStreamingUpdate],
-    ) -> LMMCompletionMessage:
-        ...
+        stream: Callable[[LMMCompletionStreamingUpdate], None],
+    ) -> LMMCompletionMessage: ...
 
     @overload
     async def __call__(
@@ -50,8 +46,7 @@ class LMMCompletion(Protocol):
         context: list[LMMCompletionMessage],
         tools: Toolbox | None = None,
         output: Literal["text", "json"] = "text",
-    ) -> LMMCompletionMessage:
-        ...
+    ) -> LMMCompletionMessage: ...
 
     async def __call__(
         self,
@@ -59,6 +54,5 @@ class LMMCompletion(Protocol):
         context: list[LMMCompletionMessage],
         tools: Toolbox | None = None,
         output: Literal["text", "json"] = "text",
-        stream: UpdateSend[LMMCompletionStreamingUpdate] | bool = False,
-    ) -> LMMCompletionStream | LMMCompletionMessage:
-        ...
+        stream: Callable[[LMMCompletionStreamingUpdate], None] | bool = False,
+    ) -> LMMCompletionStream | LMMCompletionMessage: ...

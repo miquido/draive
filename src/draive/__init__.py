@@ -102,12 +102,13 @@ from draive.types import (
     MultimodalContent,
     ReadOnlyMemory,
     State,
-    UpdateSend,
     VideoBase64Content,
     VideoContent,
     VideoURLContent,
 )
 from draive.utils import (
+    AsyncStream,
+    AsyncStreamTask,
     allowing_early_exit,
     auto_retry,
     cache,
@@ -116,6 +117,8 @@ from draive.utils import (
 )
 
 __all__ = [
+    "AsyncStream",
+    "AsyncStreamTask",
     "allowing_early_exit",
     "Argument",
     "AudioBase64Content",
@@ -216,7 +219,6 @@ __all__ = [
     "ToolException",
     "ToolsUpdatesContext",
     "traced",
-    "UpdateSend",
     "VideoBase64Content",
     "VideoContent",
     "VideoURLContent",

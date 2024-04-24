@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, AsyncIterator
+from collections.abc import AsyncIterable, AsyncIterator, Callable
 from typing import cast
 
 from mistralai.models.chat_completion import (
@@ -19,7 +19,6 @@ from draive.mistral.config import MistralChatConfig
 from draive.mistral.errors import MistralException
 from draive.scope import ctx
 from draive.tools import Toolbox, ToolCallUpdate
-from draive.types import UpdateSend
 
 __all__ = [
     "_chat_stream",
@@ -32,7 +31,7 @@ async def _chat_stream(  # noqa: C901, PLR0913
     config: MistralChatConfig,
     messages: list[ChatMessage],
     tools: Toolbox | None,
-    send_update: UpdateSend[ToolCallUpdate | str],
+    send_update: Callable[[ToolCallUpdate | str], None],
     recursion_level: int = 0,
 ) -> str:
     if recursion_level > config.recursion_limit:

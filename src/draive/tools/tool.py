@@ -1,6 +1,5 @@
 from collections.abc import Callable, Coroutine
 from typing import (
-    Any,
     Protocol,
     final,
     overload,
@@ -14,7 +13,6 @@ from draive.scope import ctx
 from draive.tools.errors import ToolException
 from draive.tools.state import ToolCallContext, ToolsUpdatesContext
 from draive.tools.update import ToolCallUpdate
-from draive.types import UpdateSend
 
 __all__ = [
     "tool",
@@ -28,13 +26,13 @@ class ToolAvailability(Protocol):
 
 
 @final
-class Tool[**Args, Result](ParametrizedTool[Args, Coroutine[Any, Any, Result]]):
+class Tool[**Args, Result](ParametrizedTool[Args, Coroutine[None, None, Result]]):
     def __init__(
         self,
         /,
         name: str,
         *,
-        function: Function[Args, Coroutine[Any, Any, Result]],
+        function: Function[Args, Coroutine[None, None, Result]],
         description: str | None = None,
         availability: ToolAvailability | None = None,
     ) -> None:
@@ -63,9 +61,9 @@ class Tool[**Args, Result](ParametrizedTool[Args, Coroutine[Any, Any, Result]]):
             call_id=tool_call_id or uuid4().hex,
             tool=self.name,
         )
-        send_update: UpdateSend[ToolCallUpdate] = ctx.state(ToolsUpdatesContext).send_update or (
-            lambda update: None
-        )
+        send_update: Callable[[ToolCallUpdate], None] = ctx.state(
+            ToolsUpdatesContext
+        ).send_update or (lambda _: None)
         with ctx.nested(
             self.name,
             state=[call_context],
@@ -119,7 +117,7 @@ class Tool[**Args, Result](ParametrizedTool[Args, Coroutine[Any, Any, Result]]):
 
 @overload
 def tool[**Args, Result](
-    function: Function[Args, Coroutine[Any, Any, Result]],
+    function: Function[Args, Coroutine[None, None, Result]],
     /,
 ) -> Tool[Args, Result]: ...
 
@@ -130,24 +128,25 @@ def tool[**Args, Result](
     name: str | None = None,
     description: str | None = None,
     availability: ToolAvailability | None = None,
-) -> Callable[[Function[Args, Coroutine[Any, Any, Result]]], Tool[Args, Result]]: ...
+) -> Callable[[Function[Args, Coroutine[None, None, Result]]], Tool[Args, Result]]: ...
 
 
 def tool[**Args, Result](
-    function: Function[Args, Coroutine[Any, Any, Result]] | None = None,
+    function: Function[Args, Coroutine[None, None, Result]] | None = None,
     *,
     name: str | None = None,
     description: str | None = None,
     availability: ToolAvailability | None = None,
 ) -> (
-    Callable[[Function[Args, Coroutine[Any, Any, Result]]], Tool[Args, Result]] | Tool[Args, Result]
+    Callable[[Function[Args, Coroutine[None, None, Result]]], Tool[Args, Result]]
+    | Tool[Args, Result]
 ):
     """
     Convert a function to a tool. Tool arguments support only limited types.
     """
 
     def wrap(
-        function: Function[Args, Coroutine[Any, Any, Result]],
+        function: Function[Args, Coroutine[None, None, Result]],
     ) -> Tool[Args, Result]:
         return Tool(
             name=name or function.__name__,

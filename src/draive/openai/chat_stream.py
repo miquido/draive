@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import cast
 
 from openai import AsyncStream as OpenAIAsyncStream
@@ -19,7 +20,6 @@ from draive.openai.config import OpenAIChatConfig
 from draive.openai.errors import OpenAIException
 from draive.scope import ctx
 from draive.tools import Toolbox, ToolCallUpdate
-from draive.types import UpdateSend
 
 __all__ = [
     "_chat_stream",
@@ -32,7 +32,7 @@ async def _chat_stream(  # noqa: PLR0913
     config: OpenAIChatConfig,
     messages: list[ChatCompletionMessageParam],
     tools: Toolbox | None,
-    send_update: UpdateSend[ToolCallUpdate | str],
+    send_update: Callable[[ToolCallUpdate | str], None],
     recursion_level: int = 0,
 ) -> str:
     if recursion_level > config.recursion_limit:

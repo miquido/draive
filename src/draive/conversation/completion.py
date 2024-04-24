@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Literal, Protocol, overload, runtime_checkable
 
 from draive.conversation.message import (
@@ -7,7 +8,7 @@ from draive.conversation.message import (
 )
 from draive.lmm import LMMCompletionStream
 from draive.tools import Toolbox
-from draive.types import Memory, UpdateSend
+from draive.types import Memory
 
 __all__ = [
     "ConversationCompletionStream",
@@ -29,8 +30,7 @@ class ConversationCompletion(Protocol):
         memory: Memory[ConversationMessage] | None = None,
         tools: Toolbox | None = None,
         stream: Literal[True],
-    ) -> ConversationCompletionStream:
-        ...
+    ) -> ConversationCompletionStream: ...
 
     @overload
     async def __call__(
@@ -40,9 +40,8 @@ class ConversationCompletion(Protocol):
         input: ConversationMessage | ConversationMessageContent,  # noqa: A002
         memory: Memory[ConversationMessage] | None = None,
         tools: Toolbox | None = None,
-        stream: UpdateSend[ConversationStreamingUpdate],
-    ) -> ConversationMessage:
-        ...
+        stream: Callable[[ConversationStreamingUpdate], None],
+    ) -> ConversationMessage: ...
 
     @overload
     async def __call__(
@@ -52,8 +51,7 @@ class ConversationCompletion(Protocol):
         input: ConversationMessage | ConversationMessageContent,  # noqa: A002
         memory: Memory[ConversationMessage] | None = None,
         tools: Toolbox | None = None,
-    ) -> ConversationMessage:
-        ...
+    ) -> ConversationMessage: ...
 
     async def __call__(  # noqa: PLR0913
         self,
@@ -62,6 +60,5 @@ class ConversationCompletion(Protocol):
         input: ConversationMessage | ConversationMessageContent,  # noqa: A002
         memory: Memory[ConversationMessage] | None = None,
         tools: Toolbox | None = None,
-        stream: UpdateSend[ConversationStreamingUpdate] | bool = False,
-    ) -> ConversationCompletionStream | ConversationMessage:
-        ...
+        stream: Callable[[ConversationStreamingUpdate], None] | bool = False,
+    ) -> ConversationCompletionStream | ConversationMessage: ...

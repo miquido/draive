@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Literal, overload
 
 from openai.types.chat import ChatCompletionContentPartParam, ChatCompletionMessageParam
@@ -10,7 +11,7 @@ from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig
 from draive.scope import ctx
 from draive.tools import Toolbox, ToolCallUpdate, ToolsUpdatesContext
-from draive.types import ImageBase64Content, ImageURLContent, Model, UpdateSend
+from draive.types import ImageBase64Content, ImageURLContent, Model
 from draive.utils import AsyncStreamTask
 
 __all__ = [
@@ -32,7 +33,7 @@ async def openai_lmm_completion(
     *,
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
-    stream: UpdateSend[LMMCompletionStreamingUpdate],
+    stream: Callable[[LMMCompletionStreamingUpdate], None],
 ) -> LMMCompletionMessage: ...
 
 
@@ -50,7 +51,7 @@ async def openai_lmm_completion(
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
     output: Literal["text", "json"] = "text",
-    stream: UpdateSend[LMMCompletionStreamingUpdate] | bool = False,
+    stream: Callable[[LMMCompletionStreamingUpdate], None] | bool = False,
 ) -> LMMCompletionStream | LMMCompletionMessage:
     client: OpenAIClient = ctx.dependency(OpenAIClient)
     config: OpenAIChatConfig
@@ -79,7 +80,7 @@ async def openai_lmm_completion(
         case True:
 
             async def stream_task(
-                streaming_update: UpdateSend[LMMCompletionStreamingUpdate],
+                streaming_update: Callable[[LMMCompletionStreamingUpdate], None],
             ) -> None:
                 with ctx.nested(
                     "openai_lmm_completion",

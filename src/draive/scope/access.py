@@ -1,7 +1,7 @@
-from asyncio import Task, TaskGroup, shield
+from asyncio import Task, TaskGroup, current_task, shield
 from collections.abc import Callable, Coroutine, Iterable
 from contextvars import Context, ContextVar, Token, copy_context
-from logging import Logger
+from logging import Logger, getLogger
 from types import TracebackType
 from typing import Any, final
 
@@ -98,7 +98,7 @@ class _RootContext:
             # report metrics trace
             if report_trace := self._report_trace:
                 # it still have access to the dependencies and state
-                try:  # catch all exceptions - we don't wan't to blow up on metrics
+                try:  # catch all exceptions - we don't want to blow up on metrics
                     await shield(
                         report_trace(
                             trace_id=self._metrics.trace_id,
@@ -189,6 +189,8 @@ class ctx:
         else:
             root_state = ScopeState(*state)
 
+        root_logger: Logger = logger or getLogger(name=label)
+
         trace_reporter: MetricsTraceReporter | None
         if trace_reporting:
             trace_reporter = trace_reporting
@@ -206,7 +208,7 @@ class ctx:
             state=root_state,
             metrics=MetricsTrace(
                 label=label,
-                logger=logger,
+                logger=root_logger,
                 parent=None,
                 metrics=metrics,
             ),
@@ -225,20 +227,48 @@ class ctx:
         logger: Logger | None = None,
         trace_reporting: MetricsTraceReporter | None = None,
     ) -> Callable[
-        [Callable[Args, Coroutine[Any, Any, Result]]], Callable[Args, Coroutine[Any, Any, Result]]
+        [Callable[Args, Coroutine[None, None, Result]]],
+        Callable[Args, Coroutine[None, None, Result]],
     ]:
+        root_dependencies: ScopeDependencies
+        if dependencies is None:
+            root_dependencies = ScopeDependencies()
+        elif isinstance(dependencies, ScopeDependencies):
+            root_dependencies = dependencies
+        else:
+            root_dependencies = ScopeDependencies(*dependencies)
+
+        root_state: ScopeState
+        if state is None:
+            root_state = ScopeState()
+        elif isinstance(state, ScopeState):
+            root_state = state
+        else:
+            root_state = ScopeState(*state)
+
+        trace_reporter: MetricsTraceReporter | None
+        if trace_reporting:
+            trace_reporter = trace_reporting
+        elif getenv_bool("DEBUG_LOGGING", __debug__):
+            trace_reporter = metrics_log_reporter(
+                list_items_limit=-4,
+                item_character_limit=64,
+            )
+        else:
+            trace_reporter = None
+
         def wrapper(
-            function: Callable[Args, Coroutine[Any, Any, Result]],
+            function: Callable[Args, Coroutine[None, None, Result]],
             /,
-        ) -> Callable[Args, Coroutine[Any, Any, Result]]:
+        ) -> Callable[Args, Coroutine[None, None, Result]]:
             async def wrapped(*args: Args.args, **kwargs: Args.kwargs) -> Result:
                 async with ctx.new(
                     label,
-                    dependencies=dependencies,
-                    state=state,
+                    dependencies=root_dependencies,
+                    state=root_state,
                     metrics=metrics,
                     logger=logger,
-                    trace_reporting=trace_reporting,
+                    trace_reporting=trace_reporter,
                 ):
                     return await function(*args, **kwargs)
 
@@ -276,7 +306,7 @@ class ctx:
 
     @staticmethod
     def spawn_task[**Args, Result](
-        function: Callable[Args, Coroutine[Any, Any, Result]],
+        function: Callable[Args, Coroutine[None, None, Result]],
         /,
         *args: Args.args,
         **kwargs: Args.kwargs,
@@ -289,6 +319,13 @@ class ctx:
                 return await function(*args, **kwargs)
 
         return ctx._current_task_group().create_task(current_context.run(wrapped, *args, **kwargs))
+
+    @staticmethod
+    def cancel() -> None:
+        if task := current_task():
+            task.cancel()
+        else:
+            raise RuntimeError("Attempting to cancel context out of asyncio task")
 
     @staticmethod
     def nested(
