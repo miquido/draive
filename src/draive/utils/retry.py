@@ -1,7 +1,6 @@
-from asyncio import iscoroutinefunction, sleep
+from asyncio import CancelledError, iscoroutinefunction, sleep
 from collections.abc import Callable, Coroutine
 from functools import wraps
-from random import uniform
 from typing import Any, cast, overload
 
 from draive.scope import ctx
@@ -22,7 +21,7 @@ def auto_retry[**Args, Result](
 def auto_retry[**Args, Result](
     *,
     limit: int = 1,
-    delay: tuple[float, float] | float | None = None,
+    delay: Callable[[int], float] | float | None = None,
 ) -> Callable[[Callable[Args, Result]], Callable[Args, Result]]: ...
 
 
@@ -30,7 +29,7 @@ def auto_retry[**Args, Result](
     function: Callable[Args, Result] | None = None,
     *,
     limit: int = 1,
-    delay: tuple[float, float] | float | None = None,
+    delay: Callable[[int], float] | float | None = None,
 ) -> Callable[[Callable[Args, Result]], Callable[Args, Result]] | Callable[Args, Result]:
     """\
     Simple on fail retry function wrapper. \
@@ -44,8 +43,8 @@ def auto_retry[**Args, Result](
         function to wrap in auto retry, either sync or async
     limit: int
         limit of retries, default is 1
-    delay: tuple[float, float] | float | None
-        retry delay time in seconds, tuple allows to provide time range to use, \
+    delay: Callable[[], float] | float | None
+        retry delay time in seconds, either concrete value or a function producing it, \
         default is None (no delay)
 
     Returns
@@ -85,7 +84,7 @@ def _wrap_sync[**Args, Result](
     function: Callable[Args, Result],
     *,
     limit: int,
-    delay: tuple[float, float] | float | None,
+    delay: Callable[[int], float] | float | None,
 ) -> Callable[Args, Result]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
     assert delay is None, "Delay is not supported in sync wrapper"  # nosec: B101
@@ -99,6 +98,8 @@ def _wrap_sync[**Args, Result](
         while True:
             try:
                 return function(*args, **kwargs)
+            except CancelledError as exc:
+                raise exc
             except Exception as exc:
                 if attempt < limit:
                     attempt += 1
@@ -118,7 +119,7 @@ def _wrap_async[**Args, Result](
     function: Callable[Args, Coroutine[Any, Any, Result]],
     *,
     limit: int,
-    delay: tuple[float, float] | float | None,
+    delay: Callable[[int], float] | float | None,
 ) -> Callable[Args, Coroutine[Any, Any, Result]]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
 
@@ -131,6 +132,8 @@ def _wrap_async[**Args, Result](
         while True:
             try:
                 return await function(*args, **kwargs)
+            except CancelledError as exc:
+                raise exc
             except Exception as exc:
                 if attempt < limit:
                     attempt += 1
@@ -141,14 +144,14 @@ def _wrap_async[**Args, Result](
                     )
 
                     match delay:
-                        case (float() as lower, float() as upper):
-                            await sleep(delay=uniform(lower, upper))  # nosec: B311
+                        case None:
+                            continue
 
-                        case float() as strict:
+                        case float(strict):
                             await sleep(delay=strict)
 
-                        case _:
-                            continue
+                        case make_delay:  # type: Callable[[], float]
+                            await sleep(delay=make_delay(attempt))  # pyright: ignore[reportCallIssue, reportUnknownArgumentType]
 
                 else:
                     raise exc
