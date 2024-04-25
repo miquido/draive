@@ -1,13 +1,12 @@
 from collections.abc import Callable
 from typing import Literal, overload
 
-from mistralai.models.chat_completion import ChatMessage
-
 from draive.lmm import LMMCompletionMessage, LMMCompletionStream, LMMCompletionStreamingUpdate
 from draive.mistral.chat_response import _chat_response  # pyright: ignore[reportPrivateUsage]
 from draive.mistral.chat_stream import _chat_stream  # pyright: ignore[reportPrivateUsage]
 from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralChatConfig
+from draive.mistral.models import ChatMessage
 from draive.scope import ctx
 from draive.tools import Toolbox, ToolCallUpdate, ToolsUpdatesContext
 from draive.types import ImageBase64Content, ImageURLContent, Model
@@ -73,14 +72,21 @@ async def mistral_lmm_completion(
     match stream:
         case False:
             with ctx.nested("mistral_lmm_completion", metrics=[config]):
+                message: str = await _chat_response(
+                    client=client,
+                    config=config,
+                    messages=messages,
+                    tools=tools or Toolbox(),
+                )
+                if tools and output == "json":
+                    # workaround for json mode with tools
+                    # most common mistral mistake is to not escape newlines
+                    # we can't fix it easily - code below removes all newlines
+                    # which may cause missing newlines in the json content
+                    message = message.replace("\n", "")
                 return LMMCompletionMessage(
                     role="assistant",
-                    content=await _chat_response(
-                        client=client,
-                        config=config,
-                        messages=messages,
-                        tools=tools,
-                    ),
+                    content=message,
                 )
 
         case True:
@@ -94,7 +100,7 @@ async def mistral_lmm_completion(
                     metrics=[config],
                 ):
 
-                    def send_update(update: ToolCallUpdate | str):
+                    def send_update(update: ToolCallUpdate | str) -> None:
                         if isinstance(update, str):
                             streaming_update(
                                 LMMCompletionMessage(
@@ -109,7 +115,7 @@ async def mistral_lmm_completion(
                         client=client,
                         config=config,
                         messages=messages,
-                        tools=tools,
+                        tools=tools or Toolbox(),
                         send_update=send_update,
                     )
 
@@ -117,7 +123,7 @@ async def mistral_lmm_completion(
 
         case streaming_update:
 
-            def send_update(update: ToolCallUpdate | str):
+            def send_update(update: ToolCallUpdate | str) -> None:
                 if isinstance(update, str):
                     streaming_update(
                         LMMCompletionMessage(
@@ -139,7 +145,7 @@ async def mistral_lmm_completion(
                         client=client,
                         config=config,
                         messages=messages,
-                        tools=tools,
+                        tools=tools or Toolbox(),
                         send_update=send_update,
                     ),
                 )

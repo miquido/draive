@@ -1,19 +1,19 @@
+import json
 from asyncio import gather
-from collections.abc import AsyncIterable, Awaitable
+from collections.abc import Awaitable
+from typing import Any
 
-from mistralai.models.chat_completion import ChatCompletionStreamResponse, ChatMessage, ToolCall
-
+from draive.mistral.models import ChatMessage, ToolCallResponse
 from draive.tools import Toolbox
 
 __all__ = [
     "_execute_chat_tool_calls",
-    "_flush_chat_tool_calls",
 ]
 
 
 async def _execute_chat_tool_calls(
     *,
-    tool_calls: list[ToolCall],
+    tool_calls: list[ToolCallResponse],
     tools: Toolbox,
 ) -> list[ChatMessage]:
     tool_call_results: list[Awaitable[ChatMessage]] = []
@@ -26,12 +26,23 @@ async def _execute_chat_tool_calls(
                 tools=tools,
             )
         )
-
     return [
         ChatMessage(
             role="assistant",
             content="",
-            tool_calls=tool_calls,
+            tool_calls=[
+                {
+                    "id": call.id,
+                    "type": "function",
+                    "function": {
+                        "name": call.function.name,
+                        "arguments": call.function.arguments
+                        if isinstance(call.function.arguments, str)
+                        else json.dumps(call.function.arguments),
+                    },
+                }
+                for call in tool_calls
+            ],
         ),
         *await gather(
             *tool_call_results,
@@ -44,7 +55,7 @@ async def _execute_chat_tool_call(
     *,
     call_id: str,
     name: str,
-    arguments: str,
+    arguments: dict[str, Any] | str,
     tools: Toolbox,
 ) -> ChatMessage:
     try:  # make sure that tool error won't blow up whole chain
@@ -66,46 +77,3 @@ async def _execute_chat_tool_call(
             name=name,
             content="Error",
         )
-
-
-async def _flush_chat_tool_calls(  # noqa: PLR0912
-    *,
-    tool_calls: list[ToolCall],
-    completion_stream: AsyncIterable[ChatCompletionStreamResponse],
-) -> list[ToolCall]:
-    # iterate over the stream to get full list of tool calls
-    async for chunk in completion_stream:
-        for call in chunk.choices[0].delta.tool_calls or []:
-            try:
-                tool_call: ToolCall = next(
-                    tool_call for tool_call in tool_calls if tool_call.id == call.id
-                )
-
-                if call.id:
-                    if tool_call.id != "null":
-                        tool_call.id += call.id
-                    else:
-                        tool_call.id = call.id
-                else:
-                    pass
-
-                if call.function.name:
-                    if tool_call.function.name:
-                        tool_call.function.name += call.function.name
-                    else:
-                        tool_call.function.name = call.function.name
-                else:
-                    pass
-
-                if call.function.arguments:
-                    if tool_call.function.arguments:
-                        tool_call.function.arguments += call.function.arguments
-                    else:
-                        tool_call.function.arguments = call.function.arguments
-                else:
-                    pass
-
-            except (StopIteration, StopAsyncIteration):
-                tool_calls.append(call)
-
-    return tool_calls

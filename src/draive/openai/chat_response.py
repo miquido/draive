@@ -27,7 +27,7 @@ async def _chat_response(
     client: OpenAIClient,
     config: OpenAIChatConfig,
     messages: list[ChatCompletionMessageParam],
-    tools: Toolbox | None,
+    tools: Toolbox,
     recursion_level: int = 0,
 ) -> str:
     if recursion_level > config.recursion_limit:
@@ -50,7 +50,7 @@ async def _chat_response(
                     "name": tools.suggested_tool_name,
                 },
             }  # suggest/require tool call only initially
-            if recursion_level == 0 and tools is not None and tools.suggested_tool_name
+            if recursion_level == 0 and tools.suggested_tool_name
             else None,
         )
 

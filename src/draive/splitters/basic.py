@@ -39,10 +39,10 @@ def _split(
     splitter: str
     alt_splitter: str
     match separators:
-        case (str() as primary, str() as secondary):
+        case (str(primary), str(secondary)):
             splitter = primary
             alt_splitter = secondary
-        case str() as primary:
+        case str(primary):
             splitter = primary
             alt_splitter = "\n"
         case None:

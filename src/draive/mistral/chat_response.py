@@ -1,7 +1,5 @@
 from typing import cast
 
-from mistralai.models.chat_completion import ChatCompletionResponse, ChatMessage
-
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.mistral.chat_tools import (
     _execute_chat_tool_calls,  # pyright: ignore[reportPrivateUsage]
@@ -9,6 +7,7 @@ from draive.mistral.chat_tools import (
 from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralChatConfig
 from draive.mistral.errors import MistralException
+from draive.mistral.models import ChatCompletionResponse, ChatMessage, ChatMessageResponse
 from draive.scope import ctx
 from draive.tools import Toolbox
 
@@ -22,7 +21,7 @@ async def _chat_response(
     client: MistralClient,
     config: MistralChatConfig,
     messages: list[ChatMessage],
-    tools: Toolbox | None,
+    tools: Toolbox,
     recursion_level: int = 0,
 ) -> str:
     if recursion_level > config.recursion_limit:
@@ -32,14 +31,24 @@ async def _chat_response(
         "chat_response",
         metrics=[ArgumentsTrace.of(messages=messages.copy())],
     ):
+        suggest_tools: bool
+        available_tools: list[dict[str, object]]
+        if recursion_level == 0 and (suggested := tools.suggested_tool):
+            # suggest/require tool call only initially
+            suggest_tools = True
+            available_tools = cast(list[dict[str, object]], [suggested])
+        else:
+            suggest_tools = False
+            available_tools = cast(
+                list[dict[str, object]],
+                tools.available_tools if tools else [],
+            )
+
         completion: ChatCompletionResponse = await client.chat_completion(
             config=config,
             messages=messages,
-            tools=cast(
-                list[dict[str, object]],
-                tools.available_tools if tools else [],
-            ),
-            suggest_tools=tools is not None and tools.suggested_tool_name is not None,
+            tools=available_tools,
+            suggest_tools=suggest_tools,
         )
 
         if usage := completion.usage:
@@ -54,7 +63,7 @@ async def _chat_response(
         if not completion.choices:
             raise MistralException("Invalid Mistral completion - missing messages!", completion)
 
-        completion_message: ChatMessage = completion.choices[0].message
+        completion_message: ChatMessageResponse = completion.choices[0].message
 
         if (tool_calls := completion_message.tool_calls) and (tools := tools):
             messages.extend(
@@ -68,7 +77,7 @@ async def _chat_response(
         elif message := completion_message.content:
             ctx.record(ResultTrace.of(message))
             match message:
-                case str() as content:
+                case str(content):
                     return content
 
                 # API docs say that it can be only a string in response

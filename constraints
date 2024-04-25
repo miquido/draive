@@ -22,10 +22,8 @@ h11==0.14.0
     # via httpcore
 httpcore==1.0.5
     # via httpx
-httpx==0.25.2
-    # via
-    #   mistralai
-    #   openai
+httpx==0.27.0
+    # via openai
 idna==3.7
     # via
     #   anyio
@@ -37,13 +35,10 @@ markdown-it-py==3.0.0
     # via rich
 mdurl==0.1.2
     # via markdown-it-py
-mistralai==0.1.8
 nodeenv==1.8.0
     # via pyright
 numpy==1.26.4
-openai==1.23.3
-orjson==3.10.1
-    # via mistralai
+openai==1.23.6
 packaging==24.0
     # via pytest
 pbr==6.0.0
@@ -51,9 +46,7 @@ pbr==6.0.0
 pluggy==1.5.0
     # via pytest
 pydantic==2.7.1
-    # via
-    #   mistralai
-    #   openai
+    # via openai
 pydantic-core==2.18.2
     # via pydantic
 pygments==2.17.2

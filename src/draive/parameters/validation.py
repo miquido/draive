@@ -819,6 +819,9 @@ def parameter_validator[Value](  # noqa: PLR0911, C901
         case types.NoneType | None:
             return _none_validator(verifier=verifier)
 
+        case typing.Any:
+            return _any_validator(verifier=verifier)
+
         case types.UnionType | typing.Union:
             return _union_validator(
                 alternatives=get_args(annotation),
@@ -1010,9 +1013,6 @@ def parameter_validator[Value](  # noqa: PLR0911, C901
                 annotation=annotation,
                 verifier=verifier,
             )
-
-        case typing.Any:
-            return _any_validator(verifier=verifier)
 
         case other:
             raise TypeError("Unsupported type annotation %s", other)

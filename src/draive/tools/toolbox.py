@@ -26,10 +26,17 @@ class Toolbox:
 
     @property
     def suggested_tool_name(self) -> str | None:
-        if self._suggested_tool is None or not self._suggested_tool.available:
-            return None
-        elif self._suggested_tool.available:
+        if self._suggested_tool is not None and self._suggested_tool.available:
             return self._suggested_tool.name
+        else:
+            return None
+
+    @property
+    def suggested_tool(self) -> ToolSpecification | None:
+        if self._suggested_tool is not None and self._suggested_tool.available:
+            return self._suggested_tool.specification
+        else:
+            return None
 
     @property
     def available_tools(self) -> list[ToolSpecification]:
@@ -40,12 +47,12 @@ class Toolbox:
         name: str,
         /,
         call_id: str,
-        arguments: str | bytes | None,
+        arguments: dict[str, Any] | str | bytes | None,
     ) -> Any:
         if tool := self._tools[name]:
             return await tool(
                 tool_call_id=call_id,
-                **loads(arguments) if arguments else {},
+                **loads(arguments) if isinstance(arguments, str | bytes) else arguments or {},
             )
         else:
             raise ToolException("Requested tool is not defined", name)
