@@ -11,6 +11,7 @@ from draive.helpers import freeze
 from draive.metrics import ArgumentsTrace
 from draive.parameters import ParametrizedData
 from draive.scope import ctx
+from draive.types import MultimodalContent
 
 __all__ = [
     "agent",
@@ -38,7 +39,7 @@ class Agent[State: ParametrizedData](BaseAgent[State]):
     async def __call__(
         self,
         state: AgentState[State],
-    ) -> None:
+    ) -> MultimodalContent | None:
         invocation_id: str = uuid4().hex
         with ctx.nested(
             f"Agent|{self.name}",

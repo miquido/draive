@@ -3,9 +3,11 @@ from typing import final
 from uuid import uuid4
 
 from draive.agents.abc import BaseAgent
-from draive.agents.state import AgentState
+from draive.agents.state import AgentScratchpad, AgentState
 from draive.helpers import freeze
 from draive.parameters import ParametrizedData
+from draive.scope import ctx
+from draive.types import MultimodalContent, merge_multimodal_content
 
 __all__ = [
     "AgentFlow",
@@ -20,6 +22,7 @@ class AgentFlow[State: ParametrizedData](BaseAgent[State]):
         name: str,
         description: str,
     ) -> None:
+        assert agents, "Can't make emptty agent flow"  # nosec: B101
         super().__init__(
             agent_id=uuid4().hex,
             name=name,
@@ -32,16 +35,30 @@ class AgentFlow[State: ParametrizedData](BaseAgent[State]):
     async def __call__(
         self,
         state: AgentState[State],
-    ) -> None:
+    ) -> MultimodalContent:
+        current_scratchpad: AgentScratchpad = AgentScratchpad.current()
+        scratchpad_notes: list[MultimodalContent] = []
         for agent in self.agents:
-            match agent:
-                case [*agents]:
-                    await gather(
-                        *[agent(state) for agent in agents],
-                    )
+            with ctx.updated(current_scratchpad):
+                match agent:
+                    case [*agents]:
+                        merged_note: MultimodalContent = merge_multimodal_content(
+                            *[
+                                scratchpad_note
+                                for scratchpad_note in await gather(
+                                    *[agent(state) for agent in agents],
+                                )
+                                if scratchpad_note is not None
+                            ]
+                        )
+                        if merged_note:
+                            scratchpad_notes.append(merged_note)
+                            current_scratchpad = current_scratchpad.extended(merged_note)
 
-                # case [agent]:
-                #     await agent(state)
+                    case agent:
+                        scratchpad_note: MultimodalContent | None = await agent(state)
+                        if scratchpad_note:
+                            current_scratchpad = current_scratchpad.extended(scratchpad_note)
+                            scratchpad_notes.append(scratchpad_note)
 
-                case agent:
-                    await agent(state)
+        return merge_multimodal_content(*scratchpad_notes)

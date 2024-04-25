@@ -1,31 +1,58 @@
 from asyncio import Lock
-from collections.abc import Callable
-from typing import Any
+from types import TracebackType
+from typing import Any, Self
 
 from draive.parameters import ParametrizedData
-from draive.types import MultimodalContent, MultimodalContentItem, merge_multimodal_content
+from draive.scope import ctx
+from draive.types import MultimodalContent, MultimodalContentItem, State
 
 __all__ = [
     "AgentState",
+    "AgentScratchpad",
 ]
+
+
+class AgentScratchpad(State):
+    @classmethod
+    def current(cls) -> Self:
+        return ctx.state(cls)
+
+    @classmethod
+    def prepare(
+        cls,
+        content: MultimodalContent | None,
+    ) -> Self:
+        match content:
+            case None:
+                return cls(content=())
+            case [*items]:
+                return cls(content=tuple(items))
+            case item:
+                return cls(content=(item,))
+
+    content: tuple[MultimodalContentItem, ...] = ()
+
+    def extended(
+        self,
+        content: MultimodalContent | None,
+    ) -> Self:
+        match content:
+            case None:
+                return self
+            case [*items]:
+                return self.__class__(content=(*self.content, *items))
+            case item:
+                return self.__class__(content=(*self.content, item))
 
 
 class AgentState[State: ParametrizedData]:
     def __init__(
         self,
         initial: State,
-        scratchpad: MultimodalContent | None = None,
     ) -> None:
         self._lock: Lock = Lock()
         self._current: State = initial
-        self._scratchpad: tuple[MultimodalContentItem, ...]
-        match scratchpad:
-            case None:
-                self._scratchpad = ()
-            case [*items]:
-                self._scratchpad = tuple(items)
-            case item:
-                self._scratchpad = (item,)
+        self._mutable_proxy: MutableAgentState[State] | None = None
 
     @property
     async def current(self) -> State:
@@ -33,31 +60,41 @@ class AgentState[State: ParametrizedData]:
             return self._current
 
     @property
-    async def scratchpad(self) -> MultimodalContent:
-        async with self._lock:
-            return self._scratchpad
+    def scratchpad(self) -> MultimodalContent:
+        return AgentScratchpad.current().content
 
-    async def extend_scratchpad(
-        self,
-        content: MultimodalContent,
-    ) -> MultimodalContent:
-        async with self._lock:
-            self._scratchpad = merge_multimodal_content(self._scratchpad, content)
-            return self._scratchpad
+    async def __aenter__(self) -> "MutableAgentState[State]":
+        await self._lock.__aenter__()
+        assert self._mutable_proxy is None  # nosec: B101
+        self._mutable_proxy = MutableAgentState(source=self)
+        return self._mutable_proxy
 
-    async def apply(
+    async def __aexit__(
         self,
-        patch: Callable[[State], State],
-    ) -> State:
-        async with self._lock:
-            self._current = patch(self._current)
-            return self._current
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        assert self._mutable_proxy is not None  # nosec: B101
+        self._mutable_proxy = None
+        await self._lock.__aexit__(
+            exc_type,
+            exc_val,
+            exc_tb,
+        )
+
+
+class MutableAgentState[State: ParametrizedData]:
+    def __init__(
+        self,
+        source: AgentState[State],
+    ) -> None:
+        self._source: AgentState[State] = source
 
     # TODO: find a way to generate signature Based on ParametrizedData
-    async def update(
+    def update(
         self,
         **kwargs: Any,
     ) -> State:
-        async with self._lock:
-            self._current = self._current.updated(**kwargs)
-            return self._current
+        self._source._current = self._source._current.updated(**kwargs)  # pyright: ignore[reportPrivateUsage]
+        return self._source._current  # pyright: ignore[reportPrivateUsage]
