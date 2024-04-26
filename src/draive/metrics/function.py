@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any, Self
 
 from draive.helpers import MISSING, Missing
@@ -63,19 +64,26 @@ class ExceptionTrace(State):
         # the code below does not keep proper exception semantics of BaseException/Exception
         # however we are using it only for logging purposes at the moment
         # because of that merging exceptions in groups is simplified under BaseExceptionGroup
+        exceptions: Sequence[BaseException]
+        exception_messages: Sequence[str]
         if isinstance(self.exception, BaseExceptionGroup):
-            return self.__class__(
-                name="ExceptionGroup",
-                exception=BaseExceptionGroup(
-                    "Multiple errors",
-                    (*self.exception.exceptions, other.exception),  # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
-                ),
-            )
+            exceptions = []
+            exception_messages = []
+            for exception in (*self.exception.exceptions, other.exception):  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                exception_messages.append(exception)  # pyright: ignore[reportArgumentType]
+                exceptions.append(f"{exception.__qualname__}:{exception}")  # pyright: ignore[reportArgumentType, reportUnknownMemberType]
+
         else:
-            return self.__class__(
-                name="ExceptionGroup",
-                exception=BaseExceptionGroup(
-                    "Multiple errors",
-                    (self.exception, other.exception),
-                ),
+            exceptions = (self.exception, other.exception)
+            exception_messages = (
+                f"{self.exception.__qualname__}:{self.exception}",
+                f"{other.exception.__qualname__}:{other.exception}",
             )
+
+        return self.__class__(
+            name="ExceptionGroup",
+            exception=BaseExceptionGroup(
+                f"Multiple errors: [{','.join(exception_messages)}]",
+                exceptions,
+            ),
+        )

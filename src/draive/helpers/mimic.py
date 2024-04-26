@@ -1,44 +1,67 @@
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any, cast, overload
 
 __all__ = [
     "mimic_function",
 ]
 
 
+@overload
 def mimic_function[**Args, Result](
     function: Callable[Args, Result],
     /,
     within: Callable[..., Any],
-) -> Callable[Args, Result]:
-    # mimic function attributes if able
-    for attribute in [
-        "__module__",
-        "__name__",
-        "__qualname__",
-        "__annotations__",
-        "__defaults__",
-        "__kwdefaults__",
-        "__doc__",
-    ]:
-        try:
-            setattr(
-                within,
-                attribute,
-                getattr(
-                    function,
-                    attribute,
-                ),
-            )
+) -> Callable[Args, Result]: ...
 
+
+@overload
+def mimic_function[**Args, Result](
+    function: Callable[Args, Result],
+    /,
+) -> Callable[[Callable[..., Any]], Callable[Args, Result]]: ...
+
+
+def mimic_function[**Args, Result](
+    function: Callable[Args, Result],
+    /,
+    within: Callable[..., Result] | None = None,
+) -> Callable[[Callable[..., Result]], Callable[Args, Result]] | Callable[Args, Result]:
+    def mimic(
+        target: Callable[..., Result],
+    ) -> Callable[Args, Result]:
+        # mimic function attributes if able
+        for attribute in [
+            "__module__",
+            "__name__",
+            "__qualname__",
+            "__annotations__",
+            "__defaults__",
+            "__kwdefaults__",
+            "__doc__",
+        ]:
+            try:
+                setattr(
+                    target,
+                    attribute,
+                    getattr(
+                        function,
+                        attribute,
+                    ),
+                )
+
+            except AttributeError:
+                pass
+        try:
+            target.__dict__.update(function.__dict__)
         except AttributeError:
             pass
-    try:
-        within.__dict__.update(function.__dict__)
-    except AttributeError:
-        pass
 
-    return cast(
-        Callable[Args, Result],
-        within,
-    )
+        return cast(
+            Callable[Args, Result],
+            target,
+        )
+
+    if target := within:
+        return mimic(target)
+    else:
+        return mimic
