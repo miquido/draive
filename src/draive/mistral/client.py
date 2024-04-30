@@ -6,7 +6,7 @@ from typing import Any, Literal, Self, cast, final, overload
 
 from httpx import AsyncClient, Response
 
-from draive.helpers import getenv_str, when_missing
+from draive.helpers import getenv_str
 from draive.mistral.config import MistralChatConfig, MistralEmbeddingConfig
 from draive.mistral.errors import MistralException
 from draive.mistral.models import (
@@ -94,10 +94,10 @@ class MistralClient(ScopeDependency):
                 messages=messages,
                 model=config.model,
                 temperature=config.temperature,
-                top_p=when_missing(config.top_p, default=None),
-                max_tokens=when_missing(config.max_tokens, default=None),
+                top_p=config.top_p,
+                max_tokens=config.max_tokens,
                 response_format=cast(dict[str, str], config.response_format),
-                seed=when_missing(config.seed, default=None),
+                seed=config.seed,
                 tools=tools,
                 tool_choice=("any" if suggest_tools else "auto") if tools else None,
             )

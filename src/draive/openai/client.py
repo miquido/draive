@@ -5,7 +5,7 @@ from random import uniform
 from typing import Literal, Self, final, overload
 
 from openai import AsyncAzureOpenAI, AsyncOpenAI, AsyncStream, RateLimitError
-from openai._types import NOT_GIVEN
+from openai._types import NOT_GIVEN, NotGiven
 from openai.types import Moderation, ModerationCreateResponse
 from openai.types.chat import (
     ChatCompletion,
@@ -18,7 +18,7 @@ from openai.types.create_embedding_response import CreateEmbeddingResponse
 from openai.types.image import Image
 from openai.types.images_response import ImagesResponse
 
-from draive.helpers import getenv_str, when_missing
+from draive.helpers import getenv_str
 from draive.openai.config import (
     OpenAIChatConfig,
     OpenAIEmbeddingConfig,
@@ -114,17 +114,17 @@ class OpenAIClient(ScopeDependency):
         return await self._client.chat.completions.create(
             messages=messages,
             model=config.model,
-            frequency_penalty=when_missing(config.frequency_penalty, default=NOT_GIVEN),
-            max_tokens=when_missing(config.max_tokens, default=NOT_GIVEN),
+            frequency_penalty=_value_when_given(config.frequency_penalty),
+            max_tokens=_value_when_given(config.max_tokens),
             n=1,
-            response_format=when_missing(config.response_format, default=NOT_GIVEN),
-            seed=when_missing(config.seed, default=NOT_GIVEN),
+            response_format=_value_when_given(config.response_format),
+            seed=_value_when_given(config.seed),
             stream=stream,
             temperature=config.temperature,
             tools=tools or NOT_GIVEN,
             tool_choice=(suggested_tool or "auto") if tools else NOT_GIVEN,
-            top_p=when_missing(config.top_p, default=NOT_GIVEN),
-            timeout=when_missing(config.timeout, default=NOT_GIVEN),
+            top_p=_value_when_given(config.top_p),
+            timeout=_value_when_given(config.timeout),
         )
 
     async def embedding(
@@ -140,13 +140,9 @@ class OpenAIClient(ScopeDependency):
                         self._create_text_embedding(
                             texts=list(inputs_list[index : index + config.batch_size]),
                             model=config.model,
-                            dimensions=when_missing(config.dimensions, default=None),
-                            encoding_format=when_missing(
-                                config.encoding_format,
-                                default=None,
-                                cast=Literal["float", "base64"],
-                            ),
-                            timeout=when_missing(config.timeout, default=None),
+                            dimensions=config.dimensions,
+                            encoding_format=config.encoding_format,
+                            timeout=config.timeout,
                         )
                         for index in range(0, len(inputs_list), config.batch_size)
                     ]
@@ -166,9 +162,9 @@ class OpenAIClient(ScopeDependency):
             response: CreateEmbeddingResponse = await self._client.embeddings.create(
                 input=texts,
                 model=model,
-                dimensions=dimensions or NOT_GIVEN,
-                encoding_format=encoding_format or NOT_GIVEN,
-                timeout=timeout or NOT_GIVEN,
+                dimensions=_value_when_given(dimensions),
+                encoding_format=_value_when_given(encoding_format),
+                timeout=_value_when_given(timeout),
             )
             return [element.embedding for element in response.data]
 
@@ -204,10 +200,17 @@ class OpenAIClient(ScopeDependency):
             quality=config.quality,
             size=config.size,
             style=config.style,
-            timeout=when_missing(config.timeout, default=None),
+            timeout=_value_when_given(config.timeout),
             response_format=config.response_format,
         )
         return response.data[0]
 
     async def dispose(self):
         await self._client.close()
+
+
+def _value_when_given[Value](
+    value: Value | None,
+    /,
+) -> Value | NotGiven:
+    return value if value is not None else NOT_GIVEN

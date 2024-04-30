@@ -188,7 +188,7 @@ def _tuple_validator(  # noqa: C901
             else:
 
                 def validated(value: Any) -> Any:
-                    if isinstance(value, list | tuple):
+                    if isinstance(value, list | tuple | set):
                         validated: tuple[Any, ...] = tuple(
                             validate_element(element)
                             for element in value  # pyright: ignore[reportUnknownVariableType]

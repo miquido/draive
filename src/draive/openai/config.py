@@ -3,7 +3,7 @@ from typing import Literal
 
 from openai.types.chat.completion_create_params import ResponseFormat
 
-from draive.helpers import MISSING, Missing, getenv_float, getenv_int
+from draive.helpers import getenv_float, getenv_int
 from draive.types import Model
 
 __all__ = [
@@ -36,13 +36,13 @@ class OpenAIChatConfig(Model):
         | str
     ) = getenv("OPENAI_MODEL", default="gpt-3.5-turbo-0125")
     temperature: float = getenv_float("OPENAI_TEMPERATURE", 0.0)
-    top_p: float | Missing = MISSING
-    frequency_penalty: float | Missing = MISSING
-    max_tokens: int | Missing = MISSING
-    seed: int | None | Missing = getenv_int("OPENAI_SEED") or MISSING
-    response_format: ResponseFormat | Missing = MISSING
-    vision_details: Literal["auto", "low", "high"] | Missing = MISSING
-    timeout: float | Missing = MISSING
+    top_p: float | None = None
+    frequency_penalty: float | None = None
+    max_tokens: int | None = None
+    seed: int | None = getenv_int("OPENAI_SEED")
+    response_format: ResponseFormat | None = None
+    vision_details: Literal["auto", "low", "high"] | None = None
+    timeout: float | None = None
     recursion_limit: int = 4
 
 
@@ -55,10 +55,10 @@ class OpenAIEmbeddingConfig(Model):
         ]
         | str
     ) = "text-embedding-3-small"
-    dimensions: int | Missing = MISSING
+    dimensions: int | None = None
     batch_size: int = 32
-    encoding_format: Literal["float", "base64"] | Missing = MISSING
-    timeout: float | Missing = MISSING
+    encoding_format: Literal["float", "base64"] | None = None
+    timeout: float | None = None
 
 
 class OpenAIImageGenerationConfig(Model):
@@ -66,5 +66,5 @@ class OpenAIImageGenerationConfig(Model):
     quality: Literal["standard", "hd"] = "standard"
     size: Literal["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"] = "1024x1024"
     style: Literal["vivid", "natural"] = "vivid"
-    timeout: float | Missing = MISSING
+    timeout: float | None = None
     response_format: Literal["url", "b64_json"] = "b64_json"
