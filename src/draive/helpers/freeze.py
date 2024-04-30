@@ -5,7 +5,7 @@ __all__ = [
 ]
 
 
-def freeze(instance: object) -> None:
+def freeze(instance: object, /) -> None:
     def frozen_set(
         __name: str,
         __value: Any,

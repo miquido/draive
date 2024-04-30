@@ -218,7 +218,7 @@ def parameter_specification(  # noqa: C901, PLR0912
                 "oneOf": [
                     parameter_specification(
                         annotation=arg,
-                        description=description,
+                        description=None,
                         globalns=globalns,
                         localns=localns,
                         recursion_guard=recursion_guard,

@@ -1,4 +1,3 @@
-from draive.helpers import MISSING, Missing
 from draive.types.model import Model
 
 __all__ = [
@@ -10,12 +9,12 @@ __all__ = [
 
 class VideoURLContent(Model):
     video_url: str
-    video_transcription: str | Missing = MISSING
+    video_transcription: str | None = None
 
 
 class VideoBase64Content(Model):
     video_base64: str
-    video_transcription: str | Missing = MISSING
+    video_transcription: str | None = None
 
 
 VideoContent = VideoURLContent | VideoBase64Content
