@@ -42,6 +42,15 @@ class Toolbox:
     def available_tools(self) -> list[ToolSpecification]:
         return [tool.specification for tool in self._tools.values() if tool.available]
 
+    def requires_direct_result(
+        self,
+        tool_name: str,
+    ) -> bool:
+        if tool := self._tools.get(tool_name):
+            return tool.requires_direct_result
+        else:
+            return False
+
     async def call_tool(
         self,
         name: str,
@@ -49,7 +58,7 @@ class Toolbox:
         call_id: str,
         arguments: dict[str, Any] | str | bytes | None,
     ) -> Any:
-        if tool := self._tools[name]:
+        if tool := self._tools.get(name):
             return await tool(
                 tool_call_id=call_id,
                 **loads(arguments) if isinstance(arguments, str | bytes) else arguments or {},

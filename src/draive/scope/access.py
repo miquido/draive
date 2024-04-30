@@ -261,6 +261,7 @@ class ctx:
             function: Callable[Args, Coroutine[None, None, Result]],
             /,
         ) -> Callable[Args, Coroutine[None, None, Result]]:
+            @mimic_function(function)
             async def wrapped(*args: Args.args, **kwargs: Args.kwargs) -> Result:
                 async with ctx.new(
                     label,
@@ -272,7 +273,27 @@ class ctx:
                 ):
                     return await function(*args, **kwargs)
 
-            return mimic_function(function, within=wrapped)
+            return wrapped
+
+        return wrapper
+
+    @staticmethod
+    def update[**Args, Result](
+        *state: ParametrizedData,
+    ) -> Callable[
+        [Callable[Args, Coroutine[None, None, Result]]],
+        Callable[Args, Coroutine[None, None, Result]],
+    ]:
+        def wrapper(
+            function: Callable[Args, Coroutine[None, None, Result]],
+            /,
+        ) -> Callable[Args, Coroutine[None, None, Result]]:
+            @mimic_function(function)
+            async def wrapped(*args: Args.args, **kwargs: Args.kwargs) -> Result:
+                with ctx.updated(*state):
+                    return await function(*args, **kwargs)
+
+            return wrapped
 
         return wrapper
 

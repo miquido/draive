@@ -130,8 +130,6 @@ __all__ = [
     "AsyncStream",
     "AsyncStreamTask",
     "agent",
-    "agent",
-    "Agent",
     "Agent",
     "AgentException",
     "AgentFlow",

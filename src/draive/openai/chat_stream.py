@@ -26,7 +26,7 @@ __all__ = [
 ]
 
 
-async def _chat_stream(  # noqa: PLR0913
+async def _chat_stream(  # noqa: PLR0913, C901
     *,
     client: OpenAIClient,
     config: OpenAIChatConfig,
@@ -82,13 +82,21 @@ async def _chat_stream(  # noqa: PLR0913
                     tool_calls=completion_head.tool_calls,
                     completion_stream=completion_stream,
                 )
-                messages.extend(
-                    await _execute_chat_tool_calls(
-                        tool_calls=tool_calls,
-                        tools=tools,
-                    )
-                )
                 ctx.record(ResultTrace.of(tool_calls))
+
+                tools_result: (
+                    list[ChatCompletionMessageParam] | str
+                ) = await _execute_chat_tool_calls(
+                    tool_calls=tool_calls,
+                    tools=tools,
+                )
+
+                if isinstance(tools_result, str):
+                    send_update(tools_result)
+                    return tools_result
+                else:
+                    messages.extend(tools_result)
+
                 break  # after processing tool calls continue with recursion in outer context
 
             elif completion_head.content is not None:

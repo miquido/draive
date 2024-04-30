@@ -1,47 +1,55 @@
 from asyncio import CancelledError, Task, sleep
-from random import randint
+from collections.abc import Callable, Generator
 from time import sleep as sync_sleep
 
 from draive import cache
-from pytest import mark, raises
+from pytest import fixture, mark, raises
 
 
 class FakeException(Exception):
     pass
 
 
-def test_returns_cached_value_with_same_argument():
+@fixture
+def fake_random() -> Callable[[], Generator[int, None, None]]:
+    def random_next() -> Generator[int, None, None]:
+        yield from range(0, 65536)
+
+    return random_next
+
+
+def test_returns_cached_value_with_same_argument(fake_random: Callable[[], int]):
     @cache
     def randomized(_: str, /) -> int:
-        return randint(-65536, 65535)
+        return fake_random()
 
     expected: int = randomized("expected")
     assert randomized("expected") == expected
 
 
-def test_returns_fresh_value_with_different_argument():
+def test_returns_fresh_value_with_different_argument(fake_random: Callable[[], int]):
     @cache
     def randomized(_: str, /) -> int:
-        return randint(-65536, 65535)
+        return fake_random()
 
     expected: int = randomized("expected")
     assert randomized("checked") != expected
 
 
-def test_returns_fresh_value_with_limit_exceed():
+def test_returns_fresh_value_with_limit_exceed(fake_random: Callable[[], int]):
     @cache(limit=1)
     def randomized(_: str, /) -> int:
-        return randint(-65536, 65535)
+        return fake_random()
 
     expected: int = randomized("expected")
     randomized("different")
     assert randomized("expected") != expected
 
 
-def test_returns_same_value_with_repeating_argument():
+def test_returns_same_value_with_repeating_argument(fake_random: Callable[[], int]):
     @cache(limit=2)
     def randomized(_: str, /) -> int:
-        return randint(-65536, 65535)
+        return fake_random()
 
     expected: int = randomized("expected")
     randomized("different")
@@ -61,10 +69,10 @@ def test_fails_with_error():
         randomized("expected")
 
 
-def test_returns_fresh_value_with_expiration_time_exceed():
+def test_returns_fresh_value_with_expiration_time_exceed(fake_random: Callable[[], int]):
     @cache(expiration=0.02)
     def randomized(_: str, /) -> int:
-        return randint(-65536, 65535)
+        return fake_random()
 
     expected: int = randomized("expected")
     sync_sleep(0.02)
@@ -72,30 +80,30 @@ def test_returns_fresh_value_with_expiration_time_exceed():
 
 
 @mark.asyncio
-async def test_async_returns_cached_value_with_same_argument():
+async def test_async_returns_cached_value_with_same_argument(fake_random: Callable[[], int]):
     @cache
     async def randomized(_: str, /) -> int:
-        return randint(-65536, 65535)
+        return fake_random()
 
     expected: int = await randomized("expected")
     assert await randomized("expected") == expected
 
 
 @mark.asyncio
-async def test_async_returns_fresh_value_with_different_argument():
+async def test_async_returns_fresh_value_with_different_argument(fake_random: Callable[[], int]):
     @cache
     async def randomized(_: str, /) -> int:
-        return randint(-65536, 65535)
+        return fake_random()
 
     expected: int = await randomized("expected")
     assert await randomized("checked") != expected
 
 
 @mark.asyncio
-async def test_async_returns_fresh_value_with_limit_exceed():
+async def test_async_returns_fresh_value_with_limit_exceed(fake_random: Callable[[], int]):
     @cache(limit=1)
     async def randomized(_: str, /) -> int:
-        return randint(-65536, 65535)
+        return fake_random()
 
     expected: int = await randomized("expected")
     await randomized("different")
@@ -103,10 +111,10 @@ async def test_async_returns_fresh_value_with_limit_exceed():
 
 
 @mark.asyncio
-async def test_async_returns_same_value_with_repeating_argument():
+async def test_async_returns_same_value_with_repeating_argument(fake_random: Callable[[], int]):
     @cache(limit=2)
     async def randomized(_: str, /) -> int:
-        return randint(-65536, 65535)
+        return fake_random()
 
     expected: int = await randomized("expected")
     await randomized("different")
@@ -118,10 +126,12 @@ async def test_async_returns_same_value_with_repeating_argument():
 
 
 @mark.asyncio
-async def test_async_returns_fresh_value_with_expiration_time_exceed():
+async def test_async_returns_fresh_value_with_expiration_time_exceed(
+    fake_random: Callable[[], int],
+):
     @cache(expiration=0.02)
     async def randomized(_: str, /) -> int:
-        return randint(-65536, 65535)
+        return fake_random()
 
     expected: int = await randomized("expected")
     await sleep(0.02)
@@ -162,11 +172,11 @@ async def test_async_expiration_does_not_cancel_task():
 
 
 @mark.asyncio
-async def test_async_expiration_creates_new_task():
+async def test_async_expiration_creates_new_task(fake_random: Callable[[], int]):
     @cache(expiration=0.01)
     async def randomized(_: str, /) -> int:
         await sleep(0.02)
-        return randint(-65536, 65535)
+        return fake_random()
 
     assert await randomized("expected") != await randomized("expected")
 

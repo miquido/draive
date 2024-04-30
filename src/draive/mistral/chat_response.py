@@ -66,13 +66,17 @@ async def _chat_response(
         completion_message: ChatMessageResponse = completion.choices[0].message
 
         if (tool_calls := completion_message.tool_calls) and (tools := tools):
-            messages.extend(
-                await _execute_chat_tool_calls(
-                    tool_calls=tool_calls,
-                    tools=tools,
-                )
-            )
             ctx.record(ResultTrace.of(tool_calls))
+
+            tools_result: list[ChatMessage] | str = await _execute_chat_tool_calls(
+                tool_calls=tool_calls,
+                tools=tools,
+            )
+
+            if isinstance(tools_result, str):
+                return tools_result
+            else:
+                messages.extend(tools_result)
 
         elif message := completion_message.content:
             ctx.record(ResultTrace.of(message))

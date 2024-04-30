@@ -30,6 +30,7 @@ def _traced_sync[**Args, Result](
 ) -> Callable[Args, Result]:
     label: str = function.__name__
 
+    @mimic_function(function)
     def wrapped(
         *args: Args.args,
         **kwargs: Args.kwargs,
@@ -42,7 +43,7 @@ def _traced_sync[**Args, Result](
             ctx.record(ResultTrace.of(result))
             return result
 
-    return mimic_function(function, within=wrapped)
+    return wrapped
 
 
 def _traced_async[**Args, Result](
@@ -51,6 +52,7 @@ def _traced_async[**Args, Result](
 ) -> Callable[Args, Coroutine[Any, Any, Result]]:
     label: str = function.__name__
 
+    @mimic_function(function)
     async def wrapped(
         *args: Args.args,
         **kwargs: Args.kwargs,
@@ -63,4 +65,4 @@ def _traced_async[**Args, Result](
             ctx.record(ResultTrace.of(result))
             return result
 
-    return mimic_function(function, within=wrapped)
+    return wrapped
