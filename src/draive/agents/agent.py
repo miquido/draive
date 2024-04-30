@@ -1,14 +1,10 @@
 from collections.abc import Callable
 from inspect import isfunction
-from typing import final, overload
-from uuid import uuid4
+from typing import Protocol, final
+from uuid import UUID, uuid4
 
-from draive.agents.abc import BaseAgent
 from draive.agents.errors import AgentException
-from draive.agents.state import AgentState
-from draive.agents.types import AgentInvocation
-from draive.helpers import freeze
-from draive.metrics import ArgumentsTrace
+from draive.agents.state import AgentsChat, AgentsChatMessage, AgentsData
 from draive.parameters import ParametrizedData
 from draive.scope import ctx
 from draive.types import MultimodalContent
@@ -16,92 +12,84 @@ from draive.types import MultimodalContent
 __all__ = [
     "agent",
     "Agent",
+    "AgentInvocation",
 ]
 
 
+class AgentInvocation[Data: ParametrizedData](Protocol):
+    async def __call__(
+        self,
+        chat: AgentsChat,
+        data: AgentsData[Data],
+    ) -> MultimodalContent: ...
+
+
 @final
-class Agent[State: ParametrizedData](BaseAgent[State]):
+class Agent[Data: ParametrizedData]:
     def __init__(
         self,
-        name: str,
-        description: str,
-        invoke: AgentInvocation[State],
+        role: str,
+        capabilities: str,
+        invocation: AgentInvocation[Data],
     ) -> None:
-        self.invoke: AgentInvocation[State] = invoke
-        super().__init__(
-            agent_id=uuid4().hex,
-            name=name,
-            description=description,
+        self.role: str = role
+        self.identifier: UUID = uuid4()
+        self.capabilities: str = capabilities
+        self._invocation: AgentInvocation[Data] = invocation
+        self.description: str = (
+            f"{self.role}:\n| ID: {self.identifier}\n| Capabilities: {self.capabilities}"
         )
 
-        freeze(self)
+    def __eq__(
+        self,
+        other: object,
+    ) -> bool:
+        if isinstance(other, Agent):
+            return self.identifier == other.identifier
+        else:
+            return False
+
+    def __hash__(self) -> int:
+        return hash(self.identifier)
+
+    def __str__(self) -> str:
+        return self.description
 
     async def __call__(
         self,
-        state: AgentState[State],
-    ) -> MultimodalContent | None:
-        invocation_id: str = uuid4().hex
+        chat: AgentsChat,
+        data: AgentsData[Data],
+    ) -> AgentsChatMessage:
         with ctx.nested(
-            f"Agent|{self.name}",
-            metrics=[
-                ArgumentsTrace.of(
-                    agent_id=self.agent_id,
-                    invocation_id=invocation_id,
-                    state=state,
-                )
-            ],
+            f"Agent|{self.role}|{self.identifier}",
         ):
             try:
-                return await self.invoke(state)
+                return AgentsChatMessage(
+                    author=self.role,
+                    content=await self._invocation(chat, data),
+                )
 
             except Exception as exc:
                 raise AgentException(
-                    "Agent invocation %s of %s failed due to an error: %s",
-                    invocation_id,
-                    self.agent_id,
+                    "Agent invocation of %s failed due to an error: %s",
+                    self.identifier,
                     exc,
                 ) from exc
 
 
-@overload
-def agent[State: ParametrizedData](
-    invoke: AgentInvocation[State],
-    /,
-) -> Agent[State]: ...
-
-
-@overload
-def agent[State: ParametrizedData](
+def agent[Data: ParametrizedData](
     *,
-    name: str,
-    description: str | None = None,
-) -> Callable[[AgentInvocation[State]], Agent[State]]: ...
-
-
-@overload
-def agent[State: ParametrizedData](
-    *,
-    description: str,
-) -> Callable[[AgentInvocation[State]], Agent[State]]: ...
-
-
-def agent[State: ParametrizedData](
-    invoke: AgentInvocation[State] | None = None,
-    *,
-    name: str | None = None,
-    description: str | None = None,
-) -> Callable[[AgentInvocation[State]], Agent[State]] | Agent[State]:
+    role: str,
+    capabilities: str,
+) -> Callable[[AgentInvocation[Data]], Agent[Data]]:
     def wrap(
-        invoke: AgentInvocation[State],
-    ) -> Agent[State]:
-        assert isfunction(invoke), "Agent has to be defined from function"  # nosec: B101
-        return Agent[State](
-            name=name or invoke.__qualname__,
-            description=description or "",
-            invoke=invoke,
+        invoke: AgentInvocation[Data],
+    ) -> Agent[Data]:
+        assert isfunction(invoke), "Agent has to be defined from a function"  # nosec: B101
+        return Agent[Data](
+            role=role,
+            capabilities=capabilities,
+            invocation=invoke,
         )
 
-    if invoke := invoke:
-        return wrap(invoke=invoke)
-    else:
-        return wrap
+    return wrap
