@@ -79,7 +79,7 @@ from draive.openai import (
     openai_lmm_completion,
     openai_tokenize_text,
 )
-from draive.parameters import Argument, Field
+from draive.parameters import Argument, Field, ParameterPath
 from draive.scope import (
     ScopeDependencies,
     ScopeDependency,
@@ -219,6 +219,7 @@ __all__ = [
     "OpenAIEmbeddingConfig",
     "OpenAIException",
     "OpenAIImageGenerationConfig",
+    "ParameterPath",
     "ReadOnlyMemory",
     "ScopeDependencies",
     "ScopeDependency",
