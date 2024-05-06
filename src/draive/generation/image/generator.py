@@ -1,4 +1,4 @@
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from draive.types import ImageContent
 
@@ -13,5 +13,5 @@ class ImageGenerator(Protocol):
         self,
         *,
         instruction: str,
-    ) -> ImageContent:
-        ...
+        **extra: Any,
+    ) -> ImageContent: ...

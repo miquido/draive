@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-async def _chat_response(
+async def _chat_response(  # noqa: C901
     *,
     client: MistralClient,
     config: MistralChatConfig,
@@ -24,32 +24,50 @@ async def _chat_response(
     tools: Toolbox,
     recursion_level: int = 0,
 ) -> str:
-    if recursion_level > config.recursion_limit:
-        raise MistralException("Reached limit of recursive calls of %d", config.recursion_limit)
-
     with ctx.nested(
         "chat_response",
         metrics=[ArgumentsTrace.of(messages=messages.copy())],
     ):
-        suggest_tools: bool
-        available_tools: list[dict[str, object]]
-        if recursion_level == 0 and (suggested := tools.suggested_tool):
-            # suggest/require tool call only initially
-            suggest_tools = True
-            available_tools = cast(list[dict[str, object]], [suggested])
-        else:
-            suggest_tools = False
-            available_tools = cast(
-                list[dict[str, object]],
-                tools.available_tools if tools else [],
+        completion: ChatCompletionResponse
+
+        if recursion_level == config.recursion_limit:
+            ctx.log_warning("Reaching limit of recursive Mistral calls, ignoring tools...")
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
             )
 
-        completion: ChatCompletionResponse = await client.chat_completion(
-            config=config,
-            messages=messages,
-            tools=available_tools,
-            suggest_tools=suggest_tools,
-        )
+        elif recursion_level != 0:  # suggest/require tool call only initially
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=cast(
+                    list[dict[str, object]],
+                    tools.available_tools,
+                ),
+            )
+
+        elif suggested_tool := tools.suggested_tool:
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=cast(
+                    list[dict[str, object]],
+                    [suggested_tool],
+                ),
+                suggest_tools=True,
+            )
+
+        else:
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=cast(
+                    list[dict[str, object]],
+                    tools.available_tools,
+                ),
+                suggest_tools=tools.suggest_tools,
+            )
 
         if usage := completion.usage:
             ctx.record(
@@ -93,6 +111,9 @@ async def _chat_response(
             raise MistralException("Invalid Mistral completion", completion)
 
     # recursion outside of context
+    if recursion_level >= config.recursion_limit:
+        raise MistralException("Reached limit of recursive calls of %d", config.recursion_limit)
+
     return await _chat_response(
         client=client,
         config=config,

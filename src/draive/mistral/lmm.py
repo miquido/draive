@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Literal, overload
+from typing import Any, Literal, overload
 
 from draive.lmm import LMMCompletionMessage, LMMCompletionStream, LMMCompletionStreamingUpdate
 from draive.mistral.chat_response import _chat_response  # pyright: ignore[reportPrivateUsage]
@@ -23,6 +23,7 @@ async def mistral_lmm_completion(
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
     stream: Literal[True],
+    **extra: Any,
 ) -> LMMCompletionStream: ...
 
 
@@ -32,6 +33,7 @@ async def mistral_lmm_completion(
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
     stream: Callable[[LMMCompletionStreamingUpdate], None],
+    **extra: Any,
 ) -> LMMCompletionMessage: ...
 
 
@@ -41,6 +43,8 @@ async def mistral_lmm_completion(
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
     output: Literal["text", "json"] = "text",
+    stream: Literal[False] = False,
+    **extra: Any,
 ) -> LMMCompletionMessage: ...
 
 
@@ -50,23 +54,23 @@ async def mistral_lmm_completion(
     tools: Toolbox | None = None,
     output: Literal["text", "json"] = "text",
     stream: Callable[[LMMCompletionStreamingUpdate], None] | bool = False,
+    **extra: Any,
 ) -> LMMCompletionStream | LMMCompletionMessage:
     client: MistralClient = ctx.dependency(MistralClient)
-    config: MistralChatConfig
+    config: MistralChatConfig = ctx.state(MistralChatConfig).updated(**extra)
     match output:
         case "text":
-            config = ctx.state(MistralChatConfig).updated(response_format={"type": "text"})
+            config = config.updated(response_format={"type": "text"})
         case "json":
             if tools is None:
-                config = ctx.state(MistralChatConfig).updated(
-                    response_format={"type": "json_object"}
-                )
+                config = config.updated(response_format={"type": "json_object"})
             else:
                 ctx.log_warning(
                     "Attempting to use Mistral in JSON mode with tools which is not supported."
                     " Using text mode instead..."
                 )
-                config = ctx.state(MistralChatConfig).updated(response_format={"type": "text"})
+                config = config.updated(response_format={"type": "text"})
+
     messages: list[ChatMessage] = [_convert_message(message=message) for message in context]
 
     match stream:

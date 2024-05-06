@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from typing import Any
 
 from draive.generation.text.state import TextGeneration
 from draive.scope import ctx
@@ -16,6 +17,7 @@ async def generate_text(
     input: MultimodalContent,  # noqa: A002
     tools: Toolbox | None = None,
     examples: Iterable[tuple[MultimodalContent, str]] | None = None,
+    **extra: Any,
 ) -> str:
     text_generation: TextGeneration = ctx.state(TextGeneration)
     return await text_generation.generate(
@@ -23,4 +25,5 @@ async def generate_text(
         input=input,
         tools=tools or text_generation.tools,
         examples=examples,
+        **extra,
     )

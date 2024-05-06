@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from draive.tools import Toolbox
 from draive.types import MultimodalContent
@@ -18,5 +18,5 @@ class TextGenerator(Protocol):
         input: MultimodalContent,  # noqa: A002
         tools: Toolbox | None = None,
         examples: Iterable[tuple[MultimodalContent, str]] | None = None,
-    ) -> str:
-        ...
+        **extra: Any,
+    ) -> str: ...

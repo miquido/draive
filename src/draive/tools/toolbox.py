@@ -1,6 +1,7 @@
 from json import loads
-from typing import Any, final
+from typing import Any, Literal, final
 
+from draive.helpers import freeze
 from draive.parameters import ToolSpecification
 from draive.tools import Tool
 from draive.tools.errors import ToolException
@@ -17,12 +18,24 @@ class Toolbox:
     def __init__(
         self,
         *tools: AnyTool,
-        suggested: AnyTool | None = None,
+        suggest: AnyTool | Literal[True] | None = None,
     ) -> None:
-        self._suggested_tool: AnyTool | None = suggested
         self._tools: dict[str, AnyTool] = {tool.name: tool for tool in tools}
-        if suggested := suggested:
-            self._tools[suggested.name] = suggested
+        self.suggest_tools: bool
+        self._suggested_tool: AnyTool | None
+        match suggest:
+            case None:
+                self.suggest_tools = False
+                self._suggested_tool = None
+            case True:
+                self.suggest_tools = True if self._tools else False
+                self._suggested_tool = None
+            case tool:
+                self.suggest_tools = True
+                self._suggested_tool = tool
+                self._tools[tool.name] = tool
+
+        freeze(self)
 
     @property
     def suggested_tool_name(self) -> str | None:

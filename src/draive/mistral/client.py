@@ -53,7 +53,8 @@ class MistralClient(ScopeDependency):
         *,
         config: MistralChatConfig,
         messages: list[ChatMessage],
-        tools: list[dict[str, object]],
+        tools: list[dict[str, object]] | None = None,
+        suggest_tools: bool = False,
         stream: Literal[True],
     ) -> AsyncIterable[ChatCompletionStreamResponse]: ...
 
@@ -63,18 +64,7 @@ class MistralClient(ScopeDependency):
         *,
         config: MistralChatConfig,
         messages: list[ChatMessage],
-        tools: list[dict[str, object]],
-        suggest_tools: bool,
-        stream: Literal[True],
-    ) -> AsyncIterable[ChatCompletionStreamResponse]: ...
-
-    @overload
-    async def chat_completion(
-        self,
-        *,
-        config: MistralChatConfig,
-        messages: list[ChatMessage],
-        tools: list[dict[str, object]],
+        tools: list[dict[str, object]] | None = None,
         suggest_tools: bool = False,
     ) -> ChatCompletionResponse: ...
 
@@ -83,7 +73,7 @@ class MistralClient(ScopeDependency):
         *,
         config: MistralChatConfig,
         messages: list[ChatMessage],
-        tools: list[dict[str, object]],
+        tools: list[dict[str, object]] | None = None,
         suggest_tools: bool = False,
         stream: bool = False,
     ) -> AsyncIterable[ChatCompletionStreamResponse] | ChatCompletionResponse:
@@ -131,7 +121,7 @@ class MistralClient(ScopeDependency):
         max_tokens: int | None,
         response_format: dict[str, str] | None,
         messages: list[ChatMessage],
-        tools: list[dict[str, object]],
+        tools: list[dict[str, object]] | None,
         tool_choice: str | None,
     ) -> ChatCompletionResponse:
         request_body: dict[str, Any] = {

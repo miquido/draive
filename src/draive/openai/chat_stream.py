@@ -6,6 +6,7 @@ from openai.types.chat import (
     ChatCompletionChunk,
     ChatCompletionMessageParam,
     ChatCompletionMessageToolCall,
+    ChatCompletionNamedToolChoiceParam,
     ChatCompletionToolParam,
 )
 from openai.types.chat.chat_completion_chunk import ChoiceDelta
@@ -35,30 +36,46 @@ async def _chat_stream(  # noqa: PLR0913, C901
     send_update: Callable[[ToolCallUpdate | str], None],
     recursion_level: int = 0,
 ) -> str:
-    if recursion_level > config.recursion_limit:
-        raise OpenAIException("Reached limit of recursive calls of %d", config.recursion_limit)
-
     with ctx.nested(
         "chat_stream",
         metrics=[ArgumentsTrace.of(messages=messages.copy())],
     ):
-        completion_stream: OpenAIAsyncStream[ChatCompletionChunk] = await client.chat_completion(
-            config=config,
-            messages=messages,
-            tools=cast(
-                list[ChatCompletionToolParam],
-                tools.available_tools if tools else [],
-            ),
-            suggested_tool={
-                "type": "function",
-                "function": {
-                    "name": tools.suggested_tool_name,
-                },
-            }  # suggest/require tool call only initially
-            if recursion_level == 0 and tools.suggested_tool_name
-            else None,
-            stream=True,
-        )
+        completion_stream: OpenAIAsyncStream[ChatCompletionChunk]
+        if recursion_level == config.recursion_limit:
+            ctx.log_warning("Reaching limit of recursive OpenAI calls, ignoring tools...")
+            completion_stream = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=None,
+                stream=True,
+            )
+
+        else:
+            tools_suggestion: ChatCompletionNamedToolChoiceParam | bool
+            if recursion_level != 0:  # suggest/require tool call only initially
+                tools_suggestion = False
+
+            elif suggested_tool_name := tools.suggested_tool_name:
+                tools_suggestion = {
+                    "type": "function",
+                    "function": {
+                        "name": suggested_tool_name,
+                    },
+                }
+
+            else:
+                tools_suggestion = tools.suggest_tools
+
+            completion_stream = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=cast(
+                    list[ChatCompletionToolParam],
+                    tools.available_tools if tools else [],
+                ),
+                tools_suggestion=tools_suggestion,
+                stream=True,
+            )
 
         while True:  # load chunks to decide what to do next
             head: ChatCompletionChunk
@@ -119,6 +136,9 @@ async def _chat_stream(  # noqa: PLR0913, C901
                 continue  # iterate over the stream until can decide what to do or reach the end
 
     # recursion outside of context
+    if recursion_level >= config.recursion_limit:
+        raise OpenAIException("Reached limit of recursive calls of %d", config.recursion_limit)
+
     return await _chat_stream(
         client=client,
         config=config,

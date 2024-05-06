@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Literal, Protocol, Self, overload, runtime_checkable
+from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
 
 from draive.lmm.message import (
     LMMCompletionMessage,
@@ -26,8 +26,10 @@ class LMMCompletion(Protocol):
         self,
         *,
         context: list[LMMCompletionMessage],
-        tools: Toolbox | None = None,
+        tools: Toolbox | None,
+        output: Literal["text", "json"],
         stream: Literal[True],
+        **extra: Any,
     ) -> LMMCompletionStream: ...
 
     @overload
@@ -35,8 +37,10 @@ class LMMCompletion(Protocol):
         self,
         *,
         context: list[LMMCompletionMessage],
-        tools: Toolbox | None = None,
+        tools: Toolbox | None,
+        output: Literal["text", "json"],
         stream: Callable[[LMMCompletionStreamingUpdate], None],
+        **extra: Any,
     ) -> LMMCompletionMessage: ...
 
     @overload
@@ -44,8 +48,10 @@ class LMMCompletion(Protocol):
         self,
         *,
         context: list[LMMCompletionMessage],
-        tools: Toolbox | None = None,
-        output: Literal["text", "json"] = "text",
+        tools: Toolbox | None,
+        output: Literal["text", "json"],
+        stream: Literal[False],
+        **extra: Any,
     ) -> LMMCompletionMessage: ...
 
     async def __call__(
@@ -55,4 +61,5 @@ class LMMCompletion(Protocol):
         tools: Toolbox | None = None,
         output: Literal["text", "json"] = "text",
         stream: Callable[[LMMCompletionStreamingUpdate], None] | bool = False,
+        **extra: Any,
     ) -> LMMCompletionStream | LMMCompletionMessage: ...

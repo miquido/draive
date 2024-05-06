@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from typing import Any
 
 from draive.lmm import LMMCompletionMessage, lmm_completion
 from draive.tools import Toolbox
@@ -15,6 +16,7 @@ async def lmm_generate_text(
     input: MultimodalContent,  # noqa: A002
     tools: Toolbox | None = None,
     examples: Iterable[tuple[MultimodalContent, str]] | None = None,
+    **extra: Any,
 ) -> str:
     system_message: LMMCompletionMessage = LMMCompletionMessage(
         role="system",
@@ -57,6 +59,8 @@ async def lmm_generate_text(
         context=context,
         tools=tools,
         output="text",
+        stream=False,
+        **extra,
     )
     generated: str = completion.content_string
 

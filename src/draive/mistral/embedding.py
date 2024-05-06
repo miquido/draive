@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from typing import Any
 
 from draive.embedding import Embedded
 from draive.mistral.client import MistralClient
@@ -12,8 +13,9 @@ __all__ = [
 
 async def mistral_embed_text(
     values: Iterable[str],
+    **extra: Any,
 ) -> list[Embedded[str]]:
-    config: MistralEmbeddingConfig = ctx.state(MistralEmbeddingConfig)
+    config: MistralEmbeddingConfig = ctx.state(MistralEmbeddingConfig).updated(**extra)
     with ctx.nested("text_embedding", metrics=[config]):
         results: list[list[float]] = await ctx.dependency(MistralClient).embedding(
             config=config,

@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Literal, overload
+from typing import Any, Literal, overload
 
 from draive.lmm.completion import LMMCompletionStream
 from draive.lmm.message import (
@@ -21,6 +21,7 @@ async def lmm_completion(
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
     stream: Literal[True],
+    **extra: Any,
 ) -> LMMCompletionStream: ...
 
 
@@ -30,6 +31,7 @@ async def lmm_completion(
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
     stream: Callable[[LMMCompletionStreamingUpdate], None],
+    **extra: Any,
 ) -> LMMCompletionMessage: ...
 
 
@@ -39,6 +41,8 @@ async def lmm_completion(
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
     output: Literal["text", "json"] = "text",
+    stream: Literal[False] = False,
+    **extra: Any,
 ) -> LMMCompletionMessage: ...
 
 
@@ -48,6 +52,7 @@ async def lmm_completion(
     tools: Toolbox | None = None,
     output: Literal["text", "json"] = "text",
     stream: Callable[[LMMCompletionStreamingUpdate], None] | bool = False,
+    **extra: Any,
 ) -> LMMCompletionStream | LMMCompletionMessage:
     match stream:
         case False:
@@ -55,16 +60,22 @@ async def lmm_completion(
                 context=context,
                 tools=tools,
                 output=output,
+                stream=False,
+                **extra,
             )
         case True:
             return await ctx.state(LMM).completion(
                 context=context,
                 tools=tools,
+                output=output,
                 stream=True,
+                **extra,
             )
         case progress:
             return await ctx.state(LMM).completion(
                 context=context,
                 tools=tools,
+                output=output,
                 stream=progress,
+                **extra,
             )
