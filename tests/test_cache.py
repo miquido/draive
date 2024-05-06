@@ -70,7 +70,7 @@ def test_fails_with_error():
 
 
 def test_returns_fresh_value_with_expiration_time_exceed(fake_random: Callable[[], int]):
-    @cache(expiration=0.02)
+    @cache(expiration=0.01)
     def randomized(_: str, /) -> int:
         return fake_random()
 
@@ -129,7 +129,7 @@ async def test_async_returns_same_value_with_repeating_argument(fake_random: Cal
 async def test_async_returns_fresh_value_with_expiration_time_exceed(
     fake_random: Callable[[], int],
 ):
-    @cache(expiration=0.02)
+    @cache(expiration=0.01)
     async def randomized(_: str, /) -> int:
         return fake_random()
 

@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from draive.embedding.embedded import Embedded
 
@@ -13,4 +13,5 @@ class Embedder[Value](Protocol):
     async def __call__(
         self,
         values: Iterable[Value],
+        **extra: Any,
     ) -> list[Embedded[Value]]: ...

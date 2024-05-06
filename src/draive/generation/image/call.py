@@ -1,3 +1,5 @@
+from typing import Any
+
 from draive.generation.image.state import ImageGeneration
 from draive.scope import ctx
 from draive.types import ImageContent
@@ -10,7 +12,9 @@ __all__ = [
 async def generate_image(
     *,
     instruction: str,
+    **extra: Any,
 ) -> ImageContent:
     return await ctx.state(ImageGeneration).generate(
         instruction=instruction,
+        **extra,
     )

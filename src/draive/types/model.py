@@ -33,6 +33,7 @@ class Model(ParametrizedData):
     def from_json(
         cls,
         value: str | bytes,
+        /,
         decoder: type[json.JSONDecoder] = json.JSONDecoder,
     ) -> Self:
         try:

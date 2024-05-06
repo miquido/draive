@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from typing import Any
 
 from draive.embedding import Embedded
 from draive.openai.client import OpenAIClient
@@ -12,8 +13,9 @@ __all__ = [
 
 async def openai_embed_text(
     values: Iterable[str],
+    **extra: Any,
 ) -> list[Embedded[str]]:
-    config: OpenAIEmbeddingConfig = ctx.state(OpenAIEmbeddingConfig)
+    config: OpenAIEmbeddingConfig = ctx.state(OpenAIEmbeddingConfig).updated(**extra)
     with ctx.nested("text_embedding", metrics=[config]):
         results: list[list[float]] = await ctx.dependency(OpenAIClient).embedding(
             config=config,

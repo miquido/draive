@@ -12,6 +12,7 @@ from openai.types.chat import (
     ChatCompletionChunk,
     ChatCompletionMessageParam,
     ChatCompletionNamedToolChoiceParam,
+    ChatCompletionToolChoiceOptionParam,
     ChatCompletionToolParam,
 )
 from openai.types.create_embedding_response import CreateEmbeddingResponse
@@ -77,7 +78,8 @@ class OpenAIClient(ScopeDependency):
         *,
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
-        tools: list[ChatCompletionToolParam],
+        tools: list[ChatCompletionToolParam] | None = None,
+        tools_suggestion: ChatCompletionNamedToolChoiceParam | bool = False,
         stream: Literal[True],
     ) -> AsyncStream[ChatCompletionChunk]: ...
 
@@ -87,19 +89,8 @@ class OpenAIClient(ScopeDependency):
         *,
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
-        tools: list[ChatCompletionToolParam],
-        suggested_tool: ChatCompletionNamedToolChoiceParam | None,
-        stream: Literal[True],
-    ) -> AsyncStream[ChatCompletionChunk]: ...
-
-    @overload
-    async def chat_completion(
-        self,
-        *,
-        config: OpenAIChatConfig,
-        messages: list[ChatCompletionMessageParam],
-        tools: list[ChatCompletionToolParam],
-        suggested_tool: ChatCompletionNamedToolChoiceParam | None = None,
+        tools: list[ChatCompletionToolParam] | None = None,
+        tools_suggestion: ChatCompletionNamedToolChoiceParam | bool = False,
     ) -> ChatCompletion: ...
 
     async def chat_completion(  # noqa: PLR0913
@@ -107,24 +98,41 @@ class OpenAIClient(ScopeDependency):
         *,
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
-        tools: list[ChatCompletionToolParam],
-        suggested_tool: ChatCompletionNamedToolChoiceParam | None = None,
+        tools: list[ChatCompletionToolParam] | None = None,
+        tools_suggestion: ChatCompletionNamedToolChoiceParam | bool = False,
         stream: bool = False,
     ) -> AsyncStream[ChatCompletionChunk] | ChatCompletion:
+        tool_choice: ChatCompletionToolChoiceOptionParam | NotGiven
+        match tools_suggestion:
+            case False:
+                tool_choice = "auto" if tools else NOT_GIVEN
+
+            case True:
+                assert tools, "Can't require tools use without tools"  # nosec: B101
+                tool_choice = "required"
+
+            case tool:
+                assert tools, "Can't require tools use without tools"  # nosec: B101
+                tool_choice = tool
+
         return await self._client.chat.completions.create(
             messages=messages,
             model=config.model,
-            frequency_penalty=_value_when_given(config.frequency_penalty),
-            max_tokens=_value_when_given(config.max_tokens),
+            frequency_penalty=config.frequency_penalty
+            if config.frequency_penalty is not None
+            else NOT_GIVEN,
+            max_tokens=config.max_tokens if config.max_tokens is not None else NOT_GIVEN,
             n=1,
-            response_format=_value_when_given(config.response_format),
-            seed=_value_when_given(config.seed),
+            response_format=config.response_format
+            if config.response_format is not None
+            else NOT_GIVEN,
+            seed=config.seed if config.seed is not None else NOT_GIVEN,
             stream=stream,
             temperature=config.temperature,
             tools=tools or NOT_GIVEN,
-            tool_choice=(suggested_tool or "auto") if tools else NOT_GIVEN,
-            top_p=_value_when_given(config.top_p),
-            timeout=_value_when_given(config.timeout),
+            tool_choice=tool_choice,
+            top_p=config.top_p if config.top_p is not None else NOT_GIVEN,
+            timeout=config.timeout if config.timeout is not None else NOT_GIVEN,
         )
 
     async def embedding(
@@ -140,9 +148,13 @@ class OpenAIClient(ScopeDependency):
                         self._create_text_embedding(
                             texts=list(inputs_list[index : index + config.batch_size]),
                             model=config.model,
-                            dimensions=config.dimensions,
-                            encoding_format=config.encoding_format,
-                            timeout=config.timeout,
+                            dimensions=config.dimensions
+                            if config.dimensions is not None
+                            else NOT_GIVEN,
+                            encoding_format=config.encoding_format
+                            if config.encoding_format is not None
+                            else NOT_GIVEN,
+                            timeout=config.timeout if config.timeout is not None else NOT_GIVEN,
                         )
                         for index in range(0, len(inputs_list), config.batch_size)
                     ]
@@ -154,17 +166,17 @@ class OpenAIClient(ScopeDependency):
         self,
         texts: list[str],
         model: str,
-        dimensions: int | None,
-        encoding_format: Literal["float", "base64"] | None,
-        timeout: float | None,
+        dimensions: int | NotGiven,
+        encoding_format: Literal["float", "base64"] | NotGiven,
+        timeout: float | NotGiven,
     ) -> list[list[float]]:
         try:
             response: CreateEmbeddingResponse = await self._client.embeddings.create(
                 input=texts,
                 model=model,
-                dimensions=_value_when_given(dimensions),
-                encoding_format=_value_when_given(encoding_format),
-                timeout=_value_when_given(timeout),
+                dimensions=dimensions,
+                encoding_format=encoding_format,
+                timeout=timeout,
             )
             return [element.embedding for element in response.data]
 
@@ -200,17 +212,10 @@ class OpenAIClient(ScopeDependency):
             quality=config.quality,
             size=config.size,
             style=config.style,
-            timeout=_value_when_given(config.timeout),
+            timeout=config.timeout if config.timeout is not None else NOT_GIVEN,
             response_format=config.response_format,
         )
         return response.data[0]
 
-    async def dispose(self):
+    async def dispose(self) -> None:
         await self._client.close()
-
-
-def _value_when_given[Value](
-    value: Value | None,
-    /,
-) -> Value | NotGiven:
-    return value if value is not None else NOT_GIVEN

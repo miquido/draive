@@ -30,29 +30,54 @@ async def _chat_response(
     tools: Toolbox,
     recursion_level: int = 0,
 ) -> str:
-    if recursion_level > config.recursion_limit:
-        raise OpenAIException("Reached limit of recursive calls of %d", config.recursion_limit)
-
     with ctx.nested(
         "chat_response",
         metrics=[ArgumentsTrace.of(messages=messages.copy())],
     ):
-        completion: ChatCompletion = await client.chat_completion(
-            config=config,
-            messages=messages,
-            tools=cast(
-                list[ChatCompletionToolParam],
-                tools.available_tools if tools else [],
-            ),
-            suggested_tool={
-                "type": "function",
-                "function": {
-                    "name": tools.suggested_tool_name,
+        completion: ChatCompletion
+        if recursion_level == config.recursion_limit:
+            ctx.log_warning("Reaching limit of recursive OpenAI calls, ignoring tools...")
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+            )
+
+        elif recursion_level != 0:  # suggest/require tool call only initially
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=cast(
+                    list[ChatCompletionToolParam],
+                    tools.available_tools,
+                ),
+            )
+
+        elif suggested_tool_name := tools.suggested_tool_name:
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=cast(
+                    list[ChatCompletionToolParam],
+                    tools.available_tools,
+                ),
+                tools_suggestion={
+                    "type": "function",
+                    "function": {
+                        "name": suggested_tool_name,
+                    },
                 },
-            }  # suggest/require tool call only initially
-            if recursion_level == 0 and tools.suggested_tool_name
-            else None,
-        )
+            )
+
+        else:
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=cast(
+                    list[ChatCompletionToolParam],
+                    tools.available_tools,
+                ),
+                tools_suggestion=tools.suggest_tools,
+            )
 
         if usage := completion.usage:
             ctx.record(
@@ -89,6 +114,9 @@ async def _chat_response(
             raise OpenAIException("Invalid OpenAI completion", completion)
 
     # recursion outside of context
+    if recursion_level >= config.recursion_limit:
+        raise OpenAIException("Reached limit of recursive calls of %d", config.recursion_limit)
+
     return await _chat_response(
         client=client,
         config=config,

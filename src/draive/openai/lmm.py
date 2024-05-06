@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Literal, overload
+from typing import Any, Literal, overload
 
 from openai.types.chat import ChatCompletionContentPartParam, ChatCompletionMessageParam
 
@@ -24,6 +24,7 @@ async def openai_lmm_completion(
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
     stream: Literal[True],
+    **extra: Any,
 ) -> LMMCompletionStream: ...
 
 
@@ -33,6 +34,7 @@ async def openai_lmm_completion(
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
     stream: Callable[[LMMCompletionStreamingUpdate], None],
+    **extra: Any,
 ) -> LMMCompletionMessage: ...
 
 
@@ -42,6 +44,8 @@ async def openai_lmm_completion(
     context: list[LMMCompletionMessage],
     tools: Toolbox | None = None,
     output: Literal["text", "json"] = "text",
+    stream: Literal[False] = False,
+    **extra: Any,
 ) -> LMMCompletionMessage: ...
 
 
@@ -51,14 +55,15 @@ async def openai_lmm_completion(
     tools: Toolbox | None = None,
     output: Literal["text", "json"] = "text",
     stream: Callable[[LMMCompletionStreamingUpdate], None] | bool = False,
+    **extra: Any,
 ) -> LMMCompletionStream | LMMCompletionMessage:
     client: OpenAIClient = ctx.dependency(OpenAIClient)
-    config: OpenAIChatConfig
+    config: OpenAIChatConfig = ctx.state(OpenAIChatConfig).updated(**extra)
     match output:
         case "text":
-            config = ctx.state(OpenAIChatConfig).updated(response_format={"type": "text"})
+            config = config.updated(response_format={"type": "text"})
         case "json":
-            config = ctx.state(OpenAIChatConfig).updated(response_format={"type": "json_object"})
+            config = config.updated(response_format={"type": "json_object"})
     messages: list[ChatCompletionMessageParam] = [
         _convert_message(config=config, message=message) for message in context
     ]

@@ -238,6 +238,7 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
     def from_dict(
         cls,
         value: dict[str, Any],
+        /,
     ) -> Self:
         return cls.validated(**value)
 
@@ -256,4 +257,8 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         /,
         **parameters: Any,
     ) -> Self:
-        return self.__class__.validated(**{**vars(self), **parameters})
+        if parameters:
+            return self.__class__.validated(**{**vars(self), **parameters})
+
+        else:
+            return self

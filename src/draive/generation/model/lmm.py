@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from typing import Any
 
 from draive.lmm import LMMCompletionMessage, lmm_completion
 from draive.tools import Toolbox
@@ -10,18 +11,20 @@ __all__: list[str] = [
 
 
 async def lmm_generate_model[Generated: Model](
-    model: type[Generated],
+    generated: type[Generated],
+    /,
     *,
     instruction: str,
     input: MultimodalContent,  # noqa: A002
     tools: Toolbox | None = None,
     examples: Iterable[tuple[MultimodalContent, Generated]] | None = None,
+    **extra: Any,
 ) -> Generated:
     system_message: LMMCompletionMessage = LMMCompletionMessage(
         role="system",
         content=INSTRUCTION.format(
             instruction=instruction,
-            format=model.specification(),
+            format=generated.specification(),
         ),
     )
     input_message: LMMCompletionMessage = LMMCompletionMessage(
@@ -61,10 +64,11 @@ async def lmm_generate_model[Generated: Model](
         context=context,
         tools=tools,
         output="json",
+        stream=False,
+        **extra,
     )
-    generated: Generated = model.from_json(completion.content_string)
 
-    return generated
+    return generated.from_json(completion.content_string)
 
 
 INSTRUCTION: str = """\
