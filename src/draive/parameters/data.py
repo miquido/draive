@@ -6,11 +6,11 @@ from dataclasses import asdict as dataclass_asdict
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from dataclasses import fields as dataclass_fields
-from typing import Any, Self, cast, dataclass_transform, overload
+from typing import Any, ClassVar, Self, cast, dataclass_transform, overload
 
-from draive.keypaths import KeyPath
 from draive.parameters.definition import ParameterDefinition, ParametersDefinition
 from draive.parameters.missing import MISSING_PARAMETER, MissingParameter
+from draive.parameters.path import ParameterPath
 from draive.parameters.specification import ParameterSpecification
 from draive.parameters.validation import parameter_validator
 
@@ -203,16 +203,35 @@ def _field_parameter(
 
 
 class ParametrizedData(metaclass=ParametrizedDataMeta):
-    @classmethod
-    def key_path(
-        cls,
-        path: str | None = None,
-        /,
-    ) -> KeyPath[Self]:
-        return KeyPath(
-            cls,
-            path=path,
+    _: ClassVar[Self]
+
+    def __init_subclass__(cls) -> None:
+        super().__init_subclass__()
+        cls._: Self = cast(
+            Self,
+            ParameterPath(cls, cls),  # type: ignore
         )
+
+    @classmethod
+    def path(
+        cls,
+        /,
+    ) -> Self:
+        return cast(
+            Self,
+            ParameterPath(cls, cls),  # type: ignore
+        )
+
+    @classmethod
+    def path_cast[Parameter](
+        cls,
+        path: Parameter,
+        /,
+    ) -> ParameterPath[Self, Parameter]:
+        assert isinstance(  # nosec: B101
+            path, ParameterPath
+        ), "Prepare parameter path by using Self._.path.to.property"
+        return cast(ParameterPath[Self, Parameter], path)
 
     @classmethod
     def validated(
@@ -229,8 +248,10 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
     ) -> Self:
         if isinstance(value, cls):
             return value
+
         elif isinstance(value, dict):
             return cls.validated(**value)
+
         else:
             raise TypeError("Invalid value %s", value)
 
