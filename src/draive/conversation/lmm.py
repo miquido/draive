@@ -5,12 +5,11 @@ from typing import Literal, overload
 from draive.conversation.completion import ConversationCompletionStream
 from draive.conversation.message import (
     ConversationMessage,
-    ConversationMessageContent,
     ConversationStreamingUpdate,
 )
-from draive.lmm import LMMCompletionMessage, lmm_completion
+from draive.lmm import LMMMessage, lmm_completion
 from draive.tools import Toolbox
-from draive.types import Memory
+from draive.types import Memory, MultimodalContent
 from draive.utils import AsyncStreamTask
 
 __all__: list[str] = [
@@ -22,7 +21,7 @@ __all__: list[str] = [
 async def lmm_conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
+    input: ConversationMessage | MultimodalContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
     stream: Literal[True],
@@ -33,7 +32,7 @@ async def lmm_conversation_completion(
 async def lmm_conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
+    input: ConversationMessage | MultimodalContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
     stream: Callable[[ConversationStreamingUpdate], None],
@@ -44,7 +43,7 @@ async def lmm_conversation_completion(
 async def lmm_conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
+    input: ConversationMessage | MultimodalContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
 ) -> ConversationMessage: ...
@@ -53,12 +52,12 @@ async def lmm_conversation_completion(
 async def lmm_conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
+    input: ConversationMessage | MultimodalContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
     stream: Callable[[ConversationStreamingUpdate], None] | bool = False,
 ) -> ConversationCompletionStream | ConversationMessage:
-    system_message: LMMCompletionMessage = LMMCompletionMessage(
+    system_message: LMMMessage = LMMMessage(
         role="system",
         content=instruction,
     )
@@ -73,7 +72,7 @@ async def lmm_conversation_completion(
             content=input,
         )
 
-    context: list[LMMCompletionMessage]
+    context: list[LMMMessage]
 
     if memory:
         context = [
@@ -95,7 +94,7 @@ async def lmm_conversation_completion(
                 update: Callable[[ConversationStreamingUpdate], None],
             ) -> None:
                 nonlocal memory
-                completion: LMMCompletionMessage = await lmm_completion(
+                completion: LMMMessage = await lmm_completion(
                     context=context,
                     tools=tools,
                     stream=update,
@@ -116,7 +115,7 @@ async def lmm_conversation_completion(
             return AsyncStreamTask(job=stream_task)
 
         case False:
-            completion: LMMCompletionMessage = await lmm_completion(
+            completion: LMMMessage = await lmm_completion(
                 context=context,
                 tools=tools,
             )
@@ -136,7 +135,7 @@ async def lmm_conversation_completion(
             return response_message
 
         case update:
-            completion: LMMCompletionMessage = await lmm_completion(
+            completion: LMMMessage = await lmm_completion(
                 context=context,
                 tools=tools,
                 stream=update,

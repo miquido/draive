@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from typing import Any
 
-from draive.lmm import LMMCompletionMessage, lmm_completion
+from draive.lmm import LMMMessage, lmm_completion
 from draive.tools import Toolbox
 from draive.types import Model, MultimodalContent
 
@@ -20,19 +20,19 @@ async def lmm_generate_model[Generated: Model](
     examples: Iterable[tuple[MultimodalContent, Generated]] | None = None,
     **extra: Any,
 ) -> Generated:
-    system_message: LMMCompletionMessage = LMMCompletionMessage(
+    system_message: LMMMessage = LMMMessage(
         role="system",
         content=INSTRUCTION.format(
             instruction=instruction,
             format=generated.specification(),
         ),
     )
-    input_message: LMMCompletionMessage = LMMCompletionMessage(
+    input_message: LMMMessage = LMMMessage(
         role="user",
         content=input,
     )
 
-    context: list[LMMCompletionMessage]
+    context: list[LMMMessage]
 
     if examples:
         context = [
@@ -41,11 +41,11 @@ async def lmm_generate_model[Generated: Model](
                 message
                 for example in examples
                 for message in [
-                    LMMCompletionMessage(
+                    LMMMessage(
                         role="user",
                         content=example[0],
                     ),
-                    LMMCompletionMessage(
+                    LMMMessage(
                         role="assistant",
                         content=example[1].as_json(indent=2),
                     ),
@@ -60,7 +60,7 @@ async def lmm_generate_model[Generated: Model](
             input_message,
         ]
 
-    completion: LMMCompletionMessage = await lmm_completion(
+    completion: LMMMessage = await lmm_completion(
         context=context,
         tools=tools,
         output="json",

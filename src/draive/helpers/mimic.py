@@ -30,15 +30,18 @@ def mimic_function[**Args, Result](
         target: Callable[..., Result],
     ) -> Callable[Args, Result]:
         # mimic function attributes if able
-        for attribute in [
+        for attribute in (
             "__module__",
             "__name__",
             "__qualname__",
+            "__doc__",
             "__annotations__",
+            "__type_params__",
             "__defaults__",
             "__kwdefaults__",
-            "__doc__",
-        ]:
+            "__globals__",
+            "__self__",
+        ):
             try:
                 setattr(
                     target,
@@ -55,6 +58,12 @@ def mimic_function[**Args, Result](
             target.__dict__.update(function.__dict__)
         except AttributeError:
             pass
+
+        setattr(  # noqa: B010 - mimic functools.wraps behavior for correct signature checks
+            target,
+            "__wrapped__",
+            function,
+        )
 
         return cast(
             Callable[Args, Result],

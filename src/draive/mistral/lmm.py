@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Any, Literal, overload
 
-from draive.lmm import LMMCompletionMessage, LMMCompletionStream, LMMCompletionStreamingUpdate
+from draive.lmm import LMMCompletionStream, LMMMessage, LMMStreamingUpdate
 from draive.mistral.chat_response import _chat_response  # pyright: ignore[reportPrivateUsage]
 from draive.mistral.chat_stream import _chat_stream  # pyright: ignore[reportPrivateUsage]
 from draive.mistral.client import MistralClient
@@ -20,7 +20,7 @@ __all__ = [
 @overload
 async def mistral_lmm_completion(
     *,
-    context: list[LMMCompletionMessage],
+    context: list[LMMMessage],
     tools: Toolbox | None = None,
     stream: Literal[True],
     **extra: Any,
@@ -30,32 +30,32 @@ async def mistral_lmm_completion(
 @overload
 async def mistral_lmm_completion(
     *,
-    context: list[LMMCompletionMessage],
+    context: list[LMMMessage],
     tools: Toolbox | None = None,
-    stream: Callable[[LMMCompletionStreamingUpdate], None],
+    stream: Callable[[LMMStreamingUpdate], None],
     **extra: Any,
-) -> LMMCompletionMessage: ...
+) -> LMMMessage: ...
 
 
 @overload
 async def mistral_lmm_completion(
     *,
-    context: list[LMMCompletionMessage],
+    context: list[LMMMessage],
     tools: Toolbox | None = None,
     output: Literal["text", "json"] = "text",
     stream: Literal[False] = False,
     **extra: Any,
-) -> LMMCompletionMessage: ...
+) -> LMMMessage: ...
 
 
 async def mistral_lmm_completion(
     *,
-    context: list[LMMCompletionMessage],
+    context: list[LMMMessage],
     tools: Toolbox | None = None,
     output: Literal["text", "json"] = "text",
-    stream: Callable[[LMMCompletionStreamingUpdate], None] | bool = False,
+    stream: Callable[[LMMStreamingUpdate], None] | bool = False,
     **extra: Any,
-) -> LMMCompletionStream | LMMCompletionMessage:
+) -> LMMCompletionStream | LMMMessage:
     client: MistralClient = ctx.dependency(MistralClient)
     config: MistralChatConfig = ctx.state(MistralChatConfig).updated(**extra)
     match output:
@@ -88,7 +88,7 @@ async def mistral_lmm_completion(
                     # we can't fix it easily - code below removes all newlines
                     # which may cause missing newlines in the json content
                     message = message.replace("\n", "")
-                return LMMCompletionMessage(
+                return LMMMessage(
                     role="assistant",
                     content=message,
                 )
@@ -96,7 +96,7 @@ async def mistral_lmm_completion(
         case True:
 
             async def stream_task(
-                streaming_update: Callable[[LMMCompletionStreamingUpdate], None],
+                streaming_update: Callable[[LMMStreamingUpdate], None],
             ) -> None:
                 with ctx.nested(
                     "mistral_lmm_completion",
@@ -107,7 +107,7 @@ async def mistral_lmm_completion(
                     def send_update(update: ToolCallUpdate | str) -> None:
                         if isinstance(update, str):
                             streaming_update(
-                                LMMCompletionMessage(
+                                LMMMessage(
                                     role="assistant",
                                     content=update,
                                 )
@@ -130,7 +130,7 @@ async def mistral_lmm_completion(
             def send_update(update: ToolCallUpdate | str) -> None:
                 if isinstance(update, str):
                     streaming_update(
-                        LMMCompletionMessage(
+                        LMMMessage(
                             role="assistant",
                             content=update,
                         )
@@ -143,7 +143,7 @@ async def mistral_lmm_completion(
                 state=[ToolsUpdatesContext(send_update=streaming_update)],
                 metrics=[config],
             ):
-                return LMMCompletionMessage(
+                return LMMMessage(
                     role="assistant",
                     content=await _chat_stream(
                         client=client,
@@ -156,7 +156,7 @@ async def mistral_lmm_completion(
 
 
 def _convert_message(  # noqa: PLR0912, C901, PLR0911
-    message: LMMCompletionMessage,
+    message: LMMMessage,
 ) -> ChatMessage:
     match message.role:
         case "user":

@@ -8,7 +8,7 @@ from draive import (
     AudioURLContent,
     Field,
     ImageURLContent,
-    LMMCompletionMessage,
+    LMMMessage,
     Missing,
     Model,
 )
@@ -151,13 +151,13 @@ def test_basic_decoding() -> None:
     assert BasicsModel.from_json(basic_model_json) == basic_model_instance
 
 
-basic_lmm_message_instance: LMMCompletionMessage = LMMCompletionMessage(
+basic_lmm_message_instance: LMMMessage = LMMMessage(
     role="assistant",
     content="string",
 )
 basic_lmm_message_json: str = '{"role": "assistant", "content": "string"}'
 
-image_lmm_message_instance: LMMCompletionMessage = LMMCompletionMessage(
+image_lmm_message_instance: LMMMessage = LMMMessage(
     role="assistant",
     content=ImageURLContent(image_url="https://miquido.com/image"),
 )
@@ -166,7 +166,7 @@ image_lmm_message_json: str = (
     ' "content": {"image_url": "https://miquido.com/image", "image_description": null}'
     "}"
 )
-audio_lmm_message_instance: LMMCompletionMessage = LMMCompletionMessage(
+audio_lmm_message_instance: LMMMessage = LMMMessage(
     role="assistant",
     content=AudioURLContent(audio_url="https://miquido.com/audio"),
 )
@@ -175,7 +175,7 @@ audio_lmm_message_json: str = (
     ' "content": {"audio_url": "https://miquido.com/audio", "audio_transcription": null}'
     "}"
 )
-mixed_lmm_message_instance: LMMCompletionMessage = LMMCompletionMessage(
+mixed_lmm_message_instance: LMMMessage = LMMMessage(
     role="assistant",
     content=(
         AudioURLContent(audio_url="https://miquido.com/audio"),
@@ -196,10 +196,10 @@ mixed_lmm_message_json: str = (
 
 
 def test_llm_message_decoding() -> None:
-    assert LMMCompletionMessage.from_json(basic_lmm_message_json) == basic_lmm_message_instance
-    assert LMMCompletionMessage.from_json(image_lmm_message_json) == image_lmm_message_instance
-    assert LMMCompletionMessage.from_json(audio_lmm_message_json) == audio_lmm_message_instance
-    assert LMMCompletionMessage.from_json(mixed_lmm_message_json) == mixed_lmm_message_instance
+    assert LMMMessage.from_json(basic_lmm_message_json) == basic_lmm_message_instance
+    assert LMMMessage.from_json(image_lmm_message_json) == image_lmm_message_instance
+    assert LMMMessage.from_json(audio_lmm_message_json) == audio_lmm_message_instance
+    assert LMMMessage.from_json(mixed_lmm_message_json) == mixed_lmm_message_instance
 
 
 def test_llm_message_encoding() -> None:

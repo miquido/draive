@@ -9,17 +9,14 @@ from draive.types import (
 )
 
 __all__ = [
-    "LMMCompletionContent",
-    "LMMCompletionMessage",
-    "LMMCompletionStreamingUpdate",
+    "LMMMessage",
+    "LMMStreamingUpdate",
 ]
 
-LMMCompletionContent = MultimodalContent
 
-
-class LMMCompletionMessage(Model):
+class LMMMessage(Model):
     role: Literal["system", "assistant", "user"]
-    content: LMMCompletionContent
+    content: MultimodalContent
 
     @property
     def has_media(self) -> bool:
@@ -30,4 +27,4 @@ class LMMCompletionMessage(Model):
         return multimodal_content_string(self.content)
 
 
-LMMCompletionStreamingUpdate = LMMCompletionMessage | ToolCallUpdate
+LMMStreamingUpdate = LMMMessage | ToolCallUpdate

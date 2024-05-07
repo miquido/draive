@@ -1,8 +1,8 @@
 from asyncio import CancelledError, iscoroutinefunction, sleep
 from collections.abc import Callable, Coroutine
-from functools import wraps
 from typing import cast, overload
 
+from draive.helpers import mimic_function
 from draive.scope import ctx
 
 __all__ = [
@@ -89,7 +89,7 @@ def _wrap_sync[**Args, Result](
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
     assert delay is None, "Delay is not supported in sync wrapper"  # nosec: B101
 
-    @wraps(function)
+    @mimic_function(function)
     def wrapped(
         *args: Args.args,
         **kwargs: Args.kwargs,
@@ -123,7 +123,7 @@ def _wrap_async[**Args, Result](
 ) -> Callable[Args, Coroutine[None, None, Result]]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
 
-    @wraps(function)
+    @mimic_function(function)
     async def wrapped(
         *args: Args.args,
         **kwargs: Args.kwargs,

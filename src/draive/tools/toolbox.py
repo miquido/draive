@@ -5,6 +5,7 @@ from draive.helpers import freeze
 from draive.parameters import ToolSpecification
 from draive.tools import Tool
 from draive.tools.errors import ToolException
+from draive.types import MultimodalContent
 
 __all__ = [
     "Toolbox",
@@ -70,10 +71,10 @@ class Toolbox:
         /,
         call_id: str,
         arguments: dict[str, Any] | str | bytes | None,
-    ) -> Any:
+    ) -> MultimodalContent:
         if tool := self._tools.get(name):
-            return await tool(
-                tool_call_id=call_id,
+            return await tool.call(
+                call_id,
                 **loads(arguments) if isinstance(arguments, str | bytes) else arguments or {},
             )
         else:

@@ -3,12 +3,11 @@ from typing import Literal, Protocol, overload, runtime_checkable
 
 from draive.conversation.message import (
     ConversationMessage,
-    ConversationMessageContent,
     ConversationStreamingUpdate,
 )
 from draive.lmm import LMMCompletionStream
 from draive.tools import Toolbox
-from draive.types import Memory
+from draive.types import Memory, MultimodalContent
 
 __all__ = [
     "ConversationCompletionStream",
@@ -26,7 +25,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: str,
-        input: ConversationMessage | ConversationMessageContent,  # noqa: A002
+        input: ConversationMessage | MultimodalContent,  # noqa: A002
         memory: Memory[ConversationMessage] | None = None,
         tools: Toolbox | None = None,
         stream: Literal[True],
@@ -37,7 +36,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: str,
-        input: ConversationMessage | ConversationMessageContent,  # noqa: A002
+        input: ConversationMessage | MultimodalContent,  # noqa: A002
         memory: Memory[ConversationMessage] | None = None,
         tools: Toolbox | None = None,
         stream: Callable[[ConversationStreamingUpdate], None],
@@ -48,7 +47,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: str,
-        input: ConversationMessage | ConversationMessageContent,  # noqa: A002
+        input: ConversationMessage | MultimodalContent,  # noqa: A002
         memory: Memory[ConversationMessage] | None = None,
         tools: Toolbox | None = None,
     ) -> ConversationMessage: ...
@@ -57,7 +56,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: str,
-        input: ConversationMessage | ConversationMessageContent,  # noqa: A002
+        input: ConversationMessage | MultimodalContent,  # noqa: A002
         memory: Memory[ConversationMessage] | None = None,
         tools: Toolbox | None = None,
         stream: Callable[[ConversationStreamingUpdate], None] | bool = False,

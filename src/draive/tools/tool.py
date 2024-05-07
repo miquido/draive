@@ -1,6 +1,8 @@
 from collections.abc import Callable, Coroutine
 from typing import (
+    Any,
     Protocol,
+    cast,
     final,
     overload,
 )
@@ -13,6 +15,7 @@ from draive.scope import ctx
 from draive.tools.errors import ToolException
 from draive.tools.state import ToolCallContext, ToolsUpdatesContext
 from draive.tools.update import ToolCallUpdate
+from draive.types import MultimodalContent, MultimodalContentItem
 
 __all__ = [
     "tool",
@@ -35,6 +38,7 @@ class Tool[**Args, Result](ParametrizedTool[Args, Coroutine[None, None, Result]]
         function: Function[Args, Coroutine[None, None, Result]],
         description: str | None = None,
         availability: ToolAvailability | None = None,
+        format_result: Callable[[Result], MultimodalContent],
         require_direct_result: bool = False,
     ) -> None:
         super().__init__(
@@ -46,6 +50,7 @@ class Tool[**Args, Result](ParametrizedTool[Args, Coroutine[None, None, Result]]
         self._availability: ToolAvailability = availability or (
             lambda: True  # available by default
         )
+        self.format_result: Callable[[Result], MultimodalContent] = format_result
 
         freeze(self)
 
@@ -57,19 +62,47 @@ class Tool[**Args, Result](ParametrizedTool[Args, Coroutine[None, None, Result]]
     def requires_direct_result(self) -> bool:
         return self._require_direct_result
 
+    async def call(
+        self,
+        call_id: str,
+        /,
+        *args: Args.args,
+        **kwargs: Args.kwargs,
+    ) -> MultimodalContent:
+        return self.format_result(
+            await self._wrapped_call(
+                call_id,
+                *args,
+                **kwargs,
+            )
+        )
+
     async def __call__(
         self,
-        call_id: str | None = None,
+        *args: Args.args,
+        **kwargs: Args.kwargs,
+    ) -> Result:
+        return await self._wrapped_call(
+            uuid4().hex,
+            *args,
+            **kwargs,
+        )
+
+    async def _wrapped_call(
+        self,
+        call_id: str,
+        /,
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Result:
         call_context: ToolCallContext = ToolCallContext(
-            call_id=call_id or uuid4().hex,
+            call_id=call_id,
             tool=self.name,
         )
         send_update: Callable[[ToolCallUpdate], None] = ctx.state(
             ToolsUpdatesContext
         ).send_update or (lambda _: None)
+
         with ctx.nested(
             self.name,
             state=[call_context],
@@ -150,6 +183,7 @@ def tool[**Args, Result](
     name: str | None = None,
     description: str | None = None,
     availability: ToolAvailability | None = None,
+    format_result: Callable[[Result], MultimodalContent] | None = None,
     direct_result: bool = False,
 ) -> Callable[[Function[Args, Coroutine[None, None, Result]]], Tool[Args, Result]]:
     """
@@ -172,6 +206,9 @@ def tool[**Args, Result](
         function used to verify availability of the tool in given context. It can be used to check
         permissions or occurrence of a specific state to allow its usage.
         Default is always available.
+    format_result: Callable[[Result], MultimodalContent]
+        function converting tool result to MultimodalContent. It is used to format the result
+        for model processing. Default implementation converts the result to string if needed.
     direct_result: bool
         controls if tool result should break the ongoing processing and be the direct result of it.
         Note that during concurrent execution of multiple tools the call/result order defines
@@ -185,12 +222,13 @@ def tool[**Args, Result](
     """
 
 
-def tool[**Args, Result](
+def tool[**Args, Result](  # noqa: PLR0913
     function: Function[Args, Coroutine[None, None, Result]] | None = None,
     *,
     name: str | None = None,
     description: str | None = None,
     availability: ToolAvailability | None = None,
+    format_result: Callable[[Result], MultimodalContent] | None = None,
     direct_result: bool = False,
 ) -> (
     Callable[[Function[Args, Coroutine[None, None, Result]]], Tool[Args, Result]]
@@ -204,6 +242,7 @@ def tool[**Args, Result](
             description=description,
             function=function,
             availability=availability,
+            format_result=format_result or _default_result_format,
             require_direct_result=direct_result,
         )
 
@@ -211,3 +250,17 @@ def tool[**Args, Result](
         return wrap(function=function)
     else:
         return wrap
+
+
+def _default_result_format(result: Any) -> MultimodalContent:
+    if isinstance(result, MultimodalContentItem):
+        return result
+
+    elif isinstance(result, tuple) and all(
+        isinstance(element, MultimodalContentItem)
+        for element in result  # pyright: ignore[reportUnknownVariableType]
+    ):
+        return cast(MultimodalContent, result)
+
+    else:
+        return str(result)  # pyright: ignore[reportUnknownArgumentType]
