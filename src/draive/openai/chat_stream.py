@@ -11,7 +11,7 @@ from openai.types.chat import (
 )
 from openai.types.chat.chat_completion_chunk import ChoiceDelta
 
-from draive.metrics import ArgumentsTrace, ResultTrace
+from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.openai.chat_tools import (
     _execute_chat_tool_calls,  # pyright: ignore[reportPrivateUsage]
     _flush_chat_tool_calls,  # pyright: ignore[reportPrivateUsage]
@@ -27,7 +27,7 @@ __all__ = [
 ]
 
 
-async def _chat_stream(  # noqa: PLR0913, C901
+async def _chat_stream(  # noqa: PLR0913, C901, PLR0915
     *,
     client: OpenAIClient,
     config: OpenAIChatConfig,
@@ -91,11 +91,9 @@ async def _chat_stream(  # noqa: PLR0913, C901
 
             completion_head: ChoiceDelta = head.choices[0].delta
 
-            # TODO: record token usage - openAI does not provide usage insight when streaming
-            # (or makes it differently than when using regular response and couldn't find it)
-
             if completion_head.tool_calls is not None and (tools := tools):
                 tool_calls: list[ChatCompletionMessageToolCall] = await _flush_chat_tool_calls(
+                    model=config.model,  # model for token usage tracking
                     tool_calls=completion_head.tool_calls,
                     completion_stream=completion_stream,
                 )
@@ -122,12 +120,26 @@ async def _chat_stream(  # noqa: PLR0913, C901
                     send_update(result)
 
                 async for part in completion_stream:
-                    # we are always requesting single result - no need to take care of indices
-                    part_text: str = part.choices[0].delta.content or ""
-                    if not part_text:
-                        continue  # skip empty parts
-                    result += part_text
-                    send_update(result)
+                    if part.choices:  # usage part does not contain choices
+                        # we are always requesting single result - no need to take care of indices
+                        part_text: str = part.choices[0].delta.content or ""
+                        if not part_text:
+                            continue  # skip empty parts
+                        result += part_text
+                        send_update(result)
+
+                    elif usage := part.usage:  # record usage if able (expected in last part)
+                        ctx.record(
+                            TokenUsage.for_model(
+                                config.model,
+                                input_tokens=usage.prompt_tokens,
+                                output_tokens=usage.completion_tokens,
+                            ),
+                        )
+
+                    else:
+                        ctx.log_warning("Unexpected OpenAI streaming part: %s", part)
+                        continue
 
                 ctx.record(ResultTrace.of(result))
                 return result  # we hav final result here

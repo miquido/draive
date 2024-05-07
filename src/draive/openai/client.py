@@ -133,6 +133,7 @@ class OpenAIClient(ScopeDependency):
             tool_choice=tool_choice,
             top_p=config.top_p if config.top_p is not None else NOT_GIVEN,
             timeout=config.timeout if config.timeout is not None else NOT_GIVEN,
+            stream_options={"include_usage": True} if stream else NOT_GIVEN,
         )
 
     async def embedding(

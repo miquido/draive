@@ -13,6 +13,8 @@ from openai.types.chat.chat_completion_chunk import (
     ChoiceDeltaToolCall,
 )
 
+from draive.metrics import TokenUsage
+from draive.scope import ctx
 from draive.tools import Toolbox
 
 __all__ = [
@@ -143,50 +145,65 @@ async def _execute_chat_tool_call(
 
 async def _flush_chat_tool_calls(  # noqa: C901, PLR0912
     *,
+    model: str,
     tool_calls: list[ChoiceDeltaToolCall],
     completion_stream: AsyncStream[ChatCompletionChunk],
 ) -> list[ChatCompletionMessageToolCall]:
     # iterate over the stream to get full list of tool calls
-    async for chunk in completion_stream:
-        for call in chunk.choices[0].delta.tool_calls or []:
-            try:
-                tool_call: ChoiceDeltaToolCall = next(
-                    tool_call for tool_call in tool_calls if tool_call.index == call.index
-                )
+    async for part in completion_stream:
+        if part.choices:  # usage part does not contain choices
+            for call in part.choices[0].delta.tool_calls or []:
+                try:
+                    tool_call: ChoiceDeltaToolCall = next(
+                        tool_call for tool_call in tool_calls if tool_call.index == call.index
+                    )
 
-                if call.id:
-                    if tool_call.id is not None:
-                        tool_call.id += call.id
+                    if call.id:
+                        if tool_call.id is not None:
+                            tool_call.id += call.id
+                        else:
+                            tool_call.id = call.id
                     else:
-                        tool_call.id = call.id
-                else:
-                    pass
+                        pass
 
-                if call.function is None:
-                    continue
+                    if call.function is None:
+                        continue
 
-                if tool_call.function is None:
-                    tool_call.function = call.function
-                    continue
+                    if tool_call.function is None:
+                        tool_call.function = call.function
+                        continue
 
-                if call.function.name:
-                    if tool_call.function.name is not None:
-                        tool_call.function.name += call.function.name
+                    if call.function.name:
+                        if tool_call.function.name is not None:
+                            tool_call.function.name += call.function.name
+                        else:
+                            tool_call.function.name = call.function.name
                     else:
-                        tool_call.function.name = call.function.name
-                else:
-                    pass
+                        pass
 
-                if call.function.arguments:
-                    if tool_call.function.arguments is not None:
-                        tool_call.function.arguments += call.function.arguments
+                    if call.function.arguments:
+                        if tool_call.function.arguments is not None:
+                            tool_call.function.arguments += call.function.arguments
+                        else:
+                            tool_call.function.arguments = call.function.arguments
                     else:
-                        tool_call.function.arguments = call.function.arguments
-                else:
-                    pass
+                        pass
 
-            except (StopIteration, StopAsyncIteration):
-                tool_calls.append(call)
+                except (StopIteration, StopAsyncIteration):
+                    tool_calls.append(call)
+
+        elif usage := part.usage:  # record usage if able (expected in last part)
+            ctx.record(
+                TokenUsage.for_model(
+                    model,
+                    input_tokens=usage.prompt_tokens,
+                    output_tokens=usage.completion_tokens,
+                ),
+            )
+
+        else:
+            ctx.log_warning("Unexpected OpenAI streaming part: %s", part)
+            continue
 
     # completed calls have exactly the same model
     return cast(list[ChatCompletionMessageToolCall], tool_calls)
