@@ -1,18 +1,16 @@
 from datetime import datetime
 
-from draive.lmm import LMMCompletionContent, LMMCompletionMessage, LMMCompletionStreamingUpdate
+from draive.lmm import LMMMessage, LMMStreamingUpdate
 
 __all__ = [
     "ConversationMessage",
-    "ConversationMessageContent",
     "ConversationStreamingUpdate",
 ]
 
 
-class ConversationMessage(LMMCompletionMessage):
+class ConversationMessage(LMMMessage):
     author: str | None = None
     created: datetime | None = None
 
 
-ConversationMessageContent = LMMCompletionContent
-ConversationStreamingUpdate = LMMCompletionStreamingUpdate
+ConversationStreamingUpdate = LMMStreamingUpdate

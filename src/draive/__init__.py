@@ -12,7 +12,6 @@ from draive.conversation import (
     ConversationCompletion,
     ConversationCompletionStream,
     ConversationMessage,
-    ConversationMessageContent,
     conversation_completion,
     lmm_conversation_completion,
 )
@@ -46,10 +45,9 @@ from draive.helpers import (
 from draive.lmm import (
     LMM,
     LMMCompletion,
-    LMMCompletionContent,
-    LMMCompletionMessage,
     LMMCompletionStream,
-    LMMCompletionStreamingUpdate,
+    LMMMessage,
+    LMMStreamingUpdate,
     lmm_completion,
 )
 from draive.metrics import (
@@ -155,7 +153,6 @@ __all__ = [
     "ConversationCompletion",
     "ConversationCompletionStream",
     "ConversationMessage",
-    "ConversationMessageContent",
     "count_text_tokens",
     "ctx",
     "embed_text",
@@ -183,10 +180,9 @@ __all__ = [
     "lmm_conversation_completion",
     "LMM",
     "LMMCompletion",
-    "LMMCompletionContent",
-    "LMMCompletionMessage",
+    "LMMMessage",
     "LMMCompletionStream",
-    "LMMCompletionStreamingUpdate",
+    "LMMStreamingUpdate",
     "load_env",
     "Memory",
     "merge_multimodal_content",

@@ -2,8 +2,8 @@ from collections.abc import Callable
 from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
 
 from draive.lmm.message import (
-    LMMCompletionMessage,
-    LMMCompletionStreamingUpdate,
+    LMMMessage,
+    LMMStreamingUpdate,
 )
 from draive.tools import Toolbox
 
@@ -16,7 +16,7 @@ __all__ = [
 class LMMCompletionStream(Protocol):
     def __aiter__(self) -> Self: ...
 
-    async def __anext__(self) -> LMMCompletionStreamingUpdate: ...
+    async def __anext__(self) -> LMMStreamingUpdate: ...
 
 
 @runtime_checkable
@@ -25,7 +25,7 @@ class LMMCompletion(Protocol):
     async def __call__(
         self,
         *,
-        context: list[LMMCompletionMessage],
+        context: list[LMMMessage],
         tools: Toolbox | None,
         output: Literal["text", "json"],
         stream: Literal[True],
@@ -36,30 +36,30 @@ class LMMCompletion(Protocol):
     async def __call__(
         self,
         *,
-        context: list[LMMCompletionMessage],
+        context: list[LMMMessage],
         tools: Toolbox | None,
         output: Literal["text", "json"],
-        stream: Callable[[LMMCompletionStreamingUpdate], None],
+        stream: Callable[[LMMStreamingUpdate], None],
         **extra: Any,
-    ) -> LMMCompletionMessage: ...
+    ) -> LMMMessage: ...
 
     @overload
     async def __call__(
         self,
         *,
-        context: list[LMMCompletionMessage],
+        context: list[LMMMessage],
         tools: Toolbox | None,
         output: Literal["text", "json"],
         stream: Literal[False],
         **extra: Any,
-    ) -> LMMCompletionMessage: ...
+    ) -> LMMMessage: ...
 
     async def __call__(
         self,
         *,
-        context: list[LMMCompletionMessage],
+        context: list[LMMMessage],
         tools: Toolbox | None = None,
         output: Literal["text", "json"] = "text",
-        stream: Callable[[LMMCompletionStreamingUpdate], None] | bool = False,
+        stream: Callable[[LMMStreamingUpdate], None] | bool = False,
         **extra: Any,
-    ) -> LMMCompletionStream | LMMCompletionMessage: ...
+    ) -> LMMCompletionStream | LMMMessage: ...

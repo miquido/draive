@@ -2,15 +2,11 @@ from collections.abc import Callable
 from typing import Literal, overload
 
 from draive.conversation.completion import ConversationCompletionStream
-from draive.conversation.message import (
-    ConversationMessage,
-    ConversationMessageContent,
-    ConversationStreamingUpdate,
-)
+from draive.conversation.message import ConversationMessage, ConversationStreamingUpdate
 from draive.conversation.state import Conversation
 from draive.scope import ctx
 from draive.tools import Toolbox
-from draive.types import Memory
+from draive.types import Memory, MultimodalContent
 
 __all__ = [
     "conversation_completion",
@@ -21,7 +17,7 @@ __all__ = [
 async def conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
+    input: ConversationMessage | MultimodalContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
     stream: Literal[True],
@@ -32,7 +28,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
+    input: ConversationMessage | MultimodalContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
     stream: Callable[[ConversationStreamingUpdate], None],
@@ -43,7 +39,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
+    input: ConversationMessage | MultimodalContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
 ) -> ConversationMessage: ...
@@ -52,7 +48,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: str,
-    input: ConversationMessage | ConversationMessageContent,  # noqa: A002
+    input: ConversationMessage | MultimodalContent,  # noqa: A002
     memory: Memory[ConversationMessage] | None = None,
     tools: Toolbox | None = None,
     stream: Callable[[ConversationStreamingUpdate], None] | bool = False,
