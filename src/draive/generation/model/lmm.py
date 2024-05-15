@@ -10,23 +10,33 @@ __all__: list[str] = [
 ]
 
 
-async def lmm_generate_model[Generated: Model](
+async def lmm_generate_model[Generated: Model](  # noqa: PLR0913
     generated: type[Generated],
     /,
     *,
     instruction: str,
     input: MultimodalContent,  # noqa: A002
+    schema_variable: str | None = None,
     tools: Toolbox | None = None,
     examples: Iterable[tuple[MultimodalContent, Generated]] | None = None,
     **extra: Any,
 ) -> Generated:
-    system_message: LMMMessage = LMMMessage(
-        role="system",
-        content=INSTRUCTION.format(
-            instruction=instruction,
-            format=generated.specification(),
-        ),
-    )
+    system_message: LMMMessage
+    if variable := schema_variable:
+        system_message = LMMMessage(
+            role="system",
+            content=instruction.format(**{variable: generated.specification()}),
+        )
+
+    else:
+        system_message = LMMMessage(
+            role="system",
+            content=DEFAULT_INSTRUCTION.format(
+                instruction=instruction,
+                schema=generated.specification(),
+            ),
+        )
+
     input_message: LMMMessage = LMMMessage(
         role="user",
         content=input,
@@ -71,13 +81,13 @@ async def lmm_generate_model[Generated: Model](
     return generated.from_json(completion.content_string)
 
 
-INSTRUCTION: str = """\
+DEFAULT_INSTRUCTION: str = """\
 {instruction}
 
 IMPORTANT!
 The result have to conform to the following JSON Schema:
 ```
-{format}
+{schema}
 ```
 Provide ONLY a single, raw, valid JSON without any comments or formatting.
 """

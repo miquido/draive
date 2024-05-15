@@ -18,6 +18,7 @@ class ModelGenerator(Protocol):
         *,
         instruction: str,
         input: MultimodalContent,  # noqa: A002
+        schema_variable: str | None = None,
         tools: Toolbox | None = None,
         examples: Iterable[tuple[MultimodalContent, Generated]] | None = None,
         **extra: Any,
