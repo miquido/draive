@@ -41,19 +41,17 @@ def setup_logging(
                 },
             },
             "loggers": {
-                "": {  # root logger
+                name: {
                     "handlers": ["console"],
                     "level": "DEBUG" if debug else "INFO",
                     "propagate": False,
-                },
-                **{
-                    name: {
-                        "handlers": ["console"],
-                        "level": "DEBUG" if debug else "INFO",
-                        "propagate": False,
-                    }
-                    for name in loggers
-                },
+                }
+                for name in loggers
+            },
+            "root": {  # root logger
+                "handlers": ["console"],
+                "level": "DEBUG" if debug else "INFO",
+                "propagate": False,
             },
         },
     )
