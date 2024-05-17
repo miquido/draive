@@ -1,38 +1,56 @@
-from draive.types.audio import AudioBase64Content, AudioContent, AudioURLContent
-from draive.types.images import ImageBase64Content, ImageContent, ImageURLContent
+from draive.types.audio import AudioBase64Content, AudioContent, AudioDataContent, AudioURLContent
+from draive.types.images import ImageBase64Content, ImageContent, ImageDataContent, ImageURLContent
+from draive.types.instruction import Instruction
+from draive.types.lmm import (
+    LMMCompletion,
+    LMMCompletionChunk,
+    LMMContextElement,
+    LMMInput,
+    LMMInstruction,
+    LMMOutput,
+    LMMOutputStream,
+    LMMOutputStreamChunk,
+    LMMToolRequest,
+    LMMToolRequests,
+    LMMToolResponse,
+)
 from draive.types.memory import Memory, ReadOnlyMemory
 from draive.types.model import Model
-from draive.types.multimodal import (
-    MultimodalContent,
-    MultimodalContentItem,
-    has_media,
-    is_multimodal_content,
-    merge_multimodal_content,
-    multimodal_content_string,
-)
+from draive.types.multimodal import MultimodalContent, MultimodalContentElement
 from draive.types.state import State
-from draive.types.video import VideoBase64Content, VideoContent, VideoURLContent
+from draive.types.tool_status import ToolCallStatus
+from draive.types.video import VideoBase64Content, VideoContent, VideoDataContent, VideoURLContent
 
 __all__ = [
     "AudioBase64Content",
     "AudioContent",
+    "AudioDataContent",
     "AudioURLContent",
-    "has_media",
+    "Instruction",
     "ImageBase64Content",
     "ImageContent",
+    "ImageDataContent",
     "ImageURLContent",
-    "is_multimodal_content",
-    "is_multimodal_content",
     "Memory",
-    "merge_multimodal_content",
-    "merge_multimodal_content",
     "Model",
-    "multimodal_content_string",
     "MultimodalContent",
-    "MultimodalContentItem",
+    "MultimodalContentElement",
     "ReadOnlyMemory",
     "State",
+    "ToolCallStatus",
     "VideoBase64Content",
     "VideoContent",
+    "VideoDataContent",
     "VideoURLContent",
+    "LMMCompletion",
+    "LMMCompletionChunk",
+    "LMMContextElement",
+    "LMMInput",
+    "LMMInstruction",
+    "LMMOutput",
+    "LMMOutputStream",
+    "LMMOutputStreamChunk",
+    "LMMToolRequest",
+    "LMMToolRequests",
+    "LMMToolResponse",
 ]

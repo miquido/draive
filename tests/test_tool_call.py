@@ -1,6 +1,6 @@
 from collections.abc import Generator
 
-from draive import ToolException, auto_retry, cache, ctx, tool
+from draive import MultimodalContent, auto_retry, cache, ctx, tool
 from pytest import mark, raises
 
 
@@ -34,14 +34,14 @@ async def test_call_fails_on_error():
         executions += 1
         raise FakeException()
 
-    with raises(ToolException):
+    with raises(FakeException):
         await compute(value=42)
     assert executions == 1
 
 
 @mark.asyncio
 @ctx.wrap("test")
-async def test_formatted_call_returns_multimodal_content():
+async def test_toolbox_call_returns_multimodal_content():
     executions: int = 0
 
     @tool
@@ -50,13 +50,18 @@ async def test_formatted_call_returns_multimodal_content():
         executions += 1
         return value
 
-    assert await compute.call("call_id", value=42) == "42"
+    assert await compute._toolbox_call(
+        "call_id",
+        arguments={
+            "value": 42,
+        },
+    ) == MultimodalContent.of("42")
     assert executions == 1
 
 
 @mark.asyncio
 @ctx.wrap("test")
-async def test_formatted_call_returns_custom_content():
+async def test_toolbox_call_returns_custom_content():
     executions: int = 0
 
     def custom_format(value: int) -> str:
@@ -68,7 +73,12 @@ async def test_formatted_call_returns_custom_content():
         executions += 1
         return value
 
-    assert await compute.call("call_id", value=42) == "Value:42"
+    assert await compute._toolbox_call(
+        "call_id",
+        arguments={
+            "value": 42,
+        },
+    ) == MultimodalContent.of("Value:42")
     assert executions == 1
 
 

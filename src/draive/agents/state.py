@@ -4,7 +4,7 @@ from typing import Any, Self
 
 from draive.parameters import ParametrizedData
 from draive.scope import ctx
-from draive.types import MultimodalContent, MultimodalContentItem, State
+from draive.types import MultimodalContent, State
 
 __all__ = [
     "AgentState",
@@ -24,13 +24,12 @@ class AgentScratchpad(State):
     ) -> Self:
         match content:
             case None:
-                return cls(content=())
-            case [*items]:
-                return cls(content=tuple(items))
-            case item:
-                return cls(content=(item,))
+                return cls(content=MultimodalContent.of())
 
-    content: tuple[MultimodalContentItem, ...] = ()
+            case item:
+                return cls(content=item)
+
+    content: MultimodalContent = MultimodalContent.of()
 
     def extended(
         self,
@@ -39,10 +38,8 @@ class AgentScratchpad(State):
         match content:
             case None:
                 return self
-            case [*items]:
-                return self.__class__(content=(*self.content, *items))
             case item:
-                return self.__class__(content=(*self.content, item))
+                return self.__class__(content=MultimodalContent.of(*self.content, item))
 
 
 class AgentState[State: ParametrizedData]:

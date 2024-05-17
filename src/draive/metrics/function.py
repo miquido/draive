@@ -70,8 +70,8 @@ class ExceptionTrace(State):
             exceptions = []
             exception_messages = []
             for exception in (*self.exception.exceptions, other.exception):  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                exception_messages.append(exception)  # pyright: ignore[reportArgumentType]
-                exceptions.append(f"{type(exception).__qualname__}:{exception}")  # pyright: ignore[reportArgumentType, reportUnknownMemberType, reportUnknownArgumentType]
+                exceptions.append(exception)  # pyright: ignore[reportUnknownArgumentType]
+                exception_messages.append(f"{type(exception).__qualname__}:{exception}")  # pyright: ignore[reportUnknownArgumentType]
 
         else:
             exceptions = (self.exception, other.exception)

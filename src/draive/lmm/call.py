@@ -1,81 +1,67 @@
-from collections.abc import Callable
+from collections.abc import Sequence
 from typing import Any, Literal, overload
 
-from draive.lmm.completion import LMMCompletionStream
-from draive.lmm.message import (
-    LMMMessage,
-    LMMStreamingUpdate,
-)
+from draive.lmm.invocation import LMMOutputStream
 from draive.lmm.state import LMM
+from draive.parameters import ToolSpecification
 from draive.scope import ctx
-from draive.tools import Toolbox
+from draive.types import LMMContextElement, LMMOutput
 
 __all__ = [
-    "lmm_completion",
+    "lmm_invocation",
 ]
 
 
 @overload
-async def lmm_completion(
+async def lmm_invocation(
     *,
-    context: list[LMMMessage],
-    tools: Toolbox | None = None,
+    context: Sequence[LMMContextElement],
+    tools: Sequence[ToolSpecification] | None = None,
+    require_tool: ToolSpecification | bool = False,
+    output: Literal["text", "json"] = "text",
     stream: Literal[True],
     **extra: Any,
-) -> LMMCompletionStream: ...
+) -> LMMOutputStream: ...
 
 
 @overload
-async def lmm_completion(
+async def lmm_invocation(
     *,
-    context: list[LMMMessage],
-    tools: Toolbox | None = None,
-    stream: Callable[[LMMStreamingUpdate], None],
-    **extra: Any,
-) -> LMMMessage: ...
-
-
-@overload
-async def lmm_completion(
-    *,
-    context: list[LMMMessage],
-    tools: Toolbox | None = None,
+    context: Sequence[LMMContextElement],
+    tools: Sequence[ToolSpecification] | None = None,
+    require_tool: ToolSpecification | bool = False,
     output: Literal["text", "json"] = "text",
     stream: Literal[False] = False,
     **extra: Any,
-) -> LMMMessage: ...
+) -> LMMOutput: ...
 
 
-async def lmm_completion(
+@overload
+async def lmm_invocation(
     *,
-    context: list[LMMMessage],
-    tools: Toolbox | None = None,
+    context: Sequence[LMMContextElement],
+    tools: Sequence[ToolSpecification] | None = None,
+    require_tool: ToolSpecification | bool = False,
     output: Literal["text", "json"] = "text",
-    stream: Callable[[LMMStreamingUpdate], None] | bool = False,
+    stream: bool,
     **extra: Any,
-) -> LMMCompletionStream | LMMMessage:
-    match stream:
-        case False:
-            return await ctx.state(LMM).completion(
-                context=context,
-                tools=tools,
-                output=output,
-                stream=False,
-                **extra,
-            )
-        case True:
-            return await ctx.state(LMM).completion(
-                context=context,
-                tools=tools,
-                output=output,
-                stream=True,
-                **extra,
-            )
-        case progress:
-            return await ctx.state(LMM).completion(
-                context=context,
-                tools=tools,
-                output=output,
-                stream=progress,
-                **extra,
-            )
+) -> LMMOutputStream | LMMOutput: ...
+
+
+async def lmm_invocation(
+    *,
+    context: Sequence[LMMContextElement],
+    tools: Sequence[ToolSpecification] | None = None,
+    require_tool: ToolSpecification | bool = False,
+    output: Literal["text", "json"] = "text",
+    stream: bool = False,
+    **extra: Any,
+) -> LMMOutputStream | LMMOutput:
+    return await ctx.state(LMM).invocation(
+        context=context,
+        require_tool=require_tool,
+        tools=tools,
+        output=output,
+        stream=stream,
+        **extra,
+    )

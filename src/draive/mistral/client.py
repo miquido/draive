@@ -79,6 +79,7 @@ class MistralClient(ScopeDependency):
     ) -> AsyncIterable[ChatCompletionStreamResponse] | ChatCompletionResponse:
         if stream:
             raise NotImplementedError("Mistral streaming is not supported yet")
+
         else:
             return await self._create_chat_completion(
                 messages=messages,

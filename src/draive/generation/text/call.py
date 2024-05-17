@@ -2,9 +2,9 @@ from collections.abc import Iterable
 from typing import Any
 
 from draive.generation.text.state import TextGeneration
+from draive.lmm import Toolbox
 from draive.scope import ctx
-from draive.tools import Toolbox
-from draive.types import MultimodalContent
+from draive.types import Instruction, MultimodalContent, MultimodalContentElement
 
 __all__ = [
     "generate_text",
@@ -13,17 +13,16 @@ __all__ = [
 
 async def generate_text(
     *,
-    instruction: str,
-    input: MultimodalContent,  # noqa: A002
+    instruction: Instruction | str,
+    input: MultimodalContent | MultimodalContentElement,  # noqa: A002
     tools: Toolbox | None = None,
-    examples: Iterable[tuple[MultimodalContent, str]] | None = None,
+    examples: Iterable[tuple[MultimodalContent | MultimodalContentElement, str]] | None = None,
     **extra: Any,
 ) -> str:
-    text_generation: TextGeneration = ctx.state(TextGeneration)
-    return await text_generation.generate(
+    return await ctx.state(TextGeneration).generate(
         instruction=instruction,
         input=input,
-        tools=tools or text_generation.tools,
+        tools=tools,
         examples=examples,
         **extra,
     )

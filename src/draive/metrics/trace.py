@@ -33,7 +33,7 @@ class MetricsTrace:
             type(metric): metric for metric in metrics or []
         }
         self._nested_traces: list[MetricsTrace] = []
-        self.log_info("%s started", self)
+        self.log_info("started...")
 
     # - STATE -
 
@@ -196,8 +196,7 @@ class MetricsTrace:
         self._end = monotonic()
 
         self.log_info(
-            "%s finished after %.2fs",
-            self,
+            "...finished after %.2fs",
             self._end - self._start,
         )
 

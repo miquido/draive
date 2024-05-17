@@ -1,9 +1,19 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any
 
-from draive.lmm import LMMMessage, lmm_completion
-from draive.tools import Toolbox
-from draive.types import MultimodalContent
+from draive.lmm import AnyTool, Toolbox, lmm_invocation
+from draive.scope import ctx
+from draive.types import (
+    Instruction,
+    LMMCompletion,
+    LMMContextElement,
+    LMMInput,
+    LMMInstruction,
+    LMMToolRequests,
+    LMMToolResponse,
+    MultimodalContent,
+    MultimodalContentElement,
+)
 
 __all__: list[str] = [
     "lmm_generate_text",
@@ -12,56 +22,60 @@ __all__: list[str] = [
 
 async def lmm_generate_text(
     *,
-    instruction: str,
-    input: MultimodalContent,  # noqa: A002
-    tools: Toolbox | None = None,
-    examples: Iterable[tuple[MultimodalContent, str]] | None = None,
+    instruction: Instruction | str,
+    input: MultimodalContent | MultimodalContentElement,  # noqa: A002
+    tools: Toolbox | Sequence[AnyTool] | None = None,
+    examples: Iterable[tuple[MultimodalContent | MultimodalContentElement, str]] | None = None,
     **extra: Any,
 ) -> str:
-    system_message: LMMMessage = LMMMessage(
-        role="system",
-        content=instruction,
-    )
-    input_message: LMMMessage = LMMMessage(
-        role="user",
-        content=input,
-    )
+    with ctx.nested("lmm_generate_text"):
+        toolbox: Toolbox
+        match tools:
+            case None:
+                toolbox = Toolbox()
 
-    context: list[LMMMessage]
+            case Toolbox() as tools:
+                toolbox = tools
 
-    if examples:
-        context = [
-            system_message,
+            case [*tools]:
+                toolbox = Toolbox(*tools)
+
+        context: list[LMMContextElement] = [
+            LMMInstruction.of(instruction),
             *[
                 message
-                for example in examples
+                for example in examples or []
                 for message in [
-                    LMMMessage(
-                        role="user",
-                        content=example[0],
-                    ),
-                    LMMMessage(
-                        role="assistant",
-                        content=example[1],
-                    ),
+                    LMMInput.of(example[0]),
+                    LMMCompletion.of(example[1]),
                 ]
             ],
-            input_message,
+            LMMInput.of(input),
         ]
 
-    else:
-        context = [
-            system_message,
-            input_message,
-        ]
+        for recursion_level in toolbox.call_range:
+            match await lmm_invocation(
+                context=context,
+                tools=toolbox.available_tools(recursion_level=recursion_level),
+                require_tool=toolbox.tool_suggestion(recursion_level=recursion_level),
+                output="text",
+                stream=False,
+                **extra,
+            ):
+                case LMMCompletion() as completion:
+                    return completion.content.as_string()
 
-    completion: LMMMessage = await lmm_completion(
-        context=context,
-        tools=tools,
-        output="text",
-        stream=False,
-        **extra,
-    )
-    generated: str = completion.content_string
+                case LMMToolRequests() as tool_requests:
+                    context.append(tool_requests)
+                    responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
 
-    return generated
+                    if direct_responses := [response for response in responses if response.direct]:
+                        return MultimodalContent.of(
+                            *[response.content for response in direct_responses]
+                        ).as_string()
+
+                    else:
+                        context.extend(responses)
+
+    # fail if we have not provided a result until this point
+    raise RuntimeError("Failed to produce conversation completion")

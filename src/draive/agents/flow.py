@@ -7,7 +7,7 @@ from draive.agents.state import AgentScratchpad, AgentState
 from draive.helpers import freeze
 from draive.parameters import ParametrizedData
 from draive.scope import ctx
-from draive.types import MultimodalContent, merge_multimodal_content
+from draive.types import MultimodalContent
 
 __all__ = [
     "AgentFlow",
@@ -42,7 +42,7 @@ class AgentFlow[State: ParametrizedData](BaseAgent[State]):
             with ctx.updated(current_scratchpad):
                 match agent:
                     case [*agents]:
-                        merged_note: MultimodalContent = merge_multimodal_content(
+                        merged_note: MultimodalContent = MultimodalContent.of(
                             *[
                                 scratchpad_note
                                 for scratchpad_note in await gather(
@@ -61,4 +61,4 @@ class AgentFlow[State: ParametrizedData](BaseAgent[State]):
                             current_scratchpad = current_scratchpad.extended(scratchpad_note)
                             scratchpad_notes.append(scratchpad_note)
 
-        return merge_multimodal_content(*scratchpad_notes)
+        return MultimodalContent.of(*scratchpad_notes)

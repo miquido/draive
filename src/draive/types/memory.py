@@ -15,8 +15,7 @@ class Memory[Element](ABC):
     @abstractmethod
     async def remember(
         self,
-        elements: Iterable[Element],
-        /,
+        *elements: Element,
     ) -> None: ...
 
 
@@ -24,13 +23,13 @@ class Memory[Element](ABC):
 class ReadOnlyMemory[Element](Memory[Element]):
     def __init__(
         self,
-        elements: (Callable[[], Awaitable[list[Element]]] | Iterable[Element]),
+        elements: Callable[[], Awaitable[list[Element]]] | Iterable[Element] | None = None,
     ) -> None:
         self._elements: Callable[[], Awaitable[list[Element]]]
         if callable(elements):
             self._elements = elements
         else:
-            messages_list: list[Element] = list(elements)
+            messages_list: list[Element] = list(elements) if elements is not None else []
 
             async def constant() -> list[Element]:
                 return messages_list
@@ -42,7 +41,6 @@ class ReadOnlyMemory[Element](Memory[Element]):
 
     async def remember(
         self,
-        elements: Iterable[Element],
-        /,
+        *elements: Element,
     ) -> None:
         pass  # ignore

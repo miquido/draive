@@ -40,7 +40,6 @@ def mimic_function[**Args, Result](
             "__defaults__",
             "__kwdefaults__",
             "__globals__",
-            "__self__",
         ):
             try:
                 setattr(

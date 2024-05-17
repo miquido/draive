@@ -3,6 +3,7 @@ from draive.types.model import Model
 __all__ = [
     "AudioBase64Content",
     "AudioContent",
+    "AudioDataContent",
     "AudioURLContent",
 ]
 
@@ -17,4 +18,9 @@ class AudioBase64Content(Model):
     audio_transcription: str | None = None
 
 
-AudioContent = AudioURLContent | AudioBase64Content
+class AudioDataContent(Model):
+    audio_data: bytes
+    audio_transcription: str | None = None
+
+
+AudioContent = AudioURLContent | AudioBase64Content | AudioDataContent

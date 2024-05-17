@@ -6,38 +6,38 @@ from numpy.typing import NDArray
 from draive.similarity.cosine import cosine
 
 __all__ = [
-    "mmr_similarity",
+    "mmr_similarity_search",
 ]
 
 
-def mmr_similarity(
-    query_embedding: NDArray[Any] | list[float],
-    alternatives_embeddings: list[NDArray[Any]] | list[list[float]],
+def mmr_similarity_search(
+    query_vector: NDArray[Any] | list[float],
+    values_vectors: list[NDArray[Any]] | list[list[float]],
     limit: int,
     lambda_multiplier: float = 0.5,
 ) -> list[int]:
     assert limit > 0  # nosec: B101
-    if not alternatives_embeddings:
+    if not values_vectors:
         return []
 
-    query: NDArray[Any] = np.array(query_embedding)
+    query: NDArray[Any] = np.array(query_vector)
     if query.ndim == 1:
-        query = np.expand_dims(query_embedding, axis=0)
-    alternatives: NDArray[Any] = np.array(alternatives_embeddings)
+        query = np.expand_dims(query_vector, axis=0)
+    values: NDArray[Any] = np.array(values_vectors)
 
     # count similarity
-    similarity: NDArray[Any] = cosine(alternatives, query)
+    similarity: NDArray[Any] = cosine(values, query)
     # find most similar match for query
     most_similar: int = int(np.argmax(similarity))
     selected_indices: list[int] = [most_similar]
-    selected: NDArray[Any] = np.array([alternatives[most_similar]])
+    selected: NDArray[Any] = np.array([values[most_similar]])
 
     # then look one by one next best matches until the limit or end of alternatives
-    while len(selected_indices) < limit and len(selected_indices) < len(alternatives_embeddings):
+    while len(selected_indices) < limit and len(selected_indices) < len(values_vectors):
         best_score: float = -np.inf
         best_index: int = -1
         # count similarity to already selected results
-        similarity_to_selected: NDArray[Any] = cosine(alternatives, selected)
+        similarity_to_selected: NDArray[Any] = cosine(values, selected)
 
         # then find the next best score
         # (balancing between similarity to query and uniqueness of result)
@@ -60,7 +60,7 @@ def mmr_similarity(
         selected_indices.append(best_index)
         selected = np.append(
             selected,
-            [alternatives[best_index]],  # pyright: ignore[reportUnknownArgumentType]
+            [values[best_index]],  # pyright: ignore[reportUnknownArgumentType]
             axis=0,
         )
 

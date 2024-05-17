@@ -4,8 +4,10 @@ from draive.helpers.logs import setup_logging
 from draive.helpers.mimic import mimic_function
 from draive.helpers.missing import MISSING, Missing, is_missing, not_missing, when_missing
 from draive.helpers.split_sequence import split_sequence
+from draive.helpers.stream import AsyncStream
 
 __all__ = [
+    "AsyncStream",
     "freeze",
     "getenv_bool",
     "getenv_float",

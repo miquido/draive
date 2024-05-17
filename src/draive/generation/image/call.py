@@ -2,7 +2,7 @@ from typing import Any
 
 from draive.generation.image.state import ImageGeneration
 from draive.scope import ctx
-from draive.types import ImageContent
+from draive.types import ImageContent, Instruction, MultimodalContent, MultimodalContentElement
 
 __all__ = [
     "generate_image",
@@ -11,10 +11,12 @@ __all__ = [
 
 async def generate_image(
     *,
-    instruction: str,
+    instruction: Instruction | str,
+    input: MultimodalContent | MultimodalContentElement | None = None,  # noqa: A002
     **extra: Any,
 ) -> ImageContent:
     return await ctx.state(ImageGeneration).generate(
         instruction=instruction,
+        input=input,
         **extra,
     )

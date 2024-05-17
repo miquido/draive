@@ -35,7 +35,6 @@ class MistralChatConfig(Model):
     max_tokens: int | None = None
     response_format: ResponseFormat | None = None
     timeout: float | None = None
-    recursion_limit: int = 4
 
 
 class MistralEmbeddingConfig(Model):

@@ -6,11 +6,11 @@ __all__ = [
     "UsageInfo",
     "EmbeddingObject",
     "EmbeddingResponse",
-    "FunctionCall",
-    "ToolCall",
+    "ChatFunctionCall",
+    "ChatToolCallRequest",
     "ChatMessage",
-    "FunctionCallResponse",
-    "ToolCallResponse",
+    "ChatFunctionCallResponse",
+    "ChatToolCallResponse",
     "ChatMessageResponse",
     "ChatCompletionResponseChoice",
     "ChatCompletionResponse",
@@ -40,39 +40,39 @@ class EmbeddingResponse(Model):
     usage: UsageInfo
 
 
-class FunctionCall(TypedDict, total=False):
+class ChatFunctionCall(TypedDict, total=False):
     name: Required[str]
     arguments: Required[str]
 
 
-class ToolCall(TypedDict, total=False):
+class ChatToolCallRequest(TypedDict, total=False):
     id: Required[str]
     type: Required[Literal["function"]]
-    function: Required[FunctionCall]
+    function: Required[ChatFunctionCall]
 
 
 class ChatMessage(TypedDict, total=False):
     role: Required[str]
     content: Required[str | list[str]]
     name: NotRequired[str]
-    tool_calls: NotRequired[list[ToolCall]]
+    tool_calls: NotRequired[list[ChatToolCallRequest]]
 
 
-class FunctionCallResponse(Model):
+class ChatFunctionCallResponse(Model):
     name: str
     arguments: dict[str, Any] | str
 
 
-class ToolCallResponse(Model):
+class ChatToolCallResponse(Model):
     id: str
     type: Literal["function"]
-    function: FunctionCallResponse
+    function: ChatFunctionCallResponse
 
 
 class ChatDeltaMessageResponse(Model):
     role: str | None = None
     content: str | None = None
-    tool_calls: list[ToolCallResponse] | None = None
+    tool_calls: list[ChatToolCallResponse] | None = None
 
 
 class ChatCompletionResponseStreamChoice(Model):
@@ -92,7 +92,7 @@ class ChatCompletionStreamResponse(Model):
 class ChatMessageResponse(Model):
     role: str
     content: list[str] | str | None = None
-    tool_calls: list[ToolCallResponse] | None = None
+    tool_calls: list[ChatToolCallResponse] | None = None
 
 
 class ChatCompletionResponseChoice(Model):
