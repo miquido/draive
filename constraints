@@ -7,6 +7,7 @@ anyio==4.3.0
     #   httpx
     #   openai
 bandit==1.7.8
+    # via draive (pyproject.toml)
 certifi==2024.2.2
     # via
     #   httpcore
@@ -23,7 +24,9 @@ h11==0.14.0
 httpcore==1.0.5
     # via httpx
 httpx==0.27.0
-    # via openai
+    # via
+    #   draive (pyproject.toml)
+    #   openai
 idna==3.7
     # via
     #   anyio
@@ -38,7 +41,9 @@ mdurl==0.1.2
 nodeenv==1.8.0
     # via pyright
 numpy==1.26.4
+    # via draive (pyproject.toml)
 openai==1.30.1
+    # via draive (pyproject.toml)
 packaging==24.0
     # via pytest
 pbr==6.0.0
@@ -46,18 +51,24 @@ pbr==6.0.0
 pluggy==1.5.0
     # via pytest
 pydantic==2.7.1
-    # via openai
+    # via
+    #   draive (pyproject.toml)
+    #   openai
 pydantic-core==2.18.2
     # via pydantic
 pygments==2.18.0
     # via rich
 pyright==1.1.364
+    # via draive (pyproject.toml)
 pytest==7.4.4
     # via
+    #   draive (pyproject.toml)
     #   pytest-asyncio
     #   pytest-cov
 pytest-asyncio==0.23.7
+    # via draive (pyproject.toml)
 pytest-cov==4.1.0
+    # via draive (pyproject.toml)
 pyyaml==6.0.1
     # via bandit
 regex==2024.5.15
@@ -67,6 +78,7 @@ requests==2.32.2
 rich==13.7.1
     # via bandit
 ruff==0.4.5
+    # via draive (pyproject.toml)
 setuptools==70.0.0
     # via nodeenv
 sniffio==1.3.1
@@ -77,6 +89,7 @@ sniffio==1.3.1
 stevedore==5.2.0
     # via bandit
 tiktoken==0.7.0
+    # via draive (pyproject.toml)
 tqdm==4.66.4
     # via openai
 typing-extensions==4.11.0

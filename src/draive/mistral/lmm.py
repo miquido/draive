@@ -1,221 +1,274 @@
-from collections.abc import Callable
-from typing import Any, Literal, overload
+import json
+from collections.abc import AsyncGenerator, Sequence
+from typing import Any, Literal, cast, overload
 
-from draive.lmm import LMMCompletionStream, LMMMessage, LMMStreamingUpdate
-from draive.mistral.chat_response import _chat_response  # pyright: ignore[reportPrivateUsage]
-from draive.mistral.chat_stream import _chat_stream  # pyright: ignore[reportPrivateUsage]
+from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralChatConfig
-from draive.mistral.models import ChatMessage
+from draive.mistral.errors import MistralException
+from draive.mistral.models import ChatCompletionResponse, ChatMessage, ChatMessageResponse
+from draive.parameters import ToolSpecification
 from draive.scope import ctx
-from draive.tools import Toolbox, ToolCallUpdate, ToolsUpdatesContext
-from draive.types import ImageBase64Content, ImageURLContent, Model
-from draive.utils import AsyncStreamTask
+from draive.types import (
+    LMMCompletion,
+    LMMCompletionChunk,
+    LMMContextElement,
+    LMMInput,
+    LMMInstruction,
+    LMMOutput,
+    LMMOutputStream,
+    LMMOutputStreamChunk,
+    LMMToolRequest,
+    LMMToolRequests,
+    LMMToolResponse,
+)
 
 __all__ = [
-    "mistral_lmm_completion",
+    "mistral_lmm_invocation",
 ]
 
 
 @overload
-async def mistral_lmm_completion(
+async def mistral_lmm_invocation(
     *,
-    context: list[LMMMessage],
-    tools: Toolbox | None = None,
+    context: Sequence[LMMContextElement],
+    tools: Sequence[ToolSpecification] | None = None,
+    require_tool: ToolSpecification | bool = False,
+    output: Literal["text", "json"] = "text",
     stream: Literal[True],
     **extra: Any,
-) -> LMMCompletionStream: ...
+) -> LMMOutputStream: ...
 
 
 @overload
-async def mistral_lmm_completion(
+async def mistral_lmm_invocation(
     *,
-    context: list[LMMMessage],
-    tools: Toolbox | None = None,
-    stream: Callable[[LMMStreamingUpdate], None],
-    **extra: Any,
-) -> LMMMessage: ...
-
-
-@overload
-async def mistral_lmm_completion(
-    *,
-    context: list[LMMMessage],
-    tools: Toolbox | None = None,
+    context: Sequence[LMMContextElement],
+    tools: Sequence[ToolSpecification] | None = None,
+    require_tool: ToolSpecification | bool = False,
     output: Literal["text", "json"] = "text",
     stream: Literal[False] = False,
     **extra: Any,
-) -> LMMMessage: ...
+) -> LMMOutput: ...
 
 
-async def mistral_lmm_completion(
+@overload
+async def mistral_lmm_invocation(
     *,
-    context: list[LMMMessage],
-    tools: Toolbox | None = None,
+    context: Sequence[LMMContextElement],
+    tools: Sequence[ToolSpecification] | None = None,
+    require_tool: ToolSpecification | bool = False,
     output: Literal["text", "json"] = "text",
-    stream: Callable[[LMMStreamingUpdate], None] | bool = False,
+    stream: bool = False,
     **extra: Any,
-) -> LMMCompletionStream | LMMMessage:
-    client: MistralClient = ctx.dependency(MistralClient)
-    config: MistralChatConfig = ctx.state(MistralChatConfig).updated(**extra)
-    match output:
-        case "text":
-            config = config.updated(response_format={"type": "text"})
-        case "json":
-            if tools is None:
-                config = config.updated(response_format={"type": "json_object"})
-            else:
-                ctx.log_warning(
-                    "Attempting to use Mistral in JSON mode with tools which is not supported."
-                    " Using text mode instead..."
-                )
+) -> LMMOutputStream | LMMOutput: ...
+
+
+async def mistral_lmm_invocation(
+    *,
+    context: Sequence[LMMContextElement],
+    tools: Sequence[ToolSpecification] | None = None,
+    require_tool: ToolSpecification | bool = False,
+    output: Literal["text", "json"] = "text",
+    stream: bool = False,
+    **extra: Any,
+) -> LMMOutputStream | LMMOutput:
+    with ctx.nested(
+        "mistral_lmm_completion",
+        metrics=[
+            ArgumentsTrace.of(
+                context=context,
+                tools=tools,
+                require_tool=require_tool,
+                output=output,
+                stream=stream,
+                **extra,
+            ),
+        ],
+    ):
+        client: MistralClient = ctx.dependency(MistralClient)
+        config: MistralChatConfig = ctx.state(MistralChatConfig).updated(**extra)
+        match output:
+            case "text":
                 config = config.updated(response_format={"type": "text"})
+            case "json":
+                if tools is None:
+                    config = config.updated(response_format={"type": "json_object"})
+                else:
+                    ctx.log_warning(
+                        "Attempting to use Mistral in JSON mode with tools which is not supported."
+                        " Using text mode instead..."
+                    )
+                    config = config.updated(response_format={"type": "text"})
 
-    messages: list[ChatMessage] = [_convert_message(message=message) for message in context]
+        messages: list[ChatMessage] = [
+            _convert_context_element(element=element) for element in context
+        ]
 
-    match stream:
-        case False:
-            with ctx.nested("mistral_lmm_completion", metrics=[config]):
-                message: str = await _chat_response(
+        if stream:
+            return ctx.stream(
+                generator=_chat_completion_stream(
                     client=client,
                     config=config,
                     messages=messages,
-                    tools=tools or Toolbox(),
-                )
-                if tools and output == "json":
-                    # workaround for json mode with tools
-                    # most common mistral mistake is to not escape newlines
-                    # we can't fix it easily - code below removes all newlines
-                    # which may cause missing newlines in the json content
-                    message = message.replace("\n", "")
-                return LMMMessage(
-                    role="assistant",
-                    content=message,
-                )
+                    tools=tools,
+                    require_tool=require_tool,
+                ),
+            )
 
-        case True:
-
-            async def stream_task(
-                streaming_update: Callable[[LMMStreamingUpdate], None],
-            ) -> None:
-                with ctx.nested(
-                    "mistral_lmm_completion",
-                    state=[ToolsUpdatesContext(send_update=streaming_update)],
-                    metrics=[config],
-                ):
-
-                    def send_update(update: ToolCallUpdate | str) -> None:
-                        if isinstance(update, str):
-                            streaming_update(
-                                LMMMessage(
-                                    role="assistant",
-                                    content=update,
-                                )
-                            )
-                        else:
-                            streaming_update(update)
-
-                    await _chat_stream(
-                        client=client,
-                        config=config,
-                        messages=messages,
-                        tools=tools or Toolbox(),
-                        send_update=send_update,
-                    )
-
-            return AsyncStreamTask(job=stream_task)
-
-        case streaming_update:
-
-            def send_update(update: ToolCallUpdate | str) -> None:
-                if isinstance(update, str):
-                    streaming_update(
-                        LMMMessage(
-                            role="assistant",
-                            content=update,
-                        )
-                    )
-                else:
-                    streaming_update(update)
-
-            with ctx.nested(
-                "mistral_lmm_completion",
-                state=[ToolsUpdatesContext(send_update=streaming_update)],
-                metrics=[config],
-            ):
-                return LMMMessage(
-                    role="assistant",
-                    content=await _chat_stream(
-                        client=client,
-                        config=config,
-                        messages=messages,
-                        tools=tools or Toolbox(),
-                        send_update=send_update,
-                    ),
-                )
+        else:
+            return await _chat_completion(
+                client=client,
+                config=config,
+                messages=messages,
+                tools=tools,
+                require_tool=require_tool,
+            )
 
 
-def _convert_message(  # noqa: PLR0912, C901, PLR0911
-    message: LMMMessage,
+def _convert_context_element(
+    element: LMMContextElement,
 ) -> ChatMessage:
-    match message.role:
-        case "user":
-            if isinstance(message.content, str):
-                return ChatMessage(
-                    role="user",
-                    content=message.content,
-                )
-            elif isinstance(message.content, ImageURLContent):
-                raise ValueError("Unsupported message content", message)
-            elif isinstance(message.content, ImageBase64Content):
-                raise ValueError("Unsupported message content", message)
-            elif isinstance(message.content, Model):
-                return ChatMessage(
-                    role="user",
-                    content=str(message.content),
-                )
-            else:
-                content_parts: list[str] = []
-                for part in message.content:
-                    if isinstance(part, str):
-                        content_parts.append(part)
-                    elif isinstance(part, ImageURLContent):
-                        raise ValueError("Unsupported message content", message)
-                    elif isinstance(message.content, ImageBase64Content):
-                        raise ValueError("Unsupported message content", message)
-                    elif isinstance(message.content, Model):
-                        content_parts.append(str(message.content))
-                    else:
-                        raise ValueError("Unsupported message content", message)
-                return ChatMessage(
-                    role="user",
-                    content=content_parts,
-                )
+    match element:
+        case LMMInstruction() as instruction:
+            return ChatMessage(
+                role="system",
+                content=instruction.content,
+            )
 
-        case "assistant":
-            if isinstance(message.content, str):
-                return ChatMessage(
-                    role="assistant",
-                    content=message.content,
-                )
-            elif isinstance(message.content, Model):
-                return ChatMessage(
-                    role="assistant",
-                    content=str(message.content),
-                )
-            else:
-                raise ValueError("Invalid assistant message", message)
+        case LMMInput() as input:
+            return ChatMessage(
+                role="user",
+                content=input.content.as_string(),
+            )
 
-        case "system":
-            if isinstance(message.content, str):
-                return ChatMessage(
-                    role="system",
-                    content=message.content,
+        case LMMCompletion() as completion:
+            return ChatMessage(
+                role="assistant",
+                content=completion.content.as_string(),
+            )
+
+        case LMMToolRequests() as tool_requests:
+            return ChatMessage(
+                role="assistant",
+                content="",
+                tool_calls=[
+                    {
+                        "id": request.identifier,
+                        "type": "function",
+                        "function": {
+                            "name": request.tool,
+                            "arguments": json.dumps(request.arguments),
+                        },
+                    }
+                    for request in tool_requests.requests
+                ],
+            )
+
+        case LMMToolResponse() as tool_response:
+            return ChatMessage(
+                role="tool",
+                name=tool_response.tool,
+                content=tool_response.content.as_string(),
+            )
+
+
+async def _chat_completion(
+    *,
+    client: MistralClient,
+    config: MistralChatConfig,
+    messages: list[ChatMessage],
+    tools: Sequence[ToolSpecification] | None,
+    require_tool: ToolSpecification | bool,
+) -> LMMOutput:
+    completion: ChatCompletionResponse
+    match require_tool:
+        case bool(required):
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=cast(
+                    list[dict[str, object]],
+                    tools,
+                ),
+                suggest_tools=required,
+            )
+
+        case ToolSpecification() as tool:
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=cast(
+                    list[dict[str, object]],
+                    [tool],  # mistral can't be suggested with concrete tool
+                ),
+                suggest_tools=True,
+            )
+
+    if usage := completion.usage:
+        ctx.record(
+            TokenUsage.for_model(
+                config.model,
+                input_tokens=usage.prompt_tokens,
+                output_tokens=usage.completion_tokens,
+            ),
+        )
+
+    if not completion.choices:
+        raise MistralException("Invalid Mistral completion - missing messages!", completion)
+
+    completion_message: ChatMessageResponse = completion.choices[0].message
+
+    if (tool_calls := completion_message.tool_calls) and (tools := tools):
+        ctx.record(ResultTrace.of(tool_calls))
+
+        return LMMToolRequests(
+            requests=[
+                LMMToolRequest(
+                    identifier=call.id,
+                    tool=call.function.name,
+                    arguments=json.loads(call.function.arguments)
+                    if isinstance(call.function.arguments, str)
+                    else call.function.arguments,
                 )
-            elif isinstance(message.content, Model):
-                return ChatMessage(
-                    role="system",
-                    content=str(message.content),
-                )
-            else:
-                raise ValueError("Invalid system message", message)
+                for call in tool_calls
+            ]
+        )
+
+    elif message := completion_message.content:
+        ctx.record(ResultTrace.of(message))
+        match message:
+            case str(content):
+                return LMMCompletion.of(content)
+
+            # API docs say that it can be only a string in response
+            # however library model allows list as well
+            case other:
+                return LMMCompletion.of(*other)
+
+    else:
+        raise MistralException("Invalid Mistral completion", completion)
+
+
+async def _chat_completion_stream(
+    *,
+    client: MistralClient,
+    config: MistralChatConfig,
+    messages: list[ChatMessage],
+    tools: Sequence[ToolSpecification] | None,
+    require_tool: ToolSpecification | bool,
+) -> AsyncGenerator[LMMOutputStreamChunk, None]:
+    ctx.log_warning("Mistral streaming api is not supported yet, using regular response...")
+    output: LMMOutput = await _chat_completion(
+        client=client,
+        config=config,
+        messages=messages,
+        tools=tools,
+        require_tool=require_tool,
+    )
+    match output:
+        case LMMCompletion() as completion:
+            yield LMMCompletionChunk.of(completion.content)
+
+        case other:
+            yield other

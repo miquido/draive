@@ -1,12 +1,11 @@
-from collections.abc import Callable
+from collections.abc import Sequence
 from typing import Literal, overload
 
-from draive.conversation.completion import ConversationCompletionStream
-from draive.conversation.message import ConversationMessage, ConversationStreamingUpdate
+from draive.conversation.model import ConversationMessage, ConversationResponseStream
 from draive.conversation.state import Conversation
+from draive.lmm import AnyTool, Toolbox
 from draive.scope import ctx
-from draive.tools import Toolbox
-from draive.types import Memory, MultimodalContent
+from draive.types import Instruction, Memory, MultimodalContent, MultimodalContentElement
 
 __all__ = [
     "conversation_completion",
@@ -16,66 +15,49 @@ __all__ = [
 @overload
 async def conversation_completion(
     *,
-    instruction: str,
-    input: ConversationMessage | MultimodalContent,  # noqa: A002
-    memory: Memory[ConversationMessage] | None = None,
-    tools: Toolbox | None = None,
+    instruction: Instruction | str,
+    input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+    memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+    tools: Toolbox | Sequence[AnyTool] | None = None,
     stream: Literal[True],
-) -> ConversationCompletionStream: ...
+) -> ConversationResponseStream: ...
 
 
 @overload
 async def conversation_completion(
     *,
-    instruction: str,
-    input: ConversationMessage | MultimodalContent,  # noqa: A002
-    memory: Memory[ConversationMessage] | None = None,
-    tools: Toolbox | None = None,
-    stream: Callable[[ConversationStreamingUpdate], None],
+    instruction: Instruction | str,
+    input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+    memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+    tools: Toolbox | Sequence[AnyTool] | None = None,
+    stream: Literal[False] = False,
 ) -> ConversationMessage: ...
 
 
 @overload
 async def conversation_completion(
     *,
-    instruction: str,
-    input: ConversationMessage | MultimodalContent,  # noqa: A002
-    memory: Memory[ConversationMessage] | None = None,
-    tools: Toolbox | None = None,
-) -> ConversationMessage: ...
+    instruction: Instruction | str,
+    input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+    memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+    tools: Toolbox | Sequence[AnyTool] | None = None,
+    stream: bool,
+) -> ConversationResponseStream | ConversationMessage: ...
 
 
 async def conversation_completion(
     *,
-    instruction: str,
-    input: ConversationMessage | MultimodalContent,  # noqa: A002
-    memory: Memory[ConversationMessage] | None = None,
-    tools: Toolbox | None = None,
-    stream: Callable[[ConversationStreamingUpdate], None] | bool = False,
-) -> ConversationCompletionStream | ConversationMessage:
+    instruction: Instruction | str,
+    input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+    memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+    tools: Toolbox | Sequence[AnyTool] | None = None,
+    stream: bool = False,
+) -> ConversationResponseStream | ConversationMessage:
     conversation: Conversation = ctx.state(Conversation)
-
-    match stream:
-        case False:
-            return await conversation.completion(
-                instruction=instruction,
-                input=input,
-                memory=memory or conversation.memory,
-                tools=tools or conversation.tools,
-            )
-        case True:
-            return await conversation.completion(
-                instruction=instruction,
-                input=input,
-                memory=memory or conversation.memory,
-                tools=tools or conversation.tools,
-                stream=True,
-            )
-        case progress:
-            return await conversation.completion(
-                instruction=instruction,
-                input=input,
-                memory=memory or conversation.memory,
-                tools=tools or conversation.tools,
-                stream=progress,
-            )
+    return await conversation.completion(
+        instruction=instruction,
+        input=input,
+        memory=memory or conversation.memory,
+        tools=tools,
+        stream=stream,
+    )

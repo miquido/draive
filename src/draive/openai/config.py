@@ -43,7 +43,6 @@ class OpenAIChatConfig(Model):
     response_format: ResponseFormat | None = None
     vision_details: Literal["auto", "low", "high"] | None = None
     timeout: float | None = None
-    recursion_limit: int = 4
 
 
 class OpenAIEmbeddingConfig(Model):

@@ -1,11 +1,11 @@
 from asyncio import Task, TaskGroup, current_task, shield
-from collections.abc import Callable, Coroutine, Iterable
-from contextvars import Context, ContextVar, Token, copy_context
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Coroutine, Iterable
+from contextvars import ContextVar, Token
 from logging import Logger, getLogger
 from types import TracebackType
 from typing import Any, final
 
-from draive.helpers import getenv_bool, mimic_function
+from draive.helpers import AsyncStream, getenv_bool, mimic_function
 from draive.metrics import (
     ExceptionTrace,
     Metric,
@@ -78,13 +78,14 @@ class _RootContext:
                 exc=exc_val,
                 tb=exc_tb,
             )
+
         except BaseException as exc:
             # record task group exceptions
             self._metrics.record(ExceptionTrace.of(exc_val or exc))
 
         else:
             # or context exception
-            if exception := exc_val:
+            if (exception := exc_val) and exc_type is not GeneratorExit:
                 self._metrics.record(ExceptionTrace.of(exception))
 
         finally:
@@ -150,7 +151,7 @@ class _PartialContext:
     ) -> None:
         if (token := self._metrics_token) and (metrics := self._metrics):
             _MetricsScope_Var.reset(self._metrics_token)
-            if exception := exc_val:
+            if (exception := exc_val) and exc_type is not GeneratorExit:
                 metrics.record(ExceptionTrace.of(exception))
 
             metrics.exit()
@@ -333,13 +334,21 @@ class ctx:
         **kwargs: Args.kwargs,
     ) -> Task[Result]:
         nested_context: _PartialContext = ctx.nested(function.__name__)
-        current_context: Context = copy_context()
 
         async def wrapped(*args: Args.args, **kwargs: Args.kwargs) -> Result:
             with nested_context:
                 return await function(*args, **kwargs)
 
-        return ctx._current_task_group().create_task(current_context.run(wrapped, *args, **kwargs))
+        return ctx._current_task_group().create_task(wrapped(*args, **kwargs))
+
+    @staticmethod
+    def spawn_subtask[**Args, Result](
+        function: Callable[Args, Coroutine[None, None, Result]],
+        /,
+        *args: Args.args,
+        **kwargs: Args.kwargs,
+    ) -> Task[Result]:
+        return ctx._current_task_group().create_task(function(*args, **kwargs))
 
     @staticmethod
     def cancel() -> None:
@@ -368,6 +377,30 @@ class ctx:
             ),
             state=nested_state,
         )
+
+    @staticmethod
+    def stream[Element](
+        generator: AsyncGenerator[Element, None],
+    ) -> AsyncIterator[Element]:
+        # TODO: find better solution for streaming without spawning tasks if able
+        stream: AsyncStream[Element] = AsyncStream()
+        current_metrics: MetricsTrace = ctx._current_metrics()
+        current_metrics.enter()  # ensure valid metrics scope closing
+
+        async def iterate() -> None:
+            try:
+                async for element in generator:
+                    stream.send(element)
+
+            except BaseException as exc:
+                stream.finish(exception=exc)
+            else:
+                stream.finish()
+            finally:
+                current_metrics.exit()
+
+        ctx.spawn_subtask(iterate)
+        return stream
 
     @staticmethod
     def updated(
@@ -404,7 +437,18 @@ class ctx:
     def record(
         *metrics: Metric,
     ) -> None:
-        ctx._current_metrics().record(*metrics)
+        try:
+            ctx._current_metrics().record(*metrics)
+
+        # ignoring metrics record when using out of metrics context
+        # using default logger as fallback as we already know that we are missing metrics
+        except MissingScopeContext as exc:
+            logger: Logger = getLogger()
+            logger.error("Attempting to record metrics outside of metrics context")
+            logger.error(
+                exc,
+                exc_info=True,
+            )
 
     @staticmethod
     def log_error(
@@ -413,11 +457,25 @@ class ctx:
         *args: Any,
         exception: BaseException | None = None,
     ) -> None:
-        ctx._current_metrics().log_error(
-            message,
-            *args,
-            exception=exception,
-        )
+        try:
+            ctx._current_metrics().log_error(
+                message,
+                *args,
+                exception=exception,
+            )
+
+        # using default logger as fallback when using out of metrics context
+        except MissingScopeContext:
+            logger: Logger = getLogger()
+            logger.error(
+                message,
+                *args,
+            )
+            if exception := exception:
+                logger.error(
+                    exception,
+                    exc_info=True,
+                )
 
     @staticmethod
     def log_warning(
@@ -426,11 +484,25 @@ class ctx:
         *args: Any,
         exception: Exception | None = None,
     ) -> None:
-        ctx._current_metrics().log_warning(
-            message,
-            *args,
-            exception=exception,
-        )
+        try:
+            ctx._current_metrics().log_warning(
+                message,
+                *args,
+                exception=exception,
+            )
+
+        # using default logger as fallback when using out of metrics context
+        except MissingScopeContext:
+            logger: Logger = getLogger()
+            logger.warning(
+                message,
+                *args,
+            )
+            if exception := exception:
+                logger.error(
+                    exception,
+                    exc_info=True,
+                )
 
     @staticmethod
     def log_info(
@@ -438,10 +510,18 @@ class ctx:
         /,
         *args: Any,
     ) -> None:
-        ctx._current_metrics().log_info(
-            message,
-            *args,
-        )
+        try:
+            ctx._current_metrics().log_info(
+                message,
+                *args,
+            )
+
+        # using default logger as fallback when using out of metrics context
+        except MissingScopeContext:
+            getLogger().info(
+                message,
+                *args,
+            )
 
     @staticmethod
     def log_debug(
@@ -450,8 +530,22 @@ class ctx:
         *args: Any,
         exception: Exception | None = None,
     ) -> None:
-        ctx._current_metrics().log_debug(
-            message,
-            *args,
-            exception=exception,
-        )
+        try:
+            ctx._current_metrics().log_debug(
+                message,
+                *args,
+                exception=exception,
+            )
+
+        # using default logger as fallback when using out of metrics context
+        except MissingScopeContext:
+            logger: Logger = getLogger()
+            logger.debug(
+                message,
+                *args,
+            )
+            if exception := exception:
+                logger.error(
+                    exception,
+                    exc_info=True,
+                )

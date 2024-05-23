@@ -6,11 +6,12 @@ from uuid import UUID
 from draive import (
     MISSING,
     AudioURLContent,
+    ConversationMessage,
     Field,
     ImageURLContent,
-    LMMMessage,
     Missing,
     Model,
+    MultimodalContent,
 )
 
 
@@ -151,59 +152,98 @@ def test_basic_decoding() -> None:
     assert BasicsModel.from_json(basic_model_json) == basic_model_instance
 
 
-basic_lmm_message_instance: LMMMessage = LMMMessage(
-    role="assistant",
-    content="string",
+basic_conversation_message_instance: ConversationMessage = ConversationMessage(
+    identifier="identifier",
+    role="model",
+    content=MultimodalContent.of("string"),
 )
-basic_lmm_message_json: str = '{"role": "assistant", "content": "string"}'
+basic_conversation_message_json: str = (
+    "{"
+    '"identifier": "identifier", '
+    '"role": "model", '
+    '"author": null, '
+    '"created": null, '
+    '"content": {'
+    '"elements": ["string"]'
+    "}}"
+)
 
-image_lmm_message_instance: LMMMessage = LMMMessage(
-    role="assistant",
-    content=ImageURLContent(image_url="https://miquido.com/image"),
+image_conversation_message_instance: ConversationMessage = ConversationMessage(
+    identifier="identifier",
+    role="model",
+    content=MultimodalContent.of(ImageURLContent(image_url="https://miquido.com/image")),
 )
-image_lmm_message_json: str = (
-    '{"role": "assistant",'
-    ' "content": {"image_url": "https://miquido.com/image", "image_description": null}'
-    "}"
+image_conversation_message_json: str = (
+    "{"
+    '"identifier": "identifier", '
+    '"role": "model", '
+    '"author": null, '
+    '"created": null, '
+    '"content": {'
+    '"elements": [{"image_url": "https://miquido.com/image", "image_description": null}]'
+    "}}"
 )
-audio_lmm_message_instance: LMMMessage = LMMMessage(
-    role="assistant",
-    content=AudioURLContent(audio_url="https://miquido.com/audio"),
+audio_conversation_message_instance: ConversationMessage = ConversationMessage(
+    identifier="identifier",
+    role="model",
+    content=MultimodalContent.of(AudioURLContent(audio_url="https://miquido.com/audio")),
 )
-audio_lmm_message_json: str = (
-    '{"role": "assistant",'
-    ' "content": {"audio_url": "https://miquido.com/audio", "audio_transcription": null}'
-    "}"
+audio_conversation_message_json: str = (
+    "{"
+    '"identifier": "identifier", '
+    '"role": "model", '
+    '"author": null, '
+    '"created": null, '
+    '"content": {'
+    '"elements": [{"audio_url": "https://miquido.com/audio", "audio_transcription": null}]'
+    "}}"
 )
-mixed_lmm_message_instance: LMMMessage = LMMMessage(
-    role="assistant",
-    content=(
+mixed_conversation_message_instance: ConversationMessage = ConversationMessage(
+    identifier="identifier",
+    role="model",
+    content=MultimodalContent.of(
         AudioURLContent(audio_url="https://miquido.com/audio"),
         "string",
         ImageURLContent(image_url="https://miquido.com/image"),
         "content",
     ),
 )
-mixed_lmm_message_json: str = (
-    '{"role": "assistant",'
-    ' "content": ['
-    '{"audio_url": "https://miquido.com/audio", "audio_transcription": null},'
-    ' "string",'
-    ' {"image_url": "https://miquido.com/image", "image_description": null},'
-    ' "content"'
-    "]}"
+mixed_conversation_message_json: str = (
+    "{"
+    '"identifier": "identifier", '
+    '"role": "model", '
+    '"author": null, '
+    '"created": null, '
+    '"content": {"elements": ['
+    '{"audio_url": "https://miquido.com/audio", "audio_transcription": null}, '
+    '"string", '
+    '{"image_url": "https://miquido.com/image", "image_description": null}, '
+    '"content"'
+    "]}}"
 )
 
 
 def test_llm_message_decoding() -> None:
-    assert LMMMessage.from_json(basic_lmm_message_json) == basic_lmm_message_instance
-    assert LMMMessage.from_json(image_lmm_message_json) == image_lmm_message_instance
-    assert LMMMessage.from_json(audio_lmm_message_json) == audio_lmm_message_instance
-    assert LMMMessage.from_json(mixed_lmm_message_json) == mixed_lmm_message_instance
+    assert (
+        ConversationMessage.from_json(basic_conversation_message_json)
+        == basic_conversation_message_instance
+    )
+    assert (
+        ConversationMessage.from_json(image_conversation_message_json)
+        == image_conversation_message_instance
+    )
+    assert (
+        ConversationMessage.from_json(audio_conversation_message_json)
+        == audio_conversation_message_instance
+    )
+    assert (
+        ConversationMessage.from_json(mixed_conversation_message_json)
+        == mixed_conversation_message_instance
+    )
 
 
 def test_llm_message_encoding() -> None:
-    assert basic_lmm_message_instance.as_json() == basic_lmm_message_json
-    assert image_lmm_message_instance.as_json() == image_lmm_message_json
-    assert audio_lmm_message_instance.as_json() == audio_lmm_message_json
-    assert mixed_lmm_message_instance.as_json() == mixed_lmm_message_json
+    assert basic_conversation_message_instance.as_json() == basic_conversation_message_json
+    assert image_conversation_message_instance.as_json() == image_conversation_message_json
+    assert audio_conversation_message_instance.as_json() == audio_conversation_message_json
+    assert mixed_conversation_message_instance.as_json() == mixed_conversation_message_json

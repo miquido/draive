@@ -1,8 +1,8 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any, Protocol, runtime_checkable
 
-from draive.tools import Toolbox
-from draive.types import Model, MultimodalContent
+from draive.lmm import AnyTool, Toolbox
+from draive.types import Instruction, Model, MultimodalContent, MultimodalContentElement
 
 __all__ = [
     "ModelGenerator",
@@ -16,10 +16,11 @@ class ModelGenerator(Protocol):
         generated: type[Generated],
         /,
         *,
-        instruction: str,
-        input: MultimodalContent,  # noqa: A002
+        instruction: Instruction | str,
+        input: MultimodalContent | MultimodalContentElement,  # noqa: A002
         schema_variable: str | None = None,
-        tools: Toolbox | None = None,
-        examples: Iterable[tuple[MultimodalContent, Generated]] | None = None,
+        tools: Toolbox | Sequence[AnyTool] | None = None,
+        examples: Iterable[tuple[MultimodalContent | MultimodalContentElement, Generated]]
+        | None = None,
         **extra: Any,
     ) -> Generated: ...

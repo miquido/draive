@@ -1,9 +1,20 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any
 
-from draive.lmm import LMMMessage, lmm_completion
-from draive.tools import Toolbox
-from draive.types import Model, MultimodalContent
+from draive.lmm import AnyTool, Toolbox, lmm_invocation
+from draive.scope import ctx
+from draive.types import (
+    Instruction,
+    LMMCompletion,
+    LMMContextElement,
+    LMMInput,
+    LMMInstruction,
+    LMMToolRequests,
+    LMMToolResponse,
+    Model,
+    MultimodalContent,
+    MultimodalContentElement,
+)
 
 __all__: list[str] = [
     "lmm_generate_model",
@@ -14,76 +25,97 @@ async def lmm_generate_model[Generated: Model](  # noqa: PLR0913
     generated: type[Generated],
     /,
     *,
-    instruction: str,
-    input: MultimodalContent,  # noqa: A002
+    instruction: Instruction | str,
+    input: MultimodalContent | MultimodalContentElement,  # noqa: A002
     schema_variable: str | None = None,
-    tools: Toolbox | None = None,
-    examples: Iterable[tuple[MultimodalContent, Generated]] | None = None,
+    tools: Toolbox | Sequence[AnyTool] | None = None,
+    examples: Iterable[tuple[MultimodalContent | MultimodalContentElement, Generated]]
+    | None = None,
     **extra: Any,
 ) -> Generated:
-    system_message: LMMMessage
-    if variable := schema_variable:
-        system_message = LMMMessage(
-            role="system",
-            content=instruction.format(**{variable: generated.specification()}),
-        )
+    with ctx.nested("lmm_generate_model"):
+        toolbox: Toolbox
+        match tools:
+            case None:
+                toolbox = Toolbox()
 
-    else:
-        system_message = LMMMessage(
-            role="system",
-            content=DEFAULT_INSTRUCTION.format(
-                instruction=instruction,
-                schema=generated.specification(),
-            ),
-        )
+            case Toolbox() as tools:
+                toolbox = tools
 
-    input_message: LMMMessage = LMMMessage(
-        role="user",
-        content=input,
-    )
+            case [*tools]:
+                toolbox = Toolbox(*tools)
 
-    context: list[LMMMessage]
+        generation_instruction: Instruction
+        match instruction:
+            case str(instruction):
+                generation_instruction = Instruction(instruction)
 
-    if examples:
-        context = [
-            system_message,
+            case Instruction() as instruction:
+                generation_instruction = instruction
+
+        instruction_message: LMMContextElement
+        if variable := schema_variable:
+            instruction_message = LMMInstruction.of(
+                generation_instruction.updated(
+                    **{variable: generated.specification()},
+                ),
+            )
+
+        else:
+            instruction_message = LMMInstruction.of(
+                generation_instruction.extended(
+                    DEFAULT_INSTRUCTION_EXTENSION,
+                    joiner="\n\n",
+                    schema=generated.specification(),
+                )
+            )
+
+        context: list[LMMContextElement] = [
+            instruction_message,
             *[
                 message
-                for example in examples
+                for example in examples or []
                 for message in [
-                    LMMMessage(
-                        role="user",
-                        content=example[0],
-                    ),
-                    LMMMessage(
-                        role="assistant",
-                        content=example[1].as_json(indent=2),
-                    ),
+                    LMMInput.of(example[0]),
+                    LMMCompletion.of(example[1].as_json(indent=2)),
                 ]
             ],
-            input_message,
+            LMMInput.of(input),
         ]
 
-    else:
-        context = [
-            system_message,
-            input_message,
-        ]
+        for recursion_level in toolbox.call_range:
+            match await lmm_invocation(
+                context=context,
+                tools=toolbox.available_tools(recursion_level=recursion_level),
+                require_tool=toolbox.tool_suggestion(recursion_level=recursion_level),
+                output="json",
+                stream=False,
+                **extra,
+            ):
+                case LMMCompletion() as completion:
+                    return generated.from_json(completion.content.as_string())
 
-    completion: LMMMessage = await lmm_completion(
-        context=context,
-        tools=tools,
-        output="json",
-        stream=False,
-        **extra,
-    )
+                case LMMToolRequests() as tool_requests:
+                    context.append(tool_requests)
+                    responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
 
-    return generated.from_json(completion.content_string)
+                    if direct_responses := [response for response in responses if response.direct]:
+                        # TODO: check if this join makes any sense,
+                        # perhaps we could merge json objects instead?
+                        return generated.from_json(
+                            "".join(
+                                *[response.content.as_string() for response in direct_responses]
+                            )
+                        )
+
+                    else:
+                        context.extend(responses)
+
+    # fail if we have not provided a result until this point
+    raise RuntimeError("Failed to produce conversation completion")
 
 
-DEFAULT_INSTRUCTION: str = """\
-{instruction}
-
+DEFAULT_INSTRUCTION_EXTENSION: str = """\
 IMPORTANT!
 The result have to conform to the following JSON Schema:
 ```
