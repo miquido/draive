@@ -27,7 +27,7 @@ __all__ = [
 ]
 
 
-async def _chat_stream(  # noqa: PLR0913, C901, PLR0915
+async def _chat_stream(  # noqa: PLR0913, C901, PLR0915, PLR0912
     *,
     client: OpenAIClient,
     config: OpenAIChatConfig,

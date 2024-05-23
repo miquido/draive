@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-async def _chat_response(  # noqa: C901
+async def _chat_response(  # noqa: C901, PLR0912
     *,
     client: MistralClient,
     config: MistralChatConfig,
