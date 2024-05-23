@@ -20,7 +20,7 @@ def invalid(value: str) -> None:
 
 
 class ExampleNestedModel(Model):
-    string: str = "default"
+    nested_alias: str = Field(alias="string", default="default")
     more: list[int] | None = None
 
 
