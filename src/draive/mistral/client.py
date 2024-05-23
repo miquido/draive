@@ -6,7 +6,6 @@ from typing import Any, Literal, Self, cast, final, overload
 
 from httpx import AsyncClient, Response
 
-from draive.helpers import getenv_str
 from draive.mistral.config import MistralChatConfig, MistralEmbeddingConfig
 from draive.mistral.errors import MistralException
 from draive.mistral.models import (
@@ -15,8 +14,9 @@ from draive.mistral.models import (
     ChatMessage,
     EmbeddingResponse,
 )
+from draive.parameters import DataModel
 from draive.scope import ScopeDependency
-from draive.types import Model
+from draive.utils import getenv_str, not_missing
 
 __all__ = [
     "MistralClient",
@@ -85,10 +85,10 @@ class MistralClient(ScopeDependency):
                 messages=messages,
                 model=config.model,
                 temperature=config.temperature,
-                top_p=config.top_p,
-                max_tokens=config.max_tokens,
+                top_p=config.top_p if not_missing(config.top_p) else None,
+                max_tokens=config.max_tokens if not_missing(config.max_tokens) else None,
                 response_format=cast(dict[str, str], config.response_format),
-                seed=config.seed,
+                seed=config.seed if not_missing(config.seed) else None,
                 tools=tools,
                 tool_choice=("any" if suggest_tools else "auto") if tools else None,
             )
@@ -172,14 +172,14 @@ class MistralClient(ScopeDependency):
     async def dispose(self) -> None:
         await self._client.aclose()
 
-    async def _request[Requested: Model](  # noqa: PLR0913
+    async def _request[Requested: DataModel](  # noqa: PLR0913
         self,
         model: type[Requested],
         method: str,
         url: str,
         query: dict[str, str] | None = None,
         headers: dict[str, str] | None = None,
-        body: Model | dict[str, Any] | None = None,
+        body: DataModel | dict[str, Any] | None = None,
         follow_redirects: bool | None = None,
         timeout: float | None = None,
     ) -> Requested:
@@ -195,7 +195,7 @@ class MistralClient(ScopeDependency):
             case None:
                 body_content = None
 
-            case body_model if isinstance(body_model, Model):
+            case body_model if isinstance(body_model, DataModel):
                 body_content = body_model.as_json()
 
             case values:

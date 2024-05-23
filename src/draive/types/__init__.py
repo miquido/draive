@@ -1,6 +1,7 @@
 from draive.types.audio import AudioBase64Content, AudioContent, AudioDataContent, AudioURLContent
 from draive.types.images import ImageBase64Content, ImageContent, ImageDataContent, ImageURLContent
 from draive.types.instruction import Instruction
+from draive.types.json import JSON
 from draive.types.lmm import (
     LMMCompletion,
     LMMCompletionChunk,
@@ -15,9 +16,7 @@ from draive.types.lmm import (
     LMMToolResponse,
 )
 from draive.types.memory import Memory, ReadOnlyMemory
-from draive.types.model import Model
 from draive.types.multimodal import MultimodalContent, MultimodalContentElement
-from draive.types.state import State
 from draive.types.tool_status import ToolCallStatus
 from draive.types.video import VideoBase64Content, VideoContent, VideoDataContent, VideoURLContent
 
@@ -31,12 +30,11 @@ __all__ = [
     "ImageContent",
     "ImageDataContent",
     "ImageURLContent",
+    "JSON",
     "Memory",
-    "Model",
     "MultimodalContent",
     "MultimodalContentElement",
     "ReadOnlyMemory",
-    "State",
     "ToolCallStatus",
     "VideoBase64Content",
     "VideoContent",

@@ -4,11 +4,11 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
-from draive.helpers import Missing
 from draive.parameters import ParametrizedData
+from draive.utils import Missing
 
 __all__ = [
-    "Model",
+    "DataModel",
 ]
 
 
@@ -24,10 +24,10 @@ class ModelJSONEncoder(json.JSONEncoder):
             return json.JSONEncoder.default(self, o)
 
 
-class Model(ParametrizedData):
+class DataModel(ParametrizedData):
     @classmethod
-    def specification(cls) -> str:
-        return cls.__parameters_definition__.specification
+    def json_schema(cls) -> str:
+        return cls.__PARAMETERS__.json_schema
 
     @classmethod
     def from_json(

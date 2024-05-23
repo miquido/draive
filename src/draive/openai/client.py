@@ -2,7 +2,7 @@ from asyncio import gather, sleep
 from collections.abc import Iterable
 from itertools import chain
 from random import uniform
-from typing import Literal, Self, final, overload
+from typing import Literal, Self, cast, final, overload
 
 from openai import AsyncAzureOpenAI, AsyncOpenAI, AsyncStream, RateLimitError
 from openai._types import NOT_GIVEN, NotGiven
@@ -15,17 +15,18 @@ from openai.types.chat import (
     ChatCompletionToolChoiceOptionParam,
     ChatCompletionToolParam,
 )
+from openai.types.chat.completion_create_params import ResponseFormat
 from openai.types.create_embedding_response import CreateEmbeddingResponse
 from openai.types.image import Image
 from openai.types.images_response import ImagesResponse
 
-from draive.helpers import getenv_str
 from draive.openai.config import (
     OpenAIChatConfig,
     OpenAIEmbeddingConfig,
     OpenAIImageGenerationConfig,
 )
 from draive.scope import ScopeDependency
+from draive.utils import getenv_str, not_missing
 
 __all__ = [
     "OpenAIClient",
@@ -119,20 +120,20 @@ class OpenAIClient(ScopeDependency):
             messages=messages,
             model=config.model,
             frequency_penalty=config.frequency_penalty
-            if config.frequency_penalty is not None
+            if not_missing(config.frequency_penalty)
             else NOT_GIVEN,
-            max_tokens=config.max_tokens if config.max_tokens is not None else NOT_GIVEN,
+            max_tokens=config.max_tokens if not_missing(config.max_tokens) else NOT_GIVEN,
             n=1,
-            response_format=config.response_format
-            if config.response_format is not None
+            response_format=cast(ResponseFormat, config.response_format)
+            if not_missing(config.response_format)
             else NOT_GIVEN,
-            seed=config.seed if config.seed is not None else NOT_GIVEN,
+            seed=config.seed if not_missing(config.seed) else NOT_GIVEN,
             stream=stream,
             temperature=config.temperature,
             tools=tools or NOT_GIVEN,
             tool_choice=tool_choice,
-            top_p=config.top_p if config.top_p is not None else NOT_GIVEN,
-            timeout=config.timeout if config.timeout is not None else NOT_GIVEN,
+            top_p=config.top_p if not_missing(config.top_p) else NOT_GIVEN,
+            timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,
             stream_options={"include_usage": True} if stream else NOT_GIVEN,
         )
 
@@ -150,12 +151,12 @@ class OpenAIClient(ScopeDependency):
                             texts=list(inputs_list[index : index + config.batch_size]),
                             model=config.model,
                             dimensions=config.dimensions
-                            if config.dimensions is not None
+                            if not_missing(config.dimensions)
                             else NOT_GIVEN,
-                            encoding_format=config.encoding_format
-                            if config.encoding_format is not None
+                            encoding_format=cast(Literal["float", "base64"], config.encoding_format)
+                            if not_missing(config.encoding_format)
                             else NOT_GIVEN,
-                            timeout=config.timeout if config.timeout is not None else NOT_GIVEN,
+                            timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,
                         )
                         for index in range(0, len(inputs_list), config.batch_size)
                     ]
@@ -213,7 +214,7 @@ class OpenAIClient(ScopeDependency):
             quality=config.quality,
             size=config.size,
             style=config.style,
-            timeout=config.timeout if config.timeout is not None else NOT_GIVEN,
+            timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,
             response_format=config.response_format,
         )
         return response.data[0]

@@ -1,9 +1,9 @@
 from itertools import chain
 from typing import Self, final
 
+from draive.parameters.model import DataModel
 from draive.types.audio import AudioBase64Content, AudioContent, AudioDataContent, AudioURLContent
 from draive.types.images import ImageBase64Content, ImageContent, ImageDataContent, ImageURLContent
-from draive.types.model import Model
 from draive.types.video import VideoBase64Content, VideoContent, VideoDataContent, VideoURLContent
 
 __all__ = [
@@ -15,7 +15,7 @@ MultimodalContentElement = VideoContent | ImageContent | AudioContent | str
 
 
 @final
-class MultimodalContent(Model):
+class MultimodalContent(DataModel):
     @classmethod
     def of(
         cls,

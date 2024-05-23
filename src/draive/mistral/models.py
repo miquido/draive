@@ -1,6 +1,6 @@
 from typing import Any, Literal, NotRequired, Required, TypedDict
 
-from draive.types import Model
+from draive.parameters import DataModel
 
 __all__ = [
     "UsageInfo",
@@ -20,19 +20,19 @@ __all__ = [
 ]
 
 
-class UsageInfo(Model):
+class UsageInfo(DataModel):
     prompt_tokens: int
     total_tokens: int
     completion_tokens: int | None = None
 
 
-class EmbeddingObject(Model):
+class EmbeddingObject(DataModel):
     object: str
     embedding: list[float]
     index: int
 
 
-class EmbeddingResponse(Model):
+class EmbeddingResponse(DataModel):
     id: str
     object: str
     data: list[EmbeddingObject]
@@ -58,30 +58,30 @@ class ChatMessage(TypedDict, total=False):
     tool_calls: NotRequired[list[ChatToolCallRequest]]
 
 
-class ChatFunctionCallResponse(Model):
+class ChatFunctionCallResponse(DataModel):
     name: str
     arguments: dict[str, Any] | str
 
 
-class ChatToolCallResponse(Model):
+class ChatToolCallResponse(DataModel):
     id: str
     type: Literal["function"]
     function: ChatFunctionCallResponse
 
 
-class ChatDeltaMessageResponse(Model):
+class ChatDeltaMessageResponse(DataModel):
     role: str | None = None
     content: str | None = None
     tool_calls: list[ChatToolCallResponse] | None = None
 
 
-class ChatCompletionResponseStreamChoice(Model):
+class ChatCompletionResponseStreamChoice(DataModel):
     index: int
     delta: ChatDeltaMessageResponse
     finish_reason: Literal["stop", "length", "error", "tool_calls"] | None = None
 
 
-class ChatCompletionStreamResponse(Model):
+class ChatCompletionStreamResponse(DataModel):
     id: str
     model: str
     choices: list[ChatCompletionResponseStreamChoice]
@@ -89,19 +89,19 @@ class ChatCompletionStreamResponse(Model):
     usage: UsageInfo | None = None
 
 
-class ChatMessageResponse(Model):
+class ChatMessageResponse(DataModel):
     role: str
     content: list[str] | str | None = None
     tool_calls: list[ChatToolCallResponse] | None = None
 
 
-class ChatCompletionResponseChoice(Model):
+class ChatCompletionResponseChoice(DataModel):
     index: int
     message: ChatMessageResponse
     finish_reason: Literal["stop", "length", "error", "tool_calls"] | None = None
 
 
-class ChatCompletionResponse(Model):
+class ChatCompletionResponse(DataModel):
     id: str
     object: str
     created: int

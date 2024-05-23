@@ -4,10 +4,10 @@ from uuid import uuid4
 
 from draive.agents.abc import BaseAgent
 from draive.agents.state import AgentScratchpad, AgentState
-from draive.helpers import freeze
 from draive.parameters import ParametrizedData
 from draive.scope import ctx
 from draive.types import MultimodalContent
+from draive.utils import freeze
 
 __all__ = [
     "AgentFlow",

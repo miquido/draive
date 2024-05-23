@@ -1,4 +1,4 @@
-from draive.types.model import Model
+from draive.parameters.model import DataModel
 
 __all__ = [
     "VideoBase64Content",
@@ -8,17 +8,17 @@ __all__ = [
 ]
 
 
-class VideoURLContent(Model):
+class VideoURLContent(DataModel):
     video_url: str
     video_transcription: str | None = None
 
 
-class VideoBase64Content(Model):
+class VideoBase64Content(DataModel):
     video_base64: str
     video_transcription: str | None = None
 
 
-class VideoDataContent(Model):
+class VideoDataContent(DataModel):
     video_data: bytes
     video_transcription: str | None = None
 

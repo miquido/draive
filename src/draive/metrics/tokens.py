@@ -1,6 +1,6 @@
 from typing import Self, overload
 
-from draive.types import Model
+from draive.parameters import DataModel
 
 __all__ = [
     "ModelTokenUsage",
@@ -8,7 +8,7 @@ __all__ = [
 ]
 
 
-class ModelTokenUsage(Model):
+class ModelTokenUsage(DataModel):
     input_tokens: int
     output_tokens: int
 
@@ -22,7 +22,7 @@ class ModelTokenUsage(Model):
         )
 
 
-class TokenUsage(Model):
+class TokenUsage(DataModel):
     @overload
     @classmethod
     def for_model(

@@ -1,5 +1,5 @@
+from draive.parameters import State
 from draive.tokenization.text import TextTokenizer
-from draive.types import State
 
 __all__ = [
     "Tokenization",

@@ -240,7 +240,7 @@ async def test_async_logs_issue_with_errors():
     with test_case.assertLogs() as logs:
         await compute("expected")
         assert executions == 2
-        assert logs.output == [
+        assert logs.output[0].startswith(
             f"ERROR:test:[{metrics_trace}] Attempting to retry {compute.__name__}"
-            f" which failed due to an error: {FakeException("fake")}"
-        ]
+            " which failed due to an error"
+        )

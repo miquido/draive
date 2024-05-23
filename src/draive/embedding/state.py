@@ -1,5 +1,5 @@
 from draive.embedding.embedder import Embedder
-from draive.types import State
+from draive.parameters import State
 
 __all__ = [
     "Embedding",

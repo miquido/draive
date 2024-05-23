@@ -7,12 +7,12 @@ from typing import (
 )
 from uuid import uuid4
 
-from draive.helpers import freeze
 from draive.lmm.state import ToolCallContext, ToolStatusStream
 from draive.metrics import ArgumentsTrace, ResultTrace
-from draive.parameters import Function, ParametrizedTool
+from draive.parameters import Function, ParametrizedFunction, ToolSpecification
 from draive.scope import ctx
 from draive.types import MultimodalContent, MultimodalContentElement
+from draive.utils import freeze, not_missing
 
 __all__ = [
     "AnyTool",
@@ -27,7 +27,7 @@ class ToolAvailabilityCheck(Protocol):
 
 
 @final
-class Tool[**Args, Result](ParametrizedTool[Args, Coroutine[None, None, Result]]):
+class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Result]]):
     def __init__(  # noqa: PLR0913
         self,
         /,
@@ -40,11 +40,21 @@ class Tool[**Args, Result](ParametrizedTool[Args, Coroutine[None, None, Result]]
         format_failure: Callable[[Exception], MultimodalContent | MultimodalContentElement],
         direct_result: bool = False,
     ) -> None:
-        super().__init__(
-            name=name,
-            function=function,
-            description=description,
-        )
+        super().__init__(function=function)
+        if not_missing(self._parameters.specification):
+            self.specification: ToolSpecification = {
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "parameters": self._parameters.specification,
+                    "description": description or "",
+                },
+            }
+
+        else:
+            raise TypeError(f"{function.__qualname__} can't be represented as a tool")
+
+        self.name: str = name
         self._direct_result: bool = direct_result
         self._check_availability: ToolAvailabilityCheck = availability_check or (
             lambda: None  # available by default

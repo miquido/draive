@@ -2,7 +2,7 @@
 #    uv --no-cache pip compile pyproject.toml -o constraints --all-extras
 annotated-types==0.7.0
     # via pydantic
-anyio==4.3.0
+anyio==4.4.0
     # via
     #   httpx
     #   openai
@@ -15,7 +15,7 @@ certifi==2024.2.2
     #   requests
 charset-normalizer==3.3.2
     # via requests
-coverage==7.5.1
+coverage==7.5.2
     # via pytest-cov
 distro==1.9.0
     # via openai
@@ -42,7 +42,7 @@ nodeenv==1.8.0
     # via pyright
 numpy==1.26.4
     # via draive (pyproject.toml)
-openai==1.30.1
+openai==1.30.3
     # via draive (pyproject.toml)
 packaging==24.0
     # via pytest
@@ -92,7 +92,7 @@ tiktoken==0.7.0
     # via draive (pyproject.toml)
 tqdm==4.66.4
     # via openai
-typing-extensions==4.11.0
+typing-extensions==4.12.0
     # via
     #   openai
     #   pydantic

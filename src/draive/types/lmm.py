@@ -2,8 +2,8 @@ from collections.abc import AsyncIterator
 from typing import Any, Self
 
 from draive.parameters import Field
+from draive.parameters.model import DataModel
 from draive.types.instruction import Instruction
-from draive.types.model import Model
 from draive.types.multimodal import MultimodalContent, MultimodalContentElement
 
 __all__ = [
@@ -21,7 +21,7 @@ __all__ = [
 ]
 
 
-class LMMInstruction(Model):
+class LMMInstruction(DataModel):
     @classmethod
     def of(
         cls,
@@ -42,7 +42,7 @@ class LMMInstruction(Model):
         return bool(self.content)
 
 
-class LMMInput(Model):
+class LMMInput(DataModel):
     @classmethod
     def of(
         cls,
@@ -57,7 +57,7 @@ class LMMInput(Model):
         return bool(self.content)
 
 
-class LMMCompletion(Model):
+class LMMCompletion(DataModel):
     @classmethod
     def of(
         cls,
@@ -72,7 +72,7 @@ class LMMCompletion(Model):
         return bool(self.content)
 
 
-class LMMCompletionChunk(Model):
+class LMMCompletionChunk(DataModel):
     @classmethod
     def of(
         cls,
@@ -87,20 +87,20 @@ class LMMCompletionChunk(Model):
         return bool(self.content)
 
 
-class LMMToolResponse(Model):
+class LMMToolResponse(DataModel):
     identifier: str
     tool: str
     content: MultimodalContent
     direct: bool
 
 
-class LMMToolRequest(Model):
+class LMMToolRequest(DataModel):
     identifier: str
     tool: str
     arguments: dict[str, Any] = Field(default_factory=dict)
 
 
-class LMMToolRequests(Model):
+class LMMToolRequests(DataModel):
     requests: list[LMMToolRequest]
 
 

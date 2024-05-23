@@ -1,10 +1,9 @@
-from typing import Any, Final, TypeGuard, final, overload
+from typing import Any, Final, TypeGuard, final
 
 __all__ = [
     "MISSING",
     "Missing",
-    "when_missing",
-    "is_missing",
+    "missing",
     "not_missing",
 ]
 
@@ -46,38 +45,15 @@ class Missing:
 MISSING: Final[Missing] = Missing()
 
 
-def is_missing(value: object | Missing) -> TypeGuard[Missing]:
+def missing(
+    value: Any | Missing,
+    /,
+) -> TypeGuard[Missing]:
     return isinstance(value, Missing)
 
 
-def not_missing[Value](value: Value | Missing) -> TypeGuard[Value]:
+def not_missing[Value](
+    value: Value | Missing,
+    /,
+) -> TypeGuard[Value]:
     return not isinstance(value, Missing)
-
-
-@overload
-def when_missing[Value, Default](
-    value: Value | Missing,
-    /,
-    default: Default,
-) -> Value | Default: ...
-
-
-@overload
-def when_missing[Casted](
-    value: Any | Missing,
-    /,
-    default: Any,
-    cast: type[Casted],
-) -> Casted: ...
-
-
-def when_missing[Value, Casted, Default](
-    value: Value | Missing,
-    /,
-    default: Default,
-    cast: type[Casted] | None = None,
-) -> Value | Default | Casted:
-    if not_missing(value):
-        return value
-    else:
-        return default

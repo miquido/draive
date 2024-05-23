@@ -2,7 +2,8 @@ from collections.abc import Callable
 from typing import Literal
 
 from draive.lmm.invocation import LMMInvocation
-from draive.types import Model, State, ToolCallStatus
+from draive.parameters import DataModel, State
+from draive.types import ToolCallStatus
 
 __all__: list[str] = [
     "LMM",
@@ -33,7 +34,7 @@ class ToolCallContext(State):
             "FAILED",
         ],
         /,
-        content: Model | dict[str, object] | None = None,
+        content: DataModel | dict[str, object] | None = None,
     ) -> None:
         call_status: ToolCallStatus
         match content:
@@ -44,7 +45,7 @@ class ToolCallContext(State):
                     status=status,
                 )
 
-            case Model() as model:
+            case DataModel() as model:
                 call_status = ToolCallStatus(
                     identifier=self.call_id,
                     tool=self.tool,

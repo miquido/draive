@@ -1,4 +1,4 @@
-from draive.types.state import State
+from draive.parameters.state import State
 
 __all__ = [
     "Embedded",

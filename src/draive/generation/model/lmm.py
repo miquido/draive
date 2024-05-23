@@ -2,6 +2,7 @@ from collections.abc import Iterable, Sequence
 from typing import Any
 
 from draive.lmm import AnyTool, Toolbox, lmm_invocation
+from draive.parameters import DataModel
 from draive.scope import ctx
 from draive.types import (
     Instruction,
@@ -11,7 +12,6 @@ from draive.types import (
     LMMInstruction,
     LMMToolRequests,
     LMMToolResponse,
-    Model,
     MultimodalContent,
     MultimodalContentElement,
 )
@@ -21,7 +21,7 @@ __all__: list[str] = [
 ]
 
 
-async def lmm_generate_model[Generated: Model](  # noqa: PLR0913
+async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913
     generated: type[Generated],
     /,
     *,
@@ -57,7 +57,7 @@ async def lmm_generate_model[Generated: Model](  # noqa: PLR0913
         if variable := schema_variable:
             instruction_message = LMMInstruction.of(
                 generation_instruction.updated(
-                    **{variable: generated.specification()},
+                    **{variable: generated.json_schema()},
                 ),
             )
 
@@ -66,7 +66,7 @@ async def lmm_generate_model[Generated: Model](  # noqa: PLR0913
                 generation_instruction.extended(
                     DEFAULT_INSTRUCTION_EXTENSION,
                     joiner="\n\n",
-                    schema=generated.specification(),
+                    schema=generated.json_schema(),
                 )
             )
 

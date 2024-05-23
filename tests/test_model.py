@@ -1,16 +1,16 @@
 import json
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Literal, NotRequired, Required, TypedDict
 from uuid import UUID
 
 from draive import (
     MISSING,
     AudioURLContent,
     ConversationMessage,
+    DataModel,
     Field,
     ImageURLContent,
     Missing,
-    Model,
     MultimodalContent,
 )
 
@@ -20,12 +20,12 @@ def invalid(value: str) -> None:
         raise ValueError()
 
 
-class ExampleNestedModel(Model):
+class ExampleNestedModel(DataModel):
     nested_alias: str = Field(alias="string", default="default")
     more: list[int] | None = None
 
 
-class ExampleModel(Model):
+class ExampleModel(DataModel):
     string: str = "default"
     number: int = Field(alias="alias", description="description", default=1)
     none_default: int | None = Field(default=None)
@@ -57,7 +57,7 @@ def test_validated_passes_with_default_values() -> None:
     ExampleModel.validated()
 
 
-class DatetimeModel(Model):
+class DatetimeModel(DataModel):
     value: datetime
 
 
@@ -75,7 +75,7 @@ def test_datetime_decoding() -> None:
     assert DatetimeModel.from_json(datetime_model_json) == datetime_model_instance
 
 
-class UUIDModel(Model):
+class UUIDModel(DataModel):
     value: UUID
 
 
@@ -93,7 +93,7 @@ def test_uuid_decoding() -> None:
     assert UUIDModel.from_json(uuid_model_json) == uuid_model_instance
 
 
-class MissingModel(Model):
+class MissingModel(DataModel):
     value: Missing = MISSING
 
 
@@ -111,7 +111,74 @@ def test_missing_decoding() -> None:
     assert MissingModel.from_json(missing_model_json) == missing_model_instance
 
 
-class BasicsModel(Model):
+class ExampleTypedDictNested(DataModel):
+    value: int
+
+
+class ExampleTypedDict(TypedDict, total=False):
+    dict_int: Required[int]
+    dict_str: NotRequired[str | None]
+    dict_nested: Required[ExampleTypedDictNested]
+
+
+class ExampleTotalTypedDict(TypedDict, total=True):
+    total: bool
+
+
+class TypedDictModel(DataModel):
+    value: ExampleTypedDict
+    total_value: ExampleTotalTypedDict
+
+
+typed_dict_model_instance: TypedDictModel = TypedDictModel(
+    value={
+        "dict_int": 42,
+        "dict_str": "answer",
+        "dict_nested": ExampleTypedDictNested(
+            value=21,
+        ),
+    },
+    total_value={"total": True},
+)
+typed_dict_model_json: str = (
+    '{"value":'
+    ' {"dict_int": 42, "dict_str": "answer", "dict_nested":'
+    ' {"value": 21}'
+    "},"
+    ' "total_value": {"total": true}'
+    "}"
+)
+typed_dict_not_required_model_instance: TypedDictModel = TypedDictModel(
+    value={
+        "dict_int": 42,
+        "dict_nested": ExampleTypedDictNested(
+            value=21,
+        ),
+    },
+    total_value={"total": True},
+)
+typed_dict_not_required_model_json: str = (
+    '{"value":'
+    ' {"dict_int": 42, "dict_nested":'
+    ' {"value": 21}},'
+    ' "total_value": {"total": true}}'
+)
+
+
+def test_typed_dict_encoding() -> None:
+    assert typed_dict_model_instance.as_json() == typed_dict_model_json
+    assert typed_dict_not_required_model_instance.as_json() == typed_dict_not_required_model_json
+
+
+def test_typed_dict_decoding() -> None:
+    assert TypedDictModel.from_json(typed_dict_model_json) == typed_dict_model_instance
+    assert (
+        TypedDictModel.from_json(typed_dict_not_required_model_json)
+        == typed_dict_not_required_model_instance
+    )
+
+
+class BasicsModel(DataModel):
     string: str
     string_list: list[str]
     integer: int

@@ -6,7 +6,7 @@ from time import monotonic
 from typing import NamedTuple, cast, overload
 from weakref import ref
 
-from draive.helpers import mimic_function
+from draive.utils.mimic import mimic_function
 
 __all__ = [
     "cache",

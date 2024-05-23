@@ -4,13 +4,17 @@ from collections.abc import Callable, Generator, Iterable, Iterator
 from functools import cached_property
 from typing import Any, final
 
-from draive.helpers import freeze
-from draive.parameters.missing import MISSING_PARAMETER, MissingParameter
 from draive.parameters.specification import (
     ParameterSpecification,
     ParametersSpecification,
     parameter_specification,
 )
+from draive.parameters.validation import (
+    ParameterValidationContext,
+    ParameterValidationError,
+    ParameterValidator,
+)
+from draive.utils import MISSING, Missing, freeze, missing, not_missing
 
 __all__ = [
     "ParameterDefinition",
@@ -18,7 +22,7 @@ __all__ = [
 ]
 
 
-@final  # TODO: allow draive.helpers.Missing populated with MISSING regardless of default
+@final
 class ParameterDefinition[Value]:
     def __init__(  # noqa: PLR0913
         self,
@@ -26,47 +30,45 @@ class ParameterDefinition[Value]:
         alias: str | None,
         description: str | None,
         annotation: Any,
-        default: Value | MissingParameter,
-        default_factory: Callable[[], Value] | None,
-        validator: Callable[[Any], Value],
-        specification: ParameterSpecification | None,
+        default: Value | Missing,
+        default_factory: Callable[[], Value] | Missing,
+        validator: ParameterValidator[Value],
+        specification: ParameterSpecification | Missing,
     ) -> None:
         assert name != alias, "Alias can't be the same as name"  # nosec: B101
         assert (  # nosec: B101
-            default_factory is None or default is MISSING_PARAMETER
+            missing(default_factory) or missing(default)
         ), "Can't specify both default value and factory"
 
         self.name: str = name
         self.alias: str | None = alias
         self.description: str | None = description
         self.annotation: Any = annotation
-        self.default: Value | MissingParameter = default
-        self.default_factory: Callable[[], Value] | None = default_factory
-        self.has_default: bool = default_factory is not None or default is not MISSING_PARAMETER
-        self.validator: Callable[[Any], Value] = validator
-        self.specification: ParameterSpecification | None = specification
+        self.default_value: Callable[[], Value | Missing]
+        if not_missing(default_factory):
+            self.default_value = default_factory
 
-    def default_value(self) -> Any | MissingParameter:
-        if factory := self.default_factory:
-            return factory()
+        elif not_missing(default):
+            self.default_value = lambda: default
+
         else:
-            return self.default
+            self.default_value = lambda: MISSING
+
+        self.has_default: bool = not_missing(default_factory) or not_missing(default)
+        self.validator: ParameterValidator[Value] = validator
+        self.specification: ParameterSpecification | Missing = specification
 
     def validated_value(
         self,
-        value: Any | MissingParameter,
+        value: Any,
         /,
+        context: ParameterValidationContext,
     ) -> Any:
-        if value is MISSING_PARAMETER:
-            default: Any | MissingParameter = self.default_value()
-            if default is MISSING_PARAMETER:
-                raise ValueError("Missing required parameter: `%s`", self.name)
-
-            else:
-                return self.validator(default)
+        if missing(value):
+            return self.validator(self.default_value(), context)
 
         else:
-            return self.validator(value)
+            return self.validator(value, context)
 
 
 @final
@@ -82,7 +84,6 @@ class ParametersDefinition:
         self.source: type[Any] | str = source
         self.parameters: list[ParameterDefinition[Any]] = []
         self._alias_map: dict[str, str] = {}
-        self.aliased_required: list[str] = []
         names: set[str] = set()
         aliases: set[str] = set()
         for parameter in parameters:
@@ -100,8 +101,6 @@ class ParametersDefinition:
                 self._alias_map[parameter.name] = alias
 
             self.parameters.append(parameter)
-            if not parameter.has_default:
-                self.aliased_required.append(parameter.alias or parameter.name)
 
         assert names.isdisjoint(aliases), "Aliases can't overlap regular names"  # nosec: B101
 
@@ -109,18 +108,33 @@ class ParametersDefinition:
 
     def validated(
         self,
+        context: ParameterValidationContext,
         **parameters: Any,
     ) -> dict[str, Any]:
         validated: dict[str, Any] = {}
         for parameter in self.parameters:
+            parameter_context: ParameterValidationContext = (*context, f".{parameter.name}")
             if parameter.name in parameters:
                 validated[parameter.name] = parameter.validated_value(
-                    parameters.get(parameter.name)
+                    parameters.get(parameter.name, MISSING),
+                    context=parameter_context,
                 )
+
             elif (alias := parameter.alias) and (alias in parameters):
-                validated[parameter.name] = parameter.validated_value(parameters.get(alias))
+                validated[parameter.name] = parameter.validated_value(
+                    parameters.get(alias, MISSING),
+                    context=parameter_context,
+                )
+
             else:
-                validated[parameter.name] = parameter.validated_value(MISSING_PARAMETER)
+                try:
+                    validated[parameter.name] = parameter.validated_value(
+                        MISSING,
+                        context=parameter_context,
+                    )
+
+                except ParameterValidationError:
+                    raise ParameterValidationError.missing(context=parameter_context) from None
 
         return validated
 
@@ -131,7 +145,7 @@ class ParametersDefinition:
         return {self._alias_map.get(key, key): value for key, value in parameters.items()}
 
     @cached_property
-    def parameters_specification(self) -> ParametersSpecification:
+    def specification(self) -> ParametersSpecification | Missing:
         globalns: dict[str, Any]
         localns: dict[str, Any] | None
         recursion_guard: frozenset[Any]
@@ -144,29 +158,46 @@ class ParametersDefinition:
             localns = {self.source.__name__: self.source}
             recursion_guard = frozenset({self.source})
 
+        aliased_required: list[str] = []
         properties: dict[str, ParameterSpecification] = {}
         for parameter in self.parameters:
-            if specification := parameter.specification:
-                properties[parameter.alias or parameter.name] = specification
+            if not_missing(parameter.specification):
+                properties[parameter.alias or parameter.name] = parameter.specification
+
             else:
-                parameter.specification = parameter_specification(
+                resolved_specification: ParameterSpecification | Missing = parameter_specification(
                     annotation=parameter.annotation,
                     description=parameter.description,
                     globalns=globalns,
                     localns=localns,
                     recursion_guard=recursion_guard,
                 )
-                properties[parameter.alias or parameter.name] = parameter.specification
+
+                if not_missing(resolved_specification):
+                    parameter.specification = resolved_specification
+                    properties[parameter.alias or parameter.name] = resolved_specification
+
+                else:
+                    # when at least one element can't be represented in specification
+                    # then the whole thing can't be represented in specification
+                    return MISSING
+
+            if not parameter.has_default:
+                aliased_required.append(parameter.alias or parameter.name)
 
         return {
             "type": "object",
             "properties": properties,
-            "required": self.aliased_required,
+            "required": aliased_required,
         }
 
     @cached_property
-    def specification(self) -> str:
-        return json.dumps(
-            self.parameters_specification,
-            indent=2,
-        )
+    def json_schema(self) -> str:
+        if not_missing(self.specification):
+            return json.dumps(
+                self.specification,
+                indent=2,
+            )
+
+        else:
+            raise TypeError(f"{self.__class__.__qualname__} can't be represented using JSON schema")

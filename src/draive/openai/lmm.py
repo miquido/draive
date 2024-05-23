@@ -16,7 +16,7 @@ from openai.types.chat.chat_completion_chunk import Choice, ChoiceDeltaToolCall
 
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.openai.client import OpenAIClient
-from draive.openai.config import OpenAIChatConfig
+from draive.openai.config import OpenAIChatConfig, OpenAISystemFingerprint
 from draive.openai.errors import OpenAIException
 from draive.parameters import ToolSpecification
 from draive.scope import ctx
@@ -39,6 +39,7 @@ from draive.types.audio import AudioBase64Content, AudioDataContent, AudioURLCon
 from draive.types.images import ImageDataContent
 from draive.types.multimodal import MultimodalContentElement
 from draive.types.video import VideoBase64Content, VideoDataContent, VideoURLContent
+from draive.utils import not_missing
 
 __all__ = [
     "openai_lmm_invocation",
@@ -108,6 +109,7 @@ async def openai_lmm_invocation(
         match output:
             case "text":
                 config = config.updated(response_format={"type": "text"})
+
             case "json":
                 config = config.updated(response_format={"type": "json_object"})
 
@@ -125,6 +127,7 @@ async def openai_lmm_invocation(
                     require_tool=require_tool,
                 ),
             )
+
         else:
             return await _chat_completion(
                 client=client,
@@ -151,7 +154,9 @@ def _convert_content_element(
                 "type": "image_url",
                 "image_url": {
                     "url": image.image_url,
-                    "detail": config.vision_details or "auto",
+                    "detail": cast(Literal["auto", "low", "high"], config.vision_details)
+                    if not_missing(config.vision_details)
+                    else "auto",
                 },
             }
 
@@ -290,6 +295,9 @@ async def _chat_completion(
 
     if not completion.choices:
         raise OpenAIException("Invalid OpenAI completion - missing messages!", completion)
+
+    if fingerprint := completion.system_fingerprint:
+        ctx.record(OpenAISystemFingerprint(system_fingerprint=fingerprint))
 
     completion_message: ChatCompletionMessage = completion.choices[0].message
     match completion.choices[0].finish_reason:
@@ -455,6 +463,9 @@ async def _chat_completion_stream(  # noqa: C901, PLR0912, PLR0915
                     output_tokens=usage.completion_tokens,
                 ),
             )
+
+            if fingerprint := part.system_fingerprint:
+                ctx.record(OpenAISystemFingerprint(system_fingerprint=fingerprint))
 
         else:
             ctx.log_warning("Unexpected OpenAI streaming part: %s", part)

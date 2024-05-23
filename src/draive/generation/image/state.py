@@ -1,5 +1,5 @@
 from draive.generation.image.generator import ImageGenerator
-from draive.types import State
+from draive.parameters import State
 
 __all__ = [
     "ImageGeneration",

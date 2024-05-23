@@ -1,7 +1,7 @@
 from typing import Self
 from uuid import uuid4
 
-from draive.helpers import freeze
+from draive.utils import freeze
 
 __all__ = [
     "Instruction",

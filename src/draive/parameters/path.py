@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any, final, get_args, get_origin, overload
 
-from draive.helpers import freeze
+from draive.utils import freeze
 
 __all__ = [
     "ParameterPath",
