@@ -2,9 +2,9 @@ from asyncio import iscoroutinefunction
 from collections.abc import Callable, Coroutine
 from typing import Any, cast
 
-from draive.helpers import mimic_function
 from draive.metrics import ArgumentsTrace, ResultTrace
 from draive.scope import ctx
+from draive.utils import mimic_function
 
 __all__ = [
     "traced",

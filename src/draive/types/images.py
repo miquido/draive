@@ -1,4 +1,4 @@
-from draive.types.model import Model
+from draive.parameters.model import DataModel
 
 __all__ = [
     "ImageBase64Content",
@@ -8,17 +8,17 @@ __all__ = [
 ]
 
 
-class ImageURLContent(Model):
+class ImageURLContent(DataModel):
     image_url: str
     image_description: str | None = None
 
 
-class ImageBase64Content(Model):
+class ImageBase64Content(DataModel):
     image_base64: str
     image_description: str | None = None
 
 
-class ImageDataContent(Model):
+class ImageDataContent(DataModel):
     image_data: bytes
     image_description: str | None = None
 

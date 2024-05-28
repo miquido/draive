@@ -1,6 +1,6 @@
 from draive.generation.model.generator import ModelGenerator
 from draive.generation.model.lmm import lmm_generate_model
-from draive.types import State
+from draive.parameters import State
 
 __all__ = [
     "ModelGeneration",

@@ -5,7 +5,6 @@ from logging import Logger, getLogger
 from types import TracebackType
 from typing import Any, final
 
-from draive.helpers import AsyncStream, getenv_bool, mimic_function
 from draive.metrics import (
     ExceptionTrace,
     Metric,
@@ -17,6 +16,7 @@ from draive.parameters import ParametrizedData
 from draive.scope.dependencies import ScopeDependencies, ScopeDependency
 from draive.scope.errors import MissingScopeContext
 from draive.scope.state import ScopeState
+from draive.utils import AsyncStream, getenv_bool, mimic_function
 
 __all__ = [
     "ctx",

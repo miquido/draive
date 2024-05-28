@@ -6,21 +6,20 @@ from dataclasses import Field as DataclassField
 from dataclasses import dataclass, is_dataclass
 from dataclasses import field as dataclass_field
 from dataclasses import fields as dataclass_fields
-from types import (
-    BuiltinFunctionType,
-    CodeType,
-    EllipsisType,
-    FunctionType,
-    NoneType,
-    NotImplementedType,
-)
-from typing import Any, ClassVar, Self, cast, dataclass_transform, get_origin, overload
+from typing import Any, ClassVar, Self, cast, dataclass_transform, overload
 
+from draive.parameters.basic import BasicValue
 from draive.parameters.definition import ParameterDefinition, ParametersDefinition
-from draive.parameters.missing import MISSING_PARAMETER, MissingParameter
 from draive.parameters.path import ParameterPath
 from draive.parameters.specification import ParameterSpecification
-from draive.parameters.validation import parameter_validator
+from draive.parameters.validation import (
+    ParameterValidationContext,
+    ParameterValidationError,
+    ParameterValidator,
+    ParameterVerifier,
+    parameter_validator,
+)
+from draive.utils import MISSING, Missing, missing, not_missing
 
 __all__ = [
     "Field",
@@ -33,9 +32,10 @@ def Field[Value](
     *,
     alias: str | None = None,
     description: str | None = None,
-    default: Value | MissingParameter = MISSING_PARAMETER,
-    validator: Callable[[Any], Value] | None = None,
-    specification: ParameterSpecification | None = None,
+    default: Value | Missing = MISSING,
+    validator: ParameterValidator[Value] | Missing = MISSING,
+    converter: Callable[[Value], BasicValue] | Missing = MISSING,
+    specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
 
 
@@ -44,9 +44,10 @@ def Field[Value](
     *,
     alias: str | None = None,
     description: str | None = None,
-    default_factory: Callable[[], Value] | None = None,
-    validator: Callable[[Any], Value] | None = None,
-    specification: ParameterSpecification | None = None,
+    default_factory: Callable[[], Value] | Missing = MISSING,
+    validator: ParameterValidator[Value] | Missing = MISSING,
+    converter: Callable[[Value], BasicValue] | Missing = MISSING,
+    specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
 
 
@@ -55,9 +56,10 @@ def Field[Value](
     *,
     alias: str | None = None,
     description: str | None = None,
-    default: Value | MissingParameter = MISSING_PARAMETER,
-    verifier: Callable[[Value], None] | None = None,
-    specification: ParameterSpecification | None = None,
+    default: Value | Missing = MISSING,
+    verifier: ParameterVerifier[Value] | None = None,
+    converter: Callable[[Value], BasicValue] | Missing = MISSING,
+    specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
 
 
@@ -66,9 +68,10 @@ def Field[Value](
     *,
     alias: str | None = None,
     description: str | None = None,
-    default_factory: Callable[[], Value] | None = None,
-    verifier: Callable[[Value], None] | None = None,
-    specification: ParameterSpecification | None = None,
+    default_factory: Callable[[], Value] | Missing = MISSING,
+    verifier: ParameterVerifier[Value] | None = None,
+    converter: Callable[[Value], BasicValue] | Missing = MISSING,
+    specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
 
 
@@ -76,45 +79,48 @@ def Field[Value](  # noqa: PLR0913 # Ruff - noqa: B008
     *,
     alias: str | None = None,
     description: str | None = None,
-    default: Value | MissingParameter = MISSING_PARAMETER,
-    default_factory: Callable[[], Value] | None = None,
-    validator: Callable[[Any], Value] | None = None,
-    verifier: Callable[[Value], None] | None = None,
-    specification: ParameterSpecification | None = None,
+    default: Value | Missing = MISSING,
+    default_factory: Callable[[], Value] | Missing = MISSING,
+    validator: ParameterValidator[Value] | Missing = MISSING,
+    verifier: ParameterVerifier[Value] | None = None,
+    converter: Callable[[Value], BasicValue] | Missing = MISSING,
+    specification: ParameterSpecification | Missing = MISSING,
 ) -> Value:  # it is actually a dataclass.Field, but type checker has to be fooled
     assert (  # nosec: B101
-        default_factory is None or default is MISSING_PARAMETER
+        missing(default_factory) or missing(default)
     ), "Can't specify both default value and factory"
     assert (  # nosec: B101
-        validator is None or verifier is None
+        missing(validator) or verifier is None
     ), "Can't specify both validator and verifier"
+
     metadata: dict[str, Any] = {}
-    if alias := alias:
+    if alias is not None:
         metadata["alias"] = alias
-    if description := description:
+    if not_missing(description):
         metadata["description"] = description
-    if validator := validator:
+    if not_missing(validator):
         metadata["validator"] = validator
-    if verifier := verifier:
+    if verifier is not None:
         metadata["verifier"] = verifier
-    if specification := specification:
+    if not_missing(converter):
+        metadata["converter"] = converter
+    if not_missing(specification):
         metadata["specification"] = specification
 
-    if default_factory := default_factory:
+    if not_missing(default_factory):
         return dataclass_field(
             default_factory=default_factory,
             metadata=metadata,
         )
-    elif default is MISSING_PARAMETER:
-        return cast(Value, dataclass_field(metadata=metadata))
-    else:
-        return cast(
-            Value,
-            dataclass_field(
-                default=default,
-                metadata=metadata,
-            ),
+
+    elif not_missing(default):
+        return dataclass_field(
+            default=default,
+            metadata=metadata,
         )
+
+    else:
+        return dataclass_field(metadata=metadata)
 
 
 @dataclass_transform(
@@ -126,7 +132,7 @@ def Field[Value](  # noqa: PLR0913 # Ruff - noqa: B008
     ),
 )
 class ParametrizedDataMeta(type):
-    __parameters_definition__: ParametersDefinition
+    __PARAMETERS__: ParametersDefinition
 
     def __new__(
         cls,
@@ -135,22 +141,22 @@ class ParametrizedDataMeta(type):
         classdict: dict[str, Any],
         **kwargs: Any,
     ) -> Any:
+        data_class: Any = dataclass(  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
+            type.__new__(
+                cls,
+                name,
+                bases,
+                classdict,
+                **kwargs,
+            ),
+            frozen=True,
+            kw_only=True,
+        )
         if bases:
-            data_class: Any = dataclass(  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
-                type.__new__(
-                    cls,
-                    name,
-                    bases,
-                    classdict,
-                    **kwargs,
-                ),
-                frozen=True,
-                kw_only=True,
-            )
             globalns: dict[str, Any] = sys.modules.get(data_class.__module__).__dict__
             localns: dict[str, Any] = {data_class.__name__: data_class}
             recursion_guard: frozenset[type[Any]] = frozenset({data_class})
-            data_class.__parameters_definition__ = ParametersDefinition(
+            data_class.__PARAMETERS__ = ParametersDefinition(
                 data_class,
                 (
                     _field_parameter(
@@ -163,28 +169,15 @@ class ParametrizedDataMeta(type):
                 ),
             )
 
-            return data_class
-
         else:
-            return type.__new__(
-                cls,
-                name,
-                bases,
-                classdict,
-                **kwargs,
+            data_class.__PARAMETERS__ = ParametersDefinition(
+                data_class,
+                parameters=[],
             )
 
-    def _validated(
-        cls,
-        **parameters: Any,
-    ) -> dict[str, Any]:
-        return cls.__parameters_definition__.validated(**parameters)
+        data_class._ = ParameterPath(data_class, data_class)
 
-    def _aliased(
-        cls,
-        **parameters: Any,
-    ) -> dict[str, Any]:
-        return cls.__parameters_definition__.aliased(**parameters)
+        return data_class
 
 
 def _field_parameter(
@@ -198,44 +191,31 @@ def _field_parameter(
         alias=field.metadata.get("alias", None),
         description=field.metadata.get("description", None),
         annotation=field.type,
-        default=MISSING_PARAMETER if field.default is DATACLASS_MISSING else field.default,
-        default_factory=None
+        default=MISSING if field.default is DATACLASS_MISSING else field.default,
+        default_factory=MISSING
         if field.default_factory is DATACLASS_MISSING
         else field.default_factory,
-        validator=field.metadata.get("validator", None)
-        or parameter_validator(
-            field.type,
-            verifier=field.metadata.get("verifier", None),
-            globalns=globalns,
-            localns=localns,
-            recursion_guard=recursion_guard,
+        validator=field.metadata.get(
+            "validator",
+            parameter_validator(
+                field.type,
+                verifier=field.metadata.get("verifier", None),
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
+            ),
         ),
-        specification=field.metadata.get("specification", None),
+        specification=field.metadata.get("specification", MISSING),
     )
 
 
 class ParametrizedData(metaclass=ParametrizedDataMeta):
     _: ClassVar[Self]
 
-    def __init_subclass__(cls) -> None:
-        super().__init_subclass__()
-        cls._: Self = cast(
-            Self,
-            ParameterPath(cls, cls),  # type: ignore
-        )
+    # TODO: add validation on __init__
 
     @classmethod
-    def path(
-        cls,
-        /,
-    ) -> Self:
-        return cast(
-            Self,
-            ParameterPath(cls, cls),  # type: ignore
-        )
-
-    @classmethod
-    def path_cast[Parameter](
+    def path[Parameter](
         cls,
         path: Parameter,
         /,
@@ -243,6 +223,7 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         assert isinstance(  # nosec: B101
             path, ParameterPath
         ), "Prepare parameter path by using Self._.path.to.property"
+
         return cast(ParameterPath[Self, Parameter], path)
 
     @classmethod
@@ -250,22 +231,38 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         cls,
         **values: Any,
     ) -> Self:
-        return cls(**cls._validated(**values))  # pyright: ignore[reportPrivateUsage]
+        return cls(
+            **cls.__PARAMETERS__.validated(
+                context=(cls.__qualname__,),
+                **values,
+            )
+        )
 
     @classmethod
     def validator(
         cls,
         /,
         value: Any,
+        context: ParameterValidationContext,
     ) -> Self:
-        if isinstance(value, cls):
-            return value
+        match value:
+            case self if type(self) == cls:
+                return self
 
-        elif isinstance(value, dict):
-            return cls.validated(**value)
+            case {**values}:
+                return cls(
+                    **cls.__PARAMETERS__.validated(
+                        context=context,
+                        **values,
+                    )
+                )
 
-        else:
-            raise TypeError("Invalid value %s", value)
+            case _:
+                raise ParameterValidationError.invalid_type(
+                    expected=cls,
+                    received=value,
+                    context=context,
+                )
 
     @classmethod
     def from_dict(
@@ -279,9 +276,14 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         self,
         aliased: bool = True,
     ) -> dict[str, Any]:
-        return _data_dict(self, aliased=aliased)
+        return _data_dict(
+            self,
+            aliased=aliased,
+            converter=None,
+        )
 
     # TODO: find a way to generate signature similar to dataclass __init__
+    # or try using ParameterPath if found a way to generate setters
     def updated(
         self,
         /,
@@ -299,19 +301,24 @@ def _data_dict(  # noqa: PLR0911
     data: Any,
     /,
     aliased: bool,
+    converter: Callable[[Any], BasicValue] | None,
 ) -> Any:
-    data_type: type = get_origin(type(data)) or type(data)
-    match data:
-        case atomic if data_type in _ATOMIC_TYPES:
-            return atomic  # use basic value types as they are
+    # use converter if able
+    if converter := converter:
+        return converter(data)
 
-        case parametrized_data if hasattr(data_type, "__parameters_definition__"):
+    match data:
+        case str() | None | int() | float() | bool():
+            return data  # use basic value types as they are
+
+        case parametrized_data if hasattr(parametrized_data.__class__, "__PARAMETERS__"):
             # convert parametrized data to dict
             if aliased:
                 return {
                     field.metadata.get("alias", field.name): _data_dict(
                         getattr(parametrized_data, field.name),
                         aliased=aliased,
+                        converter=field.metadata.get("converter", None),
                     )
                     for field in dataclass_fields(parametrized_data)
                 }
@@ -321,49 +328,40 @@ def _data_dict(  # noqa: PLR0911
                     field.name: _data_dict(
                         getattr(parametrized_data, field.name),
                         aliased=aliased,
+                        converter=field.metadata.get("converter", None),
                     )
                     for field in dataclass_fields(parametrized_data)
                 }
 
         case {**elements}:  # replace mapping with dict
-            return {key: _data_dict(value, aliased=aliased) for key, value in elements.items()}
+            return {
+                key: _data_dict(
+                    value,
+                    aliased=aliased,
+                    converter=None,
+                )
+                for key, value in elements.items()
+            }
 
         case [*values]:  # replace sequence with list
-            return [_data_dict(value, aliased=aliased) for value in values]
+            return [
+                _data_dict(
+                    value,
+                    aliased=aliased,
+                    converter=None,
+                )
+                for value in values
+            ]
 
-        case dataclass if is_dataclass(data_type):
+        case dataclass if is_dataclass(dataclass):
             return {
                 f.name: _data_dict(
                     getattr(dataclass, f.name),
                     aliased=aliased,
+                    converter=None,
                 )
                 for f in dataclass_fields(dataclass)
             }
 
         case other:  # for other types use deepcopy
             return deepcopy(other)
-
-
-# copied from python dataclasses
-_ATOMIC_TYPES = frozenset(
-    {
-        # Common JSON Serializable types
-        NoneType,
-        bool,
-        int,
-        float,
-        str,
-        # Other common types
-        complex,
-        bytes,
-        # Other types that are also unaffected by deepcopy
-        EllipsisType,
-        NotImplementedType,
-        CodeType,
-        BuiltinFunctionType,
-        FunctionType,
-        type,
-        range,
-        property,
-    }
-)

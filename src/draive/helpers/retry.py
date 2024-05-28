@@ -2,8 +2,8 @@ from asyncio import CancelledError, iscoroutinefunction, sleep
 from collections.abc import Callable, Coroutine
 from typing import cast, overload
 
-from draive.helpers import mimic_function
 from draive.scope import ctx
+from draive.utils import mimic_function
 
 __all__ = [
     "auto_retry",
@@ -138,9 +138,9 @@ def _wrap_async[**Args, Result](
                 if attempt < limit:
                     attempt += 1
                     ctx.log_error(
-                        "Attempting to retry %s which failed due to an error: %s",
+                        "Attempting to retry %s which failed due to an error",
                         function.__name__,
-                        exc,
+                        exception=exc,
                     )
 
                     match delay:

@@ -3,12 +3,11 @@ from datetime import datetime
 from typing import Literal, Self
 from uuid import uuid4
 
-from draive.parameters import Field
+from draive.parameters import DataModel, Field
 from draive.types import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
-    Model,
     MultimodalContent,
     MultimodalContentElement,
     ToolCallStatus,
@@ -21,7 +20,7 @@ __all__ = [
 ]
 
 
-class ConversationMessage(Model):
+class ConversationMessage(DataModel):
     @classmethod
     def user(
         cls,
@@ -56,7 +55,7 @@ class ConversationMessage(Model):
         return bool(self.content)
 
 
-class ConversationMessageChunk(Model):
+class ConversationMessageChunk(DataModel):
     identifier: str
     content: MultimodalContent
 

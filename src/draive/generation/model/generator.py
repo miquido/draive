@@ -2,7 +2,8 @@ from collections.abc import Iterable, Sequence
 from typing import Any, Protocol, runtime_checkable
 
 from draive.lmm import AnyTool, Toolbox
-from draive.types import Instruction, Model, MultimodalContent, MultimodalContentElement
+from draive.parameters import DataModel
+from draive.types import Instruction, MultimodalContent, MultimodalContentElement
 
 __all__ = [
     "ModelGenerator",
@@ -11,7 +12,7 @@ __all__ = [
 
 @runtime_checkable
 class ModelGenerator(Protocol):
-    async def __call__[Generated: Model](  # noqa: PLR0913
+    async def __call__[Generated: DataModel](  # noqa: PLR0913
         self,
         generated: type[Generated],
         /,

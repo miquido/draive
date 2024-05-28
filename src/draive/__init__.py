@@ -29,20 +29,9 @@ from draive.generation import (
     generate_text,
 )
 from draive.helpers import (
-    MISSING,
-    AsyncStream,
-    Missing,
-    freeze,
-    getenv_bool,
-    getenv_float,
-    getenv_int,
-    getenv_str,
-    is_missing,
-    load_env,
-    not_missing,
-    setup_logging,
-    split_sequence,
-    when_missing,
+    AsyncStreamTask,
+    auto_retry,
+    traced,
 )
 from draive.lmm import (
     LMM,
@@ -81,7 +70,7 @@ from draive.openai import (
     openai_lmm_invocation,
     openai_tokenize_text,
 )
-from draive.parameters import Argument, Field, ParameterPath
+from draive.parameters import Argument, BasicValue, DataModel, Field, ParameterPath, State
 from draive.scope import (
     ScopeDependencies,
     ScopeDependency,
@@ -92,6 +81,7 @@ from draive.similarity import mmr_similarity_search, similarity_score, similarit
 from draive.splitters import split_text
 from draive.tokenization import TextTokenizer, Tokenization, count_text_tokens, tokenize_text
 from draive.types import (
+    JSON,
     AudioBase64Content,
     AudioContent,
     AudioDataContent,
@@ -111,10 +101,8 @@ from draive.types import (
     LMMToolRequest,
     LMMToolResponse,
     Memory,
-    Model,
     MultimodalContent,
     ReadOnlyMemory,
-    State,
     ToolCallStatus,
     VideoBase64Content,
     VideoContent,
@@ -122,10 +110,20 @@ from draive.types import (
     VideoURLContent,
 )
 from draive.utils import (
-    AsyncStreamTask,
-    auto_retry,
+    MISSING,
+    AsyncStream,
+    Missing,
     cache,
-    traced,
+    freeze,
+    getenv_bool,
+    getenv_float,
+    getenv_int,
+    getenv_str,
+    load_env,
+    missing,
+    not_missing,
+    setup_logging,
+    split_sequence,
 )
 
 __all__ = [
@@ -146,17 +144,19 @@ __all__ = [
     "AudioURLContent",
     "auto_retry",
     "BaseAgent",
+    "BasicValue",
     "cache",
     "conversation_completion",
     "conversation_completion",
     "Conversation",
     "Conversation",
     "ConversationCompletion",
+    "ConversationMessage",
     "ConversationMessageChunk",
     "ConversationResponseStream",
-    "ConversationMessage",
     "count_text_tokens",
     "ctx",
+    "DataModel",
     "embed_text",
     "Embedded",
     "Embedder",
@@ -177,9 +177,9 @@ __all__ = [
     "ImageGenerator",
     "ImageURLContent",
     "Instruction",
-    "is_missing",
-    "lmm_invocation",
+    "JSON",
     "lmm_conversation_completion",
+    "lmm_invocation",
     "LMM",
     "LMMCompletion",
     "LMMCompletionChunk",
@@ -197,6 +197,7 @@ __all__ = [
     "MetricsTrace",
     "MetricsTraceReport",
     "MetricsTraceReporter",
+    "missing",
     "Missing",
     "MISSING",
     "mistral_embed_text",
@@ -206,7 +207,6 @@ __all__ = [
     "MistralEmbeddingConfig",
     "MistralException",
     "mmr_similarity_search",
-    "Model",
     "ModelGeneration",
     "ModelGenerator",
     "MultimodalContent",
@@ -252,5 +252,4 @@ __all__ = [
     "VideoContent",
     "VideoDataContent",
     "VideoURLContent",
-    "when_missing",
 ]

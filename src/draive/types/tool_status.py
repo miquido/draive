@@ -1,13 +1,13 @@
 from typing import Literal
 
-from draive.types.model import Model
+from draive.parameters.model import DataModel
 
 __all__ = [
     "ToolCallStatus",
 ]
 
 
-class ToolCallStatus(Model):
+class ToolCallStatus(DataModel):
     identifier: str
     tool: str
     status: Literal[

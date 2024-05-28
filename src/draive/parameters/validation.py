@@ -1,1018 +1,925 @@
 import builtins
 import datetime
 import enum
-import inspect
 import types
 import typing
 import uuid
 from collections import abc as collections_abc
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Sequence
 from dataclasses import is_dataclass
-from typing import Any, ForwardRef, Protocol, TypeAliasType, TypeVar, get_args, get_origin
+from typing import Any, Self
 
-import typing_extensions
-
-import draive.helpers.missing as draive_missing
+import draive.utils as draive_missing
+from draive.parameters.annotations import resolve_annotation
 
 __all__ = [
+    "ParameterVerifier",
+    "ParameterValidator",
+    "ParameterValidationContext",
+    "ParameterValidationError",
     "parameter_validator",
+    "as_validator",
 ]
 
-ValueVerifier = Callable[[Any], None]
-ValueValidator = Callable[[Any], Any]
+type ParameterValidationContext = tuple[str, ...]
+type ParameterValidator[Value] = Callable[[Any, ParameterValidationContext], Value]
+type ParameterVerifier[Value] = Callable[[Value], None]
+
+
+class ParameterValidationError(Exception):
+    @classmethod
+    def missing(
+        cls,
+        context: ParameterValidationContext,
+    ) -> Self:
+        return cls("Validation error: Missing required parameter at: %s", context)
+
+    @classmethod
+    def invalid_type(
+        cls,
+        expected: Any,
+        received: Any,
+        context: ParameterValidationContext,
+    ) -> Self:
+        return cls(
+            "Validation error: Invalid parameter at: %s - expected '%s' while received '%s'",
+            context,
+            expected,
+            received,
+        )
+
+    @classmethod
+    def invalid_key(
+        cls,
+        received: Any,
+        context: ParameterValidationContext,
+    ) -> Self:
+        return cls(
+            "Validation error: Invalid parameter key at: %s - received '%s'",
+            context,
+            received,
+        )
+
+    @classmethod
+    def invalid_value(
+        cls,
+        expected: Any,
+        received: Any,
+        context: ParameterValidationContext,
+    ) -> Self:
+        return cls(
+            "Validation error: Invalid parameter value at: %s - expected '%s' while received '%s'",
+            context,
+            expected,
+            received,
+        )
+
+    @classmethod
+    def invalid(
+        cls,
+        exception: Exception,
+        context: ParameterValidationContext,
+    ) -> Self:
+        return cls(
+            "Validation error: Invalid parameter at: %s - %s",
+            context,
+            exception,
+        )
+
+
+def as_validator[Value](
+    function: Callable[[Any], Value],
+) -> ParameterValidator[Value]:
+    def validator(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Value:
+        try:
+            return function(value)
+
+        except Exception as exc:
+            raise ParameterValidationError.invalid(
+                exception=exc,
+                context=context,
+            ) from exc
+
+    return validator
 
 
 def _none_validator(
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
+    value: Any,
+    context: ParameterValidationContext,
+) -> Any:
+    match value:
+        case None:
+            return None
 
-        def validated(value: Any) -> Any:
-            if value is None:
-                verify(value)
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-    else:
+        case _:
+            raise ParameterValidationError.invalid_type(
+                expected=types.NoneType,
+                received=value,
+                context=context,
+            )
 
-        def validated(value: Any) -> Any:
-            if value is None:
-                return value
-            else:
-                raise TypeError("Invalid value", value)
 
-    return validated
+def _missing_validator(
+    value: Any,
+    context: ParameterValidationContext,
+) -> Any:
+    match value:
+        case missing if isinstance(missing, draive_missing.Missing):
+            return missing
+
+        case None:
+            return draive_missing.MISSING
+
+        case _:
+            raise ParameterValidationError.invalid_type(
+                expected=draive_missing.Missing,
+                received=value,
+                context=context,
+            )
+
+
+def _any_validator(
+    value: Any,
+    context: ParameterValidationContext,
+) -> Any:
+    return value  # any is always valid
 
 
 def _str_validator(
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
+    value: Any,
+    context: ParameterValidationContext,
+) -> Any:
+    match value:
+        case str() as value:
+            return value
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, str):
-                verify(value)
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, str):
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-
-    return validated
+        case _:
+            raise ParameterValidationError.invalid_type(
+                expected=str,
+                received=value,
+                context=context,
+            )
 
 
 def _int_validator(
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
+    value: Any,
+    context: ParameterValidationContext,
+) -> Any:
+    match value:
+        case int() as value:
+            return value
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, int):
-                verify(value)
-                return value
-            elif isinstance(value, float) and value.is_integer():
-                # auto-convert from float
-                converted: int = int(value)
-                verify(converted)
-                return converted
-            else:
-                raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, int):
-                return value
-            elif isinstance(value, float) and value.is_integer():
-                # auto-convert from float
-                return int(value)
-            else:
-                raise TypeError("Invalid value", value)
-
-    return validated
+        case _:
+            raise ParameterValidationError.invalid_type(
+                expected=int,
+                received=value,
+                context=context,
+            )
 
 
 def _float_validator(
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
+    value: Any,
+    context: ParameterValidationContext,
+) -> Any:
+    match value:
+        case float() as value:
+            return value
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, float):
-                verify(value)
-                return value
-            elif isinstance(value, int):
-                # auto-convert from int
-                converted: float = float(value)
-                verify(converted)
-                return converted
-            else:
-                raise TypeError("Invalid value", value)
-    else:
+        case int() as convertible:
+            return float(convertible)
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, float):
-                return value
-            elif isinstance(value, int):
-                # auto-convert from int
-                return float(value)
-            else:
-                raise TypeError("Invalid value", value)
-
-    return validated
+        case _:
+            raise ParameterValidationError.invalid_type(
+                expected=float,
+                received=value,
+                context=context,
+            )
 
 
 def _bool_validator(
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
+    value: Any,
+    context: ParameterValidationContext,
+) -> Any:
+    match value:
+        case bool() as value:
+            return value
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, bool):
-                verify(value)
-                return value
-            elif isinstance(value, int):
-                # auto-convert from int
-                converted: bool = bool(value)
-                verify(converted)
-                return converted
-            else:
-                raise TypeError("Invalid value", value)
-    else:
+        case int() as convertible:
+            return bool(convertible != 0)
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, bool):
-                return value
-            elif isinstance(value, int):
-                # auto-convert from int
-                return bool(value)
-            else:
-                raise TypeError("Invalid value", value)
+        case str() as convertible if convertible.lower() == "true":
+            return True
 
-    return validated
+        case str() as convertible if convertible.lower() == "false":
+            return False
+
+        case _:
+            raise ParameterValidationError.invalid_type(
+                expected=bool,
+                received=value,
+                context=context,
+            )
 
 
-def _tuple_validator(  # noqa: C901
-    options: tuple[Any, ...],
+def _prepare_tuple_validator(
+    elements_annotation: tuple[Any, ...],
+    /,
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    match options:
-        case [element_annotation, builtins.Ellipsis | types.EllipsisType]:
-            validate_element: Callable[[Any], Any] = parameter_validator(
-                element_annotation,
+) -> ParameterValidator[Any]:
+    match elements_annotation:
+        case [element, builtins.Ellipsis]:
+            element_validator: ParameterValidator[Any] = parameter_validator(
+                element,
+                verifier=None,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,
-                verifier=None,
             )
 
-            if verify := verifier:
-
-                def validated(value: Any) -> Any:
-                    if isinstance(value, list | tuple):
-                        validated: tuple[Any, ...] = tuple(
-                            validate_element(element)
-                            for element in value  # pyright: ignore[reportUnknownVariableType]
+            def variable_tuple_validator(
+                value: Any,
+                context: ParameterValidationContext,
+            ) -> Any:
+                match value:
+                    case [*values] as value:
+                        return tuple[Any, ...](
+                            element_validator(element, (*context, f"[{idx}]"))
+                            for idx, element in enumerate(values)
                         )
-                        verify(validated)
-                        return validated  # pyright: ignore[reportUnknownVariableType]
-                    else:
-                        raise TypeError("Invalid value", value)
-            else:
 
-                def validated(value: Any) -> Any:
-                    if isinstance(value, list | tuple | set):
-                        validated: tuple[Any, ...] = tuple(
-                            validate_element(element)
-                            for element in value  # pyright: ignore[reportUnknownVariableType]
+                    case []:
+                        return tuple[Any, ...]()
+
+                    case _:
+                        raise ParameterValidationError.invalid_type(
+                            expected=tuple,
+                            received=value,
+                            context=context,
                         )
-                        return validated  # pyright: ignore[reportUnknownVariableType]
-                    else:
-                        raise TypeError("Invalid value", value)
 
-        case [*annotations]:
-            element_validators: list[Callable[[Any], Any]] = [
+            return variable_tuple_validator
+
+        case [*fixed]:
+            element_validators: list[ParameterValidator[Any]] = [
                 parameter_validator(
-                    annotation,
-                    verifier=verifier,
+                    element,
+                    verifier=None,
                     globalns=globalns,
                     localns=localns,
                     recursion_guard=recursion_guard,
                 )
-                for annotation in annotations
+                for element in fixed
             ]
 
-            if verify := verifier:
-
-                def validated(value: Any) -> Any:
-                    if isinstance(value, list | tuple):
-                        if len(value) != len(element_validators):  # pyright: ignore[reportUnknownArgumentType]
-                            raise TypeError("Invalid value", value)  # pyright: ignore[reportUnknownArgumentType]
-
-                        validated: tuple[Any, ...] = tuple(
-                            validation(value[idx])
-                            for idx, validation in enumerate(element_validators)
+            def fixed_tuple_validator(
+                value: Any,
+                context: ParameterValidationContext,
+            ) -> Any:
+                match value:
+                    case [*values] as value if len(values) == len(element_validators):
+                        return tuple[Any, ...](
+                            validator(element, (*context, f"[{idx}]"))
+                            for (idx, element), validator in zip(
+                                enumerate(values),
+                                element_validators,
+                                strict=True,
+                            )
                         )
-                        verify(validated)
-                        return validated  # pyright: ignore[reportUnknownVariableType]
-                    else:
-                        raise TypeError("Invalid value", value)
-            else:
 
-                def validated(value: Any) -> Any:
-                    if isinstance(value, tuple):
-                        return value  # pyright: ignore[reportUnknownVariableType]
-                    else:
-                        raise TypeError("Invalid value", value)
+                    case _:
+                        raise ParameterValidationError.invalid_type(
+                            expected=tuple,
+                            received=value,
+                            context=context,
+                        )
 
-    return validated
+            return fixed_tuple_validator
 
 
-def _union_validator(
-    alternatives: Iterable[Any],
+def _prepare_list_validator(
+    elements_annotation: tuple[Any, ...],
+    /,
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    validators: list[Callable[[Any], Any]] = [
+) -> ParameterValidator[Any]:
+    element_validator: ParameterValidator[Any]
+    match elements_annotation:
+        case [element]:
+            element_validator = parameter_validator(
+                element,
+                verifier=None,
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
+            )
+
+        case other:
+            raise TypeError(f"Unsupported annotation - list[{other}]")
+
+    def list_validator(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Any:
+        match value:
+            case [*values] as value:
+                return list[Any](
+                    element_validator(element, (*context, f"[{idx}]"))
+                    for idx, element in enumerate(values)
+                )
+
+            case []:
+                return list[Any]()
+
+            case _:
+                raise ParameterValidationError.invalid_type(
+                    expected=list,
+                    received=value,
+                    context=context,
+                )
+
+    return list_validator
+
+
+def _prepare_union_validator(
+    elements_annotation: tuple[Any, ...],
+    /,
+    globalns: dict[str, Any] | None,
+    localns: dict[str, Any] | None,
+    recursion_guard: frozenset[type[Any]],
+) -> ParameterValidator[Any]:
+    alternatives_validators: list[ParameterValidator[Any]] = [
         parameter_validator(
             alternative,
-            verifier=verifier,
-            globalns=globalns,
-            localns=localns,
-            recursion_guard=recursion_guard,
-        )
-        for alternative in alternatives
-    ]
-    if verify := verifier:
-
-        def validated(value: Any) -> Any:
-            for validator in validators:
-                try:
-                    validated: Any = validator(value)
-                    verify(validated)
-                    return validated
-                except (ValueError, TypeError):
-                    continue
-
-            raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            for validator in validators:
-                try:
-                    return validator(value)
-                except (ValueError, TypeError):
-                    continue
-
-            raise TypeError("Invalid value", value)
-
-    return validated
-
-
-def _list_validator(
-    element_annotation: Any | None,
-    globalns: dict[str, Any] | None,
-    localns: dict[str, Any] | None,
-    recursion_guard: frozenset[type[Any]],
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    validate_element: Callable[[Any], Any]
-    if element_annotation is None:
-        validate_element = lambda value: value  # noqa: E731
-
-    else:
-        validate_element = parameter_validator(
-            element_annotation,
-            globalns=globalns,
-            localns=localns,
-            recursion_guard=recursion_guard,
             verifier=None,
+            globalns=globalns,
+            localns=localns,
+            recursion_guard=recursion_guard,
+        )
+        for alternative in elements_annotation
+    ]
+
+    def union_validator(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Any:
+        for validator in alternatives_validators:
+            try:
+                return validator(value, context)
+
+            except ParameterValidationError:
+                continue
+
+        raise ParameterValidationError.invalid_type(
+            expected=types.UnionType,
+            received=value,
+            context=context,
         )
 
-    if verify := verifier:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, list):
-                values_list: builtins.list[Any] = [
-                    validate_element(element)
-                    for element in value  # pyright: ignore[reportUnknownVariableType]
-                ]
-                verify(values_list)
-                return values_list
-            else:
-                raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, list):
-                return [
-                    validate_element(element)
-                    for element in value  # pyright: ignore[reportUnknownVariableType]
-                ]
-            else:
-                raise TypeError("Invalid value", value)
-
-    return validated
+    return union_validator
 
 
-def _literal_validator(
-    options: tuple[Any, ...],
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
+def _prepare_str_enum_validator(
+    values: Sequence[str],
+    /,
+) -> ParameterValidator[Any]:
+    def str_enum_validator(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Any:
+        match value:
+            case str() as value:
+                if value in values:
+                    return value
 
-        def validated(value: Any) -> Any:
-            if value in options:
-                verify(value)
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-    else:
+                else:
+                    raise ParameterValidationError.invalid_value(
+                        expected=values,
+                        received=value,
+                        context=context,
+                    )
 
-        def validated(value: Any) -> Any:
-            if value in options:
-                return value
-            else:
-                raise TypeError("Invalid value", value)
+            case _:
+                raise ParameterValidationError.invalid_type(
+                    expected=str,
+                    received=value,
+                    context=context,
+                )
 
-    return validated
-
-
-def _str_enum_validator(
-    annotation: Any,
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                verify(value)
-                return value
-            elif isinstance(value, str):
-                enum_value: Any = annotation(value)
-                verify(enum_value)
-                return enum_value
-            else:
-                raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                return value
-            elif isinstance(value, str):
-                return annotation(value)
-            else:
-                raise TypeError("Invalid value", value)
-
-    return validated
+    return str_enum_validator
 
 
-def _int_enum_validator(
-    annotation: Any,
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
+def _prepare_int_enum_validator(
+    values: Sequence[int],
+    /,
+) -> ParameterValidator[Any]:
+    def int_enum_validator(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Any:
+        match value:
+            case int() as value:
+                if value in values:
+                    return value
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                verify(value)
-                return value
-            elif isinstance(value, int):
-                enum_value: Any = annotation(value)
-                verify(enum_value)
-                return enum_value
-            else:
-                raise TypeError("Invalid value", value)
-    else:
+                else:
+                    raise ParameterValidationError.invalid_value(
+                        expected=values,
+                        received=value,
+                        context=context,
+                    )
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                return value
-            elif isinstance(value, int):
-                return annotation(value)
-            else:
-                raise TypeError("Invalid value", value)
+            case _:
+                raise ParameterValidationError.invalid_type(
+                    expected=int,
+                    received=value,
+                    context=context,
+                )
 
-    return validated
+    return int_enum_validator
 
 
-def _enum_validator(
-    annotation: Any,
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
+def _prepare_any_enum_validator(
+    values: Sequence[Any],
+    /,
+) -> ParameterValidator[Any]:
+    def enum_validator(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Any:
+        if value in values:
+            return value
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                verify(value)
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-    else:
+        else:
+            raise ParameterValidationError.invalid_value(
+                expected=values,
+                received=value,
+                context=context,
+            )
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-
-    return validated
+    return enum_validator
 
 
 def _uuid_validator(
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
+    value: Any,
+    context: ParameterValidationContext,
+) -> Any:
+    match value:
+        case str() as value:
+            try:
+                return uuid.UUID(hex=value)
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, uuid.UUID):
-                verify(value)
-                return value
-            elif isinstance(value, str):
-                uuid_value: uuid.UUID = uuid.UUID(hex=value)
-                verify(uuid_value)
-                return uuid_value
-            elif isinstance(value, bytes):
-                uuid_value: uuid.UUID = uuid.UUID(bytes=value)
-                verify(uuid_value)
-                return uuid_value
-            else:
-                raise TypeError("Invalid value", value)
-    else:
+            except Exception as exc:
+                raise ParameterValidationError.invalid_value(
+                    expected=uuid.UUID,
+                    received=value,
+                    context=context,
+                ) from exc
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, uuid.UUID):
-                return value
-            elif isinstance(value, str):
-                uuid_value: uuid.UUID = uuid.UUID(hex=value)
-                return uuid_value
-            elif isinstance(value, bytes):
-                uuid_value: uuid.UUID = uuid.UUID(bytes=value)
-                return uuid_value
-            else:
-                raise TypeError("Invalid value", value)
+        case uuid.UUID() as value:
+            return value
 
-    return validated
+        case bytes() as value:
+            try:
+                return uuid.UUID(bytes=value)
+
+            except Exception as exc:
+                raise ParameterValidationError.invalid_value(
+                    expected=uuid.UUID,
+                    received=value,
+                    context=context,
+                ) from exc
+
+        case _:
+            raise ParameterValidationError.invalid_type(
+                expected=uuid.UUID,
+                received=value,
+                context=context,
+            )
 
 
 def _datetime_validator(
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, datetime.datetime):
-                verify(value)
-                return value
-            elif isinstance(value, str):
-                datetime_value: datetime.datetime = datetime.datetime.fromisoformat(value)
-                verify(datetime_value)
-                return datetime_value
-            elif isinstance(value, float | int):
-                datetime_value: datetime.datetime = datetime.datetime.fromtimestamp(
-                    value,
-                    datetime.UTC,
-                )
-                verify(datetime_value)
-                return datetime_value
-            else:
-                raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, datetime.datetime):
-                return value
-            elif isinstance(value, str):
+    value: Any,
+    context: ParameterValidationContext,
+) -> Any:
+    match value:
+        case str() as value:
+            try:
                 return datetime.datetime.fromisoformat(value)
-            elif isinstance(value, float | int):
+
+            except Exception as exc:
+                raise ParameterValidationError.invalid_value(
+                    expected=datetime.datetime,
+                    received=value,
+                    context=context,
+                ) from exc
+
+        case datetime.datetime() as value:
+            return value
+
+        case int() as value:
+            try:
                 return datetime.datetime.fromtimestamp(
                     value,
                     datetime.UTC,
                 )
-            else:
-                raise TypeError("Invalid value", value)
 
-    return validated
+            except Exception as exc:
+                raise ParameterValidationError.invalid_value(
+                    expected=datetime.datetime,
+                    received=value,
+                    context=context,
+                ) from exc
+
+        case float() as value:
+            try:
+                return datetime.datetime.fromtimestamp(
+                    value,
+                    datetime.UTC,
+                )
+
+            except Exception as exc:
+                raise ParameterValidationError.invalid_value(
+                    expected=datetime.datetime,
+                    received=value,
+                    context=context,
+                ) from exc
+
+        case _:
+            raise ParameterValidationError.invalid_type(
+                expected=datetime.datetime,
+                received=value,
+                context=context,
+            )
 
 
 def _callable_validator(
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    # TODO: validate callable signature
-    if verify := verifier:
+    value: Any,
+    context: ParameterValidationContext,
+) -> Any:
+    match value:
+        # TODO: verify signature eventually
+        case value if callable(value):
+            return value
 
-        def validated(value: Any) -> Any:
-            if callable(value) or inspect.isfunction(value):
-                verify(value)
+        case _:
+            raise ParameterValidationError.invalid_type(
+                expected=collections_abc.Callable,
+                received=value,
+                context=context,
+            )
+
+
+def _prepare_type_validator(
+    validated_type: type[Any],
+    /,
+) -> ParameterValidator[Any]:
+    def type_validator(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Any:
+        match value:
+            case value if isinstance(value, validated_type):
                 return value
-            else:
-                raise TypeError("Invalid value", value)
-    else:
 
-        def validated(value: Any) -> Any:
-            if callable(value) or inspect.isfunction(value):
+            case _:
+                raise ParameterValidationError.invalid_type(
+                    expected=validated_type,
+                    received=value,
+                    context=context,
+                )
+
+    return type_validator
+
+
+def _prepare_meta_type_validator(
+    validated_type: type[Any],
+    /,
+) -> ParameterValidator[Any]:
+    def type_validator(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Any:
+        match value:
+            case type() as type_value:
+                if type_value == validated_type:
+                    return type_value
+
+                else:
+                    raise ParameterValidationError.invalid_value(
+                        expected=validated_type,
+                        received=type_value,
+                        context=context,
+                    )
+
+            case _:
+                raise ParameterValidationError.invalid_type(
+                    expected=type,
+                    received=value,
+                    context=context,
+                )
+
+    return type_validator
+
+
+def _prepare_dataclass_validator(
+    dataclass_type: type[Any],
+    /,
+) -> ParameterValidator[Any]:
+    def dataclass_validator(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Any:
+        match value:
+            case value if isinstance(value, dataclass_type):
                 return value
-            else:
-                raise TypeError("Invalid value", value)
 
-    return validated
+            case {**parameters}:
+                # TODO: nested validation?
+                try:
+                    return dataclass_type(**parameters)
 
+                except Exception as exc:
+                    raise ParameterValidationError.invalid_value(
+                        expected=dataclass_type,
+                        received=value,
+                        context=context,
+                    ) from exc
 
-def _protocol_validator(
-    annotation: Any,
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
+            case _:
+                raise ParameterValidationError.invalid_type(
+                    expected=dataclass_type,
+                    received=value,
+                    context=context,
+                )
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                verify(value)
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-
-    return validated
+    return dataclass_validator
 
 
-def _dataclass_validator(
-    annotation: Any,
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    # TODO: validate dataclass internals (i.e. nested dataclass)
-    if verify := verifier:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                verify(value)
-                return value
-            elif isinstance(value, dict):
-                validated: Any = annotation(**value)
-                verify(validated)
-                return validated
-            else:
-                raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                return value
-            elif isinstance(value, dict):
-                validated: Any = annotation(**value)
-                return validated
-            else:
-                raise TypeError("Invalid value", value)
-
-    return validated
-
-
-def _dict_validator(
-    element_annotation: Any,
+def _prepare_dict_validator(
+    items_annotation: tuple[Any, ...],
+    /,
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    validate_element: Callable[[Any], Any] = parameter_validator(
-        element_annotation,
-        globalns=globalns,
-        localns=localns,
-        recursion_guard=recursion_guard,
-        verifier=None,
-    )
+) -> ParameterValidator[Any]:
+    key_validator: ParameterValidator[Any]
+    value_validator: ParameterValidator[Any]
+    match items_annotation:
+        case [key, value]:
+            key_validator = parameter_validator(
+                key,
+                verifier=None,
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
+            )
+            value_validator = parameter_validator(
+                value,
+                verifier=None,
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
+            )
 
-    if verify := verifier:
+        case other:
+            raise TypeError(f"Unsupported annotation - dict[{other}]")
 
-        def validated(value: Any) -> Any:
-            if isinstance(value, dict):
-                values_dict: builtins.dict[str, Any] = {
-                    key: validate_element(element)
-                    for key, element in value.items()  # pyright: ignore[reportUnknownVariableType]
-                    if isinstance(key, str)
-                }
-                verify(values_dict)
-                return values_dict
-            else:
-                raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, dict):
+    def dict_validator(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Any:
+        match value:
+            case {**values}:
                 return {
-                    key: validate_element(element)
-                    for key, element in value.items()  # pyright: ignore[reportUnknownVariableType]
-                    if isinstance(key, str)
+                    key_validator(key, context): value_validator(value, (*context, f"[{key}]"))
+                    for key, value in values.items()
                 }
-            else:
-                raise TypeError("Invalid value", value)
 
-    return validated
+            case _:
+                raise ParameterValidationError.invalid_type(
+                    expected=dict,
+                    received=value,
+                    context=context,
+                )
 
-
-def _typed_dict_validator(
-    annotation: Any,
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    # TODO: validate typed dict internals (i.e. nested typed dicts)
-    if verify := verifier:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, dict):
-                typed_dict: Any = annotation(**value)
-                verify(typed_dict)
-                return typed_dict
-            else:
-                raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, dict):
-                return annotation(**value)
-            else:
-                raise TypeError("Invalid value", value)
-
-    return validated
+    return dict_validator
 
 
-def _parametrized_validator(
-    annotation: Any,
-    validator: Callable[..., Any],
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                verify(value)
-                return value
-            elif isinstance(value, dict):
-                parametrized: Any = validator(**value)
-                verify(parametrized)
-                return parametrized
-            else:
-                raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                return value
-            elif isinstance(value, dict):
-                return validator(**value)
-            else:
-                raise TypeError("Invalid value", value)
-
-    return validated
-
-
-def _class_instance_validator(
-    annotation: Any,
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                verify(value)
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, annotation):
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-
-    return validated
-
-
-def _type_match_validator(
-    *annotation: Any,
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
-
-        def validated(value: Any) -> Any:
-            if type(value) in annotation:
-                verify(value)
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            if type(value) in annotation:
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-
-    return validated
-
-
-def _any_validator(
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    if verify := verifier:
-
-        def validated(value: Any) -> Any:
-            verify(value)
-            return value
-    else:
-
-        def validated(value: Any) -> Any:
-            return value
-
-    return validated
-
-
-def _meta_type_validator(
-    annotation: Any,
-    verifier: ValueVerifier | None,
-) -> ValueValidator:
-    # TODO: FIXME: verify meta type
-    if verify := verifier:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, type):
-                verify(value)
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-    else:
-
-        def validated(value: Any) -> Any:
-            if isinstance(value, type):
-                return value
-            else:
-                raise TypeError("Invalid value", value)
-
-    return validated
-
-
-def _resolved_annotation(
-    annotation: Any,
+def _prepare_typed_dict_validator(
+    typed_dict_annotation: type[Any],
+    /,
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
-) -> Any:
-    if isinstance(annotation, str):
-        return ForwardRef(annotation)._evaluate(  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+    recursion_guard: frozenset[type[Any]],
+) -> ParameterValidator[Any]:
+    required_fields: set[str] = typed_dict_annotation.__required_keys__
+    field_validators: dict[str, ParameterValidator[Any]] = {
+        name: parameter_validator(
+            annotation,
+            verifier=None,
             globalns=globalns,
             localns=localns,
-            recursive_guard=frozenset(),
+            recursion_guard=recursion_guard,
         )
-    elif isinstance(annotation, ForwardRef):
-        return annotation._evaluate(  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-            globalns=globalns,
-            localns=localns,
-            recursive_guard=frozenset(),
-        )
-    else:
-        return annotation
+        for name, annotation in typed_dict_annotation.__annotations__.items()
+    }
+
+    def typed_dict_validator(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Any:
+        match value:
+            case {**values}:
+                result: dict[str, Any] = {}
+                for key, value in values.items():
+                    match key:
+                        case str() as name if name in field_validators:
+                            result[key] = field_validators[name](value, (*context, f"[{key}]"))
+
+                        case other:
+                            raise ParameterValidationError.invalid_type(
+                                expected=str,
+                                received=other,
+                                context=context,
+                            )
+
+                missing_values: set[str] = required_fields.difference(result.keys())
+                if missing_values:
+                    raise ParameterValidationError.missing(context=context)
+
+                return result
+
+            case _:
+                raise ParameterValidationError.invalid_type(
+                    expected=dict,
+                    received=value,
+                    context=context,
+                )
+
+    return typed_dict_validator
 
 
-def parameter_validator[Value](  # noqa: PLR0911, C901
-    parameter_annotation: Any,
+def _verified[Value](
+    validator: ParameterValidator[Value],
+    /,
+    *,
+    verifier: ParameterVerifier[Value],
+) -> ParameterValidator[Value]:
+    def wrapped(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Value:
+        validated: Value = validator(value, context)
+
+        try:
+            verifier(validated)
+
+        except ParameterValidationError as exc:
+            raise exc
+
+        except Exception as exc:
+            raise ParameterValidationError.invalid(
+                exception=exc,
+                context=context,
+            ) from exc
+
+        return validated
+
+    return wrapped
+
+
+def parameter_validator[Value](
+    annotation: Any,
     /,
     verifier: Callable[[Value], None] | None,
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
-) -> Callable[[Any], Value]:
-    annotation: Any = _resolved_annotation(
-        parameter_annotation,
+) -> ParameterValidator[Value]:
+    resolved_origin, resolved_args = resolve_annotation(
+        annotation,
         globalns=globalns,
         localns=localns,
     )
 
-    if annotation in recursion_guard:
-        return annotation.validator
+    if resolved_origin in recursion_guard:
+        return resolved_origin.validator
 
-    match get_origin(annotation) or annotation:
+    validator: ParameterValidator[Value]
+    match resolved_origin:
         case builtins.str:
-            return _str_validator(verifier=verifier)
+            validator = _str_validator
 
         case builtins.int:
-            return _int_validator(verifier=verifier)
+            validator = _int_validator
 
         case builtins.float:
-            return _float_validator(verifier=verifier)
+            validator = _float_validator
 
         case builtins.bool:
-            return _bool_validator(verifier=verifier)
+            validator = _bool_validator
 
-        case types.NoneType | None:
-            return _none_validator(verifier=verifier)
+        case types.NoneType:
+            validator = _none_validator
 
-        case typing.Any:
-            return _any_validator(verifier=verifier)
-
-        case types.UnionType | typing.Union:
-            return _union_validator(
-                alternatives=get_args(annotation),
+        case types.UnionType:
+            validator = _prepare_union_validator(
+                resolved_args,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,
-                verifier=verifier,
             )
 
-        case (
-            builtins.list  # pyright: ignore[reportUnknownMemberType]
-            | typing.List  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
-        ):
-            match get_args(annotation):
-                case (element_annotation,):
-                    return _list_validator(
-                        element_annotation=element_annotation,
-                        globalns=globalns,
-                        localns=localns,
-                        recursion_guard=recursion_guard,
-                        verifier=verifier,
-                    )
+        case builtins.tuple:  # pyright: ignore[reportUnknownMemberType]
+            validator = _prepare_tuple_validator(
+                resolved_args,
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
+            )
 
-                case other:
-                    return _list_validator(
-                        element_annotation=None,
-                        globalns=globalns,
-                        localns=localns,
-                        recursion_guard=recursion_guard,
-                        verifier=verifier,
-                    )
+        case parametrized if hasattr(parametrized, "__PARAMETERS__"):
+            validator = parametrized.validator
+
+        case data_class if is_dataclass(data_class):
+            validator = _prepare_dataclass_validator(data_class)
+
+        case typed_dict if typing.is_typeddict(typed_dict):
+            validator = _prepare_typed_dict_validator(
+                typed_dict,
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
+            )
+
+        case builtins.dict | collections_abc.Mapping:  # pyright: ignore[reportUnknownMemberType]
+            validator = _prepare_dict_validator(
+                resolved_args,
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
+            )
+
+        case builtins.list | collections_abc.Sequence:  # pyright: ignore[reportUnknownMemberType]
+            validator = _prepare_list_validator(
+                resolved_args,
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
+            )
 
         case typing.Literal:
-            return _literal_validator(
-                options=get_args(annotation),
-                verifier=verifier,
-            )
+            if all(isinstance(option, str) for option in resolved_args):
+                validator = _prepare_str_enum_validator(resolved_args)
+
+            elif all(isinstance(option, int) for option in resolved_args):
+                validator = _prepare_int_enum_validator(resolved_args)
+
+            else:
+                validator = _prepare_any_enum_validator(resolved_args)
 
         case enum_type if isinstance(enum_type, enum.EnumType):
             if isinstance(enum_type, enum.StrEnum):
-                return _str_enum_validator(
-                    annotation=enum_type,
-                    verifier=verifier,
-                )
+                validator = _prepare_str_enum_validator(resolved_args)
+
             elif isinstance(enum_type, enum.IntEnum):
-                return _int_enum_validator(
-                    annotation=enum_type,
-                    verifier=verifier,
-                )
+                validator = _prepare_int_enum_validator(resolved_args)
+
             else:
-                return _enum_validator(
-                    annotation=enum_type,
-                    verifier=verifier,
-                )
-
-        case builtins.tuple:
-            return _tuple_validator(
-                options=get_args(annotation),
-                globalns=globalns,
-                localns=localns,
-                recursion_guard=recursion_guard,
-                verifier=verifier,
-            )
-
-        case uuid.UUID:
-            return _uuid_validator(verifier=verifier)
+                raise TypeError(f"Unsupported enum type annotation: {annotation}")
 
         case datetime.datetime:
-            return _datetime_validator(verifier=verifier)
+            validator = _datetime_validator
 
-        case parametrized if hasattr(parametrized, "__parameters_definition__"):
-            return _parametrized_validator(
-                annotation=parametrized,
-                validator=parametrized.validated,
-                verifier=verifier,
-            )
+        case uuid.UUID:
+            validator = _uuid_validator
 
-        case typed_dict if typing.is_typeddict(typed_dict) or typing_extensions.is_typeddict(
-            typed_dict
-        ):
-            return _typed_dict_validator(
-                annotation=typed_dict,
-                verifier=verifier,
-            )
-
-        case (
-            builtins.dict  # pyright: ignore[reportUnknownMemberType]
-            | typing.Dict  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
-        ):
-            match get_args(annotation):
-                case (builtins.str, element_annotation):
-                    return _dict_validator(
-                        element_annotation=element_annotation,
-                        globalns=globalns,
-                        localns=localns,
-                        recursion_guard=recursion_guard,
-                        verifier=verifier,
-                    )
-
-                case other:  # pyright: ignore[reportUnnecessaryComparison]
-                    raise TypeError("Unsupported dict type annotation", other)
-
-        case data_class if is_dataclass(data_class):
-            return _dataclass_validator(
-                annotation=data_class,
-                verifier=verifier,
-            )
-
-        case protocol if isinstance(protocol, Protocol):
-            return _protocol_validator(
-                annotation=protocol,
-                verifier=verifier,
-            )
-
-        case collections_abc.Callable:  # pyright: ignore[reportUnknownMemberType]
-            return _callable_validator(verifier=verifier)
-
-        case typing.Annotated:
-            match get_args(annotation):
-                case (other, *_):
-                    return parameter_validator(
-                        other,
-                        globalns=globalns,
-                        localns=localns,
-                        recursion_guard=recursion_guard,
-                        verifier=verifier,
-                    )
-
-                case other:
-                    raise TypeError("Unsupported annotated type", annotation)
+        case collections_abc.Callable:  # pyright: ignore[reportUnknownMemberType, reportUnnecessaryComparison]
+            validator = _callable_validator
 
         case draive_missing.Missing:
-
-            def validated_missing(value: Any) -> Any:
-                if draive_missing.is_missing(value):
-                    return value
-
-                elif value is None:
-                    return draive_missing.MISSING
-
-                else:
-                    raise TypeError("Invalid value", value)
-
-            return validated_missing
-
-        case typing.Required | typing.NotRequired:
-            match get_args(annotation):
-                case (other,):
-                    return parameter_validator(
-                        other,
-                        globalns=globalns,
-                        localns=localns,
-                        recursion_guard=recursion_guard,
-                        verifier=verifier,
-                    )
-
-                case other:
-                    raise TypeError("Unsupported type annotation", annotation)
-
-        case type_var if isinstance(type_var, TypeVar):
-            # TODO: FIXME: resolve against concrete contextual type if able
-            if constraints := type_var.__constraints__:
-                return _type_match_validator(
-                    constraints,
-                    verifier=verifier,
-                )
-            elif bound := type_var.__bound__:
-                return _class_instance_validator(
-                    bound,
-                    verifier=verifier,
-                )
-            else:
-                return _any_validator(verifier=verifier)
-
-        case type_alias if isinstance(type_alias, TypeAliasType):
-            return _class_instance_validator(
-                annotation=type_alias.__value__,
-                verifier=verifier,
-            )
-
-        case class_type if inspect.isclass(class_type):
-            return _class_instance_validator(
-                annotation=class_type,
-                verifier=verifier,
-            )
+            validator = _missing_validator
 
         case builtins.type:
-            return _meta_type_validator(
-                annotation=annotation,
-                verifier=verifier,
-            )
+            validator = _prepare_meta_type_validator(annotation)
+
+        case typing.Any:
+            validator = _any_validator
+
+        case type() as other_type:
+            validator = _prepare_type_validator(other_type)
 
         case other:
-            raise TypeError("Unsupported type annotation %s", other)
+            raise TypeError("Unsupported type annotation: %s", other)
+
+    if verifier := verifier:
+        return _verified(validator, verifier=verifier)
+
+    else:
+        return validator

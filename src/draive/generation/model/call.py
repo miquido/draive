@@ -3,15 +3,16 @@ from typing import Any
 
 from draive.generation.model.state import ModelGeneration
 from draive.lmm import AnyTool, Toolbox
+from draive.parameters import DataModel
 from draive.scope import ctx
-from draive.types import Instruction, Model, MultimodalContent, MultimodalContentElement
+from draive.types import Instruction, MultimodalContent, MultimodalContentElement
 
 __all__ = [
     "generate_model",
 ]
 
 
-async def generate_model[Generated: Model](  # noqa: PLR0913
+async def generate_model[Generated: DataModel](  # noqa: PLR0913
     generated: type[Generated],
     /,
     *,

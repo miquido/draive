@@ -7,11 +7,11 @@ from draive.agents.abc import BaseAgent
 from draive.agents.errors import AgentException
 from draive.agents.state import AgentState
 from draive.agents.types import AgentInvocation
-from draive.helpers import freeze
 from draive.metrics import ArgumentsTrace
 from draive.parameters import ParametrizedData
 from draive.scope import ctx
 from draive.types import MultimodalContent
+from draive.utils import freeze
 
 __all__ = [
     "agent",

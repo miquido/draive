@@ -3,10 +3,10 @@ from typing import Self
 
 import pytest
 import pytest_asyncio
-from draive import MetricsTraceReport, Model, TokenUsage, ctx
+from draive import DataModel, MetricsTraceReport, TokenUsage, ctx
 
 
-class ExpMetric(Model):
+class ExpMetric(DataModel):
     value: float
 
     def __add__(

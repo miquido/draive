@@ -1,4 +1,4 @@
-from draive.types.model import Model
+from draive.parameters.model import DataModel
 
 __all__ = [
     "AudioBase64Content",
@@ -8,17 +8,17 @@ __all__ = [
 ]
 
 
-class AudioURLContent(Model):
+class AudioURLContent(DataModel):
     audio_url: str
     audio_transcription: str | None = None
 
 
-class AudioBase64Content(Model):
+class AudioBase64Content(DataModel):
     audio_base64: str
     audio_transcription: str | None = None
 
 
-class AudioDataContent(Model):
+class AudioDataContent(DataModel):
     audio_data: bytes
     audio_transcription: str | None = None
 

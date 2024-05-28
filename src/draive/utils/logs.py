@@ -1,6 +1,6 @@
 from logging.config import dictConfig
 
-from draive.helpers.env import getenv_bool
+from draive.utils.env import getenv_bool
 
 __all__ = [
     "setup_logging",

@@ -2,9 +2,9 @@ from asyncio import Lock
 from types import TracebackType
 from typing import Any, Self
 
-from draive.parameters import ParametrizedData
+from draive.parameters import ParametrizedData, State
 from draive.scope import ctx
-from draive.types import MultimodalContent, State
+from draive.types import MultimodalContent
 
 __all__ = [
     "AgentState",
