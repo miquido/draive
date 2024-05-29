@@ -3,7 +3,7 @@ from typing import Any, Final, TypeGuard, final
 __all__ = [
     "MISSING",
     "Missing",
-    "missing",
+    "is_missing",
     "not_missing",
 ]
 
@@ -45,7 +45,7 @@ class Missing:
 MISSING: Final[Missing] = Missing()
 
 
-def missing(
+def is_missing(
     value: Any | Missing,
     /,
 ) -> TypeGuard[Missing]:

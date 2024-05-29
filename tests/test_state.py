@@ -45,16 +45,16 @@ def test_validated_passes_with_valid_values() -> None:
         "all": True,
         "function": dummy_callable,
     }
-    model: ExampleState = ExampleState.validated(**values_dict)
+    model: ExampleState = ExampleState(**values_dict)
     assert model.as_dict() == values_dict
 
 
 def test_validated_passes_with_default_values() -> None:
-    ExampleState.validated()
+    ExampleState()
 
 
 class MissingState(State):
-    value: Missing
+    value: Any | Missing
 
 
 missingStateInstance: MissingState = MissingState(

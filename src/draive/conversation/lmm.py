@@ -164,6 +164,7 @@ async def _lmm_conversation_completion(
             **extra,
         ):
             case LMMCompletion() as completion:
+                ctx.log_debug("Received conversation result")
                 response_message: ConversationMessage = ConversationMessage(
                     role="model",
                     created=datetime.now(UTC),
@@ -176,6 +177,7 @@ async def _lmm_conversation_completion(
                 return response_message
 
             case LMMToolRequests() as tool_requests:
+                ctx.log_debug("Received conversation tool calls")
                 context.append(tool_requests)
                 responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
 
@@ -221,6 +223,7 @@ async def _lmm_conversation_completion_stream(
         ):
             match part:
                 case LMMCompletionChunk() as chunk:
+                    ctx.log_debug("Received conversation result chunk")
                     response_content = response_content.extending(chunk.content)
 
                     yield ConversationMessageChunk(
@@ -230,6 +233,7 @@ async def _lmm_conversation_completion_stream(
                     # keep yielding parts
 
                 case LMMToolRequests() as tool_requests:
+                    ctx.log_debug("Received conversation tool calls")
                     assert (  # nosec: B101
                         not response_content
                     ), "Tools and completion message should not be used at the same time"
@@ -264,6 +268,7 @@ async def _lmm_conversation_completion_stream(
             break  # exit the loop with result
 
     if response_content:
+        ctx.log_debug("Remembering conversation result")
         # remember messages when finishing stream
         await conversation_memory.remember(
             request_message,

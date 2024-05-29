@@ -50,11 +50,11 @@ def test_validated_passes_with_valid_values() -> None:
         "answer": {"string": "value", "more": None},
         "all": True,
     }
-    assert json.loads(ExampleModel.validated(**values_dict).as_json()) == values_dict
+    assert json.loads(ExampleModel(**values_dict).as_json()) == values_dict
 
 
 def test_validated_passes_with_default_values() -> None:
-    ExampleModel.validated()
+    ExampleModel()
 
 
 class DatetimeModel(DataModel):
@@ -205,7 +205,7 @@ basic_model_json: str = (
     ' "integer": 42,'
     ' "integer_or_float_list": [12, 3.14, 7],'
     ' "floating": 9.99,'
-    ' "floating_dict": {"a": 65, "b": 66.0, "c": 67.5},'
+    ' "floating_dict": {"a": 65.0, "b": 66.0, "c": 67.5},'
     ' "optional": "some",'
     ' "none": null}'
 )

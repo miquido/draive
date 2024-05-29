@@ -117,7 +117,7 @@ def _is_media(
             return True
 
 
-def _as_string(  # noqa: PLR0911
+def _as_string(  # noqa: PLR0911, C901
     element: MultimodalContentElement,
 ) -> str:
     match element:

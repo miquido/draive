@@ -104,6 +104,7 @@ async def openai_lmm_invocation(
             ),
         ],
     ):
+        ctx.log_debug("Requested OpenAI lmm")
         client: OpenAIClient = ctx.dependency(OpenAIClient)
         config: OpenAIChatConfig = ctx.state(OpenAIChatConfig).updated(**extra)
         match output:
@@ -138,7 +139,7 @@ async def openai_lmm_invocation(
             )
 
 
-def _convert_content_element(
+def _convert_content_element(  # noqa: C901
     element: MultimodalContentElement,
     config: OpenAIChatConfig,
 ) -> ChatCompletionContentPartParam:

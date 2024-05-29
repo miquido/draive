@@ -86,6 +86,7 @@ async def mistral_lmm_invocation(
             ),
         ],
     ):
+        ctx.log_debug("Requested Mistral lmm")
         client: MistralClient = ctx.dependency(MistralClient)
         config: MistralChatConfig = ctx.state(MistralChatConfig).updated(**extra)
         match output:
