@@ -1,4 +1,5 @@
 from draive.types.audio import AudioBase64Content, AudioContent, AudioDataContent, AudioURLContent
+from draive.types.errors import RateLimitError
 from draive.types.images import ImageBase64Content, ImageContent, ImageDataContent, ImageURLContent
 from draive.types.instruction import Instruction
 from draive.types.json import JSON
@@ -51,4 +52,5 @@ __all__ = [
     "LMMToolRequest",
     "LMMToolRequests",
     "LMMToolResponse",
+    "RateLimitError",
 ]

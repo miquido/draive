@@ -3,6 +3,7 @@ from collections.abc import Callable, Coroutine
 from typing import cast, overload
 
 from draive.scope import ctx
+from draive.types import RateLimitError
 from draive.utils import mimic_function
 
 __all__ = [
@@ -100,6 +101,7 @@ def _wrap_sync[**Args, Result](
                 return function(*args, **kwargs)
             except CancelledError as exc:
                 raise exc
+
             except Exception as exc:
                 if attempt < limit:
                     attempt += 1
@@ -134,6 +136,16 @@ def _wrap_async[**Args, Result](
                 return await function(*args, **kwargs)
             except CancelledError as exc:
                 raise exc
+
+            except RateLimitError as exc:
+                attempt += 1
+                ctx.log_warning(
+                    "Attempting to retry %s after %.2fs which failed due to rate limit",
+                    function.__name__,
+                    exc.retry_after,
+                )
+                await sleep(exc.retry_after)
+
             except Exception as exc:
                 if attempt < limit:
                     attempt += 1

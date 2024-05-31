@@ -4,7 +4,8 @@ from itertools import chain
 from random import uniform
 from typing import Literal, Self, cast, final, overload
 
-from openai import AsyncAzureOpenAI, AsyncOpenAI, AsyncStream, RateLimitError
+from openai import AsyncAzureOpenAI, AsyncOpenAI, AsyncStream
+from openai import RateLimitError as OpenAIRateLimitError
 from openai._types import NOT_GIVEN, NotGiven
 from openai.types import Moderation, ModerationCreateResponse
 from openai.types.chat import (
@@ -26,6 +27,7 @@ from draive.openai.config import (
     OpenAIImageGenerationConfig,
 )
 from draive.scope import ScopeDependency
+from draive.types import RateLimitError
 from draive.utils import getenv_str, not_missing
 
 __all__ = [
@@ -116,26 +118,51 @@ class OpenAIClient(ScopeDependency):
                 assert tools, "Can't require tools use without tools"  # nosec: B101
                 tool_choice = tool
 
-        return await self._client.chat.completions.create(
-            messages=messages,
-            model=config.model,
-            frequency_penalty=config.frequency_penalty
-            if not_missing(config.frequency_penalty)
-            else NOT_GIVEN,
-            max_tokens=config.max_tokens if not_missing(config.max_tokens) else NOT_GIVEN,
-            n=1,
-            response_format=cast(ResponseFormat, config.response_format)
-            if not_missing(config.response_format)
-            else NOT_GIVEN,
-            seed=config.seed if not_missing(config.seed) else NOT_GIVEN,
-            stream=stream,
-            temperature=config.temperature,
-            tools=tools or NOT_GIVEN,
-            tool_choice=tool_choice,
-            top_p=config.top_p if not_missing(config.top_p) else NOT_GIVEN,
-            timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,
-            stream_options={"include_usage": True} if stream else NOT_GIVEN,
-        )
+        attempts: int = 64  # we do want retry on rate limit but we have to fail eventually
+        while True:
+            try:
+                return await self._client.chat.completions.create(
+                    messages=messages,
+                    model=config.model,
+                    frequency_penalty=config.frequency_penalty
+                    if not_missing(config.frequency_penalty)
+                    else NOT_GIVEN,
+                    max_tokens=config.max_tokens if not_missing(config.max_tokens) else NOT_GIVEN,
+                    n=1,
+                    response_format=cast(ResponseFormat, config.response_format)
+                    if not_missing(config.response_format)
+                    else NOT_GIVEN,
+                    seed=config.seed if not_missing(config.seed) else NOT_GIVEN,
+                    stream=stream,
+                    temperature=config.temperature,
+                    tools=tools or NOT_GIVEN,
+                    tool_choice=tool_choice,
+                    top_p=config.top_p if not_missing(config.top_p) else NOT_GIVEN,
+                    timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,
+                    stream_options={"include_usage": True} if stream else NOT_GIVEN,
+                )
+
+            except OpenAIRateLimitError as exc:  # retry on rate limit after delay
+                if attempts > 0:
+                    attempts -= 1
+                    await sleep(
+                        delay=float(
+                            exc.response.headers.get(
+                                "Retry-After",
+                                # wait between 0.5s and 2s before next attempt if no delay found
+                                default=uniform(0.5, 2),  # nosec: B311
+                            )
+                        ),
+                    )
+
+                else:
+                    raise RateLimitError(
+                        retry_after=exc.response.headers.get(
+                            "Retry-After",
+                            # wait between 0.5s and 2s before next attempt if no delay found
+                            default=uniform(0.5, 2),  # nosec: B311
+                        )
+                    ) from exc
 
     async def embedding(
         self,
@@ -172,26 +199,39 @@ class OpenAIClient(ScopeDependency):
         encoding_format: Literal["float", "base64"] | NotGiven,
         timeout: float | NotGiven,
     ) -> list[list[float]]:
-        try:
-            response: CreateEmbeddingResponse = await self._client.embeddings.create(
-                input=texts,
-                model=model,
-                dimensions=dimensions,
-                encoding_format=encoding_format,
-                timeout=timeout,
-            )
-            return [element.embedding for element in response.data]
+        attempts: int = 64  # we do want retry on rate limit but we have to fail eventually
+        while True:
+            try:
+                response: CreateEmbeddingResponse = await self._client.embeddings.create(
+                    input=texts,
+                    model=model,
+                    dimensions=dimensions,
+                    encoding_format=encoding_format,
+                    timeout=timeout,
+                )
+                return [element.embedding for element in response.data]
 
-        except RateLimitError:  # always retry on rate limit
-            # wait between 0.1s and 1s before next attempt
-            await sleep(delay=uniform(0.1, 1))  # nosec: B311
-            return await self._create_text_embedding(
-                texts=texts,
-                model=model,
-                dimensions=dimensions,
-                encoding_format=encoding_format,
-                timeout=timeout,
-            )
+            except OpenAIRateLimitError as exc:  # always retry on rate limit after delay
+                if attempts > 0:
+                    attempts -= 1
+                    await sleep(
+                        delay=float(
+                            exc.response.headers.get(
+                                "Retry-After",
+                                # wait between 0.5s and 2s before next attempt if no delay found
+                                default=uniform(0.5, 2),  # nosec: B311
+                            )
+                        ),
+                    )
+
+                else:
+                    raise RateLimitError(
+                        retry_after=exc.response.headers.get(
+                            "Retry-After",
+                            # wait between 0.5s and 2s before next attempt if no delay found
+                            default=uniform(0.5, 2),  # nosec: B311
+                        )
+                    ) from exc
 
     async def moderation_check(
         self,
