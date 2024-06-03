@@ -21,7 +21,7 @@ __all__: list[str] = [
 ]
 
 
-async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913
+async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901
     generated: type[Generated],
     /,
     *,
@@ -57,7 +57,7 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913
         if variable := schema_variable:
             instruction_message = LMMInstruction.of(
                 generation_instruction.updated(
-                    **{variable: generated.json_schema()},
+                    **{variable: generated.json_schema(indent=2)},
                 ),
             )
 
@@ -66,7 +66,7 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913
                 generation_instruction.extended(
                     DEFAULT_INSTRUCTION_EXTENSION,
                     joiner="\n\n",
-                    schema=generated.json_schema(),
+                    schema=generated.json_schema(indent=2),
                 )
             )
 
@@ -93,9 +93,11 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913
                 **extra,
             ):
                 case LMMCompletion() as completion:
+                    ctx.log_debug("Received model generation result")
                     return generated.from_json(completion.content.as_string())
 
                 case LMMToolRequests() as tool_requests:
+                    ctx.log_debug("Received model generation tool calls")
                     context.append(tool_requests)
                     responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
 

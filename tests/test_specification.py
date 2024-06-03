@@ -133,4 +133,4 @@ def test_basic_schema() -> None:
             "dict_value",
         ],
     }
-    assert TestModel.__PARAMETERS__.specification == specification
+    assert TestModel.__PARAMETERS_SPECIFICATION__ == specification

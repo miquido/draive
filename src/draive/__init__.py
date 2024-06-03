@@ -70,7 +70,18 @@ from draive.openai import (
     openai_lmm_invocation,
     openai_tokenize_text,
 )
-from draive.parameters import Argument, BasicValue, DataModel, Field, ParameterPath, State
+from draive.parameters import (
+    Argument,
+    BasicValue,
+    DataModel,
+    Field,
+    ParameterDefaultFactory,
+    ParameterPath,
+    ParameterValidationContext,
+    ParameterValidator,
+    ParameterVerifier,
+    State,
+)
 from draive.scope import (
     ScopeDependencies,
     ScopeDependency,
@@ -119,8 +130,8 @@ from draive.utils import (
     getenv_float,
     getenv_int,
     getenv_str,
+    is_missing,
     load_env,
-    missing,
     not_missing,
     setup_logging,
     split_sequence,
@@ -197,7 +208,7 @@ __all__ = [
     "MetricsTrace",
     "MetricsTraceReport",
     "MetricsTraceReporter",
-    "missing",
+    "is_missing",
     "Missing",
     "MISSING",
     "mistral_embed_text",
@@ -252,4 +263,8 @@ __all__ = [
     "VideoContent",
     "VideoDataContent",
     "VideoURLContent",
+    "ParameterDefaultFactory",
+    "ParameterValidationContext",
+    "ParameterValidator",
+    "ParameterVerifier",
 ]

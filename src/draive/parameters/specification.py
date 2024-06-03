@@ -5,6 +5,7 @@ import types
 import typing
 import uuid
 from collections import abc as collections_abc
+from collections.abc import Sequence
 from dataclasses import MISSING as DATACLASS_MISSING
 from dataclasses import fields as dataclass_fields
 from dataclasses import is_dataclass
@@ -15,7 +16,6 @@ from typing import (
     Required,
     TypedDict,
     final,
-    get_origin,
 )
 
 from draive.parameters.annotations import resolve_annotation
@@ -295,7 +295,7 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
 
         case parametrized if hasattr(parametrized, "__PARAMETERS__"):
             nested_specification: ParameterSpecification | Missing = (
-                parametrized.__PARAMETERS__.specification
+                parametrized.__PARAMETERS_SPECIFICATION__
             )
 
             if not_missing(nested_specification):
@@ -455,6 +455,7 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
             }
 
         case other:
+            return MISSING
             raise TypeError("Unsupported type annotation", other)
 
     if description := description:
@@ -466,13 +467,12 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
 def _annotations_specification(
     annotations: dict[str, Any],
     /,
-    required: list[str],
+    required: Sequence[str],
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
 ) -> ParametersSpecification | Missing:
     parameters: dict[str, ParameterSpecification] = {}
-
     for name, annotation in annotations.items():
         try:
             specification: ParameterSpecification | Missing = parameter_specification(
@@ -485,9 +485,6 @@ def _annotations_specification(
 
             if not_missing(specification):
                 parameters[name] = specification
-                # assuming total=True or explicitly annotated
-                if get_origin(annotation) != typing.NotRequired:
-                    required.append(name)
 
             else:
                 # when at least one element can't be represented in specification
@@ -500,5 +497,5 @@ def _annotations_specification(
     return {
         "type": "object",
         "properties": parameters,
-        "required": required,
+        "required": list(required),
     }

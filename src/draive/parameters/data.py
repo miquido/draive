@@ -1,17 +1,22 @@
 import sys
 from collections.abc import Callable
 from copy import deepcopy
-from dataclasses import MISSING as DATACLASS_MISSING
-from dataclasses import Field as DataclassField
-from dataclasses import dataclass, is_dataclass
-from dataclasses import field as dataclass_field
 from dataclasses import fields as dataclass_fields
-from typing import Any, ClassVar, Self, cast, dataclass_transform, overload
+from dataclasses import is_dataclass
+from typing import Any, ClassVar, Self, cast, dataclass_transform, final, get_origin, overload
 
+from draive.parameters.annotations import (
+    ParameterDefaultFactory,
+    allows_missing,
+    object_annotations,
+)
 from draive.parameters.basic import BasicValue
-from draive.parameters.definition import ParameterDefinition, ParametersDefinition
 from draive.parameters.path import ParameterPath
-from draive.parameters.specification import ParameterSpecification
+from draive.parameters.specification import (
+    ParameterSpecification,
+    ParametersSpecification,
+    parameter_specification,
+)
 from draive.parameters.validation import (
     ParameterValidationContext,
     ParameterValidationError,
@@ -19,7 +24,7 @@ from draive.parameters.validation import (
     ParameterVerifier,
     parameter_validator,
 )
-from draive.utils import MISSING, Missing, missing, not_missing
+from draive.utils import MISSING, Missing, freeze, is_missing, not_missing
 
 __all__ = [
     "Field",
@@ -85,54 +90,194 @@ def Field[Value](  # noqa: PLR0913 # Ruff - noqa: B008
     verifier: ParameterVerifier[Value] | None = None,
     converter: Callable[[Value], BasicValue] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
-) -> Value:  # it is actually a dataclass.Field, but type checker has to be fooled
+) -> Value:  # it is actually a DataField, but type checker has to be fooled
     assert (  # nosec: B101
-        missing(default_factory) or missing(default)
+        is_missing(default_factory) or is_missing(default)
     ), "Can't specify both default value and factory"
     assert (  # nosec: B101
-        missing(validator) or verifier is None
+        is_missing(validator) or verifier is None
     ), "Can't specify both validator and verifier"
 
-    metadata: dict[str, Any] = {}
-    if alias is not None:
-        metadata["alias"] = alias
-    if not_missing(description):
-        metadata["description"] = description
-    if not_missing(validator):
-        metadata["validator"] = validator
-    if verifier is not None:
-        metadata["verifier"] = verifier
-    if not_missing(converter):
-        metadata["converter"] = converter
-    if not_missing(specification):
-        metadata["specification"] = specification
-
-    if not_missing(default_factory):
-        return dataclass_field(
-            default_factory=default_factory,
-            metadata=metadata,
-        )
-
-    elif not_missing(default):
-        return dataclass_field(
+    return cast(
+        Value,
+        DataField(
+            alias=alias,
+            description=description,
             default=default,
-            metadata=metadata,
-        )
+            default_factory=default_factory,
+            validator=validator,
+            verifier=verifier,
+            converter=converter,
+            specification=specification,
+        ),
+    )
 
-    else:
-        return dataclass_field(metadata=metadata)
+
+@final
+class DataField:
+    def __init__(  # noqa: PLR0913
+        self,
+        alias: str | None = None,
+        description: str | None = None,
+        default: Any | Missing = MISSING,
+        default_factory: ParameterDefaultFactory[Any] | Missing = MISSING,
+        validator: ParameterValidator[Any] | Missing = MISSING,
+        verifier: ParameterVerifier[Any] | None = None,
+        converter: Callable[[Any], BasicValue] | Missing = MISSING,
+        specification: ParameterSpecification | Missing = MISSING,
+    ) -> None:
+        self.alias: str | None = alias
+        self.description: str | None = description
+        self.default: Any | Missing = default
+        self.default_factory: Callable[[], Any] | Missing = default_factory
+        self.validator: ParameterValidator[Any] | Missing = validator
+        self.verifier: ParameterVerifier[Any] | None = verifier
+        self.converter: Callable[[Any], BasicValue] | Missing = converter
+        self.specification: ParameterSpecification | Missing = specification
+
+
+@final
+class DataParameter:
+    def __init__(  # noqa: PLR0913
+        self,
+        name: str,
+        alias: str | None,
+        description: str | None,
+        annotation: Any,
+        default: Any | Missing,
+        default_factory: ParameterDefaultFactory[Any] | Missing,
+        allows_missing: bool,
+        validator: ParameterValidator[Any],
+        converter: Callable[[Any], BasicValue] | Missing,
+        specification: ParameterSpecification | Missing,
+    ) -> None:
+        self.name: str = name
+        self.alias: str | None = alias
+        self.description: str | None = description
+        self.annotation: Any = annotation
+        self.default_value: Callable[[], Any | Missing]
+        if not_missing(default_factory):
+            self.default_value = default_factory
+
+        elif not_missing(default):
+            self.default_value = lambda: default
+
+        else:
+            self.default_value = lambda: MISSING
+
+        self.has_default: bool = not_missing(default_factory) or not_missing(default)
+        self.allows_missing: bool = allows_missing
+        self.validator: ParameterValidator[Any] = validator
+        self.converter: Callable[[Any], BasicValue] | Missing = converter
+        self.specification: ParameterSpecification | Missing = specification
+
+        freeze(self)
+
+    def validated(
+        self,
+        value: Any,
+        /,
+        context: ParameterValidationContext,
+    ) -> Any:
+        if is_missing(value):
+            if self.has_default:
+                return self.validator(self.default_value(), (*context, f".{self.name}"))
+
+            elif self.allows_missing:
+                return MISSING
+
+            else:
+                raise ParameterValidationError.missing(context=(*context, f".{self.name}"))
+
+        else:
+            return self.validator(value, (*context, f".{self.name}"))
+
+    @classmethod
+    def of(  # noqa: PLR0913
+        cls,
+        annotation: Any,
+        /,
+        name: str,
+        default: Any,
+        globalns: dict[str, Any],
+        localns: dict[str, Any] | None,
+        recursion_guard: frozenset[type[Any]],
+    ) -> Self:
+        match default:
+            case DataField() as data_field:
+                return cls(
+                    name=name,
+                    alias=data_field.alias,
+                    description=data_field.description,
+                    annotation=annotation,
+                    default=data_field.default,
+                    default_factory=data_field.default_factory,
+                    allows_missing=allows_missing(
+                        annotation,
+                        globalns=globalns,
+                        localns=localns,
+                    ),
+                    validator=data_field.validator
+                    if not_missing(data_field.validator)
+                    else parameter_validator(
+                        annotation,
+                        verifier=data_field.verifier,
+                        globalns=globalns,
+                        localns=localns,
+                        recursion_guard=recursion_guard,
+                    ),
+                    converter=data_field.converter,
+                    specification=data_field.specification
+                    if not_missing(data_field.specification)
+                    else parameter_specification(
+                        annotation,
+                        description=data_field.description,
+                        globalns=globalns,
+                        localns=localns,
+                        recursion_guard=recursion_guard,
+                    ),
+                )
+
+            case default:
+                return cls(
+                    name=name,
+                    alias=None,
+                    description=None,
+                    annotation=annotation,
+                    default=default,
+                    default_factory=MISSING,
+                    allows_missing=allows_missing(
+                        annotation,
+                        globalns=globalns,
+                        localns=localns,
+                    ),
+                    validator=parameter_validator(
+                        annotation,
+                        verifier=None,
+                        globalns=globalns,
+                        localns=localns,
+                        recursion_guard=recursion_guard,
+                    ),
+                    converter=MISSING,
+                    specification=parameter_specification(
+                        annotation,
+                        description=None,
+                        globalns=globalns,
+                        localns=localns,
+                        recursion_guard=recursion_guard,
+                    ),
+                )
 
 
 @dataclass_transform(
     kw_only_default=True,
     frozen_default=True,
-    field_specifiers=(
-        DataclassField,
-        dataclass_field,
-    ),
+    field_specifiers=(),
 )
 class ParametrizedDataMeta(type):
-    __PARAMETERS__: ParametersDefinition
+    _: Any
+    __PARAMETERS__: dict[str, DataParameter]
+    __PARAMETERS_SPECIFICATION__: ParametersSpecification | Missing
 
     def __new__(
         cls,
@@ -141,78 +286,95 @@ class ParametrizedDataMeta(type):
         classdict: dict[str, Any],
         **kwargs: Any,
     ) -> Any:
-        data_class: Any = dataclass(  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
-            type.__new__(
-                cls,
-                name,
-                bases,
-                classdict,
-                **kwargs,
-            ),
-            frozen=True,
-            kw_only=True,
+        data_type = type.__new__(
+            cls,
+            name,
+            bases,
+            classdict,
+            **kwargs,
         )
-        if bases:
-            globalns: dict[str, Any] = sys.modules.get(data_class.__module__).__dict__
-            localns: dict[str, Any] = {data_class.__name__: data_class}
-            recursion_guard: frozenset[type[Any]] = frozenset({data_class})
-            data_class.__PARAMETERS__ = ParametersDefinition(
-                data_class,
-                (
-                    _field_parameter(
-                        field,
-                        globalns=globalns,
-                        localns=localns,
-                        recursion_guard=recursion_guard,
-                    )
-                    for field in dataclass_fields(data_class)
-                ),
-            )
 
-        else:
-            data_class.__PARAMETERS__ = ParametersDefinition(
-                data_class,
-                parameters=[],
-            )
+        globalns: dict[str, Any] = sys.modules.get(data_type.__module__).__dict__
+        localns: dict[str, Any] = {data_type.__name__: data_type}
+        recursion_guard: frozenset[type[Any]] = frozenset({data_type})
+        parameters: dict[str, DataParameter] = {}
+        properties_specification: dict[str, ParameterSpecification] | Missing = {}
+        aliased_required: list[str] = []
+        for key, annotation in object_annotations(
+            data_type,
+            globalns,
+            localns,
+        ).items():
+            # do not include ClassVars and private or dunder items
+            if ((get_origin(annotation) or annotation) is ClassVar) or key.startswith("_"):
+                continue
 
-        data_class._ = ParameterPath(data_class, data_class)
-
-        return data_class
-
-
-def _field_parameter(
-    field: DataclassField[Any],
-    globalns: dict[str, Any] | None,
-    localns: dict[str, Any] | None,
-    recursion_guard: frozenset[type[Any]],
-) -> ParameterDefinition[Any]:
-    return ParameterDefinition(
-        name=field.name,
-        alias=field.metadata.get("alias", None),
-        description=field.metadata.get("description", None),
-        annotation=field.type,
-        default=MISSING if field.default is DATACLASS_MISSING else field.default,
-        default_factory=MISSING
-        if field.default_factory is DATACLASS_MISSING
-        else field.default_factory,
-        validator=field.metadata.get(
-            "validator",
-            parameter_validator(
-                field.type,
-                verifier=field.metadata.get("verifier", None),
+            parameter: DataParameter = DataParameter.of(
+                annotation,
+                name=key,
+                default=getattr(data_type, key, MISSING),
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,
-            ),
-        ),
-        specification=field.metadata.get("specification", MISSING),
-    )
+            )
+            parameters[key] = parameter
+
+            if not_missing(properties_specification):
+                if not_missing(parameter.specification):
+                    properties_specification[parameter.name] = parameter.specification
+
+                    if not (parameter.has_default or parameter.allows_missing):
+                        aliased_required.append(key)
+
+                else:
+                    # if any parameter does not have specification then whole type does not have one
+                    properties_specification = MISSING  # pyright: ignore[reportConstantRedefinition]
+
+            else:
+                continue  # skip if we already have missing specification
+
+        data_type.__PARAMETERS__ = parameters  # pyright: ignore[reportConstantRedefinition]
+        if not_missing(properties_specification):
+            data_type.__PARAMETERS_SPECIFICATION__ = {  # pyright: ignore[reportConstantRedefinition]
+                "type": "object",
+                "properties": properties_specification,
+                "required": aliased_required,
+            }
+
+        else:
+            data_type.__PARAMETERS_SPECIFICATION__ = MISSING  # pyright: ignore[reportConstantRedefinition]
+
+        data_type.__slots__ = frozenset(parameters.keys())  # pyright: ignore[reportAttributeAccessIssue]
+        data_type.__match_args__ = data_type.__slots__  # pyright: ignore[reportAttributeAccessIssue]
+        data_type._ = ParameterPath(data_type, data_type)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+        return data_type
 
 
 class ParametrizedData(metaclass=ParametrizedDataMeta):
     _: ClassVar[Self]
+    __PARAMETERS__: ClassVar[dict[str, DataParameter]]
+    __PARAMETERS_SPECIFICATION__: ClassVar[ParametersSpecification | Missing]
 
-    # TODO: add validation on __init__
+    def __init__(self, *args: Any, **kwargs: Any) -> None:  # pyright: ignore[reportUnknownParameterType, reportMissingParameterType]
+        assert not args, "Positional unkeyed arguments are not supported"  # nosec: B101
+        for parameter in self.__class__.__PARAMETERS__.values():
+            parameter_context: ParameterValidationContext = (self.__class__.__qualname__,)
+            object.__setattr__(
+                self,  # pyright: ignore[reportUnknownArgumentType]
+                parameter.name,
+                parameter.validated(
+                    kwargs.get(
+                        parameter.name,
+                        kwargs.get(
+                            parameter.alias,
+                            MISSING,
+                        )
+                        if parameter.alias
+                        else MISSING,
+                    ),
+                    context=parameter_context,
+                ),
+            )
 
     @classmethod
     def path[Parameter](
@@ -227,18 +389,6 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         return cast(ParameterPath[Self, Parameter], path)
 
     @classmethod
-    def validated(
-        cls,
-        **values: Any,
-    ) -> Self:
-        return cls(
-            **cls.__PARAMETERS__.validated(
-                context=(cls.__qualname__,),
-                **values,
-            )
-        )
-
-    @classmethod
     def validator(
         cls,
         /,
@@ -246,16 +396,15 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         context: ParameterValidationContext,
     ) -> Self:
         match value:
-            case self if type(self) == cls:
+            case self if self.__class__ == cls:
                 return self
 
             case {**values}:
-                return cls(
-                    **cls.__PARAMETERS__.validated(
-                        context=context,
-                        **values,
-                    )
-                )
+                return cls(**values)
+
+            case self if cls == ParametrizedData and isinstance(self, ParametrizedData):
+                # when the required type is the base ParametrizedData then allow any subclass
+                return cast(Self, self)
 
             case _:
                 raise ParameterValidationError.invalid_type(
@@ -270,7 +419,7 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         value: dict[str, Any],
         /,
     ) -> Self:
-        return cls.validated(**value)
+        return cls(**value)
 
     def as_dict(
         self,
@@ -290,10 +439,38 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         **parameters: Any,
     ) -> Self:
         if parameters:
-            return self.__class__.validated(**{**vars(self), **parameters})
+            return self.__class__(**{**vars(self), **parameters})
 
         else:
             return self
+
+    def __str__(self) -> str:
+        return str(self.as_dict())
+
+    def __repr__(self) -> str:
+        return str(self.as_dict())
+
+    def __eq__(self, other: Any) -> bool:
+        if other.__class__ != self.__class__:
+            return False
+
+        return all(
+            getattr(self, key, MISSING) == getattr(other, key, MISSING)
+            for key in self.__class__.__PARAMETERS__.keys()
+        )
+
+    def __setattr__(
+        self,
+        __name: str,
+        __value: Any,
+    ) -> None:
+        raise RuntimeError(f"{self.__class__.__qualname__} is frozen and can't be modified")
+
+    def __delattr__(
+        self,
+        __name: str,
+    ) -> None:
+        raise RuntimeError(f"{self.__class__.__qualname__} is frozen and can't be modified")
 
 
 # based on python dataclass asdict but simplified
@@ -315,12 +492,12 @@ def _data_dict(  # noqa: PLR0911
             # convert parametrized data to dict
             if aliased:
                 return {
-                    field.metadata.get("alias", field.name): _data_dict(
+                    field.alias or field.name: _data_dict(
                         getattr(parametrized_data, field.name),
                         aliased=aliased,
-                        converter=field.metadata.get("converter", None),
+                        converter=field.converter,
                     )
-                    for field in dataclass_fields(parametrized_data)
+                    for field in parametrized_data.__class__.__PARAMETERS__.values()
                 }
 
             else:
@@ -328,9 +505,9 @@ def _data_dict(  # noqa: PLR0911
                     field.name: _data_dict(
                         getattr(parametrized_data, field.name),
                         aliased=aliased,
-                        converter=field.metadata.get("converter", None),
+                        converter=field.converter,
                     )
-                    for field in dataclass_fields(parametrized_data)
+                    for field in parametrized_data.__class__.__PARAMETERS__.values()
                 }
 
         case {**elements}:  # replace mapping with dict

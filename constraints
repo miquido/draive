@@ -15,7 +15,7 @@ certifi==2024.2.2
     #   requests
 charset-normalizer==3.3.2
     # via requests
-coverage==7.5.2
+coverage==7.5.3
     # via pytest-cov
 distro==1.9.0
     # via openai
@@ -38,11 +38,11 @@ markdown-it-py==3.0.0
     # via rich
 mdurl==0.1.2
     # via markdown-it-py
-nodeenv==1.8.0
+nodeenv==1.9.0
     # via pyright
 numpy==1.26.4
     # via draive (pyproject.toml)
-openai==1.30.3
+openai==1.30.4
     # via draive (pyproject.toml)
 packaging==24.0
     # via pytest
@@ -50,15 +50,15 @@ pbr==6.0.0
     # via stevedore
 pluggy==1.5.0
     # via pytest
-pydantic==2.7.1
+pydantic==2.7.2
     # via
     #   draive (pyproject.toml)
     #   openai
-pydantic-core==2.18.2
+pydantic-core==2.18.3
     # via pydantic
 pygments==2.18.0
     # via rich
-pyright==1.1.364
+pyright==1.1.365
     # via draive (pyproject.toml)
 pytest==7.4.4
     # via
@@ -77,10 +77,8 @@ requests==2.32.2
     # via tiktoken
 rich==13.7.1
     # via bandit
-ruff==0.4.5
+ruff==0.4.6
     # via draive (pyproject.toml)
-setuptools==70.0.0
-    # via nodeenv
 sniffio==1.3.1
     # via
     #   anyio

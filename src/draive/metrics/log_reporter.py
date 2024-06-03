@@ -3,7 +3,7 @@ from typing import Any, cast
 
 from draive.metrics.reporter import MetricsTraceReport, MetricsTraceReporter
 from draive.parameters import ParametrizedData
-from draive.utils import missing
+from draive.utils import is_missing
 
 __all__ = [
     "metrics_log_reporter",
@@ -150,7 +150,7 @@ def _raw_value_report(
     list_items_limit: int | None,
     item_character_limit: int | None,
 ) -> str | None:
-    if missing(value):
+    if is_missing(value):
         return None  # skip missing
 
     # workaround for pydantic models

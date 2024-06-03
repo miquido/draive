@@ -5,7 +5,7 @@ from typing import Any, Self
 from uuid import UUID
 
 from draive.parameters import ParametrizedData
-from draive.utils import Missing
+from draive.utils import Missing, not_missing
 
 __all__ = [
     "DataModel",
@@ -26,8 +26,18 @@ class ModelJSONEncoder(json.JSONEncoder):
 
 class DataModel(ParametrizedData):
     @classmethod
-    def json_schema(cls) -> str:
-        return cls.__PARAMETERS__.json_schema
+    def json_schema(
+        cls,
+        indent: int | None = None,
+    ) -> str:
+        if not_missing(cls.__PARAMETERS_SPECIFICATION__):
+            return json.dumps(
+                cls.__PARAMETERS_SPECIFICATION__,
+                indent=indent,
+            )
+
+        else:
+            raise TypeError(f"{cls.__qualname__} can't be represented using json schema")
 
     @classmethod
     def from_json(
@@ -37,7 +47,7 @@ class DataModel(ParametrizedData):
         decoder: type[json.JSONDecoder] = json.JSONDecoder,
     ) -> Self:
         try:
-            return cls.validated(
+            return cls(
                 **json.loads(
                     value,
                     cls=decoder,

@@ -7,9 +7,15 @@ from typing import (
 )
 from uuid import uuid4
 
+from draive.lmm.errors import ToolException
 from draive.lmm.state import ToolCallContext, ToolStatusStream
 from draive.metrics import ArgumentsTrace, ResultTrace
-from draive.parameters import Function, ParametrizedFunction, ToolSpecification
+from draive.parameters import (
+    Function,
+    ParameterSpecification,
+    ParametrizedFunction,
+    ToolSpecification,
+)
 from draive.scope import ctx
 from draive.types import MultimodalContent, MultimodalContentElement
 from draive.utils import freeze, not_missing
@@ -23,7 +29,7 @@ __all__ = [
 
 
 class ToolAvailabilityCheck(Protocol):
-    def __call__(self) -> None: ...
+    def __call__(self) -> bool: ...
 
 
 @final
@@ -41,23 +47,38 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
         direct_result: bool = False,
     ) -> None:
         super().__init__(function=function)
-        if not_missing(self._parameters.specification):
-            self.specification: ToolSpecification = {
-                "type": "function",
-                "function": {
-                    "name": name,
-                    "parameters": self._parameters.specification,
-                    "description": description or "",
-                },
-            }
+        aliased_required: list[str] = []
+        parameters: dict[str, ParameterSpecification] = {}
+        for parameter in self._parameters.values():
+            if not_missing(parameter.specification):
+                parameters[parameter.alias or parameter.name] = parameter.specification
 
-        else:
-            raise TypeError(f"{function.__qualname__} can't be represented as a tool")
+            else:
+                raise TypeError(
+                    f"{function.__qualname__} can't be represented as a tool"
+                    f" - argument '{parameter.name}' is missing specification."
+                )
+
+            if not (parameter.has_default and parameter.allows_missing):
+                aliased_required.append(parameter.alias or parameter.name)
+
+        self.specification: ToolSpecification = {
+            "type": "function",
+            "function": {
+                "name": name,
+                "parameters": {
+                    "type": "object",
+                    "properties": parameters,
+                    "required": aliased_required,
+                },
+                "description": description or "",
+            },
+        }
 
         self.name: str = name
         self._direct_result: bool = direct_result
         self._check_availability: ToolAvailabilityCheck = availability_check or (
-            lambda: None  # available by default
+            lambda: True  # available by default
         )
         self.format_result: Callable[[Result], MultimodalContent | MultimodalContentElement] = (
             format_result
@@ -71,8 +92,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
     @property
     def available(self) -> bool:
         try:
-            self._check_availability()
-            return True
+            return self._check_availability()
 
         except Exception:
             return False
@@ -101,7 +121,9 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
             call_context.report("STARTED")
 
             try:
-                self._check_availability()
+                if not self.available:
+                    raise ToolException(f"{self.name} is not available!")
+
                 result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
                 ctx.record(ResultTrace.of(result))
 

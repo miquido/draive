@@ -63,9 +63,11 @@ async def lmm_generate_text(
                 **extra,
             ):
                 case LMMCompletion() as completion:
+                    ctx.log_debug("Received text generation result")
                     return completion.content.as_string()
 
                 case LMMToolRequests() as tool_requests:
+                    ctx.log_debug("Received text generation tool calls")
                     context.append(tool_requests)
                     responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
 

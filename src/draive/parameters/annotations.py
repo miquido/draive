@@ -1,5 +1,6 @@
+import types
 import typing
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from types import GenericAlias, NoneType, UnionType
 from typing import (
     Any,
@@ -13,14 +14,22 @@ from typing import (
     get_type_hints,
 )
 
+import draive.utils.missing as draive_missing
+
 __all__ = [
     "object_annotations",
     "resolve_annotation",
+    "allows_missing",
+    "ParameterDefaultFactory",
 ]
+
+
+type ParameterDefaultFactory[Value] = Callable[[], Value]
 
 
 def object_annotations(
     annotation: Any,
+    /,
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
 ) -> dict[str, Any]:
@@ -32,8 +41,31 @@ def object_annotations(
     )
 
 
-def resolve_annotation(  # noqa: PLR0911
+def allows_missing(
     annotation: Any,
+    /,
+    globalns: dict[str, Any] | None,
+    localns: dict[str, Any] | None,
+) -> bool:
+    resolved_type, resolved_args = resolve_annotation(
+        annotation,
+        globalns=globalns,
+        localns=localns,
+    )
+    match resolved_type:
+        case draive_missing.Missing:
+            return True
+
+        case types.UnionType:
+            return draive_missing.Missing in resolved_args
+
+        case _:
+            return False
+
+
+def resolve_annotation(  # noqa: PLR0911, C901, PLR0912
+    annotation: Any,
+    /,
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
 ) -> tuple[Any, tuple[Any, ...]]:
