@@ -130,7 +130,6 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
 
 
 DEFAULT_INSTRUCTION_EXTENSION: str = """\
-
 The result have to be a JSON conforming to the following schema:
 ```
 {schema}

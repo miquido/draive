@@ -136,6 +136,7 @@ from draive.utils import (
     not_missing,
     setup_logging,
     split_sequence,
+    timeout,
 )
 
 __all__ = [
@@ -247,6 +248,7 @@ __all__ = [
     "TextGeneration",
     "TextGenerator",
     "TextTokenizer",
+    "timeout",
     "Tokenization",
     "tokenize_text",
     "TokenUsage",

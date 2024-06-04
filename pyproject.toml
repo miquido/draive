@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "draive"
-version = "0.13.0"
+version = "0.13.1"
 readme = "README.md"
 maintainers = [
   {name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com"}
@@ -22,7 +22,6 @@ dependencies = [
     "openai~=1.26",
     "numpy~=1.26",
     "tiktoken~=0.6",
-    "pydantic~=2.6",
     "httpx~=0.25",
 ]
 
