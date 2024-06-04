@@ -34,8 +34,11 @@ class Instruction:
                 },
             )
 
-        else:
+        elif self.variables:
             return self.instruction.format_map(self.variables)
+
+        else:
+            return self.instruction
 
     def extended(
         self,

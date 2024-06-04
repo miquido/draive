@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, Literal
 
 from draive.generation.model.state import ModelGeneration
 from draive.lmm import AnyTool, Toolbox
@@ -18,7 +18,7 @@ async def generate_model[Generated: DataModel](  # noqa: PLR0913
     *,
     instruction: Instruction | str,
     input: MultimodalContent | MultimodalContentElement,  # noqa: A002
-    schema_variable: str | None = None,
+    schema_injection: Literal["auto", "full", "simplified", "skip"] = "auto",
     tools: Toolbox | Sequence[AnyTool] | None = None,
     examples: Iterable[tuple[MultimodalContent | MultimodalContentElement, Generated]]
     | None = None,
@@ -28,7 +28,7 @@ async def generate_model[Generated: DataModel](  # noqa: PLR0913
         generated,
         instruction=instruction,
         input=input,
-        schema_variable=schema_variable,
+        schema_injection=schema_injection,
         tools=tools,
         examples=examples,
         **extra,
