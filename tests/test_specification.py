@@ -102,7 +102,7 @@ def test_specifications() -> None:
     ) == {"oneOf": [{"type": "string"}, {"type": "integer"}]}
 
 
-def test_basic_schema() -> None:
+def test_basic_specification() -> None:
     class TestModel(DataModel):
         str_value: str
         int_value: int

@@ -5,6 +5,7 @@ from typing import Any, Self
 from uuid import UUID
 
 from draive.parameters import ParametrizedData
+from draive.parameters.schema import json_schema, simplified_schema
 from draive.utils import Missing, not_missing
 
 __all__ = [
@@ -31,13 +32,27 @@ class DataModel(ParametrizedData):
         indent: int | None = None,
     ) -> str:
         if not_missing(cls.__PARAMETERS_SPECIFICATION__):
-            return json.dumps(
+            return json_schema(
                 cls.__PARAMETERS_SPECIFICATION__,
                 indent=indent,
             )
 
         else:
             raise TypeError(f"{cls.__qualname__} can't be represented using json schema")
+
+    @classmethod
+    def simplified_schema(
+        cls,
+        indent: int | None = None,
+    ) -> str:
+        if not_missing(cls.__PARAMETERS_SPECIFICATION__):
+            return simplified_schema(
+                cls.__PARAMETERS_SPECIFICATION__,
+                indent=indent,
+            )
+
+        else:
+            raise TypeError(f"{cls.__qualname__} can't be represented using simplified schema")
 
     @classmethod
     def from_json(

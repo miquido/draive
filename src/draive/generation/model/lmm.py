@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, Literal
 
 from draive.lmm import AnyTool, Toolbox, lmm_invocation
 from draive.parameters import DataModel
@@ -21,13 +21,13 @@ __all__: list[str] = [
 ]
 
 
-async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901
+async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0912
     generated: type[Generated],
     /,
     *,
     instruction: Instruction | str,
     input: MultimodalContent | MultimodalContentElement,  # noqa: A002
-    schema_variable: str | None = None,
+    schema_injection: Literal["auto", "full", "simplified", "skip"] = "auto",
     tools: Toolbox | Sequence[AnyTool] | None = None,
     examples: Iterable[tuple[MultimodalContent | MultimodalContentElement, Generated]]
     | None = None,
@@ -54,21 +54,33 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901
                 generation_instruction = instruction
 
         instruction_message: LMMContextElement
-        if variable := schema_variable:
-            instruction_message = LMMInstruction.of(
-                generation_instruction.updated(
-                    **{variable: generated.json_schema(indent=2)},
-                ),
-            )
+        match schema_injection:
+            case "auto":
+                instruction_message = LMMInstruction.of(
+                    generation_instruction.extended(
+                        DEFAULT_INSTRUCTION_EXTENSION.format(
+                            schema=generated.simplified_schema(indent=2),
+                        ),
+                        joiner="\n\n",
+                    ),
+                )
 
-        else:
-            instruction_message = LMMInstruction.of(
-                generation_instruction.extended(
-                    DEFAULT_INSTRUCTION_EXTENSION,
-                    joiner="\n\n",
+            case "full":
+                instruction_message = LMMInstruction.of(
+                    generation_instruction,
                     schema=generated.json_schema(indent=2),
                 )
-            )
+
+            case "simplified":
+                instruction_message = LMMInstruction.of(
+                    generation_instruction,
+                    schema=generated.simplified_schema(indent=2),
+                )
+
+            case "skip":
+                instruction_message = LMMInstruction.of(
+                    generation_instruction,
+                )
 
         context: list[LMMContextElement] = [
             instruction_message,
@@ -118,8 +130,8 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901
 
 
 DEFAULT_INSTRUCTION_EXTENSION: str = """\
-IMPORTANT!
-The result have to conform to the following JSON Schema:
+
+The result have to be a JSON conforming to the following schema:
 ```
 {schema}
 ```
