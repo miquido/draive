@@ -17,7 +17,20 @@ ifndef INSTALL_OPTIONS
 	INSTALL_OPTIONS := .[dev]
 endif
 
+ifndef UV_VERSION
+	UV_VERSION := 0.2.4
+endif
+
 .PHONY: venv sync lock update format lint test
+
+# Install in system without virtual environment and extras. DO NOT USE FOR DEVELOPMENT
+install:
+	@echo '# Installing...'
+	@echo '...installing uv...'
+	@curl -LsSf https://github.com/astral-sh/uv/releases/download/$(UV_VERSION)/uv-installer.sh | sh
+	@echo '...preparing dependencies...'
+	@uv pip install $(INSTALL_OPTIONS) --system --constraint constraints
+	@echo '...finished!'
 
 # Setup virtual environment for local development.
 venv:
@@ -26,23 +39,33 @@ venv:
 	@cp -n ./config/.env.example ./.env || :
 	@echo '...preparing git hooks...'
 	@cp -n ./config/pre-push ./.git/hooks/pre-push || :
+	@echo '...installing uv...'
+	@curl -LsSf https://github.com/astral-sh/uv/releases/download/$(UV_VERSION)/uv-installer.sh | sh
 	@echo '...preparing venv...'
 	@$(PYTHON_ALIAS) -m venv .venv --prompt="VENV[DEV]" --clear --upgrade-deps
-	@. ./.venv/bin/activate && pip install --upgrade pip && pip install --editable $(INSTALL_OPTIONS) --require-virtualenv -c constraints
+	@. ./.venv/bin/activate && pip install --upgrade pip && uv pip install --editable $(INSTALL_OPTIONS) --constraint constraints
 	@echo '...development environment ready! Activate venv using `. ./.venv/bin/activate`.'
 
-# Sync environment with uv based on constraints file
+# Sync environment with uv based on constraints
 sync:
+	@echo '# Synchronizing dependencies...'
+	@$(if $(findstring $(UV_VERSION), $(shell uv --version | head -n1 | cut -d" " -f2)), , @echo '...updating uv...' && curl -LsSf https://github.com/astral-sh/uv/releases/download/$(UV_VERSION)/uv-installer.sh | sh)
 	@uv pip install --editable $(INSTALL_OPTIONS) --constraint constraints
+	@echo '...finished!'
 
 # Generate a set of locked dependencies from pyproject.toml
 lock:
+	@echo '# Locking dependencies...'
 	@uv pip compile pyproject.toml -o constraints --all-extras
+	@echo '...finished!'
 
 # Update and lock dependencies from pyproject.toml
 update:
+	@echo '# Updating dependencies...'
+	@$(if $(findstring $(UV_VERSION), $(shell uv --version | head -n1 | cut -d" " -f2)), , @echo '...updating uv...' && curl -LsSf https://github.com/astral-sh/uv/releases/download/$(UV_VERSION)/uv-installer.sh | sh)
 	@uv --no-cache pip compile pyproject.toml -o constraints --all-extras --upgrade
 	@uv pip install --editable $(INSTALL_OPTIONS) --constraint constraints
+	@echo '...finished!'
 
 # Run formatter.
 format:

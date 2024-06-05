@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "draive"
-version = "0.13.1"
+version = "0.13.2"
 readme = "README.md"
 maintainers = [
   {name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com"}
@@ -60,9 +60,13 @@ include = [
   "./src",
 ]
 exclude = [
+  "**/node_modules",
   "**/__pycache__",
 ]
 ignore = []
 reportMissingImports = true
 reportMissingTypeStubs = true
 typeCheckingMode = "strict"
+userFileIndexingLimit = -1
+useLibraryCodeForTypes = true
+

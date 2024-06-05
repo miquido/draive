@@ -112,7 +112,7 @@ class ParameterPathItemComponent(ParameterPathComponent):
 
     def path_str(
         self,
-        current: str,
+        current: str | None = None,
     ) -> str:
         if current:
             return f"{current}[{self._item}]"
@@ -156,6 +156,9 @@ class ParameterPath[Root, Parameter]:
         self._components: tuple[ParameterPathItemComponent, ...] = components
 
         freeze(self)
+
+    def components(self) -> tuple[str, ...]:
+        return tuple(component.path_str() for component in self._components)
 
     def __str__(self) -> str:
         path: str = ""

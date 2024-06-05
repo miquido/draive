@@ -7,84 +7,22 @@ import uuid
 from collections import abc as collections_abc
 from collections.abc import Callable, Sequence
 from dataclasses import is_dataclass
-from typing import Any, Self
+from typing import Any
 
 import draive.utils as draive_missing
 from draive.parameters.annotations import resolve_annotation
+from draive.parameters.errors import ParameterValidationContext, ParameterValidationError
 
 __all__ = [
     "as_validator",
     "parameter_validator",
-    "ParameterValidationError",
-    "ParameterValidationContext",
     "ParameterValidator",
     "ParameterVerifier",
 ]
 
-type ParameterValidationContext = tuple[str, ...]
+
 type ParameterValidator[Value] = Callable[[Any, ParameterValidationContext], Value]
 type ParameterVerifier[Value] = Callable[[Value], None]
-
-
-class ParameterValidationError(Exception):
-    @classmethod
-    def missing(
-        cls,
-        context: ParameterValidationContext,
-    ) -> Self:
-        return cls("Validation error: Missing required parameter at: %s", context)
-
-    @classmethod
-    def invalid_type(
-        cls,
-        expected: Any,
-        received: Any,
-        context: ParameterValidationContext,
-    ) -> Self:
-        return cls(
-            "Validation error: Invalid parameter at: %s - expected '%s' while received '%s'",
-            context,
-            expected,
-            received,
-        )
-
-    @classmethod
-    def invalid_key(
-        cls,
-        received: Any,
-        context: ParameterValidationContext,
-    ) -> Self:
-        return cls(
-            "Validation error: Invalid parameter key at: %s - received '%s'",
-            context,
-            received,
-        )
-
-    @classmethod
-    def invalid_value(
-        cls,
-        expected: Any,
-        received: Any,
-        context: ParameterValidationContext,
-    ) -> Self:
-        return cls(
-            "Validation error: Invalid parameter value at: %s - expected '%s' while received '%s'",
-            context,
-            expected,
-            received,
-        )
-
-    @classmethod
-    def invalid(
-        cls,
-        exception: Exception,
-        context: ParameterValidationContext,
-    ) -> Self:
-        return cls(
-            "Validation error: Invalid parameter at: %s - %s",
-            context,
-            exception,
-        )
 
 
 def as_validator[Value](

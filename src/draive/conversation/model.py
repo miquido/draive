@@ -37,6 +37,22 @@ class ConversationMessage(DataModel):
             content=MultimodalContent.of(content),
         )
 
+    @classmethod
+    def model(
+        cls,
+        content: MultimodalContent | MultimodalContentElement,
+        identifier: str | None = None,
+        author: str | None = None,
+        created: datetime | None = None,
+    ) -> Self:
+        return cls(
+            identifier=identifier or uuid4().hex,
+            role="model",
+            author=author,
+            created=created,
+            content=MultimodalContent.of(content),
+        )
+
     identifier: str = Field(default_factory=lambda: uuid4().hex)
     role: Literal["user", "model"]
     author: str | None = None
