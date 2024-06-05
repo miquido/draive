@@ -2,7 +2,7 @@ import sys
 from collections.abc import Callable
 from inspect import Parameter, signature
 from inspect import _empty as INSPECT_EMPTY  # pyright: ignore[reportPrivateUsage]
-from typing import Any, Protocol, Self, cast, final, overload
+from typing import Any, Self, cast, final, overload
 
 from draive.parameters.annotations import ParameterDefaultFactory, allows_missing
 from draive.parameters.specification import ParameterSpecification, parameter_specification
@@ -19,17 +19,6 @@ __all__ = [
     "Argument",
     "ParametrizedFunction",
 ]
-
-
-class Function[**Args, Result](Protocol):
-    @property
-    def __name__(self) -> str: ...
-
-    def __call__(
-        self,
-        *args: Args.args,
-        **kwargs: Args.kwargs,
-    ) -> Result: ...
 
 
 @overload
@@ -131,30 +120,30 @@ class FunctionArgument:
 class ParametrizedFunction[**Args, Result]:
     def __init__(
         self,
-        function: Function[Args, Result],
+        function: Callable[Args, Result],
     ) -> None:
-        if isinstance(function, ParametrizedFunction):
-            self = function
+        assert (  # nosec: B101
+            not isinstance(function, ParametrizedFunction)
+        ), "Cannot parametrize the same function more than once!"
+
+        self._call: Callable[Args, Result] = function
+        globalns: dict[str, Any]
+        if hasattr(function, "__globals__"):
+            globalns = function.__globals__  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
 
         else:
-            self._call: Function[Args, Result] = function
-            globalns: dict[str, Any]
-            if hasattr(function, "__globals__"):
-                globalns = function.__globals__  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
+            globalns = sys.modules.get(function.__module__).__dict__
 
-            else:
-                globalns = sys.modules.get(function.__module__).__dict__
+        self._parameters: dict[str, FunctionParameter] = {
+            parameter.name: FunctionParameter.of(
+                parameter,
+                globalns=globalns,  # pyright: ignore[reportUnknownArgumentType]
+                localns=None,
+            )
+            for parameter in signature(function).parameters.values()
+        }
 
-            self._parameters: dict[str, FunctionParameter] = {
-                parameter.name: FunctionParameter.of(
-                    parameter,
-                    globalns=globalns,  # pyright: ignore[reportUnknownArgumentType]
-                    localns=None,
-                )
-                for parameter in signature(function).parameters.values()
-            }
-
-            mimic_function(function, within=self)
+        mimic_function(function, within=self)
 
     def validate_arguments(
         self,

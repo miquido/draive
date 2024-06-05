@@ -2,6 +2,7 @@ from collections.abc import Callable, Coroutine
 from typing import (
     Any,
     Protocol,
+    cast,
     final,
     overload,
 )
@@ -11,7 +12,6 @@ from draive.lmm.errors import ToolException
 from draive.lmm.state import ToolCallContext, ToolStatusStream
 from draive.metrics import ArgumentsTrace, ResultTrace
 from draive.parameters import (
-    Function,
     ParameterSpecification,
     ParametrizedFunction,
     ToolSpecification,
@@ -33,13 +33,13 @@ class ToolAvailabilityCheck(Protocol):
 
 
 @final
-class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Result]]):
+class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result]]):
     def __init__(  # noqa: PLR0913
         self,
         /,
         name: str,
         *,
-        function: Function[Args, Coroutine[None, None, Result]],
+        function: Callable[Args, Coroutine[Any, Any, Result]],
         description: str | None = None,
         availability_check: ToolAvailabilityCheck | None = None,
         format_result: Callable[[Result], MultimodalContent | MultimodalContentElement],
@@ -166,9 +166,23 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
 AnyTool = Tool[Any, Any]
 
 
+class ToolWrapper(Protocol):
+    def __call__[**Args, Result](
+        self,
+        function: Callable[Args, Coroutine[Any, Any, Result]],
+    ) -> Tool[Args, Result]: ...
+
+
+class PartialToolWrapper[Result](Protocol):
+    def __call__[**Args](
+        self,
+        function: Callable[Args, Coroutine[Any, Any, Result]],
+    ) -> Tool[Args, Result]: ...
+
+
 @overload
 def tool[**Args, Result](
-    function: Function[Args, Coroutine[None, None, Result]],
+    function: Callable[Args, Coroutine[Any, Any, Result]],
     /,
 ) -> Tool[Args, Result]:
     """
@@ -180,7 +194,7 @@ def tool[**Args, Result](
 
     Parameters
     ----------
-    function: Function[Args, Coroutine[None, None, Result]]
+    function: Callable[Args, Coroutine[None, None, Result]]
         a function to be wrapped as a Tool.
     Returns
     -------
@@ -190,16 +204,66 @@ def tool[**Args, Result](
 
 
 @overload
-def tool[**Args, Result](
+def tool[Result](
     *,
     name: str | None = None,
     description: str | None = None,
     availability_check: ToolAvailabilityCheck | None = None,
-    format_result: Callable[[Result], MultimodalContent | MultimodalContentElement] | None = None,
+    format_result: Callable[[Result], MultimodalContent | MultimodalContentElement],
     format_failure: Callable[[Exception], MultimodalContent | MultimodalContentElement]
     | None = None,
     direct_result: bool = False,
-) -> Callable[[Function[Args, Coroutine[None, None, Result]]], Tool[Args, Result]]:
+) -> PartialToolWrapper[Result]:
+    """
+    Convert a function to a tool using provided parameters.
+
+    In order to adjust the arguments behavior and specification use an instance of Argument
+    as a default value of any given argument with desired configuration
+    for each argument individually.
+
+    Parameters
+    ----------
+    name: str
+        name to be used in a tool specification.
+        Default is the name of the wrapped function.
+    description: int
+        description to be used in a tool specification. Allows to present the tool behavior to the
+        external system.
+        Default is empty.
+    availability_check: ToolAvailabilityCheck
+        function used to verify availability of the tool in given context. It can be used to check
+        permissions or occurrence of a specific state to allow its usage.
+        Provided function should raise an Exception when the tool should not be available.
+        Default is always available.
+    format_result: Callable[[Result], MultimodalContent]
+        function converting tool result to MultimodalContent. It is used to format the result
+        for model processing. Default implementation converts the result to string if needed.
+    format_failure: Callable[[Exception], MultimodalContent]
+        function converting tool call exception to a fallback MultimodalContent.
+        Default implementation return "ERROR" string and logs the exception.
+    direct_result: bool
+        controls if tool result should break the ongoing processing and be the direct result of it.
+        Note that during concurrent execution of multiple tools the call/result order defines
+        direct result and exact behavior is not defined.
+        Default is False.
+
+    Returns
+    -------
+    Callable[[Function[Args, Coroutine[None, None, Result]]], Tool[Args, Result]]
+        function allowing to convert other function to a Tool using provided configuration.
+    """
+
+
+@overload
+def tool(
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    availability_check: ToolAvailabilityCheck | None = None,
+    format_failure: Callable[[Exception], MultimodalContent | MultimodalContentElement]
+    | None = None,
+    direct_result: bool = False,
+) -> ToolWrapper:
     """
     Convert a function to a tool using provided parameters.
 
@@ -241,7 +305,7 @@ def tool[**Args, Result](
 
 
 def tool[**Args, Result](  # noqa: PLR0913
-    function: Function[Args, Coroutine[None, None, Result]] | None = None,
+    function: Callable[Args, Coroutine[Any, Any, Result]] | None = None,
     *,
     name: str | None = None,
     description: str | None = None,
@@ -250,12 +314,9 @@ def tool[**Args, Result](  # noqa: PLR0913
     format_failure: Callable[[Exception], MultimodalContent | MultimodalContentElement]
     | None = None,
     direct_result: bool = False,
-) -> (
-    Callable[[Function[Args, Coroutine[None, None, Result]]], Tool[Args, Result]]
-    | Tool[Args, Result]
-):
+) -> ToolWrapper | Tool[Args, Result]:
     def wrap(
-        function: Function[Args, Coroutine[None, None, Result]],
+        function: Callable[Args, Coroutine[Any, Any, Result]],
     ) -> Tool[Args, Result]:
         return Tool(
             name=name or function.__name__,
@@ -269,8 +330,9 @@ def tool[**Args, Result](  # noqa: PLR0913
 
     if function := function:
         return wrap(function=function)
+
     else:
-        return wrap
+        return cast(PartialToolWrapper[Result], wrap)
 
 
 def _default_result_format(result: Any) -> MultimodalContent:

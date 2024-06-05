@@ -3,6 +3,7 @@ from typing import Self, final
 
 from draive.parameters.model import DataModel
 from draive.types.audio import AudioBase64Content, AudioContent, AudioDataContent, AudioURLContent
+from draive.types.frozenlist import frozenlist
 from draive.types.images import ImageBase64Content, ImageContent, ImageDataContent, ImageURLContent
 from draive.types.video import VideoBase64Content, VideoContent, VideoDataContent, VideoURLContent
 
@@ -30,7 +31,7 @@ class MultimodalContent(DataModel):
                     elements=tuple(chain.from_iterable(_extract(element) for element in elements)),
                 )
 
-    elements: tuple[MultimodalContentElement, ...]
+    elements: frozenlist[MultimodalContentElement]
 
     @property
     def has_media(self) -> bool:
@@ -97,7 +98,7 @@ class MultimodalContent(DataModel):
 def _extract(
     element: MultimodalContent | MultimodalContentElement,
     /,
-) -> tuple[MultimodalContentElement, ...]:
+) -> frozenlist[MultimodalContentElement]:
     match element:
         case MultimodalContent() as content:
             return content.elements
