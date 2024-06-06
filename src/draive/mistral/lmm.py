@@ -89,6 +89,8 @@ async def mistral_lmm_invocation(
         ctx.log_debug("Requested Mistral lmm")
         client: MistralClient = ctx.dependency(MistralClient)
         config: MistralChatConfig = ctx.state(MistralChatConfig).updated(**extra)
+        ctx.record(config)
+
         match output:
             case "text":
                 config = config.updated(response_format={"type": "text"})
@@ -195,7 +197,7 @@ async def _chat_completion(
                 suggest_tools=required,
             )
 
-        case ToolSpecification() as tool:
+        case tool:
             completion = await client.chat_completion(
                 config=config,
                 messages=messages,

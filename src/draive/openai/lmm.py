@@ -107,6 +107,8 @@ async def openai_lmm_invocation(
         ctx.log_debug("Requested OpenAI lmm")
         client: OpenAIClient = ctx.dependency(OpenAIClient)
         config: OpenAIChatConfig = ctx.state(OpenAIChatConfig).updated(**extra)
+        ctx.record(config)
+
         match output:
             case "text":
                 config = config.updated(response_format={"type": "text"})
@@ -248,7 +250,7 @@ def _convert_context_element(
             }
 
 
-async def _chat_completion(
+async def _chat_completion(  # noqa: PLR0912
     *,
     client: OpenAIClient,
     config: OpenAIChatConfig,
@@ -269,7 +271,7 @@ async def _chat_completion(
                 tools_suggestion=required,
             )
 
-        case ToolSpecification() as tool:
+        case tool:
             completion = await client.chat_completion(
                 config=config,
                 messages=messages,
@@ -325,6 +327,19 @@ async def _chat_completion(
                 # TODO: OpenAI models generating media?
                 return LMMCompletion.of(content)
 
+            elif (tool_calls := completion_message.tool_calls) and (tools := tools):
+                ctx.record(ResultTrace.of(tool_calls))
+                return LMMToolRequests(
+                    requests=[
+                        LMMToolRequest(
+                            identifier=call.id,
+                            tool=call.function.name,
+                            arguments=json.loads(call.function.arguments),
+                        )
+                        for call in tool_calls
+                    ]
+                )
+
             else:
                 raise OpenAIException("Invalid OpenAI completion", completion)
 
@@ -342,7 +357,7 @@ async def _chat_completion_stream(  # noqa: C901, PLR0912, PLR0915
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
     completion_stream: OpenAIAsyncStream[ChatCompletionChunk]
     match require_tool:
-        case bool(required):
+        case bool() as required:
             completion_stream = await client.chat_completion(
                 config=config,
                 messages=messages,
