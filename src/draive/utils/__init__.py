@@ -7,7 +7,7 @@ from draive.utils.mimic import mimic_function
 from draive.utils.missing import MISSING, Missing, is_missing, not_missing
 from draive.utils.split_sequence import split_sequence
 from draive.utils.stream import AsyncStream
-from draive.utils.timeout import timeout
+from draive.utils.timeout import with_timeout
 
 __all__ = [
     "AsyncStream",
@@ -25,6 +25,6 @@ __all__ = [
     "not_missing",
     "setup_logging",
     "split_sequence",
-    "timeout",
+    "with_timeout",
     "run_async",
 ]

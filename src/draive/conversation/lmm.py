@@ -15,6 +15,7 @@ from draive.lmm import (
 )
 from draive.scope import ctx
 from draive.types import (
+    ConstantMemory,
     Instruction,
     LMMCompletion,
     LMMCompletionChunk,
@@ -26,9 +27,9 @@ from draive.types import (
     Memory,
     MultimodalContent,
     MultimodalContentElement,
-    ReadOnlyMemory,
 )
 from draive.types.tool_status import ToolCallStatus
+from draive.utils import Missing, not_missing
 
 __all__: list[str] = [
     "lmm_conversation_completion",
@@ -40,7 +41,9 @@ async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
     input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
-    memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+    | Sequence[ConversationMessage]
+    | None = None,
     tools: Toolbox | Sequence[AnyTool] | None = None,
     stream: Literal[True],
     **extra: Any,
@@ -52,7 +55,9 @@ async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
     input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
-    memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+    | Sequence[ConversationMessage]
+    | None = None,
     tools: Toolbox | Sequence[AnyTool] | None = None,
     stream: Literal[False] = False,
     **extra: Any,
@@ -64,7 +69,9 @@ async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
     input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
-    memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+    | Sequence[ConversationMessage]
+    | None = None,
     tools: Toolbox | Sequence[AnyTool] | None = None,
     stream: bool,
     **extra: Any,
@@ -75,7 +82,9 @@ async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
     input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
-    memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+    | Sequence[ConversationMessage]
+    | None = None,
     tools: Toolbox | Sequence[AnyTool] | None = None,
     stream: bool = False,
     **extra: Any,
@@ -98,20 +107,20 @@ async def lmm_conversation_completion(
             LMMInstruction.of(instruction),
         ]
 
-        conversation_memory: Memory[ConversationMessage]
+        conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage]
         match memory:
             case None:
-                conversation_memory = ReadOnlyMemory()
+                conversation_memory = ConstantMemory([])
 
             case Memory() as memory:
-                context.extend(
-                    message.as_lmm_context_element() for message in await memory.recall()
-                )
+                messages: Sequence[ConversationMessage] | Missing = await memory.recall()
+                if not_missing(messages):
+                    context.extend(message.as_lmm_context_element() for message in messages)
                 conversation_memory = memory
 
             case [*memory_messages]:
                 context.extend(message.as_lmm_context_element() for message in memory_messages)
-                conversation_memory = ReadOnlyMemory(elements=memory_messages)
+                conversation_memory = ConstantMemory(memory_messages)
 
         request_message: ConversationMessage
         match input:
@@ -149,7 +158,7 @@ async def lmm_conversation_completion(
 
 async def _lmm_conversation_completion(
     request_message: ConversationMessage,
-    conversation_memory: Memory[ConversationMessage],
+    conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage],
     context: list[LMMContextElement],
     toolbox: Toolbox,
     **extra: Any,
@@ -204,7 +213,7 @@ async def _lmm_conversation_completion(
 
 async def _lmm_conversation_completion_stream(
     request_message: ConversationMessage,
-    conversation_memory: Memory[ConversationMessage],
+    conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage],
     context: list[LMMContextElement],
     toolbox: Toolbox,
     **extra: Any,

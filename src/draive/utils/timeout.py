@@ -4,11 +4,11 @@ from collections.abc import Callable, Coroutine
 from draive.utils.mimic import mimic_function
 
 __all__ = [
-    "timeout",
+    "with_timeout",
 ]
 
 
-def timeout[**Args, Result](
+def with_timeout[**Args, Result](
     timeout: float,
     /,
 ) -> Callable[
@@ -86,7 +86,9 @@ class _AsyncTimeout[**Args, Result]:
             future,
         )
 
-        def on_completion(task: Task[Result]) -> None:
+        def on_completion(
+            task: Task[Result],
+        ) -> None:
             timeout_handle.cancel()  # at this stage we no longer need timeout to trigger
 
             if future.done():
@@ -100,7 +102,9 @@ class _AsyncTimeout[**Args, Result]:
 
         task.add_done_callback(on_completion)
 
-        def on_result(future: Future[Result]) -> None:
+        def on_result(
+            future: Future[Result],
+        ) -> None:
             task.cancel()  # when result future completes make sure that task also completes
 
         future.add_done_callback(on_result)

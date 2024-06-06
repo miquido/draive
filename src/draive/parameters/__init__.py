@@ -13,7 +13,7 @@ from draive.parameters.specification import (
     ParametersSpecification,
     ToolSpecification,
 )
-from draive.parameters.state import State
+from draive.parameters.state import State, Stateless
 from draive.parameters.validation import ParameterValidator, ParameterVerifier
 
 __all__ = [
@@ -35,5 +35,6 @@ __all__ = [
     "ParametrizedData",
     "ParametrizedFunction",
     "State",
+    "Stateless",
     "ToolSpecification",
 ]

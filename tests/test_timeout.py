@@ -1,6 +1,6 @@
 from asyncio import CancelledError, Task, sleep
 
-from draive import ctx, timeout
+from draive import ctx, with_timeout
 from pytest import mark, raises
 
 
@@ -11,7 +11,7 @@ class FakeException(Exception):
 @mark.asyncio
 @ctx.wrap("test")
 async def test_returns_result_when_returning_value():
-    @timeout(3)
+    @with_timeout(3)
     async def long_running() -> int:
         return 42
 
@@ -21,7 +21,7 @@ async def test_returns_result_when_returning_value():
 @mark.asyncio
 @ctx.wrap("test")
 async def test_raises_with_error():
-    @timeout(3)
+    @with_timeout(3)
     async def long_running() -> int:
         raise FakeException()
 
@@ -32,7 +32,7 @@ async def test_raises_with_error():
 @mark.asyncio
 @ctx.wrap("test")
 async def test_raises_with_cancel():
-    @timeout(3)
+    @with_timeout(3)
     async def long_running() -> int:
         await sleep(1)
         raise RuntimeError("Invalid state")
@@ -47,7 +47,7 @@ async def test_raises_with_cancel():
 @mark.asyncio
 @ctx.wrap("test")
 async def test_raises_with_timeout():
-    @timeout(0.01)
+    @with_timeout(0.01)
     async def long_running() -> int:
         await sleep(0.03)
         raise RuntimeError("Invalid state")

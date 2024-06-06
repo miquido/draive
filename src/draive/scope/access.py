@@ -126,9 +126,12 @@ class _RootContext:
 class _PartialContext:
     def __init__(
         self,
+        task_group: TaskGroup | None = None,
         metrics: MetricsTrace | None = None,
         state: ScopeState | None = None,
     ) -> None:
+        self._task_group: TaskGroup | None = task_group
+        self._task_group_token: Token[TaskGroup] | None = None
         self._metrics: MetricsTrace | None = metrics
         self._metrics_token: Token[MetricsTrace] | None = None
         self._state: ScopeState | None = state
@@ -158,6 +161,44 @@ class _PartialContext:
 
         if token := self._state_token:
             _StateScope_Var.reset(token)
+
+    async def __aenter__(self) -> None:
+        if task_group := self._task_group:
+            assert self._task_group_token is None, "Reentrance is not allowed"  # nosec: B101
+            self._task_group_token = _TaskGroup_Var.set(task_group)
+            await task_group.__aenter__()
+
+        self.__enter__()
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        try:
+            if task_group := self._task_group:
+                assert self._task_group_token is not None, "Can't exit scope without entering"  # nosec: B101
+                _TaskGroup_Var.reset(self._task_group_token)
+                await task_group.__aexit__(
+                    et=exc_type,
+                    exc=exc_val,
+                    tb=exc_tb,
+                )
+
+        except BaseException as exc:
+            self.__exit__(
+                exc_type=type(exc),
+                exc_val=exc,
+                exc_tb=exc.__traceback__,
+            )
+
+        else:
+            self.__exit__(
+                exc_type=exc_type,
+                exc_val=exc_val,
+                exc_tb=exc_tb,
+            )
 
 
 @final
@@ -371,6 +412,7 @@ class ctx:
             nested_state = ctx._current_state().updated(state)
 
         return _PartialContext(
+            task_group=TaskGroup(),
             metrics=ctx._current_metrics().nested(
                 label=label,
                 metrics=metrics,

@@ -355,7 +355,11 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
     __PARAMETERS__: ClassVar[dict[str, DataParameter]]
     __PARAMETERS_SPECIFICATION__: ClassVar[ParametersSpecification | Missing]
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:  # pyright: ignore[reportUnknownParameterType, reportMissingParameterType]
+    def __init__(
+        self,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         assert not args, "Positional unkeyed arguments are not supported"  # nosec: B101
         for parameter in self.__class__.__PARAMETERS__.values():
             parameter_context: ParameterValidationContext = (self.__class__.__qualname__,)
@@ -438,11 +442,78 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         /,
         **parameters: Any,
     ) -> Self:
-        if parameters:
-            return self.__class__(**{**vars(self), **parameters})
-
-        else:
+        if not parameters:
             return self
+
+        updated: Self = self.__class__.__new__(self.__class__)
+        for parameter in self.__class__.__PARAMETERS__.values():
+            parameter_context: ParameterValidationContext = (self.__class__.__qualname__,)
+            validated_value: Any
+            if parameter.name in parameters:
+                validated_value = parameter.validated(
+                    parameters[parameter.name],
+                    context=parameter_context,
+                )
+
+            elif parameter.alias and parameter.alias in parameters:
+                validated_value = parameter.validated(
+                    parameters[parameter.alias],
+                    context=parameter_context,
+                )
+
+            else:  # no need to validate again when reusing current value
+                validated_value = object.__getattribute__(
+                    self,
+                    parameter.name,
+                )
+
+            object.__setattr__(
+                updated,
+                parameter.name,
+                validated_value,
+            )
+
+        return updated
+
+    def updating_parameter(
+        self,
+        name: str,
+        /,
+        value: Any,
+    ) -> Self:
+        assert (  # nosec: B101
+            name in self.__class__.__PARAMETERS__
+        ), f"Parameter {name} does not exist in {self.__class__.__qualname__}"
+
+        updated: Self = self.__class__.__new__(self.__class__)
+        for parameter in self.__class__.__PARAMETERS__.values():
+            parameter_context: ParameterValidationContext = (self.__class__.__qualname__,)
+            validated_value: Any
+            if parameter.name == name:
+                validated_value = parameter.validated(
+                    value,
+                    context=parameter_context,
+                )
+
+            elif parameter.alias and parameter.alias == name:
+                validated_value = parameter.validated(
+                    value,
+                    context=parameter_context,
+                )
+
+            else:  # no need to validate again when reusing current value
+                validated_value = object.__getattribute__(
+                    self,
+                    parameter.name,
+                )
+
+            object.__setattr__(
+                updated,
+                parameter.name,
+                validated_value,
+            )
+
+        return updated
 
     def __str__(self) -> str:
         return str(self.as_dict())
