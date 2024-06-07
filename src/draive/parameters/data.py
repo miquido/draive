@@ -464,13 +464,13 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         __name: str,
         __value: Any,
     ) -> None:
-        raise RuntimeError(f"{self.__class__.__qualname__} is frozen and can't be modified")
+        raise AttributeError(f"{self.__class__.__qualname__} is frozen and can't be modified")
 
     def __delattr__(
         self,
         __name: str,
     ) -> None:
-        raise RuntimeError(f"{self.__class__.__qualname__} is frozen and can't be modified")
+        raise AttributeError(f"{self.__class__.__qualname__} is frozen and can't be modified")
 
 
 # based on python dataclass asdict but simplified

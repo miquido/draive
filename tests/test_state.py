@@ -110,3 +110,18 @@ def test_basic_encoding() -> None:
 
 def test_basic_decoding() -> None:
     assert BasicsState.from_dict(basicStateDict) == basicStateInstance
+
+
+def test_type_parametrized_state() -> None:
+    class Parameter(State):
+        value: int
+
+    class Parametrized[Value](State):
+        value: Value
+
+    ParametrizedAlias = Parametrized[str]
+    ParametrizedParameterAlias = Parametrized[Parameter]
+
+    # those should only instantiate without any issues
+    ParametrizedAlias(value="")
+    ParametrizedParameterAlias(value=Parameter(value=42))
