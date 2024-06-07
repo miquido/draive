@@ -59,7 +59,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
                     f" - argument '{parameter.name}' is missing specification."
                 )
 
-            if not (parameter.has_default and parameter.allows_missing):
+            if not (parameter.has_default or parameter.allows_missing):
                 aliased_required.append(parameter.alias or parameter.name)
 
         self.specification: ToolSpecification = {
