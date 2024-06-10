@@ -2,9 +2,14 @@ from draive.embedding.embedder import Embedder
 from draive.parameters import State
 
 __all__ = [
-    "Embedding",
+    "TextEmbedding",
+    "ImageEmbedding",
 ]
 
 
-class Embedding(State):
-    embed_text: Embedder[str]
+class TextEmbedding(State):
+    embed: Embedder[str]
+
+
+class ImageEmbedding(State):
+    embed: Embedder[bytes]
