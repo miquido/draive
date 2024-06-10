@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterator, Sequence
 
 __all__ = [
     "split_text",
@@ -9,22 +9,35 @@ def split_text(
     text: str,
     part_size: int,
     count_size: Callable[[str], int],
-    separators: tuple[str, str] | str | None = None,
+    separators: Sequence[str] | str | None = None,
     part_overlap_size: int | None = None,
 ) -> list[str]:
     # if the text is already small enough just use it
-    if count_size(text) < part_size:
+    if count_size(text) <= part_size:
         return [text]
 
+    splitters: Sequence[str]
+
+    match separators:
+        case None:
+            splitters = ["\n\n", "\n", " "]
+
+        case str() as splitter:
+            splitters = [splitter, " "]
+
+        case [*separators]:
+            splitters = separators
+
     # split using provided separators
-    splitter, parts = _split(
+    used_splitter, fallback_splitters, parts = _split(
         text=text,
-        separators=separators,
+        splitters=splitters,
     )
     # then merge
     return _merge(
         parts=parts,
-        splitter=splitter,
+        splitter=used_splitter,
+        fallback_splitters=fallback_splitters,
         part_size=part_size,
         count_size=count_size,
         part_overlap_size=part_overlap_size,
@@ -33,98 +46,104 @@ def split_text(
 
 def _split(
     text: str,
-    separators: tuple[str, str] | str | None = None,
-) -> tuple[str, list[str]]:
-    # prepare initial splitter - default is new paragraph
-    splitter: str
-    alt_splitter: str
-    match separators:
-        case (str(primary), str(secondary)):
-            splitter = primary
-            alt_splitter = secondary
-        case str(primary):
-            splitter = primary
-            alt_splitter = "\n"
-        case None:
-            splitter = "\n\n"
-            alt_splitter = "\n"
+    splitters: Sequence[str],
+) -> tuple[str, list[str], list[str]]:
+    iterator: Iterator[str] = iter(splitters)
+    while splitter := next(iterator, None):
+        # try splitting using provided splitters
+        parts: list[str] = text.split(splitter)
+        if len(parts) == 1:
+            continue
 
-    # try splitting using provided splitter
-    parts: list[str] = text.split(splitter)
-    # if splitting has done nothing retry using secondary splitter
-    if len(parts) == 1:
-        splitter = alt_splitter
-        parts = text.split(splitter)
+        else:
+            # used_splitter, remaining_splitters, parts
+            return (splitter, list(iterator), parts)
+
     # if splitting has still done nothing then fail
-    if len(parts) == 1:
-        raise ValueError("Failed to properly split text with provided separators")
-
-    return (splitter, parts)
+    raise ValueError("Text splitting failed")
 
 
-def _merge(  # noqa: C901
+def _merge(  # noqa: C901, PLR0912, PLR0913
     parts: list[str],
     part_size: int,
     count_size: Callable[[str], int],
     splitter: str,
+    fallback_splitters: list[str],
     part_overlap_size: int | None,
 ) -> list[str]:
     result: list[str] = []
-    accumulator: list[str] = []
-    accumulator_size: int = 0
-    # iterate over splitted pats
-    for part in parts:
-        temp_size: int = count_size(part)
+    accumulator: str = ""
+    overlap_accumulator: list[str] = []
+    last_part_idx: int = len(parts) - 1
+    # iterate over splitted parts
+    for idx, part in enumerate(parts):
+        # Add the separator back if it is not the last part
+        current_part: str
+        if idx == last_part_idx:
+            current_part = part
+
+        else:
+            current_part = part + splitter
+
+        merged_part: str = accumulator + current_part
         # check if can add to previous part
-        if accumulator_size + temp_size < part_size:
-            accumulator.append(part)
-            accumulator_size += temp_size
-        # check if part is not too big on its own
-        elif temp_size > part_size:
-            chunk: str = splitter.join(accumulator).strip()
-            if chunk:
+        if count_size(merged_part) <= part_size:
+            accumulator = merged_part
+            overlap_accumulator.append(current_part)
+
+        # check if current part is not too big on its own
+        elif count_size(current_part) > part_size:
+            if chunk := accumulator.strip():
                 result.append(chunk)
-            # do special splitting if it is too big indeed
-            # force overlap and split on newlines and spaces
+
+            # clean up accumulators - we have made nested splitting
+            accumulator = ""
+            overlap_accumulator = []
+
+            # do nested splitting if the part is too big
             result.extend(
                 split_text(
-                    text=part,
+                    text=current_part,
                     part_size=part_size,
-                    separators=("\n", " "),
-                    part_overlap_size=part_overlap_size
-                    or int(part_size * 0.2),  # if there was no overlap force at least 20%
+                    separators=fallback_splitters,
+                    part_overlap_size=part_overlap_size,
                     count_size=count_size,
                 ),
             )
-            accumulator = []
-            accumulator_size = 0
+
         # if we have overlap defined do overlap between last part and current (not fitting)
         elif part_overlap_size := part_overlap_size:
-            chunk: str = splitter.join(accumulator).strip()
-            if chunk:
+            if chunk := accumulator.strip():
                 result.append(chunk)
-            overlap_size: int = 0
-            overlap: list[str] = []
-            for element in reversed(accumulator):
-                element_size: int = count_size(element)
-                if overlap_size + element_size < part_overlap_size:
-                    overlap.append(element)
-                    overlap_size += element_size
+
+            # clear accumulator - we will fill it now
+            accumulator = ""
+            for element in reversed(overlap_accumulator):
+                merged_accumulator: str = element + accumulator
+
+                if (
+                    count_size(merged_accumulator) < part_overlap_size
+                    and count_size(accumulator + current_part) <= part_size
+                ):
+                    overlap_accumulator = [element, *overlap_accumulator]
+                    accumulator = merged_accumulator
+
                 else:
                     break
 
-            accumulator = [*reversed(overlap), part]
-            accumulator_size = overlap_size + temp_size
+            overlap_accumulator.append(current_part)
+            accumulator = accumulator + current_part
+
         # otherwise make start a new part out of current
         else:
-            chunk: str = splitter.join(accumulator).strip()
-            if chunk:
+            if chunk := accumulator.strip():
                 result.append(chunk)
-            accumulator = [part]
-            accumulator_size = temp_size
 
-    chunk: str = splitter.join(accumulator).strip()
-    if chunk:  # add leftover if any
+            accumulator = current_part
+            overlap_accumulator = [current_part]
+
+    # add leftover if any
+    if chunk := accumulator.strip():
         result.append(chunk)
 
     return result
