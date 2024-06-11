@@ -472,6 +472,24 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
     ) -> None:
         raise AttributeError(f"{self.__class__.__qualname__} is frozen and can't be modified")
 
+    def __copy__(self) -> Self:
+        return self.__class__(**vars(self))
+
+    def __deepcopy__(
+        self,
+        memo: dict[int, Any] | None,
+    ) -> Self:
+        copy: Self = self.__class__(
+            **{
+                key: deepcopy(
+                    value,
+                    memo,
+                )
+                for key, value in vars(self).items()
+            }
+        )
+        return copy
+
 
 # based on python dataclass asdict but simplified
 def _data_dict(  # noqa: PLR0911
