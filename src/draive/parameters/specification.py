@@ -377,6 +377,33 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
                 case _:  # pyright: ignore[reportUnnecessaryComparison]
                     raise TypeError("Unsupported dict type annotation", annotation)
 
+        case builtins.set | collections_abc.Set:
+            match resolved_args:
+                case [list_type_annotation]:
+                    element_specification: ParameterSpecification | Missing = (
+                        parameter_specification(
+                            annotation=list_type_annotation,
+                            description=None,
+                            globalns=globalns,
+                            localns=localns,
+                            recursion_guard=recursion_guard,
+                        )
+                    )
+
+                    if not_missing(element_specification):
+                        specification = {
+                            "type": "array",
+                            "items": element_specification,
+                        }
+
+                    else:
+                        # when at least one element can't be represented in specification
+                        # then the whole thing can't be represented in specification
+                        return MISSING
+
+                case _:
+                    raise TypeError("Unsupported set type annotation: %s", annotation)
+
         case builtins.list | collections_abc.Sequence:  # pyright: ignore[reportUnknownMemberType]
             match resolved_args:
                 case [list_type_annotation]:

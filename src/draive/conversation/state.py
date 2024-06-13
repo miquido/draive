@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from draive.conversation.completion import ConversationCompletion
 from draive.conversation.lmm import lmm_conversation_completion
 from draive.conversation.model import ConversationMessage
@@ -11,4 +13,4 @@ __all__: list[str] = [
 
 class Conversation(State):
     completion: ConversationCompletion = lmm_conversation_completion
-    memory: Memory[ConversationMessage] | None = None
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage] | None = None

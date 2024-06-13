@@ -1,46 +1,58 @@
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable, Iterable
 from typing import final
 
 __all__ = [
     "Memory",
-    "ReadOnlyMemory",
+    "ConstantMemory",
+    "VolatileMemory",
 ]
 
 
-class Memory[Element](ABC):
+class Memory[Recalled, Remembered](ABC):
     @abstractmethod
-    async def recall(self) -> list[Element]: ...
+    async def recall(self) -> Recalled: ...
 
     @abstractmethod
     async def remember(
         self,
-        *elements: Element,
+        *items: Remembered,
     ) -> None: ...
 
 
 @final
-class ReadOnlyMemory[Element](Memory[Element]):
+class ConstantMemory[Recalled, Remembered](Memory[Recalled, Remembered]):
     def __init__(
         self,
-        elements: Callable[[], Awaitable[list[Element]]] | Iterable[Element] | None = None,
+        item: Recalled,
+        /,
     ) -> None:
-        self._elements: Callable[[], Awaitable[list[Element]]]
-        if callable(elements):
-            self._elements = elements
-        else:
-            messages_list: list[Element] = list(elements) if elements is not None else []
+        self._item: Recalled = item
 
-            async def constant() -> list[Element]:
-                return messages_list
-
-            self._elements = constant
-
-    async def recall(self) -> list[Element]:
-        return await self._elements()
+    async def recall(self) -> Recalled:
+        return self._item
 
     async def remember(
         self,
-        *elements: Element,
+        *items: Remembered,
     ) -> None:
         pass  # ignore
+
+
+@final
+class VolatileMemory[Item](Memory[Item, Item]):
+    def __init__(
+        self,
+        item: Item,
+        /,
+    ) -> None:
+        self._item: Item = item
+
+    async def recall(self) -> Item:
+        return self._item
+
+    async def remember(
+        self,
+        *items: Item,
+    ) -> None:
+        if items:
+            self._item = items[-1]

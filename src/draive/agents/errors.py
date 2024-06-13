@@ -4,4 +4,6 @@ __all__ = [
 
 
 class AgentException(Exception):
-    pass
+    def __init__(self, cause: BaseException, *args: object) -> None:
+        self.__cause__ = cause
+        super().__init__(*args)

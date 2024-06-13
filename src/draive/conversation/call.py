@@ -17,7 +17,9 @@ async def conversation_completion(
     *,
     instruction: Instruction | str,
     input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
-    memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+    | Sequence[ConversationMessage]
+    | None = None,
     tools: Toolbox | Sequence[AnyTool] | None = None,
     stream: Literal[True],
 ) -> ConversationResponseStream: ...
@@ -28,7 +30,9 @@ async def conversation_completion(
     *,
     instruction: Instruction | str,
     input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
-    memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+    | Sequence[ConversationMessage]
+    | None = None,
     tools: Toolbox | Sequence[AnyTool] | None = None,
     stream: Literal[False] = False,
 ) -> ConversationMessage: ...
@@ -39,7 +43,9 @@ async def conversation_completion(
     *,
     instruction: Instruction | str,
     input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
-    memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+    | Sequence[ConversationMessage]
+    | None = None,
     tools: Toolbox | Sequence[AnyTool] | None = None,
     stream: bool,
 ) -> ConversationResponseStream | ConversationMessage: ...
@@ -49,7 +55,9 @@ async def conversation_completion(
     *,
     instruction: Instruction | str,
     input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
-    memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+    | Sequence[ConversationMessage]
+    | None = None,
     tools: Toolbox | Sequence[AnyTool] | None = None,
     stream: bool = False,
 ) -> ConversationResponseStream | ConversationMessage:

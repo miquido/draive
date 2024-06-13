@@ -284,6 +284,51 @@ def _prepare_list_validator(
     return list_validator
 
 
+def _prepare_set_validator(
+    elements_annotation: tuple[Any, ...],
+    /,
+    globalns: dict[str, Any] | None,
+    localns: dict[str, Any] | None,
+    recursion_guard: frozenset[type[Any]],
+) -> ParameterValidator[Any]:
+    element_validator: ParameterValidator[Any]
+    match elements_annotation:
+        case [element]:
+            element_validator = parameter_validator(
+                element,
+                verifier=None,
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
+            )
+
+        case other:
+            raise TypeError(f"Unsupported annotation - set[{other}]")
+
+    def set_validator(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Any:
+        match value:
+            case [*values] as value:
+                return set[Any](
+                    element_validator(element, (*context, f"[{idx}]"))
+                    for idx, element in enumerate(values)
+                )
+
+            case []:
+                return set[Any]()
+
+            case _:
+                raise ParameterValidationError.invalid_type(
+                    expected=list,
+                    received=value,
+                    context=context,
+                )
+
+    return set_validator
+
+
 def _prepare_union_validator(
     elements_annotation: tuple[Any, ...],
     /,
@@ -798,6 +843,14 @@ def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912
 
         case builtins.dict | collections_abc.Mapping:  # pyright: ignore[reportUnknownMemberType]
             validator = _prepare_dict_validator(
+                resolved_args,
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
+            )
+
+        case builtins.set | collections_abc.Set:
+            validator = _prepare_set_validator(
                 resolved_args,
                 globalns=globalns,
                 localns=localns,

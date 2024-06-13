@@ -1,4 +1,4 @@
-from asyncio import AbstractEventLoop, CancelledError, Future, get_running_loop
+from asyncio import AbstractEventLoop, CancelledError, Event, Future, get_running_loop
 from collections import deque
 from collections.abc import AsyncIterator
 from typing import Self
@@ -17,22 +17,31 @@ class AsyncStream[Element](AsyncIterator[Element]):
         self._buffer: deque[Element] = deque()
         self._waiting_queue: deque[Future[Element]] = deque()
         self._finish_exception: BaseException | None = None
+        self._finished: Event = Event()
 
     def __del__(self) -> None:
         while self._waiting_queue:
             waiting: Future[Element] = self._waiting_queue.popleft()
             if waiting.done():
                 continue
+
             else:
                 waiting.set_exception(CancelledError())
 
+        self._finished.set()
+
     @property
     def finished(self) -> bool:
-        return self._finish_exception is not None
+        return self._finished.is_set()
+
+    async def wait(self) -> None:
+        await self._finished.wait()
 
     def send(
         self,
         element: Element,
+        /,
+        *elements: Element,
     ) -> None:
         if self.finished:
             raise RuntimeError("AsyncStream has been already finished")
@@ -48,16 +57,21 @@ class AsyncStream[Element](AsyncIterator[Element]):
         else:
             self._buffer.append(element)
 
+        self._buffer.extend(elements)
+
     def finish(
         self,
         exception: BaseException | None = None,
     ) -> None:
         if self.finished:
             raise RuntimeError("AsyncStream has been already finished")
+
         self._finish_exception = exception or StopAsyncIteration()
+        self._finished.set()
+
         if self._buffer:
-            assert self._waiting_queue is None  # nosec: B101
             return  # allow consuming buffer to the end
+
         while self._waiting_queue:
             waiting: Future[Element] = self._waiting_queue.popleft()
             if waiting.done():

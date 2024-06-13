@@ -23,7 +23,9 @@ class ConversationCompletion(Protocol):
         *,
         instruction: Instruction | str,
         input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
-        memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+        memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+        | Sequence[ConversationMessage]
+        | None = None,
         tools: Toolbox | Sequence[AnyTool] | None = None,
         stream: Literal[True],
         **extra: Any,
@@ -35,7 +37,9 @@ class ConversationCompletion(Protocol):
         *,
         instruction: Instruction | str,
         input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
-        memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+        memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+        | Sequence[ConversationMessage]
+        | None = None,
         tools: Toolbox | Sequence[AnyTool] | None = None,
         stream: Literal[False] = False,
         **extra: Any,
@@ -47,7 +51,9 @@ class ConversationCompletion(Protocol):
         *,
         instruction: Instruction | str,
         input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
-        memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+        memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+        | Sequence[ConversationMessage]
+        | None = None,
         tools: Toolbox | Sequence[AnyTool] | None = None,
         stream: bool,
         **extra: Any,
@@ -58,7 +64,9 @@ class ConversationCompletion(Protocol):
         *,
         instruction: Instruction | str,
         input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
-        memory: Memory[ConversationMessage] | Sequence[ConversationMessage] | None = None,
+        memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+        | Sequence[ConversationMessage]
+        | None = None,
         tools: Toolbox | Sequence[AnyTool] | None = None,
         stream: bool = False,
         **extra: Any,

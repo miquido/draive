@@ -18,10 +18,10 @@ ifndef INSTALL_OPTIONS
 endif
 
 ifndef UV_VERSION
-	UV_VERSION := 0.2.8
+	UV_VERSION := 0.2.10
 endif
 
-.PHONY: venv sync lock update format lint test
+.PHONY: install venv sync lock update format lint test release
 
 # Install in system without virtual environment and extras. DO NOT USE FOR DEVELOPMENT
 install:
@@ -80,3 +80,8 @@ lint:
 # Run tests suite.
 test:
 	@$(PYTHON_ALIAS) -B -m pytest -v --cov=$(SOURCES_PATH) --rootdir=$(TESTS_PATH)
+
+release: lint test
+	@echo '# Preparing release...'
+	@python -m build && python -m twine upload --skip-existing dist/*
+	@echo '...finished!'

@@ -17,7 +17,7 @@ from draive.types.lmm import (
     LMMToolRequests,
     LMMToolResponse,
 )
-from draive.types.memory import Memory, ReadOnlyMemory
+from draive.types.memory import ConstantMemory, Memory, VolatileMemory
 from draive.types.multimodal import MultimodalContent, MultimodalContentElement
 from draive.types.tool_status import ToolCallStatus
 from draive.types.video import VideoBase64Content, VideoContent, VideoDataContent, VideoURLContent
@@ -27,6 +27,7 @@ __all__ = [
     "AudioContent",
     "AudioDataContent",
     "AudioURLContent",
+    "ConstantMemory",
     "frozenlist",
     "ImageBase64Content",
     "ImageContent",
@@ -49,10 +50,10 @@ __all__ = [
     "MultimodalContent",
     "MultimodalContentElement",
     "RateLimitError",
-    "ReadOnlyMemory",
     "ToolCallStatus",
     "VideoBase64Content",
     "VideoContent",
     "VideoDataContent",
     "VideoURLContent",
+    "VolatileMemory",
 ]
