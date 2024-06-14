@@ -34,12 +34,16 @@ openai = [
 mistral = [
   "httpx~=0.27",
 ]
+ollama = [
+  "httpx~=0.27",
+]
 fastembed = [
   "fastembed~=0.3.0",
 ]
 dev = [
   "draive[openai]",
   "draive[mistral]",
+  "draive[ollama]",
   "draive[fastembed]",
   "ruff~=0.4.0",
   "pyright~=1.1",

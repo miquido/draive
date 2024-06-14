@@ -1,6 +1,7 @@
 import json
 from asyncio import gather
 from collections.abc import AsyncIterable, Iterable
+from http import HTTPStatus
 from itertools import chain
 from typing import Any, Literal, Self, cast, final, overload
 
@@ -215,13 +216,16 @@ class MistralClient(ScopeDependency):
                 follow_redirects=follow_redirects or False,
                 timeout=timeout,
             )
+
         except Exception as exc:
             raise MistralException("Network request failed") from exc
 
-        if response.status_code in range(200, 299):
+        if HTTPStatus(value=response.status_code).is_success:
             try:
                 return model.from_json(await response.aread())
+
             except Exception as exc:
-                raise MistralException("Failed to decode mistral response", response) from exc
+                raise MistralException("Failed to decode Mistral response", response) from exc
+
         else:
             raise MistralException("Network request failed", response)
