@@ -1,4 +1,4 @@
-from draive.embedding.embedder import Embedder
+from draive.embedding.embedder import ValueEmbedder
 from draive.parameters import State
 
 __all__ = [
@@ -8,8 +8,8 @@ __all__ = [
 
 
 class TextEmbedding(State):
-    embed: Embedder[str]
+    embed: ValueEmbedder[str]
 
 
 class ImageEmbedding(State):
-    embed: Embedder[bytes]
+    embed: ValueEmbedder[bytes]

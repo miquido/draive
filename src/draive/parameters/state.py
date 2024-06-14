@@ -1,4 +1,4 @@
-from draive.parameters import ParametrizedData
+from draive.parameters.data import ParametrizedData
 
 __all__ = [
     "State",

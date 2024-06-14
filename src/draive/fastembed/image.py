@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Sequence
 from io import BytesIO
 from typing import Any
 
@@ -17,7 +17,7 @@ __all__ = [
 
 
 async def fastembed_image_embedding(
-    values: Iterable[bytes],
+    values: Sequence[bytes],
     **extra: Any,
 ) -> list[Embedded[bytes]]:
     config: FastembedImageConfig = ctx.state(FastembedImageConfig).updated(**extra)
@@ -26,8 +26,8 @@ async def fastembed_image_embedding(
         metrics=[config],
     ):
         return await _fastembed_image_embedding(
-            config,
-            values,
+            config=config,
+            images=values,
         )
 
 
@@ -45,7 +45,7 @@ def _image_embedding_model(
 @run_async
 def _fastembed_image_embedding(
     config: FastembedImageConfig,
-    values: Iterable[bytes],
+    images: Sequence[bytes],
 ) -> list[Embedded[bytes]]:
     embedding_model: ImageEmbedding = _image_embedding_model(
         model_name=config.model,
@@ -60,9 +60,9 @@ def _fastembed_image_embedding(
             value,  # pyright: ignore[reportUnknownVariableType]
             embedding,  # pyright: ignore[reportUnknownVariableType]
         ) in zip(
-            values,
+            images,
             embedding_model.embed(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportUnknownArgumentType]
-                [BytesIO(value) for value in values]  # pyright: ignore[reportArgumentType]
+                [BytesIO(image) for image in images]  # pyright: ignore[reportArgumentType]
             ),
             strict=True,
         )

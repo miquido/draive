@@ -8,6 +8,7 @@ from draive.conversation.model import (
     ConversationMessageChunk,
     ConversationResponseStream,
 )
+from draive.helpers import ConstantMemory
 from draive.lmm import (
     AnyTool,
     Toolbox,
@@ -15,7 +16,6 @@ from draive.lmm import (
 )
 from draive.scope import ctx
 from draive.types import (
-    ConstantMemory,
     Instruction,
     LMMCompletion,
     LMMCompletionChunk,
@@ -27,8 +27,8 @@ from draive.types import (
     Memory,
     MultimodalContent,
     MultimodalContentElement,
+    ToolCallStatus,
 )
-from draive.types.tool_status import ToolCallStatus
 from draive.utils import Missing, not_missing
 
 __all__: list[str] = [

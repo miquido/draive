@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Sequence
 from typing import Any
 
 from fastembed.text.text_embedding import TextEmbedding  # pyright: ignore[reportMissingTypeStubs]
@@ -14,7 +14,7 @@ __all__ = [
 
 
 async def fastembed_text_embedding(
-    values: Iterable[str],
+    values: Sequence[str],
     **extra: Any,
 ) -> list[Embedded[str]]:
     config: FastembedTextConfig = ctx.state(FastembedTextConfig).updated(**extra)
@@ -23,8 +23,8 @@ async def fastembed_text_embedding(
         metrics=[config],
     ):
         return await _fastembed_text_embedding(
-            config,
-            values,
+            config=config,
+            texts=values,
         )
 
 
@@ -42,7 +42,7 @@ def _text_embedding_model(
 @run_async
 def _fastembed_text_embedding(
     config: FastembedTextConfig,
-    values: Iterable[str],
+    texts: Sequence[str],
 ) -> list[Embedded[str]]:
     embedding_model: TextEmbedding = _text_embedding_model(
         model_name=config.model,
@@ -57,9 +57,9 @@ def _fastembed_text_embedding(
             value,
             embedding,  # pyright: ignore[reportUnknownVariableType]
         ) in zip(
-            values,
+            texts,
             embedding_model.embed(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportUnknownArgumentType]
-                [str(value) for value in values]
+                texts
             ),
             strict=True,
         )

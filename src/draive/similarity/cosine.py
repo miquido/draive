@@ -4,11 +4,11 @@ import numpy as np
 from numpy.typing import NDArray
 
 __all__ = [
-    "cosine",
+    "cosine_similarity",
 ]
 
 
-def cosine(
+def cosine_similarity(
     a: list[NDArray[Any]] | NDArray[Any],
     b: list[NDArray[Any]] | NDArray[Any],
 ) -> NDArray[Any]:

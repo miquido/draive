@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any, Literal, Self, cast, final
 
 from draive.parameters.errors import ParameterValidationError
@@ -180,5 +180,22 @@ class ParameterRequirement[Root]:
         self,
         root: Root,
         /,
-    ) -> None:
-        self._check(root)
+        *,
+        raise_exception: bool = True,
+    ) -> bool:
+        try:
+            self._check(root)
+            return True
+
+        except Exception as exc:
+            if raise_exception:
+                raise exc
+
+            else:
+                return False
+
+    def filter(
+        self,
+        values: Iterable[Root],
+    ) -> list[Root]:
+        return [value for value in values if self.check(value, raise_exception=False)]

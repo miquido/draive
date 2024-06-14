@@ -17,7 +17,7 @@ from draive.types.lmm import (
     LMMToolRequests,
     LMMToolResponse,
 )
-from draive.types.memory import ConstantMemory, Memory, VolatileMemory
+from draive.types.memory import Memory
 from draive.types.multimodal import MultimodalContent, MultimodalContentElement
 from draive.types.tool_status import ToolCallStatus
 from draive.types.video import VideoBase64Content, VideoContent, VideoDataContent, VideoURLContent
@@ -27,7 +27,6 @@ __all__ = [
     "AudioContent",
     "AudioDataContent",
     "AudioURLContent",
-    "ConstantMemory",
     "frozenlist",
     "ImageBase64Content",
     "ImageContent",
@@ -55,5 +54,4 @@ __all__ = [
     "VideoContent",
     "VideoDataContent",
     "VideoURLContent",
-    "VolatileMemory",
 ]

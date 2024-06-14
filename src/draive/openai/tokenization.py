@@ -1,3 +1,5 @@
+from typing import Any
+
 from tiktoken import Encoding, encoding_for_model
 
 from draive.openai.config import OpenAIChatConfig
@@ -11,6 +13,7 @@ __all__ = [
 
 def openai_tokenize_text(
     text: str,
+    **extra: Any,
 ) -> list[int]:
     model_name: str | Missing = ctx.state(OpenAIChatConfig).model
     if not_missing(model_name):

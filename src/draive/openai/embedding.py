@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Sequence
 from typing import Any
 
 from draive.embedding import Embedded
@@ -12,14 +12,14 @@ __all__ = [
 
 
 async def openai_embed_text(
-    values: Iterable[str],
+    values: Sequence[str],
     **extra: Any,
 ) -> list[Embedded[str]]:
     config: OpenAIEmbeddingConfig = ctx.state(OpenAIEmbeddingConfig).updated(**extra)
-    with ctx.nested("text_embedding", metrics=[config]):
+    with ctx.nested("openai_embed_text", metrics=[config]):
         results: list[list[float]] = await ctx.dependency(OpenAIClient).embedding(
             config=config,
-            inputs=[str(value) for value in values],
+            inputs=values,
         )
 
         return [
@@ -29,7 +29,7 @@ async def openai_embed_text(
             )
             for embedded in zip(
                 values,
-                results,  # [result.embedding for result in results.data],
+                results,
                 strict=True,
             )
         ]

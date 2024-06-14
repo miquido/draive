@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Sequence
 from typing import Any
 
 from draive.embedding.embedded import Embedded
@@ -7,25 +7,55 @@ from draive.scope import ctx
 
 __all__ = [
     "embed_text",
+    "embed_texts",
     "embed_image",
+    "embed_images",
 ]
 
 
 async def embed_text(
-    values: Iterable[str],
+    text: str,
+    /,
+    **extra: Any,
+) -> Embedded[str]:
+    return (
+        await ctx.state(TextEmbedding).embed(
+            [text],
+            **extra,
+        )
+    )[0]
+
+
+async def embed_texts(
+    texts: Sequence[str],
+    /,
     **extra: Any,
 ) -> list[Embedded[str]]:
     return await ctx.state(TextEmbedding).embed(
-        values=values,
+        texts,
         **extra,
     )
 
 
 async def embed_image(
-    values: Iterable[bytes],
+    image: bytes,
+    /,
+    **extra: Any,
+) -> Embedded[bytes]:
+    return (
+        await ctx.state(ImageEmbedding).embed(
+            [image],
+            **extra,
+        )
+    )[0]
+
+
+async def embed_images(
+    images: Sequence[bytes],
+    /,
     **extra: Any,
 ) -> list[Embedded[bytes]]:
     return await ctx.state(ImageEmbedding).embed(
-        values=values,
+        images,
         **extra,
     )
