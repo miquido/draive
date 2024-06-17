@@ -17,14 +17,13 @@ from draive.agents.types import (
     WorkflowAgentBase,
 )
 from draive.agents.workflow import AgentWorkflow
+from draive.helpers import ConstantMemory, VolatileMemory
 from draive.parameters import ParametrizedData, Stateless
 from draive.scope import ctx
 from draive.types import (
-    ConstantMemory,
     Memory,
     MultimodalContent,
     MultimodalContentElement,
-    VolatileMemory,
 )
 from draive.utils import freeze, mimic_function
 

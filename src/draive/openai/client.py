@@ -1,5 +1,5 @@
 from asyncio import gather, sleep
-from collections.abc import Iterable
+from collections.abc import Sequence
 from itertools import chain
 from random import uniform
 from typing import Literal, Self, cast, final, overload
@@ -167,15 +167,14 @@ class OpenAIClient(ScopeDependency):
     async def embedding(
         self,
         config: OpenAIEmbeddingConfig,
-        inputs: Iterable[str],
+        inputs: Sequence[str],
     ) -> list[list[float]]:
-        inputs_list: list[str] = list(inputs)
         return list(
             chain(
                 *await gather(
                     *[
                         self._create_text_embedding(
-                            texts=list(inputs_list[index : index + config.batch_size]),
+                            texts=inputs[index : index + config.batch_size],
                             model=config.model,
                             dimensions=config.dimensions
                             if not_missing(config.dimensions)
@@ -185,7 +184,7 @@ class OpenAIClient(ScopeDependency):
                             else NOT_GIVEN,
                             timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,
                         )
-                        for index in range(0, len(inputs_list), config.batch_size)
+                        for index in range(0, len(inputs), config.batch_size)
                     ]
                 )
             )
@@ -193,7 +192,7 @@ class OpenAIClient(ScopeDependency):
 
     async def _create_text_embedding(  # noqa: PLR0913
         self,
-        texts: list[str],
+        texts: Sequence[str],
         model: str,
         dimensions: int | NotGiven,
         encoding_format: Literal["float", "base64"] | NotGiven,
@@ -203,7 +202,7 @@ class OpenAIClient(ScopeDependency):
         while True:
             try:
                 response: CreateEmbeddingResponse = await self._client.embeddings.create(
-                    input=texts,
+                    input=list(texts),
                     model=model,
                     dimensions=dimensions,
                     encoding_format=encoding_format,

@@ -1,4 +1,4 @@
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 __all__ = [
     "TextTokenizer",
@@ -10,5 +10,5 @@ class TextTokenizer(Protocol):
     def __call__(
         self,
         text: str,
-    ) -> list[int]:
-        ...
+        **extra: Any,
+    ) -> list[int]: ...

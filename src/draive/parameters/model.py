@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Self
 from uuid import UUID
 
-from draive.parameters import ParametrizedData
+from draive.parameters.data import ParametrizedData
 from draive.parameters.schema import json_schema, simplified_schema
 from draive.utils import Missing, not_missing
 

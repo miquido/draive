@@ -1,6 +1,6 @@
 import json
 from asyncio import gather
-from collections.abc import AsyncIterable, Iterable
+from collections.abc import AsyncIterable, Sequence
 from http import HTTPStatus
 from itertools import chain
 from typing import Any, Literal, Self, cast, final, overload
@@ -97,18 +97,17 @@ class MistralClient(ScopeDependency):
     async def embedding(
         self,
         config: MistralEmbeddingConfig,
-        inputs: Iterable[str],
+        inputs: Sequence[str],
     ) -> list[list[float]]:
-        inputs_list: list[str] = list(inputs)
         return list(
             chain(
                 *await gather(
                     *[
                         self._create_text_embedding(
                             model=config.model,
-                            texts=list(inputs_list[index : index + config.batch_size]),
+                            texts=inputs[index : index + config.batch_size],
                         )
-                        for index in range(0, len(inputs_list), config.batch_size)
+                        for index in range(0, len(inputs), config.batch_size)
                     ]
                 )
             )
@@ -157,7 +156,7 @@ class MistralClient(ScopeDependency):
     async def _create_text_embedding(
         self,
         model: str,
-        texts: list[str],
+        texts: Sequence[str],
     ) -> list[list[float]]:
         response: EmbeddingResponse = await self._request(
             model=EmbeddingResponse,

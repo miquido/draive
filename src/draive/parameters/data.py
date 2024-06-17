@@ -199,6 +199,7 @@ class DataParameter:
         /,
         name: str,
         default: Any,
+        prepare_specification: bool,
         globalns: dict[str, Any],
         localns: dict[str, Any] | None,
         recursion_guard: frozenset[type[Any]],
@@ -227,15 +228,19 @@ class DataParameter:
                         recursion_guard=recursion_guard,
                     ),
                     converter=data_field.converter,
-                    specification=data_field.specification
-                    if not_missing(data_field.specification)
-                    else parameter_specification(
-                        annotation,
-                        description=data_field.description,
-                        globalns=globalns,
-                        localns=localns,
-                        recursion_guard=recursion_guard,
-                    ),
+                    specification=(
+                        data_field.specification
+                        if not_missing(data_field.specification)
+                        else parameter_specification(
+                            annotation,
+                            description=data_field.description,
+                            globalns=globalns,
+                            localns=localns,
+                            recursion_guard=recursion_guard,
+                        )
+                    )
+                    if prepare_specification
+                    else MISSING,
                 )
 
             case default:
@@ -265,7 +270,9 @@ class DataParameter:
                         globalns=globalns,
                         localns=localns,
                         recursion_guard=recursion_guard,
-                    ),
+                    )
+                    if prepare_specification
+                    else MISSING,
                 )
 
 
@@ -313,6 +320,8 @@ class ParametrizedDataMeta(type):
                 annotation,
                 name=key,
                 default=getattr(data_type, key, MISSING),
+                # prepare specification only for the data models
+                prepare_specification="DataModel" in tuple(base.__name__ for base in bases),
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,
@@ -400,15 +409,11 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         context: ParameterValidationContext,
     ) -> Self:
         match value:
-            case self if self.__class__ == cls:
+            case self if isinstance(self, cls):
                 return self
 
             case {**values}:
                 return cls(**values)
-
-            case self if cls == ParametrizedData and isinstance(self, ParametrizedData):
-                # when the required type is the base ParametrizedData then allow any subclass
-                return cast(Self, self)
 
             case _:
                 raise ParameterValidationError.invalid_type(
