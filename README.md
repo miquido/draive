@@ -12,12 +12,19 @@ With pip:
 ```bash
 pip install draive
 ```
+
 ### Optional dependencies
 
 - OpenAI:
 ```bash
 pip install draive[openai]
 ```
+
+- Gemini:
+```bash
+pip install draive[gemini]
+```
+
 - Mistral:
 ```bash
 pip install draive[mistral]
@@ -37,7 +44,6 @@ pip install draive[mistralrs]
 ```bash
 pip install draive[fastembed]
 ```
-
 
 ## ❓ What is draive?
 

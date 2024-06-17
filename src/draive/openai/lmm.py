@@ -21,7 +21,11 @@ from draive.openai.errors import OpenAIException
 from draive.parameters import ToolSpecification
 from draive.scope import ctx
 from draive.types import (
+    AudioBase64Content,
+    AudioDataContent,
+    AudioURLContent,
     ImageBase64Content,
+    ImageDataContent,
     ImageURLContent,
     LMMCompletion,
     LMMCompletionChunk,
@@ -34,11 +38,11 @@ from draive.types import (
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
+    MultimodalContentElement,
+    VideoBase64Content,
+    VideoDataContent,
+    VideoURLContent,
 )
-from draive.types.audio import AudioBase64Content, AudioDataContent, AudioURLContent
-from draive.types.images import ImageDataContent
-from draive.types.multimodal import MultimodalContentElement
-from draive.types.video import VideoBase64Content, VideoDataContent, VideoURLContent
 from draive.utils import not_missing
 
 __all__ = [
@@ -215,7 +219,7 @@ def _convert_context_element(
                         element=element,
                         config=config,
                     )
-                    for element in input.content.elements
+                    for element in input.content.parts
                 ],
             }
 
@@ -370,6 +374,7 @@ async def _chat_completion_stream(  # noqa: C901, PLR0912, PLR0915
             )
 
         case ToolSpecification() as tool:
+            assert tool in (tools or []), "Can't suggest a tool without using it"  # nosec: B101
             completion_stream = await client.chat_completion(
                 config=config,
                 messages=messages,

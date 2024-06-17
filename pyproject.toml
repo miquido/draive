@@ -40,6 +40,9 @@ mistralrs = [
 ollama = [
   "httpx~=0.27",
 ]
+gemini = [
+  "httpx~=0.27",
+]
 fastembed = [
   "fastembed~=0.3.0",
 ]
@@ -47,6 +50,7 @@ dev = [
   "draive[openai]",
   "draive[mistral]",
   "draive[ollama]",
+  "draive[gemini]",
   "draive[fastembed]",
   "ruff~=0.4.0",
   "pyright~=1.1",

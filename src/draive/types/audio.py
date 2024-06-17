@@ -9,16 +9,19 @@ __all__ = [
 
 
 class AudioURLContent(DataModel):
+    mime_type: str | None = None
     audio_url: str
     audio_transcription: str | None = None
 
 
 class AudioBase64Content(DataModel):
+    mime_type: str | None = None
     audio_base64: str
     audio_transcription: str | None = None
 
 
 class AudioDataContent(DataModel):
+    mime_type: str | None = None
     audio_data: bytes
     audio_transcription: str | None = None
 

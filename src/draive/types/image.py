@@ -9,16 +9,19 @@ __all__ = [
 
 
 class ImageURLContent(DataModel):
+    mime_type: str | None = None
     image_url: str
     image_description: str | None = None
 
 
 class ImageBase64Content(DataModel):
+    mime_type: str | None = None
     image_base64: str
     image_description: str | None = None
 
 
 class ImageDataContent(DataModel):
+    mime_type: str | None = None
     image_data: bytes
     image_description: str | None = None
 

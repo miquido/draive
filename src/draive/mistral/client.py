@@ -186,10 +186,12 @@ class MistralClient(ScopeDependency):
         request_headers: dict[str, str]
         if headers:
             request_headers = headers
+
         else:
             request_headers = {
                 "Accept": "application/json",
             }
+
         body_content: str | None
         match body:
             case None:

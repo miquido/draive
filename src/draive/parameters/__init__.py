@@ -11,6 +11,7 @@ from draive.parameters.requirement import ParameterRequirement
 from draive.parameters.specification import (
     ParameterSpecification,
     ParametersSpecification,
+    ToolFunctionSpecification,
     ToolSpecification,
 )
 from draive.parameters.state import State, Stateless
@@ -36,5 +37,6 @@ __all__ = [
     "ParametrizedFunction",
     "State",
     "Stateless",
+    "ToolFunctionSpecification",
     "ToolSpecification",
 ]
