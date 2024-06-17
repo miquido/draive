@@ -269,6 +269,7 @@ async def _chat_completion_stream(
         tools=tools,
         require_tool=require_tool,
     )
+
     match output:
         case LMMCompletion() as completion:
             yield LMMCompletionChunk.of(completion.content)
