@@ -11,15 +11,15 @@ maintainers = [
 ]
 requires-python = ">=3.12"
 classifiers = [
-    "Intended Audience :: Developers",
-    "Programming Language :: Python",
-    "License :: OSI Approved :: MIT License",
-    "Topic :: Software Development",
-    "Typing :: Typed",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Software Development",
+  "Typing :: Typed",
 ]
 license = {file = "LICENSE"}
 dependencies = [
-    "numpy~=1.26",
+  "numpy~=1.26",
 ]
 
 [project.urls]
@@ -33,6 +33,9 @@ openai = [
 ]
 mistral = [
   "httpx~=0.27",
+]
+mistralrs = [
+  "mistralrs~=0.1.19",
 ]
 ollama = [
   "httpx~=0.27",
@@ -78,6 +81,7 @@ exclude = [
   "**/__pycache__",
 ]
 ignore = []
+stubPath = "./stubs"
 reportMissingImports = true
 reportMissingTypeStubs = true
 typeCheckingMode = "strict"
