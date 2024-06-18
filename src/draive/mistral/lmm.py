@@ -94,15 +94,17 @@ async def mistral_lmm_invocation(
         match output:
             case "text":
                 config = config.updated(response_format={"type": "text"})
+
             case "json":
-                if tools is None:
-                    config = config.updated(response_format={"type": "json_object"})
-                else:
+                if tools:
                     ctx.log_warning(
                         "Attempting to use Mistral in JSON mode with tools which is not supported."
                         " Using text mode instead..."
                     )
                     config = config.updated(response_format={"type": "text"})
+
+                else:
+                    config = config.updated(response_format={"type": "json_object"})
 
         messages: list[ChatMessage] = [
             _convert_context_element(element=element) for element in context
@@ -198,6 +200,7 @@ async def _chat_completion(
             )
 
         case tool:
+            assert tool in (tools or []), "Can't suggest a tool without using it"  # nosec: B101
             completion = await client.chat_completion(
                 config=config,
                 messages=messages,

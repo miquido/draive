@@ -22,10 +22,11 @@ from draive.parameters.annotations import resolve_annotation
 from draive.utils import MISSING, Missing, not_missing
 
 __all__ = [
+    "parameter_specification",
     "ParameterSpecification",
     "ParametersSpecification",
+    "ToolFunctionSpecification",
     "ToolSpecification",
-    "parameter_specification",
 ]
 
 

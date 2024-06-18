@@ -1,7 +1,7 @@
 from draive.types.audio import AudioBase64Content, AudioContent, AudioDataContent, AudioURLContent
 from draive.types.errors import RateLimitError
 from draive.types.frozenlist import frozenlist
-from draive.types.images import ImageBase64Content, ImageContent, ImageDataContent, ImageURLContent
+from draive.types.image import ImageBase64Content, ImageContent, ImageDataContent, ImageURLContent
 from draive.types.instruction import Instruction
 from draive.types.json import JSON
 from draive.types.lmm import (

@@ -4,7 +4,7 @@ from typing import Self, final
 from draive.parameters.model import DataModel
 from draive.types.audio import AudioBase64Content, AudioContent, AudioDataContent, AudioURLContent
 from draive.types.frozenlist import frozenlist
-from draive.types.images import ImageBase64Content, ImageContent, ImageDataContent, ImageURLContent
+from draive.types.image import ImageBase64Content, ImageContent, ImageDataContent, ImageURLContent
 from draive.types.video import VideoBase64Content, VideoContent, VideoDataContent, VideoURLContent
 
 __all__ = [
@@ -28,29 +28,29 @@ class MultimodalContent(DataModel):
 
             case elements:
                 return cls(
-                    elements=tuple(chain.from_iterable(_extract(element) for element in elements)),
+                    parts=tuple(chain.from_iterable(_extract(element) for element in elements)),
                 )
 
-    elements: frozenlist[MultimodalContentElement]
+    parts: frozenlist[MultimodalContentElement]
 
     @property
     def has_media(self) -> bool:
-        return any(_is_media(element) for element in self.elements)
+        return any(_is_media(element) for element in self.parts)
 
     def as_string(
         self,
         joiner: str | None = None,
     ) -> str:
-        return (joiner or "\n").join(_as_string(element) for element in self.elements)
+        return (joiner or "\n").join(_as_string(element) for element in self.parts)
 
     def appending(
         self,
-        *elements: MultimodalContentElement,
+        *parts: MultimodalContentElement,
     ) -> Self:
         return self.__class__(
-            elements=(
-                *self.elements,
-                *elements,
+            parts=(
+                *self.parts,
+                *parts,
             )
         )
 
@@ -59,9 +59,9 @@ class MultimodalContent(DataModel):
         *other: Self,
     ) -> Self:
         return self.__class__(
-            elements=(
-                *self.elements,
-                *(element for content in other for element in content.elements),
+            parts=(
+                *self.parts,
+                *(element for content in other for element in content.parts),
             )
         )
 
@@ -69,9 +69,9 @@ class MultimodalContent(DataModel):
         self,
         joiner: str | None = None,
     ) -> Self:
-        joined_elements: list[MultimodalContentElement] = []
+        joined_parts: list[MultimodalContentElement] = []
         current_text: str | None = None
-        for element in self.elements:
+        for element in self.parts:
             match element:
                 case str() as string:
                     if current_text:
@@ -82,17 +82,17 @@ class MultimodalContent(DataModel):
 
                 case other:
                     if current_text:
-                        joined_elements.append(current_text)
+                        joined_parts.append(current_text)
                         current_text = None
 
-                    joined_elements.append(other)
+                    joined_parts.append(other)
 
         return self.__class__(
-            elements=tuple(joined_elements),
+            parts=tuple(joined_parts),
         )
 
     def __bool__(self) -> bool:
-        return bool(self.elements) and any(self.elements)
+        return bool(self.parts) and any(self.parts)
 
 
 def _extract(
@@ -101,7 +101,7 @@ def _extract(
 ) -> frozenlist[MultimodalContentElement]:
     match element:
         case MultimodalContent() as content:
-            return content.elements
+            return content.parts
 
         case element:
             return (element,)

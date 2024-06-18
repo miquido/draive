@@ -231,7 +231,7 @@ basic_conversation_message_json: str = (
     '"author": null, '
     '"created": null, '
     '"content": {'
-    '"elements": ["string"]'
+    '"parts": ["string"]'
     "}}"
 )
 
@@ -247,7 +247,9 @@ image_conversation_message_json: str = (
     '"author": null, '
     '"created": null, '
     '"content": {'
-    '"elements": [{"image_url": "https://miquido.com/image", "image_description": null}]'
+    '"parts": ['
+    '{"mime_type": null, "image_url": "https://miquido.com/image", "image_description": null}'
+    "]"
     "}}"
 )
 audio_conversation_message_instance: ConversationMessage = ConversationMessage(
@@ -262,7 +264,9 @@ audio_conversation_message_json: str = (
     '"author": null, '
     '"created": null, '
     '"content": {'
-    '"elements": [{"audio_url": "https://miquido.com/audio", "audio_transcription": null}]'
+    '"parts": ['
+    '{"mime_type": null, "audio_url": "https://miquido.com/audio", "audio_transcription": null}'
+    "]"
     "}}"
 )
 mixed_conversation_message_instance: ConversationMessage = ConversationMessage(
@@ -281,10 +285,10 @@ mixed_conversation_message_json: str = (
     '"role": "model", '
     '"author": null, '
     '"created": null, '
-    '"content": {"elements": ['
-    '{"audio_url": "https://miquido.com/audio", "audio_transcription": null}, '
+    '"content": {"parts": ['
+    '{"mime_type": null, "audio_url": "https://miquido.com/audio", "audio_transcription": null}, '
     '"string", '
-    '{"image_url": "https://miquido.com/image", "image_description": null}, '
+    '{"mime_type": null, "image_url": "https://miquido.com/image", "image_description": null}, '
     '"content"'
     "]}}"
 )
