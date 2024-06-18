@@ -12,6 +12,32 @@ With pip:
 ```bash
 pip install draive
 ```
+### Optional dependencies
+
+- OpenAI:
+```bash
+pip install draive[openai]
+```
+- Mistral:
+```bash
+pip install draive[mistral]
+```
+
+- Ollama:
+```bash
+pip install draive[ollama]
+```
+
+- Mistral.rs:
+```bash
+pip install draive[mistralrs]
+```
+
+- Fastembed:
+```bash
+pip install draive[fastembed]
+```
+
 
 ## ❓ What is draive?
 
@@ -25,6 +51,7 @@ pip install draive
 - **⚙️ Function-oriented design**: Utilizes basic programming concepts, allowing you to represent complex programs as simple functions.
 - **🏗️ Composable and reusable**: Combine functions to create complex programs, while retaining the ability to use them individually.
 - **📊 Diagnostics and metrics**: Offers extensive tools for measuring and debugging complex functionalities.
+- **🔄 Fully typed and asynchronous**: Ensures type safety and efficient asynchronous operations for modern Python apps.
 
 ## 🧱 What can you build with draive?
 
