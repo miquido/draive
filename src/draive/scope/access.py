@@ -436,8 +436,10 @@ class ctx:
 
             except BaseException as exc:
                 stream.finish(exception=exc)
+
             else:
                 stream.finish()
+
             finally:
                 current_metrics.exit()
 

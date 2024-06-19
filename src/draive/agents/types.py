@@ -5,7 +5,7 @@ from typing import Any, Protocol, Self, final, overload, runtime_checkable
 from uuid import UUID, uuid4
 
 from draive.parameters import DataModel, Field, ParameterPath, ParametrizedData, Stateless
-from draive.types import Memory, MultimodalContent, MultimodalContentElement, frozenlist
+from draive.types import Memory, MultimodalContent, MultimodalContentConvertible, frozenlist
 from draive.utils import AsyncStream, freeze
 
 __all__ = [
@@ -83,7 +83,7 @@ class AgentBase(ABC):
     @abstractmethod
     def prepare_message(
         self,
-        content: MultimodalContent | MultimodalContentElement,
+        content: MultimodalContent | MultimodalContentConvertible,
         *,
         addressee: "AgentBase | None" = None,
     ) -> "AgentMessageDraft": ...
@@ -100,7 +100,7 @@ class WorkflowAgentBase[WorkflowState: ParametrizedData, WorkflowResult](AgentBa
     @abstractmethod
     async def start_workflow(
         self,
-        input: MultimodalContent | MultimodalContentElement,  # noqa: A002
+        input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
         /,
         state: WorkflowState,
         timeout: float | None = None,
@@ -138,7 +138,7 @@ class AgentMessage(DataModel):
 
     def prepare_response(
         self,
-        content: MultimodalContent | MultimodalContentElement,
+        content: MultimodalContent | MultimodalContentConvertible,
         addressee: AgentBase | None = None,
         /,
     ) -> AgentMessageDraft:

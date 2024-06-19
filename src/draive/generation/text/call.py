@@ -4,7 +4,7 @@ from typing import Any
 from draive.generation.text.state import TextGeneration
 from draive.lmm import Toolbox
 from draive.scope import ctx
-from draive.types import Instruction, MultimodalContent, MultimodalContentElement
+from draive.types import Instruction, MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
     "generate_text",
@@ -14,9 +14,9 @@ __all__ = [
 async def generate_text(
     *,
     instruction: Instruction | str,
-    input: MultimodalContent | MultimodalContentElement,  # noqa: A002
+    input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
     tools: Toolbox | None = None,
-    examples: Iterable[tuple[MultimodalContent | MultimodalContentElement, str]] | None = None,
+    examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, str]] | None = None,
     **extra: Any,
 ) -> str:
     return await ctx.state(TextGeneration).generate(

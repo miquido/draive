@@ -34,7 +34,7 @@ class ToolCallContext(State):
             "FAILED",
         ],
         /,
-        content: DataModel | dict[str, object] | None = None,
+        content: DataModel | None = None,
     ) -> None:
         call_status: ToolCallStatus
         match content:
@@ -50,15 +50,7 @@ class ToolCallContext(State):
                     identifier=self.call_id,
                     tool=self.tool,
                     status=status,
-                    content=model.as_dict(),
-                )
-
-            case content:
-                call_status = ToolCallStatus(
-                    identifier=self.call_id,
-                    tool=self.tool,
-                    status=status,
-                    content=content,
+                    content=model,
                 )
 
         self.send_status(call_status)

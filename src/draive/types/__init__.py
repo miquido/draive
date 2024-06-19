@@ -18,7 +18,12 @@ from draive.types.lmm import (
     LMMToolResponse,
 )
 from draive.types.memory import Memory
-from draive.types.multimodal import MultimodalContent, MultimodalContentElement
+from draive.types.multimodal import (
+    MultimodalContent,
+    MultimodalContentConvertible,
+    MultimodalContentElement,
+)
+from draive.types.text import TextContent
 from draive.types.tool_status import ToolCallStatus
 from draive.types.video import VideoBase64Content, VideoContent, VideoDataContent, VideoURLContent
 
@@ -47,8 +52,10 @@ __all__ = [
     "LMMToolResponse",
     "Memory",
     "MultimodalContent",
+    "MultimodalContentConvertible",
     "MultimodalContentElement",
     "RateLimitError",
+    "TextContent",
     "ToolCallStatus",
     "VideoBase64Content",
     "VideoContent",

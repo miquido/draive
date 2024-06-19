@@ -12,7 +12,7 @@ from draive.types import (
     LMMToolRequests,
     LMMToolResponse,
     MultimodalContent,
-    MultimodalContentElement,
+    MultimodalContentConvertible,
 )
 
 __all__: list[str] = [
@@ -23,9 +23,9 @@ __all__: list[str] = [
 async def lmm_generate_text(
     *,
     instruction: Instruction | str,
-    input: MultimodalContent | MultimodalContentElement,  # noqa: A002
+    input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
     tools: Toolbox | Sequence[AnyTool] | None = None,
-    examples: Iterable[tuple[MultimodalContent | MultimodalContentElement, str]] | None = None,
+    examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, str]] | None = None,
     **extra: Any,
 ) -> str:
     with ctx.nested("lmm_generate_text"):

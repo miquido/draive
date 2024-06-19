@@ -23,7 +23,7 @@ from draive.gemini.models import (
     GeminiTextMessageContent,
 )
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
-from draive.parameters import ToolSpecification
+from draive.parameters import DataModel, ToolSpecification
 from draive.scope import ctx
 from draive.types import (
     AudioBase64Content,
@@ -44,6 +44,7 @@ from draive.types import (
     LMMToolRequests,
     LMMToolResponse,
     MultimodalContentElement,
+    TextContent,
     VideoBase64Content,
     VideoDataContent,
     VideoURLContent,
@@ -169,8 +170,8 @@ def _convert_content_element(  # noqa: C901, PLR0911
     element: MultimodalContentElement,
 ) -> GeminiMessageContent:
     match element:
-        case str() as string:
-            return GeminiTextMessageContent(text=string)
+        case TextContent() as text:
+            return GeminiTextMessageContent(text=text.text)
 
         case ImageURLContent() as image:
             return GeminiDataReferenceMessageContent(
@@ -244,6 +245,11 @@ def _convert_content_element(  # noqa: C901, PLR0911
                 )
             )
 
+        case DataModel() as data:
+            return GeminiTextMessageContent(
+                text=data.as_json(),
+            )
+
 
 def _convert_context_element(
     element: LMMContextElement,
@@ -302,7 +308,7 @@ def _convert_content_part(  # noqa: PLR0911
 ) -> MultimodalContentElement:
     match part:
         case GeminiTextMessageContent() as text:
-            return text.text
+            return TextContent(text=text.text)
 
         case GeminiDataMessageContent() as data:
             mime_type: str = data.data.mime_type
