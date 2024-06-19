@@ -33,6 +33,7 @@ openai = [
 ]
 mistral = [
   "httpx~=0.27",
+  "sentencepiece~=0.2",
 ]
 mistralrs = [
   "mistralrs~=0.1.19",

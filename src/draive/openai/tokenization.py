@@ -23,6 +23,6 @@ def openai_tokenize_text(
         raise ValueError("Missing model name in OpenAIChatConfig")
 
 
-@cache(limit=8)
+@cache(limit=4)
 def _encoding(model_name: str) -> Encoding:
     return encoding_for_model(model_name=model_name)
