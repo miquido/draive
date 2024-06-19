@@ -16,4 +16,4 @@ class ToolCallStatus(DataModel):
         "FINISHED",
         "FAILED",
     ]
-    content: dict[str, object] | None = None
+    content: DataModel | None = None

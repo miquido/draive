@@ -26,7 +26,7 @@ from draive.types import (
     LMMToolResponse,
     Memory,
     MultimodalContent,
-    MultimodalContentElement,
+    MultimodalContentConvertible,
     ToolCallStatus,
 )
 from draive.utils import Missing, not_missing
@@ -40,7 +40,7 @@ __all__: list[str] = [
 async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,
@@ -54,7 +54,7 @@ async def lmm_conversation_completion(
 async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,
@@ -68,7 +68,7 @@ async def lmm_conversation_completion(
 async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,
@@ -81,7 +81,7 @@ async def lmm_conversation_completion(
 async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,
@@ -146,6 +146,7 @@ async def lmm_conversation_completion(
                     **extra,
                 ),
             )
+
         else:
             return await _lmm_conversation_completion(
                 request_message=request_message,
@@ -233,7 +234,10 @@ async def _lmm_conversation_completion_stream(
             match part:
                 case LMMCompletionChunk() as chunk:
                     ctx.log_debug("Received conversation result chunk")
-                    response_content = response_content.extending(chunk.content)
+                    response_content = response_content.extending(
+                        chunk.content,
+                        merge_text=True,
+                    )
 
                     yield ConversationMessageChunk(
                         identifier=response_identifier,
@@ -285,7 +289,7 @@ async def _lmm_conversation_completion_stream(
                 identifier=response_identifier,
                 role="model",
                 created=datetime.now(UTC),
-                content=response_content.joining_texts(joiner=""),
+                content=response_content,
             ),
         )
     else:

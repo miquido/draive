@@ -23,7 +23,7 @@ from draive.scope import ctx
 from draive.types import (
     Memory,
     MultimodalContent,
-    MultimodalContentElement,
+    MultimodalContentConvertible,
 )
 from draive.utils import freeze, mimic_function
 
@@ -155,7 +155,7 @@ class Agent[
 
     def prepare_message(
         self,
-        content: MultimodalContent | MultimodalContentElement,
+        content: MultimodalContent | MultimodalContentConvertible,
         *,
         addressee: AgentBase | None = None,
     ) -> AgentMessageDraft:
@@ -167,7 +167,7 @@ class Agent[
 
     async def start_workflow(
         self,
-        input: MultimodalContent | MultimodalContentElement,  # noqa: A002
+        input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
         /,
         state: WorkflowState,
         timeout: float | None = None,

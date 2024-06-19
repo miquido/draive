@@ -7,7 +7,7 @@ from draive.types import (
     Instruction,
     Memory,
     MultimodalContent,
-    MultimodalContentElement,
+    MultimodalContentConvertible,
 )
 
 __all__ = [
@@ -22,7 +22,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: Instruction | str,
-        input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+        input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
         memory: Memory[Sequence[ConversationMessage], ConversationMessage]
         | Sequence[ConversationMessage]
         | None = None,
@@ -36,7 +36,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: Instruction | str,
-        input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+        input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
         memory: Memory[Sequence[ConversationMessage], ConversationMessage]
         | Sequence[ConversationMessage]
         | None = None,
@@ -50,7 +50,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: Instruction | str,
-        input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+        input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
         memory: Memory[Sequence[ConversationMessage], ConversationMessage]
         | Sequence[ConversationMessage]
         | None = None,
@@ -63,7 +63,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: Instruction | str,
-        input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+        input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
         memory: Memory[Sequence[ConversationMessage], ConversationMessage]
         | Sequence[ConversationMessage]
         | None = None,

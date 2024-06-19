@@ -3,7 +3,7 @@ from typing import Any, Literal, Protocol, runtime_checkable
 
 from draive.lmm import AnyTool, Toolbox
 from draive.parameters import DataModel
-from draive.types import Instruction, MultimodalContent, MultimodalContentElement
+from draive.types import Instruction, MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
     "ModelGenerator",
@@ -18,10 +18,10 @@ class ModelGenerator(Protocol):
         /,
         *,
         instruction: Instruction | str,
-        input: MultimodalContent | MultimodalContentElement,  # noqa: A002
+        input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
         schema_injection: Literal["auto", "full", "simplified", "skip"] = "auto",
         tools: Toolbox | Sequence[AnyTool] | None = None,
-        examples: Iterable[tuple[MultimodalContent | MultimodalContentElement, Generated]]
+        examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, Generated]]
         | None = None,
         **extra: Any,
     ) -> Generated: ...

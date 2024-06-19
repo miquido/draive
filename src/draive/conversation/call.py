@@ -5,7 +5,7 @@ from draive.conversation.model import ConversationMessage, ConversationResponseS
 from draive.conversation.state import Conversation
 from draive.lmm import AnyTool, Toolbox
 from draive.scope import ctx
-from draive.types import Instruction, Memory, MultimodalContent, MultimodalContentElement
+from draive.types import Instruction, Memory, MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
     "conversation_completion",
@@ -16,7 +16,7 @@ __all__ = [
 async def conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,
@@ -29,7 +29,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,
@@ -42,7 +42,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,
@@ -54,7 +54,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentElement,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,

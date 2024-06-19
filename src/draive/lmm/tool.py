@@ -17,7 +17,7 @@ from draive.parameters import (
     ToolSpecification,
 )
 from draive.scope import ctx
-from draive.types import MultimodalContent, MultimodalContentElement
+from draive.types import MultimodalContent, MultimodalContentConvertible
 from draive.utils import freeze, not_missing
 
 __all__ = [
@@ -42,8 +42,8 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         function: Callable[Args, Coroutine[Any, Any, Result]],
         description: str | None = None,
         availability_check: ToolAvailabilityCheck | None = None,
-        format_result: Callable[[Result], MultimodalContent | MultimodalContentElement],
-        format_failure: Callable[[Exception], MultimodalContent | MultimodalContentElement],
+        format_result: Callable[[Result], MultimodalContent | MultimodalContentConvertible],
+        format_failure: Callable[[Exception], MultimodalContent | MultimodalContentConvertible],
         direct_result: bool = False,
     ) -> None:
         super().__init__(function=function)
@@ -80,12 +80,12 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         self._check_availability: ToolAvailabilityCheck = availability_check or (
             lambda: True  # available by default
         )
-        self.format_result: Callable[[Result], MultimodalContent | MultimodalContentElement] = (
+        self.format_result: Callable[[Result], MultimodalContent | MultimodalContentConvertible] = (
             format_result
         )
-        self.format_failure: Callable[[Exception], MultimodalContent | MultimodalContentElement] = (
-            format_failure
-        )
+        self.format_failure: Callable[
+            [Exception], MultimodalContent | MultimodalContentConvertible
+        ] = format_failure
 
         freeze(self)
 
@@ -209,8 +209,8 @@ def tool[Result](
     name: str | None = None,
     description: str | None = None,
     availability_check: ToolAvailabilityCheck | None = None,
-    format_result: Callable[[Result], MultimodalContent | MultimodalContentElement],
-    format_failure: Callable[[Exception], MultimodalContent | MultimodalContentElement]
+    format_result: Callable[[Result], MultimodalContent | MultimodalContentConvertible],
+    format_failure: Callable[[Exception], MultimodalContent | MultimodalContentConvertible]
     | None = None,
     direct_result: bool = False,
 ) -> PartialToolWrapper[Result]:
@@ -260,7 +260,7 @@ def tool(
     name: str | None = None,
     description: str | None = None,
     availability_check: ToolAvailabilityCheck | None = None,
-    format_failure: Callable[[Exception], MultimodalContent | MultimodalContentElement]
+    format_failure: Callable[[Exception], MultimodalContent | MultimodalContentConvertible]
     | None = None,
     direct_result: bool = False,
 ) -> ToolWrapper:
@@ -310,8 +310,9 @@ def tool[**Args, Result](  # noqa: PLR0913
     name: str | None = None,
     description: str | None = None,
     availability_check: ToolAvailabilityCheck | None = None,
-    format_result: Callable[[Result], MultimodalContent | MultimodalContentElement] | None = None,
-    format_failure: Callable[[Exception], MultimodalContent | MultimodalContentElement]
+    format_result: Callable[[Result], MultimodalContent | MultimodalContentConvertible]
+    | None = None,
+    format_failure: Callable[[Exception], MultimodalContent | MultimodalContentConvertible]
     | None = None,
     direct_result: bool = False,
 ) -> ToolWrapper | Tool[Args, Result]:
@@ -340,7 +341,7 @@ def _default_result_format(result: Any) -> MultimodalContent:
         case MultimodalContent() as content:
             return content
 
-        case element if isinstance(element, MultimodalContentElement):
+        case element if isinstance(element, MultimodalContentConvertible):
             return MultimodalContent.of(element)
 
         case other:

@@ -13,7 +13,7 @@ from draive.types import (
     LMMToolRequests,
     LMMToolResponse,
     MultimodalContent,
-    MultimodalContentElement,
+    MultimodalContentConvertible,
 )
 
 __all__: list[str] = [
@@ -26,10 +26,10 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
     /,
     *,
     instruction: Instruction | str,
-    input: MultimodalContent | MultimodalContentElement,  # noqa: A002
+    input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
     schema_injection: Literal["auto", "full", "simplified", "skip"] = "auto",
     tools: Toolbox | Sequence[AnyTool] | None = None,
-    examples: Iterable[tuple[MultimodalContent | MultimodalContentElement, Generated]]
+    examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, Generated]]
     | None = None,
     **extra: Any,
 ) -> Generated:
@@ -114,6 +114,14 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
                     responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
 
                     if direct_responses := [response for response in responses if response.direct]:
+                        for response in direct_responses:
+                            if isinstance(response, generated):
+                                # return first response matching requested model
+                                return response
+
+                            else:
+                                continue
+
                         # TODO: check if this join makes any sense,
                         # perhaps we could merge json objects instead?
                         return generated.from_json(

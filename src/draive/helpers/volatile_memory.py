@@ -53,11 +53,11 @@ class VolatileMemory[Item](Memory[Item, Item]):
 class VolatileAccumulativeMemory[Item](Memory[list[Item], Item]):
     def __init__(
         self,
-        items: Iterable[Item],
+        items: Iterable[Item] | None = None,
         /,
         limit: int | None = None,
     ) -> None:
-        self._items: list[Item] = list(items)
+        self._items: list[Item] = list(items) if items else []
         self._limit: int = limit or 0
 
     async def recall(self) -> list[Item]:

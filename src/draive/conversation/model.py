@@ -9,7 +9,7 @@ from draive.types import (
     LMMContextElement,
     LMMInput,
     MultimodalContent,
-    MultimodalContentElement,
+    MultimodalContentConvertible,
     ToolCallStatus,
 )
 
@@ -24,7 +24,7 @@ class ConversationMessage(DataModel):
     @classmethod
     def user(
         cls,
-        content: MultimodalContent | MultimodalContentElement,
+        content: MultimodalContent | MultimodalContentConvertible,
         identifier: str | None = None,
         author: str | None = None,
         created: datetime | None = None,
@@ -40,7 +40,7 @@ class ConversationMessage(DataModel):
     @classmethod
     def model(
         cls,
-        content: MultimodalContent | MultimodalContentElement,
+        content: MultimodalContent | MultimodalContentConvertible,
         identifier: str | None = None,
         author: str | None = None,
         created: datetime | None = None,

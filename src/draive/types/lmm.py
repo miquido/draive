@@ -4,7 +4,7 @@ from typing import Any, Self
 from draive.parameters import Field
 from draive.parameters.model import DataModel
 from draive.types.instruction import Instruction
-from draive.types.multimodal import MultimodalContent, MultimodalContentElement
+from draive.types.multimodal import MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
     "LMMCompletion",
@@ -46,7 +46,7 @@ class LMMInput(DataModel):
     @classmethod
     def of(
         cls,
-        content: MultimodalContent | MultimodalContentElement,
+        content: MultimodalContent | MultimodalContentConvertible,
         /,
     ) -> Self:
         return cls(content=MultimodalContent.of(content))
@@ -61,7 +61,7 @@ class LMMCompletion(DataModel):
     @classmethod
     def of(
         cls,
-        content: MultimodalContent | MultimodalContentElement,
+        content: MultimodalContent | MultimodalContentConvertible,
         /,
     ) -> Self:
         return cls(content=MultimodalContent.of(content))
@@ -76,7 +76,7 @@ class LMMCompletionChunk(DataModel):
     @classmethod
     def of(
         cls,
-        content: MultimodalContent | MultimodalContentElement,
+        content: MultimodalContent | MultimodalContentConvertible,
         /,
     ) -> Self:
         return cls(content=MultimodalContent.of(content))

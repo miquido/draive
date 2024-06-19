@@ -231,7 +231,7 @@ basic_conversation_message_json: str = (
     '"author": null, '
     '"created": null, '
     '"content": {'
-    '"parts": ["string"]'
+    '"parts": [{"text": "string"}]'
     "}}"
 )
 
@@ -287,9 +287,9 @@ mixed_conversation_message_json: str = (
     '"created": null, '
     '"content": {"parts": ['
     '{"mime_type": null, "audio_url": "https://miquido.com/audio", "audio_transcription": null}, '
-    '"string", '
+    '{"text": "string"}, '
     '{"mime_type": null, "image_url": "https://miquido.com/image", "image_description": null}, '
-    '"content"'
+    '{"text": "content"}'
     "]}}"
 )
 

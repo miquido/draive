@@ -18,7 +18,7 @@ from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig, OpenAISystemFingerprint
 from draive.openai.errors import OpenAIException
-from draive.parameters import ToolSpecification
+from draive.parameters import DataModel, ToolSpecification
 from draive.scope import ctx
 from draive.types import (
     AudioBase64Content,
@@ -39,6 +39,7 @@ from draive.types import (
     LMMToolRequests,
     LMMToolResponse,
     MultimodalContentElement,
+    TextContent,
     VideoBase64Content,
     VideoDataContent,
     VideoURLContent,
@@ -150,10 +151,10 @@ def _convert_content_element(  # noqa: C901
     config: OpenAIChatConfig,
 ) -> ChatCompletionContentPartParam:
     match element:
-        case str() as string:
+        case TextContent() as text:
             return {
                 "type": "text",
-                "text": string,
+                "text": text.text,
             }
 
         case ImageURLContent() as image:
@@ -167,13 +168,19 @@ def _convert_content_element(  # noqa: C901
                 },
             }
 
-        case ImageBase64Content():
+        case ImageBase64Content() as image:
             # TODO: we could upload media using openAI endpoint to have url instead
-            raise ValueError("Unsupported message content", element)
+            return {
+                "type": "text",
+                "text": image.image_description or "MISSING IMAGE",
+            }
 
-        case ImageDataContent():
+        case ImageDataContent() as image:
             # TODO: we could upload media using openAI endpoint to have url instead
-            raise ValueError("Unsupported message content", element)
+            return {
+                "type": "text",
+                "text": image.image_description or "MISSING IMAGE",
+            }
 
         case AudioURLContent():
             # TODO: OpenAI models with audio?
@@ -198,6 +205,12 @@ def _convert_content_element(  # noqa: C901
         case VideoDataContent():
             # TODO: we could upload media using openAI endpoint to have url instead
             raise ValueError("Unsupported message content", element)
+
+        case DataModel() as data:
+            return {
+                "type": "text",
+                "text": data.as_json(),
+            }
 
 
 def _convert_context_element(
