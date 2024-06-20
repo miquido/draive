@@ -24,16 +24,16 @@ def mistral_tokenize_text(
 
 @cache(limit=4)
 def _encoding(model_name: str) -> SentencePieceProcessor:
-    model_file: str = _mapping.get(model_name, "mistral_instruct_tokenizer_240323.model.v3")
+    model_file: str = _mapping.get(model_name, "mistral_v3_tokenizer.model")
     return SentencePieceProcessor(model_file=str(Path(__file__).parent / "tokens" / model_file))  # pyright: ignore[reportCallIssue]
 
 
 _mapping: dict[str, str] = {
-    "open-mistral-7b": "tokenizer.model.v1",
-    "open-mixtral-8x7b": "tokenizer.model.v1",
-    "mistral-embed": "tokenizer.model.v1",
-    "mistral-small": "mistral_instruct_tokenizer_240216.model.v2",
-    "mistral-large": "mistral_instruct_tokenizer_240216.model.v2",
-    "open-mixtral-8x22b": "mistral_instruct_tokenizer_240323.model.v3",
-    "codestral-22b": "mistral_instruct_tokenizer_240323.model.v3",
+    "open-mistral-7b": "mistral_v1_tokenizer.model",
+    "open-mixtral-8x7b": "mistral_v1_tokenizer.model",
+    "mistral-embed": "mistral_v1_tokenizer.model",
+    "mistral-small": "mistral_v2_tokenizer.model",
+    "mistral-large": "mistral_v2_tokenizer.model",
+    "open-mixtral-8x22b": "mistral_v3_tokenizer.model",
+    "codestral-22b": "mistral_v3_tokenizer.model",
 }

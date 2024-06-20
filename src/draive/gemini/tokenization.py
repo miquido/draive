@@ -24,11 +24,11 @@ def gemini_tokenize_text(
 
 @cache(limit=4)
 def _encoding(model_name: str) -> SentencePieceProcessor:
-    model_file: str = _mapping.get(model_name, "tokenizer.model")
+    model_file: str = _mapping.get(model_name, "gemini_tokenizer.model")
     return SentencePieceProcessor(model_file=str(Path(__file__).parent / "tokens" / model_file))  # pyright: ignore[reportCallIssue]
 
 
 _mapping: dict[str, str] = {
-    "gemini-1.5-flash": "tokenizer.model",
-    "gemini-1.5-pro": "tokenizer.model",
+    "gemini-1.5-flash": "gemini_tokenizer.model",
+    "gemini-1.5-pro": "gemini_tokenizer.model",
 }
