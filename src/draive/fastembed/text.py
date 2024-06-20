@@ -23,8 +23,8 @@ async def fastembed_text_embedding(
         metrics=[config],
     ):
         return await _fastembed_text_embedding(
-            config=config,
-            texts=values,
+            config,
+            values,
         )
 
 
@@ -43,6 +43,7 @@ def _text_embedding_model(
 def _fastembed_text_embedding(
     config: FastembedTextConfig,
     texts: Sequence[str],
+    /,
 ) -> list[Embedded[str]]:
     embedding_model: TextEmbedding = _text_embedding_model(
         model_name=config.model,

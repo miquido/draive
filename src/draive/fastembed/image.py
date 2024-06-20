@@ -26,8 +26,8 @@ async def fastembed_image_embedding(
         metrics=[config],
     ):
         return await _fastembed_image_embedding(
-            config=config,
-            images=values,
+            config,
+            values,
         )
 
 
@@ -46,6 +46,7 @@ def _image_embedding_model(
 def _fastembed_image_embedding(
     config: FastembedImageConfig,
     images: Sequence[bytes],
+    /,
 ) -> list[Embedded[bytes]]:
     embedding_model: ImageEmbedding = _image_embedding_model(
         model_name=config.model,
