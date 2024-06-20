@@ -375,9 +375,9 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912
                         functionDeclarations=[
                             # those models are the same, can safely cast
                             cast(GeminiFunctionToolSpecification, tool["function"])
+                            for tool in tools or []
                         ]
                     )
-                    for tool in tools or []
                 ],
                 suggest_tools=required,
             )
@@ -393,9 +393,9 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912
                         functionDeclarations=[
                             # those models are the same, can safely cast
                             cast(GeminiFunctionToolSpecification, tool["function"])
+                            for tool in tools or []
                         ]
                     )
-                    for tool in tools or []
                 ],
                 suggest_tools=True,
             )
