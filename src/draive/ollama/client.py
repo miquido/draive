@@ -146,12 +146,17 @@ class OllamaClient(ScopeDependency):
         except Exception as exc:
             raise OllamaException("Network request failed") from exc
 
-        if HTTPStatus(value=response.status_code).is_success:
+        status: HTTPStatus = HTTPStatus(value=response.status_code)
+        if status.is_success:
             try:
                 return model.from_json(await response.aread())
 
             except Exception as exc:
                 raise OllamaException("Failed to decode Ollama response", response) from exc
+
+        elif status.is_client_error:
+            error_body: bytes = await response.aread()
+            raise OllamaException("Ollama request error: %s", error_body.decode("utf-8"))
 
         else:
             raise OllamaException("Network request failed", response)
