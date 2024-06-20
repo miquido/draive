@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Any, Literal, NotRequired, Required, TypedDict
 
 from draive.parameters import DataModel, Field
 
@@ -18,6 +18,7 @@ __all__ = [
     "GeminiDataReferenceMessageContent",
     "GeminiFunctionResponse",
     "GeminiFunctionCall",
+    "GeminiRequestMessage",
 ]
 
 
@@ -71,50 +72,58 @@ GeminiMessageContent = (
 
 
 class GeminiMessage(DataModel):
-    role: Literal["user", "model", ""]
+    role: Literal["user", "model"]
     content: list[GeminiMessageContent] = Field(alias="parts")
 
 
-class GeminiFunctionToolSpecification(DataModel):
-    name: str
-    description: str
-    parameters: dict[str, Any]
+class GeminiRequestMessage(TypedDict, total=False):
+    role: Required[Literal["user", "model"]]
+    parts: Required[list[dict[str, Any]]]
 
 
-class GeminiFunctionsTool(DataModel):
-    functions: list[GeminiFunctionToolSpecification] = Field(alias="functionDeclarations")
+class GeminiSystemMessageContent(TypedDict, total=False):
+    text: Required[str]
 
 
-class GeminiToolFunctionCallingConfig(DataModel):
-    mode: Literal["AUTO", "ANY", "NONE"]
+class GeminiSystemMessage(TypedDict, total=False):
+    role: Required[Literal[""]]
+    parts: Required[tuple[GeminiSystemMessageContent]]
 
 
-class GeminiToolConfig(DataModel):
-    function_calling: GeminiToolFunctionCallingConfig = Field(alias="functionCallingConfig")
+class GeminiFunctionToolSpecification(TypedDict, total=False):
+    name: Required[str]
+    description: Required[str]
+    parameters: Required[dict[str, Any]]
 
 
-class GeminiGenerationConfig(DataModel):
-    response_format: Literal["text/plain", "application/json"] = Field(
-        alias="responseMimeType",
-        default="text/plain",
-    )
-    response_schema: dict[str, Any] | None = Field(
-        alias="responseSchema",
-        default=None,
-    )
-    temperature: float
-    max_tokens: int | None = Field(alias="maxOutputTokens", default=None)
-    top_p: float | None = Field(alias="topP", default=None)
-    top_k: int | None = Field(alias="topK", default=None)
-    n: int = Field(alias="candidateCount", default=1)
+class GeminiFunctionsTool(TypedDict, total=False):
+    functionDeclarations: Required[list[GeminiFunctionToolSpecification]]
 
 
-class GeminiGenerationRequest(DataModel):
-    config: GeminiGenerationConfig = Field(alias="generationConfig")
-    instruction: GeminiMessage | None = Field(alias="systemInstruction", default=None)
-    messages: list[GeminiMessage] = Field(alias="contents")
-    tools: list[GeminiFunctionsTool] | None = None
-    tools_config: GeminiToolConfig | None = Field(alias="toolConfig", default=None)
+class GeminiToolFunctionCallingConfig(TypedDict, total=False):
+    mode: Required[Literal["AUTO", "ANY", "NONE"]]
+
+
+class GeminiToolConfig(TypedDict, total=False):
+    functionCallingConfig: Required[GeminiToolFunctionCallingConfig]
+
+
+class GeminiGenerationConfig(TypedDict, total=False):
+    responseMimeType: Required[Literal["text/plain", "application/json"]]
+    responseSchema: NotRequired[dict[str, Any] | None]
+    temperature: NotRequired[float]
+    maxOutputTokens: NotRequired[int | None]
+    topP: NotRequired[float | None]
+    topK: NotRequired[int | None]
+    candidateCount: NotRequired[int]
+
+
+class GeminiGenerationRequest(TypedDict, total=False):
+    generationConfig: Required[GeminiGenerationConfig]
+    systemInstruction: NotRequired[GeminiSystemMessage | None]
+    contents: Required[list[GeminiRequestMessage]]
+    tools: Required[list[GeminiFunctionsTool]]
+    toolConfig: Required[GeminiToolConfig]
 
 
 class GeminiUsage(DataModel):

@@ -9,17 +9,13 @@ from draive.gemini.errors import GeminiException
 from draive.gemini.models import (
     GeminiDataMessageContent,
     GeminiDataReferenceMessageContent,
-    GeminiFunctionCall,
     GeminiFunctionCallMessageContent,
-    GeminiFunctionResponse,
-    GeminiFunctionResponseMessageContent,
     GeminiFunctionsTool,
     GeminiFunctionToolSpecification,
     GeminiGenerationResult,
     GeminiMessage,
     GeminiMessageContent,
-    GeminiMessageContentBlob,
-    GeminiMessageContentReference,
+    GeminiRequestMessage,
     GeminiTextMessageContent,
 )
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
@@ -134,7 +130,7 @@ async def gemini_lmm_invocation(
                     config = config.updated(response_format="application/json")
 
         instruction: str = ""
-        messages: list[GeminiMessage] = []
+        messages: list[GeminiRequestMessage] = []
         for element in context:
             match element:
                 case LMMInstruction() as instruction_element:
@@ -168,139 +164,137 @@ async def gemini_lmm_invocation(
 
 def _convert_content_element(  # noqa: C901, PLR0911
     element: MultimodalContentElement,
-) -> GeminiMessageContent:
+) -> dict[str, Any]:
     match element:
         case TextContent() as text:
-            return GeminiTextMessageContent(text=text.text)
+            return {"text": text.text}
 
         case ImageURLContent() as image:
-            return GeminiDataReferenceMessageContent(
-                reference=GeminiMessageContentReference(
-                    mime_type=image.mime_type or "image",
-                    uri=image.image_url,
-                )
-            )
+            return {
+                "fileData": {
+                    "mimeType": image.mime_type or "image",
+                    "fileUri": image.image_url,
+                }
+            }
 
         case ImageBase64Content() as image:
-            return GeminiDataMessageContent(
-                data=GeminiMessageContentBlob(
-                    mime_type=image.mime_type or "image",
-                    data=image.image_base64,
-                )
-            )
+            return {
+                "inlineData": {
+                    "mimeType": image.mime_type or "image",
+                    "data": image.image_base64,
+                }
+            }
 
         case ImageDataContent() as image:
-            return GeminiDataMessageContent(
-                data=GeminiMessageContentBlob(
-                    mime_type=image.mime_type or "image",
-                    data=b64encode(image.image_data).decode("utf-8"),
-                )
-            )
+            return {
+                "inlineData": {
+                    "mimeType": image.mime_type or "image",
+                    "data": b64encode(image.image_data).decode("utf-8"),
+                }
+            }
 
         case AudioURLContent() as audio:
-            return GeminiDataReferenceMessageContent(
-                reference=GeminiMessageContentReference(
-                    mime_type=audio.mime_type or "audio",
-                    uri=audio.audio_url,
-                )
-            )
+            return {
+                "fileData": {
+                    "mimeType": audio.mime_type or "audio",
+                    "fileUri": audio.audio_url,
+                }
+            }
 
         case AudioBase64Content() as audio:
-            return GeminiDataMessageContent(
-                data=GeminiMessageContentBlob(
-                    mime_type=audio.mime_type or "audio",
-                    data=audio.audio_base64,
-                )
-            )
+            return {
+                "inlineData": {
+                    "mimeType": audio.mime_type or "audio",
+                    "data": audio.audio_base64,
+                }
+            }
 
         case AudioDataContent() as audio:
-            return GeminiDataMessageContent(
-                data=GeminiMessageContentBlob(
-                    mime_type=audio.mime_type or "audio",
-                    data=b64encode(audio.audio_data).decode("utf-8"),
-                )
-            )
+            return {
+                "inlineData": {
+                    "mimeType": audio.mime_type or "audio",
+                    "data": b64encode(audio.audio_data).decode("utf-8"),
+                }
+            }
 
         case VideoURLContent() as video:
-            return GeminiDataReferenceMessageContent(
-                reference=GeminiMessageContentReference(
-                    mime_type=video.mime_type or "video",
-                    uri=video.video_url,
-                )
-            )
+            return {
+                "fileData": {
+                    "mimeType": video.mime_type or "video",
+                    "fileUri": video.video_url,
+                }
+            }
 
         case VideoBase64Content() as video:
-            return GeminiDataMessageContent(
-                data=GeminiMessageContentBlob(
-                    mime_type=video.mime_type or "video",
-                    data=video.video_base64,
-                )
-            )
+            return {
+                "inlineData": {
+                    "mimeType": video.mime_type or "video",
+                    "data": video.video_base64,
+                }
+            }
 
         case VideoDataContent() as video:
-            return GeminiDataMessageContent(
-                data=GeminiMessageContentBlob(
-                    mime_type=video.mime_type or "video",
-                    data=b64encode(video.video_data).decode("utf-8"),
-                )
-            )
+            return {
+                "inlineData": {
+                    "mimeType": video.mime_type or "video",
+                    "data": b64encode(video.video_data).decode("utf-8"),
+                }
+            }
 
         case DataModel() as data:
-            return GeminiTextMessageContent(
-                text=data.as_json(),
-            )
+            return {"text": data.as_json()}
 
 
 def _convert_context_element(
     element: LMMContextElement,
-) -> GeminiMessage:
+) -> GeminiRequestMessage:
     match element:
         case LMMInstruction():
             raise ValueError("Instruction has to be processed separately")
 
         case LMMInput() as input:
-            return GeminiMessage(
-                role="user",
-                content=[
+            return {
+                "role": "user",
+                "parts": [
                     _convert_content_element(element=element) for element in input.content.parts
                 ],
-            )
+            }
 
         case LMMCompletion() as completion:
-            return GeminiMessage(
-                role="model",
-                content=[
+            return {
+                "role": "model",
+                "parts": [
                     _convert_content_element(element=element)
                     for element in completion.content.parts
                 ],
-            )
+            }
 
         case LMMToolRequests() as tool_requests:
-            return GeminiMessage(
-                role="model",
-                content=[
-                    GeminiFunctionCallMessageContent(
-                        function_call=GeminiFunctionCall(
-                            name=request.tool,
-                            arguments=request.arguments,
-                        ),
-                    )
+            return {
+                "role": "model",
+                "parts": [
+                    {
+                        "functionCall": {
+                            "name": request.tool,
+                            "args": request.arguments,
+                        },
+                    }
                     for request in tool_requests.requests
                 ],
-            )
+            }
 
         case LMMToolResponse() as tool_response:
-            return GeminiMessage(
-                role="model",
-                content=[
-                    GeminiFunctionResponseMessageContent(
-                        function_response=GeminiFunctionResponse(
-                            name=tool_response.tool,
-                            response=tool_response.content.as_dict(),
-                        ),
-                    )
+            return {
+                "role": "model",
+                "parts": [
+                    {
+                        "functionResponse": {
+                            "name": tool_response.tool,
+                            "response": tool_response.content.as_dict(),
+                        },
+                    }
                 ],
-            )
+            }
 
 
 def _convert_content_part(  # noqa: PLR0911
@@ -365,7 +359,7 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912
     client: GeminiClient,
     config: GeminiConfig,
     instruction: str,
-    messages: list[GeminiMessage],
+    messages: list[GeminiRequestMessage],
     tools: Sequence[ToolSpecification] | None,
     require_tool: ToolSpecification | bool,
 ) -> LMMOutput:
@@ -378,15 +372,12 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912
                 messages=messages,
                 tools=[
                     GeminiFunctionsTool(
-                        functions=[
-                            GeminiFunctionToolSpecification(
-                                name=tool["function"]["name"],
-                                description=tool["function"]["description"],
-                                parameters=cast(dict[str, Any], tool["function"]["parameters"]),
-                            )
-                            for tool in tools or []
+                        functionDeclarations=[
+                            # those models are the same, can safely cast
+                            cast(GeminiFunctionToolSpecification, tool["function"])
                         ]
                     )
+                    for tool in tools or []
                 ],
                 suggest_tools=required,
             )
@@ -399,14 +390,12 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912
                 messages=messages,
                 tools=[
                     GeminiFunctionsTool(
-                        functions=[
-                            GeminiFunctionToolSpecification(
-                                name=tool["function"]["name"],
-                                description=tool["function"]["description"],
-                                parameters=cast(dict[str, Any], tool["function"]["parameters"]),
-                            )
+                        functionDeclarations=[
+                            # those models are the same, can safely cast
+                            cast(GeminiFunctionToolSpecification, tool["function"])
                         ]
                     )
+                    for tool in tools or []
                 ],
                 suggest_tools=True,
             )
@@ -474,7 +463,7 @@ async def _generation_stream(  # noqa: PLR0913
     client: GeminiClient,
     config: GeminiConfig,
     instruction: str,
-    messages: list[GeminiMessage],
+    messages: list[GeminiRequestMessage],
     tools: Sequence[ToolSpecification] | None,
     require_tool: ToolSpecification | bool,
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:

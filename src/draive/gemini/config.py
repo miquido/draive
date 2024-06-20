@@ -5,6 +5,7 @@ from draive.utils import MISSING, Missing
 
 __all__ = [
     "GeminiConfig",
+    "GeminiEmbeddingConfig",
 ]
 
 
@@ -22,3 +23,7 @@ class GeminiConfig(DataModel):
     top_k: int | Missing = MISSING
     max_tokens: int | Missing = MISSING
     timeout: float | Missing = MISSING
+
+
+class GeminiEmbeddingConfig(DataModel):
+    model: Literal["text-embedding-004",] | str = "text-embedding-004"

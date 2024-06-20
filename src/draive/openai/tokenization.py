@@ -4,7 +4,7 @@ from tiktoken import Encoding, encoding_for_model
 
 from draive.openai.config import OpenAIChatConfig
 from draive.scope import ctx
-from draive.utils import Missing, cache, not_missing
+from draive.utils import cache
 
 __all__ = [
     "openai_tokenize_text",
@@ -15,12 +15,7 @@ def openai_tokenize_text(
     text: str,
     **extra: Any,
 ) -> list[int]:
-    model_name: str | Missing = ctx.state(OpenAIChatConfig).model
-    if not_missing(model_name):
-        return _encoding(model_name=model_name).encode(text=text)
-
-    else:
-        raise ValueError("Missing model name in OpenAIChatConfig")
+    return _encoding(model_name=ctx.state(OpenAIChatConfig).model).encode(text=text)
 
 
 @cache(limit=4)
