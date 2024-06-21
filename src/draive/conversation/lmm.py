@@ -21,7 +21,6 @@ from draive.types import (
     LMMCompletionChunk,
     LMMContextElement,
     LMMInput,
-    LMMInstruction,
     LMMToolRequests,
     LMMToolResponse,
     Memory,
@@ -103,9 +102,7 @@ async def lmm_conversation_completion(
             case [*tools]:
                 toolbox = Toolbox(*tools)
 
-        context: list[LMMContextElement] = [
-            LMMInstruction.of(instruction),
-        ]
+        context: list[LMMContextElement] = []
 
         conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage]
         match memory:
@@ -139,6 +136,7 @@ async def lmm_conversation_completion(
         if stream:
             return ctx.stream(
                 generator=_lmm_conversation_completion_stream(
+                    instruction=instruction,
                     request_message=request_message,
                     conversation_memory=conversation_memory,
                     context=context,
@@ -149,6 +147,7 @@ async def lmm_conversation_completion(
 
         else:
             return await _lmm_conversation_completion(
+                instruction=instruction,
                 request_message=request_message,
                 conversation_memory=conversation_memory,
                 context=context,
@@ -158,6 +157,7 @@ async def lmm_conversation_completion(
 
 
 async def _lmm_conversation_completion(
+    instruction: Instruction | str,
     request_message: ConversationMessage,
     conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage],
     context: list[LMMContextElement],
@@ -166,6 +166,7 @@ async def _lmm_conversation_completion(
 ) -> ConversationMessage:
     for recursion_level in toolbox.call_range:
         match await lmm_invocation(
+            instruction=instruction,
             context=context,
             tools=toolbox.available_tools(recursion_level=recursion_level),
             require_tool=toolbox.tool_suggestion(recursion_level=recursion_level),
@@ -213,6 +214,7 @@ async def _lmm_conversation_completion(
 
 
 async def _lmm_conversation_completion_stream(
+    instruction: Instruction | str,
     request_message: ConversationMessage,
     conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage],
     context: list[LMMContextElement],
@@ -224,6 +226,7 @@ async def _lmm_conversation_completion_stream(
 
     for recursion_level in toolbox.call_range:
         async for part in await lmm_invocation(
+            instruction=instruction,
             context=context,
             tools=toolbox.available_tools(recursion_level=recursion_level),
             require_tool=toolbox.tool_suggestion(recursion_level=recursion_level),

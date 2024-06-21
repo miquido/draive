@@ -137,6 +137,7 @@ class OpenAIClient(ScopeDependency):
                     temperature=config.temperature,
                     tools=tools or NOT_GIVEN,
                     tool_choice=tool_choice,
+                    parallel_tool_calls=True if tools else NOT_GIVEN,
                     top_p=config.top_p if not_missing(config.top_p) else NOT_GIVEN,
                     timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,
                     stream_options={"include_usage": True} if stream else NOT_GIVEN,

@@ -27,11 +27,11 @@ from draive.types import (
     ImageBase64Content,
     ImageDataContent,
     ImageURLContent,
+    Instruction,
     LMMCompletion,
     LMMCompletionChunk,
     LMMContextElement,
     LMMInput,
-    LMMInstruction,
     LMMOutput,
     LMMOutputStream,
     LMMOutputStreamChunk,
@@ -54,6 +54,7 @@ __all__ = [
 @overload
 async def openai_lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -66,6 +67,7 @@ async def openai_lmm_invocation(
 @overload
 async def openai_lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -78,6 +80,7 @@ async def openai_lmm_invocation(
 @overload
 async def openai_lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -87,8 +90,9 @@ async def openai_lmm_invocation(
 ) -> LMMOutputStream | LMMOutput: ...
 
 
-async def openai_lmm_invocation(
+async def openai_lmm_invocation(  # noqa: PLR0913
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -97,7 +101,7 @@ async def openai_lmm_invocation(
     **extra: Any,
 ) -> LMMOutputStream | LMMOutput:
     with ctx.nested(
-        "openai_lmm_completion",
+        "openai_lmm_invocation",
         metrics=[
             ArgumentsTrace.of(
                 context=context,
@@ -122,7 +126,11 @@ async def openai_lmm_invocation(
                 config = config.updated(response_format={"type": "json_object"})
 
         messages: list[ChatCompletionMessageParam] = [
-            _convert_context_element(config=config, element=message) for message in context
+            {
+                "role": "system",
+                "content": Instruction.of(instruction).format(),
+            },
+            *[_convert_context_element(config=config, element=element) for element in context],
         ]
 
         if stream:
@@ -218,12 +226,6 @@ def _convert_context_element(
     config: OpenAIChatConfig,
 ) -> ChatCompletionMessageParam:
     match element:
-        case LMMInstruction() as instruction:
-            return {
-                "role": "system",
-                "content": instruction.content,
-            }
-
         case LMMInput() as input:
             return {
                 "role": "user",

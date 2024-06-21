@@ -8,7 +8,7 @@ from typing import (
 )
 
 from draive.parameters import ToolSpecification
-from draive.types import LMMContextElement, LMMOutput, LMMOutputStream
+from draive.types import Instruction, LMMContextElement, LMMOutput, LMMOutputStream
 
 __all__ = [
     "LMMInvocation",
@@ -21,6 +21,7 @@ class LMMInvocation(Protocol):
     async def __call__(
         self,
         *,
+        instruction: Instruction | str,
         context: Sequence[LMMContextElement],
         tools: Sequence[ToolSpecification] | None = None,
         require_tool: ToolSpecification | bool = False,
@@ -33,6 +34,7 @@ class LMMInvocation(Protocol):
     async def __call__(
         self,
         *,
+        instruction: Instruction | str,
         context: Sequence[LMMContextElement],
         tools: Sequence[ToolSpecification] | None = None,
         require_tool: ToolSpecification | bool = False,
@@ -45,6 +47,7 @@ class LMMInvocation(Protocol):
     async def __call__(
         self,
         *,
+        instruction: Instruction | str,
         context: Sequence[LMMContextElement],
         tools: Sequence[ToolSpecification] | None = None,
         require_tool: ToolSpecification | bool = False,
@@ -56,6 +59,7 @@ class LMMInvocation(Protocol):
     async def __call__(  # noqa: PLR0913
         self,
         *,
+        instruction: Instruction | str,
         context: Sequence[LMMContextElement],
         tools: Sequence[ToolSpecification] | None = None,
         require_tool: ToolSpecification | bool = False,

@@ -20,6 +20,11 @@ pip install draive
 pip install draive[openai]
 ```
 
+- Anthropic:
+```bash
+pip install draive[anthropic]
+```
+
 - Gemini:
 ```bash
 pip install draive[gemini]

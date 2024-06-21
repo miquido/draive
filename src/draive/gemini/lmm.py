@@ -29,11 +29,11 @@ from draive.types import (
     ImageBase64Content,
     ImageDataContent,
     ImageURLContent,
+    Instruction,
     LMMCompletion,
     LMMCompletionChunk,
     LMMContextElement,
     LMMInput,
-    LMMInstruction,
     LMMOutput,
     LMMOutputStream,
     LMMOutputStreamChunk,
@@ -55,6 +55,7 @@ __all__ = [
 @overload
 async def gemini_lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -67,6 +68,7 @@ async def gemini_lmm_invocation(
 @overload
 async def gemini_lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -79,6 +81,7 @@ async def gemini_lmm_invocation(
 @overload
 async def gemini_lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -88,8 +91,9 @@ async def gemini_lmm_invocation(
 ) -> LMMOutputStream | LMMOutput: ...
 
 
-async def gemini_lmm_invocation(
+async def gemini_lmm_invocation(  # noqa: PLR0913
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -98,7 +102,7 @@ async def gemini_lmm_invocation(
     **extra: Any,
 ) -> LMMOutputStream | LMMOutput:
     with ctx.nested(
-        "gemini_lmm_completion",
+        "gemini_lmm_invocation",
         metrics=[
             ArgumentsTrace.of(
                 context=context,
@@ -130,22 +134,16 @@ async def gemini_lmm_invocation(
                 else:
                     config = config.updated(response_format="application/json")
 
-        instruction: str = ""
-        messages: list[GeminiRequestMessage] = []
-        for element in context:
-            match element:
-                case LMMInstruction() as instruction_element:
-                    instruction += instruction_element.content
-
-                case other:
-                    messages.append(_convert_context_element(element=other))
+        messages: list[GeminiRequestMessage] = [
+            _convert_context_element(element=element) for element in context
+        ]
 
         if stream:
             return ctx.stream(
                 generator=_generation_stream(
                     client=client,
                     config=config,
-                    instruction=instruction,
+                    instruction=Instruction.of(instruction).format(),
                     messages=messages,
                     tools=tools,
                     require_tool=require_tool,
@@ -156,7 +154,7 @@ async def gemini_lmm_invocation(
             return await _generate(
                 client=client,
                 config=config,
-                instruction=instruction,
+                instruction=Instruction.of(instruction).format(),
                 messages=messages,
                 tools=tools,
                 require_tool=require_tool,
@@ -250,9 +248,6 @@ def _convert_context_element(
     element: LMMContextElement,
 ) -> GeminiRequestMessage:
     match element:
-        case LMMInstruction():
-            raise ValueError("Instruction has to be processed separately")
-
         case LMMInput() as input:
             return {
                 "role": "user",
@@ -309,7 +304,12 @@ def _convert_content_part(  # noqa: PLR0911
             mime_type: str = data.data.mime_type
             if mime_type.startswith("image"):
                 return ImageBase64Content(
-                    mime_type=mime_type,
+                    mime_type=cast(
+                        Literal["image/jpeg", "image/png", "image/gif"] | None,
+                        mime_type
+                        if mime_type in {"image/jpeg", "image/png", "image/gif"}
+                        else None,
+                    ),
                     image_base64=data.data.data,
                 )
 
@@ -332,7 +332,12 @@ def _convert_content_part(  # noqa: PLR0911
             mime_type: str = reference.reference.mime_type
             if mime_type.startswith("image"):
                 return ImageURLContent(
-                    mime_type=mime_type,
+                    mime_type=cast(
+                        Literal["image/jpeg", "image/png", "image/gif"] | None,
+                        mime_type
+                        if mime_type in {"image/jpeg", "image/png", "image/gif"}
+                        else None,
+                    ),
                     image_url=reference.reference.uri,
                 )
 

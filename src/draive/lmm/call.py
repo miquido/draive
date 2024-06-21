@@ -5,7 +5,7 @@ from draive.lmm.invocation import LMMOutputStream
 from draive.lmm.state import LMM
 from draive.parameters import ToolSpecification
 from draive.scope import ctx
-from draive.types import LMMContextElement, LMMOutput
+from draive.types import Instruction, LMMContextElement, LMMOutput
 
 __all__ = [
     "lmm_invocation",
@@ -15,6 +15,7 @@ __all__ = [
 @overload
 async def lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -27,6 +28,7 @@ async def lmm_invocation(
 @overload
 async def lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -39,6 +41,7 @@ async def lmm_invocation(
 @overload
 async def lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -48,8 +51,9 @@ async def lmm_invocation(
 ) -> LMMOutputStream | LMMOutput: ...
 
 
-async def lmm_invocation(
+async def lmm_invocation(  # noqa: PLR0913
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -58,6 +62,7 @@ async def lmm_invocation(
     **extra: Any,
 ) -> LMMOutputStream | LMMOutput:
     return await ctx.state(LMM).invocation(
+        instruction=instruction,
         context=context,
         require_tool=require_tool,
         tools=tools,

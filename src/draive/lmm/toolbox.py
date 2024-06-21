@@ -2,7 +2,7 @@ from asyncio import FIRST_COMPLETED, Task, gather, wait
 from collections.abc import AsyncIterator
 from typing import Any, Literal, final
 
-from draive.lmm.errors import ToolException
+from draive.lmm.errors import ToolError, ToolException
 from draive.lmm.state import ToolStatusStream
 from draive.lmm.tool import AnyTool
 from draive.parameters import ToolSpecification
@@ -106,15 +106,27 @@ class Toolbox:
         /,
     ) -> LMMToolResponse:
         if tool := self._tools.get(request.tool):
-            return LMMToolResponse(
-                identifier=request.identifier,
-                tool=request.tool,
-                content=await tool._toolbox_call(  # pyright: ignore[reportPrivateUsage]
-                    request.identifier,
-                    arguments=request.arguments or {},
-                ),
-                direct=tool.requires_direct_result,
-            )
+            try:
+                return LMMToolResponse(
+                    identifier=request.identifier,
+                    tool=request.tool,
+                    content=await tool._toolbox_call(  # pyright: ignore[reportPrivateUsage]
+                        request.identifier,
+                        arguments=request.arguments or {},
+                    ),
+                    direct=tool.requires_direct_result,
+                    error=False,
+                )
+
+            except ToolError as error:  # use formatted error, blow up on other exception
+                ctx.log_error("Tool (%s) returned an error", exception=error)
+                return LMMToolResponse(
+                    identifier=request.identifier,
+                    tool=request.tool,
+                    content=error.content,
+                    direct=False,
+                    error=True,
+                )
 
         else:
             # log error and provide fallback result to avoid blowing out the execution
@@ -124,6 +136,7 @@ class Toolbox:
                 tool=request.tool,
                 content=MultimodalContent.of("ERROR"),
                 direct=False,
+                error=True,
             )
 
     def stream(

@@ -8,7 +8,6 @@ from draive.types import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
-    LMMInstruction,
     LMMToolRequests,
     LMMToolResponse,
     MultimodalContent,
@@ -41,7 +40,6 @@ async def lmm_generate_text(
                 toolbox = Toolbox(*tools)
 
         context: list[LMMContextElement] = [
-            LMMInstruction.of(instruction),
             *[
                 message
                 for example in examples or []
@@ -55,6 +53,7 @@ async def lmm_generate_text(
 
         for recursion_level in toolbox.call_range:
             match await lmm_invocation(
+                instruction=instruction,
                 context=context,
                 tools=toolbox.available_tools(recursion_level=recursion_level),
                 require_tool=toolbox.tool_suggestion(recursion_level=recursion_level),

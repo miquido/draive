@@ -9,7 +9,6 @@ from draive.types import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
-    LMMInstruction,
     LMMToolRequests,
     LMMToolResponse,
     MultimodalContent,
@@ -53,10 +52,10 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
             case Instruction() as instruction:
                 generation_instruction = instruction
 
-        instruction_message: LMMContextElement
+        extended_instruction: Instruction
         match schema_injection:
             case "auto":
-                instruction_message = LMMInstruction.of(
+                extended_instruction = Instruction.of(
                     generation_instruction.extended(
                         DEFAULT_INSTRUCTION_EXTENSION.format(
                             schema=generated.simplified_schema(indent=2),
@@ -66,24 +65,23 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
                 )
 
             case "full":
-                instruction_message = LMMInstruction.of(
+                extended_instruction = Instruction.of(
                     generation_instruction,
                     schema=generated.json_schema(indent=2),
                 )
 
             case "simplified":
-                instruction_message = LMMInstruction.of(
+                extended_instruction = Instruction.of(
                     generation_instruction,
                     schema=generated.simplified_schema(indent=2),
                 )
 
             case "skip":
-                instruction_message = LMMInstruction.of(
+                extended_instruction = Instruction.of(
                     generation_instruction,
                 )
 
         context: list[LMMContextElement] = [
-            instruction_message,
             *[
                 message
                 for example in examples or []
@@ -97,6 +95,7 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
 
         for recursion_level in toolbox.call_range:
             match await lmm_invocation(
+                instruction=extended_instruction,
                 context=context,
                 tools=toolbox.available_tools(recursion_level=recursion_level),
                 require_tool=toolbox.tool_suggestion(recursion_level=recursion_level),

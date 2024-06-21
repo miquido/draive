@@ -17,10 +17,10 @@ class ResponseFormat(TypedDict):
 
 class OpenAIChatConfig(DataModel):
     model: str = "gpt-3.5-turbo"
-    temperature: float = 0.0
+    temperature: float = 0.75
     top_p: float | Missing = MISSING
     frequency_penalty: float | Missing = MISSING
-    max_tokens: int | Missing = MISSING
+    max_tokens: int = 2048
     seed: int | None | Missing = MISSING
     response_format: ResponseFormat | Missing = MISSING
     vision_details: Literal["auto", "low", "high"] | Missing = MISSING

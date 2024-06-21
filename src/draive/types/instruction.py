@@ -9,6 +9,24 @@ __all__ = [
 
 
 class Instruction:
+    @classmethod
+    def of(
+        cls,
+        instruction: Self | str,
+        /,
+        **variables: object,
+    ) -> Self:
+        match instruction:
+            case str() as content:
+                return cls(
+                    content,
+                    identifier=None,
+                    **variables,
+                )
+
+            case instruction:
+                return instruction.updated(**variables)
+
     def __init__(
         self,
         instruction: str,
