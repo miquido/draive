@@ -26,4 +26,12 @@ class GeminiConfig(DataModel):
 
 
 class GeminiEmbeddingConfig(DataModel):
-    model: Literal["text-embedding-004",] | str = "text-embedding-004"
+    model: (
+        Literal[
+            "text-embedding-004",
+            "text-embedding-001",
+            "embedding-gecko-001",
+        ]
+        | str
+    ) = "embedding-gecko-001"
+    batch_size: int = 128

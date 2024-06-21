@@ -212,7 +212,7 @@ async def _chat_completion_stream(
     config: MRSChatConfig,
     messages: list[dict[str, object]],
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
-    ctx.log_warning("mistral.rs streaming api is not supported yet, using regular response...")
+    ctx.log_debug("mistral.rs streaming api is not supported yet, using regular response...")
     output: LMMOutput = await _chat_completion(
         client=client,
         config=config,

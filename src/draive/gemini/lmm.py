@@ -7,6 +7,7 @@ from draive.gemini.client import GeminiClient
 from draive.gemini.config import GeminiConfig
 from draive.gemini.errors import GeminiException
 from draive.gemini.models import (
+    GeminiChoice,
     GeminiDataMessageContent,
     GeminiDataReferenceMessageContent,
     GeminiFunctionCallMessageContent,
@@ -412,13 +413,35 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912
     if not result.choices:
         raise GeminiException("Invalid Gemini completion - missing messages!", result)
 
-    generated_message: GeminiMessage = result.choices[0].content
+    result_choice: GeminiChoice = result.choices[0]
+    result_message: GeminiMessage
+    match result_choice.finish_reason:
+        case "STOP":
+            if message := result_choice.content:
+                result_message = message
+
+            else:
+                raise GeminiException(
+                    "Invalid Gemini response - missing message content: %s", result
+                )
+
+        case "MAX_TOKENS":
+            raise GeminiException("Gemini response finish caused by token limit: %s", result)
+
+        case "SAFETY":
+            raise GeminiException("Gemini response finish caused by safety reason: %s", result)
+
+        case "RECITATION":
+            raise GeminiException("Gemini response finish caused by recitation reason: %s", result)
+
+        case "OTHER":
+            raise GeminiException("Gemini response finish caused by unknown reason: %s", result)
 
     message_parts: list[
         GeminiTextMessageContent | GeminiDataReferenceMessageContent | GeminiDataMessageContent
     ] = []
     tool_calls: list[GeminiFunctionCallMessageContent] = []
-    for part in generated_message.content:
+    for part in result_message.content:
         match part:
             case GeminiTextMessageContent() as text:
                 message_parts.append(text)
@@ -436,7 +459,9 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912
                 raise GeminiException("Invalid Gemini completion part", other)
 
     if tool_calls and (tools := tools):
-        assert not message_parts, "Unexpected content when calling tools"  # nosec: B101
+        if __debug__ and message_parts:
+            ctx.log_debug("Gemini has generated a message and tool calls, ignoring the message...")
+
         ctx.record(ResultTrace.of(tool_calls))
 
         return LMMToolRequests(
@@ -467,7 +492,7 @@ async def _generation_stream(  # noqa: PLR0913
     tools: Sequence[ToolSpecification] | None,
     require_tool: ToolSpecification | bool,
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
-    ctx.log_warning("Gemini streaming api is not supported yet, using regular response...")
+    ctx.log_debug("Gemini streaming api is not supported yet, using regular response...")
     output: LMMOutput = await _generate(
         client=client,
         config=config,

@@ -1,15 +1,11 @@
-from typing import Any, Literal, NotRequired, Required, TypedDict
+from typing import Any, Literal, Required, TypedDict
 
 from draive.parameters import DataModel, Field
 
 __all__ = [
-    "GeminiGenerationConfig",
-    "GeminiGenerationRequest",
     "GeminiGenerationResult",
     "GeminiMessage",
     "GeminiTextMessageContent",
-    "GeminiToolConfig",
-    "GeminiToolFunctionCallingConfig",
     "GeminiFunctionCallMessageContent",
     "GeminiFunctionResponseMessageContent",
     "GeminiMessageContentBlob",
@@ -18,7 +14,6 @@ __all__ = [
     "GeminiDataReferenceMessageContent",
     "GeminiFunctionResponse",
     "GeminiFunctionCall",
-    "GeminiRequestMessage",
 ]
 
 
@@ -86,7 +81,6 @@ class GeminiSystemMessageContent(TypedDict, total=False):
 
 
 class GeminiSystemMessage(TypedDict, total=False):
-    role: Required[Literal[""]]
     parts: Required[tuple[GeminiSystemMessageContent]]
 
 
@@ -100,39 +94,13 @@ class GeminiFunctionsTool(TypedDict, total=False):
     functionDeclarations: Required[list[GeminiFunctionToolSpecification]]
 
 
-class GeminiToolFunctionCallingConfig(TypedDict, total=False):
-    mode: Required[Literal["AUTO", "ANY", "NONE"]]
-
-
-class GeminiToolConfig(TypedDict, total=False):
-    functionCallingConfig: Required[GeminiToolFunctionCallingConfig]
-
-
-class GeminiGenerationConfig(TypedDict, total=False):
-    responseMimeType: Required[Literal["text/plain", "application/json"]]
-    responseSchema: NotRequired[dict[str, Any] | None]
-    temperature: NotRequired[float]
-    maxOutputTokens: NotRequired[int | None]
-    topP: NotRequired[float | None]
-    topK: NotRequired[int | None]
-    candidateCount: NotRequired[int]
-
-
-class GeminiGenerationRequest(TypedDict, total=False):
-    generationConfig: Required[GeminiGenerationConfig]
-    systemInstruction: NotRequired[GeminiSystemMessage | None]
-    contents: Required[list[GeminiRequestMessage]]
-    tools: Required[list[GeminiFunctionsTool]]
-    toolConfig: Required[GeminiToolConfig]
-
-
 class GeminiUsage(DataModel):
-    prompt_tokens: int = Field(alias="promptTokenCount")
-    generated_tokens: int = Field(alias="candidatesTokenCount")
+    prompt_tokens: int = Field(alias="promptTokenCount", default_factory=int)
+    generated_tokens: int = Field(alias="candidatesTokenCount", default_factory=int)
 
 
 class GeminiChoice(DataModel):
-    content: GeminiMessage
+    content: GeminiMessage | None = None
     finish_reason: Literal[
         "STOP",
         "MAX_TOKENS",

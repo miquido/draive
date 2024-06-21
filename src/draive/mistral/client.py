@@ -227,11 +227,15 @@ class MistralClient(ScopeDependency):
                 return model.from_json(await response.aread())
 
             except Exception as exc:
-                raise MistralException("Failed to decode Mistral response", response) from exc
+                raise MistralException("Failed to decode Mistral response %s", response) from exc
 
         elif status.is_client_error:
             error_body: bytes = await response.aread()
-            raise MistralException("Mistral request error: %s", error_body.decode("utf-8"))
+            raise MistralException(
+                "Mistral request error: %s %s",
+                status,
+                error_body.decode("utf-8"),
+            )
 
         else:
-            raise MistralException("Network request failed", response)
+            raise MistralException("Network request failed %s", response)

@@ -11,7 +11,7 @@ __all__ = [
 ]
 
 
-async def vector_similarity_score(
+def vector_similarity_score(
     value_vector: NDArray[Any] | list[float],
     reference_vector: NDArray[Any] | list[float],
     similarity: Callable[
