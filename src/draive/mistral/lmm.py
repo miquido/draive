@@ -264,7 +264,7 @@ async def _chat_completion_stream(
     tools: Sequence[ToolSpecification] | None,
     require_tool: ToolSpecification | bool,
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
-    ctx.log_warning("Mistral streaming api is not supported yet, using regular response...")
+    ctx.log_debug("Mistral streaming api is not supported yet, using regular response...")
     output: LMMOutput = await _chat_completion(
         client=client,
         config=config,

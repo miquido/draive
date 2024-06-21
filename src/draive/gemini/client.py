@@ -2,7 +2,8 @@ import json
 from asyncio import gather
 from collections.abc import Sequence
 from http import HTTPStatus
-from typing import Any, Literal, Self, cast, final, overload
+from itertools import chain
+from typing import Any, Self, final, overload
 
 from httpx import AsyncClient, Response
 
@@ -10,7 +11,6 @@ from draive.gemini.config import GeminiConfig, GeminiEmbeddingConfig
 from draive.gemini.errors import GeminiException
 from draive.gemini.models import (
     GeminiFunctionsTool,
-    GeminiGenerationRequest,
     GeminiGenerationResult,
     GeminiRequestMessage,
 )
@@ -51,11 +51,11 @@ class GeminiClient(ScopeDependency):
         self,
         *,
         config: GeminiConfig,
+        instruction: str,
         messages: list[GeminiRequestMessage],
-        instruction: str | None = None,
-        response_schema: dict[str, Any] | None = None,
         tools: list[GeminiFunctionsTool] | None = None,
         suggest_tools: bool = False,
+        response_schema: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> GeminiGenerationResult:
         if stream:
@@ -66,27 +66,21 @@ class GeminiClient(ScopeDependency):
                 model=config.model,
                 request={
                     "generationConfig": {
-                        "responseMimeType": cast(
-                            Literal["text/plain", "application/json"],
-                            config.response_format,
-                        )
+                        "responseMimeType": config.response_format
                         if not_missing(config.response_format)
                         else "text/plain",
-                        "responseSchema": response_schema,
                         "temperature": config.temperature,
+                        "topP": config.top_p if not_missing(config.top_p) else None,
+                        "topK": config.top_k if not_missing(config.top_k) else None,
                         "maxOutputTokens": config.max_tokens
                         if not_missing(config.max_tokens)
                         else None,
-                        "topP": config.top_p if not_missing(config.top_p) else None,
-                        "topK": config.top_k if not_missing(config.top_k) else None,
+                        "responseSchema": response_schema if response_schema else None,
                         "candidateCount": 1,
                     },
                     "systemInstruction": {
-                        "role": "",
                         "parts": ({"text": instruction},),
-                    }
-                    if instruction
-                    else None,
+                    },
                     "contents": messages,
                     "tools": tools or [],
                     "toolConfig": {
@@ -94,19 +88,37 @@ class GeminiClient(ScopeDependency):
                             "mode": ("ANY" if suggest_tools else "AUTO") if tools else "NONE",
                         },
                     },
+                    "safetySettings": [  # google moderation is terrible, disabling it all
+                        {
+                            "category": "HARM_CATEGORY_HATE_SPEECH",
+                            "threshold": "BLOCK_NONE",
+                        },
+                        {
+                            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                            "threshold": "BLOCK_NONE",
+                        },
+                        {
+                            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                            "threshold": "BLOCK_NONE",
+                        },
+                        {
+                            "category": "HARM_CATEGORY_HARASSMENT",
+                            "threshold": "BLOCK_NONE",
+                        },
+                    ],
                 },
             )
 
     async def _generate_content(
         self,
         model: str,
-        request: GeminiGenerationRequest,
+        request: dict[str, Any],
     ) -> GeminiGenerationResult:
         return await self._request(
             model=GeminiGenerationResult,
             method="POST",
             url=f"v1beta/models/{model}:generateContent",
-            body=cast(dict[str, Any], request),  # there is some linter issue requiring to cast
+            body=request,
         )
 
     async def embedding(
@@ -115,37 +127,51 @@ class GeminiClient(ScopeDependency):
         inputs: Sequence[str],
     ) -> list[list[float]]:
         return list(
-            await gather(
-                *[
-                    self._create_text_embedding(
-                        model=config.model,
-                        text=text,
-                    )
-                    for text in inputs
-                ]
+            chain(
+                *await gather(
+                    *[
+                        self._create_text_embedding(
+                            model=config.model,
+                            texts=inputs[index : index + config.batch_size],
+                        )
+                        for index in range(0, len(inputs), config.batch_size)
+                    ]
+                )
             )
         )
 
     async def _create_text_embedding(
         self,
         model: str,
-        text: str,
-    ) -> list[float]:
+        texts: Sequence[str],
+    ) -> list[list[float]]:
+        if not texts:
+            return []
+
         response: dict[str, Any] = await self._request(
             model=None,
             method="POST",
-            url=f"v1/models/{model}:embedContent",
-            body={
-                "content": {"parts": [{"text": text}]},
-            },
+            url=f"v1beta/models/{model}:batchEmbedText",
+            body={"texts": texts},
         )
 
+        result: list[list[float]] = []
         match response:
-            case {"embedding": {"values": [*vector]}}:
-                return vector
+            case {"embeddings": [*embeddings]}:
+                for embedding in embeddings:
+                    match embedding:
+                        case {"value": [*vector]}:
+                            assert all(isinstance(value, float) for value in vector)  # nosec: B101
+                            result.append(vector)
+
+                        case _:
+                            raise GeminiException("Invalid Gemini embedding response: %s", response)
 
             case _:
                 raise GeminiException("Invalid Gemini embedding response: %s", response)
+
+        assert len(texts) == len(result)  # nosec: B101
+        return result
 
     async def dispose(self) -> None:
         await self._client.aclose()
@@ -239,7 +265,11 @@ class GeminiClient(ScopeDependency):
 
         elif status.is_client_error:
             error_body: bytes = await response.aread()
-            raise GeminiException("Gemini request error: %s", error_body.decode("utf-8"))
+            raise GeminiException(
+                "Gemini request error: %s, %s",
+                status,
+                error_body.decode("utf-8"),
+            )
 
         else:
             raise GeminiException("Network request failed: %s", response)

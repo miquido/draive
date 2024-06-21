@@ -156,7 +156,11 @@ class OllamaClient(ScopeDependency):
 
         elif status.is_client_error:
             error_body: bytes = await response.aread()
-            raise OllamaException("Ollama request error: %s", error_body.decode("utf-8"))
+            raise OllamaException(
+                "Ollama request error: %s %s",
+                status,
+                error_body.decode("utf-8"),
+            )
 
         else:
             raise OllamaException("Network request failed", response)

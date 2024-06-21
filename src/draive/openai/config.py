@@ -30,7 +30,7 @@ class OpenAIChatConfig(DataModel):
 class OpenAIEmbeddingConfig(DataModel):
     model: str = "text-embedding-3-small"
     dimensions: int | Missing = MISSING
-    batch_size: int = 32
+    batch_size: int = 128
     encoding_format: Literal["float", "base64"] | Missing = MISSING
     timeout: float | Missing = MISSING
 

@@ -186,7 +186,7 @@ async def _chat_completion_stream(
     config: OllamaChatConfig,
     messages: list[ChatMessage],
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
-    ctx.log_warning("Ollama streaming api is not supported yet, using regular response...")
+    ctx.log_debug("Ollama streaming api is not supported yet, using regular response...")
     output: LMMOutput = await _chat_completion(
         client=client,
         config=config,
