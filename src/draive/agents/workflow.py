@@ -6,18 +6,21 @@ from asyncio import (
     TimerHandle,
     get_running_loop,
 )
-from typing import Any, cast, final
-from uuid import UUID
+from typing import Any, Final, Self, cast, final
+from uuid import UUID, uuid4
 
 from draive.agents.runner import AgentRunner
 from draive.agents.types import (
+    AgentBase,
     AgentMessage,
+    AgentMessageDraft,
     AgentWorkflowCurrent,
     AgentWorkflowStateAccess,
     WorkflowAgentBase,
 )
 from draive.parameters import ParameterPath, ParametrizedData
 from draive.scope import ctx
+from draive.types import MultimodalContent, MultimodalContentConvertible
 from draive.utils import AsyncStream, freeze
 
 __all__ = [
@@ -27,10 +30,44 @@ __all__ = [
 
 @final
 class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
+    @classmethod
+    async def run(
+        cls,
+        messages: AgentMessageDraft,
+        /,
+        *__messages: AgentMessageDraft,
+        state: WorkflowState,
+        timeout: float | None = None,
+    ) -> WorkflowResult:
+        workflow: Self = cls(
+            state=state,
+            timeout=timeout,
+        )
+        async with ctx.nested(f"Workflow|{workflow.identifier}"):
+            workflow.send(
+                AgentMessage(
+                    sender=WORKFLOW_ENTRY,
+                    recipient=messages.recipient,
+                    addressee=messages.addressee,
+                    content=messages.content,
+                ),
+                *(
+                    AgentMessage(
+                        sender=WORKFLOW_ENTRY,
+                        recipient=message.recipient,
+                        addressee=message.addressee,
+                        content=message.content,
+                    )
+                    for message in __messages
+                ),
+            )
+
+            return await workflow.execute()
+
     def __init__(
         self,
         state: WorkflowState,
-        timeout: float,
+        timeout: float | None = None,
     ) -> None:
         current_state: WorkflowState = state
 
@@ -47,10 +84,11 @@ class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
             read=state_read,
             update=state_update,
         )
+        self.identifier: UUID = uuid4()
         self._runners: dict[UUID, AgentRunner] = {}
         self._messages: AsyncStream[AgentMessage] = AsyncStream()
         self._result: Future[WorkflowResult] = Future()
-        self._timeout: float = timeout
+        self._timeout: float = timeout or 600  # default timeout is 10 minutes
 
         self._workflow_current: AgentWorkflowCurrent[WorkflowState, WorkflowResult] = (
             AgentWorkflowCurrent(
@@ -81,6 +119,8 @@ class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
         message: AgentMessage,
         /,
     ) -> None:
+        assert message.recipient.identifier != WORKFLOW_ENTRY.identifier  # nosec: B101
+
         ctx.log_info(
             "Delivering message [%s] from %s to %s",
             message.identifier,
@@ -109,12 +149,13 @@ class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
 
     def send(
         self,
-        *messages: AgentMessage,
+        messages: AgentMessage,
+        *_messages: AgentMessage,
     ) -> None:
         if self._result.done():
             return ctx.log_debug("Ignoring messages - workflow finished")
 
-        self._messages.send(*messages)
+        self._messages.send(messages, *_messages)
 
     def finish_with(
         self,
@@ -170,3 +211,26 @@ class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
             await self._deliver(message)
 
         return await self._result
+
+
+@final
+class PlaceholderAgent(AgentBase):
+    def __init__(self) -> None:
+        self._identifier: UUID = UUID(int=0)
+
+        freeze(self)
+
+    @property
+    def identifier(self) -> UUID:
+        return self._identifier
+
+    def address(
+        self,
+        content: MultimodalContent | MultimodalContentConvertible,
+        *,
+        addressee: AgentBase | None = None,
+    ) -> AgentMessageDraft:
+        raise RuntimeError("Can't address a message to a placeholder agent!")
+
+
+WORKFLOW_ENTRY: Final[PlaceholderAgent] = PlaceholderAgent()

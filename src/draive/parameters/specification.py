@@ -120,7 +120,7 @@ class ParameterTupleSpecification(TypedDict, total=False):
 @final
 class ParameterDictSpecification(TypedDict, total=False):
     type: Required[Literal["object"]]
-    additionalProperties: Required["ParameterSpecification"]
+    additionalProperties: Required["ParameterSpecification | bool"]
     description: NotRequired[str]
     required: NotRequired[list[str]]
 

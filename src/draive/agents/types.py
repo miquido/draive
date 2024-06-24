@@ -81,30 +81,12 @@ class AgentBase(ABC):
     def identifier(self) -> UUID: ...
 
     @abstractmethod
-    def prepare_message(
+    def address(
         self,
         content: MultimodalContent | MultimodalContentConvertible,
         *,
         addressee: "AgentBase | None" = None,
     ) -> "AgentMessageDraft": ...
-
-
-class WorkflowAgentBase[WorkflowState: ParametrizedData, WorkflowResult](AgentBase):
-    @abstractmethod
-    async def _draive(  # yes, it is the name of the library
-        self,
-        input: "AgentInput",  # noqa: A002
-        workflow: "AgentWorkflowCurrent[WorkflowState, WorkflowResult]",
-    ) -> None: ...
-
-    @abstractmethod
-    async def start_workflow(
-        self,
-        input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
-        /,
-        state: WorkflowState,
-        timeout: float | None = None,
-    ) -> WorkflowResult: ...
 
 
 class AgentMessageDraft(DataModel):
@@ -133,14 +115,14 @@ class AgentMessage(DataModel):
     content: MultimodalContent
 
     @property
-    def expects_response(self) -> bool:
+    def should_respond(self) -> bool:
         return self.addressee is not None
 
-    def prepare_response(
+    def response(
         self,
         content: MultimodalContent | MultimodalContentConvertible,
+        *,
         addressee: AgentBase | None = None,
-        /,
     ) -> AgentMessageDraft:
         return AgentMessageDraft(
             recipient=self.addressee or self.sender,
@@ -153,6 +135,24 @@ type AgentInput = AsyncStream[AgentMessage]
 type AgentOutput[WorkflowResult] = (
     AgentMessageDraftGroup | AgentMessageDraft | WorkflowResult | None
 )
+
+
+class WorkflowAgentBase[WorkflowState: ParametrizedData, WorkflowResult](AgentBase):
+    @abstractmethod
+    async def _draive(  # yes, it is the name of the library
+        self,
+        input: AgentInput,  # noqa: A002
+        workflow: "AgentWorkflowCurrent[WorkflowState, WorkflowResult]",
+    ) -> None: ...
+
+    @abstractmethod
+    async def start_workflow(
+        self,
+        input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+        /,
+        state: WorkflowState,
+        timeout: float | None = None,
+    ) -> WorkflowResult: ...
 
 
 class WorkflowStateAccess[WorkflowState: ParametrizedData](Protocol):
@@ -278,7 +278,7 @@ class AgentCurrent[
                     content=message.content,
                 )
                 for message in messages
-            )
+            ),
         )
 
 

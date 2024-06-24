@@ -318,3 +318,27 @@ def test_llm_message_encoding() -> None:
     assert image_conversation_message_instance.as_json() == image_conversation_message_json
     assert audio_conversation_message_instance.as_json() == audio_conversation_message_json
     assert mixed_conversation_message_instance.as_json() == mixed_conversation_message_json
+
+
+class AnyModelNested(DataModel):
+    answer: int
+
+
+class AnyModel(DataModel):
+    any_model: DataModel
+
+
+any_model_instance: AnyModel = AnyModel(
+    any_model=AnyModelNested(
+        answer=42,
+    ),
+)
+any_model_json: str = '{"any_model": {"answer": 42}}'
+
+
+def test_any_encoding() -> None:
+    assert any_model_instance.as_json() == any_model_json
+
+
+def test_any_dict_decoding() -> None:
+    assert DataModel.from_json(any_model_json).as_dict() == any_model_instance.as_dict()
