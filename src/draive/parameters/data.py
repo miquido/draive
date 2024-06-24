@@ -282,10 +282,6 @@ class DataParameter:
     field_specifiers=(),
 )
 class ParametrizedDataMeta(type):
-    _: Any
-    __PARAMETERS__: dict[str, DataParameter]
-    __PARAMETERS_SPECIFICATION__: ParametersSpecification | Missing
-
     def __new__(
         cls,
         name: str,
@@ -300,7 +296,10 @@ class ParametrizedDataMeta(type):
             classdict,
             **kwargs,
         )
+        if not bases:
+            return data_type
 
+        is_data_model: bool = "DataModel" in tuple(base.__name__ for base in bases)
         globalns: dict[str, Any] = sys.modules.get(data_type.__module__).__dict__
         localns: dict[str, Any] = {data_type.__name__: data_type}
         recursion_guard: frozenset[type[Any]] = frozenset({data_type})
@@ -321,7 +320,7 @@ class ParametrizedDataMeta(type):
                 name=key,
                 default=getattr(data_type, key, MISSING),
                 # prepare specification only for the data models
-                prepare_specification="DataModel" in tuple(base.__name__ for base in bases),
+                prepare_specification=is_data_model,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,
@@ -336,22 +335,35 @@ class ParametrizedDataMeta(type):
                         aliased_required.append(key)
 
                 else:
-                    # if any parameter does not have specification then whole type does not have one
-                    properties_specification = MISSING  # pyright: ignore[reportConstantRedefinition]
+                    # if any parameter does not have specification
+                    # then whole type does not have one
+                    properties_specification = MISSING
 
             else:
                 continue  # skip if we already have missing specification
 
-        data_type.__PARAMETERS__ = parameters  # pyright: ignore[reportConstantRedefinition]
-        if not_missing(properties_specification):
-            data_type.__PARAMETERS_SPECIFICATION__ = {  # pyright: ignore[reportConstantRedefinition]
+        assert parameters or name in {  # nosec: B101
+            "DataModel",
+            "State",
+            "Stateless",
+        }, "Can't prepare parametrized data without parameters!"
+        data_type.__PARAMETERS__ = parameters  # pyright: ignore[reportAttributeAccessIssue]
+        data_type.__PARAMETERS_LIST__ = list(parameters.values())  # pyright: ignore[reportAttributeAccessIssue]
+        if not parameters and name == "DataModel":
+            data_type.__PARAMETERS_SPECIFICATION__ = {  # pyright: ignore[reportAttributeAccessIssue]
+                "type": "object",
+                "additionalProperties": True,
+            }
+
+        elif not_missing(properties_specification):
+            data_type.__PARAMETERS_SPECIFICATION__ = {  # pyright: ignore[reportAttributeAccessIssue]
                 "type": "object",
                 "properties": properties_specification,
                 "required": aliased_required,
             }
 
         else:
-            data_type.__PARAMETERS_SPECIFICATION__ = MISSING  # pyright: ignore[reportConstantRedefinition]
+            data_type.__PARAMETERS_SPECIFICATION__ = MISSING  # pyright: ignore[reportAttributeAccessIssue]
 
         data_type.__slots__ = frozenset(parameters.keys())  # pyright: ignore[reportAttributeAccessIssue]
         data_type.__match_args__ = data_type.__slots__  # pyright: ignore[reportAttributeAccessIssue]
@@ -362,32 +374,40 @@ class ParametrizedDataMeta(type):
 class ParametrizedData(metaclass=ParametrizedDataMeta):
     _: ClassVar[Self]
     __PARAMETERS__: ClassVar[dict[str, DataParameter]]
+    __PARAMETERS_LIST__: ClassVar[list[DataParameter]]
     __PARAMETERS_SPECIFICATION__: ClassVar[ParametersSpecification | Missing]
 
     def __init__(
         self,
-        *args: Any,
         **kwargs: Any,
     ) -> None:
-        assert not args, "Positional unkeyed arguments are not supported"  # nosec: B101
-        for parameter in self.__class__.__PARAMETERS__.values():
-            parameter_context: ParameterValidationContext = (self.__class__.__qualname__,)
-            object.__setattr__(
-                self,  # pyright: ignore[reportUnknownArgumentType]
-                parameter.name,
-                parameter.validated(
-                    kwargs.get(
-                        parameter.name,
+        if self.__class__.__PARAMETERS_LIST__:
+            for parameter in self.__class__.__PARAMETERS_LIST__:
+                parameter_context: ParameterValidationContext = (self.__class__.__qualname__,)
+                object.__setattr__(
+                    self,  # pyright: ignore[reportUnknownArgumentType]
+                    parameter.name,
+                    parameter.validated(
                         kwargs.get(
-                            parameter.alias,
-                            MISSING,
-                        )
-                        if parameter.alias
-                        else MISSING,
+                            parameter.name,
+                            kwargs.get(
+                                parameter.alias,
+                                MISSING,
+                            )
+                            if parameter.alias
+                            else MISSING,
+                        ),
+                        context=parameter_context,
                     ),
-                    context=parameter_context,
-                ),
-            )
+                )
+
+        else:
+            for key, value in kwargs.items():
+                object.__setattr__(
+                    self,  # pyright: ignore[reportUnknownArgumentType]
+                    key,
+                    value,
+                )
 
     @classmethod
     def path[Parameter](
@@ -451,7 +471,7 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
             return self
 
         updated: Self = self.__class__.__new__(self.__class__)
-        for parameter in self.__class__.__PARAMETERS__.values():
+        for parameter in self.__class__.__PARAMETERS_LIST__:
             parameter_context: ParameterValidationContext = (self.__class__.__qualname__,)
             validated_value: Any
             if parameter.name in parameters:
@@ -491,7 +511,7 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         ), f"Parameter {name} does not exist in {self.__class__.__qualname__}"
 
         updated: Self = self.__class__.__new__(self.__class__)
-        for parameter in self.__class__.__PARAMETERS__.values():
+        for parameter in self.__class__.__PARAMETERS_LIST__:
             parameter_context: ParameterValidationContext = (self.__class__.__qualname__,)
             validated_value: Any
             if parameter.name == name:
@@ -582,16 +602,19 @@ def _data_dict(  # noqa: PLR0911
         case str() | None | int() | float() | bool():
             return data  # use basic value types as they are
 
-        case parametrized_data if hasattr(parametrized_data.__class__, "__PARAMETERS__"):
+        case parametrized_data if hasattr(parametrized_data.__class__, "__PARAMETERS_LIST__"):
             # convert parametrized data to dict
-            if aliased:
+            if not parametrized_data.__class__.__PARAMETERS_LIST__:  # if base - use all variables
+                return cast(dict[str, Any], vars(parametrized_data))
+
+            elif aliased:  # alias if needed
                 return {
                     field.alias or field.name: _data_dict(
                         getattr(parametrized_data, field.name),
                         aliased=aliased,
                         converter=field.converter,
                     )
-                    for field in parametrized_data.__class__.__PARAMETERS__.values()
+                    for field in parametrized_data.__class__.__PARAMETERS_LIST__
                 }
 
             else:
@@ -601,7 +624,7 @@ def _data_dict(  # noqa: PLR0911
                         aliased=aliased,
                         converter=field.converter,
                     )
-                    for field in parametrized_data.__class__.__PARAMETERS__.values()
+                    for field in parametrized_data.__class__.__PARAMETERS_LIST__
                 }
 
         case {**elements}:  # replace mapping with dict

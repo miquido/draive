@@ -6,7 +6,7 @@ from uuid import UUID
 
 from draive.parameters.data import ParametrizedData
 from draive.parameters.schema import json_schema, simplified_schema
-from draive.utils import Missing, not_missing
+from draive.utils import Missing, cache, not_missing
 
 __all__ = [
     "DataModel",
@@ -27,6 +27,7 @@ class ModelJSONEncoder(json.JSONEncoder):
 
 class DataModel(ParametrizedData):
     @classmethod
+    @cache(limit=2)
     def json_schema(
         cls,
         indent: int | None = None,
@@ -41,6 +42,7 @@ class DataModel(ParametrizedData):
             raise TypeError(f"{cls.__qualname__} can't be represented using json schema")
 
     @classmethod
+    @cache(limit=2)
     def simplified_schema(
         cls,
         indent: int | None = None,

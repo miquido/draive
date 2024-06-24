@@ -11,5 +11,5 @@ class State(ParametrizedData):
         return str(self.as_dict(aliased=False))
 
 
-class Stateless(State):
+class Stateless(ParametrizedData):
     pass
