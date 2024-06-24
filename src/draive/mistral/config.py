@@ -15,10 +15,10 @@ class ResponseFormat(TypedDict):
 
 class MistralChatConfig(DataModel):
     model: str = "open-mistral-7b"
-    temperature: float = 0.0
+    temperature: float = 0.75
     top_p: float | Missing = MISSING
     seed: int | None | Missing = MISSING
-    max_tokens: int | Missing = MISSING
+    max_tokens: int = 2048
     response_format: ResponseFormat | Missing = MISSING
     timeout: float | Missing = MISSING
 

@@ -1,5 +1,3 @@
-from typing import Literal
-
 from draive.parameters import DataModel
 from draive.utils import MISSING, Missing
 
@@ -9,8 +7,8 @@ __all__ = [
 
 
 class MRSChatConfig(DataModel):
-    model: Literal["Phi-3"] | str = "Phi-3"
-    temperature: float = 0.0
+    model: str = "Phi-3"
+    temperature: float = 0.75
     top_p: float | Missing = MISSING
     top_k: int | Missing = MISSING
-    max_tokens: int | Missing = MISSING
+    max_tokens: int = 2048

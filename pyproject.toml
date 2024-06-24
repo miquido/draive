@@ -31,6 +31,9 @@ openai = [
   "openai~=1.32",
   "tiktoken~=0.7",
 ]
+anthropic = [
+  "anthropic~=0.29.0",
+]
 mistral = [
   "httpx~=0.27",
   "sentencepiece~=0.2",
@@ -50,6 +53,7 @@ fastembed = [
 ]
 dev = [
   "draive[openai]",
+  "draive[anthropic]",
   "draive[mistral]",
   "draive[ollama]",
   "draive[gemini]",

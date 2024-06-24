@@ -10,28 +10,15 @@ __all__ = [
 
 
 class GeminiConfig(DataModel):
-    model: (
-        Literal[
-            "gemini-1.5-pro",
-            "gemini-1.5-flash",
-        ]
-        | str
-    ) = "gemini-1.5-flash"
-    temperature: float = 0.0
+    model: str = "gemini-1.5-flash"
+    temperature: float = 0.75
     response_format: Literal["text/plain", "application/json"] | Missing = MISSING
     top_p: float | Missing = MISSING
     top_k: int | Missing = MISSING
-    max_tokens: int | Missing = MISSING
+    max_tokens: int = 2048
     timeout: float | Missing = MISSING
 
 
 class GeminiEmbeddingConfig(DataModel):
-    model: (
-        Literal[
-            "text-embedding-004",
-            "text-embedding-001",
-            "embedding-gecko-001",
-        ]
-        | str
-    ) = "embedding-gecko-001"
+    model: str = "embedding-gecko-001"
     batch_size: int = 128

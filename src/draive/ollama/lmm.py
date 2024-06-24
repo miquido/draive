@@ -10,11 +10,11 @@ from draive.ollama.models import ChatCompletionResponse, ChatMessage
 from draive.parameters import ToolSpecification
 from draive.scope import ctx
 from draive.types import (
+    Instruction,
     LMMCompletion,
     LMMCompletionChunk,
     LMMContextElement,
     LMMInput,
-    LMMInstruction,
     LMMOutput,
     LMMOutputStream,
     LMMOutputStreamChunk,
@@ -30,6 +30,7 @@ __all__ = [
 @overload
 async def ollama_lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -42,6 +43,7 @@ async def ollama_lmm_invocation(
 @overload
 async def ollama_lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -54,6 +56,7 @@ async def ollama_lmm_invocation(
 @overload
 async def ollama_lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -63,8 +66,9 @@ async def ollama_lmm_invocation(
 ) -> LMMOutputStream | LMMOutput: ...
 
 
-async def ollama_lmm_invocation(
+async def ollama_lmm_invocation(  # noqa: PLR0913
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -104,7 +108,11 @@ async def ollama_lmm_invocation(
                 config = config.updated(response_format="json")
 
         messages: list[ChatMessage] = [
-            _convert_context_element(element=element) for element in context
+            ChatMessage(
+                role="system",
+                content=Instruction.of(instruction).format(),
+            ),
+            *[_convert_context_element(element=element) for element in context],
         ]
 
         if stream:
@@ -128,12 +136,6 @@ def _convert_context_element(
     element: LMMContextElement,
 ) -> ChatMessage:
     match element:
-        case LMMInstruction() as instruction:
-            return ChatMessage(
-                role="system",
-                content=instruction.content,
-            )
-
         case LMMInput() as input:
             return ChatMessage(
                 role="user",

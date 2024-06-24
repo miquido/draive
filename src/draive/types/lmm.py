@@ -3,7 +3,6 @@ from typing import Any, Self
 
 from draive.parameters import Field
 from draive.parameters.model import DataModel
-from draive.types.instruction import Instruction
 from draive.types.multimodal import MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
@@ -11,7 +10,6 @@ __all__ = [
     "LMMCompletionChunk",
     "LMMContextElement",
     "LMMInput",
-    "LMMInstruction",
     "LMMOutput",
     "LMMOutputStream",
     "LMMOutputStreamChunk",
@@ -19,27 +17,6 @@ __all__ = [
     "LMMToolRequests",
     "LMMToolResponse",
 ]
-
-
-class LMMInstruction(DataModel):
-    @classmethod
-    def of(
-        cls,
-        instruction: Instruction | str,
-        /,
-        **variables: object,
-    ) -> Self:
-        match instruction:
-            case str(content):
-                return cls(content=content.format_map(variables) if variables else content)
-
-            case instruction:
-                return cls(content=instruction.format(**variables))
-
-    content: str
-
-    def __bool__(self) -> bool:
-        return bool(self.content)
 
 
 class LMMInput(DataModel):
@@ -92,6 +69,7 @@ class LMMToolResponse(DataModel):
     tool: str
     content: MultimodalContent
     direct: bool
+    error: bool
 
 
 class LMMToolRequest(DataModel):
@@ -104,7 +82,7 @@ class LMMToolRequests(DataModel):
     requests: list[LMMToolRequest]
 
 
-LMMContextElement = LMMInstruction | LMMInput | LMMCompletion | LMMToolRequests | LMMToolResponse
+LMMContextElement = LMMInput | LMMCompletion | LMMToolRequests | LMMToolResponse
 LMMOutput = LMMCompletion | LMMToolRequests
 LMMOutputStreamChunk = LMMCompletionChunk | LMMToolRequests
 LMMOutputStream = AsyncIterator[LMMOutputStreamChunk]

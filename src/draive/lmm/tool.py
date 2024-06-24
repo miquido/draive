@@ -8,7 +8,7 @@ from typing import (
 )
 from uuid import uuid4
 
-from draive.lmm.errors import ToolException
+from draive.lmm.errors import ToolError, ToolException
 from draive.lmm.state import ToolCallContext, ToolStatusStream
 from draive.metrics import ArgumentsTrace, ResultTrace
 from draive.parameters import (
@@ -133,8 +133,10 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
 
             except Exception as exc:
                 call_context.report("FAILED")
-                # do not blow up on tool call, return an error content instead
-                return MultimodalContent.of(self.format_failure(exc))
+                # return an error with formatted content
+                raise ToolError(
+                    content=MultimodalContent.of(self.format_failure(exc)),
+                ) from exc
 
     # regular call when using as a function
     async def __call__(

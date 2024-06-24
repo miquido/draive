@@ -11,11 +11,11 @@ from draive.mrs.errors import MRSException
 from draive.parameters import ToolSpecification
 from draive.scope import ctx
 from draive.types import (
+    Instruction,
     LMMCompletion,
     LMMCompletionChunk,
     LMMContextElement,
     LMMInput,
-    LMMInstruction,
     LMMOutput,
     LMMOutputStream,
     LMMOutputStreamChunk,
@@ -31,6 +31,7 @@ __all__ = [
 @overload
 async def mrs_lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -43,6 +44,7 @@ async def mrs_lmm_invocation(
 @overload
 async def mrs_lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -55,6 +57,7 @@ async def mrs_lmm_invocation(
 @overload
 async def mrs_lmm_invocation(
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -64,8 +67,9 @@ async def mrs_lmm_invocation(
 ) -> LMMOutputStream | LMMOutput: ...
 
 
-async def mrs_lmm_invocation(
+async def mrs_lmm_invocation(  # noqa: PLR0913
     *,
+    instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
     require_tool: ToolSpecification | bool = False,
@@ -105,7 +109,11 @@ async def mrs_lmm_invocation(
                 config = config.updated(response_format={"type": "json_object"})
 
         messages: list[dict[str, object]] = [
-            _convert_context_element(element=element) for element in context
+            {
+                "role": "system",
+                "content": Instruction.of(instruction).format(),
+            },
+            *[_convert_context_element(element=element) for element in context],
         ]
 
         if stream:
@@ -129,12 +137,6 @@ def _convert_context_element(
     element: LMMContextElement,
 ) -> dict[str, object]:
     match element:
-        case LMMInstruction() as instruction:
-            return {
-                "role": "system",
-                "content": instruction.content,
-            }
-
         case LMMInput() as input:
             return {
                 "role": "user",  # multimodal not supported yet

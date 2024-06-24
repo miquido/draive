@@ -72,9 +72,7 @@ class GeminiClient(ScopeDependency):
                         "temperature": config.temperature,
                         "topP": config.top_p if not_missing(config.top_p) else None,
                         "topK": config.top_k if not_missing(config.top_k) else None,
-                        "maxOutputTokens": config.max_tokens
-                        if not_missing(config.max_tokens)
-                        else None,
+                        "maxOutputTokens": config.max_tokens,
                         "responseSchema": response_schema if response_schema else None,
                         "candidateCount": 1,
                     },
