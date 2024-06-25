@@ -1,4 +1,4 @@
-from draive.splitters.basic import split_text
+from draive.splitters.text import split_text
 
 __all__ = [
     "split_text",
