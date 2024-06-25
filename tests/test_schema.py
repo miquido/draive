@@ -15,7 +15,7 @@ class SchemaModel(DataModel):
     bool_value: bool
     list_value: list[str]
     optional_value: str | None = Field(description="alternative")
-    nested: SchemaNestedModel = Field(alias="nested_value", description="alternative")
+    nested: SchemaNestedModel = Field(aliased="nested_value", description="alternative")
 
 
 json_schema: str = """\

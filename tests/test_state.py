@@ -20,13 +20,13 @@ def dummy_callable() -> None:
 
 class ExampleState(State):
     string: str = "default"
-    number: int = Field(alias="alias", description="description", default=1)
+    number: int = Field(aliased="alias", description="description", default=1)
     none_default: int | None = Field(default=None)
     value_default: int = Field(default=9)
     invalid: str = Field(verifier=invalid, default="valid")
-    nested: ExampleNestedState = Field(alias="answer", default=ExampleNestedState())
+    nested: ExampleNestedState = Field(aliased="answer", default=ExampleNestedState())
     full: Literal["A", "B"] | list[int] | str | bool | None = Field(
-        alias="all",
+        aliased="all",
         description="complex",
         default="",
     )
