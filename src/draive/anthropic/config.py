@@ -13,7 +13,15 @@ class ResponseFormat(TypedDict):
 
 
 class AnthropicConfig(DataModel):
-    model: str = "claude-3-5-sonnet-20240620"
+    model: (
+        Literal[
+            "claude-3-5-sonnet-20240620",
+            "claude-3-opus-20240229",
+            "claude-3-sonnet-20240229",
+            "claude-3-haiku-20240307",
+        ]
+        | str
+    ) = "claude-3-haiku-20240307"
     temperature: float = 0.0
     top_p: float | Missing = MISSING
     max_tokens: int = 2048
