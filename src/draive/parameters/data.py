@@ -279,7 +279,7 @@ class DataParameter:
 @dataclass_transform(
     kw_only_default=True,
     frozen_default=True,
-    field_specifiers=(),
+    field_specifiers=(Field,),
 )
 class ParametrizedDataMeta(type):
     def __new__(
