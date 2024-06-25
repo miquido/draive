@@ -18,13 +18,13 @@ __all__ = [
 
 
 class GeminiMessageContentBlob(DataModel):
-    mime_type: str = Field(alias="mimeType")
+    mime_type: str = Field(aliased="mimeType")
     data: str  # base64 encoded
 
 
 class GeminiMessageContentReference(DataModel):
-    mime_type: str = Field(alias="mimeType")
-    uri: str = Field(alias="fileUri")
+    mime_type: str = Field(aliased="mimeType")
+    uri: str = Field(aliased="fileUri")
 
 
 class GeminiTextMessageContent(DataModel):
@@ -32,20 +32,20 @@ class GeminiTextMessageContent(DataModel):
 
 
 class GeminiDataMessageContent(DataModel):
-    data: GeminiMessageContentBlob = Field(alias="inlineData")
+    data: GeminiMessageContentBlob = Field(aliased="inlineData")
 
 
 class GeminiDataReferenceMessageContent(DataModel):
-    reference: GeminiMessageContentReference = Field(alias="fileData")
+    reference: GeminiMessageContentReference = Field(aliased="fileData")
 
 
 class GeminiFunctionCall(DataModel):
     name: str
-    arguments: dict[str, Any] = Field(alias="args")
+    arguments: dict[str, Any] = Field(aliased="args")
 
 
 class GeminiFunctionCallMessageContent(DataModel):
-    function_call: GeminiFunctionCall = Field(alias="functionCall")
+    function_call: GeminiFunctionCall = Field(aliased="functionCall")
 
 
 class GeminiFunctionResponse(DataModel):
@@ -54,7 +54,7 @@ class GeminiFunctionResponse(DataModel):
 
 
 class GeminiFunctionResponseMessageContent(DataModel):
-    function_response: GeminiFunctionResponse = Field(alias="functionResponse")
+    function_response: GeminiFunctionResponse = Field(aliased="functionResponse")
 
 
 GeminiMessageContent = (
@@ -68,7 +68,7 @@ GeminiMessageContent = (
 
 class GeminiMessage(DataModel):
     role: Literal["user", "model"]
-    content: list[GeminiMessageContent] = Field(alias="parts")
+    content: list[GeminiMessageContent] = Field(aliased="parts")
 
 
 class GeminiRequestMessage(TypedDict, total=False):
@@ -95,8 +95,8 @@ class GeminiFunctionsTool(TypedDict, total=False):
 
 
 class GeminiUsage(DataModel):
-    prompt_tokens: int = Field(alias="promptTokenCount", default_factory=int)
-    generated_tokens: int = Field(alias="candidatesTokenCount", default_factory=int)
+    prompt_tokens: int = Field(aliased="promptTokenCount", default_factory=int)
+    generated_tokens: int = Field(aliased="candidatesTokenCount", default_factory=int)
 
 
 class GeminiChoice(DataModel):
@@ -107,9 +107,9 @@ class GeminiChoice(DataModel):
         "SAFETY",
         "RECITATION",
         "OTHER",
-    ] = Field(alias="finishReason")
+    ] = Field(aliased="finishReason")
 
 
 class GeminiGenerationResult(DataModel):
-    choices: list[GeminiChoice] = Field(alias="candidates")
-    usage: GeminiUsage = Field(alias="usageMetadata")
+    choices: list[GeminiChoice] = Field(aliased="candidates")
+    usage: GeminiUsage = Field(aliased="usageMetadata")

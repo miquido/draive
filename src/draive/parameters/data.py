@@ -35,7 +35,7 @@ __all__ = [
 @overload
 def Field[Value](
     *,
-    alias: str | None = None,
+    aliased: str | None = None,
     description: str | None = None,
     default: Value | Missing = MISSING,
     validator: ParameterValidator[Value] | Missing = MISSING,
@@ -47,7 +47,7 @@ def Field[Value](
 @overload
 def Field[Value](
     *,
-    alias: str | None = None,
+    aliased: str | None = None,
     description: str | None = None,
     default_factory: Callable[[], Value] | Missing = MISSING,
     validator: ParameterValidator[Value] | Missing = MISSING,
@@ -59,7 +59,7 @@ def Field[Value](
 @overload
 def Field[Value](
     *,
-    alias: str | None = None,
+    aliased: str | None = None,
     description: str | None = None,
     default: Value | Missing = MISSING,
     verifier: ParameterVerifier[Value] | None = None,
@@ -71,7 +71,7 @@ def Field[Value](
 @overload
 def Field[Value](
     *,
-    alias: str | None = None,
+    aliased: str | None = None,
     description: str | None = None,
     default_factory: Callable[[], Value] | Missing = MISSING,
     verifier: ParameterVerifier[Value] | None = None,
@@ -82,7 +82,7 @@ def Field[Value](
 
 def Field[Value](  # noqa: PLR0913 # Ruff - noqa: B008
     *,
-    alias: str | None = None,
+    aliased: str | None = None,
     description: str | None = None,
     default: Value | Missing = MISSING,
     default_factory: Callable[[], Value] | Missing = MISSING,
@@ -101,7 +101,7 @@ def Field[Value](  # noqa: PLR0913 # Ruff - noqa: B008
     return cast(
         Value,
         DataField(
-            alias=alias,
+            aliased=aliased,
             description=description,
             default=default,
             default_factory=default_factory,
@@ -117,7 +117,7 @@ def Field[Value](  # noqa: PLR0913 # Ruff - noqa: B008
 class DataField:
     def __init__(  # noqa: PLR0913
         self,
-        alias: str | None = None,
+        aliased: str | None = None,
         description: str | None = None,
         default: Any | Missing = MISSING,
         default_factory: ParameterDefaultFactory[Any] | Missing = MISSING,
@@ -126,7 +126,7 @@ class DataField:
         converter: Callable[[Any], BasicValue] | Missing = MISSING,
         specification: ParameterSpecification | Missing = MISSING,
     ) -> None:
-        self.alias: str | None = alias
+        self.aliased: str | None = aliased
         self.description: str | None = description
         self.default: Any | Missing = default
         self.default_factory: Callable[[], Any] | Missing = default_factory
@@ -141,7 +141,7 @@ class DataParameter:
     def __init__(  # noqa: PLR0913
         self,
         name: str,
-        alias: str | None,
+        aliased: str | None,
         description: str | None,
         annotation: Any,
         default: Any | Missing,
@@ -152,7 +152,7 @@ class DataParameter:
         specification: ParameterSpecification | Missing,
     ) -> None:
         self.name: str = name
-        self.alias: str | None = alias
+        self.aliased: str | None = aliased
         self.description: str | None = description
         self.annotation: Any = annotation
         self.default_value: Callable[[], Any | Missing]
@@ -208,7 +208,7 @@ class DataParameter:
             case DataField() as data_field:
                 return cls(
                     name=name,
-                    alias=data_field.alias,
+                    aliased=data_field.aliased,
                     description=data_field.description,
                     annotation=annotation,
                     default=data_field.default,
@@ -246,7 +246,7 @@ class DataParameter:
             case default:
                 return cls(
                     name=name,
-                    alias=None,
+                    aliased=None,
                     description=None,
                     annotation=annotation,
                     default=default,
@@ -391,10 +391,10 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
                         kwargs.get(
                             parameter.name,
                             kwargs.get(
-                                parameter.alias,
+                                parameter.aliased,
                                 MISSING,
                             )
-                            if parameter.alias
+                            if parameter.aliased
                             else MISSING,
                         ),
                         context=parameter_context,
@@ -480,9 +480,9 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
                     context=parameter_context,
                 )
 
-            elif parameter.alias and parameter.alias in parameters:
+            elif parameter.aliased and parameter.aliased in parameters:
                 validated_value = parameter.validated(
-                    parameters[parameter.alias],
+                    parameters[parameter.aliased],
                     context=parameter_context,
                 )
 
@@ -520,7 +520,7 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
                     context=parameter_context,
                 )
 
-            elif parameter.alias and parameter.alias == name:
+            elif parameter.aliased and parameter.aliased == name:
                 validated_value = parameter.validated(
                     value,
                     context=parameter_context,
@@ -609,7 +609,7 @@ def _data_dict(  # noqa: PLR0911
 
             elif aliased:  # alias if needed
                 return {
-                    field.alias or field.name: _data_dict(
+                    field.aliased or field.name: _data_dict(
                         getattr(parametrized_data, field.name),
                         aliased=aliased,
                         converter=field.converter,

@@ -51,7 +51,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         parameters: dict[str, ParameterSpecification] = {}
         for parameter in self._parameters.values():
             if not_missing(parameter.specification):
-                parameters[parameter.alias or parameter.name] = parameter.specification
+                parameters[parameter.aliased or parameter.name] = parameter.specification
 
             else:
                 raise TypeError(
@@ -60,7 +60,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
                 )
 
             if not (parameter.has_default or parameter.allows_missing):
-                aliased_required.append(parameter.alias or parameter.name)
+                aliased_required.append(parameter.aliased or parameter.name)
 
         self.specification: ToolSpecification = {
             "type": "function",

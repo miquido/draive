@@ -20,7 +20,7 @@ charset-normalizer==3.3.2
     # via requests
 coloredlogs==15.0.1
     # via onnxruntime
-coverage==7.5.3
+coverage==7.5.4
     # via pytest-cov
 distro==1.9.0
     # via
@@ -28,7 +28,7 @@ distro==1.9.0
     #   openai
 fastembed==0.3.1
     # via draive (pyproject.toml)
-filelock==3.15.3
+filelock==3.15.4
     # via huggingface-hub
 flatbuffers==24.3.25
     # via onnxruntime
@@ -56,7 +56,7 @@ idna==3.7
     #   requests
 iniconfig==2.0.0
     # via pytest
-jiter==0.4.2
+jiter==0.5.0
     # via anthropic
 loguru==0.7.2
     # via fastembed
@@ -64,7 +64,7 @@ markdown-it-py==3.0.0
     # via rich
 mdurl==0.1.2
     # via markdown-it-py
-mistralrs==0.1.20
+mistralrs==0.1.22
     # via draive (pyproject.toml)
 mmh3==4.1.0
     # via fastembed

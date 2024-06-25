@@ -21,19 +21,19 @@ def invalid(value: str) -> None:
 
 
 class ExampleNestedModel(DataModel):
-    nested_alias: str = Field(alias="string", default="default")
+    nested_alias: str = Field(aliased="string", default="default")
     more: list[int] | None = None
 
 
 class ExampleModel(DataModel):
     string: str = "default"
-    number: int = Field(alias="alias", description="description", default=1)
+    number: int = Field(aliased="alias", description="description", default=1)
     none_default: int | None = Field(default=None)
     value_default: int = Field(default=9)
     invalid: str = Field(verifier=invalid, default="valid")
-    nested: ExampleNestedModel = Field(alias="answer", default=ExampleNestedModel())
+    nested: ExampleNestedModel = Field(aliased="answer", default=ExampleNestedModel())
     full: Literal["A", "B"] | list[int] | str | bool | None = Field(
-        alias="all",
+        aliased="all",
         description="complex",
         default="",
     )
