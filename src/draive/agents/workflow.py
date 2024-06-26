@@ -227,7 +227,7 @@ class PlaceholderAgent(AgentBase):
     def address(
         self,
         content: MultimodalContent | MultimodalContentConvertible,
-        *,
+        /,
         addressee: AgentBase | None = None,
     ) -> AgentMessageDraft:
         raise RuntimeError("Can't address a message to a placeholder agent!")

@@ -2,10 +2,12 @@ import builtins
 import types
 import typing
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections import deque
+from collections.abc import Callable, Mapping, Sequence
+from copy import copy
 from typing import Any, final, get_args, get_origin, overload
 
-from draive.utils import freeze
+from draive.utils import MISSING, Missing, freeze, not_missing
 
 __all__ = [
     "ParameterPath",
@@ -16,7 +18,7 @@ class ParameterPathComponent(ABC):
     @abstractmethod
     def path_str(
         self,
-        current: str,
+        current: str | None = None,
     ) -> str: ...
 
     @abstractmethod
@@ -24,6 +26,14 @@ class ParameterPathComponent(ABC):
         self,
         subject: Any,
         /,
+    ) -> Any: ...
+
+    @abstractmethod
+    def assign(
+        self,
+        subject: Any,
+        /,
+        value: Any,
     ) -> Any: ...
 
 
@@ -56,14 +66,39 @@ class ParameterPathAttributeComponent(ParameterPathComponent):
             )
             return resolved
 
+        def assign(
+            subject: Root,
+            /,
+            value: Parameter,
+        ) -> Root:
+            assert isinstance(subject, root_origin), (  # nosec: B101
+                f"ParameterPathComponent used on unexpected root of "
+                f"'{type(root)}' instead of '{root}' for '{attribute}'"
+            )
+            assert isinstance(value, parameter_origin), (  # nosec: B101
+                f"ParameterPathComponent assigning to unexpected value of "
+                f"'{type(value)}' instead of '{parameter}' for '{attribute}'"
+            )
+
+            updated: Root
+            if hasattr(subject, "updating_parameter"):  # can't check full type here
+                updated = subject.updating_parameter(attribute, value=value)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
+
+            else:
+                updated = copy(subject)
+                setattr(updated, attribute, value)
+
+            return updated  # pyright: ignore[reportUnknownVariableType]
+
         self._resolve: Callable[[Root], Parameter] = resolve
+        self._assign: Callable[[Root, Parameter], Root] = assign
         self._attribute: str = attribute
 
         freeze(self)
 
     def path_str(
         self,
-        current: str,
+        current: str | None = None,
     ) -> str:
         if current:
             return f"{current}.{self._attribute}"
@@ -76,6 +111,14 @@ class ParameterPathAttributeComponent(ParameterPathComponent):
         /,
     ) -> Any:
         return self._resolve(subject)
+
+    def assign(
+        self,
+        subject: Any,
+        /,
+        value: Any,
+    ) -> Any:
+        return self._assign(subject, value)
 
 
 @final
@@ -107,7 +150,40 @@ class ParameterPathItemComponent(ParameterPathComponent):
             )
             return resolved
 
+        def assign(
+            subject: Root,
+            /,
+            value: Parameter,
+        ) -> Root:
+            assert isinstance(subject, root_origin), (  # nosec: B101
+                f"ParameterPathComponent used on unexpected root of "
+                f"'{type(root)}' instead of '{root}' for '{item}'"
+            )
+            assert isinstance(value, parameter_origin), (  # nosec: B101
+                f"ParameterPathComponent assigning to unexpected value of "
+                f"'{type(value)}' instead of '{parameter}' for '{item}'"
+            )
+
+            if hasattr(subject, "__setitem__"):  # can't check full type here
+                updated: Root = copy(subject)
+                updated.__setitem__(item, value)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+                return updated
+
+            elif isinstance(subject, Mapping):
+                temp_dict: dict[Any, Any] = dict(subject)  # pyright: ignore[reportUnknownArgumentType]
+                temp_dict[item] = value
+                return subject.__class__(temp_dict)  # pyright: ignore[reportCallIssue, reportUnknownVariableType, reportUnknownMemberType]
+
+            elif isinstance(subject, Sequence):
+                temp_list: list[Any] = list(subject)  # pyright: ignore[reportUnknownArgumentType]
+                temp_list[item] = value
+                return subject.__class__(temp_list)  # pyright: ignore[reportCallIssue, reportUnknownVariableType, reportUnknownMemberType]
+
+            else:
+                raise RuntimeError(f"Unsupported item assignment - {type(value)} in {type(root)}")
+
         self._resolve: Callable[[Root], Parameter] = resolve
+        self._assign: Callable[[Root, Parameter], Root] = assign
         self._item: Any = item
 
     def path_str(
@@ -126,6 +202,14 @@ class ParameterPathItemComponent(ParameterPathComponent):
     ) -> Any:
         return self._resolve(subject)
 
+    def assign(
+        self,
+        subject: Any,
+        /,
+        value: Any,
+    ) -> Any:
+        return self._assign(subject, value)
+
 
 @final
 class ParameterPath[Root, Parameter]:
@@ -141,19 +225,19 @@ class ParameterPath[Root, Parameter]:
         self,
         root: type[Root],
         parameter: type[Parameter],
-        *path: ParameterPathItemComponent,
+        *path: ParameterPathComponent,
     ) -> None: ...
 
     def __init__(
         self,
         root: type[Root],
         parameter: type[Parameter],
-        *components: ParameterPathItemComponent,
+        *components: ParameterPathComponent,
     ) -> None:
         assert components or root == parameter  # nosec: B101
         self._root: type[Root] = root
         self._parameter: type[Parameter] = parameter
-        self._components: tuple[ParameterPathItemComponent, ...] = components
+        self._components: tuple[ParameterPathComponent, ...] = components
 
         freeze(self)
 
@@ -264,21 +348,62 @@ class ParameterPath[Root, Parameter]:
             ],
         )
 
+    @overload
     def __call__(
         self,
         root: Root,
-    ) -> Parameter:
+        /,
+    ) -> Parameter: ...
+
+    @overload
+    def __call__(
+        self,
+        root: Root,
+        /,
+        updated: Parameter,
+    ) -> Root: ...
+
+    def __call__(
+        self,
+        root: Root,
+        /,
+        updated: Parameter | Missing = MISSING,
+    ) -> Root | Parameter:
         assert isinstance(root, get_origin(self._root) or self._root), (  # nosec: B101
             f"ParameterPath '{self.__repr__()}' used on unexpected root of "
             f"'{type(root)}' instead of '{self._root}'"
         )
 
-        resolved: Any = root
-        for component in self._components:
-            resolved = component.resolve(resolved)
+        if not_missing(updated):
+            assert isinstance(updated, get_origin(self._parameter) or self._parameter), (  # nosec: B101
+                f"ParameterPath '{self.__repr__()}' assigning to unexpected value of "
+                f"'{type(updated)}' instead of '{self._parameter}'"
+            )
 
-        assert isinstance(resolved, get_origin(self._parameter) or self._parameter), (  # nosec: B101
-            f"ParameterPath '{self.__repr__()}' pointing to unexpected value of "
-            f"'{type(resolved)}' instead of '{self._parameter}'"
-        )
-        return resolved
+            resolved: Any = root
+            updates_stack: deque[tuple[Any, ParameterPathComponent]] = deque()
+            for component in self._components:
+                updates_stack.append((resolved, component))
+                resolved = component.resolve(resolved)
+
+            updated_value: Any = updated
+            while updates_stack:
+                subject, component = updates_stack.pop()
+                updated_value = component.assign(
+                    subject,
+                    value=updated_value,
+                )
+
+            return updated_value
+
+        else:
+            resolved: Any = root
+            for component in self._components:
+                resolved = component.resolve(resolved)
+
+            assert isinstance(resolved, get_origin(self._parameter) or self._parameter), (  # nosec: B101
+                f"ParameterPath '{self.__repr__()}' pointing to unexpected value of "
+                f"'{type(resolved)}' instead of '{self._parameter}'"
+            )
+
+            return resolved

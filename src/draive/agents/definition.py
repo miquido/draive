@@ -201,7 +201,7 @@ class Agent[
     def address(
         self,
         content: MultimodalContent | MultimodalContentConvertible,
-        *,
+        /,
         addressee: AgentBase | None = None,
     ) -> AgentMessageDraft:
         return AgentMessageDraft(

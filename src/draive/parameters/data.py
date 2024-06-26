@@ -500,6 +500,18 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
 
         return updated
 
+    def updating[Value](
+        self,
+        path: ParameterPath[Self, Value] | Value,
+        /,
+        value: Value,
+    ) -> Self:
+        assert isinstance(  # nosec: B101
+            path, ParameterPath
+        ), "Prepare parameter path by using Self._.path.to.property"
+
+        return cast(ParameterPath[Self, Value], path)(self, updated=value)
+
     def updating_parameter(
         self,
         name: str,
