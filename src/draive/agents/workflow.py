@@ -50,6 +50,7 @@ class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
                     recipient=messages.recipient,
                     addressee=messages.addressee,
                     content=messages.content,
+                    attachment=messages.attachment,
                 ),
                 *(
                     AgentMessage(
@@ -57,6 +58,7 @@ class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
                         recipient=message.recipient,
                         addressee=message.addressee,
                         content=message.content,
+                        attachment=message.attachment,
                     )
                     for message in __messages
                 ),
@@ -228,6 +230,7 @@ class PlaceholderAgent(AgentBase):
         self,
         content: MultimodalContent | MultimodalContentConvertible,
         /,
+        attachment: ParametrizedData | None = None,
         addressee: AgentBase | None = None,
     ) -> AgentMessageDraft:
         raise RuntimeError("Can't address a message to a placeholder agent!")
