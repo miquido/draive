@@ -84,7 +84,7 @@ class AgentBase(ABC):
     def address(
         self,
         content: MultimodalContent | MultimodalContentConvertible,
-        *,
+        /,
         addressee: "AgentBase | None" = None,
     ) -> "AgentMessageDraft": ...
 
