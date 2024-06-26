@@ -553,7 +553,7 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         return updated
 
     def __str__(self) -> str:
-        return str(self.as_dict())
+        return _data_str(self, aliased=True, converter=None).strip()
 
     def __repr__(self) -> str:
         return str(self.as_dict())
@@ -671,3 +671,108 @@ def _data_dict(  # noqa: PLR0911
 
         case other:  # for other types use deepcopy
             return deepcopy(other)
+
+
+def _data_str(  # noqa: PLR0911, PLR0912, C901
+    data: Any,
+    /,
+    aliased: bool,
+    converter: Callable[[Any], BasicValue] | None,
+) -> str:
+    # use converter if able
+    if converter := converter:
+        return _data_str(
+            converter(data),
+            aliased=aliased,
+            converter=None,
+        )
+
+    match data:
+        case str() as string:
+            return string
+
+        case None | int() | float() | bool():
+            return str(data)
+
+        case parametrized_data if hasattr(parametrized_data.__class__, "__PARAMETERS_LIST__"):
+            # convert parametrized data to dict
+            if not parametrized_data.__class__.__PARAMETERS_LIST__:  # if base - use all variables
+                string: str = ""
+                for key, value in vars(parametrized_data).items():  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                    element: str = _data_str(
+                        value,
+                        aliased=aliased,
+                        converter=None,
+                    ).replace("\n", "\n  ")
+
+                    string += f"\n{key}: {element}"
+
+                return string
+
+            elif aliased:  # alias if needed
+                string: str = ""
+                for field in parametrized_data.__class__.__PARAMETERS_LIST__:
+                    element: str = _data_str(
+                        getattr(parametrized_data, field.name),
+                        aliased=aliased,
+                        converter=field.converter,
+                    ).replace("\n", "\n  ")
+
+                    string += f"\n{field.aliased or field.name}: {element}"
+
+                return string
+
+            else:
+                string: str = ""
+                for field in parametrized_data.__class__.__PARAMETERS_LIST__:
+                    element: str = _data_str(
+                        getattr(parametrized_data, field.name),
+                        aliased=aliased,
+                        converter=field.converter,
+                    ).replace("\n", "\n  ")
+
+                    string += f"\n{field.name}: {element}"
+
+                return string
+
+        case {**elements}:  # replace mapping with dict
+            string: str = ""
+            for key, value in elements.items():
+                element: str = _data_str(
+                    value,
+                    aliased=aliased,
+                    converter=None,
+                ).replace("\n", "\n  ")
+
+                string += f"\n{key}: {element}"
+
+            return string
+
+        case [*values]:  # replace sequence with list
+            string: str = ""
+            for value in values:
+                element: str = _data_str(
+                    value,
+                    aliased=aliased,
+                    converter=None,
+                ).replace("\n", "\n  ")
+
+                string += f"\n- {element}"
+
+            return string
+
+        case dataclass if is_dataclass(dataclass):
+            string: str = ""
+            for field in dataclass_fields(dataclass):
+                element: str = _data_str(
+                    getattr(parametrized_data, field.name),
+                    aliased=aliased,
+                    converter=None,
+                ).replace("\n", "\n  ")
+
+                string += f"\n{field.name}: {element}"
+
+            return string
+
+        case other:  # for other types use its str
+            return str(other)

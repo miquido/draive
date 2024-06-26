@@ -91,9 +91,3 @@ class DataModel(ParametrizedData):
             raise ValueError(
                 f"Failed to encode {self.__class__.__name__} to json:\n{asdict(self)}"
             ) from exc
-
-    def __str__(self) -> str:
-        return self.as_json(
-            aliased=True,
-            indent=2,
-        )

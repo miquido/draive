@@ -176,6 +176,7 @@ class Agent[
                             recipient=message.recipient,
                             addressee=message.addressee,
                             content=message.content,
+                            attachment=message.attachment,
                         )
                         for message in messages_group.messages
                     )
@@ -188,6 +189,7 @@ class Agent[
                         recipient=message.recipient,
                         addressee=message.addressee,
                         content=message.content,
+                        attachment=message.attachment,
                     )
                 )
 
@@ -202,12 +204,14 @@ class Agent[
         self,
         content: MultimodalContent | MultimodalContentConvertible,
         /,
+        attachment: ParametrizedData | None = None,
         addressee: AgentBase | None = None,
     ) -> AgentMessageDraft:
         return AgentMessageDraft(
             recipient=self,
             addressee=addressee,
             content=MultimodalContent.of(content),
+            attachment=attachment,
         )
 
     async def start_workflow(

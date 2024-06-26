@@ -85,6 +85,7 @@ class AgentBase(ABC):
         self,
         content: MultimodalContent | MultimodalContentConvertible,
         /,
+        attachment: ParametrizedData | None = None,
         addressee: "AgentBase | None" = None,
     ) -> "AgentMessageDraft": ...
 
@@ -93,6 +94,7 @@ class AgentMessageDraft(DataModel):
     recipient: AgentBase
     addressee: AgentBase | None
     content: MultimodalContent
+    attachment: ParametrizedData | None
 
 
 class AgentMessageDraftGroup:
@@ -113,6 +115,7 @@ class AgentMessage(DataModel):
     recipient: AgentBase
     addressee: AgentBase | None
     content: MultimodalContent
+    attachment: ParametrizedData | None
 
     @property
     def should_respond(self) -> bool:
@@ -122,12 +125,14 @@ class AgentMessage(DataModel):
         self,
         content: MultimodalContent | MultimodalContentConvertible,
         *,
+        attachment: ParametrizedData | None = None,
         addressee: AgentBase | None = None,
     ) -> AgentMessageDraft:
         return AgentMessageDraft(
             recipient=self.addressee or self.sender,
             addressee=addressee,
             content=MultimodalContent.of(content),
+            attachment=attachment,
         )
 
 
@@ -276,6 +281,7 @@ class AgentCurrent[
                     recipient=message.recipient,
                     addressee=message.addressee,
                     content=message.content,
+                    attachment=message.attachment,
                 )
                 for message in messages
             ),

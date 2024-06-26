@@ -7,8 +7,7 @@ __all__ = [
 
 
 class State(ParametrizedData):
-    def __str__(self) -> str:
-        return str(self.as_dict(aliased=False))
+    pass
 
 
 class Stateless(ParametrizedData):
