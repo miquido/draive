@@ -2,29 +2,25 @@ from asyncio import Task
 from typing import Self, final
 from uuid import UUID
 
-from draive.agents.types import AgentInput, AgentMessage, AgentWorkflowCurrent, WorkflowAgentBase
-from draive.parameters import ParametrizedData
+from draive.agents.types import AgentID, AgentInput, AgentMessage, AgentWorkflowBase
 from draive.scope import ctx
 from draive.utils import AsyncStream, freeze
 
 __all__ = [
-    "AgentRunner",
+    "WorkflowAgentRunner",
 ]
 
 
 @final
-class AgentRunner:
+class WorkflowAgentRunner[Workflow]:
     @classmethod
-    def spawn[
-        WorkflowState: ParametrizedData,
-        WorkflowResult,
-    ](
+    def spawn(
         cls,
-        agent: WorkflowAgentBase[WorkflowState, WorkflowResult],
+        agent: AgentID[Workflow],
         /,
-        workflow: AgentWorkflowCurrent[WorkflowState, WorkflowResult],
+        workflow: AgentWorkflowBase[Workflow],
     ) -> Self:
-        agent_input: AgentInput = AsyncStream()
+        agent_input: AgentInput[Workflow] = AsyncStream()
 
         return cls(
             identifier=agent.identifier,
@@ -39,18 +35,18 @@ class AgentRunner:
     def __init__(
         self,
         identifier: UUID,
-        input: AgentInput,  # noqa: A002
+        input: AgentInput[Workflow],  # noqa: A002
         task: Task[None],
     ) -> None:
         self.identifier: UUID = identifier
-        self._input: AgentInput = input
+        self._input: AgentInput[Workflow] = input
         self._task: Task[None] = task
 
         freeze(self)
 
     def send(
         self,
-        message: AgentMessage,
+        message: AgentMessage[Workflow],
         /,
     ) -> None:
         self._input.send(message)

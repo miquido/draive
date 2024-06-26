@@ -6,8 +6,7 @@ __all__ = [
 ]
 
 
-class State(ParametrizedData):
-    pass
+State = ParametrizedData
 
 
 class Stateless(ParametrizedData):

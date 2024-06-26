@@ -235,24 +235,24 @@ class ParameterPath[Root, Parameter]:
         *components: ParameterPathComponent,
     ) -> None:
         assert components or root == parameter  # nosec: B101
-        self._root: type[Root] = root
-        self._parameter: type[Parameter] = parameter
-        self._components: tuple[ParameterPathComponent, ...] = components
+        self.__root__: type[Root] = root
+        self.__parameter__: type[Parameter] = parameter
+        self.__components__: tuple[ParameterPathComponent, ...] = components
 
         freeze(self)
 
     def components(self) -> tuple[str, ...]:
-        return tuple(component.path_str() for component in self._components)
+        return tuple(component.path_str() for component in self.__components__)
 
     def __str__(self) -> str:
         path: str = ""
-        for component in self._components:
+        for component in self.__components__:
             path = component.path_str(path)
         return path
 
     def __repr__(self) -> str:
-        path: str = self._root.__qualname__
-        for component in self._components:
+        path: str = self.__root__.__qualname__
+        for component in self.__components__:
             path = component.path_str(path)
         return path
 
@@ -271,18 +271,18 @@ class ParameterPath[Root, Parameter]:
         ), f"Accessing private/special parameter paths ({name}) is forbidden"
 
         try:
-            annotation: Any = self._parameter.__annotations__[name]
+            annotation: Any = self.__parameter__.__annotations__[name]
 
         except (AttributeError, KeyError) as exc:
             raise AttributeError(name) from exc
 
         return ParameterPath[Root, Any](
-            self._root,
+            self.__root__,
             annotation,
             *[
-                *self._components,
+                *self.__components__,
                 ParameterPathAttributeComponent(
-                    root=self._parameter,
+                    root=self.__parameter__,
                     parameter=annotation,
                     attribute=name,
                 ),
@@ -294,12 +294,12 @@ class ParameterPath[Root, Parameter]:
         key: str | int,
     ) -> Any:
         annotation: Any
-        match get_origin(self._parameter) or self._parameter:
+        match get_origin(self.__parameter__) or self.__parameter__:
             case (
                 builtins.list  # pyright: ignore[reportUnknownMemberType]
                 | typing.List  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
             ):
-                match get_args(self._parameter):
+                match get_args(self.__parameter__):
                     case (element_annotation,) if isinstance(key, int):
                         annotation = element_annotation
 
@@ -309,7 +309,7 @@ class ParameterPath[Root, Parameter]:
                 builtins.tuple  # pyright: ignore[reportUnknownMemberType]
                 | typing.Tuple  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
             ):
-                match get_args(self._parameter):
+                match get_args(self.__parameter__):
                     case (element_annotation, builtins.Ellipsis | types.EllipsisType):
                         annotation = element_annotation
 
@@ -322,7 +322,7 @@ class ParameterPath[Root, Parameter]:
                 builtins.dict  # pyright: ignore[reportUnknownMemberType]
                 | typing.Dict  # pyright: ignore[reportUnknownMemberType]  # noqa: UP006
             ):
-                match get_args(self._parameter):
+                match get_args(self.__parameter__):
                     case (builtins.str, element_annotation) if isinstance(key, str):
                         annotation = element_annotation
 
@@ -336,12 +336,12 @@ class ParameterPath[Root, Parameter]:
                 raise TypeError("Unsupported type annotation", other)
 
         return ParameterPath[Root, Any](
-            self._root,
+            self.__root__,
             annotation,
             *[
-                *self._components,
+                *self.__components__,
                 ParameterPathItemComponent(
-                    root=self._parameter,
+                    root=self.__parameter__,
                     parameter=annotation,
                     item=key,
                 ),
@@ -369,20 +369,20 @@ class ParameterPath[Root, Parameter]:
         /,
         updated: Parameter | Missing = MISSING,
     ) -> Root | Parameter:
-        assert isinstance(root, get_origin(self._root) or self._root), (  # nosec: B101
+        assert isinstance(root, get_origin(self.__root__) or self.__root__), (  # nosec: B101
             f"ParameterPath '{self.__repr__()}' used on unexpected root of "
-            f"'{type(root)}' instead of '{self._root}'"
+            f"'{type(root)}' instead of '{self.__root__}'"
         )
 
         if not_missing(updated):
-            assert isinstance(updated, get_origin(self._parameter) or self._parameter), (  # nosec: B101
+            assert isinstance(updated, get_origin(self.__parameter__) or self.__parameter__), (  # nosec: B101
                 f"ParameterPath '{self.__repr__()}' assigning to unexpected value of "
-                f"'{type(updated)}' instead of '{self._parameter}'"
+                f"'{type(updated)}' instead of '{self.__parameter__}'"
             )
 
             resolved: Any = root
             updates_stack: deque[tuple[Any, ParameterPathComponent]] = deque()
-            for component in self._components:
+            for component in self.__components__:
                 updates_stack.append((resolved, component))
                 resolved = component.resolve(resolved)
 
@@ -398,12 +398,12 @@ class ParameterPath[Root, Parameter]:
 
         else:
             resolved: Any = root
-            for component in self._components:
+            for component in self.__components__:
                 resolved = component.resolve(resolved)
 
-            assert isinstance(resolved, get_origin(self._parameter) or self._parameter), (  # nosec: B101
+            assert isinstance(resolved, get_origin(self.__parameter__) or self.__parameter__), (  # nosec: B101
                 f"ParameterPath '{self.__repr__()}' pointing to unexpected value of "
-                f"'{type(resolved)}' instead of '{self._parameter}'"
+                f"'{type(resolved)}' instead of '{self.__parameter__}'"
             )
 
             return resolved

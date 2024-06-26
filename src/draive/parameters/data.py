@@ -344,7 +344,6 @@ class ParametrizedDataMeta(type):
 
         assert parameters or name in {  # nosec: B101
             "DataModel",
-            "State",
             "Stateless",
         }, "Can't prepare parametrized data without parameters!"
         data_type.__PARAMETERS__ = parameters  # pyright: ignore[reportAttributeAccessIssue]

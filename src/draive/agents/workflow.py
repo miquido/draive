@@ -1,127 +1,70 @@
 from asyncio import (
     AbstractEventLoop,
     CancelledError,
+    Event,
     Future,
-    Lock,
     TimerHandle,
     get_running_loop,
 )
-from typing import Any, Final, Self, cast, final
+from typing import Any, Final, Self, final
 from uuid import UUID, uuid4
 
-from draive.agents.runner import AgentRunner
-from draive.agents.types import (
-    AgentBase,
-    AgentMessage,
-    AgentMessageDraft,
-    AgentWorkflowCurrent,
-    AgentWorkflowStateAccess,
-    WorkflowAgentBase,
-)
-from draive.parameters import ParameterPath, ParametrizedData
+from draive.agents.runner import WorkflowAgentRunner
+from draive.agents.types import AgentID, AgentMessage, AgentWorkflowBase, WorkflowState
+from draive.parameters import ParametrizedData
 from draive.scope import ctx
-from draive.types import MultimodalContent, MultimodalContentConvertible
 from draive.utils import AsyncStream, freeze
 
 __all__ = [
     "AgentWorkflow",
 ]
 
+WORKFLOW_ENTRY: Final[AgentID[Any]] = AgentID(Any, identifier=UUID(int=0))
+
 
 @final
-class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
+class AgentWorkflow[Workflow](AgentWorkflowBase[Workflow]):
     @classmethod
     async def run(
         cls,
-        messages: AgentMessageDraft,
+        messages: AgentMessage[Workflow],
         /,
-        *__messages: AgentMessageDraft,
-        state: WorkflowState,
-        timeout: float | None = None,
-    ) -> WorkflowResult:
-        workflow: Self = cls(
-            state=state,
-            timeout=timeout,
-        )
+        *_messages: AgentMessage[Workflow],
+        state: tuple[ParametrizedData, ...] | ParametrizedData,
+        timeout: float = 600,  # default timeout is 10 minutes
+    ) -> Workflow:
+        workflow: Self = cls(state=state)
+
         async with ctx.nested(f"Workflow|{workflow.identifier}"):
             workflow.send(
-                AgentMessage(
-                    sender=WORKFLOW_ENTRY,
-                    recipient=messages.recipient,
-                    addressee=messages.addressee,
-                    content=messages.content,
-                    attachment=messages.attachment,
-                ),
-                *(
-                    AgentMessage(
-                        sender=WORKFLOW_ENTRY,
-                        recipient=message.recipient,
-                        addressee=message.addressee,
-                        content=message.content,
-                        attachment=message.attachment,
-                    )
-                    for message in __messages
-                ),
+                messages.updated(sender=WORKFLOW_ENTRY),
+                *(message.updated(sender=WORKFLOW_ENTRY) for message in _messages),
             )
 
-            return await workflow.execute()
+            return await workflow.execute(timeout=timeout)
 
     def __init__(
         self,
-        state: WorkflowState,
-        timeout: float | None = None,
+        state: tuple[ParametrizedData, ...] | ParametrizedData,
     ) -> None:
-        current_state: WorkflowState = state
-
-        def state_read() -> WorkflowState:
-            return current_state
-
-        def state_update(**parameters: Any) -> None:
-            nonlocal current_state
-            current_state = current_state.updated(**parameters)
-
-        # TODO: prepare property based slice access
-        self._workflow_state: AgentWorkflowStateAccess[WorkflowState] = AgentWorkflowStateAccess(
-            lock=Lock(),
-            read=state_read,
-            update=state_update,
-        )
+        self._workflow_state: WorkflowState = WorkflowState(state)
         self.identifier: UUID = uuid4()
-        self._runners: dict[UUID, AgentRunner] = {}
-        self._messages: AsyncStream[AgentMessage] = AsyncStream()
-        self._result: Future[WorkflowResult] = Future()
-        self._timeout: float = timeout or 600  # default timeout is 10 minutes
-
-        self._workflow_current: AgentWorkflowCurrent[WorkflowState, WorkflowResult] = (
-            AgentWorkflowCurrent(
-                access=self.state,
-                send=self.send,
-                finish=self.finish_with,
-            )
-        )
+        self._runners: dict[UUID, WorkflowAgentRunner] = {}
+        self._messages: AsyncStream[AgentMessage[Workflow]] = AsyncStream()
+        self._message_trace: dict[UUID, Event] = {}
+        self._result: Future[Workflow] = Future()
 
         freeze(self)
 
     def __del__(self) -> None:
         self.finish_with(CancelledError())
 
-    def state[Parameter: ParametrizedData](
-        self,
-        path: ParameterPath[WorkflowState, Parameter] | Parameter | None,
-        /,
-    ) -> AgentWorkflowStateAccess[Parameter]:
-        if path is not None:
-            # TODO: prepare property based slice access
-            raise NotImplementedError("Not implemented yet")
-
-        return cast(AgentWorkflowStateAccess[Parameter], self._workflow_state)
-
     async def _deliver(
         self,
-        message: AgentMessage,
+        message: AgentMessage[Workflow],
         /,
     ) -> None:
-        assert message.recipient.identifier != WORKFLOW_ENTRY.identifier  # nosec: B101
+        assert message.recipient != WORKFLOW_ENTRY  # nosec: B101
 
         ctx.log_info(
             "Delivering message [%s] from %s to %s",
@@ -136,14 +79,14 @@ class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
                 message.content,
             )
 
-        runner: AgentRunner
+        runner: WorkflowAgentRunner
         if running := self._runners.get(message.recipient.identifier):
             runner = running
 
         else:
-            runner = AgentRunner.spawn(
-                cast(WorkflowAgentBase[WorkflowState, WorkflowResult], message.recipient),
-                workflow=self._workflow_current,
+            runner = WorkflowAgentRunner.spawn(
+                message.recipient,
+                workflow=self,
             )
             self._runners[message.recipient.identifier] = runner
 
@@ -151,8 +94,9 @@ class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
 
     def send(
         self,
-        messages: AgentMessage,
-        *_messages: AgentMessage,
+        messages: AgentMessage[Workflow],
+        /,
+        *_messages: AgentMessage[Workflow],
     ) -> None:
         if self._result.done():
             return ctx.log_debug("Ignoring messages - workflow finished")
@@ -161,7 +105,7 @@ class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
 
     def finish_with(
         self,
-        result: WorkflowResult | BaseException,
+        result: Workflow | BaseException,
         /,
     ) -> None:
         if self._result.done():
@@ -179,14 +123,17 @@ class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
             case result:
                 self._result.set_result(result)
 
-    async def execute(self) -> WorkflowResult:
+    async def execute(
+        self,
+        timeout: float = 600,  # default timeout is 10 minutes
+    ) -> Workflow:
         if self._result.done():
             raise RuntimeError("AgentWorkflow can be executed only once!")
 
         loop: AbstractEventLoop = get_running_loop()
 
         def on_timeout(
-            future: Future[WorkflowResult],
+            future: Future[Workflow],
         ) -> None:
             if future.done():
                 return  # ignore if already finished
@@ -195,13 +142,13 @@ class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
             future.set_exception(TimeoutError())
 
         timeout_handle: TimerHandle = loop.call_later(
-            self._timeout,
+            timeout,
             on_timeout,
             self._result,
         )
 
         def on_result(
-            future: Future[WorkflowResult],
+            future: Future[Workflow],
         ) -> None:
             timeout_handle.cancel()  # at this stage we no longer need timeout to trigger
             self._messages.finish()
@@ -213,27 +160,3 @@ class AgentWorkflow[WorkflowState: ParametrizedData, WorkflowResult]:
             await self._deliver(message)
 
         return await self._result
-
-
-@final
-class PlaceholderAgent(AgentBase):
-    def __init__(self) -> None:
-        self._identifier: UUID = UUID(int=0)
-
-        freeze(self)
-
-    @property
-    def identifier(self) -> UUID:
-        return self._identifier
-
-    def address(
-        self,
-        content: MultimodalContent | MultimodalContentConvertible,
-        /,
-        attachment: ParametrizedData | None = None,
-        addressee: AgentBase | None = None,
-    ) -> AgentMessageDraft:
-        raise RuntimeError("Can't address a message to a placeholder agent!")
-
-
-WORKFLOW_ENTRY: Final[PlaceholderAgent] = PlaceholderAgent()
