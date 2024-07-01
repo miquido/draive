@@ -2,7 +2,7 @@
 #    uv --no-cache pip compile pyproject.toml -o constraints --all-extras
 annotated-types==0.7.0
     # via pydantic
-anthropic==0.29.0
+anthropic==0.29.2
     # via draive (pyproject.toml)
 anyio==4.4.0
     # via
@@ -32,7 +32,7 @@ filelock==3.15.4
     # via huggingface-hub
 flatbuffers==24.3.25
     # via onnxruntime
-fsspec==2024.6.0
+fsspec==2024.6.1
     # via huggingface-hub
 h11==0.14.0
     # via httpcore
@@ -64,7 +64,7 @@ markdown-it-py==3.0.0
     # via rich
 mdurl==0.1.2
     # via markdown-it-py
-mistralrs==0.1.22
+mistralrs==0.1.24
     # via draive (pyproject.toml)
 mmh3==4.1.0
     # via fastembed
@@ -80,9 +80,9 @@ numpy==1.26.4
     #   onnxruntime
 onnx==1.16.1
     # via fastembed
-onnxruntime==1.18.0
+onnxruntime==1.18.1
     # via fastembed
-openai==1.35.3
+openai==1.35.7
     # via draive (pyproject.toml)
 packaging==24.1
     # via
@@ -91,11 +91,11 @@ packaging==24.1
     #   pytest
 pbr==6.0.0
     # via stevedore
-pillow==10.3.0
+pillow==10.4.0
     # via fastembed
 pluggy==1.5.0
     # via pytest
-protobuf==5.27.1
+protobuf==5.27.2
     # via
     #   onnx
     #   onnxruntime
@@ -107,7 +107,7 @@ pydantic-core==2.18.4
     # via pydantic
 pygments==2.18.0
     # via rich
-pyright==1.1.368
+pyright==1.1.369
     # via draive (pyproject.toml)
 pystemmer==2.2.0.1
     # via fastembed

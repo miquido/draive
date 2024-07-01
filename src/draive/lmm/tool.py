@@ -135,6 +135,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
                 call_context.report("FAILED")
                 # return an error with formatted content
                 raise ToolError(
+                    f"Tool {self.name}[{call_id}] failed",
                     content=MultimodalContent.of(self.format_failure(exc)),
                 ) from exc
 

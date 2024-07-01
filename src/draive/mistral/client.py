@@ -55,7 +55,7 @@ class MistralClient(ScopeDependency):
         config: MistralChatConfig,
         messages: list[ChatMessage],
         tools: list[dict[str, object]] | None = None,
-        suggest_tools: bool = False,
+        require_tools: bool | None = False,
         stream: Literal[True],
     ) -> AsyncIterable[ChatCompletionStreamResponse]: ...
 
@@ -66,7 +66,7 @@ class MistralClient(ScopeDependency):
         config: MistralChatConfig,
         messages: list[ChatMessage],
         tools: list[dict[str, object]] | None = None,
-        suggest_tools: bool = False,
+        require_tools: bool | None = False,
     ) -> ChatCompletionResponse: ...
 
     async def chat_completion(  # noqa: PLR0913
@@ -75,13 +75,24 @@ class MistralClient(ScopeDependency):
         config: MistralChatConfig,
         messages: list[ChatMessage],
         tools: list[dict[str, object]] | None = None,
-        suggest_tools: bool = False,
+        require_tools: bool | None = False,
         stream: bool = False,
     ) -> AsyncIterable[ChatCompletionStreamResponse] | ChatCompletionResponse:
         if stream:
             raise NotImplementedError("Mistral streaming is not supported yet")
 
         else:
+            tool_choice: str
+            match require_tools:
+                case None:
+                    tool_choice = "none"
+
+                case True:
+                    tool_choice = "any"
+
+                case False:
+                    tool_choice = "auto"
+
             return await self._create_chat_completion(
                 messages=messages,
                 model=config.model,
@@ -91,7 +102,7 @@ class MistralClient(ScopeDependency):
                 response_format=cast(dict[str, str], config.response_format),
                 seed=config.seed if not_missing(config.seed) else None,
                 tools=tools,
-                tool_choice=("any" if suggest_tools else "auto") if tools else None,
+                tool_choice=tool_choice if tools else None,
             )
 
     async def embedding(

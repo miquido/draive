@@ -1,333 +1,401 @@
-from asyncio import (
-    AbstractEventLoop,
-    CancelledError,
-    Event,
-    Future,
-    Task,
-    TimerHandle,
-    get_running_loop,
-)
+from asyncio import AbstractEventLoop, CancelledError, TimerHandle, gather, get_running_loop
 from inspect import isfunction
-from typing import Any, Final, Protocol, Self, final, runtime_checkable
+from typing import Protocol, cast, final, overload, runtime_checkable
 from uuid import UUID, uuid4
 
-from draive.agents.agent import Agent, AgentID, AgentInput, AgentMessage
-from draive.agents.errors import AgentException
-from draive.agents.workflow import AgentWorkflow
+from draive.agents.definition import AgentMessage, AgentNode
+from draive.agents.node import Agent, AgentError, AgentOutput
+from draive.agents.runner import AgentRunner
+from draive.helpers import VolatileMemory
+from draive.parameters import DataModel, ParametrizedData
 from draive.scope import ctx
-from draive.types import frozenlist
-from draive.types.memory import Memory
-from draive.utils import AsyncStream, freeze
+from draive.types import Memory, MultimodalContent, MultimodalContentConvertible, frozenlist
+from draive.utils import MISSING, AsyncQueue, Missing, freeze, not_missing
 
 __all__ = [
+    "workflow",
     "AgentWorkflow",
+    "AgentWorkflowInvocation",
+    "AgentWorkflowOutput",
+    "AgentWorkflowInput",
 ]
 
-WORKFLOW_ENTRY: Final[AgentID] = AgentID(
-    UUID(int=0),
-    name="WORKFLOW_ENTRY",
-    capabilities=None,
+
+type AgentWorkflowInput = AgentMessage | AgentError
+type AgentWorkflowOutput[Result: ParametrizedData | str] = (
+    frozenlist[AgentMessage] | AgentMessage | Result | None
 )
-
-
-@final
-class WorkflowAgentRunner[WorkflowResult]:
-    @classmethod
-    def spawn(
-        cls,
-        agent: AgentID,
-        /,
-        workflow: "AgentWorkflow[WorkflowResult]",
-    ) -> Self: ...
-
-    def __init__(
-        self,
-        agent: AgentID,
-        task: Task[None],
-    ) -> None:
-        self.agent: AgentID = agent
-        self._input: AgentInput = AsyncStream()
-        self._task: Task[None] = ctx.spawn_subtask(
-            agent._draive,  # pyright: ignore[reportPrivateUsage]
-            agent_input,
-            workflow,
-        )
-
-        freeze(self)
-
-    def send(
-        self,
-        message: AgentMessage,
-        /,
-    ) -> None:
-        self._input.send(message)
-
-    def cancel(self) -> None:
-        self._task.cancel()
-        if not self._input.finished:
-            self._input.finish(exception=CancelledError())
-
-    async def finalize(self) -> None:
-        if not self._input.finished:
-            self._input.finish()
-
-        await self._input.wait()
-        await self._task
-
-    @classmethod
-    async def _draive(  # yes, it is the name of the library
-        cls,
-        input: AgentInput,  # noqa: A002
-        agent: Agent[Any, Any],
-        workflow: AgentWorkflow[WorkflowResult],
-    ) -> None:
-        with ctx.nested(agent.__str__()):
-            memory: Memory[Any, Any] = agent.prepare_memory()
-            try:
-                if agent._concurrent:  # pyright: ignore[reportPrivateUsage]
-                    # process all messages concurrently by spawning a task for each
-                    async for message in input:
-                        ctx.spawn_subtask(
-                            agent.process_message,
-                            message,
-                            memory,
-                        )
-
-                else:
-                    # process only one message at the time by waiting for results
-                    async for message in input:
-                        await agent.process_message(
-                            message,
-                            memory=memory,
-                        )
-
-            except Exception as exc:
-                workflow.fail_with(AgentException(cause=exc))
-
-    async def _handle_message(
-        self,
-        message: AgentMessage,
-        /,
-        workflow: AgentWorkflow,
-    ) -> None:
-        try:
-            self._handle_output(
-                await self(
-                    current=agent_current,
-                    message=message,
-                ),
-                workflow=workflow,
-            )
-
-        except Exception as exc:  # when any agent fails the whole workflow fails
-            workflow.finish_with(AgentException(cause=exc))
-
-    def _handle_output(
-        self,
-        output: AgentOutput[WorkflowResult],
-        /,
-        workflow: AgentWorkflowCurrent[WorkflowState, WorkflowResult],
-    ) -> None:
-        match output:
-            case None:
-                pass  # no action
-
-            case AgentMessageDraftGroup() as messages_group:
-                workflow.send(
-                    *(
-                        AgentMessage(
-                            sender=self,
-                            recipient=message.recipient,
-                            addressee=message.addressee,
-                            content=message.content,
-                            attachment=message.attachment,
-                        )
-                        for message in messages_group.messages
-                    )
-                )
-
-            case AgentMessageDraft() as message:
-                workflow.send(
-                    AgentMessage(
-                        sender=self,
-                        recipient=message.recipient,
-                        addressee=message.addressee,
-                        content=message.content,
-                        attachment=message.attachment,
-                    )
-                )
-
-            case result:
-                workflow.finish_with(result)
-
-
-type WorkflowOutput[Result] = frozenlist[AgentMessage] | AgentMessage | Result
 
 
 @runtime_checkable
-class WorkflowInvocation[Result](Protocol):
+class AgentWorkflowStateInitializer[AgentWorkflowState](Protocol):
+    def __call__(self) -> AgentWorkflowState: ...
+
+
+@runtime_checkable
+class AgentWorkflowInvocation[AgentWorkflowState, AgentWorkflowResult: ParametrizedData | str](
+    Protocol
+):
     async def __call__(
         self,
-        workflow: "AgentWorkflow[Result]",
-        message: AgentMessage,
-    ) -> WorkflowOutput[Result]: ...
+        memory: Memory[AgentWorkflowState, AgentWorkflowState],
+        input: AgentWorkflowInput,  # noqa: A002
+    ) -> AgentWorkflowOutput[AgentWorkflowResult]: ...
 
 
 @final
-class AgentWorkflow[Result]:
+class AgentWorkflow[AgentWorkflowState, AgentWorkflowResult: ParametrizedData | str]:
     def __init__(
         self,
-        invocation: WorkflowInvocation[Result],
+        node: AgentNode,
+        invocation: AgentWorkflowInvocation[
+            AgentWorkflowState,
+            AgentWorkflowResult,
+        ],
+        state_initializer: AgentWorkflowStateInitializer[AgentWorkflowState],
     ) -> None:
-        self.identifier: UUID = uuid4()
-        self._invocation: WorkflowInvocation[Result] = invocation
-        self._runners: dict[UUID, WorkflowAgentRunner[Result]] = {}
-        self._messages: AsyncStream[AgentMessage[Workflow]] = AsyncStream()
-        self._message_trace: dict[UUID, Event] = {}
-        self._result: Future[Workflow] = Future()
+        self.node: AgentNode = node
+        self._invocation: AgentWorkflowInvocation[
+            AgentWorkflowState,
+            AgentWorkflowResult,
+        ] = invocation
+        self._state_initializer: AgentWorkflowStateInitializer[AgentWorkflowState] = (
+            state_initializer
+        )
 
         freeze(self)
 
-    def __del__(self) -> None:
-        self.fail_with(CancelledError())
-
-    async def _deliver(
-        self,
-        message: AgentMessage[Workflow],
-        /,
-    ) -> None:
-        assert message.recipient != WORKFLOW_ENTRY  # nosec: B101
-
-        ctx.log_info(
-            "Delivering message [%s] from %s to %s",
-            message.identifier,
-            message.sender,
-            message.recipient,
-        )
-        if __debug__:
-            ctx.log_debug(
-                "\nMessage [%s] content: %s",
-                message.identifier,
-                message.content,
-            )
-
-        runner: WorkflowAgentRunner
-        if running := self._runners.get(message.recipient.identifier):
-            runner = running
-
-        else:
-            runner = WorkflowAgentRunner.spawn(
-                message.recipient,
-                workflow=self,
-            )
-            self._runners[message.recipient.identifier] = runner
-
-        runner.send(message)
-
-    def send(
-        self,
-        messages: AgentMessage[Workflow],
-        /,
-        *_messages: AgentMessage[Workflow],
-    ) -> None:
-        if self._result.done():
-            return ctx.log_debug("Ignoring messages - workflow finished")
-
-        self._messages.send(messages, *_messages)
-
-    def fail_with(
-        self,
-        result: BaseException,
-        /,
-    ) -> None:
-        if self._result.done():
-            return  # ignore - already done
-
-        for runner in self._runners.values():
-            runner.finish()
-
-        self._messages.finish()
-
-        match result:
-            case BaseException() as exception:
-                self._result.set_exception(exception)
-
-            case result:
-                self._result.set_result(result)
-
-    async def execute(
-        self,
-        timeout: float = 600,  # default timeout is 10 minutes
-    ) -> Workflow:
-        if self._result.done():
-            raise RuntimeError("AgentWorkflow can be executed only once!")
-
-        loop: AbstractEventLoop = get_running_loop()
-
-        def on_timeout(
-            future: Future[Workflow],
-        ) -> None:
-            if future.done():
-                return  # ignore if already finished
-
-            # result future on its completion will ensure that task will complete
-            future.set_exception(TimeoutError())
-
-        timeout_handle: TimerHandle = loop.call_later(
-            timeout,
-            on_timeout,
-            self._result,
-        )
-
-        def on_result(
-            future: Future[Workflow],
-        ) -> None:
-            timeout_handle.cancel()  # at this stage we no longer need timeout to trigger
-            self._messages.finish()
-
-        self._result.add_done_callback(on_result)
-
-        # TODO: detect idle state - no agent working
-        async for message in self._messages:
-            await self._deliver(message)
-
-        return await self._result
-
     async def __call__(
+        self,
+        memory: Memory[AgentWorkflowState, AgentWorkflowState],
+        input: AgentWorkflowInput,  # noqa: A002
+    ) -> AgentWorkflowOutput[AgentWorkflowResult]:
+        return await self._invocation(
+            memory=memory,
+            input=input,
+        )
+
+    async def run(
+        self,
+        input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+        state: AgentWorkflowState | None = None,
+        timeout: float = 120,  # default timeout is 2 minutes
+    ) -> AgentWorkflowResult:
+        return await WorkflowRunner[AgentWorkflowState, AgentWorkflowResult].run(
+            self,
+            input=input,
+            memory=VolatileMemory(state or self._state_initializer()),
+            timeout=timeout,
+        )
+
+    def address(
+        self,
+        content: MultimodalContent | MultimodalContentConvertible,
+        /,
+        *_content: MultimodalContent | MultimodalContentConvertible,
+        addressee: AgentNode | None = None,
+    ) -> AgentMessage:
+        return AgentMessage(
+            identifier=uuid4(),
+            sender=MISSING,
+            recipient=self.node,
+            addressee=addressee,
+            content=MultimodalContent.of(content, *_content),
+            responding=None,
+        )
+
+
+class PartialAgentWorkflowWrapper[AgentWorkflowState](Protocol):
+    def __call__[AgentWorkflowResult: ParametrizedData | str](
+        self,
+        invocation: AgentWorkflowInvocation[AgentWorkflowState, AgentWorkflowResult],
+    ) -> AgentWorkflow[AgentWorkflowState, AgentWorkflowResult]: ...
+
+
+@overload
+def workflow[AgentWorkflowState](
+    node: AgentNode,
+    /,
+    *,
+    state: AgentWorkflowStateInitializer[AgentWorkflowState],
+) -> PartialAgentWorkflowWrapper[AgentWorkflowState]: ...
+
+
+@overload
+def workflow[AgentWorkflowState](
+    *,
+    name: str | None = None,
+    description: str,
+    state: AgentWorkflowStateInitializer[AgentWorkflowState],
+) -> PartialAgentWorkflowWrapper[AgentWorkflowState]: ...
+
+
+def workflow[AgentWorkflowState](
+    node: AgentNode | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    state: AgentWorkflowStateInitializer[AgentWorkflowState],
+) -> PartialAgentWorkflowWrapper[AgentWorkflowState]:
+    assert node is None or (  # nosec: B101
+        name is None and description is None
+    ), "Can't specify both agent node and name/description"
+    assert (  # nosec: B101
+        description is not None or node is not None
+    ), "Either agent node or description has to be provided"
+
+    def wrap[AgentWorkflowResult: ParametrizedData | str](
+        invocation: AgentWorkflowInvocation[AgentWorkflowState, AgentWorkflowResult],
+    ) -> AgentWorkflow[AgentWorkflowState, AgentWorkflowResult]:
+        assert isfunction(invocation), "workflow has to be defined from a function"  # nosec: B101
+
+        workflow_node: AgentNode = node or AgentNode(
+            name=name or invocation.__qualname__,
+            description=description or "",
+        )
+
+        def initialize_agent() -> Agent:
+            agent_memory: Memory[AgentWorkflowState, AgentWorkflowState] = cast(
+                Memory[AgentWorkflowState, AgentWorkflowState], VolatileMemory(state())
+            )
+
+            async def agent(message: AgentMessage) -> AgentOutput:
+                match await cast(  # pyright fails to properly type this function
+                    AgentWorkflowInvocation[AgentWorkflowState, AgentWorkflowResult],
+                    invocation,
+                )(
+                    memory=agent_memory,
+                    input=message,
+                ):
+                    case None:
+                        pass
+
+                    case tuple() as messages:
+                        return messages
+
+                    case AgentMessage() as message:
+                        return message
+
+                    case result:
+                        return message.respond(
+                            MultimodalContent.of(
+                                result if isinstance(result, DataModel) else str(result)
+                            )
+                        )
+
+            return agent
+
+        # workflow can run as an agent with limited capabilities
+        workflow_node._associate(  # pyright: ignore[reportPrivateUsage]
+            initialize_agent,
+            concurrent=False,  # workflow can't be concurrent
+        )
+
+        return AgentWorkflow[AgentWorkflowState, AgentWorkflowResult](
+            node=workflow_node,
+            invocation=invocation,
+            state_initializer=state,
+        )
+
+    return wrap
+
+
+@runtime_checkable
+class WorkflowRunnerOutput(Protocol):
+    def __call__(
         self,
         messages: AgentMessage,
         /,
         *_messages: AgentMessage,
-        timeout: float = 600,  # default timeout is 10 minutes
-    ) -> Result:
-        async with ctx.nested(f"Workflow|{workflow.identifier}"):
-            workflow.send(
-                messages.updated(sender=WORKFLOW_ENTRY),
-                *(message.updated(sender=WORKFLOW_ENTRY) for message in _messages),
+    ) -> None: ...
+
+
+@runtime_checkable
+class WorkflowRunnerResultOutput[WorkflowResult: ParametrizedData | str](Protocol):
+    def __call__(
+        self,
+        result: WorkflowResult,
+        /,
+    ) -> None: ...
+
+
+class WorkflowHistory(DataModel):
+    history: frozenlist[AgentMessage]
+
+
+class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
+    @classmethod
+    async def run(
+        cls,
+        workflow: AgentWorkflow[WorkflowState, WorkflowResult],
+        /,
+        input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+        memory: Memory[WorkflowState, WorkflowState],
+        timeout: float,
+    ) -> WorkflowResult:
+        return await cls(
+            workflow=workflow,
+            memory=memory,
+            loop=get_running_loop(),
+        ).execute(
+            input=input,
+            timeout=timeout,
+        )
+
+    def __init__(
+        self,
+        workflow: AgentWorkflow[WorkflowState, WorkflowResult],
+        memory: Memory[WorkflowState, WorkflowState],
+        loop: AbstractEventLoop,
+    ) -> None:
+        self._loop: AbstractEventLoop = loop
+        self._history: list[AgentMessage] = []
+        self._workflow_queue: AsyncQueue[AgentMessage | AgentError] = AsyncQueue()
+        self._workflow_memory: Memory[WorkflowState, WorkflowState] = memory
+        self._workflow: AgentWorkflow[WorkflowState, WorkflowResult] = workflow
+        self._agent_runners: dict[UUID, AgentRunner] = {}
+        self._result: WorkflowResult | BaseException | Missing = MISSING
+
+    def __del__(self) -> None:
+        self.finish(result=CancelledError())
+
+    @overload
+    def send(
+        self,
+        error: AgentError,
+        /,
+    ) -> None: ...
+
+    @overload
+    def send(
+        self,
+        messages: AgentMessage,
+        /,
+        *_messages: AgentMessage,
+    ) -> None: ...
+
+    def send(
+        self,
+        messages: AgentMessage | AgentError,
+        /,
+        *_messages: AgentMessage,
+    ) -> None:
+        pending: list[AgentMessage | AgentError] = [messages, *_messages]
+        self._history.extend([message for message in pending if isinstance(message, AgentMessage)])
+        self._workflow_queue.enqueue(*pending)
+
+    def finish(
+        self,
+        result: WorkflowResult | BaseException,
+    ) -> None:
+        if not_missing(self._result):
+            return  # already finished
+
+        ctx.log_debug("Finishing workflow with result: %s", result)
+
+        self._result = result
+
+        for runner in self._agent_runners.values():
+            runner.finish()
+
+        self._workflow_queue.finish()
+
+    async def wait(self) -> None:
+        await gather(
+            *[runner.wait() for runner in self._agent_runners.values()],
+            return_exceptions=False,
+        )
+
+        await self._workflow_queue.wait()
+
+    async def finalize(
+        self,
+        result: WorkflowResult | BaseException,
+    ) -> None:
+        self.finish(result=result)
+        await self.wait()
+
+    async def execute(
+        self,
+        input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+        timeout: float,
+    ) -> WorkflowResult:
+        assert not self._agent_runners, "WorkflowRunner can run only once!"  # nosec: B101
+
+        if self._workflow_queue.finished or not_missing(self._result):
+            raise RuntimeError("WorkflowRunner can run only once!")
+
+        async with ctx.nested(self._workflow.node.__str__()):
+
+            def on_timeout() -> None:
+                self.finish(result=TimeoutError())
+
+            timeout_handle: TimerHandle = self._loop.call_later(
+                delay=timeout,
+                callback=on_timeout,
             )
 
-            return await workflow.execute(timeout=timeout)
+            self.send(self._workflow.address(input))
 
+            async for element in self._workflow_queue:
+                match element:
+                    case AgentMessage() as message:
+                        if message.recipient.identifier == self._workflow.node.identifier:
+                            await self._handle(message)
 
-@final
-class WorkflowRunner[WorkflowResult]:
-    @classmethod
-    def spawn(
-        cls,
-        agent: AgentID,
+                        elif runner := self._agent_runners.get(message.recipient.identifier):
+                            runner.send(message)
+
+                        else:
+                            spawned_runner: AgentRunner = AgentRunner.run(
+                                message.recipient,
+                                output=self.send,
+                            )
+                            self._agent_runners[message.recipient.identifier] = spawned_runner
+                            spawned_runner.send(message)
+
+                    case error:
+                        await self._handle(error)
+
+            await self.wait()  # wait for completion of all runners
+
+            timeout_handle.cancel()  # cancel the timeout
+
+            ctx.record(WorkflowHistory(history=tuple(self._history)))
+
+            match self._result:
+                case BaseException() as exc:
+                    raise exc
+
+                case Missing():
+                    raise RuntimeError("Invalid workflow state")
+
+                case result:
+                    return result
+
+    async def _handle(
+        self,
+        input: AgentWorkflowInput,  # noqa: A002
         /,
-        workflow: "AgentWorkflow[WorkflowResult]",
-    ) -> Self: ...
+    ) -> None:
+        try:
+            match await self._workflow(
+                memory=self._workflow_memory,
+                input=input,
+            ):
+                case None:
+                    pass  # nothing to do
 
+                case [*messages]:
+                    self.send(
+                        *[message.updated(sender=self._workflow.node) for message in messages]
+                    )
 
-def workflow[Result](
-    invocation: WorkflowInvocation[Result],
-) -> AgentWorkflow[Result]:
-    def wrap(
-        invocation: WorkflowInvocation[Result],
-    ) -> AgentWorkflow[Result]:
-        assert isfunction(invocation), "AgentWorkflow has to be defined from a function"  # nosec: B101
+                case AgentMessage() as message:
+                    self.send(message.updated(sender=self._workflow.node))
 
-        return AgentWorkflow[Result](invocation=invocation)
+                case result:
+                    self.finish(result=cast(WorkflowResult, result))
 
-    return wrap(invocation)
+        except BaseException as exc:
+            self.finish(result=exc)

@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Iterator
 from itertools import chain
-from typing import Self, final
+from typing import Self, final, overload
 
 from draive.parameters.model import DataModel
 from draive.types.audio import AudioBase64Content, AudioContent, AudioDataContent, AudioURLContent
@@ -54,7 +54,32 @@ class MultimodalContent(DataModel):
 
     @property
     def has_media(self) -> bool:
-        return any(_is_media(element) for element in self.parts)
+        return any(_is_media(part) for part in self.parts)
+
+    @property
+    def has_artifacts(self) -> bool:
+        return any(_is_artifact(part) for part in self.parts)
+
+    @overload
+    def artifacts(self, /) -> frozenlist[DataModel]: ...
+
+    @overload
+    def artifacts[Artifact: DataModel](
+        self,
+        model: type[Artifact],
+        /,
+    ) -> frozenlist[Artifact]: ...
+
+    def artifacts[Artifact: DataModel](
+        self,
+        model: type[Artifact] | None = None,
+        /,
+    ) -> frozenlist[Artifact] | frozenlist[DataModel]:
+        if model:
+            return tuple(part for part in self.parts if isinstance(part, model))
+
+        else:
+            return tuple(part for part in self.parts if _is_artifact(part))
 
     def as_string(
         self,
@@ -153,6 +178,44 @@ def _is_media(
 ) -> bool:
     match element:
         case TextContent():
+            return False
+
+        case _:
+            return True
+
+
+def _is_artifact(  # noqa: C901, PLR0911
+    element: MultimodalContentElement,
+) -> bool:
+    match element:
+        case TextContent():
+            return False
+
+        case ImageURLContent():
+            return False
+
+        case ImageBase64Content():
+            return False
+
+        case ImageDataContent():
+            return False
+
+        case AudioURLContent():
+            return False
+
+        case AudioBase64Content():
+            return False
+
+        case AudioDataContent():
+            return False
+
+        case VideoURLContent():
+            return False
+
+        case VideoBase64Content():
+            return False
+
+        case VideoDataContent():
             return False
 
         case _:

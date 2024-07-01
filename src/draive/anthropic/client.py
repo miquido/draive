@@ -46,7 +46,7 @@ class AnthropicClient(ScopeDependency):
         instruction: str,
         messages: list[MessageParam],
         tools: list[ToolParam] | None = None,
-        tools_suggestion: ToolChoiceToolChoiceTool | bool = False,
+        tool_requirement: ToolChoiceToolChoiceTool | bool | None = False,
         stream: Literal[True],
     ) -> AsyncStream[RawMessageStreamEvent]: ...
 
@@ -58,7 +58,7 @@ class AnthropicClient(ScopeDependency):
         instruction: str,
         messages: list[MessageParam],
         tools: list[ToolParam] | None = None,
-        tools_suggestion: ToolChoiceToolChoiceTool | bool = False,
+        tool_requirement: ToolChoiceToolChoiceTool | bool | None = False,
     ) -> Message: ...
 
     async def completion(  # noqa: PLR0913
@@ -68,11 +68,14 @@ class AnthropicClient(ScopeDependency):
         instruction: str,
         messages: list[MessageParam],
         tools: list[ToolParam] | None = None,
-        tools_suggestion: ToolChoiceToolChoiceTool | bool = False,
+        tool_requirement: ToolChoiceToolChoiceTool | bool | None = False,
         stream: bool = False,
     ) -> AsyncStream[RawMessageStreamEvent] | Message:
         tool_choice: ToolChoice | NotGiven
-        match tools_suggestion:
+        match tool_requirement:
+            case None:
+                tool_choice = NOT_GIVEN
+
             case False:
                 tool_choice = {"type": "auto"} if tools else NOT_GIVEN
 
@@ -84,30 +87,28 @@ class AnthropicClient(ScopeDependency):
                 assert tools, "Can't require tools use without tools"  # nosec: B101
                 tool_choice = tool
 
-        while True:
-            try:
-                return await self._client.messages.create(
-                    model=config.model,
-                    system=instruction,
-                    messages=messages,
-                    tools=tools or NOT_GIVEN,
-                    tool_choice=tool_choice,
-                    temperature=config.temperature,
-                    max_tokens=config.max_tokens,
-                    top_p=config.top_p if not_missing(config.top_p) else NOT_GIVEN,
-                    timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,
-                    stream=stream,
-                )
+        try:
+            return await self._client.messages.create(
+                model=config.model,
+                system=instruction,
+                messages=messages,
+                tools=tools or NOT_GIVEN,
+                tool_choice=tool_choice,
+                temperature=config.temperature,
+                max_tokens=config.max_tokens,
+                top_p=config.top_p if not_missing(config.top_p) else NOT_GIVEN,
+                timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,
+                stream=stream,
+            )
 
-            except AnthropicRateLimitError as exc:  # retry on rate limit after delay
+        except AnthropicRateLimitError as exc:  # retry on rate limit after delay
+            if delay := exc.response.headers.get("Retry-After"):
                 raise RateLimitError(
-                    retry_after=exc.response.headers.get(
-                        "Retry-After",
-                        # wait between 0.5s and 2s before next attempt if no delay found
-                        default=uniform(0.5, 2),  # nosec: B311
-                    )
-                    + uniform(0.0, 0.3)  # nosec: B311 # add small random delay
+                    retry_after=delay + uniform(0.0, 0.3)  # nosec: B311 # add small random delay
                 ) from exc
+
+            else:
+                raise exc
 
     async def dispose(self) -> None:
         await self._client.close()

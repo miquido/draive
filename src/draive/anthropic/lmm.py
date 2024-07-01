@@ -55,7 +55,7 @@ async def anthropic_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    require_tool: ToolSpecification | bool = False,
+    tool_requirement: ToolSpecification | bool | None = False,
     output: Literal["text", "json"] = "text",
     stream: Literal[True],
     **extra: Any,
@@ -68,7 +68,7 @@ async def anthropic_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    require_tool: ToolSpecification | bool = False,
+    tool_requirement: ToolSpecification | bool | None = False,
     output: Literal["text", "json"] = "text",
     stream: Literal[False] = False,
     **extra: Any,
@@ -81,7 +81,7 @@ async def anthropic_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    require_tool: ToolSpecification | bool = False,
+    tool_requirement: ToolSpecification | bool | None = False,
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -93,7 +93,7 @@ async def anthropic_lmm_invocation(  # noqa: PLR0913
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    require_tool: ToolSpecification | bool = False,
+    tool_requirement: ToolSpecification | bool | None = False,
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -102,9 +102,10 @@ async def anthropic_lmm_invocation(  # noqa: PLR0913
         "anthropic_lmm_invocation",
         metrics=[
             ArgumentsTrace.of(
+                instruction=instruction,
                 context=context,
                 tools=tools,
-                require_tool=require_tool,
+                tool_requirement=tool_requirement,
                 output=output,
                 stream=stream,
                 **extra,
@@ -128,7 +129,7 @@ async def anthropic_lmm_invocation(  # noqa: PLR0913
                     instruction=Instruction.of(instruction).format(),
                     messages=messages,
                     tools=tools,
-                    require_tool=require_tool,
+                    tool_requirement=tool_requirement,
                 ),
             )
 
@@ -139,7 +140,7 @@ async def anthropic_lmm_invocation(  # noqa: PLR0913
                 instruction=Instruction.of(instruction).format(),
                 messages=messages,
                 tools=tools,
-                require_tool=require_tool,
+                tool_requirement=tool_requirement,
             )
 
 
@@ -252,17 +253,36 @@ def _convert_context_element(
             }
 
 
-async def _completion(  # noqa: PLR0913, PLR0912
+async def _completion(  # noqa: PLR0913, PLR0912, C901
     *,
     client: AnthropicClient,
     config: AnthropicConfig,
     instruction: str,
     messages: list[MessageParam],
     tools: Sequence[ToolSpecification] | None,
-    require_tool: ToolSpecification | bool,
+    tool_requirement: ToolSpecification | bool | None,
 ) -> LMMOutput:
     completion: Message
-    match require_tool:
+    match tool_requirement:
+        case None:
+            completion = await client.completion(
+                config=config,
+                instruction=instruction,
+                messages=messages,
+                tools=[
+                    ToolParam(
+                        name=tool["function"]["name"],
+                        description=tool["function"]["description"],
+                        input_schema=cast(
+                            dict[str, Any],
+                            tool["function"]["parameters"],
+                        ),
+                    )
+                    for tool in tools or []
+                ],
+                tool_requirement=None,
+            )
+
         case bool(required):
             completion = await client.completion(
                 config=config,
@@ -279,7 +299,7 @@ async def _completion(  # noqa: PLR0913, PLR0912
                     )
                     for tool in tools or []
                 ],
-                tools_suggestion=required,
+                tool_requirement=required,
             )
 
         case tool:
@@ -298,7 +318,7 @@ async def _completion(  # noqa: PLR0913, PLR0912
                     )
                     for tool in tools or []
                 ],
-                tools_suggestion={
+                tool_requirement={
                     "type": "tool",
                     "name": tool["function"]["name"],
                 },
@@ -374,7 +394,7 @@ async def _completion_stream(  # noqa: PLR0913
     instruction: str,
     messages: list[MessageParam],
     tools: Sequence[ToolSpecification] | None,
-    require_tool: ToolSpecification | bool,
+    tool_requirement: ToolSpecification | bool | None,
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
     ctx.log_debug("Anthropic streaming api is not supported yet, using regular response...")
     output: LMMOutput = await _completion(
@@ -383,7 +403,7 @@ async def _completion_stream(  # noqa: PLR0913
         instruction=instruction,
         messages=messages,
         tools=tools,
-        require_tool=require_tool,
+        tool_requirement=tool_requirement,
     )
 
     match output:

@@ -1,347 +1,183 @@
-# from collections.abc import Callable
-# from inspect import isfunction
-# from typing import Literal, Protocol, cast, final, overload
-# from uuid import UUID, uuid4
+from inspect import isfunction
+from typing import Protocol, cast, overload, runtime_checkable
 
-# from draive.agents.agent import (
-#     AgentABC,
-#     AgentCurrent,
-#     AgentInput,
-#     AgentInvocation,
-#     AgentMessage,
-#     AgentMessageDraft,
-#     AgentMessageDraftGroup,
-#     AgentOutput,
-#     AgentWorkflowCurrent,
-#     WorkflowAgentBase,
-# )
-# from draive.agents.errors import AgentException
-# from draive.agents.workflow import AgentWorkflow
-# from draive.helpers import ConstantMemory, VolatileMemory
-# from draive.parameters import ParametrizedData, Stateless
-# from draive.scope import ctx
-# from draive.types import (
-#     Memory,
-#     MultimodalContent,
-#     MultimodalContentConvertible,
-# )
-# from draive.utils import freeze, mimic_function
+from draive.agents.node import Agent, AgentMessage, AgentNode, AgentOutput
+from draive.helpers import VolatileMemory
+from draive.types import Memory
 
-# __all__ = [
-#     "agent",
-#     "Agent",
-# ]
+__all__ = [
+    "agent",
+    "AgentStateInitializer",
+    "AgentMemoryInitializer",
+    "AgentInvocation",
+]
 
 
-# @final
-# class Agent[AgentState, AgentStateScratch]:
-#     def address(
-#         self,
-#         content: MultimodalContent | MultimodalContentConvertible,
-#         /,
-#         *_content: MultimodalContent | MultimodalContentConvertible,
-#         artifacts: frozenlist[DataModel] = (),
-#         addressee: AgentID | None = None,
-#     ) -> AgentMessage:
-#         return self._agent_id.address(
-#             content,
-#             *_content,
-#             artifacts=artifacts,
-#             addressee=addressee,
-#         )
-
-#     @abstractmethod
-#     async def process_message(
-#         self,
-#         message: "AgentMessage",
-#         /,
-#     ) -> AgentOutput: ...
-
-#     @abstractmethod
-#     async def prepare_memory(self) -> Memory[AgentState, AgentStateScratch]: ...
-
-#     def __init__(  # noqa: PLR0913
-#         self,
-#         identifier: UUID,
-#         name: str,
-#         capabilities: str,
-#         prepare_memory: Callable[[], Memory[AgentState, AgentStateScratch]],
-#         invocation: AgentInvocation[
-#             AgentState,
-#             AgentStateScratch,
-#         ],
-#         concurrent: bool,
-#     ) -> None:
-#         self._identifier: UUID = identifier
-#         self.name: str = name
-#         self.capabilities: str = capabilities
-#         self._prepare_memory: Callable[[], Memory[AgentState, AgentStateScratch]] = memory
-#         self._invocation: AgentInvocation[
-#             AgentState,
-#             AgentStateScratch,
-#         ] = invocation
-#         self._concurrent: bool = concurrent
-
-#         mimic_function(invocation, within=self)
-#         freeze(self)
-
-#     def __eq__(
-#         self,
-#         other: object,
-#     ) -> bool:
-#         if isinstance(other, Agent):
-#             return self._identifier == other._identifier
-#         else:
-#             return False
-
-#     def __hash__(self) -> int:
-#         return hash(self._identifier)
-
-#     def __str__(self) -> str:
-#         return f"Agent|{self.name}|{self._identifier}"
-
-#     async def __call__(
-#         self,
-#         current: AgentCurrent[
-#             AgentState,
-#             AgentState,
-#             WorkflowState,
-#             WorkflowResult,
-#         ],
-#         message: AgentMessage,
-#     ) -> AgentOutput[WorkflowResult]:
-#         with ctx.nested(
-#             f"{self.__str__()}|Invocation|{message.identifier}",
-#             metrics=[message],
-#         ):
-#             return await self._invocation(
-#                 current,
-#                 message,
-#             )
-
-#     async def _draive(  # yes, it is the name of the library
-#         self,
-#         input: AgentInput,  # noqa: A002
-#         workflow: AgentWorkflowCurrent[WorkflowState, WorkflowResult],
-#     ) -> None:
-#         with ctx.nested(self.__str__()):
-#             agent_current: AgentCurrent[
-#                 AgentState, AgentStateScratch, WorkflowState, WorkflowResult
-#             ] = AgentCurrent(
-#                 agent=self,
-#                 memory=self._memory(),
-#                 workflow=workflow,
-#             )
-#             try:
-#                 if self._concurrent:
-#                     # process all messages concurrently by spawning a task for each
-#                     async for message in input:
-#                         ctx.spawn_subtask(
-#                             self._handle_message,
-#                             message,
-#                             agent_current,
-#                             workflow,
-#                         )
-
-#                 else:
-#                     # process only one message at the time by waiting for results
-#                     async for message in input:
-#                         await self._handle_message(
-#                             message,
-#                             agent_current=agent_current,
-#                             workflow=workflow,
-#                         )
-
-#             except Exception as exc:
-#                 workflow.finish_with(AgentException(cause=exc))
-
-#     async def _handle_message(
-#         self,
-#         message: AgentMessage,
-#         /,
-#         workflow: AgentWorkflow,
-#     ) -> None:
-#         try:
-#             self._handle_output(
-#                 await self(
-#                     current=agent_current,
-#                     message=message,
-#                 ),
-#                 workflow=workflow,
-#             )
-
-#         except Exception as exc:  # when any agent fails the whole workflow fails
-#             workflow.finish_with(AgentException(cause=exc))
-
-#     def _handle_output(
-#         self,
-#         output: AgentOutput[WorkflowResult],
-#         /,
-#         workflow: AgentWorkflowCurrent[WorkflowState, WorkflowResult],
-#     ) -> None:
-#         match output:
-#             case None:
-#                 pass  # no action
-
-#             case AgentMessageDraftGroup() as messages_group:
-#                 workflow.send(
-#                     *(
-#                         AgentMessage(
-#                             sender=self,
-#                             recipient=message.recipient,
-#                             addressee=message.addressee,
-#                             content=message.content,
-#                             attachment=message.attachment,
-#                         )
-#                         for message in messages_group.messages
-#                     )
-#                 )
-
-#             case AgentMessageDraft() as message:
-#                 workflow.send(
-#                     AgentMessage(
-#                         sender=self,
-#                         recipient=message.recipient,
-#                         addressee=message.addressee,
-#                         content=message.content,
-#                         attachment=message.attachment,
-#                     )
-#                 )
-
-#             case result:
-#                 workflow.finish_with(result)
-
-#     @property
-#     def identifier(self) -> UUID:
-#         return self._identifier
-
-#     def address(
-#         self,
-#         content: MultimodalContent | MultimodalContentConvertible,
-#         /,
-#         attachment: ParametrizedData | None = None,
-#         addressee: AgentABC | None = None,
-#     ) -> AgentMessageDraft:
-#         return AgentMessageDraft(
-#             recipient=self,
-#             addressee=addressee,
-#             content=MultimodalContent.of(content),
-#             attachment=attachment,
-#         )
-
-#     async def start_workflow(
-#         self,
-#         input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
-#         /,
-#         state: WorkflowState,
-#         timeout: float | None = None,
-#     ) -> WorkflowResult:
-#         return await AgentWorkflow[WorkflowState, WorkflowResult].run(
-#             self.address(input, addressee=None),
-#             state=state,
-#             timeout=timeout,
-#         )
+@runtime_checkable
+class AgentStateInitializer[AgentState](Protocol):
+    def __call__(self) -> AgentState: ...
 
 
-# class StatelessAgentWrapper(Protocol):
-#     def __call__[WorkflowState: ParametrizedData, WorkflowResult](
-#         self,
-#         invocation: AgentInvocation[Stateless, Stateless, WorkflowState, WorkflowResult],
-#     ) -> Agent[Stateless, Stateless, WorkflowState, WorkflowResult]: ...
+@runtime_checkable
+class AgentMemoryInitializer[AgentState, AgentStateScratch](Protocol):
+    def __call__(self) -> Memory[AgentState, AgentStateScratch]: ...
 
 
-# class PartialAgentWrapper[LocalState, LocalStateScratch](Protocol):
-#     def __call__[WorkflowState: ParametrizedData, WorkflowResult](
-#         self,
-#         invocation: AgentInvocation[LocalState, LocalStateScratch, WorkflowState, WorkflowResult],
-#     ) -> Agent[LocalState, LocalStateScratch, WorkflowState, WorkflowResult]: ...
+@runtime_checkable
+class AgentInvocation[AgentState, AgentStateScratch](Protocol):
+    async def __call__(
+        self,
+        memory: Memory[AgentState, AgentStateScratch],
+        message: AgentMessage,
+    ) -> AgentOutput: ...
 
 
-# @overload
-# def agent[WorkflowState: ParametrizedData, WorkflowResult](
-#     invocation: AgentInvocation[Stateless, Stateless, WorkflowState, WorkflowResult],
-#     /,
-# ) -> Agent[Stateless, Stateless, WorkflowState, WorkflowResult]: ...
+@runtime_checkable
+class StatelessAgentInvocation(Protocol):
+    async def __call__(
+        self,
+        message: AgentMessage,
+    ) -> AgentOutput: ...
 
 
-# @overload
-# def agent(
-#     *,
-#     name: str | None = None,
-#     description: str | None = None,
-#     concurrent: Literal[True],
-# ) -> StatelessAgentWrapper: ...
+class PartialAgentWrapper[AgentState, AgentStateScratch](Protocol):
+    def __call__(
+        self,
+        invocation: AgentInvocation[AgentState, AgentStateScratch],
+    ) -> AgentNode: ...
 
 
-# @overload
-# def agent[LocalState](
-#     *,
-#     name: str | None = None,
-#     description: str | None = None,
-#     initial_state: Callable[[], LocalState],
-#     concurrent: Literal[False] = False,
-# ) -> PartialAgentWrapper[LocalState, LocalState]: ...
+class PartialStatelessAgentWrapper(Protocol):
+    def __call__(
+        self,
+        invocation: StatelessAgentInvocation,
+    ) -> AgentNode: ...
 
 
-# @overload
-# def agent[LocalState, LocalStateScratch](
-#     *,
-#     name: str | None = None,
-#     description: str | None = None,
-#     memory: Memory[LocalState, LocalStateScratch],
-#     concurrent: Literal[False] = False,
-# ) -> PartialAgentWrapper[LocalState, LocalStateScratch]: ...
+@overload
+def agent(
+    node: AgentNode,
+    /,
+) -> PartialStatelessAgentWrapper: ...
 
 
-# def agent[  # noqa: PLR0913
-#     LocalState,
-#     LocalStateScratch,
-#     WorkflowState: ParametrizedData,
-#     WorkflowResult,
-# ](
-#     invocation: AgentInvocation[LocalState, LocalStateScratch, WorkflowState, WorkflowResult]
-#     | None = None,
-#     *,
-#     name: str | None = None,
-#     description: str | None = None,
-#     initial_state: Callable[[], LocalState] | None = None,
-#     memory: Memory[LocalState, LocalStateScratch] | None = None,
-#     concurrent: bool = False,
-# ) -> (
-#     StatelessAgentWrapper
-#     | PartialAgentWrapper[LocalState, LocalStateScratch]
-#     | Agent[LocalState, LocalStateScratch, WorkflowState, WorkflowResult]
-# ):
-#     assert initial_state is None or memory is None, "Can't specify both initial state and memory"  # nosec: B101
+@overload
+def agent[AgentState](
+    node: AgentNode,
+    /,
+    *,
+    state: AgentStateInitializer[AgentState],
+) -> PartialAgentWrapper[AgentState, AgentState]: ...
 
-#     def agent_memory() -> Memory[LocalState, LocalStateScratch]:
-#         if memory is not None:
-#             return memory
 
-#         elif initial_state is not None:
-#             return cast(Memory[LocalState, LocalStateScratch], VolatileMemory(initial_state()))
+@overload
+def agent[AgentState, AgentStateScratch](
+    node: AgentNode,
+    /,
+    *,
+    memory: AgentMemoryInitializer[AgentState, AgentStateScratch],
+) -> PartialAgentWrapper[AgentState, AgentStateScratch]: ...
 
-#         else:
-#             return cast(Memory[LocalState, LocalStateScratch], ConstantMemory(Stateless()))
 
-#     def wrap[WrappedWorkflowState: ParametrizedData, WrappedWorkflowResult](
-#         invocation: AgentInvocation[
-#             LocalState, LocalStateScratch, WrappedWorkflowState, WrappedWorkflowResult
-#         ],
-#     ) -> Agent[LocalState, LocalStateScratch, WrappedWorkflowState, WrappedWorkflowResult]:
-#         assert isfunction(invocation), "Agent has to be defined from a function"  # nosec: B101
+@overload
+def agent(
+    *,
+    name: str | None = None,
+    description: str,
+) -> PartialStatelessAgentWrapper: ...
 
-#         return Agent(
-#             identifier=uuid4(),
-#             name=name or invocation.__qualname__,
-#             description=description,
-#             memory=agent_memory,
-#             invocation=invocation,
-#             concurrent=concurrent,
-#         )
 
-#     if invocation := invocation:
-#         return wrap(invocation)
+@overload
+def agent[AgentState](
+    *,
+    name: str | None = None,
+    description: str,
+    state: AgentStateInitializer[AgentState],
+) -> PartialAgentWrapper[AgentState, AgentState]: ...
 
-#     else:
-#         return wrap
+
+@overload
+def agent[AgentState, AgentStateScratch](
+    *,
+    name: str | None = None,
+    description: str,
+    memory: AgentMemoryInitializer[AgentState, AgentStateScratch],
+) -> PartialAgentWrapper[AgentState, AgentStateScratch]: ...
+
+
+def agent[AgentState, AgentStateScratch](
+    node: AgentNode | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    state: AgentStateInitializer[AgentState] | None = None,
+    memory: AgentMemoryInitializer[AgentState, AgentStateScratch] | None = None,
+) -> PartialStatelessAgentWrapper | PartialAgentWrapper[AgentState, AgentStateScratch]:
+    assert state is None or memory is None, "Can't specify both state and memory"  # nosec: B101
+    assert node is None or (  # nosec: B101
+        name is None and description is None
+    ), "Can't specify both agent node and name/description"
+    assert (  # nosec: B101
+        description is not None or node is not None
+    ), "Either agent node or description has to be provided"
+
+    def wrap(
+        invocation: AgentInvocation[AgentState, AgentStateScratch],
+    ) -> AgentNode:
+        assert isfunction(invocation), "agent has to be defined from a function"  # nosec: B101
+
+        agent_node: AgentNode = node or AgentNode(
+            name=name or invocation.__qualname__,
+            description=description or "",
+        )
+        concurrent: bool
+
+        if memory is not None:
+            concurrent = False
+            memory_initializer: AgentMemoryInitializer[AgentState, AgentStateScratch] = memory
+
+            def initialize() -> Agent:
+                agent_memory: Memory[AgentState, AgentStateScratch] = memory_initializer()
+
+                async def agent(message: AgentMessage) -> AgentOutput:
+                    return await invocation(
+                        memory=agent_memory,
+                        message=message,
+                    )
+
+                return agent
+
+        elif state is not None:
+            concurrent = False
+            state_initializer: AgentStateInitializer[AgentState] = state
+
+            def initialize() -> Agent:
+                agent_memory: Memory[AgentState, AgentStateScratch] = cast(
+                    Memory[AgentState, AgentStateScratch], VolatileMemory(state_initializer())
+                )
+
+                async def agent(message: AgentMessage) -> AgentOutput:
+                    return await invocation(
+                        memory=agent_memory,
+                        message=message,
+                    )
+
+                return agent
+
+        else:
+            concurrent = True  # stateless agents are concurrent by default
+
+            def initialize() -> Agent:
+                async def stateless_agent(message: AgentMessage) -> AgentOutput:
+                    return await invocation(message=message)
+
+                return stateless_agent
+
+        agent_node._associate(  # pyright: ignore[reportPrivateUsage]
+            initialize,
+            concurrent=concurrent,
+        )
+
+        return agent_node
+
+    return wrap

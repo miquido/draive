@@ -82,7 +82,7 @@ class OpenAIClient(ScopeDependency):
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
         tools: list[ChatCompletionToolParam] | None = None,
-        tools_suggestion: ChatCompletionNamedToolChoiceParam | bool = False,
+        tool_requirement: ChatCompletionNamedToolChoiceParam | bool | None = False,
         stream: Literal[True],
     ) -> AsyncStream[ChatCompletionChunk]: ...
 
@@ -93,7 +93,7 @@ class OpenAIClient(ScopeDependency):
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
         tools: list[ChatCompletionToolParam] | None = None,
-        tools_suggestion: ChatCompletionNamedToolChoiceParam | bool = False,
+        tool_requirement: ChatCompletionNamedToolChoiceParam | bool | None = False,
     ) -> ChatCompletion: ...
 
     async def chat_completion(  # noqa: PLR0913
@@ -102,11 +102,14 @@ class OpenAIClient(ScopeDependency):
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
         tools: list[ChatCompletionToolParam] | None = None,
-        tools_suggestion: ChatCompletionNamedToolChoiceParam | bool = False,
+        tool_requirement: ChatCompletionNamedToolChoiceParam | bool | None = False,
         stream: bool = False,
     ) -> AsyncStream[ChatCompletionChunk] | ChatCompletion:
         tool_choice: ChatCompletionToolChoiceOptionParam | NotGiven
-        match tools_suggestion:
+        match tool_requirement:
+            case None:
+                tool_choice = "none"
+
             case False:
                 tool_choice = "auto" if tools else NOT_GIVEN
 
@@ -118,39 +121,37 @@ class OpenAIClient(ScopeDependency):
                 assert tools, "Can't require tools use without tools"  # nosec: B101
                 tool_choice = tool
 
-        while True:
-            try:
-                return await self._client.chat.completions.create(
-                    messages=messages,
-                    model=config.model,
-                    frequency_penalty=config.frequency_penalty
-                    if not_missing(config.frequency_penalty)
-                    else NOT_GIVEN,
-                    max_tokens=config.max_tokens if not_missing(config.max_tokens) else NOT_GIVEN,
-                    n=1,
-                    response_format=cast(ResponseFormat, config.response_format)
-                    if not_missing(config.response_format)
-                    else NOT_GIVEN,
-                    seed=config.seed if not_missing(config.seed) else NOT_GIVEN,
-                    stream=stream,
-                    temperature=config.temperature,
-                    tools=tools or NOT_GIVEN,
-                    tool_choice=tool_choice,
-                    parallel_tool_calls=True if tools else NOT_GIVEN,
-                    top_p=config.top_p if not_missing(config.top_p) else NOT_GIVEN,
-                    timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,
-                    stream_options={"include_usage": True} if stream else NOT_GIVEN,
-                )
+        try:
+            return await self._client.chat.completions.create(
+                messages=messages,
+                model=config.model,
+                frequency_penalty=config.frequency_penalty
+                if not_missing(config.frequency_penalty)
+                else NOT_GIVEN,
+                max_tokens=config.max_tokens if not_missing(config.max_tokens) else NOT_GIVEN,
+                n=1,
+                response_format=cast(ResponseFormat, config.response_format)
+                if not_missing(config.response_format)
+                else NOT_GIVEN,
+                seed=config.seed if not_missing(config.seed) else NOT_GIVEN,
+                stream=stream,
+                temperature=config.temperature,
+                tools=tools or NOT_GIVEN,
+                tool_choice=tool_choice,
+                parallel_tool_calls=True if tools else NOT_GIVEN,
+                top_p=config.top_p if not_missing(config.top_p) else NOT_GIVEN,
+                timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,
+                stream_options={"include_usage": True} if stream else NOT_GIVEN,
+            )
 
-            except OpenAIRateLimitError as exc:  # retry on rate limit after delay
+        except OpenAIRateLimitError as exc:  # retry on rate limit after delay
+            if delay := exc.response.headers.get("Retry-After"):
                 raise RateLimitError(
-                    retry_after=exc.response.headers.get(
-                        "Retry-After",
-                        # wait between 0.5s and 2s before next attempt if no delay found
-                        default=uniform(0.5, 2),  # nosec: B311
-                    )
-                    + uniform(0.0, 0.3)  # nosec: B311 # add small random delay
+                    retry_after=delay + uniform(0.0, 0.3)  # nosec: B311 # add small random delay
                 ) from exc
+
+            else:
+                raise exc
 
     async def embedding(
         self,
@@ -198,14 +199,13 @@ class OpenAIClient(ScopeDependency):
                 return [element.embedding for element in response.data]
 
             except OpenAIRateLimitError as exc:  # always retry on rate limit after delay
-                raise RateLimitError(
-                    retry_after=exc.response.headers.get(
-                        "Retry-After",
-                        # wait between 0.5s and 2s before next attempt if no delay found
-                        default=uniform(0.5, 2),  # nosec: B311
-                    )
-                    + uniform(0.0, 0.3)  # nosec: B311 # add small random delay
-                ) from exc
+                if delay := exc.response.headers.get("Retry-After"):
+                    raise RateLimitError(
+                        retry_after=delay + uniform(0.0, 0.3)  # nosec: B311 # add small random delay
+                    ) from exc
+
+                else:
+                    raise exc
 
     async def moderation_check(
         self,

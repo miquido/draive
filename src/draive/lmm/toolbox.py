@@ -47,32 +47,24 @@ class Toolbox:
 
         freeze(self)
 
-    @property
-    def call_range(self) -> range:
-        return range(0, self.recursion_limit + 1)
-
-    def tool_suggestion(
+    def tool_requirement(
         self,
         recursion_level: int = 0,
-    ) -> ToolSpecification | bool:
+    ) -> ToolSpecification | bool | None:
         if recursion_level != 0:
-            return False  # suggest tools only for the first call
+            return False  # require tools only for the first call
+
+        elif recursion_level >= self.recursion_limit:
+            return None  # require no tools if reached the limit
 
         elif self._suggested_tool is not None:
             return self._suggested_tool.specification if self._suggested_tool.available else False
 
         else:
-            return self.suggest_tools
+            return self.suggest_tools  # use suggestion mode if no specific tool was required
 
-    def available_tools(
-        self,
-        recursion_level: int = 0,
-    ) -> list[ToolSpecification]:
-        if recursion_level <= self.recursion_limit:
-            return [tool.specification for tool in self._tools.values() if tool.available]
-        else:
-            ctx.log_warning("Reached tool calls recursion limit, ignoring tools...")
-            return []  # disable tools when reached recursion limit
+    def available_tools(self) -> list[ToolSpecification]:
+        return [tool.specification for tool in self._tools.values() if tool.available]
 
     async def call_tool(
         self,

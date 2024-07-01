@@ -51,12 +51,13 @@ async def lmm_generate_text(
             LMMInput.of(input),
         ]
 
-        for recursion_level in toolbox.call_range:
+        recursion_level: int = 0
+        while True:
             match await lmm_invocation(
                 instruction=instruction,
                 context=context,
-                tools=toolbox.available_tools(recursion_level=recursion_level),
-                require_tool=toolbox.tool_suggestion(recursion_level=recursion_level),
+                tools=toolbox.available_tools(),
+                tool_requirement=toolbox.tool_requirement(recursion_level=recursion_level),
                 output="text",
                 stream=False,
                 **extra,
@@ -77,6 +78,4 @@ async def lmm_generate_text(
 
                     else:
                         context.extend(responses)
-
-    # fail if we have not provided a result until this point
-    raise RuntimeError("Failed to produce conversation completion")
+                        recursion_level += 1  # continue with next recursion level

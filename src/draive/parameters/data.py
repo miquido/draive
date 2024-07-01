@@ -566,6 +566,12 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
             for key in self.__class__.__PARAMETERS__.keys()
         )
 
+    def __getitem__(
+        self,
+        name: str,
+    ) -> Any | Missing:
+        return vars(self).get(name, MISSING)
+
     def __setattr__(
         self,
         __name: str,
