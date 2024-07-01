@@ -6,9 +6,16 @@ Are you looking for maximum flexibility and efficiency in your next Python libra
 
 👉 Introducing **draive** - an open-source Python library under the Miquido AI Kickstarter framework, designed to simplify and accelerate the development of LLM-based applications. Get started with draive to streamline your workflow and build powerful, efficient apps with ease.
 
+## Examples repository
+
+Fully functional examples of using the Draive library are available in a separate repository
+
+[Draive Examples](https://github.com/miquido/draive-examples)
+
 ## 🚀 Quick Install
 
 With pip:
+
 ```bash
 pip install draive
 ```
@@ -16,36 +23,43 @@ pip install draive
 ### Optional dependencies
 
 - OpenAI:
+
 ```bash
 pip install draive[openai]
 ```
 
 - Anthropic:
+
 ```bash
 pip install draive[anthropic]
 ```
 
 - Gemini:
+
 ```bash
 pip install draive[gemini]
 ```
 
 - Mistral:
+
 ```bash
 pip install draive[mistral]
 ```
 
 - Ollama:
+
 ```bash
 pip install draive[ollama]
 ```
 
 - Mistral.rs:
+
 ```bash
 pip install draive[mistralrs]
 ```
 
 - Fastembed:
+
 ```bash
 pip install draive[fastembed]
 ```
@@ -67,15 +81,21 @@ pip install draive[fastembed]
 ## 🧱 What can you build with draive?
 
 ### 🦾 RAG applications
+
 RAG enhances model capabilities and personalizes the outputs.
+
 - **Examples**: Question answering, custom knowledge bases.
 
 ### 🧹 Extracting structured output
+
 Simplified data extraction and structuring.
+
 - **Examples**: Data parsing, report generation.
 
 ### 🤖 Chatbots
+
 Sophisticated conversational agents.
+
 - **Examples**: Customer service bots, virtual assistants.
 
 … and much more!
