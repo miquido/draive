@@ -1,4 +1,4 @@
-from asyncio import gather, sleep
+from asyncio import gather
 from collections.abc import Sequence
 from itertools import chain
 from random import uniform
@@ -118,7 +118,6 @@ class OpenAIClient(ScopeDependency):
                 assert tools, "Can't require tools use without tools"  # nosec: B101
                 tool_choice = tool
 
-        attempts: int = 64  # we do want retry on rate limit but we have to fail eventually
         while True:
             try:
                 return await self._client.chat.completions.create(
@@ -144,26 +143,14 @@ class OpenAIClient(ScopeDependency):
                 )
 
             except OpenAIRateLimitError as exc:  # retry on rate limit after delay
-                if attempts > 0:
-                    attempts -= 1
-                    await sleep(
-                        delay=float(
-                            exc.response.headers.get(
-                                "Retry-After",
-                                # wait between 0.5s and 2s before next attempt if no delay found
-                                default=uniform(0.5, 2),  # nosec: B311
-                            )
-                        ),
+                raise RateLimitError(
+                    retry_after=exc.response.headers.get(
+                        "Retry-After",
+                        # wait between 0.5s and 2s before next attempt if no delay found
+                        default=uniform(0.5, 2),  # nosec: B311
                     )
-
-                else:
-                    raise RateLimitError(
-                        retry_after=exc.response.headers.get(
-                            "Retry-After",
-                            # wait between 0.5s and 2s before next attempt if no delay found
-                            default=uniform(0.5, 2),  # nosec: B311
-                        )
-                    ) from exc
+                    + uniform(0.0, 0.3)  # nosec: B311 # add small random delay
+                ) from exc
 
     async def embedding(
         self,
@@ -199,7 +186,6 @@ class OpenAIClient(ScopeDependency):
         encoding_format: Literal["float", "base64"] | NotGiven,
         timeout: float | NotGiven,
     ) -> list[list[float]]:
-        attempts: int = 64  # we do want retry on rate limit but we have to fail eventually
         while True:
             try:
                 response: CreateEmbeddingResponse = await self._client.embeddings.create(
@@ -212,26 +198,14 @@ class OpenAIClient(ScopeDependency):
                 return [element.embedding for element in response.data]
 
             except OpenAIRateLimitError as exc:  # always retry on rate limit after delay
-                if attempts > 0:
-                    attempts -= 1
-                    await sleep(
-                        delay=float(
-                            exc.response.headers.get(
-                                "Retry-After",
-                                # wait between 0.5s and 2s before next attempt if no delay found
-                                default=uniform(0.5, 2),  # nosec: B311
-                            )
-                        ),
+                raise RateLimitError(
+                    retry_after=exc.response.headers.get(
+                        "Retry-After",
+                        # wait between 0.5s and 2s before next attempt if no delay found
+                        default=uniform(0.5, 2),  # nosec: B311
                     )
-
-                else:
-                    raise RateLimitError(
-                        retry_after=exc.response.headers.get(
-                            "Retry-After",
-                            # wait between 0.5s and 2s before next attempt if no delay found
-                            default=uniform(0.5, 2),  # nosec: B311
-                        )
-                    ) from exc
+                    + uniform(0.0, 0.3)  # nosec: B311 # add small random delay
+                ) from exc
 
     async def moderation_check(
         self,
