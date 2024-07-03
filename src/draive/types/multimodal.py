@@ -81,6 +81,11 @@ class MultimodalContent(DataModel):
         else:
             return tuple(part for part in self.parts if _is_artifact(part))
 
+    def excluding_artifacts(self) -> Self:
+        return self.__class__(
+            parts=tuple(part for part in self.parts if not _is_artifact(part)),
+        )
+
     def as_string(
         self,
         joiner: str | None = None,

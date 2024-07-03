@@ -111,7 +111,11 @@ class Toolbox:
                 )
 
             except ToolError as error:  # use formatted error, blow up on other exception
-                ctx.log_error("Tool (%s) returned an error", exception=error)
+                ctx.log_error(
+                    "Tool (%s) returned an error",
+                    request.tool,
+                    exception=error,
+                )
                 return LMMToolResponse(
                     identifier=request.identifier,
                     tool=request.tool,
