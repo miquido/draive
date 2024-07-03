@@ -253,7 +253,7 @@ def _convert_context_element(
             }
 
 
-async def _completion(  # noqa: PLR0913, PLR0912, C901
+async def _completion(  # noqa: PLR0913, PLR0912
     *,
     client: AnthropicClient,
     config: AnthropicConfig,
@@ -361,12 +361,6 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
                 raise AnthropicException("Invalid Anthropic completion", completion)
 
         case "end_turn":
-            if message_parts:
-                ctx.record(ResultTrace.of(message_parts))
-                return LMMCompletion.of(
-                    MultimodalContent.of(*[TextContent(text=part.text) for part in message_parts])
-                )
-
             if (tool_calls := tool_calls) and (tools := tools):
                 ctx.record(ResultTrace.of(tool_calls))
                 return LMMToolRequests(
@@ -381,7 +375,10 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
                 )
 
             else:
-                raise AnthropicException("Invalid Anthropic completion", completion)
+                ctx.record(ResultTrace.of(message_parts))
+                return LMMCompletion.of(
+                    MultimodalContent.of(*[TextContent(text=part.text) for part in message_parts])
+                )
 
         case other:
             raise AnthropicException(f"Unexpected finish reason: {other}")

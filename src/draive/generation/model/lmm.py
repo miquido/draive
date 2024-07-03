@@ -94,7 +94,7 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
         ]
 
         recursion_level: int = 0
-        while True:
+        while recursion_level <= toolbox.recursion_limit:
             match await lmm_invocation(
                 instruction=extended_instruction,
                 context=context,
@@ -132,7 +132,10 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
 
                     else:
                         context.extend(responses)
-                        recursion_level += 1  # continue with next recursion level
+
+            recursion_level += 1  # continue with next recursion level
+
+        raise RuntimeError("LMM exceeded limit of recursive calls")
 
 
 DEFAULT_INSTRUCTION_EXTENSION: str = """\
