@@ -1,4 +1,4 @@
-from typing import Self
+from typing import Self, final
 from uuid import uuid4
 
 from draive.utils import freeze
@@ -8,6 +8,7 @@ __all__ = [
 ]
 
 
+@final
 class Instruction:
     @classmethod
     def of(

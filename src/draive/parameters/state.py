@@ -1,3 +1,5 @@
+from typing import final
+
 from draive.parameters.data import ParametrizedData
 
 __all__ = [
@@ -6,9 +8,9 @@ __all__ = [
 ]
 
 
-class State(ParametrizedData):
-    pass
+State = ParametrizedData
 
 
+@final
 class Stateless(ParametrizedData):
     pass

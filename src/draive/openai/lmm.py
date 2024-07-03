@@ -57,7 +57,7 @@ async def openai_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    require_tool: ToolSpecification | bool = False,
+    tool_requirement: ToolSpecification | bool | None = False,
     output: Literal["text", "json"] = "text",
     stream: Literal[True],
     **extra: Any,
@@ -70,7 +70,7 @@ async def openai_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    require_tool: ToolSpecification | bool = False,
+    tool_requirement: ToolSpecification | bool | None = False,
     output: Literal["text", "json"] = "text",
     stream: Literal[False] = False,
     **extra: Any,
@@ -83,7 +83,7 @@ async def openai_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    require_tool: ToolSpecification | bool = False,
+    tool_requirement: ToolSpecification | bool | None = False,
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -95,7 +95,7 @@ async def openai_lmm_invocation(  # noqa: PLR0913
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    require_tool: ToolSpecification | bool = False,
+    tool_requirement: ToolSpecification | bool | None = False,
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -104,9 +104,10 @@ async def openai_lmm_invocation(  # noqa: PLR0913
         "openai_lmm_invocation",
         metrics=[
             ArgumentsTrace.of(
+                instruction=instruction,
                 context=context,
                 tools=tools,
-                require_tool=require_tool,
+                tool_requirement=tool_requirement,
                 output=output,
                 stream=stream,
                 **extra,
@@ -140,7 +141,7 @@ async def openai_lmm_invocation(  # noqa: PLR0913
                     config=config,
                     messages=messages,
                     tools=tools,
-                    require_tool=require_tool,
+                    tool_requirement=tool_requirement,
                 ),
             )
 
@@ -150,7 +151,7 @@ async def openai_lmm_invocation(  # noqa: PLR0913
                 config=config,
                 messages=messages,
                 tools=tools,
-                require_tool=require_tool,
+                tool_requirement=tool_requirement,
             )
 
 
@@ -269,16 +270,24 @@ def _convert_context_element(
             }
 
 
-async def _chat_completion(  # noqa: PLR0912
+async def _chat_completion(  # noqa: PLR0912, C901
     *,
     client: OpenAIClient,
     config: OpenAIChatConfig,
     messages: list[ChatCompletionMessageParam],
     tools: Sequence[ToolSpecification] | None,
-    require_tool: ToolSpecification | bool,
+    tool_requirement: ToolSpecification | bool | None,
 ) -> LMMOutput:
     completion: ChatCompletion
-    match require_tool:
+    match tool_requirement:
+        case None:
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=[],
+                tool_requirement=None,
+            )
+
         case bool(required):
             completion = await client.chat_completion(
                 config=config,
@@ -287,7 +296,7 @@ async def _chat_completion(  # noqa: PLR0912
                     list[ChatCompletionToolParam],
                     tools,
                 ),
-                tools_suggestion=required,
+                tool_requirement=required,
             )
 
         case tool:
@@ -298,7 +307,7 @@ async def _chat_completion(  # noqa: PLR0912
                     list[ChatCompletionToolParam],
                     tools,
                 ),
-                tools_suggestion={
+                tool_requirement={
                     "type": "function",
                     "function": {
                         "name": tool["function"]["name"],
@@ -372,10 +381,19 @@ async def _chat_completion_stream(  # noqa: C901, PLR0912, PLR0915
     config: OpenAIChatConfig,
     messages: list[ChatCompletionMessageParam],
     tools: Sequence[ToolSpecification] | None,
-    require_tool: ToolSpecification | bool,
+    tool_requirement: ToolSpecification | bool | None,
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
     completion_stream: OpenAIAsyncStream[ChatCompletionChunk]
-    match require_tool:
+    match tool_requirement:
+        case None:
+            completion_stream = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=[],
+                tool_requirement=None,
+                stream=True,
+            )
+
         case bool() as required:
             completion_stream = await client.chat_completion(
                 config=config,
@@ -384,11 +402,11 @@ async def _chat_completion_stream(  # noqa: C901, PLR0912, PLR0915
                     list[ChatCompletionToolParam],
                     tools,
                 ),
-                tools_suggestion=required,
+                tool_requirement=required,
                 stream=True,
             )
 
-        case ToolSpecification() as tool:
+        case tool:
             assert tool in (tools or []), "Can't suggest a tool without using it"  # nosec: B101
             completion_stream = await client.chat_completion(
                 config=config,
@@ -397,7 +415,7 @@ async def _chat_completion_stream(  # noqa: C901, PLR0912, PLR0915
                     list[ChatCompletionToolParam],
                     tools,
                 ),
-                tools_suggestion={
+                tool_requirement={
                     "type": "function",
                     "function": {
                         "name": tool["function"]["name"],
@@ -483,7 +501,30 @@ async def _chat_completion_stream(  # noqa: C901, PLR0912, PLR0915
                         )
 
                     case "stop":
-                        ctx.record(ResultTrace.of(accumulated_completion))
+                        if requested_tool_calls:
+                            if accumulated_completion:
+                                ctx.record(
+                                    ResultTrace.of((accumulated_completion, requested_tool_calls))
+                                )
+                            else:
+                                ctx.record(ResultTrace.of(requested_tool_calls))
+
+                            yield LMMToolRequests(
+                                requests=[
+                                    LMMToolRequest(
+                                        identifier=call.id or uuid4().hex,
+                                        tool=call.function.name,
+                                        arguments=json.loads(call.function.arguments)
+                                        if call.function.arguments
+                                        else {},
+                                    )
+                                    for call in requested_tool_calls
+                                    if call.function and call.function.name
+                                ]
+                            )
+
+                        else:
+                            ctx.record(ResultTrace.of(accumulated_completion))
 
                     case other:
                         raise OpenAIException(f"Unexpected finish reason: {other}")

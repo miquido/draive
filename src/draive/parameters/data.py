@@ -344,7 +344,6 @@ class ParametrizedDataMeta(type):
 
         assert parameters or name in {  # nosec: B101
             "DataModel",
-            "State",
             "Stateless",
         }, "Can't prepare parametrized data without parameters!"
         data_type.__PARAMETERS__ = parameters  # pyright: ignore[reportAttributeAccessIssue]
@@ -566,6 +565,12 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
             getattr(self, key, MISSING) == getattr(other, key, MISSING)
             for key in self.__class__.__PARAMETERS__.keys()
         )
+
+    def __getitem__(
+        self,
+        name: str,
+    ) -> Any | Missing:
+        return vars(self).get(name, MISSING)
 
     def __setattr__(
         self,

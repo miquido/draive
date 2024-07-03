@@ -54,7 +54,7 @@ class GeminiClient(ScopeDependency):
         instruction: str,
         messages: list[GeminiRequestMessage],
         tools: list[GeminiFunctionsTool] | None = None,
-        suggest_tools: bool = False,
+        require_tools: bool | None = False,
         response_schema: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> GeminiGenerationResult:
@@ -62,6 +62,17 @@ class GeminiClient(ScopeDependency):
             raise NotImplementedError("Gemini streaming is not supported yet")
 
         else:
+            function_calling_mode: str
+            match require_tools:
+                case None:
+                    function_calling_mode = "NONE"
+
+                case True:
+                    function_calling_mode = "ANY"
+
+                case False:
+                    function_calling_mode = "AUTO"
+
             return await self._generate_content(
                 model=config.model,
                 request={
@@ -83,7 +94,7 @@ class GeminiClient(ScopeDependency):
                     "tools": tools or [],
                     "toolConfig": {
                         "functionCallingConfig": {
-                            "mode": ("ANY" if suggest_tools else "AUTO") if tools else "NONE",
+                            "mode": function_calling_mode if tools else "NONE",
                         },
                     },
                     "safetySettings": [  # google moderation is terrible, disabling it all

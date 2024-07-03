@@ -206,6 +206,7 @@ class ctx:
     @staticmethod
     def new(  # noqa: PLR0913
         label: str | None = None,
+        /,
         *,
         dependencies: ScopeDependencies
         | Iterable[type[ScopeDependency] | ScopeDependency]
@@ -260,6 +261,7 @@ class ctx:
     @staticmethod
     def wrap[**Args, Result](  # noqa: PLR0913
         label: str | None = None,
+        /,
         *,
         dependencies: ScopeDependencies
         | Iterable[type[ScopeDependency] | ScopeDependency]
@@ -402,6 +404,7 @@ class ctx:
     def nested(
         label: str,
         /,
+        *,
         state: ScopeState | Iterable[ParametrizedData] | None = None,
         metrics: Iterable[Metric] | None = None,
     ) -> _PartialContext:

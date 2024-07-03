@@ -164,12 +164,13 @@ async def _lmm_conversation_completion(
     toolbox: Toolbox,
     **extra: Any,
 ) -> ConversationMessage:
-    for recursion_level in toolbox.call_range:
+    recursion_level: int = 0
+    while True:
         match await lmm_invocation(
             instruction=instruction,
             context=context,
-            tools=toolbox.available_tools(recursion_level=recursion_level),
-            require_tool=toolbox.tool_suggestion(recursion_level=recursion_level),
+            tools=toolbox.available_tools(),
+            tool_requirement=toolbox.tool_requirement(recursion_level=recursion_level),
             output="text",
             stream=False,
             **extra,
@@ -208,9 +209,7 @@ async def _lmm_conversation_completion(
 
                 else:
                     context.extend(responses)
-
-    # fail if we have not provided a result until this point
-    raise RuntimeError("Failed to produce conversation completion")
+                    recursion_level += 1  # continue with next recursion level
 
 
 async def _lmm_conversation_completion_stream(
@@ -224,12 +223,15 @@ async def _lmm_conversation_completion_stream(
     response_identifier: str = uuid4().hex
     response_content: MultimodalContent = MultimodalContent.of()  # empty
 
-    for recursion_level in toolbox.call_range:
+    recursion_level: int = 0
+    require_callback: bool = True
+    while require_callback:
+        require_callback = False
         async for part in await lmm_invocation(
             instruction=instruction,
             context=context,
-            tools=toolbox.available_tools(recursion_level=recursion_level),
-            require_tool=toolbox.tool_suggestion(recursion_level=recursion_level),
+            tools=toolbox.available_tools(),
+            tool_requirement=toolbox.tool_requirement(recursion_level=recursion_level),
             output="text",
             stream=True,
             **extra,
@@ -250,9 +252,6 @@ async def _lmm_conversation_completion_stream(
 
                 case LMMToolRequests() as tool_requests:
                     ctx.log_debug("Received conversation tool calls")
-                    assert (  # nosec: B101
-                        not response_content
-                    ), "Tools and completion message should not be used at the same time"
 
                     responses: list[LMMToolResponse] = []
                     async for update in toolbox.stream(tool_requests):
@@ -270,31 +269,33 @@ async def _lmm_conversation_completion_stream(
                     if direct_content := [
                         response.content for response in responses if response.direct
                     ]:
-                        response_content = MultimodalContent.of(*direct_content)
+                        direct_response_content: MultimodalContent = MultimodalContent.of(
+                            *direct_content
+                        )
+                        response_content = response_content.extending(
+                            direct_response_content,
+                            merge_text=True,
+                        )
+
                         yield ConversationMessageChunk(
                             identifier=response_identifier,
-                            content=response_content,
+                            content=direct_response_content,
                         )
-                        # exit the loop - we have final result
 
                     else:
                         context.extend([tool_requests, *responses])
-                        break  # request lmm again with tool results using outer loop
-        else:
-            break  # exit the loop with result
+                        require_callback = True  # request lmm again with tool results
 
-    if response_content:
-        ctx.log_debug("Remembering conversation result")
-        # remember messages when finishing stream
-        await conversation_memory.remember(
-            request_message,
-            ConversationMessage(
-                identifier=response_identifier,
-                role="model",
-                created=datetime.now(UTC),
-                content=response_content,
-            ),
-        )
-    else:
-        # fail if we have not provided a result until this point
-        raise RuntimeError("Failed to produce conversation completion")
+        recursion_level += 1  # continue with next recursion level
+
+    ctx.log_debug("Remembering conversation result")
+    # remember messages when finishing stream
+    await conversation_memory.remember(
+        request_message,
+        ConversationMessage(
+            identifier=response_identifier,
+            role="model",
+            created=datetime.now(UTC),
+            content=response_content,
+        ),
+    )

@@ -1,32 +1,26 @@
-# from draive.agents.pool import AgentPool, AgentPoolCoordinator
-from draive.agents.definition import Agent, agent
+from draive.agents.definition import AgentInvocation, agent
 from draive.agents.errors import AgentException
-from draive.agents.types import (
-    AgentCurrent,
-    AgentInput,
-    AgentMessage,
-    AgentMessageDraft,
-    AgentMessageDraftGroup,
-    AgentOutput,
-    AgentWorkflowCurrent,
-    AgentWorkflowStateAccess,
-    StatelessAgentCurrent,
+from draive.agents.node import Agent, AgentError, AgentMessage, AgentNode, AgentOutput
+from draive.agents.workflow import (
+    AgentWorkflow,
+    AgentWorkflowInput,
+    AgentWorkflowInvocation,
+    AgentWorkflowOutput,
+    workflow,
 )
-from draive.agents.workflow import AgentWorkflow
 
 __all__ = [
     "agent",
     "Agent",
-    "AgentWorkflow",
+    "AgentError",
     "AgentException",
+    "AgentInvocation",
     "AgentMessage",
-    "AgentMessage",
-    "AgentCurrent",
-    "AgentWorkflowCurrent",
-    "AgentWorkflowStateAccess",
-    "AgentInput",
+    "AgentNode",
     "AgentOutput",
-    "AgentMessageDraft",
-    "StatelessAgentCurrent",
-    "AgentMessageDraftGroup",
+    "AgentWorkflow",
+    "AgentWorkflowInput",
+    "AgentWorkflowInvocation",
+    "AgentWorkflowOutput",
+    "workflow",
 ]

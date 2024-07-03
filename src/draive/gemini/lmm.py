@@ -58,7 +58,7 @@ async def gemini_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    require_tool: ToolSpecification | bool = False,
+    tool_requirement: ToolSpecification | bool | None = False,
     output: Literal["text", "json"] = "text",
     stream: Literal[True],
     **extra: Any,
@@ -71,7 +71,7 @@ async def gemini_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    require_tool: ToolSpecification | bool = False,
+    tool_requirement: ToolSpecification | bool | None = False,
     output: Literal["text", "json"] = "text",
     stream: Literal[False] = False,
     **extra: Any,
@@ -84,7 +84,7 @@ async def gemini_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    require_tool: ToolSpecification | bool = False,
+    tool_requirement: ToolSpecification | bool | None = False,
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -96,7 +96,7 @@ async def gemini_lmm_invocation(  # noqa: PLR0913
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    require_tool: ToolSpecification | bool = False,
+    tool_requirement: ToolSpecification | bool | None = False,
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -105,9 +105,10 @@ async def gemini_lmm_invocation(  # noqa: PLR0913
         "gemini_lmm_invocation",
         metrics=[
             ArgumentsTrace.of(
+                instruction=instruction,
                 context=context,
                 tools=tools,
-                require_tool=require_tool,
+                tool_requirement=tool_requirement,
                 output=output,
                 stream=stream,
                 **extra,
@@ -146,7 +147,7 @@ async def gemini_lmm_invocation(  # noqa: PLR0913
                     instruction=Instruction.of(instruction).format(),
                     messages=messages,
                     tools=tools,
-                    require_tool=require_tool,
+                    tool_requirement=tool_requirement,
                 ),
             )
 
@@ -157,7 +158,7 @@ async def gemini_lmm_invocation(  # noqa: PLR0913
                 instruction=Instruction.of(instruction).format(),
                 messages=messages,
                 tools=tools,
-                require_tool=require_tool,
+                tool_requirement=tool_requirement,
             )
 
 
@@ -367,10 +368,19 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912
     instruction: str,
     messages: list[GeminiRequestMessage],
     tools: Sequence[ToolSpecification] | None,
-    require_tool: ToolSpecification | bool,
+    tool_requirement: ToolSpecification | bool | None,
 ) -> LMMOutput:
     result: GeminiGenerationResult
-    match require_tool:
+    match tool_requirement:
+        case None:
+            result = await client.generate(
+                config=config,
+                instruction=instruction,
+                messages=messages,
+                tools=[],
+                require_tools=None,
+            )
+
         case bool(required):
             result = await client.generate(
                 config=config,
@@ -385,7 +395,7 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912
                         ]
                     )
                 ],
-                suggest_tools=required,
+                require_tools=required,
             )
 
         case tool:
@@ -403,7 +413,7 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912
                         ]
                     )
                 ],
-                suggest_tools=True,
+                require_tools=True,
             )
 
     if usage := result.usage:
@@ -495,7 +505,7 @@ async def _generation_stream(  # noqa: PLR0913
     instruction: str,
     messages: list[GeminiRequestMessage],
     tools: Sequence[ToolSpecification] | None,
-    require_tool: ToolSpecification | bool,
+    tool_requirement: ToolSpecification | bool | None,
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
     ctx.log_debug("Gemini streaming api is not supported yet, using regular response...")
     output: LMMOutput = await _generate(
@@ -504,7 +514,7 @@ async def _generation_stream(  # noqa: PLR0913
         instruction=instruction,
         messages=messages,
         tools=tools,
-        require_tool=require_tool,
+        tool_requirement=tool_requirement,
     )
 
     match output:

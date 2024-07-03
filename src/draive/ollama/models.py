@@ -15,5 +15,5 @@ class ChatMessage(DataModel):
 class ChatCompletionResponse(DataModel):
     model: str
     message: ChatMessage
-    prompt_eval_count: int
-    eval_count: int
+    prompt_eval_count: int | None = None
+    eval_count: int | None = None
