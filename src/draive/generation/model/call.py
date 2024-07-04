@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Sequence
 from typing import Any, Literal
 
+from draive.generation.model.generator import ModelGeneratorDecoder
 from draive.generation.model.state import ModelGeneration
 from draive.lmm import AnyTool, Toolbox
 from draive.parameters import DataModel
@@ -22,6 +23,7 @@ async def generate_model[Generated: DataModel](  # noqa: PLR0913
     tools: Toolbox | Sequence[AnyTool] | None = None,
     examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, Generated]]
     | None = None,
+    decoder: ModelGeneratorDecoder | None = None,
     **extra: Any,
 ) -> Generated:
     return await ctx.state(ModelGeneration).generate(
@@ -31,5 +33,6 @@ async def generate_model[Generated: DataModel](  # noqa: PLR0913
         schema_injection=schema_injection,
         tools=tools,
         examples=examples,
+        decoder=decoder,
         **extra,
     )

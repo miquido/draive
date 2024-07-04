@@ -2,7 +2,7 @@ import json
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any, Literal, overload
 
-from mistralrs import ChatCompletionResponse, ResponseMessage
+from mistralrs import ChatCompletionResponse, ResponseMessage  # type: ignore
 
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.mrs.client import MRSClient
