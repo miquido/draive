@@ -8,25 +8,27 @@ from draive.utils.missing import MISSING, Missing, is_missing, not_missing
 from draive.utils.queue import AsyncQueue
 from draive.utils.split_sequence import split_sequence
 from draive.utils.stream import AsyncStream
+from draive.utils.tags import tag_content
 from draive.utils.timeout import with_timeout
 
 __all__ = [
-    "AsyncStream",
     "AsyncQueue",
+    "AsyncStream",
     "cache",
+    "tag_content",
     "freeze",
     "getenv_bool",
     "getenv_float",
     "getenv_int",
     "getenv_str",
+    "is_missing",
     "load_env",
     "mimic_function",
     "Missing",
     "MISSING",
-    "is_missing",
     "not_missing",
+    "run_async",
     "setup_logging",
     "split_sequence",
     "with_timeout",
-    "run_async",
 ]

@@ -161,6 +161,7 @@ from draive.utils import (
     run_async,
     setup_logging,
     split_sequence,
+    tag_content,
     with_timeout,
 )
 
@@ -209,6 +210,7 @@ __all__ = [
     "EvaluationScore",
     "evaluator",
     "Field",
+    "tag_content",
     "freeze",
     "frozenlist",
     "generate_image",
