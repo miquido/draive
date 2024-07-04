@@ -165,7 +165,7 @@ async def _lmm_conversation_completion(
     **extra: Any,
 ) -> ConversationMessage:
     recursion_level: int = 0
-    while True:
+    while recursion_level <= toolbox.recursion_limit:
         match await lmm_invocation(
             instruction=instruction,
             context=context,
@@ -209,7 +209,10 @@ async def _lmm_conversation_completion(
 
                 else:
                     context.extend(responses)
-                    recursion_level += 1  # continue with next recursion level
+
+        recursion_level += 1  # continue with next recursion level
+
+    raise RuntimeError("LMM exceeded limit of recursive calls")
 
 
 async def _lmm_conversation_completion_stream(
@@ -225,7 +228,7 @@ async def _lmm_conversation_completion_stream(
 
     recursion_level: int = 0
     require_callback: bool = True
-    while require_callback:
+    while require_callback and recursion_level <= toolbox.recursion_limit:
         require_callback = False
         async for part in await lmm_invocation(
             instruction=instruction,

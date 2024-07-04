@@ -52,7 +52,7 @@ async def lmm_generate_text(
         ]
 
         recursion_level: int = 0
-        while True:
+        while recursion_level <= toolbox.recursion_limit:
             match await lmm_invocation(
                 instruction=instruction,
                 context=context,
@@ -78,4 +78,7 @@ async def lmm_generate_text(
 
                     else:
                         context.extend(responses)
-                        recursion_level += 1  # continue with next recursion level
+
+            recursion_level += 1  # continue with next recursion level
+
+        raise RuntimeError("LMM exceeded limit of recursive calls")
