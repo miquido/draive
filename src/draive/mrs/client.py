@@ -2,7 +2,7 @@ from asyncio import Lock, get_running_loop
 from collections.abc import AsyncIterable
 from typing import Any, Literal, Self, cast, final, overload
 
-from mistralrs import (
+from mistralrs import (  # type: ignore
     Architecture,
     ChatCompletionChunkResponse,
     ChatCompletionRequest,

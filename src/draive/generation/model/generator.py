@@ -7,7 +7,16 @@ from draive.types import Instruction, MultimodalContent, MultimodalContentConver
 
 __all__ = [
     "ModelGenerator",
+    "ModelGeneratorDecoder",
 ]
+
+
+@runtime_checkable
+class ModelGeneratorDecoder(Protocol):
+    def __call__(
+        self,
+        generated: MultimodalContent,
+    ) -> dict[str, Any]: ...
 
 
 @runtime_checkable
@@ -23,5 +32,6 @@ class ModelGenerator(Protocol):
         tools: Toolbox | Sequence[AnyTool] | None = None,
         examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, Generated]]
         | None = None,
+        decoder: ModelGeneratorDecoder | None = None,
         **extra: Any,
     ) -> Generated: ...

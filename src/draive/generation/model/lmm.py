@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Sequence
 from typing import Any, Literal
 
+from draive.generation.model.generator import ModelGeneratorDecoder
 from draive.lmm import AnyTool, Toolbox, lmm_invocation
 from draive.parameters import DataModel
 from draive.scope import ctx
@@ -30,6 +31,7 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
     tools: Toolbox | Sequence[AnyTool] | None = None,
     examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, Generated]]
     | None = None,
+    decoder: ModelGeneratorDecoder | None = None,
     **extra: Any,
 ) -> Generated:
     with ctx.nested("lmm_generate_model"):
@@ -106,7 +108,11 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
             ):
                 case LMMCompletion() as completion:
                     ctx.log_debug("Received model generation result")
-                    return generated.from_json(completion.content.as_string())
+                    if decoder := decoder:
+                        return generated.from_dict(decoder(completion.content))
+
+                    else:
+                        return generated.from_json(completion.content.as_string())
 
                 case LMMToolRequests() as tool_requests:
                     ctx.log_debug("Received model generation tool calls")
@@ -122,13 +128,17 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
                             else:
                                 continue
 
+                        direct_responses_content: MultimodalContent = MultimodalContent.of(
+                            *[response.content for response in direct_responses]
+                        )
+
                         # TODO: check if this join makes any sense,
                         # perhaps we could merge json objects instead?
-                        return generated.from_json(
-                            "".join(
-                                *[response.content.as_string() for response in direct_responses]
-                            )
-                        )
+                        if decoder := decoder:
+                            return generated.from_dict(decoder(direct_responses_content))
+
+                        else:
+                            return generated.from_json(direct_responses_content.as_string())
 
                     else:
                         context.extend(responses)

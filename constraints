@@ -11,7 +11,7 @@ anyio==4.4.0
     #   openai
 bandit==1.7.9
     # via draive (pyproject.toml)
-certifi==2024.6.2
+certifi==2024.7.4
     # via
     #   httpcore
     #   httpx
@@ -82,7 +82,7 @@ onnx==1.16.1
     # via fastembed
 onnxruntime==1.18.1
     # via fastembed
-openai==1.35.7
+openai==1.35.10
     # via draive (pyproject.toml)
 packaging==24.1
     # via
@@ -99,15 +99,15 @@ protobuf==5.27.2
     # via
     #   onnx
     #   onnxruntime
-pydantic==2.7.4
+pydantic==2.8.2
     # via
     #   anthropic
     #   openai
-pydantic-core==2.18.4
+pydantic-core==2.20.1
     # via pydantic
 pygments==2.18.0
     # via rich
-pyright==1.1.369
+pyright==1.1.370
     # via draive (pyproject.toml)
 pystemmer==2.2.0.1
     # via fastembed
