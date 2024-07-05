@@ -13,6 +13,24 @@ def test_returns_none_without_tag():
     assert tag_content("test", source=source) is None
 
 
+def test_returns_none_with_other_tag():
+    source: str = "<other>Lorem ipsum</other>"
+
+    assert tag_content("test", source=source) is None
+
+
+def test_returns_none_with_closing_tag():
+    source: str = "Lorem ipsum</test>"
+
+    assert tag_content("test", source=source) is None
+
+
+def test_returns_none_with_reversed_tags():
+    source: str = "</test>Lorem ipsum<test>"
+
+    assert tag_content("test", source=source) is None
+
+
 def test_returns_none_without_closing_tag():
     source: str = "<test>Lorem ipsum"
 

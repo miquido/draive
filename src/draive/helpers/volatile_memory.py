@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import final
+from typing import Any, final
 
 from draive.types import Memory
 
@@ -19,12 +19,16 @@ class ConstantMemory[Recalled, Remembered](Memory[Recalled, Remembered]):
     ) -> None:
         self._item: Recalled = item
 
-    async def recall(self) -> Recalled:
+    async def recall(
+        self,
+        **extra: Any,
+    ) -> Recalled:
         return self._item
 
     async def remember(
         self,
         *items: Remembered,
+        **extra: Any,
     ) -> None:
         pass  # ignore
 
@@ -38,12 +42,16 @@ class VolatileMemory[Item](Memory[Item, Item]):
     ) -> None:
         self._item: Item = item
 
-    async def recall(self) -> Item:
+    async def recall(
+        self,
+        **extra: Any,
+    ) -> Item:
         return self._item
 
     async def remember(
         self,
         *items: Item,
+        **extra: Any,
     ) -> None:
         if items:
             self._item = items[-1]
@@ -60,12 +68,16 @@ class VolatileAccumulativeMemory[Item](Memory[list[Item], Item]):
         self._items: list[Item] = list(items) if items else []
         self._limit: int = limit or 0
 
-    async def recall(self) -> list[Item]:
+    async def recall(
+        self,
+        **extra: Any,
+    ) -> list[Item]:
         return self._items
 
     async def remember(
         self,
         *items: Item,
+        **extra: Any,
     ) -> None:
         if not items:
             return  # nothing to do
