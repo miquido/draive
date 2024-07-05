@@ -227,15 +227,9 @@ async def _chat_completion_stream(
 
     accumulated_completion: str = ""
     async for part in completion_stream:
-        if choices := part.choices:  # usage part does not contain choices
-            # we are always requesting single result - no need to take care of indices
-            part_text: str = choices[0].delta.content
-            if not part_text:
-                continue  # skip empty parts
-            accumulated_completion += part_text
-            yield LMMCompletionChunk.of(part_text)
-
-        else:
-            ctx.log_warning("Unexpected mistral.rs streaming part: %s", part)
+        # we always request only one
+        part_text: str = part.choices[0].delta.content
+        accumulated_completion += part_text
+        yield LMMCompletionChunk.of(part_text)
 
     ctx.record(ResultTrace.of(accumulated_completion))
