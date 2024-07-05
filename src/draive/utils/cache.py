@@ -119,6 +119,7 @@ class _SyncCache[**Args, Result]:
     ) -> Callable[Args, Result]:
         if owner is None:
             return self
+
         else:
             return mimic_function(
                 self._function,

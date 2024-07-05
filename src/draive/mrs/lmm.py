@@ -5,7 +5,6 @@ from typing import Any, Literal, overload
 from mistralrs import (  # type: ignore
     ChatCompletionChunkResponse,
     ChatCompletionResponse,
-    ChunkChoice,
     ResponseMessage,
 )
 
@@ -230,24 +229,13 @@ async def _chat_completion_stream(
     async for part in completion_stream:
         if choices := part.choices:  # usage part does not contain choices
             # we are always requesting single result - no need to take care of indices
-            element: ChunkChoice = choices[0]
-            if element.delta.content:
-                part_text: str = element.delta.content
-                if not part_text:
-                    continue  # skip empty parts
-                accumulated_completion += part_text
-                yield LMMCompletionChunk.of(part_text)
-
-            elif finish_reason := element.finish_reason:
-                match finish_reason:
-                    case "stop":
-                        ctx.record(ResultTrace.of(accumulated_completion))
-
-                    case other:
-                        raise MRSException(f"Unexpected finish reason: {other}")
-
-            else:
-                ctx.log_warning("Unexpected mistral.rs streaming part: %s", part)
+            part_text: str = choices[0].delta.content
+            if not part_text:
+                continue  # skip empty parts
+            accumulated_completion += part_text
+            yield LMMCompletionChunk.of(part_text)
 
         else:
             ctx.log_warning("Unexpected mistral.rs streaming part: %s", part)
+
+    ctx.record(ResultTrace.of(accumulated_completion))
