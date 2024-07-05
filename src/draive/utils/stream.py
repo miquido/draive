@@ -41,7 +41,6 @@ class AsyncStream[Element](AsyncIterator[Element]):
         self,
         element: Element,
         /,
-        *elements: Element,
     ) -> None:
         if self.finished:
             raise RuntimeError("AsyncStream has been already finished")
@@ -51,13 +50,13 @@ class AsyncStream[Element](AsyncIterator[Element]):
             waiting: Future[Element] = self._waiting_queue.popleft()
             if waiting.done():
                 continue
+
             else:
                 waiting.set_result(element)
                 break
+
         else:
             self._buffer.append(element)
-
-        self._buffer.extend(elements)
 
     def finish(
         self,

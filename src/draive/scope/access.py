@@ -8,6 +8,7 @@ from collections.abc import (
     Iterable,
     Iterator,
 )
+from concurrent.futures import Executor
 from contextvars import ContextVar, Token
 from logging import Logger, getLogger
 from types import TracebackType
@@ -24,7 +25,7 @@ from draive.parameters import ParametrizedData
 from draive.scope.dependencies import ScopeDependencies, ScopeDependency
 from draive.scope.errors import MissingScopeContext
 from draive.scope.state import ScopeState
-from draive.utils import AsyncStream, getenv_bool, mimic_function
+from draive.utils import AsyncStream, getenv_bool, mimic_function, run_async
 
 __all__ = [
     "ctx",
@@ -439,17 +440,18 @@ class ctx:
         stream: AsyncStream[Element] = AsyncStream()
         current_metrics: MetricsTrace = ctx._current_metrics()
         current_metrics.enter()  # ensure valid metrics scope closing
+        loop: AbstractEventLoop = get_running_loop()
 
         async def iterate() -> None:
             try:
                 async for element in generator:
-                    stream.send(element)
+                    loop.call_soon(stream.send, element)
 
             except BaseException as exc:
-                stream.finish(exception=exc)
+                loop.call_soon(stream.finish, exc)
 
             else:
-                stream.finish()
+                loop.call_soon(stream.finish)
 
             finally:
                 current_metrics.exit()
@@ -458,39 +460,36 @@ class ctx:
         return stream
 
     @staticmethod
-    def stream_sync[**Args, Element](
-        function: Callable[Args, Generator[Element, None] | Iterator[Element]],
+    def stream_sync[Element](
+        generator: Generator[Element, None] | Iterator[Element],
         /,
-        *args: Args.args,
-        **kwargs: Args.kwargs,
+        executor: Executor | None = None,
     ) -> AsyncIterator[Element]:
         # TODO: find better solution for streaming without spawning tasks if able
         stream: AsyncStream[Element] = AsyncStream()
         current_metrics: MetricsTrace = ctx._current_metrics()
         current_metrics.enter()  # ensure valid metrics scope closing
-        run_loop: AbstractEventLoop = get_running_loop()
+        loop: AbstractEventLoop = get_running_loop()
 
+        @run_async(executor=executor)
         def iterate() -> None:
             try:
-                for element in function(*args, **kwargs):
-                    stream.send(element)
+                for element in generator:
+                    loop.call_soon_threadsafe(
+                        stream.send,
+                        element,
+                    )
 
             except BaseException as exc:
-                stream.finish(exception=exc)
+                loop.call_soon_threadsafe(stream.finish, exc)
 
             else:
-                stream.finish()
+                loop.call_soon_threadsafe(stream.finish)
 
             finally:
                 current_metrics.exit()
 
-        async def iterate_async() -> None:
-            await run_loop.run_in_executor(
-                None,
-                iterate,
-            )
-
-        ctx.spawn_subtask(iterate_async)
+        ctx.spawn_subtask(iterate)
         return stream
 
     @staticmethod

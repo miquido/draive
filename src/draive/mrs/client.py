@@ -1,6 +1,7 @@
-from asyncio import Lock, get_running_loop
+from asyncio import Lock
 from collections.abc import AsyncIterable, Iterator
-from typing import Any, Literal, Self, cast, final, overload
+from concurrent.futures import Executor, ThreadPoolExecutor
+from typing import Any, Final, Literal, Self, cast, final, overload
 
 from mistralrs import (  # type: ignore
     Architecture,
@@ -14,11 +15,13 @@ from mistralrs import (  # type: ignore
 from draive.mrs.config import MRSChatConfig
 from draive.mrs.errors import MRSException
 from draive.scope import ScopeDependency, ctx
-from draive.utils import not_missing
+from draive.utils import not_missing, run_async
 
 __all__ = [
     "MRSClient",
 ]
+
+MRS_EXECUTOR: Final[Executor | None] = ThreadPoolExecutor(max_workers=1)
 
 
 @final
@@ -121,16 +124,14 @@ class MRSClient(ScopeDependency):
         max_tokens: int | None,
         messages: list[dict[str, object]],
     ) -> ChatCompletionResponse:
-        return await get_running_loop().run_in_executor(
-            None,
-            self._send_chat_completion_request,
-            await self._get_runner(model),
-            model,
-            temperature,
-            top_p,
-            top_k,
-            max_tokens,
-            messages,
+        return await self._send_chat_completion_request(
+            runner=await self._get_runner(model),
+            model=model,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            max_tokens=max_tokens,
+            messages=messages,
         )
 
     async def _create_chat_stream(  # noqa: PLR0913
@@ -143,14 +144,16 @@ class MRSClient(ScopeDependency):
         messages: list[dict[str, object]],
     ) -> AsyncIterable[ChatCompletionChunkResponse]:
         return ctx.stream_sync(
-            self._send_chat_completion_stream_request,
-            runner=await self._get_runner(model),
-            model=model,
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k,
-            max_tokens=max_tokens,
-            messages=messages,
+            await self._send_chat_completion_stream_request(
+                runner=await self._get_runner(model),
+                model=model,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                max_tokens=max_tokens,
+                messages=messages,
+            ),
+            executor=MRS_EXECUTOR,
         )
 
     async def dispose(self) -> None:
@@ -166,11 +169,7 @@ class MRSClient(ScopeDependency):
                 return current
 
             elif model := self._models.get(model_name):
-                runner: Runner = await get_running_loop().run_in_executor(
-                    None,
-                    self._load_runner,
-                    model,
-                )
+                runner: Runner = await self._load_runner(model=model)
                 self._runners[model_name] = runner
                 return runner
 
@@ -180,6 +179,7 @@ class MRSClient(ScopeDependency):
                     model_name,
                 )
 
+    @run_async(executor=MRS_EXECUTOR)
     def _load_runner(
         self,
         model: Which.Plain
@@ -195,6 +195,7 @@ class MRSClient(ScopeDependency):
     ) -> Runner:
         return Runner(which=model)
 
+    @run_async(executor=MRS_EXECUTOR)
     def _send_chat_completion_request(  # noqa: PLR0913
         self,
         runner: Runner,
@@ -230,6 +231,7 @@ class MRSClient(ScopeDependency):
             ),
         )
 
+    @run_async(executor=MRS_EXECUTOR)
     def _send_chat_completion_stream_request(  # noqa: PLR0913
         self,
         runner: Runner,
