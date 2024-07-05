@@ -1,5 +1,5 @@
 from asyncio import Lock, get_running_loop
-from collections.abc import AsyncIterable
+from collections.abc import AsyncIterable, Iterator
 from typing import Any, Literal, Self, cast, final, overload
 
 from mistralrs import (  # type: ignore
@@ -13,7 +13,7 @@ from mistralrs import (  # type: ignore
 
 from draive.mrs.config import MRSChatConfig
 from draive.mrs.errors import MRSException
-from draive.scope import ScopeDependency
+from draive.scope import ScopeDependency, ctx
 from draive.utils import not_missing
 
 __all__ = [
@@ -93,7 +93,14 @@ class MRSClient(ScopeDependency):
         stream: bool = False,
     ) -> AsyncIterable[ChatCompletionChunkResponse] | ChatCompletionResponse:
         if stream:
-            raise NotImplementedError("mistral.rs streaming is not supported yet")
+            return await self._create_chat_stream(
+                messages=messages,
+                model=config.model,
+                temperature=config.temperature,
+                top_p=config.top_p if not_missing(config.top_p) else None,
+                top_k=config.top_k if not_missing(config.top_k) else None,
+                max_tokens=config.max_tokens if not_missing(config.max_tokens) else None,
+            )
 
         else:
             return await self._create_chat_completion(
@@ -126,12 +133,33 @@ class MRSClient(ScopeDependency):
             messages,
         )
 
+    async def _create_chat_stream(  # noqa: PLR0913
+        self,
+        model: str,
+        temperature: float,
+        top_p: float | None,
+        top_k: int | None,
+        max_tokens: int | None,
+        messages: list[dict[str, object]],
+    ) -> AsyncIterable[ChatCompletionChunkResponse]:
+        return ctx.stream_sync(
+            self._send_chat_completion_stream_request,
+            runner=await self._get_runner(model),
+            model=model,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            max_tokens=max_tokens,
+            messages=messages,
+        )
+
     async def dispose(self) -> None:
         pass
 
     async def _get_runner(
         self,
         model_name: str,
+        /,
     ) -> Runner:
         async with self._cache_lock:
             if current := self._runners.get(model_name):
@@ -194,6 +222,41 @@ class MRSClient(ScopeDependency):
                     temperature=temperature,
                     top_p=top_p,
                     stream=False,
+                    top_k=top_k,
+                    grammar=None,
+                    grammar_type=None,
+                    adapters=None,
+                ),
+            ),
+        )
+
+    def _send_chat_completion_stream_request(  # noqa: PLR0913
+        self,
+        runner: Runner,
+        model: str,
+        temperature: float,
+        top_p: float | None,
+        top_k: int | None,
+        max_tokens: int | None,
+        messages: list[dict[Any, Any]],
+    ) -> Iterator[ChatCompletionChunkResponse]:
+        return cast(
+            Iterator[ChatCompletionChunkResponse],
+            runner.send_chat_completion_request(
+                request=ChatCompletionRequest(
+                    messages=messages,
+                    model=model,
+                    logit_bias=None,
+                    logprobs=False,
+                    top_logprobs=None,
+                    max_tokens=max_tokens,
+                    n_choices=1,
+                    presence_penalty=None,
+                    frequency_penalty=None,
+                    stop_seqs=None,
+                    temperature=temperature,
+                    top_p=top_p,
+                    stream=True,
                     top_k=top_k,
                     grammar=None,
                     grammar_type=None,

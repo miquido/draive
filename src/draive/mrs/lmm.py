@@ -1,8 +1,13 @@
 import json
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import AsyncGenerator, AsyncIterable, Sequence
 from typing import Any, Literal, overload
 
-from mistralrs import ChatCompletionResponse, ResponseMessage  # type: ignore
+from mistralrs import (  # type: ignore
+    ChatCompletionChunkResponse,
+    ChatCompletionResponse,
+    ChunkChoice,
+    ResponseMessage,
+)
 
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.mrs.client import MRSClient
@@ -215,16 +220,34 @@ async def _chat_completion_stream(
     config: MRSChatConfig,
     messages: list[dict[str, object]],
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
-    ctx.log_debug("mistral.rs streaming api is not supported yet, using regular response...")
-    output: LMMOutput = await _chat_completion(
-        client=client,
+    completion_stream: AsyncIterable[ChatCompletionChunkResponse] = await client.chat_completion(
         config=config,
         messages=messages,
+        stream=True,
     )
 
-    match output:
-        case LMMCompletion() as completion:
-            yield LMMCompletionChunk.of(completion.content)
+    accumulated_completion: str = ""
+    async for part in completion_stream:
+        if choices := part.choices:  # usage part does not contain choices
+            # we are always requesting single result - no need to take care of indices
+            element: ChunkChoice = choices[0]
+            if element.delta.content:
+                part_text: str = element.delta.content
+                if not part_text:
+                    continue  # skip empty parts
+                accumulated_completion += part_text
+                yield LMMCompletionChunk.of(part_text)
 
-        case other:
-            yield other
+            elif finish_reason := element.finish_reason:
+                match finish_reason:
+                    case "stop":
+                        ctx.record(ResultTrace.of(accumulated_completion))
+
+                    case other:
+                        raise MRSException(f"Unexpected finish reason: {other}")
+
+            else:
+                ctx.log_warning("Unexpected mistral.rs streaming part: %s", part)
+
+        else:
+            ctx.log_warning("Unexpected mistral.rs streaming part: %s", part)
