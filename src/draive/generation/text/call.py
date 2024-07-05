@@ -1,8 +1,8 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 from draive.generation.text.state import TextGeneration
-from draive.lmm import Toolbox
+from draive.lmm import AnyTool, Toolbox
 from draive.scope import ctx
 from draive.types import Instruction, MultimodalContent, MultimodalContentConvertible
 
@@ -15,7 +15,7 @@ async def generate_text(
     *,
     instruction: Instruction | str,
     input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
-    tools: Toolbox | None = None,
+    tools: Toolbox | Sequence[AnyTool] | None = None,
     examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, str]] | None = None,
     **extra: Any,
 ) -> str:

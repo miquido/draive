@@ -1,7 +1,7 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any, Protocol, runtime_checkable
 
-from draive.lmm import Toolbox
+from draive.lmm import AnyTool, Toolbox
 from draive.types import Instruction, MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
@@ -16,7 +16,7 @@ class TextGenerator(Protocol):
         *,
         instruction: Instruction | str,
         input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
-        tools: Toolbox | None = None,
+        tools: Toolbox | Sequence[AnyTool] | None = None,
         examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, str]]
         | None = None,
         **extra: Any,
