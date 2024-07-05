@@ -11,11 +11,13 @@ maintainers = [
 ]
 requires-python = ">=3.12"
 classifiers = [
+  "License :: OSI Approved :: MIT License",
   "Intended Audience :: Developers",
   "Programming Language :: Python",
-  "License :: OSI Approved :: MIT License",
-  "Topic :: Software Development",
   "Typing :: Typed",
+  "Topic :: Software Development",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 license = {file = "LICENSE"}
 dependencies = [
