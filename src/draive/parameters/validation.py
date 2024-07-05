@@ -720,10 +720,10 @@ def _prepare_typed_dict_validator(
         match value:
             case {**values}:
                 result: dict[str, Any] = {}
-                for key, value in values.items():
+                for key, item in values.items():
                     match key:
                         case str() as name if name in field_validators:
-                            result[key] = field_validators[name](value, (*context, f"[{key}]"))
+                            result[key] = field_validators[name](item, (*context, f"[{key}]"))
 
                         case other:
                             raise ParameterValidationError.invalid_type(

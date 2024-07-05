@@ -1,5 +1,13 @@
-from asyncio import Task, TaskGroup, current_task, shield
-from collections.abc import AsyncGenerator, AsyncIterator, Callable, Coroutine, Iterable
+from asyncio import AbstractEventLoop, Task, TaskGroup, current_task, get_running_loop, shield
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Callable,
+    Coroutine,
+    Generator,
+    Iterable,
+    Iterator,
+)
 from contextvars import ContextVar, Token
 from logging import Logger, getLogger
 from types import TracebackType
@@ -447,6 +455,42 @@ class ctx:
                 current_metrics.exit()
 
         ctx.spawn_subtask(iterate)
+        return stream
+
+    @staticmethod
+    def stream_sync[**Args, Element](
+        function: Callable[Args, Generator[Element, None] | Iterator[Element]],
+        /,
+        *args: Args.args,
+        **kwargs: Args.kwargs,
+    ) -> AsyncIterator[Element]:
+        # TODO: find better solution for streaming without spawning tasks if able
+        stream: AsyncStream[Element] = AsyncStream()
+        current_metrics: MetricsTrace = ctx._current_metrics()
+        current_metrics.enter()  # ensure valid metrics scope closing
+        run_loop: AbstractEventLoop = get_running_loop()
+
+        def iterate() -> None:
+            try:
+                for element in function(*args, **kwargs):
+                    stream.send(element)
+
+            except BaseException as exc:
+                stream.finish(exception=exc)
+
+            else:
+                stream.finish()
+
+            finally:
+                current_metrics.exit()
+
+        async def iterate_async() -> None:
+            await run_loop.run_in_executor(
+                None,
+                iterate,
+            )
+
+        ctx.spawn_subtask(iterate_async)
         return stream
 
     @staticmethod
