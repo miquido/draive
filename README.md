@@ -6,13 +6,74 @@ Are you looking for maximum flexibility and efficiency in your next Python libra
 
 👉 Introducing **draive** - an open-source Python library under the Miquido AI Kickstarter framework, designed to simplify and accelerate the development of LLM-based applications. Get started with draive to streamline your workflow and build powerful, efficient apps with ease.
 
-## Examples repository
+## 🚀 Quick start
 
-Fully functional examples of using the Draive library are available in a separate repository
+Dive straight into the code and learn how to use draive with our interactive [guides](https://github.com/miquido/draive/tree/main/guides). For quick solutions to common problems, explore our [cookbooks](https://github.com/miquido/draive/tree/main/cookbooks).
 
-[Draive Examples](https://github.com/miquido/draive-examples)
+Great, but how it looks like?
 
-## 🚀 Quick Install
+```python
+from draive import ctx, generate_text, LMM, tool, Toolbox
+from draive.openai import OpenAIClient, openai_lmm_invocation
+
+
+@tool # simply annotate a function as a tool
+async def current_time(location: str) -> str:
+    return f"Time in {location} is 9:53:22"
+
+async with ctx.new( # create execution context
+    dependencies=[OpenAIClient], # define client for llm provider
+    state=[LMM(invocation=openai_lmm_invocation)], # and use it for this scope
+):
+    result: str = await generate_text( # choose the right abstraction, like simple `generate_text`
+        instruction="You are a helpful assistant", # provide clear instructions
+        input="What is the time in Kraków?", # give it some input (including multimodal)
+        tools=Toolbox(current_time), # and select any tools you like
+    )
+
+    print(result) # to finally get the result!
+    # output: The current time in Kraków is 9:53:22.
+```
+
+Fully functional examples of using the Draive library are also available in [Draive Examples](https://github.com/miquido/draive-examples) repository.
+
+## ❓ What is draive?
+
+**draive** is an open-source Python library for developing apps powered by large language models. It stands out for its simplicity, consistent behavior, and transparency.
+
+### Key Features:
+
+- **🧱 Abstract building blocks**: Easily connect multiple functionalities with LLMs and link various LLMs together.
+- **🧩 Flexible integration**: Supports any LLM, external service, and other AI solutions.
+- **🧒 User-friendly framework**: Designed to build scalable and composable data processing pipelines with ease.
+- **⚙️ Function-oriented design**: Utilizes basic programming concepts, allowing you to represent complex programs as simple functions.
+- **🏗️ Composable and reusable**: Combine functions to create complex programs, while retaining the ability to use them individually.
+- **📊 Diagnostics and metrics**: Offers extensive tools for measuring and debugging complex functionalities.
+- **🔄 Fully typed and asynchronous**: Ensures type safety and efficient asynchronous operations for modern Python apps.
+
+## 🧱 What can you build with draive?
+
+### 🦾 RAG applications
+
+RAG enhances model capabilities and personalizes the outputs.
+
+- **Examples**: Question answering, custom knowledge bases.
+
+### 🧹 Extracting structured output
+
+Simplified data extraction and structuring.
+
+- **Examples**: Data parsing, report generation.
+
+### 🤖 Chatbots
+
+Sophisticated conversational agents.
+
+- **Examples**: Customer service bots, virtual assistants.
+
+… and much more!
+
+## 🖥️ Install
 
 With pip:
 
@@ -63,42 +124,6 @@ pip install draive[mistralrs]
 ```bash
 pip install draive[fastembed]
 ```
-
-## ❓ What is draive?
-
-**draive** is an open-source Python library for developing apps powered by large language models. It stands out for its simplicity, consistent behavior, and transparency.
-
-### Key Features:
-
-- **🧱 Abstract building blocks**: Easily connect multiple functionalities with LLMs and link various LLMs together.
-- **🧩 Flexible integration**: Supports any LLM, external service, and other AI solutions.
-- **🧒 User-friendly framework**: Designed to build scalable and composable data processing pipelines with ease.
-- **⚙️ Function-oriented design**: Utilizes basic programming concepts, allowing you to represent complex programs as simple functions.
-- **🏗️ Composable and reusable**: Combine functions to create complex programs, while retaining the ability to use them individually.
-- **📊 Diagnostics and metrics**: Offers extensive tools for measuring and debugging complex functionalities.
-- **🔄 Fully typed and asynchronous**: Ensures type safety and efficient asynchronous operations for modern Python apps.
-
-## 🧱 What can you build with draive?
-
-### 🦾 RAG applications
-
-RAG enhances model capabilities and personalizes the outputs.
-
-- **Examples**: Question answering, custom knowledge bases.
-
-### 🧹 Extracting structured output
-
-Simplified data extraction and structuring.
-
-- **Examples**: Data parsing, report generation.
-
-### 🤖 Chatbots
-
-Sophisticated conversational agents.
-
-- **Examples**: Customer service bots, virtual assistants.
-
-… and much more!
 
 ## 👷 Contributing
 
