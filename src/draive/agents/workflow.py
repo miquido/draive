@@ -9,7 +9,13 @@ from draive.agents.runner import AgentRunner
 from draive.helpers import VolatileMemory
 from draive.parameters import DataModel, ParametrizedData
 from draive.scope import ctx
-from draive.types import Memory, MultimodalContent, MultimodalContentConvertible, frozenlist
+from draive.types import (
+    BasicMemory,
+    Memory,
+    MultimodalContent,
+    MultimodalContentConvertible,
+    frozenlist,
+)
 from draive.utils import MISSING, AsyncQueue, Missing, freeze, not_missing
 
 __all__ = [
@@ -38,7 +44,7 @@ class AgentWorkflowInvocation[AgentWorkflowState, AgentWorkflowResult: Parametri
 ):
     async def __call__(
         self,
-        memory: Memory[AgentWorkflowState, AgentWorkflowState],
+        memory: BasicMemory[AgentWorkflowState],
         input: AgentWorkflowInput,  # noqa: A002
     ) -> AgentWorkflowOutput[AgentWorkflowResult]: ...
 
@@ -67,7 +73,7 @@ class AgentWorkflow[AgentWorkflowState, AgentWorkflowResult: ParametrizedData | 
 
     async def __call__(
         self,
-        memory: Memory[AgentWorkflowState, AgentWorkflowState],
+        memory: BasicMemory[AgentWorkflowState],
         input: AgentWorkflowInput,  # noqa: A002
     ) -> AgentWorkflowOutput[AgentWorkflowResult]:
         return await self._invocation(
@@ -155,8 +161,8 @@ def workflow[AgentWorkflowState](
         )
 
         def initialize_agent() -> Agent:
-            agent_memory: Memory[AgentWorkflowState, AgentWorkflowState] = cast(
-                Memory[AgentWorkflowState, AgentWorkflowState], VolatileMemory(state())
+            agent_memory: BasicMemory[AgentWorkflowState] = cast(
+                BasicMemory[AgentWorkflowState], VolatileMemory(state())
             )
 
             async def agent(message: AgentMessage) -> AgentOutput:

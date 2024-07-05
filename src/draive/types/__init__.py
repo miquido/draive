@@ -16,7 +16,7 @@ from draive.types.lmm import (
     LMMToolRequests,
     LMMToolResponse,
 )
-from draive.types.memory import Memory
+from draive.types.memory import BasicMemory, Memory
 from draive.types.multimodal import (
     MultimodalContent,
     MultimodalContentConvertible,
@@ -31,6 +31,7 @@ __all__ = [
     "AudioContent",
     "AudioDataContent",
     "AudioURLContent",
+    "BasicMemory",
     "frozenlist",
     "ImageBase64Content",
     "ImageContent",
