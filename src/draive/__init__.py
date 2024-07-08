@@ -58,7 +58,6 @@ from draive.generation import (
     generate_text,
 )
 from draive.helpers import (
-    AsyncStreamTask,
     ConstantMemory,
     VolatileAccumulativeMemory,
     VolatileMemory,
@@ -148,6 +147,7 @@ from draive.types import (
 )
 from draive.utils import (
     MISSING,
+    AsyncBufferedStream,
     AsyncStream,
     Missing,
     cache,
@@ -180,8 +180,8 @@ __all__ = [
     "AgentWorkflowInvocation",
     "AgentWorkflowOutput",
     "Argument",
+    "AsyncBufferedStream",
     "AsyncStream",
-    "AsyncStreamTask",
     "AudioBase64Content",
     "AudioContent",
     "AudioDataContent",

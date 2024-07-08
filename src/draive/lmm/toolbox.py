@@ -159,7 +159,7 @@ class Toolbox:
                             return_when=FIRST_COMPLETED,
                         )
                         for task in done:
-                            stream.send(task.result())
+                            await stream.send(task.result())
 
             except BaseException as exc:
                 stream.finish(exception=exc)

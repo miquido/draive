@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from typing import Literal
 
 from draive.lmm.invocation import LMMInvocation
@@ -17,15 +17,15 @@ class LMM(State):
 
 
 class ToolStatusStream(State):
-    send: Callable[[ToolCallStatus], None] | None = None
+    send: Callable[[ToolCallStatus], Coroutine[None, None, None]] | None = None
 
 
 class ToolCallContext(State):
     call_id: str
     tool: str
-    send_status: Callable[[ToolCallStatus], None]
+    send_status: Callable[[ToolCallStatus], Coroutine[None, None, None]]
 
-    def report(
+    async def report(
         self,
         status: Literal[
             "STARTED",
@@ -53,4 +53,4 @@ class ToolCallContext(State):
                     content=model,
                 )
 
-        self.send_status(call_status)
+        await self.send_status(call_status)

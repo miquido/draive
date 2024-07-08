@@ -1,7 +1,6 @@
-from asyncio import AbstractEventLoop, Task, TaskGroup, current_task, get_running_loop, shield
+from asyncio import Task, TaskGroup, current_task, shield
 from collections.abc import (
     AsyncGenerator,
-    AsyncIterator,
     Callable,
     Coroutine,
     Generator,
@@ -354,6 +353,7 @@ class ctx:
     def _current_task_group() -> TaskGroup:
         try:
             return _TaskGroup_Var.get()
+
         except LookupError as exc:
             raise MissingScopeContext("TaskGroup requested but not defined!") from exc
 
@@ -361,6 +361,7 @@ class ctx:
     def _current_metrics() -> MetricsTrace:
         try:
             return _MetricsScope_Var.get()
+
         except LookupError as exc:
             raise MissingScopeContext("MetricsScope requested but not defined!") from exc
 
@@ -368,6 +369,7 @@ class ctx:
     def _current_dependencies() -> ScopeDependencies:
         try:
             return _DependenciesScope_Var.get()
+
         except LookupError as exc:
             raise MissingScopeContext("DependenciesScope requested but not defined!") from exc
 
@@ -375,6 +377,7 @@ class ctx:
     def _current_state() -> ScopeState:
         try:
             return _StateScope_Var.get()
+
         except LookupError as exc:
             raise MissingScopeContext("StateScope requested but not defined!") from exc
 
@@ -406,6 +409,7 @@ class ctx:
     def cancel() -> None:
         if task := current_task():
             task.cancel()
+
         else:
             raise RuntimeError("Attempting to cancel context out of asyncio task")
 
@@ -435,23 +439,22 @@ class ctx:
     @staticmethod
     def stream[Element](
         generator: AsyncGenerator[Element, None],
-    ) -> AsyncIterator[Element]:
+    ) -> AsyncStream[Element]:
         # TODO: find better solution for streaming without spawning tasks if able
         stream: AsyncStream[Element] = AsyncStream()
         current_metrics: MetricsTrace = ctx._current_metrics()
         current_metrics.enter()  # ensure valid metrics scope closing
-        loop: AbstractEventLoop = get_running_loop()
 
         async def iterate() -> None:
             try:
                 async for element in generator:
-                    loop.call_soon(stream.send, element)
+                    await stream.send(element)
 
             except BaseException as exc:
-                loop.call_soon(stream.finish, exc)
+                stream.finish(exception=exc)
 
             else:
-                loop.call_soon(stream.finish)
+                stream.finish()
 
             finally:
                 current_metrics.exit()
@@ -464,27 +467,29 @@ class ctx:
         generator: Generator[Element, None] | Iterator[Element],
         /,
         executor: Executor | None = None,
-    ) -> AsyncIterator[Element]:
+    ) -> AsyncStream[Element]:
         # TODO: find better solution for streaming without spawning tasks if able
         stream: AsyncStream[Element] = AsyncStream()
         current_metrics: MetricsTrace = ctx._current_metrics()
         current_metrics.enter()  # ensure valid metrics scope closing
-        loop: AbstractEventLoop = get_running_loop()
+
+        iterator: Iterator[Element] = iter(generator)
 
         @run_async(executor=executor)
-        def iterate() -> None:
+        def next_element() -> Element:
             try:
-                for element in generator:
-                    loop.call_soon_threadsafe(
-                        stream.send,
-                        element,
-                    )
+                return next(iterator)
+
+            except StopIteration as exc:
+                raise StopAsyncIteration() from exc
+
+        async def iterate() -> None:
+            try:
+                while True:
+                    await stream.send(await next_element())
 
             except BaseException as exc:
-                loop.call_soon_threadsafe(stream.finish, exc)
-
-            else:
-                loop.call_soon_threadsafe(stream.finish)
+                stream.finish(exception=exc)
 
             finally:
                 current_metrics.exit()

@@ -18,7 +18,7 @@ from draive.parameters import (
 )
 from draive.scope import ctx
 from draive.types import MultimodalContent, MultimodalContentConvertible
-from draive.utils import freeze, not_missing
+from draive.utils import freeze, noop, not_missing
 
 __all__ = [
     "AnyTool",
@@ -111,14 +111,14 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         call_context: ToolCallContext = ToolCallContext(
             call_id=call_id,
             tool=self.name,
-            send_status=ctx.state(ToolStatusStream).send or (lambda _: None),
+            send_status=ctx.state(ToolStatusStream).send or noop,
         )
         with ctx.nested(
             self.name,
             state=[call_context],
             metrics=[ArgumentsTrace.of(**arguments)],
         ):
-            call_context.report("STARTED")
+            await call_context.report("STARTED")
 
             try:
                 if not self.available:
@@ -127,12 +127,12 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
                 result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
                 ctx.record(ResultTrace.of(result))
 
-                call_context.report("FINISHED")
+                await call_context.report("FINISHED")
 
                 return MultimodalContent.of(self.format_result(result))
 
             except Exception as exc:
-                call_context.report("FAILED")
+                await call_context.report("FAILED")
                 # return an error with formatted content
                 raise ToolError(
                     f"Tool {self.name}[{call_id}] failed",
@@ -151,7 +151,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
                 ToolCallContext(
                     call_id=uuid4().hex,
                     tool=self.name,
-                    send_status=lambda _: None,
+                    send_status=noop,
                 )
             ],
             metrics=[ArgumentsTrace.of(*args, **kwargs)],
