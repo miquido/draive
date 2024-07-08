@@ -1,4 +1,4 @@
-from asyncio import get_running_loop, iscoroutinefunction
+from asyncio import AbstractEventLoop, get_running_loop, iscoroutinefunction
 from collections.abc import Callable, Coroutine
 from concurrent.futures import Executor
 from functools import partial
@@ -12,7 +12,8 @@ __all__ = [
 @overload
 def run_async[**Args, Result](
     *,
-    executor: Executor | None,
+    loop: AbstractEventLoop | None = None,
+    executor: Executor | None = None,
 ) -> Callable[
     [Callable[Args, Result]],
     Callable[Args, Coroutine[None, None, Result]],
@@ -29,6 +30,7 @@ def run_async[**Args, Result](
 def run_async[**Args, Result](
     function: Callable[Args, Result] | None = None,
     /,
+    loop: AbstractEventLoop | None = None,
     executor: Executor | None = None,
 ) -> (
     Callable[
@@ -46,8 +48,11 @@ def run_async[**Args, Result](
     function: Callable[Args, Result]
         function to be wrapped as running in loop executor
 
+    loop: AbstractEventLoop | None
+        loop used to call the function
+
     executor: Executor | None
-        executor used to call the function
+        executor used to execute the function
 
     Returns
     -------
@@ -61,6 +66,7 @@ def run_async[**Args, Result](
         assert not iscoroutinefunction(wrapped), "Cannot wrap async function in executor"  # nosec: B101
         return _ExecutorWrapper(
             wrapped,
+            loop=loop,
             executor=executor,
         )
 
@@ -76,9 +82,11 @@ class _ExecutorWrapper[**Args, Result]:
         self,
         function: Callable[Args, Result],
         /,
+        loop: AbstractEventLoop | None,
         executor: Executor | None,
     ) -> None:
         self._function: Callable[Args, Result] = function
+        self._loop: AbstractEventLoop | None = loop
         self._executor: Executor | None = executor
 
         # mimic function attributes if able
@@ -89,7 +97,7 @@ class _ExecutorWrapper[**Args, Result]:
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Result:
-        return await get_running_loop().run_in_executor(
+        return await (self._loop or get_running_loop()).run_in_executor(
             self._executor,
             partial(self._function, *args, **kwargs),
         )
@@ -118,7 +126,7 @@ class _ExecutorWrapper[**Args, Result]:
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Result:
-        return await get_running_loop().run_in_executor(
+        return await (self._loop or get_running_loop()).run_in_executor(
             self._executor,
             partial(self._function, __method_self, *args, **kwargs),
         )

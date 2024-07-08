@@ -141,7 +141,7 @@ async def gemini_lmm_invocation(  # noqa: PLR0913
 
         if stream:
             return ctx.stream(
-                generator=_generation_stream(
+                _generation_stream(
                     client=client,
                     config=config,
                     instruction=Instruction.of(instruction).format(),

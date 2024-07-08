@@ -135,7 +135,7 @@ async def lmm_conversation_completion(
 
         if stream:
             return ctx.stream(
-                generator=_lmm_conversation_completion_stream(
+                _lmm_conversation_completion_stream(
                     instruction=instruction,
                     request_message=request_message,
                     conversation_memory=conversation_memory,

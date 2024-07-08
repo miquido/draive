@@ -5,6 +5,7 @@ from typing import Any, Literal, overload
 from mistralrs import (  # type: ignore
     ChatCompletionChunkResponse,
     ChatCompletionResponse,
+    ChunkChoice,
     ResponseMessage,
 )
 
@@ -123,7 +124,7 @@ async def mrs_lmm_invocation(  # noqa: PLR0913
 
         if stream:
             return ctx.stream(
-                generator=_chat_completion_stream(
+                _chat_completion_stream(
                     client=client,
                     config=config,
                     messages=messages,
@@ -227,9 +228,14 @@ async def _chat_completion_stream(
 
     accumulated_completion: str = ""
     async for part in completion_stream:
+        choice: ChunkChoice = part.choices[0]
         # we always request only one
-        part_text: str = part.choices[0].delta.content
-        accumulated_completion += part_text
-        yield LMMCompletionChunk.of(part_text)
+        part_text: str = choice.delta.content
+        if part_text:  # skip empty parts
+            accumulated_completion += part_text
+            yield LMMCompletionChunk.of(part_text)
+
+        if choice.finish_reason:
+            break  # finish when got finish reason
 
     ctx.record(ResultTrace.of(accumulated_completion))

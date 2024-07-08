@@ -1,5 +1,5 @@
 from asyncio import Lock
-from collections.abc import AsyncIterable, Iterator
+from collections.abc import AsyncIterable, Generator, Iterator
 from concurrent.futures import Executor, ThreadPoolExecutor
 from typing import Any, Final, Literal, Self, cast, final, overload
 
@@ -144,7 +144,7 @@ class MRSClient(ScopeDependency):
         messages: list[dict[str, object]],
     ) -> AsyncIterable[ChatCompletionChunkResponse]:
         return ctx.stream_sync(
-            await self._send_chat_completion_stream_request(
+            self._send_chat_completion_stream_request(
                 runner=await self._get_runner(model),
                 model=model,
                 temperature=temperature,
@@ -231,7 +231,6 @@ class MRSClient(ScopeDependency):
             ),
         )
 
-    @run_async(executor=MRS_EXECUTOR)
     def _send_chat_completion_stream_request(  # noqa: PLR0913
         self,
         runner: Runner,
@@ -241,8 +240,8 @@ class MRSClient(ScopeDependency):
         top_k: int | None,
         max_tokens: int | None,
         messages: list[dict[Any, Any]],
-    ) -> Iterator[ChatCompletionChunkResponse]:
-        return cast(
+    ) -> Generator[ChatCompletionChunkResponse]:
+        yield from cast(
             Iterator[ChatCompletionChunkResponse],
             runner.send_chat_completion_request(
                 request=ChatCompletionRequest(
