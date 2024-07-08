@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterable
 from typing import Any, Self
 
 from draive.parameters import Field
@@ -85,4 +85,4 @@ class LMMToolRequests(DataModel):
 LMMContextElement = LMMInput | LMMCompletion | LMMToolRequests | LMMToolResponse
 LMMOutput = LMMCompletion | LMMToolRequests
 LMMOutputStreamChunk = LMMCompletionChunk | LMMToolRequests
-LMMOutputStream = AsyncIterator[LMMOutputStreamChunk]
+LMMOutputStream = AsyncIterable[LMMOutputStreamChunk]

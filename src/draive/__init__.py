@@ -147,7 +147,7 @@ from draive.types import (
 )
 from draive.utils import (
     MISSING,
-    AsyncBufferedStream,
+    AsyncQueue,
     AsyncStream,
     Missing,
     cache,
@@ -180,7 +180,7 @@ __all__ = [
     "AgentWorkflowInvocation",
     "AgentWorkflowOutput",
     "Argument",
-    "AsyncBufferedStream",
+    "AsyncQueue",
     "AsyncStream",
     "AudioBase64Content",
     "AudioContent",
@@ -212,7 +212,6 @@ __all__ = [
     "EvaluationScore",
     "evaluator",
     "Field",
-    "tag_content",
     "freeze",
     "frozenlist",
     "generate_image",
@@ -282,6 +281,7 @@ __all__ = [
     "split_text",
     "State",
     "Stateless",
+    "tag_content",
     "TextContent",
     "TextEmbedding",
     "TextGeneration",

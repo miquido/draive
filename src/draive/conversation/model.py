@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterable
 from datetime import datetime
 from typing import Literal, Self
 from uuid import uuid4
@@ -79,4 +79,4 @@ class ConversationMessageChunk(DataModel):
         return bool(self.content)
 
 
-ConversationResponseStream = AsyncIterator[ConversationMessageChunk | ToolCallStatus]
+ConversationResponseStream = AsyncIterable[ConversationMessageChunk | ToolCallStatus]

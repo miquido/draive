@@ -123,7 +123,7 @@ async def anthropic_lmm_invocation(  # noqa: PLR0913
 
         if stream:
             return ctx.stream(
-                generator=_completion_stream(
+                _completion_stream(
                     client=client,
                     config=config,
                     instruction=Instruction.of(instruction).format(),

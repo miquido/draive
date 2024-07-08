@@ -1,11 +1,18 @@
-from asyncio import Task, TaskGroup, current_task, shield
+from asyncio import (
+    AbstractEventLoop,
+    Task,
+    TaskGroup,
+    current_task,
+    get_running_loop,
+    shield,
+)
 from collections.abc import (
     AsyncGenerator,
+    AsyncIterable,
     Callable,
     Coroutine,
     Generator,
     Iterable,
-    Iterator,
 )
 from concurrent.futures import Executor
 from contextvars import ContextVar, Token
@@ -24,7 +31,8 @@ from draive.parameters import ParametrizedData
 from draive.scope.dependencies import ScopeDependencies, ScopeDependency
 from draive.scope.errors import MissingScopeContext
 from draive.scope.state import ScopeState
-from draive.utils import AsyncStream, getenv_bool, mimic_function, run_async
+from draive.utils import getenv_bool, mimic_function, run_async
+from draive.utils.stream import AsyncStream
 
 __all__ = [
     "ctx",
@@ -438,16 +446,17 @@ class ctx:
 
     @staticmethod
     def stream[Element](
-        generator: AsyncGenerator[Element, None],
-    ) -> AsyncStream[Element]:
-        # TODO: find better solution for streaming without spawning tasks if able
-        stream: AsyncStream[Element] = AsyncStream()
-        current_metrics: MetricsTrace = ctx._current_metrics()
-        current_metrics.enter()  # ensure valid metrics scope closing
+        source: AsyncGenerator[Element, None],
+        /,
+    ) -> AsyncIterable[Element]:
+        metrics: MetricsTrace = ctx._current_metrics()
+        metrics.enter()
 
-        async def iterate() -> None:
+        stream: AsyncStream[Element] = AsyncStream()
+
+        async def consumer() -> None:
             try:
-                async for element in generator:
+                async for element in source:
                     await stream.send(element)
 
             except BaseException as exc:
@@ -456,45 +465,61 @@ class ctx:
             else:
                 stream.finish()
 
-            finally:
-                current_metrics.exit()
+        task: Task[None] = ctx.spawn_subtask(consumer)
 
-        ctx.spawn_subtask(iterate)
+        def on_finish(task: Task[None]) -> None:
+            metrics.exit()
+
+        task.add_done_callback(on_finish)
+
         return stream
 
     @staticmethod
     def stream_sync[Element](
-        generator: Generator[Element, None] | Iterator[Element],
+        source: Generator[Element, None],
         /,
         executor: Executor | None = None,
-    ) -> AsyncStream[Element]:
-        # TODO: find better solution for streaming without spawning tasks if able
-        stream: AsyncStream[Element] = AsyncStream()
-        current_metrics: MetricsTrace = ctx._current_metrics()
-        current_metrics.enter()  # ensure valid metrics scope closing
+    ) -> AsyncIterable[Element]:
+        metrics: MetricsTrace = ctx._current_metrics()
+        metrics.enter()
 
-        iterator: Iterator[Element] = iter(generator)
+        loop: AbstractEventLoop = get_running_loop()
 
-        @run_async(executor=executor)
-        def next_element() -> Element:
+        @run_async(loop=loop, executor=executor)
+        def source_next() -> Element:
             try:
-                return next(iterator)
+                return next(source)
+
+            except GeneratorExit as exc:
+                raise StopAsyncIteration() from exc
 
             except StopIteration as exc:
                 raise StopAsyncIteration() from exc
 
-        async def iterate() -> None:
+        stream: AsyncStream[Element] = AsyncStream()
+
+        async def consumer() -> None:
             try:
                 while True:
-                    await stream.send(await next_element())
+                    try:
+                        await stream.send(await source_next())
+
+                    except StopAsyncIteration:
+                        break
 
             except BaseException as exc:
                 stream.finish(exception=exc)
 
-            finally:
-                current_metrics.exit()
+            else:
+                stream.finish()
 
-        ctx.spawn_subtask(iterate)
+        task: Task[None] = ctx.spawn_subtask(consumer)
+
+        def on_finish(task: Task[None]) -> None:
+            metrics.exit()
+
+        task.add_done_callback(on_finish)
+
         return stream
 
     @staticmethod

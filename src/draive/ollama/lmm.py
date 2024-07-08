@@ -118,7 +118,7 @@ async def ollama_lmm_invocation(  # noqa: PLR0913
 
         if stream:
             return ctx.stream(
-                generator=_chat_completion_stream(
+                _chat_completion_stream(
                     client=client,
                     config=config,
                     messages=messages,
