@@ -29,10 +29,7 @@ class AsyncQueue[Element](AsyncIterator[Element]):
     def finished(self) -> bool:
         return self._finished.done()
 
-    def enqueue(
-        self,
-        element: Element,
-    ) -> None:
+    def enqueue(self, element: Element, /, *elements: Element) -> None:
         if self.finished:
             raise RuntimeError("AsyncQueue is already finished")
 
@@ -42,6 +39,8 @@ class AsyncQueue[Element](AsyncIterator[Element]):
 
         else:
             self._queue.append(element)
+
+        self._queue.extend(elements)
 
     def finish(
         self,
