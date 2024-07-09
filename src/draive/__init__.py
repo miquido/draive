@@ -10,6 +10,7 @@ from draive.agents import (
     AgentWorkflowInput,
     AgentWorkflowInvocation,
     AgentWorkflowOutput,
+    AgentWorkflowVisualization,
     agent,
     workflow,
 )
@@ -170,6 +171,7 @@ __all__ = [
     "AgentWorkflowInvocation",
     "AgentWorkflowOutput",
     "always",
+    "AgentWorkflowVisualization",
     "Argument",
     "async_always",
     "async_noop",

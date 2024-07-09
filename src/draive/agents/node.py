@@ -1,8 +1,9 @@
+from datetime import datetime
 from typing import Protocol, Self, final, runtime_checkable
 from uuid import UUID, uuid4
 
 from draive.agents.errors import AgentException
-from draive.parameters import ParametrizedData
+from draive.parameters import Field, ParametrizedData
 from draive.types import MultimodalContent, MultimodalContentConvertible, frozenlist
 from draive.utils import MISSING, Missing, freeze, is_missing, not_missing
 
@@ -104,6 +105,7 @@ class AgentNode:
 @final
 class AgentMessage(ParametrizedData):
     identifier: UUID
+    timestamp: datetime = Field(default_factory=datetime.now)
     sender: AgentNode | Missing
     recipient: AgentNode
     addressee: AgentNode | None

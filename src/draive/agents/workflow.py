@@ -8,6 +8,7 @@ from draive.agents.errors import AgentException
 from draive.agents.idle import IdleMonitor
 from draive.agents.node import Agent, AgentOutput
 from draive.agents.runner import AgentRunner
+from draive.agents.visualization import AgentWorkflowVisualization
 from draive.helpers import VolatileMemory
 from draive.parameters import DataModel, ParametrizedData, State
 from draive.scope import ctx
@@ -390,6 +391,9 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
 
             ctx.record(WorkflowHistory(history=tuple(self._history)))
 
+            if __debug__:
+                self._visualize()
+
             match self._result:
                 case BaseException() as exc:
                     raise exc
@@ -439,3 +443,6 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
             # when workflow should still be running (did not provided result yet)
             # but no agent is working then notify workflow node about the error
             self.send(AgentWorkflowIdle())
+
+    def _visualize(self) -> None:
+        ctx.state(AgentWorkflowVisualization).visualize(self._history)

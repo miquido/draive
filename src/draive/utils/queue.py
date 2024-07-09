@@ -36,7 +36,7 @@ class AsyncQueue[Element](AsyncIterator[Element]):
         *elements: Element,
     ) -> None:
         if self.finished:
-            raise RuntimeError("AsyncQueue is already finished")
+            return  # already finished
 
         if self._waiting is not None and not self._waiting.done():
             self._waiting.set_result(element)

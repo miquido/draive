@@ -56,6 +56,10 @@ ollama = [
 mistralrs = [
   "mistralrs~=0.1.19",
 ]
+visualization = [
+  "networkx~=3.3",
+  "plotly~=5.22",
+]
 
 dev = [
   "draive[sentencepiece]",
@@ -65,6 +69,7 @@ dev = [
   "draive[mistral]",
   "draive[ollama]",
   "draive[gemini]",
+  "draive[visualization]",
   "ruff~=0.5.0",
   "pyright~=1.1",
   "bandit~=1.7",

@@ -1,6 +1,7 @@
 from draive.agents.definition import AgentInvocation, agent
 from draive.agents.errors import AgentException
 from draive.agents.node import Agent, AgentError, AgentMessage, AgentNode, AgentOutput
+from draive.agents.visualization import AgentWorkflowVisualization
 from draive.agents.workflow import (
     AgentWorkflow,
     AgentWorkflowIdle,
@@ -24,5 +25,6 @@ __all__ = [
     "AgentWorkflowInput",
     "AgentWorkflowInvocation",
     "AgentWorkflowOutput",
+    "AgentWorkflowVisualization",
     "workflow",
 ]
