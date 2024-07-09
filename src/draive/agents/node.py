@@ -79,7 +79,7 @@ class AgentNode:
             responding=None,
         )
 
-    def _associate(
+    def associate(
         self,
         initializer: "AgentInitializer",
         /,
@@ -168,10 +168,10 @@ type AgentOutput = frozenlist[AgentMessage] | AgentMessage | None
 class AgentError(AgentException):
     def __init__(
         self,
+        *args: object,
         agent: AgentNode,
         message: AgentMessage,
         cause: BaseException,
-        *args: object,
     ) -> None:
         self.agent: AgentNode = agent
         self.message: AgentMessage = message
