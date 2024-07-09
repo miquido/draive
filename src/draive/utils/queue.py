@@ -78,8 +78,12 @@ class AsyncQueue[Element](AsyncIterator[Element]):
 
         # create a new future to wait for next
         assert self._waiting is None, "Only a single queue iterator is supported!"  # nosec: B101
-        future: Future[Element] = self._loop.create_future()
-        self._waiting = future
+        self._waiting = self._loop.create_future()
 
-        # wait for the result
-        return await future
+        try:
+            # wait for the result
+            return await self._waiting
+
+        finally:
+            # cleanup
+            self._waiting = None
