@@ -1,10 +1,9 @@
 from pathlib import Path
-from typing import Any, cast
-
-from sentencepiece import SentencePieceProcessor  # pyright: ignore[reportMissingTypeStubs]
+from typing import Any
 
 from draive.mistral.config import MistralChatConfig
 from draive.scope import ctx
+from draive.sentencepiece import sentencepiece_tokenize_text
 from draive.utils import cache
 
 __all__ = [
@@ -16,16 +15,17 @@ def mistral_tokenize_text(
     text: str,
     **extra: Any,
 ) -> list[int]:
-    return cast(
-        list[int],
-        _encoding(model_name=ctx.state(MistralChatConfig).model).encode(text),  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+    return sentencepiece_tokenize_text(
+        text=text,
+        model_path=_model_path(ctx.state(MistralChatConfig).model),
+        **extra,
     )
 
 
 @cache(limit=4)
-def _encoding(model_name: str) -> SentencePieceProcessor:
+def _model_path(model_name: str) -> str:
     model_file: str = _mapping.get(model_name, "mistral_v3_tokenizer.model")
-    return SentencePieceProcessor(model_file=str(Path(__file__).parent / "tokens" / model_file))  # pyright: ignore[reportCallIssue]
+    return str(Path(__file__).parent / "tokens" / model_file)
 
 
 _mapping: dict[str, str] = {
