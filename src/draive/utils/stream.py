@@ -61,7 +61,7 @@ class AsyncStream[Element](AsyncIterable[Element]):
         finish_exception: BaseException = exception or StopAsyncIteration()
 
         if not self._ready.done():
-            self._ready.set_exception(finish_exception)
+            self._ready.set_result(None)
 
         if self._waiting is not None and not self._waiting.done():
             self._waiting.set_exception(finish_exception)

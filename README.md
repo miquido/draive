@@ -83,7 +83,11 @@ pip install draive
 
 ### Optional dependencies
 
+Draive library comes with optional integrations to 3rd party services:
+
 - OpenAI:
+
+Use OpenAI services client, including GPT, dall-e and embedding. Allows to use Azure services as well.
 
 ```bash
 pip install draive[openai]
@@ -91,11 +95,15 @@ pip install draive[openai]
 
 - Anthropic:
 
+Use Anthropic services client, including Claude.
+
 ```bash
 pip install draive[anthropic]
 ```
 
 - Gemini:
+
+Use Google AIStudio services client, including Gemini.
 
 ```bash
 pip install draive[gemini]
@@ -103,11 +111,15 @@ pip install draive[gemini]
 
 - Mistral:
 
+Use Mistral services client. Allows to use Azure services as well.
+
 ```bash
 pip install draive[mistral]
 ```
 
 - Ollama:
+
+Use Ollama services client.
 
 ```bash
 pip install draive[ollama]
@@ -115,14 +127,26 @@ pip install draive[ollama]
 
 - Mistral.rs:
 
+Use locally running, in-process LLM. Requires Rust compiler to install, see [project](https://github.com/EricLBuehler/mistral.rs) page for details.
+
 ```bash
 pip install draive[mistralrs]
 ```
 
 - Fastembed:
 
+User Fastembed services client.
+
 ```bash
 pip install draive[fastembed]
+```
+
+- SentencePiece:
+
+User SentencePiece model runner. It is used by Gemini and Mistral.
+
+```bash
+pip install draive[sentencepiece]
 ```
 
 ## 👷 Contributing
