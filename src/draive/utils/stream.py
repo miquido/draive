@@ -1,6 +1,6 @@
 from asyncio import AbstractEventLoop, CancelledError, Future, get_running_loop
 from collections.abc import AsyncIterable
-from typing import Never, Self
+from typing import Self
 
 from draive.utils.freeze import freeze
 
@@ -17,7 +17,7 @@ class AsyncStream[Element](AsyncIterable[Element]):
         self._loop: AbstractEventLoop = loop or get_running_loop()
         self._ready: Future[None] = self._loop.create_future()
         self._waiting: Future[Element] | None = None
-        self._finished: Future[Never] = self._loop.create_future()
+        self._finish_reason: BaseException | None = None
 
         freeze(self)
 
@@ -26,7 +26,7 @@ class AsyncStream[Element](AsyncIterable[Element]):
 
     @property
     def finished(self) -> bool:
-        return self._finished.done()
+        return self._finish_reason is not None
 
     async def send(
         self,
@@ -34,8 +34,8 @@ class AsyncStream[Element](AsyncIterable[Element]):
         /,
     ) -> None:
         while self._waiting is None or self._waiting.done():
-            if self.finished:
-                raise self._finished.exception()  # pyright: ignore[reportGeneralTypeIssues]
+            if self._finish_reason:
+                raise self._finish_reason
 
             try:
                 # wait for readiness
@@ -45,8 +45,8 @@ class AsyncStream[Element](AsyncIterable[Element]):
                 # create new waiting future afterwards
                 self._ready = self._loop.create_future()
 
-        if self.finished:
-            raise self._finished.exception()  # pyright: ignore[reportGeneralTypeIssues]
+        if self._finish_reason:
+            raise self._finish_reason
 
         else:
             self._waiting.set_result(element)
@@ -58,15 +58,13 @@ class AsyncStream[Element](AsyncIterable[Element]):
         if self.finished:
             return  # already finished, ignore
 
-        finish_exception: BaseException = exception or StopAsyncIteration()
+        self._finish_reason = exception or StopAsyncIteration()
 
         if not self._ready.done():
             self._ready.set_result(None)
 
         if self._waiting is not None and not self._waiting.done():
-            self._waiting.set_exception(finish_exception)
-
-        self._finished.set_exception(finish_exception)
+            self._waiting.set_exception(self._finish_reason)
 
     def cancel(self) -> None:
         self.finish(exception=CancelledError())
@@ -77,8 +75,8 @@ class AsyncStream[Element](AsyncIterable[Element]):
     async def __anext__(self) -> Element:
         assert self._waiting is None, "AsyncStream can't be reused"  # nosec: B101
 
-        if self.finished:
-            raise self._finished.exception()  # pyright: ignore[reportGeneralTypeIssues]
+        if self._finish_reason:
+            raise self._finish_reason
 
         try:
             assert not self._ready.done()  # nosec: B101

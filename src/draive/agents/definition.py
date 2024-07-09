@@ -173,7 +173,7 @@ def agent[AgentState, AgentStateScratch](
 
                 return stateless_agent
 
-        agent_node._associate(  # pyright: ignore[reportPrivateUsage]
+        agent_node.associate(
             initialize,
             concurrent=concurrent,
         )

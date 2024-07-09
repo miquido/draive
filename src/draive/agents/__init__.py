@@ -3,6 +3,7 @@ from draive.agents.errors import AgentException
 from draive.agents.node import Agent, AgentError, AgentMessage, AgentNode, AgentOutput
 from draive.agents.workflow import (
     AgentWorkflow,
+    AgentWorkflowIdle,
     AgentWorkflowInput,
     AgentWorkflowInvocation,
     AgentWorkflowOutput,
@@ -19,6 +20,7 @@ __all__ = [
     "AgentNode",
     "AgentOutput",
     "AgentWorkflow",
+    "AgentWorkflowIdle",
     "AgentWorkflowInput",
     "AgentWorkflowInvocation",
     "AgentWorkflowOutput",

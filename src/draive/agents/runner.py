@@ -1,7 +1,11 @@
-from asyncio import CancelledError, Task
+from asyncio import (
+    CancelledError,
+    Task,
+)
 from collections.abc import AsyncIterator
 from typing import Protocol, Self, final, overload, runtime_checkable
 
+from draive.agents.idle import IdleMonitor
 from draive.agents.node import Agent, AgentError, AgentMessage, AgentNode
 from draive.scope import ctx
 from draive.utils import AsyncQueue, freeze
@@ -45,6 +49,7 @@ class AgentRunner:
         agent: AgentNode,
         /,
         output: AgentRunnerOutput,
+        status: IdleMonitor,
     ) -> Self:
         queue: AsyncQueue[AgentMessage] = AsyncQueue()
         return cls(
@@ -54,16 +59,20 @@ class AgentRunner:
                 agent,
                 queue,
                 output,
+                status,
             ),
+            status=status,
         )
 
     def __init__(
         self,
         queue: AsyncQueue[AgentMessage],
         task: Task[None],
+        status: IdleMonitor,
     ) -> None:
         self._queue: AsyncQueue[AgentMessage] = queue
         self._task: Task[None] = task
+        self._status: IdleMonitor = status
 
         freeze(self)
 
@@ -72,7 +81,16 @@ class AgentRunner:
         message: AgentMessage,
         /,
     ) -> None:
+        # not idle when received a message
+        self._status.enter_task()
         self._queue.enqueue(message)
+
+    @property
+    def idle(self) -> bool:
+        return self._status.idle
+
+    async def wait_idle(self) -> None:
+        await self._status.wait_idle()
 
     def cancel(self) -> None:
         self._task.cancel()
@@ -93,6 +111,7 @@ class AgentRunner:
         /,
         input: AsyncIterator[AgentMessage],  # noqa: A002
         output: AgentRunnerOutput,
+        status: IdleMonitor,
     ) -> None:
         async with ctx.nested(agent.__str__()):
             agent_instance: Agent = agent.initialize()
@@ -100,25 +119,31 @@ class AgentRunner:
             try:
                 if agent.concurrent:
                     async for message in input:
-                        ctx.spawn_subtask(
+                        task: Task[None] = ctx.spawn_subtask(
                             AgentRunner._handle,
                             message,
                             node=agent,
                             agent=agent_instance,
                             output=output,
                         )
+                        task.add_done_callback(status.exit_task)
 
                 else:
                     async for message in input:
-                        await AgentRunner._handle(
-                            message,
-                            node=agent,
-                            agent=agent_instance,
-                            output=output,
-                        )
+                        try:
+                            await AgentRunner._handle(
+                                message,
+                                node=agent,
+                                agent=agent_instance,
+                                output=output,
+                            )
+
+                        finally:
+                            status.exit_task()
 
             except CancelledError:
-                pass  # just finish when Cancelled
+                # just finish when Cancelled
+                status.exit_all()
 
     @staticmethod
     async def _handle(
@@ -145,6 +170,7 @@ class AgentRunner:
         except Exception as exc:
             output(
                 AgentError(
+                    "Agent failed while processing the message",
                     agent=node,
                     message=message,
                     cause=exc,

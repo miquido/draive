@@ -1,10 +1,12 @@
-from asyncio import AbstractEventLoop, CancelledError, TimerHandle, gather, get_running_loop
+from asyncio import AbstractEventLoop, CancelledError, Task, TimerHandle, gather, get_running_loop
 from inspect import isfunction
 from typing import Protocol, cast, final, overload, runtime_checkable
 from uuid import UUID, uuid4
 
 from draive.agents.definition import AgentMessage, AgentNode
-from draive.agents.node import Agent, AgentError, AgentOutput
+from draive.agents.errors import AgentException
+from draive.agents.idle import IdleMonitor
+from draive.agents.node import Agent, AgentOutput
 from draive.agents.runner import AgentRunner
 from draive.helpers import VolatileMemory
 from draive.parameters import DataModel, ParametrizedData
@@ -23,11 +25,12 @@ __all__ = [
     "AgentWorkflow",
     "AgentWorkflowInvocation",
     "AgentWorkflowOutput",
+    "AgentWorkflowIdle",
     "AgentWorkflowInput",
 ]
 
 
-type AgentWorkflowInput = AgentMessage | AgentError
+type AgentWorkflowInput = AgentMessage | AgentException
 type AgentWorkflowOutput[Result: ParametrizedData | str] = (
     frozenlist[AgentMessage] | AgentMessage | Result | None
 )
@@ -47,6 +50,10 @@ class AgentWorkflowInvocation[AgentWorkflowState, AgentWorkflowResult: Parametri
         memory: BasicMemory[AgentWorkflowState],
         input: AgentWorkflowInput,  # noqa: A002
     ) -> AgentWorkflowOutput[AgentWorkflowResult]: ...
+
+
+class AgentWorkflowIdle(AgentException):
+    pass
 
 
 @final
@@ -192,7 +199,7 @@ def workflow[AgentWorkflowState](
             return agent
 
         # workflow can run as an agent with limited capabilities
-        workflow_node._associate(  # pyright: ignore[reportPrivateUsage]
+        workflow_node.associate(
             initialize_agent,
             concurrent=False,  # workflow can't be concurrent
         )
@@ -256,10 +263,11 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
     ) -> None:
         self._loop: AbstractEventLoop = loop
         self._history: list[AgentMessage] = []
-        self._workflow_queue: AsyncQueue[AgentMessage | AgentError] = AsyncQueue()
+        self._workflow_queue: AsyncQueue[AgentMessage | AgentException] = AsyncQueue()
         self._workflow_memory: Memory[WorkflowState, WorkflowState] = memory
         self._workflow: AgentWorkflow[WorkflowState, WorkflowResult] = workflow
         self._agent_runners: dict[UUID, AgentRunner] = {}
+        self._status: IdleMonitor = IdleMonitor()
         self._result: WorkflowResult | BaseException | Missing = MISSING
 
     def __del__(self) -> None:
@@ -268,7 +276,7 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
     @overload
     def send(
         self,
-        error: AgentError,
+        error: AgentException,
         /,
     ) -> None: ...
 
@@ -282,13 +290,19 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
 
     def send(
         self,
-        messages: AgentMessage | AgentError,
+        messages: AgentMessage | AgentException,
         /,
         *_messages: AgentMessage,
     ) -> None:
-        pending: list[AgentMessage | AgentError] = [messages, *_messages]
+        pending: list[AgentMessage | AgentException] = [messages, *_messages]
+        for _ in pending:  # ensure not idle when received a message
+            self._status.enter_task()
         self._history.extend([message for message in pending if isinstance(message, AgentMessage)])
         self._workflow_queue.enqueue(*pending)
+
+    @property
+    def finished(self) -> bool:
+        return not_missing(self._result)
 
     def finish(
         self,
@@ -306,20 +320,18 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
 
         self._workflow_queue.finish()
 
-    async def wait(self) -> None:
+    async def _wait(self) -> None:
         await gather(
             *[runner.wait() for runner in self._agent_runners.values()],
             return_exceptions=False,
         )
-
-        await self._workflow_queue.wait()
 
     async def finalize(
         self,
         result: WorkflowResult | BaseException,
     ) -> None:
         self.finish(result=result)
-        await self.wait()
+        await self._wait()
 
     async def execute(
         self,
@@ -343,29 +355,38 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
 
             self.send(self._workflow.address(input))
 
+            idle_monitor_task: Task[None] = ctx.spawn_subtask(self._idle_monitor)
+
             async for element in self._workflow_queue:
-                match element:
-                    case AgentMessage() as message:
-                        if message.recipient.identifier == self._workflow.node.identifier:
-                            await self._handle(message)
+                try:
+                    match element:
+                        case AgentMessage() as message:
+                            if message.recipient.identifier == self._workflow.node.identifier:
+                                await self._handle(message)
 
-                        elif runner := self._agent_runners.get(message.recipient.identifier):
-                            runner.send(message)
+                            elif runner := self._agent_runners.get(message.recipient.identifier):
+                                runner.send(message)
 
-                        else:
-                            spawned_runner: AgentRunner = AgentRunner.run(
-                                message.recipient,
-                                output=self.send,
-                            )
-                            self._agent_runners[message.recipient.identifier] = spawned_runner
-                            spawned_runner.send(message)
+                            else:
+                                spawned_runner: AgentRunner = AgentRunner.run(
+                                    message.recipient,
+                                    output=self.send,
+                                    status=self._status.nested(),
+                                )
+                                self._agent_runners[message.recipient.identifier] = spawned_runner
+                                spawned_runner.send(message)
 
-                    case error:
-                        await self._handle(error)
+                        case error:
+                            await self._handle(error)
 
-            await self.wait()  # wait for completion of all runners
+                finally:
+                    self._status.exit_task()
+
+            await self._wait()  # wait for completion of all runners
 
             timeout_handle.cancel()  # cancel the timeout
+
+            idle_monitor_task.cancel()  # finish idle monitor
 
             ctx.record(WorkflowHistory(history=tuple(self._history)))
 
@@ -405,3 +426,16 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
 
         except BaseException as exc:
             self.finish(result=exc)
+
+    async def _idle_monitor(self) -> None:
+        while not self.finished:  # run until finished
+            await self._status.wait_idle()  # wait until all agents become idle
+
+            if self.finished:  # check if that is not due to finishing
+                return  # workflow might be finished at this stage
+
+            ctx.log_warning("Detected workflow idle state, attempting to resume...")
+
+            # when workflow should still be running (did not provided result yet)
+            # but no agent is working then notify workflow node about the error
+            self.send(AgentWorkflowIdle())
