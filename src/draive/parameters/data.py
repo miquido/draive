@@ -282,7 +282,7 @@ class DataParameter:
     field_specifiers=(Field,),
 )
 class ParametrizedDataMeta(type):
-    def __new__(
+    def __new__(  # noqa: PLR0912
         cls,
         name: str,
         bases: tuple[type, ...],
@@ -300,7 +300,13 @@ class ParametrizedDataMeta(type):
             return data_type
 
         is_data_model: bool = "DataModel" in tuple(base.__name__ for base in bases)
-        globalns: dict[str, Any] = sys.modules.get(data_type.__module__).__dict__
+        globalns: dict[str, Any]
+        if data_type.__module__:
+            globalns = sys.modules.get(data_type.__module__).__dict__
+
+        else:
+            globalns = {}
+
         localns: dict[str, Any] = {data_type.__name__: data_type}
         recursion_guard: frozenset[type[Any]] = frozenset({data_type})
         parameters: dict[str, DataParameter] = {}
