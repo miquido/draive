@@ -1,4 +1,5 @@
 import json
+from base64 import b64encode
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
@@ -178,17 +179,26 @@ def _convert_content_element(  # noqa: C901
             }
 
         case ImageBase64Content() as image:
-            # TODO: we could upload media using openAI endpoint to have url instead
             return {
-                "type": "text",
-                "text": image.image_description or "MISSING IMAGE",
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{image.mime_type or 'image/jpeg'};base64,{image.image_base64}",
+                    "detail": cast(Literal["auto", "low", "high"], config.vision_details)
+                    if not_missing(config.vision_details)
+                    else "auto",
+                },
             }
 
         case ImageDataContent() as image:
-            # TODO: we could upload media using openAI endpoint to have url instead
+            encoded_image: str = b64encode(image.image_data).decode("utf-8")
             return {
-                "type": "text",
-                "text": image.image_description or "MISSING IMAGE",
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{image.mime_type or 'image/jpeg'};base64,{encoded_image}",
+                    "detail": cast(Literal["auto", "low", "high"], config.vision_details)
+                    if not_missing(config.vision_details)
+                    else "auto",
+                },
             }
 
         case AudioURLContent():
