@@ -166,6 +166,7 @@ from draive.utils import (
     setup_logging,
     split_sequence,
     tag_content,
+    tags_content,
     with_timeout,
 )
 
@@ -289,6 +290,7 @@ __all__ = [
     "State",
     "Stateless",
     "tag_content",
+    "tags_content",
     "TextContent",
     "TextEmbedding",
     "TextGeneration",

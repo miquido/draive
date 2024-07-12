@@ -1,13 +1,16 @@
+from collections.abc import Generator
+
 __all__ = [
     "tag_content",
+    "tags_content",
 ]
 
 
-def tag_content(  # noqa: C901, PLR0912
+def tags_content(  # noqa: C901, PLR0912
     tag: str,
     /,
     source: str,
-) -> str | None:
+) -> Generator[str, None]:
     opening_tag_prefix: str = f"<{tag} "
     opening_tag: str = f"<{tag}>"
     closing_tag: str = f"</{tag}>"
@@ -30,7 +33,8 @@ def tag_content(  # noqa: C901, PLR0912
             if char == ">":
                 accumulator += char
                 if in_content and accumulator == closing_tag:
-                    return content
+                    yield content
+                    content = ""  # clear to be ready for next tag
 
                 elif check_opening(accumulator):
                     in_content = True
@@ -49,6 +53,7 @@ def tag_content(  # noqa: C901, PLR0912
 
             else:
                 accumulator += char
+
         elif in_content:
             if char == "<":
                 in_tag = True
@@ -61,4 +66,19 @@ def tag_content(  # noqa: C901, PLR0912
             in_tag = True
             accumulator = char
 
-    return None  # tag not found or not closed
+
+def tag_content(
+    tag: str,
+    /,
+    source: str,
+) -> str | None:
+    try:
+        return next(
+            tags_content(
+                tag,
+                source=source,
+            )
+        )
+
+    except StopIteration:
+        return None
