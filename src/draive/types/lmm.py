@@ -1,8 +1,7 @@
 from collections.abc import AsyncIterable
-from typing import Any, Self
+from typing import Any, Literal, Self
 
-from draive.parameters import Field
-from draive.parameters.model import DataModel
+from draive.parameters import DataModel, Field
 from draive.types.multimodal import MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
@@ -16,6 +15,7 @@ __all__ = [
     "LMMToolRequest",
     "LMMToolRequests",
     "LMMToolResponse",
+    "LMMToolStatus",
 ]
 
 
@@ -62,6 +62,18 @@ class LMMCompletionChunk(DataModel):
 
     def __bool__(self) -> bool:
         return bool(self.content)
+
+
+class LMMToolStatus(DataModel):
+    identifier: str
+    tool: str
+    status: Literal[
+        "STARTED",
+        "RUNNING",
+        "FINISHED",
+        "FAILED",
+    ]
+    content: MultimodalContent | None = None
 
 
 class LMMToolResponse(DataModel):

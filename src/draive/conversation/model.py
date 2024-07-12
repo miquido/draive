@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Literal, Self
 from uuid import uuid4
 
+from draive.lmm import ToolStatus
 from draive.parameters import DataModel, Field
 from draive.types import (
     LMMCompletion,
@@ -10,7 +11,6 @@ from draive.types import (
     LMMInput,
     MultimodalContent,
     MultimodalContentConvertible,
-    ToolCallStatus,
 )
 
 __all__ = [
@@ -79,4 +79,4 @@ class ConversationMessageChunk(DataModel):
         return bool(self.content)
 
 
-ConversationResponseStream = AsyncIterable[ConversationMessageChunk | ToolCallStatus]
+ConversationResponseStream = AsyncIterable[ConversationMessageChunk | ToolStatus]

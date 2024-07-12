@@ -1,4 +1,4 @@
-from typing import Any, Literal, Required, TypedDict
+from typing import Any, Literal, NotRequired, Required, TypedDict
 
 from draive.parameters import DataModel, Field
 
@@ -87,7 +87,7 @@ class GeminiSystemMessage(TypedDict, total=False):
 class GeminiFunctionToolSpecification(TypedDict, total=False):
     name: Required[str]
     description: Required[str]
-    parameters: Required[dict[str, Any]]
+    parameters: NotRequired[dict[str, Any]]
 
 
 class GeminiFunctionsTool(TypedDict, total=False):

@@ -1,6 +1,6 @@
 from collections.abc import Generator
 
-from draive import MultimodalContent, auto_retry, cache, ctx, tool
+from draive import MultimodalContent, async_noop, auto_retry, cache, ctx, tool
 from pytest import mark, raises
 
 
@@ -55,6 +55,7 @@ async def test_toolbox_call_returns_multimodal_content():
         arguments={
             "value": 42,
         },
+        report_status=async_noop,
     ) == MultimodalContent.of("42")
     assert executions == 1
 
@@ -78,6 +79,7 @@ async def test_toolbox_call_returns_custom_content():
         arguments={
             "value": 42,
         },
+        report_status=async_noop,
     ) == MultimodalContent.of("Value:42")
     assert executions == 1
 

@@ -8,12 +8,7 @@ from draive.parameters.function import Argument, ParametrizedFunction
 from draive.parameters.model import DataModel
 from draive.parameters.path import ParameterPath
 from draive.parameters.requirement import ParameterRequirement
-from draive.parameters.specification import (
-    ParameterSpecification,
-    ParametersSpecification,
-    ToolFunctionSpecification,
-    ToolSpecification,
-)
+from draive.parameters.specification import ParameterSpecification, ParametersSpecification
 from draive.parameters.state import State, Stateless
 from draive.parameters.validation import ParameterValidator, ParameterVerifier
 
@@ -37,6 +32,4 @@ __all__ = [
     "ParametrizedFunction",
     "State",
     "Stateless",
-    "ToolFunctionSpecification",
-    "ToolSpecification",
 ]

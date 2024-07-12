@@ -1,24 +1,15 @@
 from collections.abc import Callable, Coroutine
-from typing import (
-    Any,
-    Protocol,
-    cast,
-    final,
-    overload,
-)
+from typing import Any, Protocol, cast, final, overload
 from uuid import uuid4
 
-from draive.lmm.errors import ToolError, ToolException
-from draive.lmm.state import ToolCallContext, ToolStatusStream
+from draive.lmm.tools.errors import ToolError, ToolException
+from draive.lmm.tools.specification import ToolSpecification
+from draive.lmm.tools.status import ToolContext, ToolStatus
 from draive.metrics import ArgumentsTrace, ResultTrace
-from draive.parameters import (
-    ParameterSpecification,
-    ParametrizedFunction,
-    ToolSpecification,
-)
+from draive.parameters import ParameterSpecification, ParametrizedFunction
 from draive.scope import ctx
 from draive.types import MultimodalContent, MultimodalContentConvertible
-from draive.utils import freeze, noop, not_missing
+from draive.utils import freeze, not_missing
 
 __all__ = [
     "AnyTool",
@@ -107,18 +98,25 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         call_id: str,
         /,
         arguments: dict[str, Any],
+        report_status: Callable[[ToolStatus], Coroutine[None, None, None]],
     ) -> MultimodalContent:
-        call_context: ToolCallContext = ToolCallContext(
+        context: ToolContext = ToolContext(
             call_id=call_id,
             tool=self.name,
-            send_status=ctx.state(ToolStatusStream).send or noop,
+            report_status=report_status,
         )
         with ctx.nested(
             self.name,
-            state=[call_context],
+            state=[context],
             metrics=[ArgumentsTrace.of(**arguments)],
         ):
-            await call_context.report("STARTED")
+            await context.report_status(
+                ToolStatus(
+                    identifier=context.call_id,
+                    tool=context.tool,
+                    status="STARTED",
+                )
+            )
 
             try:
                 if not self.available:
@@ -127,12 +125,24 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
                 result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
                 ctx.record(ResultTrace.of(result))
 
-                await call_context.report("FINISHED")
+                await context.report_status(
+                    ToolStatus(
+                        identifier=context.call_id,
+                        tool=context.tool,
+                        status="FINISHED",
+                    )
+                )
 
                 return MultimodalContent.of(self.format_result(result))
 
             except Exception as exc:
-                await call_context.report("FAILED")
+                await context.report_status(
+                    ToolStatus(
+                        identifier=context.call_id,
+                        tool=context.tool,
+                        status="FAILED",
+                    )
+                )
                 # return an error with formatted content
                 raise ToolError(
                     f"Tool {self.name}[{call_id}] failed",
@@ -148,10 +158,12 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         with ctx.nested(
             self.name,
             state=[
-                ToolCallContext(
-                    call_id=uuid4().hex,
-                    tool=self.name,
-                    send_status=noop,
+                ctx.state(  # when called as a function preserve current context
+                    ToolContext,
+                    default=ToolContext(
+                        call_id=uuid4().hex,
+                        tool=self.name,
+                    ),
                 )
             ],
             metrics=[ArgumentsTrace.of(*args, **kwargs)],

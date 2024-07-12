@@ -3,6 +3,7 @@ from typing import Self, cast, final
 
 from draive.parameters import ParametrizedData
 from draive.scope.errors import MissingScopeState
+from draive.utils import MISSING, Missing, not_missing
 
 __all__ = [
     "ScopeState",
@@ -23,14 +24,20 @@ class ScopeState:
         self,
         state: type[State_T],
         /,
+        default: State_T | Missing = MISSING,
     ) -> State_T:
         if state in self._state:
             return cast(State_T, self._state[state])
+
+        elif not_missing(default):
+            return default
+
         else:
             try:
-                default: State_T = state()
-                self._state[state] = default
-                return default
+                initialized: State_T = state()
+                self._state[state] = initialized
+                return initialized
+
             except (TypeError, AttributeError) as exc:
                 raise MissingScopeState(
                     f"{state.__qualname__} is not defined in the current scope"

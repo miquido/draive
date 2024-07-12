@@ -57,7 +57,7 @@ async def lmm_generate_text(
                 instruction=instruction,
                 context=context,
                 tools=toolbox.available_tools(),
-                tool_requirement=toolbox.tool_requirement(recursion_level=recursion_level),
+                tool_requirement=toolbox.tool_selection(recursion_level=recursion_level),
                 output="text",
                 stream=False,
                 **extra,

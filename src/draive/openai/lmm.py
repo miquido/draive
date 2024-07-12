@@ -15,11 +15,12 @@ from openai.types.chat import (
 )
 from openai.types.chat.chat_completion_chunk import Choice, ChoiceDeltaToolCall
 
+from draive.lmm import LMMToolSelection, ToolSpecification
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig, OpenAISystemFingerprint
 from draive.openai.errors import OpenAIException
-from draive.parameters import DataModel, ToolSpecification
+from draive.parameters import DataModel
 from draive.scope import ctx
 from draive.types import (
     AudioBase64Content,
@@ -58,7 +59,7 @@ async def openai_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: Literal[True],
     **extra: Any,
@@ -71,7 +72,7 @@ async def openai_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: Literal[False] = False,
     **extra: Any,
@@ -84,7 +85,7 @@ async def openai_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -96,7 +97,7 @@ async def openai_lmm_invocation(  # noqa: PLR0913
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -108,7 +109,7 @@ async def openai_lmm_invocation(  # noqa: PLR0913
                 instruction=instruction,
                 context=context,
                 tools=tools,
-                tool_requirement=tool_requirement,
+                tool_selection=tool_selection,
                 output=output,
                 stream=stream,
                 **extra,
@@ -142,7 +143,7 @@ async def openai_lmm_invocation(  # noqa: PLR0913
                     config=config,
                     messages=messages,
                     tools=tools,
-                    tool_requirement=tool_requirement,
+                    tool_selection=tool_selection,
                 ),
             )
 
@@ -152,7 +153,7 @@ async def openai_lmm_invocation(  # noqa: PLR0913
                 config=config,
                 messages=messages,
                 tools=tools,
-                tool_requirement=tool_requirement,
+                tool_selection=tool_selection,
             )
 
 
@@ -286,19 +287,11 @@ async def _chat_completion(  # noqa: PLR0912, C901
     config: OpenAIChatConfig,
     messages: list[ChatCompletionMessageParam],
     tools: Sequence[ToolSpecification] | None,
-    tool_requirement: ToolSpecification | bool | None,
+    tool_selection: LMMToolSelection,
 ) -> LMMOutput:
     completion: ChatCompletion
-    match tool_requirement:
-        case None:
-            completion = await client.chat_completion(
-                config=config,
-                messages=messages,
-                tools=[],
-                tool_requirement=None,
-            )
-
-        case bool(required):
+    match tool_selection:
+        case "auto":
             completion = await client.chat_completion(
                 config=config,
                 messages=messages,
@@ -306,7 +299,26 @@ async def _chat_completion(  # noqa: PLR0912, C901
                     list[ChatCompletionToolParam],
                     tools,
                 ),
-                tool_requirement=required,
+                tool_choice="auto",
+            )
+
+        case "none":
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=None,
+                tool_choice="none",
+            )
+
+        case "required":
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=cast(
+                    list[ChatCompletionToolParam],
+                    tools,
+                ),
+                tool_choice="required",
             )
 
         case tool:
@@ -317,7 +329,7 @@ async def _chat_completion(  # noqa: PLR0912, C901
                     list[ChatCompletionToolParam],
                     tools,
                 ),
-                tool_requirement={
+                tool_choice={
                     "type": "function",
                     "function": {
                         "name": tool["function"]["name"],
@@ -391,20 +403,11 @@ async def _chat_completion_stream(  # noqa: C901, PLR0912, PLR0915
     config: OpenAIChatConfig,
     messages: list[ChatCompletionMessageParam],
     tools: Sequence[ToolSpecification] | None,
-    tool_requirement: ToolSpecification | bool | None,
+    tool_selection: LMMToolSelection,
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
     completion_stream: OpenAIAsyncStream[ChatCompletionChunk]
-    match tool_requirement:
-        case None:
-            completion_stream = await client.chat_completion(
-                config=config,
-                messages=messages,
-                tools=[],
-                tool_requirement=None,
-                stream=True,
-            )
-
-        case bool() as required:
+    match tool_selection:
+        case "auto":
             completion_stream = await client.chat_completion(
                 config=config,
                 messages=messages,
@@ -412,7 +415,28 @@ async def _chat_completion_stream(  # noqa: C901, PLR0912, PLR0915
                     list[ChatCompletionToolParam],
                     tools,
                 ),
-                tool_requirement=required,
+                tool_choice="auto",
+                stream=True,
+            )
+
+        case "none":
+            completion_stream = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=None,
+                tool_choice="none",
+                stream=True,
+            )
+
+        case "required":
+            completion_stream = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=cast(
+                    list[ChatCompletionToolParam],
+                    tools,
+                ),
+                tool_choice="required",
                 stream=True,
             )
 
@@ -425,7 +449,7 @@ async def _chat_completion_stream(  # noqa: C901, PLR0912, PLR0915
                     list[ChatCompletionToolParam],
                     tools,
                 ),
-                tool_requirement={
+                tool_choice={
                     "type": "function",
                     "function": {
                         "name": tool["function"]["name"],

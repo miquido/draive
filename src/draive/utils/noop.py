@@ -1,12 +1,19 @@
+from typing import Any
+
 __all__ = [
+    "async_noop",
     "noop",
 ]
 
 
-from typing import Any
+def noop(
+    *args: Any,
+    **kwargs: Any,
+) -> None:
+    pass
 
 
-async def noop(
+async def async_noop(
     *args: Any,
     **kwargs: Any,
 ) -> None:

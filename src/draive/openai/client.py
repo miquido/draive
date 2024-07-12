@@ -12,7 +12,6 @@ from openai.types.chat import (
     ChatCompletion,
     ChatCompletionChunk,
     ChatCompletionMessageParam,
-    ChatCompletionNamedToolChoiceParam,
     ChatCompletionToolChoiceOptionParam,
     ChatCompletionToolParam,
 )
@@ -28,7 +27,7 @@ from draive.openai.config import (
 )
 from draive.scope import ScopeDependency
 from draive.types import RateLimitError
-from draive.utils import getenv_str, not_missing
+from draive.utils import freeze, getenv_str, not_missing
 
 __all__ = [
     "OpenAIClient",
@@ -55,7 +54,7 @@ class OpenAIClient(ScopeDependency):
         azure_api_version: str | None = None,
         azure_deployment: str | None = None,
     ) -> None:
-        # if all AZURE settings provided use it as provider
+        # if all AZURE settings were provided use it as provider
         if azure_api_endpoint and azure_deployment and azure_api_version:
             self._client: AsyncOpenAI = AsyncAzureOpenAI(
                 api_key=api_key,
@@ -64,16 +63,14 @@ class OpenAIClient(ScopeDependency):
                 api_version=azure_api_version,
                 organization=organization,
             )
-        # otherwise try using OpenAI default
+        # otherwise try using OpenAI
         else:
             self._client: AsyncOpenAI = AsyncOpenAI(
                 api_key=api_key,
                 organization=organization,
             )
 
-    @property
-    def client(self) -> AsyncOpenAI:
-        return self._client
+        freeze(self)
 
     @overload
     async def chat_completion(
@@ -82,7 +79,7 @@ class OpenAIClient(ScopeDependency):
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
         tools: list[ChatCompletionToolParam] | None = None,
-        tool_requirement: ChatCompletionNamedToolChoiceParam | bool | None = False,
+        tool_choice: ChatCompletionToolChoiceOptionParam | NotGiven = NOT_GIVEN,
         stream: Literal[True],
     ) -> AsyncStream[ChatCompletionChunk]: ...
 
@@ -93,7 +90,7 @@ class OpenAIClient(ScopeDependency):
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
         tools: list[ChatCompletionToolParam] | None = None,
-        tool_requirement: ChatCompletionNamedToolChoiceParam | bool | None = False,
+        tool_choice: ChatCompletionToolChoiceOptionParam | NotGiven = NOT_GIVEN,
     ) -> ChatCompletion: ...
 
     async def chat_completion(  # noqa: PLR0913
@@ -102,25 +99,9 @@ class OpenAIClient(ScopeDependency):
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
         tools: list[ChatCompletionToolParam] | None = None,
-        tool_requirement: ChatCompletionNamedToolChoiceParam | bool | None = False,
+        tool_choice: ChatCompletionToolChoiceOptionParam | NotGiven = NOT_GIVEN,
         stream: bool = False,
     ) -> AsyncStream[ChatCompletionChunk] | ChatCompletion:
-        tool_choice: ChatCompletionToolChoiceOptionParam | NotGiven
-        match tool_requirement:
-            case None:
-                tool_choice = "none"
-
-            case False:
-                tool_choice = "auto" if tools else NOT_GIVEN
-
-            case True:
-                assert tools, "Can't require tools use without tools"  # nosec: B101
-                tool_choice = "required"
-
-            case tool:
-                assert tools, "Can't require tools use without tools"  # nosec: B101
-                tool_choice = tool
-
         try:
             return await self._client.chat.completions.create(
                 messages=messages,
@@ -137,7 +118,7 @@ class OpenAIClient(ScopeDependency):
                 stream=stream,
                 temperature=config.temperature,
                 tools=tools or NOT_GIVEN,
-                tool_choice=tool_choice,
+                tool_choice=tool_choice if tools else NOT_GIVEN,
                 parallel_tool_calls=True if tools else NOT_GIVEN,
                 top_p=config.top_p if not_missing(config.top_p) else NOT_GIVEN,
                 timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,

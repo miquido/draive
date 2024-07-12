@@ -15,8 +15,9 @@ from anthropic.types import (
 from draive.anthropic.client import AnthropicClient
 from draive.anthropic.config import AnthropicConfig
 from draive.anthropic.errors import AnthropicException
+from draive.lmm import LMMToolSelection, ToolSpecification
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
-from draive.parameters import DataModel, ToolSpecification
+from draive.parameters import DataModel
 from draive.scope import ctx
 from draive.types import (
     AudioBase64Content,
@@ -55,7 +56,7 @@ async def anthropic_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: Literal[True],
     **extra: Any,
@@ -68,7 +69,7 @@ async def anthropic_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: Literal[False] = False,
     **extra: Any,
@@ -81,7 +82,7 @@ async def anthropic_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -93,7 +94,7 @@ async def anthropic_lmm_invocation(  # noqa: PLR0913
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -105,7 +106,7 @@ async def anthropic_lmm_invocation(  # noqa: PLR0913
                 instruction=instruction,
                 context=context,
                 tools=tools,
-                tool_requirement=tool_requirement,
+                tool_selection=tool_selection,
                 output=output,
                 stream=stream,
                 **extra,
@@ -129,7 +130,7 @@ async def anthropic_lmm_invocation(  # noqa: PLR0913
                     instruction=Instruction.of(instruction).format(),
                     messages=messages,
                     tools=tools,
-                    tool_requirement=tool_requirement,
+                    tool_selection=tool_selection,
                 ),
             )
 
@@ -140,7 +141,7 @@ async def anthropic_lmm_invocation(  # noqa: PLR0913
                 instruction=Instruction.of(instruction).format(),
                 messages=messages,
                 tools=tools,
-                tool_requirement=tool_requirement,
+                tool_selection=tool_selection,
             )
 
 
@@ -253,18 +254,18 @@ def _convert_context_element(
             }
 
 
-async def _completion(  # noqa: PLR0913, PLR0912
+async def _completion(  # noqa: PLR0913, PLR0912, C901
     *,
     client: AnthropicClient,
     config: AnthropicConfig,
     instruction: str,
     messages: list[MessageParam],
     tools: Sequence[ToolSpecification] | None,
-    tool_requirement: ToolSpecification | bool | None,
+    tool_selection: LMMToolSelection,
 ) -> LMMOutput:
     completion: Message
-    match tool_requirement:
-        case None:
+    match tool_selection:
+        case "auto":
             completion = await client.completion(
                 config=config,
                 instruction=instruction,
@@ -280,10 +281,10 @@ async def _completion(  # noqa: PLR0913, PLR0912
                     )
                     for tool in tools or []
                 ],
-                tool_requirement=None,
+                tool_choice="auto",
             )
 
-        case bool(required):
+        case "none":
             completion = await client.completion(
                 config=config,
                 instruction=instruction,
@@ -299,7 +300,26 @@ async def _completion(  # noqa: PLR0913, PLR0912
                     )
                     for tool in tools or []
                 ],
-                tool_requirement=required,
+                tool_choice="none",
+            )
+
+        case "required":
+            completion = await client.completion(
+                config=config,
+                instruction=instruction,
+                messages=messages,
+                tools=[
+                    ToolParam(
+                        name=tool["function"]["name"],
+                        description=tool["function"]["description"],
+                        input_schema=cast(
+                            dict[str, Any],
+                            tool["function"]["parameters"],
+                        ),
+                    )
+                    for tool in tools or []
+                ],
+                tool_choice="any",
             )
 
         case tool:
@@ -318,7 +338,7 @@ async def _completion(  # noqa: PLR0913, PLR0912
                     )
                     for tool in tools or []
                 ],
-                tool_requirement={
+                tool_choice={
                     "type": "tool",
                     "name": tool["function"]["name"],
                 },
@@ -391,7 +411,7 @@ async def _completion_stream(  # noqa: PLR0913
     instruction: str,
     messages: list[MessageParam],
     tools: Sequence[ToolSpecification] | None,
-    tool_requirement: ToolSpecification | bool | None,
+    tool_selection: LMMToolSelection,
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
     ctx.log_debug("Anthropic streaming api is not supported yet, using regular response...")
     output: LMMOutput = await _completion(
@@ -400,7 +420,7 @@ async def _completion_stream(  # noqa: PLR0913
         instruction=instruction,
         messages=messages,
         tools=tools,
-        tool_requirement=tool_requirement,
+        tool_selection=tool_selection,
     )
 
     match output:

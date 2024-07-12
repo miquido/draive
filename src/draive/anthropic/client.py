@@ -46,7 +46,7 @@ class AnthropicClient(ScopeDependency):
         instruction: str,
         messages: list[MessageParam],
         tools: list[ToolParam] | None = None,
-        tool_requirement: ToolChoiceToolChoiceTool | bool | None = False,
+        tool_choice: ToolChoiceToolChoiceTool | Literal["auto", "any", "none"] = "auto",
         stream: Literal[True],
     ) -> AsyncStream[RawMessageStreamEvent]: ...
 
@@ -58,7 +58,7 @@ class AnthropicClient(ScopeDependency):
         instruction: str,
         messages: list[MessageParam],
         tools: list[ToolParam] | None = None,
-        tool_requirement: ToolChoiceToolChoiceTool | bool | None = False,
+        tool_choice: ToolChoiceToolChoiceTool | Literal["auto", "any", "none"] = "auto",
     ) -> Message: ...
 
     async def completion(  # noqa: PLR0913
@@ -68,24 +68,24 @@ class AnthropicClient(ScopeDependency):
         instruction: str,
         messages: list[MessageParam],
         tools: list[ToolParam] | None = None,
-        tool_requirement: ToolChoiceToolChoiceTool | bool | None = False,
+        tool_choice: ToolChoiceToolChoiceTool | Literal["auto", "any", "none"] = "auto",
         stream: bool = False,
     ) -> AsyncStream[RawMessageStreamEvent] | Message:
-        tool_choice: ToolChoice | NotGiven
-        match tool_requirement:
-            case None:
-                tool_choice = NOT_GIVEN
+        selected_tool_choice: ToolChoice | NotGiven
+        match tool_choice:
+            case "auto":
+                selected_tool_choice = {"type": "auto"} if tools else NOT_GIVEN
 
-            case False:
-                tool_choice = {"type": "auto"} if tools else NOT_GIVEN
+            case "none":
+                selected_tool_choice = NOT_GIVEN
 
-            case True:
+            case "any":
                 assert tools, "Can't require tools use without tools"  # nosec: B101
-                tool_choice = {"type": "any"} if tools else NOT_GIVEN
+                selected_tool_choice = {"type": "any"} if tools else NOT_GIVEN
 
             case tool:
                 assert tools, "Can't require tools use without tools"  # nosec: B101
-                tool_choice = tool
+                selected_tool_choice = tool
 
         try:
             return await self._client.messages.create(
@@ -93,7 +93,7 @@ class AnthropicClient(ScopeDependency):
                 system=instruction,
                 messages=messages,
                 tools=tools or NOT_GIVEN,
-                tool_choice=tool_choice,
+                tool_choice=selected_tool_choice,
                 temperature=config.temperature,
                 max_tokens=config.max_tokens,
                 top_p=config.top_p if not_missing(config.top_p) else NOT_GIVEN,

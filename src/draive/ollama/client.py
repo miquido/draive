@@ -6,10 +6,7 @@ from httpx import AsyncClient, Response
 
 from draive.ollama.config import OllamaChatConfig
 from draive.ollama.errors import OllamaException
-from draive.ollama.models import (
-    ChatCompletionResponse,
-    ChatMessage,
-)
+from draive.ollama.models import ChatCompletionResponse, ChatMessage
 from draive.parameters import DataModel
 from draive.scope import ScopeDependency
 from draive.utils import getenv_str, not_missing
