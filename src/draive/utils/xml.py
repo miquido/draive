@@ -1,12 +1,12 @@
 from collections.abc import Generator
 
 __all__ = [
-    "tag_content",
-    "tags_content",
+    "xml_tag",
+    "xml_tags",
 ]
 
 
-def tags_content(  # noqa: C901, PLR0912
+def xml_tags(  # noqa: C901
     tag: str,
     /,
     source: str,
@@ -33,6 +33,7 @@ def tags_content(  # noqa: C901, PLR0912
             if char == ">":
                 accumulator += char
                 if in_content and accumulator == closing_tag:
+                    in_content = False
                     yield content
                     content = ""  # clear to be ready for next tag
 
@@ -54,27 +55,24 @@ def tags_content(  # noqa: C901, PLR0912
             else:
                 accumulator += char
 
-        elif in_content:
-            if char == "<":
-                in_tag = True
-                accumulator = char
-
-            else:
-                content += char
-
         elif char == "<":
             in_tag = True
             accumulator = char
 
+        elif in_content:
+            content += char
 
-def tag_content(
+        # else skip character
+
+
+def xml_tag(
     tag: str,
     /,
     source: str,
 ) -> str | None:
     try:
         return next(
-            tags_content(
+            xml_tags(
                 tag,
                 source=source,
             )
