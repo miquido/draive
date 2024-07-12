@@ -1,4 +1,4 @@
-from draive import tag_content
+from draive import tag_content, tags_content
 
 
 def test_returns_none_with_empty():
@@ -89,3 +89,17 @@ def test_returns_nested_content_with_other_tags():
     source: str = "<other>Other<more><test>Lorem</more>ipsum</test></other>"
 
     assert tag_content("test", source=source) == "Lorem</more>ipsum"
+
+
+def test_returns_content_with_multiple_tags():
+    source: str = "<test>Lorem ipsum</test><test>Dolor</test><test>Sit amet</test>"
+    contents: list[str] = list(tags_content("test", source=source))
+
+    assert contents == ["Lorem ipsum", "Dolor", "Sit amet"]
+
+
+def test_skips_content_from_different_tags():
+    source: str = "<test>Lorem ipsum</test><other>Other</other><more><test>Dolor</test>"
+    contents: list[str] = list(tags_content("test", source=source))
+
+    assert contents == ["Lorem ipsum", "Dolor"]
