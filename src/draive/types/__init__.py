@@ -23,7 +23,6 @@ from draive.types.multimodal import (
     MultimodalContentElement,
 )
 from draive.types.text import TextContent
-from draive.types.tool_status import ToolCallStatus
 from draive.types.video import VideoBase64Content, VideoContent, VideoDataContent, VideoURLContent
 
 __all__ = [
@@ -55,7 +54,6 @@ __all__ = [
     "MultimodalContentElement",
     "RateLimitError",
     "TextContent",
-    "ToolCallStatus",
     "VideoBase64Content",
     "VideoContent",
     "VideoDataContent",

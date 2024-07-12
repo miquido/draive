@@ -9,11 +9,11 @@ from mistralrs import (  # type: ignore
     ResponseMessage,
 )
 
+from draive.lmm import LMMToolSelection, ToolSpecification
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.mrs.client import MRSClient
 from draive.mrs.config import MRSChatConfig
 from draive.mrs.errors import MRSException
-from draive.parameters import ToolSpecification
 from draive.scope import ctx
 from draive.types import (
     Instruction,
@@ -39,7 +39,7 @@ async def mrs_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: Literal[True],
     **extra: Any,
@@ -52,7 +52,7 @@ async def mrs_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: Literal[False] = False,
     **extra: Any,
@@ -65,7 +65,7 @@ async def mrs_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -77,7 +77,7 @@ async def mrs_lmm_invocation(  # noqa: PLR0913
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -89,7 +89,7 @@ async def mrs_lmm_invocation(  # noqa: PLR0913
                 instruction=instruction,
                 context=context,
                 tools=tools,
-                tool_requirement=tool_requirement,
+                tool_selection=tool_selection,
                 output=output,
                 stream=stream,
                 **extra,

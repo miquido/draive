@@ -4,16 +4,27 @@ from concurrent.futures import Executor
 from functools import partial
 from typing import Any, cast, overload
 
+from draive.utils.missing import MISSING, Missing, not_missing
+
 __all__ = [
-    "run_async",
+    "asynchronous",
 ]
 
 
 @overload
-def run_async[**Args, Result](
+def asynchronous[**Args, Result]() -> (
+    Callable[
+        [Callable[Args, Result]],
+        Callable[Args, Coroutine[None, None, Result]],
+    ]
+): ...
+
+
+@overload
+def asynchronous[**Args, Result](
     *,
     loop: AbstractEventLoop | None = None,
-    executor: Executor | None = None,
+    executor: Executor | None,
 ) -> Callable[
     [Callable[Args, Result]],
     Callable[Args, Coroutine[None, None, Result]],
@@ -21,17 +32,17 @@ def run_async[**Args, Result](
 
 
 @overload
-def run_async[**Args, Result](
+def asynchronous[**Args, Result](
     function: Callable[Args, Result],
     /,
 ) -> Callable[Args, Coroutine[None, None, Result]]: ...
 
 
-def run_async[**Args, Result](
+def asynchronous[**Args, Result](
     function: Callable[Args, Result] | None = None,
     /,
     loop: AbstractEventLoop | None = None,
-    executor: Executor | None = None,
+    executor: Executor | None | Missing = MISSING,
 ) -> (
     Callable[
         [Callable[Args, Result]],
@@ -51,8 +62,11 @@ def run_async[**Args, Result](
     loop: AbstractEventLoop | None
         loop used to call the function
 
-    executor: Executor | None
-        executor used to execute the function
+    executor: Executor | None | Missing
+        executor used to execute the function,
+        Specifying None uses default (current) executor
+        When not provided (Missing) no executor will be used
+        (function will by just wrapped as async)
 
     Returns
     -------
@@ -64,11 +78,26 @@ def run_async[**Args, Result](
         wrapped: Callable[Args, Result],
     ) -> Callable[Args, Coroutine[None, None, Result]]:
         assert not iscoroutinefunction(wrapped), "Cannot wrap async function in executor"  # nosec: B101
-        return _ExecutorWrapper(
-            wrapped,
-            loop=loop,
-            executor=executor,
-        )
+        if not_missing(executor):
+            return _ExecutorWrapper(
+                wrapped,
+                loop=loop,
+                executor=executor,
+            )
+
+        else:
+
+            async def wrapper(
+                *args: Args.args,
+                **kwargs: Args.kwargs,
+            ) -> Result:
+                return wrapped(
+                    *args,
+                    **kwargs,
+                )
+
+            _mimic_async(wrapped, within=wrapper)
+            return wrapper
 
     if function := function:
         return wrap(wrapped=function)

@@ -9,11 +9,7 @@ from draive.conversation.model import (
     ConversationResponseStream,
 )
 from draive.helpers import ConstantMemory
-from draive.lmm import (
-    AnyTool,
-    Toolbox,
-    lmm_invocation,
-)
+from draive.lmm import AnyTool, Toolbox, ToolStatus, lmm_invocation
 from draive.scope import ctx
 from draive.types import (
     Instruction,
@@ -26,7 +22,6 @@ from draive.types import (
     Memory,
     MultimodalContent,
     MultimodalContentConvertible,
-    ToolCallStatus,
 )
 from draive.utils import Missing, not_missing
 
@@ -170,7 +165,7 @@ async def _lmm_conversation_completion(
             instruction=instruction,
             context=context,
             tools=toolbox.available_tools(),
-            tool_requirement=toolbox.tool_requirement(recursion_level=recursion_level),
+            tool_requirement=toolbox.tool_selection(recursion_level=recursion_level),
             output="text",
             stream=False,
             **extra,
@@ -222,7 +217,7 @@ async def _lmm_conversation_completion_stream(
     context: list[LMMContextElement],
     toolbox: Toolbox,
     **extra: Any,
-) -> AsyncGenerator[ConversationMessageChunk | ToolCallStatus, None]:
+) -> AsyncGenerator[ConversationMessageChunk | ToolStatus, None]:
     response_identifier: str = uuid4().hex
     response_content: MultimodalContent = MultimodalContent.of()  # empty
 
@@ -234,7 +229,7 @@ async def _lmm_conversation_completion_stream(
             instruction=instruction,
             context=context,
             tools=toolbox.available_tools(),
-            tool_requirement=toolbox.tool_requirement(recursion_level=recursion_level),
+            tool_requirement=toolbox.tool_selection(recursion_level=recursion_level),
             output="text",
             stream=True,
             **extra,
@@ -262,7 +257,7 @@ async def _lmm_conversation_completion_stream(
                             case LMMToolResponse() as response:
                                 responses.append(response)
 
-                            case ToolCallStatus() as status:
+                            case ToolStatus() as status:
                                 yield status
 
                     assert len(responses) == len(  # nosec: B101

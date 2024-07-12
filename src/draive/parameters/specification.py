@@ -25,8 +25,6 @@ __all__ = [
     "parameter_specification",
     "ParameterSpecification",
     "ParametersSpecification",
-    "ToolFunctionSpecification",
-    "ToolSpecification",
 ]
 
 
@@ -160,19 +158,6 @@ ParameterSpecification = (
 )
 
 ParametersSpecification = ParameterObjectSpecification
-
-
-@final
-class ToolFunctionSpecification(TypedDict, total=False):
-    name: Required[str]
-    description: Required[str]
-    parameters: Required[ParametersSpecification]
-
-
-@final
-class ToolSpecification(TypedDict, total=False):
-    type: Required[Literal["function"]]
-    function: Required[ToolFunctionSpecification]
 
 
 def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911

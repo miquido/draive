@@ -20,7 +20,7 @@ charset-normalizer==3.3.2
     # via requests
 coloredlogs==15.0.1
     # via onnxruntime
-coverage==7.5.4
+coverage==7.6.0
     # via pytest-cov
 distro==1.9.0
     # via
@@ -82,7 +82,7 @@ onnx==1.16.1
     # via fastembed
 onnxruntime==1.18.1
     # via fastembed
-openai==1.35.10
+openai==1.35.13
     # via draive (pyproject.toml)
 packaging==24.1
     # via
@@ -107,7 +107,7 @@ pydantic-core==2.20.1
     # via pydantic
 pygments==2.18.0
     # via rich
-pyright==1.1.370
+pyright==1.1.371
     # via draive (pyproject.toml)
 pystemmer==2.2.0.1
     # via fastembed

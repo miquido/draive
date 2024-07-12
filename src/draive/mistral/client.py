@@ -55,7 +55,7 @@ class MistralClient(ScopeDependency):
         config: MistralChatConfig,
         messages: list[ChatMessage],
         tools: list[dict[str, object]] | None = None,
-        require_tools: bool | None = False,
+        tool_choice: Literal["auto", "any", "none"] = "auto",
         stream: Literal[True],
     ) -> AsyncIterable[ChatCompletionStreamResponse]: ...
 
@@ -66,7 +66,7 @@ class MistralClient(ScopeDependency):
         config: MistralChatConfig,
         messages: list[ChatMessage],
         tools: list[dict[str, object]] | None = None,
-        require_tools: bool | None = False,
+        tool_choice: Literal["auto", "any", "none"] = "auto",
     ) -> ChatCompletionResponse: ...
 
     async def chat_completion(  # noqa: PLR0913
@@ -75,24 +75,13 @@ class MistralClient(ScopeDependency):
         config: MistralChatConfig,
         messages: list[ChatMessage],
         tools: list[dict[str, object]] | None = None,
-        require_tools: bool | None = False,
+        tool_choice: Literal["auto", "any", "none"] = "auto",
         stream: bool = False,
     ) -> AsyncIterable[ChatCompletionStreamResponse] | ChatCompletionResponse:
         if stream:
             raise NotImplementedError("Mistral streaming is not supported yet")
 
         else:
-            tool_choice: str
-            match require_tools:
-                case None:
-                    tool_choice = "none"
-
-                case True:
-                    tool_choice = "any"
-
-                case False:
-                    tool_choice = "auto"
-
             return await self._create_chat_completion(
                 messages=messages,
                 model=config.model,

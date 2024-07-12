@@ -7,7 +7,7 @@ __all__ = [
 
 
 class MRSChatConfig(DataModel):
-    model: str = "Phi-3"
+    model: str
     temperature: float = 0.75
     top_p: float | Missing = MISSING
     top_k: int | Missing = MISSING

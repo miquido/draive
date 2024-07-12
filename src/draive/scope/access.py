@@ -31,8 +31,7 @@ from draive.parameters import ParametrizedData
 from draive.scope.dependencies import ScopeDependencies, ScopeDependency
 from draive.scope.errors import MissingScopeContext
 from draive.scope.state import ScopeState
-from draive.utils import getenv_bool, mimic_function, run_async
-from draive.utils.stream import AsyncStream
+from draive.utils import MISSING, AsyncStream, Missing, asynchronous, getenv_bool, mimic_function
 
 __all__ = [
     "ctx",
@@ -485,7 +484,7 @@ class ctx:
 
         loop: AbstractEventLoop = get_running_loop()
 
-        @run_async(loop=loop, executor=executor)
+        @asynchronous(loop=loop, executor=executor)
         def source_next() -> Element:
             try:
                 return next(source)
@@ -536,8 +535,12 @@ class ctx:
     def state[State_T: ParametrizedData](
         state: type[State_T],
         /,
+        default: State_T | Missing = MISSING,
     ) -> State_T:
-        return ctx._current_state().state(state)
+        return ctx._current_state().state(
+            state,
+            default=default,
+        )
 
     @staticmethod
     def dependency[Dependency_T: ScopeDependency](

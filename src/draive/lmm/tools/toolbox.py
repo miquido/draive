@@ -1,20 +1,19 @@
 from asyncio import FIRST_COMPLETED, Task, gather, wait
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterable, Callable, Coroutine
 from typing import Any, Literal, final
 
-from draive.lmm.errors import ToolError, ToolException
-from draive.lmm.state import ToolStatusStream
-from draive.lmm.tool import AnyTool
-from draive.parameters import ToolSpecification
+from draive.lmm.tools.errors import ToolError, ToolException
+from draive.lmm.tools.specification import ToolSpecification
+from draive.lmm.tools.status import ToolStatus
+from draive.lmm.tools.tool import AnyTool
 from draive.scope import ctx
 from draive.types import (
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
     MultimodalContent,
-    ToolCallStatus,
 )
-from draive.utils import AsyncStream, freeze
+from draive.utils import AsyncStream, async_noop, freeze
 
 __all__ = [
     "Toolbox",
@@ -47,21 +46,22 @@ class Toolbox:
 
         freeze(self)
 
-    def tool_requirement(
+    def tool_selection(
         self,
+        *,
         recursion_level: int = 0,
-    ) -> ToolSpecification | bool | None:
-        if recursion_level != 0:
-            return False  # require tools only for the first call
+    ) -> ToolSpecification | Literal["auto", "required", "none"]:
+        if recursion_level >= self.recursion_limit:
+            return "none"  # require no tools if reached the limit
 
-        elif recursion_level >= self.recursion_limit:
-            return None  # require no tools if reached the limit
+        elif recursion_level != 0:
+            return "auto"  # require tools only for the first call, use auto otherwise
 
-        elif self._suggested_tool is not None:
-            return self._suggested_tool.specification if self._suggested_tool.available else False
+        elif self._suggested_tool is not None and self._suggested_tool.available:
+            return self._suggested_tool.specification  # use suggested tool if able
 
-        else:
-            return self.suggest_tools  # use suggestion mode if no specific tool was required
+        else:  # use suggestion mode if no specific tool was available
+            return "required" if self.suggest_tools else "auto"
 
     def available_tools(self) -> list[ToolSpecification]:
         return [tool.specification for tool in self._tools.values() if tool.available]
@@ -77,10 +77,11 @@ class Toolbox:
             return await tool._toolbox_call(  # pyright: ignore[reportPrivateUsage]
                 call_id,
                 arguments=arguments,
+                report_status=async_noop,
             )
 
         else:
-            raise ToolException("Requested tool is not defined", name)
+            raise ToolException("Requested tool (%s) is not defined", name)
 
     async def respond(
         self,
@@ -89,13 +90,14 @@ class Toolbox:
     ) -> list[LMMToolResponse]:
         return await gather(
             *[self._respond(request) for request in requests.requests],
-            return_exceptions=False,
+            return_exceptions=False,  # toolbox calls handle errors if able
         )
 
     async def _respond(
         self,
         request: LMMToolRequest,
         /,
+        report_status: Callable[[ToolStatus], Coroutine[None, None, None]] | None = None,
     ) -> LMMToolResponse:
         if tool := self._tools.get(request.tool):
             try:
@@ -105,6 +107,7 @@ class Toolbox:
                     content=await tool._toolbox_call(  # pyright: ignore[reportPrivateUsage]
                         request.identifier,
                         arguments=request.arguments or {},
+                        report_status=report_status or async_noop,
                     ),
                     direct=tool.requires_direct_result,
                     error=False,
@@ -139,27 +142,28 @@ class Toolbox:
         self,
         requests: LMMToolRequests,
         /,
-    ) -> AsyncIterator[LMMToolResponse | ToolCallStatus]:
-        stream: AsyncStream[LMMToolResponse | ToolCallStatus] = AsyncStream()
+    ) -> AsyncIterable[LMMToolResponse | ToolStatus]:
+        stream: AsyncStream[LMMToolResponse | ToolStatus] = AsyncStream()
 
         async def tools_stream() -> None:
             try:
-                with ctx.updated(ToolStatusStream(send=stream.send)):
-                    pending_tasks: set[Task[LMMToolResponse]] = {
-                        ctx.spawn_subtask(
-                            self._respond,
-                            request,
-                        )
-                        for request in requests.requests
-                    }
+                pending_tasks: set[Task[LMMToolResponse]] = {
+                    ctx.spawn_subtask(
+                        self._respond,
+                        request,
+                        stream.send,
+                    )
+                    for request in requests.requests
+                }
 
-                    while pending_tasks:
-                        done, pending_tasks = await wait(
-                            pending_tasks,
-                            return_when=FIRST_COMPLETED,
-                        )
-                        for task in done:
-                            await stream.send(task.result())
+                while pending_tasks:
+                    done, pending_tasks = await wait(
+                        pending_tasks,
+                        return_when=FIRST_COMPLETED,
+                    )
+
+                    for task in done:
+                        await stream.send(task.result())
 
             except BaseException as exc:
                 stream.finish(exception=exc)

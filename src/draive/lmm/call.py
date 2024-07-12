@@ -1,9 +1,9 @@
 from collections.abc import Sequence
 from typing import Any, Literal, overload
 
-from draive.lmm.invocation import LMMOutputStream
+from draive.lmm.invocation import LMMOutputStream, LMMToolSelection
 from draive.lmm.state import LMM
-from draive.parameters import ToolSpecification
+from draive.lmm.tools import ToolSpecification
 from draive.scope import ctx
 from draive.types import Instruction, LMMContextElement, LMMOutput
 
@@ -18,7 +18,7 @@ async def lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: Literal[True],
     **extra: Any,
@@ -31,7 +31,7 @@ async def lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: Literal[False] = False,
     **extra: Any,
@@ -44,7 +44,7 @@ async def lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: bool,
     **extra: Any,
@@ -56,7 +56,7 @@ async def lmm_invocation(  # noqa: PLR0913
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -64,7 +64,7 @@ async def lmm_invocation(  # noqa: PLR0913
     return await ctx.state(LMM).invocation(
         instruction=instruction,
         context=context,
-        tool_requirement=tool_requirement,
+        tool_selection=tool_selection,
         tools=tools,
         output=output,
         stream=stream,

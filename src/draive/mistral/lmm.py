@@ -2,12 +2,12 @@ import json
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any, Literal, cast, overload
 
+from draive.lmm import LMMToolSelection, ToolSpecification
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralChatConfig
 from draive.mistral.errors import MistralException
 from draive.mistral.models import ChatCompletionResponse, ChatMessage, ChatMessageResponse
-from draive.parameters import ToolSpecification
 from draive.scope import ctx
 from draive.types import (
     Instruction,
@@ -34,7 +34,7 @@ async def mistral_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: Literal[True],
     **extra: Any,
@@ -47,7 +47,7 @@ async def mistral_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: Literal[False] = False,
     **extra: Any,
@@ -60,7 +60,7 @@ async def mistral_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -72,7 +72,7 @@ async def mistral_lmm_invocation(  # noqa: PLR0913
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -84,7 +84,7 @@ async def mistral_lmm_invocation(  # noqa: PLR0913
                 instruction=instruction,
                 context=context,
                 tools=tools,
-                tool_requirement=tool_requirement,
+                tool_selection=tool_selection,
                 output=output,
                 stream=stream,
                 **extra,
@@ -126,7 +126,7 @@ async def mistral_lmm_invocation(  # noqa: PLR0913
                     config=config,
                     messages=messages,
                     tools=tools,
-                    tool_requirement=tool_requirement,
+                    tool_selection=tool_selection,
                 ),
             )
 
@@ -136,7 +136,7 @@ async def mistral_lmm_invocation(  # noqa: PLR0913
                 config=config,
                 messages=messages,
                 tools=tools,
-                tool_requirement=tool_requirement,
+                tool_selection=tool_selection,
             )
 
 
@@ -187,19 +187,11 @@ async def _chat_completion(
     config: MistralChatConfig,
     messages: list[ChatMessage],
     tools: Sequence[ToolSpecification] | None,
-    tool_requirement: ToolSpecification | bool | None,
+    tool_selection: LMMToolSelection,
 ) -> LMMOutput:
     completion: ChatCompletionResponse
-    match tool_requirement:
-        case None:
-            completion = await client.chat_completion(
-                config=config,
-                messages=messages,
-                tools=[],
-                require_tools=None,
-            )
-
-        case bool(required):
+    match tool_selection:
+        case "auto":
             completion = await client.chat_completion(
                 config=config,
                 messages=messages,
@@ -207,7 +199,25 @@ async def _chat_completion(
                     list[dict[str, object]],
                     tools,
                 ),
-                require_tools=required,
+                tool_choice="auto",
+            )
+        case "none":
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=[],
+                tool_choice="none",
+            )
+
+        case "required":
+            completion = await client.chat_completion(
+                config=config,
+                messages=messages,
+                tools=cast(
+                    list[dict[str, object]],
+                    tools,
+                ),
+                tool_choice="any",
             )
 
         case tool:
@@ -219,7 +229,7 @@ async def _chat_completion(
                     list[dict[str, object]],
                     [tool],  # mistral can't be suggested with concrete tool
                 ),
-                require_tools=True,
+                tool_choice="any",
             )
 
     if usage := completion.usage:
@@ -273,7 +283,7 @@ async def _chat_completion_stream(
     config: MistralChatConfig,
     messages: list[ChatMessage],
     tools: Sequence[ToolSpecification] | None,
-    tool_requirement: ToolSpecification | bool | None,
+    tool_selection: LMMToolSelection,
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
     ctx.log_debug("Mistral streaming api is not supported yet, using regular response...")
     output: LMMOutput = await _chat_completion(
@@ -281,7 +291,7 @@ async def _chat_completion_stream(
         config=config,
         messages=messages,
         tools=tools,
-        tool_requirement=tool_requirement,
+        tool_selection=tool_selection,
     )
 
     match output:

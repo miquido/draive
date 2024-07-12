@@ -3,7 +3,7 @@ from asyncio import gather
 from collections.abc import Sequence
 from http import HTTPStatus
 from itertools import chain
-from typing import Any, Self, final, overload
+from typing import Any, Literal, Self, final, overload
 
 from httpx import AsyncClient, Response
 
@@ -54,7 +54,7 @@ class GeminiClient(ScopeDependency):
         instruction: str,
         messages: list[GeminiRequestMessage],
         tools: list[GeminiFunctionsTool] | None = None,
-        require_tools: bool | None = False,
+        tool_calling_mode: Literal["AUTO", "ANY", "NONE"] = "AUTO",
         response_schema: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> GeminiGenerationResult:
@@ -62,17 +62,6 @@ class GeminiClient(ScopeDependency):
             raise NotImplementedError("Gemini streaming is not supported yet")
 
         else:
-            function_calling_mode: str
-            match require_tools:
-                case None:
-                    function_calling_mode = "NONE"
-
-                case True:
-                    function_calling_mode = "ANY"
-
-                case False:
-                    function_calling_mode = "AUTO"
-
             return await self._generate_content(
                 model=config.model,
                 request={
@@ -94,7 +83,7 @@ class GeminiClient(ScopeDependency):
                     "tools": tools or [],
                     "toolConfig": {
                         "functionCallingConfig": {
-                            "mode": function_calling_mode if tools else "NONE",
+                            "mode": tool_calling_mode if tools else "NONE",
                         },
                     },
                     "safetySettings": [  # google moderation is terrible, disabling it all

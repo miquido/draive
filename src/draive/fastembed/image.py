@@ -9,7 +9,7 @@ from fastembed.image.image_embedding import (  # pyright: ignore[reportMissingTy
 from draive.embedding import Embedded
 from draive.fastembed.config import FastembedImageConfig
 from draive.scope import ctx
-from draive.utils import cache, run_async
+from draive.utils import asynchronous, cache
 
 __all__ = [
     "fastembed_image_embedding",
@@ -42,7 +42,7 @@ def _image_embedding_model(
     )
 
 
-@run_async
+@asynchronous(executor=None)
 def _fastembed_image_embedding(
     config: FastembedImageConfig,
     images: Sequence[bytes],

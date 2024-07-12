@@ -1,5 +1,6 @@
 from base64 import b64encode
 from collections.abc import AsyncGenerator, Sequence
+from copy import copy
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
@@ -19,8 +20,9 @@ from draive.gemini.models import (
     GeminiRequestMessage,
     GeminiTextMessageContent,
 )
+from draive.lmm import LMMToolSelection, ToolSpecification
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
-from draive.parameters import DataModel, ToolSpecification
+from draive.parameters import DataModel
 from draive.scope import ctx
 from draive.types import (
     AudioBase64Content,
@@ -58,7 +60,7 @@ async def gemini_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: Literal[True],
     **extra: Any,
@@ -71,7 +73,7 @@ async def gemini_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: Literal[False] = False,
     **extra: Any,
@@ -84,7 +86,7 @@ async def gemini_lmm_invocation(
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -96,7 +98,7 @@ async def gemini_lmm_invocation(  # noqa: PLR0913
     instruction: Instruction | str,
     context: Sequence[LMMContextElement],
     tools: Sequence[ToolSpecification] | None = None,
-    tool_requirement: ToolSpecification | bool | None = False,
+    tool_selection: LMMToolSelection = "auto",
     output: Literal["text", "json"] = "text",
     stream: bool = False,
     **extra: Any,
@@ -108,7 +110,7 @@ async def gemini_lmm_invocation(  # noqa: PLR0913
                 instruction=instruction,
                 context=context,
                 tools=tools,
-                tool_requirement=tool_requirement,
+                tool_selection=tool_selection,
                 output=output,
                 stream=stream,
                 **extra,
@@ -147,7 +149,7 @@ async def gemini_lmm_invocation(  # noqa: PLR0913
                     instruction=Instruction.of(instruction).format(),
                     messages=messages,
                     tools=tools,
-                    tool_requirement=tool_requirement,
+                    tool_selection=tool_selection,
                 ),
             )
 
@@ -158,7 +160,7 @@ async def gemini_lmm_invocation(  # noqa: PLR0913
                 instruction=Instruction.of(instruction).format(),
                 messages=messages,
                 tools=tools,
-                tool_requirement=tool_requirement,
+                tool_selection=tool_selection,
             )
 
 
@@ -361,59 +363,76 @@ def _convert_content_part(  # noqa: PLR0911
             raise GeminiException("Unsupported result content %s", other)
 
 
-async def _generate(  # noqa: PLR0913, C901, PLR0912
+async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
     *,
     client: GeminiClient,
     config: GeminiConfig,
     instruction: str,
     messages: list[GeminiRequestMessage],
     tools: Sequence[ToolSpecification] | None,
-    tool_requirement: ToolSpecification | bool | None,
+    tool_selection: LMMToolSelection,
 ) -> LMMOutput:
     result: GeminiGenerationResult
-    match tool_requirement:
-        case None:
+    converted_tools: Sequence[GeminiFunctionToolSpecification] = []
+    for tool in tools or []:
+        tool_function: GeminiFunctionToolSpecification = cast(
+            # those models are the same, can safely cast
+            GeminiFunctionToolSpecification,
+            tool["function"],
+        )
+        # AIStudio api requires to delete properties if those are empty...
+        if "parameters" in tool_function and not tool_function["parameters"]["properties"]:
+            tool_function = copy(tool_function)
+            del tool_function["parameters"]
+
+        converted_tools.append(tool_function)
+
+    match tool_selection:
+        case "auto":
+            result = await client.generate(
+                config=config,
+                instruction=instruction,
+                messages=messages,
+                tools=[GeminiFunctionsTool(functionDeclarations=converted_tools)],
+                tool_calling_mode="AUTO",
+            )
+
+        case "none":
             result = await client.generate(
                 config=config,
                 instruction=instruction,
                 messages=messages,
                 tools=[],
-                require_tools=None,
+                tool_calling_mode="NONE",
             )
 
-        case bool(required):
+        case "required":
             result = await client.generate(
                 config=config,
                 instruction=instruction,
                 messages=messages,
-                tools=[
-                    GeminiFunctionsTool(
-                        functionDeclarations=[
-                            # those models are the same, can safely cast
-                            cast(GeminiFunctionToolSpecification, tool["function"])
-                            for tool in tools or []
-                        ]
-                    )
-                ],
-                require_tools=required,
+                tools=[GeminiFunctionsTool(functionDeclarations=converted_tools)],
+                tool_calling_mode="ANY",
             )
 
         case tool:
             assert tool in (tools or []), "Can't suggest a tool without using it"  # nosec: B101
+            tool_function: GeminiFunctionToolSpecification = cast(
+                # those models are the same, can safely cast
+                GeminiFunctionToolSpecification,
+                tool["function"],
+            )
+            # AIStudio api requires to delete properties if those are empty...
+            if "parameters" in tool_function and not tool_function["parameters"]["properties"]:
+                tool_function = copy(tool_function)
+                del tool_function["parameters"]
+
             result = await client.generate(
                 config=config,
                 instruction=instruction,
                 messages=messages,
-                tools=[
-                    GeminiFunctionsTool(
-                        functionDeclarations=[
-                            # those models are the same, can safely cast
-                            cast(GeminiFunctionToolSpecification, tool["function"])
-                            for tool in tools or []
-                        ]
-                    )
-                ],
-                require_tools=True,
+                tools=[GeminiFunctionsTool(functionDeclarations=[tool_function])],
+                tool_calling_mode="ANY",
             )
 
     if usage := result.usage:
@@ -505,7 +524,7 @@ async def _generation_stream(  # noqa: PLR0913
     instruction: str,
     messages: list[GeminiRequestMessage],
     tools: Sequence[ToolSpecification] | None,
-    tool_requirement: ToolSpecification | bool | None,
+    tool_selection: LMMToolSelection,
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
     ctx.log_debug("Gemini streaming api is not supported yet, using regular response...")
     output: LMMOutput = await _generate(
@@ -514,7 +533,7 @@ async def _generation_stream(  # noqa: PLR0913
         instruction=instruction,
         messages=messages,
         tools=tools,
-        tool_requirement=tool_requirement,
+        tool_selection=tool_selection,
     )
 
     match output:

@@ -7,12 +7,15 @@ from typing import (
     runtime_checkable,
 )
 
-from draive.parameters import ToolSpecification
+from draive.lmm.tools import ToolSpecification
 from draive.types import Instruction, LMMContextElement, LMMOutput, LMMOutputStream
 
 __all__ = [
     "LMMInvocation",
+    "LMMToolSelection",
 ]
+
+LMMToolSelection = ToolSpecification | Literal["auto", "required", "none"]
 
 
 @runtime_checkable
@@ -24,7 +27,7 @@ class LMMInvocation(Protocol):
         instruction: Instruction | str,
         context: Sequence[LMMContextElement],
         tools: Sequence[ToolSpecification] | None = None,
-        tool_requirement: ToolSpecification | bool | None = False,
+        tool_selection: LMMToolSelection = "auto",
         output: Literal["text", "json"] = "text",
         stream: Literal[True],
         **extra: Any,
@@ -37,7 +40,7 @@ class LMMInvocation(Protocol):
         instruction: Instruction | str,
         context: Sequence[LMMContextElement],
         tools: Sequence[ToolSpecification] | None = None,
-        tool_requirement: ToolSpecification | bool | None = False,
+        tool_selection: LMMToolSelection = "auto",
         output: Literal["text", "json"] = "text",
         stream: Literal[False] = False,
         **extra: Any,
@@ -50,7 +53,7 @@ class LMMInvocation(Protocol):
         instruction: Instruction | str,
         context: Sequence[LMMContextElement],
         tools: Sequence[ToolSpecification] | None = None,
-        tool_requirement: ToolSpecification | bool | None = False,
+        tool_selection: LMMToolSelection = "auto",
         output: Literal["text", "json"] = "text",
         stream: bool,
         **extra: Any,
@@ -62,7 +65,7 @@ class LMMInvocation(Protocol):
         instruction: Instruction | str,
         context: Sequence[LMMContextElement],
         tools: Sequence[ToolSpecification] | None = None,
-        tool_requirement: ToolSpecification | bool | None = False,
+        tool_selection: LMMToolSelection = "auto",
         output: Literal["text", "json"] = "text",
         stream: bool = False,
         **extra: Any,

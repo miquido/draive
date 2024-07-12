@@ -15,7 +15,7 @@ from mistralrs import (  # type: ignore
 from draive.mrs.config import MRSChatConfig
 from draive.mrs.errors import MRSException
 from draive.scope import ScopeDependency, ctx
-from draive.utils import not_missing, run_async
+from draive.utils import asynchronous, not_missing
 
 __all__ = [
     "MRSClient",
@@ -179,7 +179,7 @@ class MRSClient(ScopeDependency):
                     model_name,
                 )
 
-    @run_async(executor=MRS_EXECUTOR)
+    @asynchronous(executor=MRS_EXECUTOR)
     def _load_runner(
         self,
         model: Which.Plain
@@ -195,7 +195,7 @@ class MRSClient(ScopeDependency):
     ) -> Runner:
         return Runner(which=model)
 
-    @run_async(executor=MRS_EXECUTOR)
+    @asynchronous(executor=MRS_EXECUTOR)
     def _send_chat_completion_request(  # noqa: PLR0913
         self,
         runner: Runner,
