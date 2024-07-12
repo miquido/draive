@@ -101,7 +101,7 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
                 instruction=extended_instruction,
                 context=context,
                 tools=toolbox.available_tools(),
-                tool_requirement=toolbox.tool_selection(recursion_level=recursion_level),
+                tool_selection=toolbox.tool_selection(recursion_level=recursion_level),
                 output="json",
                 stream=False,
                 **extra,
