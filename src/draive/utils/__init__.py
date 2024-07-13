@@ -4,14 +4,15 @@ from draive.utils.env import getenv_bool, getenv_float, getenv_int, getenv_str, 
 from draive.utils.executor_async import asynchronous
 from draive.utils.freeze import freeze
 from draive.utils.logs import setup_logging
+from draive.utils.markdown import markdown_block, markdown_blocks
 from draive.utils.mimic import mimic_function
 from draive.utils.missing import MISSING, Missing, is_missing, not_missing
 from draive.utils.noop import async_noop, noop
 from draive.utils.queue import AsyncQueue
 from draive.utils.split_sequence import split_sequence
 from draive.utils.stream import AsyncStream
-from draive.utils.tags import tag_content, tags_content
 from draive.utils.timeout import with_timeout
+from draive.utils.xml import xml_tag, xml_tags
 
 __all__ = [
     "always",
@@ -28,6 +29,8 @@ __all__ = [
     "getenv_str",
     "is_missing",
     "load_env",
+    "markdown_block",
+    "markdown_blocks",
     "mimic_function",
     "Missing",
     "MISSING",
@@ -35,7 +38,7 @@ __all__ = [
     "not_missing",
     "setup_logging",
     "split_sequence",
-    "tag_content",
-    "tags_content",
     "with_timeout",
+    "xml_tag",
+    "xml_tags",
 ]

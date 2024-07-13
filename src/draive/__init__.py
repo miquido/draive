@@ -161,13 +161,15 @@ from draive.utils import (
     getenv_str,
     is_missing,
     load_env,
+    markdown_block,
+    markdown_blocks,
     noop,
     not_missing,
     setup_logging,
     split_sequence,
-    tag_content,
-    tags_content,
     with_timeout,
+    xml_tag,
+    xml_tags,
 )
 
 __all__ = [
@@ -251,6 +253,8 @@ __all__ = [
     "LMMToolRequest",
     "LMMToolResponse",
     "load_env",
+    "markdown_block",
+    "markdown_blocks",
     "Memory",
     "Metric",
     "metrics_log_reporter",
@@ -289,8 +293,6 @@ __all__ = [
     "split_text",
     "State",
     "Stateless",
-    "tag_content",
-    "tags_content",
     "TextContent",
     "TextEmbedding",
     "TextGeneration",
@@ -320,4 +322,6 @@ __all__ = [
     "VolatileVectorIndex",
     "with_timeout",
     "workflow",
+    "xml_tag",
+    "xml_tags",
 ]
