@@ -1,31 +1,31 @@
 from asyncio import gather
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Sequence
 from typing import Protocol, overload, runtime_checkable
 
-from draive.evaluation.evaluator import CaseEvaluationResult, PreparedCaseEvaluator
+from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.parameters import DataModel, Field
 from draive.types import frozenlist
 from draive.utils import freeze
 
 __all__ = [
     "evaluation_scenario",
-    "ScenarioEvaluationResult",
     "ScenarioEvaluator",
-    "ScenarioDefinition",
+    "ScenarioEvaluatorDefinition",
+    "ScenarioEvaluatorResult",
 ]
 
 
-class ScenarioEvaluationResult(DataModel):
+class ScenarioEvaluatorResult(DataModel):
     name: str = Field(
         description="Name of evaluated scenario",
     )
-    cases: frozenlist[CaseEvaluationResult] = Field(
-        description="List of evaluated scenario cases",
+    evaluations: frozenlist[EvaluatorResult] = Field(
+        description="Scenario evaluation results",
     )
 
     @property
     def passed(self) -> bool:
-        return all(case.passed for case in self.cases)
+        return all(case.passed for case in self.evaluations)
 
 
 @runtime_checkable
@@ -33,11 +33,11 @@ class PreparedScenarioEvaluator[Value](Protocol):
     async def __call__(
         self,
         value: Value,
-    ) -> ScenarioEvaluationResult: ...
+    ) -> ScenarioEvaluatorResult: ...
 
 
 @runtime_checkable
-class ScenarioDefinition[Value, **Args](Protocol):
+class ScenarioEvaluatorDefinition[Value, **Args](Protocol):
     @property
     def __name__(self) -> str: ...
 
@@ -45,17 +45,17 @@ class ScenarioDefinition[Value, **Args](Protocol):
         self,
         *args: Args.args,
         **kwargs: Args.kwargs,
-    ) -> Iterable[PreparedCaseEvaluator[Value]]: ...
+    ) -> Sequence[PreparedEvaluator[Value]] | PreparedEvaluator[Value]: ...
 
 
 class ScenarioEvaluator[Value, **Args]:
     def __init__(
         self,
         name: str,
-        definition: ScenarioDefinition[Value, Args],
+        definition: ScenarioEvaluatorDefinition[Value, Args],
     ) -> None:
         self.name: str = name
-        self._definition: ScenarioDefinition[Value, Args] = definition
+        self._definition: ScenarioEvaluatorDefinition[Value, Args] = definition
 
         freeze(self)
 
@@ -64,16 +64,22 @@ class ScenarioEvaluator[Value, **Args]:
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> PreparedScenarioEvaluator[Value]:
-        prepared_cases: Iterable[PreparedCaseEvaluator[Value]] = self._definition(*args, **kwargs)
+        prepared_evaluators: Sequence[PreparedEvaluator[Value]]
+        match self._definition(*args, **kwargs):
+            case [*evaluators]:
+                prepared_evaluators = evaluators
+
+            case evaluator:
+                prepared_evaluators = (evaluator,)
 
         async def evaluate(
             value: Value,
-        ) -> ScenarioEvaluationResult:
-            return ScenarioEvaluationResult(
+        ) -> ScenarioEvaluatorResult:
+            return ScenarioEvaluatorResult(
                 name=self.name,
-                cases=tuple(
+                evaluations=tuple(
                     await gather(
-                        *[case(value=value) for case in prepared_cases],
+                        *[evaluator(value) for evaluator in prepared_evaluators],
                         return_exceptions=False,
                     ),
                 ),
@@ -87,12 +93,20 @@ class ScenarioEvaluator[Value, **Args]:
         /,
         *args: Args.args,
         **kwargs: Args.kwargs,
-    ) -> ScenarioEvaluationResult:
-        return ScenarioEvaluationResult(
+    ) -> ScenarioEvaluatorResult:
+        prepared_evaluators: Sequence[PreparedEvaluator[Value]]
+        match self._definition(*args, **kwargs):
+            case [*evaluators]:
+                prepared_evaluators = evaluators
+
+            case evaluator:
+                prepared_evaluators = (evaluator,)
+
+        return ScenarioEvaluatorResult(
             name=self.name,
-            cases=tuple(
+            evaluations=tuple(
                 await gather(
-                    *[case(value=value) for case in self._definition(*args, **kwargs)],
+                    *[evaluator(value) for evaluator in prepared_evaluators],
                     return_exceptions=False,
                 ),
             ),
@@ -101,7 +115,7 @@ class ScenarioEvaluator[Value, **Args]:
 
 @overload
 def evaluation_scenario[Value, **Args](
-    definition: ScenarioDefinition[Value, Args],
+    definition: ScenarioEvaluatorDefinition[Value, Args],
     /,
 ) -> ScenarioEvaluator[Value, Args]: ...
 
@@ -111,24 +125,24 @@ def evaluation_scenario[Value, **Args](
     *,
     name: str,
 ) -> Callable[
-    [ScenarioDefinition[Value, Args]],
+    [ScenarioEvaluatorDefinition[Value, Args]],
     ScenarioEvaluator[Value, Args],
 ]: ...
 
 
 def evaluation_scenario[Value, **Args](
-    definition: ScenarioDefinition[Value, Args] | None = None,
+    definition: ScenarioEvaluatorDefinition[Value, Args] | None = None,
     *,
     name: str | None = None,
 ) -> (
     Callable[
-        [ScenarioDefinition[Value, Args]],
+        [ScenarioEvaluatorDefinition[Value, Args]],
         ScenarioEvaluator[Value, Args],
     ]
     | ScenarioEvaluator[Value, Args]
 ):
     def wrap(
-        definition: ScenarioDefinition[Value, Args],
+        definition: ScenarioEvaluatorDefinition[Value, Args],
     ) -> ScenarioEvaluator[Value, Args]:
         return ScenarioEvaluator(
             name=name or definition.__name__,

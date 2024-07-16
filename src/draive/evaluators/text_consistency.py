@@ -44,11 +44,12 @@ and how much irrelevant or redundant information it contains.
 4. Assign a consistency score from 1 to 5 based on the provided criteria.
 """
 
-@evaluator(name="consistency")
+
+@evaluator(name="text_consistency")
 async def text_consistency_evaluator(
-    reference: str,
     compared: str,
     /,
+    reference: str,
 ) -> float:
     model: ConsistencyScore = await generate_model(
         ConsistencyScore,
@@ -56,4 +57,4 @@ async def text_consistency_evaluator(
         input=f"Reference text: {reference}\n\nCompered text: {compared}",
     )
 
-    return model.score/5
+    return model.score / 5

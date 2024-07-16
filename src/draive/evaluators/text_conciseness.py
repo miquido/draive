@@ -41,11 +41,12 @@ and how much irrelevant or redundant information it contains.
 4. Assign a conciseness score from 1 to 5 based on the provided criteria.
 """
 
-@evaluator(name="conciseness")
+
+@evaluator(name="text_conciseness")
 async def text_conciseness_evaluator(
-    reference: str,
     compared: str,
     /,
+    reference: str,
 ) -> float:
     model: ConcisenessScore = await generate_model(
         ConcisenessScore,
@@ -53,4 +54,4 @@ async def text_conciseness_evaluator(
         input=f"Reference text: {reference}\n\nCompered text: {compared}",
     )
 
-    return model.score/5
+    return model.score / 5

@@ -1,7 +1,7 @@
 from draive.utils.always import always, async_always
+from draive.utils.asynchronous import asynchronous
 from draive.utils.cache import cache
 from draive.utils.env import getenv_bool, getenv_float, getenv_int, getenv_str, load_env
-from draive.utils.executor_async import asynchronous
 from draive.utils.freeze import freeze
 from draive.utils.logs import setup_logging
 from draive.utils.markdown import markdown_block, markdown_blocks

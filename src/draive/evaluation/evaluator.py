@@ -6,16 +6,16 @@ from draive.parameters import DataModel, Field, ParameterPath
 from draive.utils import freeze
 
 __all__ = [
-    "CaseEvaluationResult",
-    "CaseEvaluator",
     "evaluator",
-    "PreparedCaseEvaluator",
+    "Evaluator",
+    "EvaluatorResult",
+    "PreparedEvaluator",
 ]
 
 
-class CaseEvaluationResult(DataModel):
-    name: str = Field(
-        description="Name of evaluated case",
+class EvaluatorResult(DataModel):
+    evaluator: str = Field(
+        description="Name of evaluator",
     )
     score: EvaluationScore = Field(
         description="Evaluation score",
@@ -30,15 +30,16 @@ class CaseEvaluationResult(DataModel):
 
 
 @runtime_checkable
-class PreparedCaseEvaluator[Value](Protocol):
+class PreparedEvaluator[Value](Protocol):
     async def __call__(
         self,
         value: Value,
-    ) -> CaseEvaluationResult: ...
+        /,
+    ) -> EvaluatorResult: ...
 
 
 @final
-class CaseEvaluator[Value, **Args]:
+class Evaluator[Value, **Args]:
     def __init__(
         self,
         name: str,
@@ -46,8 +47,9 @@ class CaseEvaluator[Value, **Args]:
         threshold: float | None,
     ) -> None:
         assert (  # nosec: B101
-            threshold is not None and 0 <= threshold <= 1
+            threshold is None or 0 <= threshold <= 1
         ), "Evaluation threshold has to be between 0 and 1"
+
         self._evaluation: Evaluation[Value, Args] = evaluation
         self.name: str = name
         self.threshold: float = threshold or 1
@@ -68,10 +70,10 @@ class CaseEvaluator[Value, **Args]:
         self,
         *args: Args.args,
         **kwargs: Args.kwargs,
-    ) -> PreparedCaseEvaluator[Value]:
+    ) -> PreparedEvaluator[Value]:
         async def evaluate(
             value: Value,
-        ) -> CaseEvaluationResult:
+        ) -> EvaluatorResult:
             return await self(
                 value,
                 *args,
@@ -84,7 +86,7 @@ class CaseEvaluator[Value, **Args]:
         self,
         mapping: Callable[[Mapped], Value] | ParameterPath[Mapped, Value] | Value,
         /,
-    ) -> "CaseEvaluator[Mapped, Args]":
+    ) -> "Evaluator[Mapped, Args]":
         mapper: Callable[[Mapped], Value]
         match mapping:
             case Callable() as function:  # pyright: ignore[reportUnknownVariableType]
@@ -107,7 +109,7 @@ class CaseEvaluator[Value, **Args]:
                 **kwargs,
             )
 
-        return CaseEvaluator[Mapped, Args](
+        return Evaluator[Mapped, Args](
             name=self.name,
             evaluation=evaluation,
             threshold=self.threshold,
@@ -119,7 +121,7 @@ class CaseEvaluator[Value, **Args]:
         /,
         *args: Args.args,
         **kwargs: Args.kwargs,
-    ) -> CaseEvaluationResult:
+    ) -> EvaluatorResult:
         evaluation_score: EvaluationScore
         match await self._evaluation(
             value,
@@ -139,8 +141,8 @@ class CaseEvaluator[Value, **Args]:
             case int() as score_int:
                 evaluation_score = EvaluationScore(value=float(score_int))
 
-        return CaseEvaluationResult(
-            name=self.name,
+        return EvaluatorResult(
+            evaluator=self.name,
             score=evaluation_score,
             threshold=self.threshold,
         )
@@ -150,7 +152,7 @@ class CaseEvaluator[Value, **Args]:
 def evaluator[Value, **Args](
     evaluation: Evaluation[Value, Args] | None = None,
     /,
-) -> CaseEvaluator[Value, Args]: ...
+) -> Evaluator[Value, Args]: ...
 
 
 @overload
@@ -160,7 +162,7 @@ def evaluator[Value, **Args](
     threshold: float | None = None,
 ) -> Callable[
     [Evaluation[Value, Args]],
-    CaseEvaluator[Value, Args],
+    Evaluator[Value, Args],
 ]: ...
 
 
@@ -172,14 +174,14 @@ def evaluator[Value, **Args](
 ) -> (
     Callable[
         [Evaluation[Value, Args]],
-        CaseEvaluator[Value, Args],
+        Evaluator[Value, Args],
     ]
-    | CaseEvaluator[Value, Args]
+    | Evaluator[Value, Args]
 ):
     def wrap(
         evaluation: Evaluation[Value, Args],
-    ) -> CaseEvaluator[Value, Args]:
-        return CaseEvaluator(
+    ) -> Evaluator[Value, Args]:
+        return Evaluator(
             name=name or evaluation.__name__,
             evaluation=evaluation,
             threshold=threshold,

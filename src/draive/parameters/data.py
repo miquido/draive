@@ -762,11 +762,15 @@ def _data_str(  # noqa: PLR0911, PLR0912, C901
         case [*values]:  # replace sequence with list
             string: str = ""
             for value in values:
-                element: str = _data_str(
-                    value,
-                    aliased=aliased,
-                    converter=None,
-                ).replace("\n", "\n  ")
+                element: str = (
+                    _data_str(
+                        value,
+                        aliased=aliased,
+                        converter=None,
+                    )
+                    .replace("\n", "\n  ")
+                    .strip()
+                )
 
                 string += f"\n- {element}"
 
