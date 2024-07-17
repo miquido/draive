@@ -9,7 +9,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import is_dataclass
 from typing import Any
 
-import draive.utils as draive_missing
+import draive.utils as draive_utils
 from draive.parameters.annotations import resolve_annotation
 from draive.parameters.errors import ParameterValidationContext, ParameterValidationError
 
@@ -65,15 +65,15 @@ def _missing_validator(
     context: ParameterValidationContext,
 ) -> Any:
     match value:
-        case missing if isinstance(missing, draive_missing.Missing):
+        case missing if isinstance(missing, draive_utils.Missing):
             return missing
 
         case None:
-            return draive_missing.MISSING
+            return draive_utils.MISSING
 
         case _:
             raise ParameterValidationError.invalid_type(
-                expected=draive_missing.Missing,
+                expected=draive_utils.Missing,
                 received=value,
                 context=context,
             )
@@ -165,6 +165,7 @@ def _bool_validator(
 def _prepare_tuple_validator(
     elements_annotation: tuple[Any, ...],
     /,
+    type_arguments: dict[str, Any],
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
@@ -174,6 +175,7 @@ def _prepare_tuple_validator(
             element_validator: ParameterValidator[Any] = parameter_validator(
                 element,
                 verifier=None,
+                type_arguments=type_arguments,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,
@@ -186,7 +188,7 @@ def _prepare_tuple_validator(
                 match value:
                     case [*values] as value:
                         return tuple[Any, ...](
-                            element_validator(element, (*context, f"[{idx}]"))
+                            element_validator(element, context.appending_path(f"[{idx}]"))
                             for idx, element in enumerate(values)
                         )
 
@@ -207,6 +209,7 @@ def _prepare_tuple_validator(
                 parameter_validator(
                     element,
                     verifier=None,
+                    type_arguments=type_arguments,
                     globalns=globalns,
                     localns=localns,
                     recursion_guard=recursion_guard,
@@ -221,7 +224,7 @@ def _prepare_tuple_validator(
                 match value:
                     case [*values] as value if len(values) == len(element_validators):
                         return tuple[Any, ...](
-                            validator(element, (*context, f"[{idx}]"))
+                            validator(element, context.appending_path(f"[{idx}]"))
                             for (idx, element), validator in zip(
                                 enumerate(values),
                                 element_validators,
@@ -242,6 +245,7 @@ def _prepare_tuple_validator(
 def _prepare_list_validator(
     elements_annotation: tuple[Any, ...],
     /,
+    type_arguments: dict[str, Any],
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
@@ -252,6 +256,7 @@ def _prepare_list_validator(
             element_validator = parameter_validator(
                 element,
                 verifier=None,
+                type_arguments=type_arguments,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,
@@ -267,7 +272,7 @@ def _prepare_list_validator(
         match value:
             case [*values] as value:
                 return list[Any](
-                    element_validator(element, (*context, f"[{idx}]"))
+                    element_validator(element, context.appending_path(f"[{idx}]"))
                     for idx, element in enumerate(values)
                 )
 
@@ -287,6 +292,7 @@ def _prepare_list_validator(
 def _prepare_set_validator(
     elements_annotation: tuple[Any, ...],
     /,
+    type_arguments: dict[str, Any],
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
@@ -297,6 +303,7 @@ def _prepare_set_validator(
             element_validator = parameter_validator(
                 element,
                 verifier=None,
+                type_arguments=type_arguments,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,
@@ -312,7 +319,7 @@ def _prepare_set_validator(
         match value:
             case [*values] as value:
                 return set[Any](
-                    element_validator(element, (*context, f"[{idx}]"))
+                    element_validator(element, context.appending_path(f"[{idx}]"))
                     for idx, element in enumerate(values)
                 )
 
@@ -332,6 +339,7 @@ def _prepare_set_validator(
 def _prepare_union_validator(
     elements_annotation: tuple[Any, ...],
     /,
+    type_arguments: dict[str, Any],
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
@@ -340,6 +348,7 @@ def _prepare_union_validator(
         parameter_validator(
             alternative,
             verifier=None,
+            type_arguments=type_arguments,
             globalns=globalns,
             localns=localns,
             recursion_guard=recursion_guard,
@@ -358,8 +367,8 @@ def _prepare_union_validator(
             except ParameterValidationError:
                 continue
 
-        raise ParameterValidationError.invalid_type(
-            expected=types.UnionType,
+        raise ParameterValidationError.invalid_union_type(
+            expected=elements_annotation,
             received=value,
             context=context,
         )
@@ -647,6 +656,7 @@ def _prepare_dataclass_validator(
 def _prepare_dict_validator(
     items_annotation: tuple[Any, ...],
     /,
+    type_arguments: dict[str, Any],
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
@@ -658,6 +668,7 @@ def _prepare_dict_validator(
             key_validator = parameter_validator(
                 key,
                 verifier=None,
+                type_arguments=type_arguments,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,
@@ -665,6 +676,7 @@ def _prepare_dict_validator(
             value_validator = parameter_validator(
                 value,
                 verifier=None,
+                type_arguments=type_arguments,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,
@@ -680,7 +692,9 @@ def _prepare_dict_validator(
         match value:
             case {**values}:
                 return {
-                    key_validator(key, context): value_validator(value, (*context, f"[{key}]"))
+                    key_validator(key, context): value_validator(
+                        value, context.appending_path(f"[{key}]")
+                    )
                     for key, value in values.items()
                 }
 
@@ -697,6 +711,7 @@ def _prepare_dict_validator(
 def _prepare_typed_dict_validator(
     typed_dict_annotation: type[Any],
     /,
+    type_arguments: dict[str, Any],
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
@@ -706,6 +721,7 @@ def _prepare_typed_dict_validator(
         name: parameter_validator(
             annotation,
             verifier=None,
+            type_arguments=type_arguments,
             globalns=globalns,
             localns=localns,
             recursion_guard=recursion_guard,
@@ -723,7 +739,9 @@ def _prepare_typed_dict_validator(
                 for key, item in values.items():
                     match key:
                         case str() as name if name in field_validators:
-                            result[key] = field_validators[name](item, (*context, f"[{key}]"))
+                            result[key] = field_validators[name](
+                                item, context.appending_path(f"[{key}]")
+                            )
 
                         case other:
                             raise ParameterValidationError.invalid_type(
@@ -777,16 +795,18 @@ def _verified[Value](
     return wrapped
 
 
-def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912
+def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912, PLR0913
     annotation: Any,
     /,
     verifier: Callable[[Value], None] | None,
+    type_arguments: dict[str, Any],
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
 ) -> ParameterValidator[Value]:
     resolved_origin, resolved_args = resolve_annotation(
         annotation,
+        type_arguments=type_arguments,
         globalns=globalns,
         localns=localns,
     )
@@ -815,6 +835,7 @@ def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912
             validator = _prepare_union_validator(
                 resolved_args,
                 globalns=globalns,
+                type_arguments=type_arguments,
                 localns=localns,
                 recursion_guard=recursion_guard,
             )
@@ -823,6 +844,7 @@ def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912
             validator = _prepare_tuple_validator(
                 resolved_args,
                 globalns=globalns,
+                type_arguments=type_arguments,
                 localns=localns,
                 recursion_guard=recursion_guard,
             )
@@ -837,6 +859,7 @@ def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912
             validator = _prepare_typed_dict_validator(
                 typed_dict,
                 globalns=globalns,
+                type_arguments=type_arguments,
                 localns=localns,
                 recursion_guard=recursion_guard,
             )
@@ -844,6 +867,7 @@ def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912
         case builtins.dict | collections_abc.Mapping:  # pyright: ignore[reportUnknownMemberType]
             validator = _prepare_dict_validator(
                 resolved_args,
+                type_arguments=type_arguments,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,
@@ -852,6 +876,7 @@ def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912
         case builtins.set | collections_abc.Set:
             validator = _prepare_set_validator(
                 resolved_args,
+                type_arguments=type_arguments,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,
@@ -860,6 +885,7 @@ def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912
         case builtins.list | collections_abc.Sequence:  # pyright: ignore[reportUnknownMemberType]
             validator = _prepare_list_validator(
                 resolved_args,
+                type_arguments=type_arguments,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,
@@ -894,7 +920,7 @@ def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912
         case collections_abc.Callable:  # pyright: ignore[reportUnknownMemberType, reportUnnecessaryComparison]
             validator = _callable_validator
 
-        case draive_missing.Missing:
+        case draive_utils.Missing:
             validator = _missing_validator
 
         case builtins.type:

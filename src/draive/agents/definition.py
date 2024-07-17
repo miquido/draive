@@ -1,7 +1,7 @@
 from inspect import isfunction
 from typing import Protocol, cast, overload, runtime_checkable
 
-from draive.agents.node import Agent, AgentMessage, AgentNode, AgentOutput
+from draive.agents.node import Agent, AgentError, AgentMessage, AgentNode, AgentOutput
 from draive.helpers import VolatileMemory
 from draive.types import Memory
 
@@ -105,7 +105,7 @@ def agent[AgentState, AgentStateScratch](
 ) -> PartialAgentWrapper[AgentState, AgentStateScratch]: ...
 
 
-def agent[AgentState, AgentStateScratch](
+def agent[AgentState, AgentStateScratch](  # noqa: C901
     node: AgentNode | None = None,
     *,
     name: str | None = None,
@@ -121,7 +121,7 @@ def agent[AgentState, AgentStateScratch](
         description is not None or node is not None
     ), "Either agent node or description has to be provided"
 
-    def wrap(
+    def wrap(  # noqa: C901
         invocation: AgentInvocation[AgentState, AgentStateScratch],
     ) -> AgentNode:
         assert isfunction(invocation), "agent has to be defined from a function"  # nosec: B101
@@ -140,10 +140,18 @@ def agent[AgentState, AgentStateScratch](
                 agent_memory: Memory[AgentState, AgentStateScratch] = memory_initializer()
 
                 async def agent(message: AgentMessage) -> AgentOutput:
-                    return await invocation(
-                        memory=agent_memory,
-                        message=message,
-                    )
+                    try:
+                        return await invocation(
+                            memory=agent_memory,
+                            message=message,
+                        )
+
+                    except Exception as exc:
+                        raise AgentError(
+                            agent=agent_node,
+                            cause=exc,
+                            message=message,
+                        ) from exc
 
                 return agent
 
@@ -157,10 +165,18 @@ def agent[AgentState, AgentStateScratch](
                 )
 
                 async def agent(message: AgentMessage) -> AgentOutput:
-                    return await invocation(
-                        memory=agent_memory,
-                        message=message,
-                    )
+                    try:
+                        return await invocation(
+                            memory=agent_memory,
+                            message=message,
+                        )
+
+                    except Exception as exc:
+                        raise AgentError(
+                            agent=agent_node,
+                            cause=exc,
+                            message=message,
+                        ) from exc
 
                 return agent
 
@@ -169,7 +185,15 @@ def agent[AgentState, AgentStateScratch](
 
             def initialize() -> Agent:
                 async def stateless_agent(message: AgentMessage) -> AgentOutput:
-                    return await invocation(message=message)
+                    try:
+                        return await invocation(message=message)
+
+                    except Exception as exc:
+                        raise AgentError(
+                            agent=agent_node,
+                            cause=exc,
+                            message=message,
+                        ) from exc
 
                 return stateless_agent
 

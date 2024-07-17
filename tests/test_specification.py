@@ -1,4 +1,5 @@
 from collections.abc import Mapping, Sequence
+from typing import TypeVar
 
 from draive import DataModel
 from draive.parameters import ParametersSpecification
@@ -9,6 +10,7 @@ def test_specifications() -> None:
     assert parameter_specification(
         annotation=str,
         description=None,
+        type_arguments={},
         globalns=globals(),
         localns=None,
         recursion_guard=frozenset(),
@@ -18,6 +20,7 @@ def test_specifications() -> None:
     assert parameter_specification(
         annotation=int,
         description=None,
+        type_arguments={},
         globalns=globals(),
         localns=None,
         recursion_guard=frozenset(),
@@ -27,6 +30,7 @@ def test_specifications() -> None:
     assert parameter_specification(
         annotation=float,
         description=None,
+        type_arguments={},
         globalns=globals(),
         localns=None,
         recursion_guard=frozenset(),
@@ -36,6 +40,7 @@ def test_specifications() -> None:
     assert parameter_specification(
         annotation=bool,
         description=None,
+        type_arguments={},
         globalns=globals(),
         localns=None,
         recursion_guard=frozenset(),
@@ -45,6 +50,7 @@ def test_specifications() -> None:
     assert parameter_specification(
         annotation=None,
         description=None,
+        type_arguments={},
         globalns=globals(),
         localns=None,
         recursion_guard=frozenset(),
@@ -54,6 +60,7 @@ def test_specifications() -> None:
     assert parameter_specification(
         annotation=list[str],
         description=None,
+        type_arguments={},
         globalns=globals(),
         localns=None,
         recursion_guard=frozenset(),
@@ -61,6 +68,7 @@ def test_specifications() -> None:
     assert parameter_specification(
         annotation=tuple[str, ...],
         description=None,
+        type_arguments={},
         globalns=globals(),
         localns=None,
         recursion_guard=frozenset(),
@@ -68,6 +76,7 @@ def test_specifications() -> None:
     assert parameter_specification(
         annotation=tuple[str, str],
         description=None,
+        type_arguments={},
         globalns=globals(),
         localns=None,
         recursion_guard=frozenset(),
@@ -75,6 +84,7 @@ def test_specifications() -> None:
     assert parameter_specification(
         annotation=Sequence[str],
         description=None,
+        type_arguments={},
         globalns=globals(),
         localns=None,
         recursion_guard=frozenset(),
@@ -82,6 +92,7 @@ def test_specifications() -> None:
     assert parameter_specification(
         annotation=dict[str, str],
         description=None,
+        type_arguments={},
         globalns=globals(),
         localns=None,
         recursion_guard=frozenset(),
@@ -89,6 +100,7 @@ def test_specifications() -> None:
     assert parameter_specification(
         annotation=Mapping[str, str],
         description=None,
+        type_arguments={},
         globalns=globals(),
         localns=None,
         recursion_guard=frozenset(),
@@ -96,10 +108,31 @@ def test_specifications() -> None:
     assert parameter_specification(
         annotation=str | int,
         description=None,
+        type_arguments={},
         globalns=globals(),
         localns=None,
         recursion_guard=frozenset(),
     ) == {"oneOf": [{"type": "string"}, {"type": "integer"}]}
+    assert parameter_specification(
+        annotation=TypeVar("Parameter", bound=int),
+        description=None,
+        type_arguments={},
+        globalns=globals(),
+        localns=None,
+        recursion_guard=frozenset(),
+    ) == {
+        "type": "integer",
+    }
+    assert parameter_specification(
+        annotation=TypeVar("Parameter"),
+        description=None,
+        type_arguments={"Parameter": int},
+        globalns=globals(),
+        localns=None,
+        recursion_guard=frozenset(),
+    ) == {
+        "type": "integer",
+    }
 
 
 def test_basic_specification() -> None:
@@ -134,3 +167,117 @@ def test_basic_specification() -> None:
         ],
     }
     assert TestModel.__PARAMETERS_SPECIFICATION__ == specification
+
+
+def test_parametrized_specification() -> None:
+    class TestModel[Param](DataModel):
+        param: Param
+
+    assert TestModel.__PARAMETERS_SPECIFICATION__ == {
+        "type": "object",
+        "properties": {
+            "param": {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "additionalProperties": True,
+                    },
+                    {"type": "array"},
+                    {"type": "string"},
+                    {"type": "number"},
+                    {"type": "boolean"},
+                ],
+            },
+        },
+        "required": ["param"],
+    }
+    assert TestModel[str].__PARAMETERS_SPECIFICATION__ == {
+        "type": "object",
+        "properties": {
+            "param": {"type": "string"},
+        },
+        "required": ["param"],
+    }
+    assert TestModel[int].__PARAMETERS_SPECIFICATION__ == {
+        "type": "object",
+        "properties": {
+            "param": {"type": "integer"},
+        },
+        "required": ["param"],
+    }
+    assert TestModel[str] == TestModel[str]
+    assert TestModel[int] == TestModel[int]
+    assert TestModel[str] != TestModel[int]
+
+
+def test_nested_parametrized_specification() -> None:
+    class TestModelNested[Param](DataModel):
+        param: Param
+
+    class TestModelHolder[Param: DataModel](DataModel):
+        param: Param
+
+    class TestModel[Param: DataModel](DataModel):
+        param: TestModelHolder[Param]
+
+    assert TestModel.__PARAMETERS_SPECIFICATION__ == {
+        "type": "object",
+        "properties": {
+            "param": {
+                "type": "object",
+                "properties": {
+                    "param": {
+                        "type": "object",
+                        "additionalProperties": True,
+                    },
+                },
+                "required": ["param"],
+            },
+        },
+        "required": ["param"],
+    }
+    assert TestModel[TestModelNested[str]].__PARAMETERS_SPECIFICATION__ == {
+        "type": "object",
+        "properties": {
+            "param": {
+                "type": "object",
+                "properties": {
+                    "param": {
+                        "type": "object",
+                        "properties": {
+                            "param": {
+                                "type": "string",
+                            },
+                        },
+                        "required": ["param"],
+                    }
+                },
+                "required": ["param"],
+            }
+        },
+        "required": ["param"],
+    }
+    assert TestModel[TestModelNested[int]].__PARAMETERS_SPECIFICATION__ == {
+        "type": "object",
+        "properties": {
+            "param": {
+                "type": "object",
+                "properties": {
+                    "param": {
+                        "type": "object",
+                        "properties": {
+                            "param": {
+                                "type": "integer",
+                            },
+                        },
+                        "required": ["param"],
+                    }
+                },
+                "required": ["param"],
+            }
+        },
+        "required": ["param"],
+    }
+    assert TestModel[TestModelNested[str]] == TestModel[TestModelNested[str]]
+    assert TestModel[TestModelNested[int]] == TestModel[TestModelNested[int]]
+    assert TestModel[TestModelNested[str]] != TestModel[TestModelNested[int]]

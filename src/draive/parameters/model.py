@@ -1,11 +1,12 @@
 import json
 from dataclasses import asdict
 from datetime import datetime
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 from uuid import UUID
 
 from draive.parameters.data import ParametrizedData
 from draive.parameters.schema import json_schema, simplified_schema
+from draive.parameters.specification import ParametersSpecification
 from draive.utils import Missing, cache, not_missing
 
 __all__ = [
@@ -26,20 +27,25 @@ class ModelJSONEncoder(json.JSONEncoder):
 
 
 class DataModel(ParametrizedData):
+    __PARAMETERS_SPECIFICATION__: ClassVar[ParametersSpecification] = {
+        "type": "object",
+        "additionalProperties": True,
+    }
+
     @classmethod
     @cache(limit=2)
     def json_schema(
         cls,
         indent: int | None = None,
     ) -> str:
-        if not_missing(cls.__PARAMETERS_SPECIFICATION__):
-            return json_schema(
-                cls.__PARAMETERS_SPECIFICATION__,
-                indent=indent,
-            )
+        assert not_missing(  # nosec: B101
+            cls.__PARAMETERS_SPECIFICATION__
+        ), f"{cls.__qualname__} can't be represented using json schema"
 
-        else:
-            raise TypeError(f"{cls.__qualname__} can't be represented using json schema")
+        return json_schema(
+            cls.__PARAMETERS_SPECIFICATION__,
+            indent=indent,
+        )
 
     @classmethod
     @cache(limit=2)
@@ -47,14 +53,14 @@ class DataModel(ParametrizedData):
         cls,
         indent: int | None = None,
     ) -> str:
-        if not_missing(cls.__PARAMETERS_SPECIFICATION__):
-            return simplified_schema(
-                cls.__PARAMETERS_SPECIFICATION__,
-                indent=indent,
-            )
+        assert not_missing(  # nosec: B101
+            cls.__PARAMETERS_SPECIFICATION__
+        ), f"{cls.__qualname__} can't be represented using simplified schema"
 
-        else:
-            raise TypeError(f"{cls.__qualname__} can't be represented using simplified schema")
+        return simplified_schema(
+            cls.__PARAMETERS_SPECIFICATION__,
+            indent=indent,
+        )
 
     @classmethod
     def from_json(

@@ -46,7 +46,7 @@ class OpenAIClient(ScopeDependency):
             azure_deployment=getenv_str("AZURE_OPENAI_DEPLOYMENT_NAME"),
         )
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         api_key: str | None,
         organization: str | None = None,
@@ -93,7 +93,7 @@ class OpenAIClient(ScopeDependency):
         tool_choice: ChatCompletionToolChoiceOptionParam | NotGiven = NOT_GIVEN,
     ) -> ChatCompletion: ...
 
-    async def chat_completion(  # noqa: PLR0913
+    async def chat_completion(
         self,
         *,
         config: OpenAIChatConfig,
@@ -160,7 +160,7 @@ class OpenAIClient(ScopeDependency):
             )
         )
 
-    async def _create_text_embedding(  # noqa: PLR0913
+    async def _create_text_embedding(
         self,
         texts: Sequence[str],
         model: str,

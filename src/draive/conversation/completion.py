@@ -59,7 +59,7 @@ class ConversationCompletion(Protocol):
         **extra: Any,
     ) -> ConversationResponseStream | ConversationMessage: ...
 
-    async def __call__(  # noqa: PLR0913
+    async def __call__(
         self,
         *,
         instruction: Instruction | str,

@@ -69,7 +69,7 @@ class MistralClient(ScopeDependency):
         tool_choice: Literal["auto", "any", "none"] = "auto",
     ) -> ChatCompletionResponse: ...
 
-    async def chat_completion(  # noqa: PLR0913
+    async def chat_completion(
         self,
         *,
         config: MistralChatConfig,

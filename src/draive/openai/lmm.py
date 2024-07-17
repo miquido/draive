@@ -1,5 +1,4 @@
 import json
-from base64 import b64encode
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
@@ -24,10 +23,8 @@ from draive.parameters import DataModel
 from draive.scope import ctx
 from draive.types import (
     AudioBase64Content,
-    AudioDataContent,
     AudioURLContent,
     ImageBase64Content,
-    ImageDataContent,
     ImageURLContent,
     Instruction,
     LMMCompletion,
@@ -43,7 +40,6 @@ from draive.types import (
     MultimodalContentElement,
     TextContent,
     VideoBase64Content,
-    VideoDataContent,
     VideoURLContent,
 )
 from draive.utils import not_missing
@@ -157,7 +153,7 @@ async def openai_lmm_invocation(  # noqa: PLR0913
             )
 
 
-def _convert_content_element(  # noqa: C901
+def _convert_content_element(
     element: MultimodalContentElement,
     config: OpenAIChatConfig,
 ) -> ChatCompletionContentPartParam:
@@ -190,18 +186,6 @@ def _convert_content_element(  # noqa: C901
                 },
             }
 
-        case ImageDataContent() as image:
-            encoded_image: str = b64encode(image.image_data).decode("utf-8")
-            return {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:{image.mime_type or 'image/jpeg'};base64,{encoded_image}",
-                    "detail": cast(Literal["auto", "low", "high"], config.vision_details)
-                    if not_missing(config.vision_details)
-                    else "auto",
-                },
-            }
-
         case AudioURLContent():
             # TODO: OpenAI models with audio?
             raise ValueError("Unsupported message content", element)
@@ -210,19 +194,11 @@ def _convert_content_element(  # noqa: C901
             # TODO: we could upload media using openAI endpoint to have url instead
             raise ValueError("Unsupported message content", element)
 
-        case AudioDataContent():
-            # TODO: we could upload media using openAI endpoint to have url instead
-            raise ValueError("Unsupported message content", element)
-
         case VideoURLContent():
             # TODO: OpenAI models with video?
             raise ValueError("Unsupported message content", element)
 
         case VideoBase64Content():
-            # TODO: we could upload media using openAI endpoint to have url instead
-            raise ValueError("Unsupported message content", element)
-
-        case VideoDataContent():
             # TODO: we could upload media using openAI endpoint to have url instead
             raise ValueError("Unsupported message content", element)
 

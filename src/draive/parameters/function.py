@@ -137,6 +137,7 @@ class ParametrizedFunction[**Args, Result]:
         self._parameters: dict[str, FunctionParameter] = {
             parameter.name: FunctionParameter.of(
                 parameter,
+                type_arguments={},  # TODO: verify if we should get type parameters
                 globalns=globalns,  # pyright: ignore[reportUnknownArgumentType]
                 localns=None,
             )
@@ -149,8 +150,10 @@ class ParametrizedFunction[**Args, Result]:
         self,
         **arguments: Any,
     ) -> dict[str, Any]:
-        # TODO: add support for positional arguments
-        context: ParameterValidationContext = (self.__qualname__,)
+        # TODO: add support for positional and parametrized arguments
+        context: ParameterValidationContext = ParameterValidationContext(
+            path=(self.__class__.__qualname__,),
+        )
         validated: dict[str, Any] = {}
         for parameter in self._parameters.values():
             validated[parameter.name] = parameter.validated(
@@ -220,22 +223,25 @@ class FunctionParameter:
     ) -> Any:
         if is_missing(value):
             if self.has_default:
-                return self.validator(self.default_value(), (*context, f"@{self.name}"))
+                return self.validator(self.default_value(), context.appending_path(f"@{self.name}"))
 
             elif self.allows_missing:
                 return MISSING
 
             else:
-                raise ParameterValidationError.missing(context=(*context, f"@{self.name}"))
+                raise ParameterValidationError.missing(
+                    context=context.appending_path(f"@{self.name}")
+                )
 
         else:
-            return self.validator(value, (*context, f"@{self.name}"))
+            return self.validator(value, context.appending_path(f"@{self.name}"))
 
     @classmethod
     def of(
         cls,
         parameter: Parameter,
         /,
+        type_arguments: dict[str, Any],
         globalns: dict[str, Any],
         localns: dict[str, Any] | None,
     ) -> Self:
@@ -256,6 +262,7 @@ class FunctionParameter:
                     default_factory=argument.default_factory,
                     allows_missing=allows_missing(
                         parameter.annotation,
+                        type_arguments=type_arguments,
                         globalns=globalns,
                         localns=localns,
                     ),
@@ -264,6 +271,7 @@ class FunctionParameter:
                     else parameter_validator(
                         parameter.annotation,
                         verifier=argument.verifier,
+                        type_arguments=type_arguments,
                         globalns=globalns,
                         localns=localns,
                         recursion_guard=frozenset(),
@@ -273,6 +281,7 @@ class FunctionParameter:
                     else parameter_specification(
                         parameter.annotation,
                         description=argument.description,
+                        type_arguments=type_arguments,
                         globalns=globalns,
                         localns=localns,
                         recursion_guard=frozenset(),
@@ -289,12 +298,14 @@ class FunctionParameter:
                     default_factory=MISSING,
                     allows_missing=allows_missing(
                         parameter.annotation,
+                        type_arguments=type_arguments,
                         globalns=globalns,
                         localns=localns,
                     ),
                     validator=parameter_validator(
                         parameter.annotation,
                         verifier=None,
+                        type_arguments=type_arguments,
                         globalns=globalns,
                         localns=localns,
                         recursion_guard=frozenset(),
@@ -302,6 +313,7 @@ class FunctionParameter:
                     specification=parameter_specification(
                         parameter.annotation,
                         description=None,
+                        type_arguments=type_arguments,
                         globalns=globalns,
                         localns=localns,
                         recursion_guard=frozenset(),

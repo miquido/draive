@@ -1,4 +1,3 @@
-from base64 import b64encode
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any, Literal, cast, overload
 
@@ -21,10 +20,8 @@ from draive.parameters import DataModel
 from draive.scope import ctx
 from draive.types import (
     AudioBase64Content,
-    AudioDataContent,
     AudioURLContent,
     ImageBase64Content,
-    ImageDataContent,
     ImageURLContent,
     Instruction,
     LMMCompletion,
@@ -41,7 +38,6 @@ from draive.types import (
     MultimodalContentElement,
     TextContent,
     VideoBase64Content,
-    VideoDataContent,
     VideoURLContent,
 )
 
@@ -145,7 +141,7 @@ async def anthropic_lmm_invocation(  # noqa: PLR0913
             )
 
 
-def _convert_content_element(  # noqa: C901
+def _convert_content_element(
     element: MultimodalContentElement,
 ) -> TextBlockParam | ImageBlockParam:
     match element:
@@ -169,32 +165,16 @@ def _convert_content_element(  # noqa: C901
                 },
             }
 
-        case ImageDataContent() as image:
-            return {
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": image.mime_type or "image/png",
-                    "data": b64encode(image.image_data).decode("utf-8"),
-                },
-            }
-
         case AudioURLContent():
             raise ValueError("Unsupported message content", element)
 
         case AudioBase64Content():
             raise ValueError("Unsupported message content", element)
 
-        case AudioDataContent():
-            raise ValueError("Unsupported message content", element)
-
         case VideoURLContent():
             raise ValueError("Unsupported message content", element)
 
         case VideoBase64Content():
-            raise ValueError("Unsupported message content", element)
-
-        case VideoDataContent():
             raise ValueError("Unsupported message content", element)
 
         case DataModel() as data:

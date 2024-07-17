@@ -1,4 +1,3 @@
-from base64 import b64encode
 from collections.abc import AsyncGenerator, Sequence
 from copy import copy
 from typing import Any, Literal, cast, overload
@@ -26,10 +25,8 @@ from draive.parameters import DataModel
 from draive.scope import ctx
 from draive.types import (
     AudioBase64Content,
-    AudioDataContent,
     AudioURLContent,
     ImageBase64Content,
-    ImageDataContent,
     ImageURLContent,
     Instruction,
     LMMCompletion,
@@ -45,7 +42,6 @@ from draive.types import (
     MultimodalContentElement,
     TextContent,
     VideoBase64Content,
-    VideoDataContent,
     VideoURLContent,
 )
 
@@ -164,7 +160,7 @@ async def gemini_lmm_invocation(  # noqa: PLR0913
             )
 
 
-def _convert_content_element(  # noqa: C901, PLR0911
+def _convert_content_element(  # noqa: PLR0911
     element: MultimodalContentElement,
 ) -> dict[str, Any]:
     match element:
@@ -187,14 +183,6 @@ def _convert_content_element(  # noqa: C901, PLR0911
                 }
             }
 
-        case ImageDataContent() as image:
-            return {
-                "inlineData": {
-                    "mimeType": image.mime_type or "image",
-                    "data": b64encode(image.image_data).decode("utf-8"),
-                }
-            }
-
         case AudioURLContent() as audio:
             return {
                 "fileData": {
@@ -211,14 +199,6 @@ def _convert_content_element(  # noqa: C901, PLR0911
                 }
             }
 
-        case AudioDataContent() as audio:
-            return {
-                "inlineData": {
-                    "mimeType": audio.mime_type or "audio",
-                    "data": b64encode(audio.audio_data).decode("utf-8"),
-                }
-            }
-
         case VideoURLContent() as video:
             return {
                 "fileData": {
@@ -232,14 +212,6 @@ def _convert_content_element(  # noqa: C901, PLR0911
                 "inlineData": {
                     "mimeType": video.mime_type or "video",
                     "data": video.video_base64,
-                }
-            }
-
-        case VideoDataContent() as video:
-            return {
-                "inlineData": {
-                    "mimeType": video.mime_type or "video",
-                    "data": b64encode(video.video_data).decode("utf-8"),
                 }
             }
 

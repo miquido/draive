@@ -9,7 +9,7 @@ from draive.agents.idle import IdleMonitor
 from draive.agents.node import Agent, AgentOutput
 from draive.agents.runner import AgentRunner
 from draive.helpers import VolatileMemory
-from draive.parameters import DataModel, ParametrizedData
+from draive.parameters import DataModel, ParametrizedData, State
 from draive.scope import ctx
 from draive.types import (
     BasicMemory,
@@ -232,7 +232,7 @@ class WorkflowRunnerResultOutput[WorkflowResult: ParametrizedData | str](Protoco
     ) -> None: ...
 
 
-class WorkflowHistory(DataModel):
+class WorkflowHistory(State):
     history: frozenlist[AgentMessage]
 
 

@@ -54,7 +54,7 @@ class Architecture(Enum):
 class VisionArchitecture(Enum):
     Phi3V = "phi3v"
 
-class Which(Enum):
+class Which:
     @dataclass
     class Plain:
         model_id: str
