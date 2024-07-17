@@ -3,8 +3,8 @@ from typing import Protocol, runtime_checkable
 from draive.parameters import DataModel, Field
 
 __all__ = [
-    "EvaluationScore",
     "Evaluation",
+    "EvaluationScore",
 ]
 
 

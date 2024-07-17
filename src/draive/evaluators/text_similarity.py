@@ -9,9 +9,11 @@ __all__ = [
     "text_vector_similarity_evaluator",
 ]
 
+
 class SimilarityScore(DataModel):
     score: float
     comment: str | None = None
+
 
 INSTRUCTION: str = """\
 You will be given two texts: a reference text and a compared text. \
@@ -36,11 +38,12 @@ Evaluation Steps:
 3. Assign a similarity score from 1 to 3 based on the provided criteria.
 """
 
-@evaluator(name="similarity")
+
+@evaluator(name="text_similarity")
 async def text_similarity_evaluator(
-    reference: str,
     compared: str,
     /,
+    reference: str,
 ) -> float:
     model: SimilarityScore = await generate_model(
         SimilarityScore,
@@ -48,13 +51,14 @@ async def text_similarity_evaluator(
         input=f"Reference text: {reference}\n\nCompered text: {compared}",
     )
 
-    return model.score/3
+    return model.score / 3
 
-@evaluator(name="text vector similarity")
+
+@evaluator(name="text_vector_similarity")
 async def text_vector_similarity_evaluator(
-    reference: str,
     compared: str,
     /,
+    reference: str,
 ) -> float:
     embedding: list[Embedded[str]] = await embed_texts([reference, compared])
 

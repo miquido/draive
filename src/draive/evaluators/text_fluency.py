@@ -33,7 +33,8 @@ Evaluation Steps:
 2. Assign a fluency score from 1 to 3 based on the provided criteria.
 """
 
-@evaluator(name="fluency")
+
+@evaluator(name="text_fluency")
 async def text_fluency_evaluator(
     text: str,
     /,
@@ -44,4 +45,4 @@ async def text_fluency_evaluator(
         input=text,
     )
 
-    return model.score/3
+    return model.score / 3

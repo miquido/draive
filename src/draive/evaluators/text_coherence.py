@@ -41,16 +41,25 @@ and if it presents them in a clear and logical order.
 3. Assign a coherence score from 1 to 5 based on the provided criteria.
 """
 
-@evaluator(name="coherence")
+INPUT: str = """\
+Reference text:
+{reference}
+
+Compered text:
+{compared}
+"""
+
+
+@evaluator(name="text_coherence")
 async def text_coherence_evaluator(
-    reference: str,
     compared: str,
     /,
+    reference: str,
 ) -> float:
     model: CoherenceScore = await generate_model(
         CoherenceScore,
         instruction=INSTRUCTION,
-        input=f"Reference text: {reference}\n\nCompered text: {compared}",
+        input=INPUT.format(reference=reference, compared=compared),
     )
 
-    return model.score/5
+    return model.score / 5

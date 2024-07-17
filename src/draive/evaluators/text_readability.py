@@ -41,7 +41,8 @@ Evaluation Steps:
 4. Assign a readability score from 1 to 5 based on the provided criteria.
 """
 
-@evaluator(name="readability")
+
+@evaluator(name="text_readability")
 async def text_readability_evaluator(
     text: str,
     /,
@@ -52,4 +53,4 @@ async def text_readability_evaluator(
         input=text,
     )
 
-    return model.score/5
+    return model.score / 5

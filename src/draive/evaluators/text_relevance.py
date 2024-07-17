@@ -44,11 +44,12 @@ and note any irrelevant or redundant information it contains.
 4. Assign a relevance score from 1 to 5 based on the provided criteria.
 """
 
-@evaluator(name="relevance")
+
+@evaluator(name="text_relevance")
 async def text_relevance_evaluator(
-    reference: str,
     compared: str,
     /,
+    reference: str,
 ) -> float:
     model: RelevanceScore = await generate_model(
         RelevanceScore,
@@ -56,4 +57,4 @@ async def text_relevance_evaluator(
         input=f"Reference text: {reference}\n\nCompered text: {compared}",
     )
 
-    return model.score/5
+    return model.score / 5

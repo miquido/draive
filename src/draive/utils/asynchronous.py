@@ -1,6 +1,7 @@
 from asyncio import AbstractEventLoop, get_running_loop, iscoroutinefunction
 from collections.abc import Callable, Coroutine
 from concurrent.futures import Executor
+from contextvars import Context, copy_context
 from functools import partial
 from typing import Any, cast, overload
 
@@ -126,8 +127,10 @@ class _ExecutorWrapper[**Args, Result]:
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Result:
+        context: Context = copy_context()
         return await (self._loop or get_running_loop()).run_in_executor(
             self._executor,
+            context.run,
             partial(self._function, *args, **kwargs),
         )
 
