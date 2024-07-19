@@ -55,7 +55,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
 class EvaluationSuiteDefinition[CaseParameters: DataModel, Value: DataModel | str](Protocol):
     async def __call__(
         self,
-        parameters: CaseParameters,
+        evaluation_case: CaseParameters,
     ) -> EvaluationCaseResult[Value]: ...
 
 
@@ -148,7 +148,7 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
         evaluated_case: EvaluationSuiteCase[CaseParameters],
     ) -> EvaluationSuiteCaseResult[CaseParameters, Value]:
         case_result: EvaluationCaseResult[Value] = await self._definition(
-            parameters=evaluated_case.parameters
+            evaluation_case=evaluated_case.parameters
         )
 
         return EvaluationSuiteCaseResult[CaseParameters, Value](

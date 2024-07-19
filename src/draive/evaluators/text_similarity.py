@@ -1,18 +1,13 @@
 from draive.embedding import Embedded, embed_texts
-from draive.evaluation import evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.score import CommonScoreModel
 from draive.generation import generate_model
-from draive.parameters import DataModel
 from draive.similarity.score import vector_similarity_score
 
 __all__ = [
     "text_similarity_evaluator",
     "text_vector_similarity_evaluator",
 ]
-
-
-class SimilarityScore(DataModel):
-    score: float
-    comment: str | None = None
 
 
 INSTRUCTION: str = """\
@@ -23,19 +18,33 @@ Please make sure you read and understand these instructions very carefully.
 Keep this document open while reviewing, and refer to it as needed.
 
 Evaluation Criteria:
-Similarity (1-3) - the degree of semantic similarity between the reference text \
+Similarity (0.0-2.0) - the degree of semantic similarity between the reference text \
 and the compared text.
 
 Rating Scale:
-1: No similarity - the reference text and compared text are completely unrelated in meaning.
-2: Moderate similarity - the reference text and compared text share some common themes or ideas.
-3: High similarity - the reference text and compared text are very close in meaning \
+0.0: No similarity - the reference text and compared text are completely unrelated in meaning.
+1.0: Moderate similarity - the reference text and compared text share some common themes or ideas.
+2.0: High similarity - the reference text and compared text are very close in meaning \
 or convey the same information.
 
 Evaluation Steps:
 1. Read both the reference text and the compared text carefully.
 2. Compare the semantic meaning of the reference text and the compared text.
-3. Assign a similarity score from 1 to 3 based on the provided criteria.
+3. Assign a similarity score from 0.0 to 2.0 based on the provided criteria.
+
+Important: The score must be a decimal number from 0.0 to 2.0. 2.0 is the maximum, \
+do not exceed this value.
+"""
+
+
+INPUT_TEMPLATE: str = """
+<REFERENCE_TEXT>
+{reference}
+</REFERENCE_TEXT>
+
+<COMPARED_TEXT>
+{compared}
+</COMPARED_TEXT>
 """
 
 
@@ -44,14 +53,68 @@ async def text_similarity_evaluator(
     compared: str,
     /,
     reference: str,
-) -> float:
-    model: SimilarityScore = await generate_model(
-        SimilarityScore,
+) -> EvaluationScore:
+    if not compared:
+        return EvaluationScore(
+            value=0,
+            comment="Input text was empty!",
+        )
+
+    if not reference:
+        return EvaluationScore(
+            value=0,
+            comment="Reference text was empty!",
+        )
+
+    score: CommonScoreModel = await generate_model(
+        CommonScoreModel,
         instruction=INSTRUCTION,
-        input=f"Reference text: {reference}\n\nCompered text: {compared}",
+        input=INPUT_TEMPLATE.format(
+            reference=reference,
+            compared=compared,
+        ),
+        examples=[
+            (
+                INPUT_TEMPLATE.format(
+                    reference=(
+                        "Cats are popular pets. They are independent and like to groom themselves."
+                    ),
+                    compared=(
+                        "Bananas are a healthy fruit. They are rich in potassium and easy to peel."
+                    ),
+                ),
+                CommonScoreModel(score=0.0),
+            ),
+            (
+                INPUT_TEMPLATE.format(
+                    reference=(
+                        "The beach is a great place for relaxation. "
+                        "People enjoy swimming and sunbathing."
+                    ),
+                    compared=(
+                        "Many people like to spend time outdoors. "
+                        "Parks are popular for picnics and walking."
+                    ),
+                ),
+                CommonScoreModel(score=1.0),
+            ),
+            (
+                INPUT_TEMPLATE.format(
+                    reference=(
+                        "Coffee is a popular morning drink. It contains caffeine which helps "
+                        "people feel more alert."
+                    ),
+                    compared=(
+                        "Many people start their day with coffee. "
+                        "The caffeine in coffee can increase alertness and energy."
+                    ),
+                ),
+                CommonScoreModel(score=2.0),
+            ),
+        ],
     )
 
-    return model.score / 3
+    return score.normalized(divider=2)
 
 
 @evaluator(name="text_vector_similarity")

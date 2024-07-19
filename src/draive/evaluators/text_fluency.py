@@ -1,15 +1,10 @@
-from draive.evaluation import evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.score import CommonScoreModel
 from draive.generation import generate_model
-from draive.parameters import DataModel
 
 __all__ = [
     "text_fluency_evaluator",
 ]
-
-
-class FluencyScore(DataModel):
-    score: float
-    comment: str | None = None
 
 
 INSTRUCTION: str = """\
@@ -19,18 +14,28 @@ Please make sure you read and understand these instructions very carefully.
 Keep this document open while reviewing, and refer to it as needed.
 
 Evaluation Criteria:
-Fluency (1-3) - the quality of the text in terms of grammar, spelling, punctuation, word choice, \
-and sentence structure.
+Fluency (0.0-2.0) - the quality of the text in terms of grammar, spelling, punctuation, \
+word choice, and sentence structure.
 
 Rating Scale:
-1: Poor - the text has many errors that make it hard to understand or sound unnatural.
-2: Fair - the text has some errors that affect the clarity or smoothness of the text, \
+0.0: Poor - the text has many errors that make it hard to understand or sound unnatural.
+1.0: Fair - the text has some errors that affect the clarity or smoothness of the text, \
 but the main points are still comprehensible.
-3: Good - the text has few or no errors and is easy to read and follow.
+2.0: Good - the text has few or no errors and is easy to read and follow.
 
 Evaluation Steps:
 1. Read the text and evaluate its fluency based on the given criteria.
-2. Assign a fluency score from 1 to 3 based on the provided criteria.
+2. Assign a fluency score from 0.0 to 2.0 based on the provided criteria.
+
+Important: The score must be a decimal number from 0.0 to 2.0. 2.0 is the maximum, \
+do not exceed this value.
+"""
+
+
+INPUT_TEMPLATE: str = """
+<TEXT>
+{text}
+</TEXT>
 """
 
 
@@ -38,11 +43,47 @@ Evaluation Steps:
 async def text_fluency_evaluator(
     text: str,
     /,
-) -> float:
-    model: FluencyScore = await generate_model(
-        FluencyScore,
+) -> EvaluationScore:
+    if not text:
+        return EvaluationScore(
+            value=0,
+            comment="Input text was empty!",
+        )
+
+    score: CommonScoreModel = await generate_model(
+        CommonScoreModel,
         instruction=INSTRUCTION,
-        input=text,
+        input=INPUT_TEMPLATE.format(text=text),
+        examples=[
+            (
+                INPUT_TEMPLATE.format(
+                    text=(
+                        "The cat sitted on mat. It were very comfrotable. "
+                        "The sun shine bright in sky."
+                    ),
+                ),
+                CommonScoreModel(score=0.0),
+            ),
+            (
+                INPUT_TEMPLATE.format(
+                    text=(
+                        "The movie was good, but I didn't liked the ending. "
+                        "It left me feeling confuse and unsatisfied."
+                    ),
+                ),
+                CommonScoreModel(score=1.0),
+            ),
+            (
+                INPUT_TEMPLATE.format(
+                    text=(
+                        "The concert last night was amazing. "
+                        "The band played all their hit songs, and the crowd was energetic "
+                        "throughout the performance."
+                    ),
+                ),
+                CommonScoreModel(score=2.0),
+            ),
+        ],
     )
 
-    return model.score / 3
+    return score.normalized(divider=2)
