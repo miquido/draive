@@ -15,6 +15,7 @@ from draive.evaluation.score import Evaluation, EvaluationScore
 from draive.evaluation.suite import (
     EvaluationCaseResult,
     EvaluationSuite,
+    EvaluationSuiteCase,
     EvaluationSuiteCaseResult,
     EvaluationSuiteDefinition,
     EvaluationSuiteStorage,
@@ -28,6 +29,7 @@ __all__ = [
     "EvaluationCaseResult",
     "EvaluationScore",
     "EvaluationSuite",
+    "EvaluationSuiteCase",
     "EvaluationSuiteCaseResult",
     "EvaluationSuiteDefinition",
     "EvaluationSuiteStorage",

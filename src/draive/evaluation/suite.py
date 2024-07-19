@@ -137,7 +137,7 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
 
                 case case_parameters:
                     return await self._evaluate(
-                        evaluated_case=EvaluationSuiteCase(
+                        evaluated_case=EvaluationSuiteCase[CaseParameters](
                             parameters=case_parameters,
                         )
                     )
@@ -186,7 +186,7 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
             self._data_cache = data.updated(
                 cases=(
                     *data.cases,
-                    EvaluationSuiteCase(
+                    EvaluationSuiteCase[CaseParameters](
                         parameters=parameters,
                         comment=comment,
                     ),
@@ -207,44 +207,32 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
             await self._storage.save(self._data_cache)
 
 
-@overload
 def evaluation_suite[CaseParameters: DataModel, Value: DataModel | str](
-    definition: EvaluationSuiteDefinition[CaseParameters, Value],
+    case: type[CaseParameters],
     /,
-) -> EvaluationSuite[CaseParameters, Value]: ...
-
-
-@overload
-def evaluation_suite[CaseParameters: DataModel, Value: DataModel | str](
-    *,
-    storage: EvaluationSuiteStorage[CaseParameters] | Path | str,
+    storage: EvaluationSuiteStorage[CaseParameters] | Path | str | None = None,
 ) -> Callable[
     [EvaluationSuiteDefinition[CaseParameters, Value]],
     EvaluationSuite[CaseParameters, Value],
-]: ...
-
-
-def evaluation_suite[CaseParameters: DataModel, Value: DataModel | str](
-    definition: EvaluationSuiteDefinition[CaseParameters, Value] | None = None,
-    *,
-    storage: EvaluationSuiteStorage[CaseParameters] | Path | str | None = None,
-) -> (
-    Callable[
-        [EvaluationSuiteDefinition[CaseParameters, Value]],
-        EvaluationSuite[CaseParameters, Value],
-    ]
-    | EvaluationSuite[CaseParameters, Value]
-):
+]:
     suite_storage: EvaluationSuiteStorage[CaseParameters]
     match storage:
         case None:
-            suite_storage = _EvaluationSuiteMemoryStorage()
+            suite_storage = _EvaluationSuiteMemoryStorage[CaseParameters](
+                data_type=EvaluationSuiteData[case],
+            )
 
         case str() as path_str:
-            suite_storage = _EvaluationSuiteFileStorage(path=path_str)
+            suite_storage = _EvaluationSuiteFileStorage[CaseParameters](
+                path=path_str,
+                data_type=EvaluationSuiteData[case],
+            )
 
         case Path() as path:
-            suite_storage = _EvaluationSuiteFileStorage(path=path)
+            suite_storage = _EvaluationSuiteFileStorage[CaseParameters](
+                path=path,
+                data_type=EvaluationSuiteData[case],
+            )
 
         case storage:
             suite_storage = storage
@@ -252,26 +240,26 @@ def evaluation_suite[CaseParameters: DataModel, Value: DataModel | str](
     def wrap(
         definition: EvaluationSuiteDefinition[CaseParameters, Value],
     ) -> EvaluationSuite[CaseParameters, Value]:
-        return EvaluationSuite(
+        return EvaluationSuite[CaseParameters, Value](
             definition=definition,
             storage=suite_storage,
         )
 
-    if definition:
-        return wrap(definition)
-
-    else:
-        return wrap
+    return wrap
 
 
 class _EvaluationSuiteMemoryStorage[CaseParameters: DataModel]:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        data_type: type[EvaluationSuiteData[CaseParameters]],
+    ) -> None:
         self.store: frozenlist[EvaluationSuiteCase[CaseParameters]] = ()
+        self._data_type: type[EvaluationSuiteData[CaseParameters]] = data_type
 
     async def load(
         self,
     ) -> EvaluationSuiteData[CaseParameters]:
-        return EvaluationSuiteData(cases=self.store)
+        return self._data_type(cases=self.store)
 
     async def save(
         self,
@@ -284,6 +272,7 @@ class _EvaluationSuiteFileStorage[CaseParameters: DataModel]:
     def __init__(
         self,
         path: Path | str,
+        data_type: type[EvaluationSuiteData[CaseParameters]],
     ) -> None:
         self._path: Path
         match path:
@@ -293,28 +282,32 @@ class _EvaluationSuiteFileStorage[CaseParameters: DataModel]:
             case path:
                 self._path = path
 
+        self._data_type: type[EvaluationSuiteData[CaseParameters]] = data_type
+
     async def load(
         self,
     ) -> EvaluationSuiteData[CaseParameters]:
         try:
-            return await self._file_load()
+            return await self._file_load(data_type=self._data_type)
 
         except ValueError as exc:
             ctx.log_error(
                 f"Invalid EvaluationSuite at {self._path}",
                 exception=exc,
             )
-            return EvaluationSuiteData[CaseParameters]()
+            return self._data_type()
 
     @asynchronous(executor=None)
     def _file_load(
         self,
+        data_type: type[EvaluationSuiteData[CaseParameters]],
     ) -> EvaluationSuiteData[CaseParameters]:
         if self._path.exists():
             with open(self._path, mode="rb") as file:
-                return EvaluationSuiteData[CaseParameters].from_json(file.read())
+                return data_type.from_json(file.read())
+
         else:
-            return EvaluationSuiteData[CaseParameters]()
+            return data_type()
 
     async def save(
         self,

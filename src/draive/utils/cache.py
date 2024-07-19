@@ -113,11 +113,11 @@ class _SyncCache[**Args, Result]:
 
     def __get__(
         self,
-        instance: object,
+        instance: object | None,
         owner: type | None = None,
         /,
     ) -> Callable[Args, Result]:
-        if owner is None:
+        if owner is None or instance is None:
             return self
 
         else:

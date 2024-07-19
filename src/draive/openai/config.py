@@ -16,7 +16,7 @@ class ResponseFormat(TypedDict):
 
 
 class OpenAIChatConfig(DataModel):
-    model: str = "gpt-3.5-turbo"
+    model: str = "gpt-4o-mini"
     temperature: float = 0.75
     top_p: float | Missing = MISSING
     frequency_penalty: float | Missing = MISSING

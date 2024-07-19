@@ -3,6 +3,7 @@ from typing import Any, Literal, Self, cast, final
 
 from draive.parameters.errors import ParameterValidationError
 from draive.parameters.path import ParameterPath
+from draive.parameters.validation import ParameterValidationContext
 from draive.utils import freeze
 
 __all__ = [
@@ -27,7 +28,9 @@ class ParameterRequirement[Root]:
             checked: Any = cast(ParameterPath[Root, Parameter], path)(root)
             if checked != value:
                 raise ParameterValidationError.invalid(
-                    context=cast(ParameterPath[Root, Parameter], path).components(),
+                    context=ParameterValidationContext(
+                        path=cast(ParameterPath[Root, Parameter], path).components(),
+                    ),
                     exception=ValueError(f"{checked} is not equal {value}"),
                 )
 
@@ -53,7 +56,9 @@ class ParameterRequirement[Root]:
             checked: Any = cast(ParameterPath[Root, Parameter], path)(root)
             if checked == value:
                 raise ParameterValidationError.invalid(
-                    context=cast(ParameterPath[Root, Parameter], path).components(),
+                    context=ParameterValidationContext(
+                        path=cast(ParameterPath[Root, Parameter], path).components(),
+                    ),
                     exception=ValueError(f"{checked} is equal {value}"),
                 )
 
@@ -79,7 +84,9 @@ class ParameterRequirement[Root]:
             checked: Any = cast(ParameterPath[Root, Parameter], path)(root)
             if value not in checked:
                 raise ParameterValidationError.invalid(
-                    context=cast(ParameterPath[Root, Parameter], path).components(),
+                    context=ParameterValidationContext(
+                        path=cast(ParameterPath[Root, Parameter], path).components(),
+                    ),
                     exception=ValueError(f"{checked} does not contain {value}"),
                 )
 
@@ -105,7 +112,9 @@ class ParameterRequirement[Root]:
             checked: Any = cast(ParameterPath[Root, Parameter], path)(root)
             if checked not in value:
                 raise ParameterValidationError.invalid(
-                    context=cast(ParameterPath[Root, Parameter], path).components(),
+                    context=ParameterValidationContext(
+                        path=cast(ParameterPath[Root, Parameter], path).components(),
+                    ),
                     exception=ValueError(f"{value} does not contain {checked}"),
                 )
 

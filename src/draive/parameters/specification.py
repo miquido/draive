@@ -18,6 +18,7 @@ from typing import (
     final,
 )
 
+from draive import utils as draive_utils
 from draive.parameters.annotations import resolve_annotation
 from draive.utils import MISSING, Missing, not_missing
 
@@ -132,6 +133,13 @@ class ParameterObjectSpecification(TypedDict, total=False):
     required: NotRequired[list[str]]
 
 
+@final
+class ParameterAnyObjectSpecification(TypedDict, total=False):
+    type: Required[Literal["object"]]
+    additionalProperties: Required[Literal[True]]
+    description: NotRequired[str]
+
+
 ReferenceParameterSpecification = TypedDict(
     "ReferenceParameterSpecification",
     {
@@ -154,24 +162,28 @@ ParameterSpecification = (
     | ParameterTupleSpecification
     | ParameterDictSpecification
     | ParameterObjectSpecification
+    | ParameterAnyObjectSpecification
     | ReferenceParameterSpecification
 )
 
-ParametersSpecification = ParameterObjectSpecification
+ParametersSpecification = ParameterObjectSpecification | ParameterAnyObjectSpecification
 
 
-def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
+def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911, PLR0913
     annotation: Any,
     description: str | None,
+    type_arguments: dict[str, Any],
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
 ) -> ParameterSpecification | Missing:
     resolved_origin, resolved_args = resolve_annotation(
         annotation,
+        type_arguments=type_arguments,
         globalns=globalns,
         localns=localns,
     )
+
     if resolved_origin in recursion_guard:
         # TODO: FIXME: recursive specification is not properly supported
         reference: ReferenceParameterSpecification = {"$ref": resolved_origin.__qualname__}
@@ -201,7 +213,7 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
                 "type": "boolean",
             }
 
-        case types.NoneType:
+        case types.NoneType | draive_utils.Missing:
             specification = {
                 "type": "null",
             }
@@ -213,6 +225,7 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
                     parameter_specification(
                         annotation=arg,
                         description=None,
+                        type_arguments=type_arguments,
                         globalns=globalns,
                         localns=localns,
                         recursion_guard=recursion_guard,
@@ -236,6 +249,7 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
                         parameter_specification(
                             annotation=tuple_type_annotation,
                             description=None,
+                            type_arguments=type_arguments,
                             globalns=globalns,
                             localns=localns,
                             recursion_guard=recursion_guard,
@@ -260,6 +274,7 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
                             parameter_specification(
                                 annotation=arg,
                                 description=None,
+                                type_arguments=type_arguments,
                                 globalns=globalns,
                                 localns=localns,
                                 recursion_guard=recursion_guard,
@@ -279,7 +294,7 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
                         "prefixItems": elements,
                     }
 
-        case parametrized if hasattr(parametrized, "__PARAMETERS__"):
+        case parametrized if hasattr(parametrized, "__PARAMETERS_SPECIFICATION__"):
             nested_specification: ParameterSpecification | Missing = (
                 parametrized.__PARAMETERS_SPECIFICATION__
             )
@@ -306,6 +321,7 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
             dataclass_specification: ParameterSpecification | Missing = _annotations_specification(
                 annotations,
                 required=required,
+                type_arguments=type_arguments,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=frozenset({*recursion_guard, data_class}),
@@ -323,6 +339,7 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
             dict_specification: ParameterSpecification | Missing = _annotations_specification(
                 typed_dict.__annotations__,
                 required=typed_dict.__required_keys__,
+                type_arguments=type_arguments,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=frozenset({*recursion_guard, typed_dict}),
@@ -336,13 +353,14 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
                 # then the whole thing can't be represented in specification
                 return MISSING
 
-        case builtins.dict | collections_abc.Mapping:  # pyright: ignore[reportUnknownMemberType]
+        case builtins.list | collections_abc.Sequence:  # pyright: ignore[reportUnknownMemberType]
             match resolved_args:
-                case (builtins.str, element_annotation):
+                case [list_type_annotation]:
                     element_specification: ParameterSpecification | Missing = (
                         parameter_specification(
-                            annotation=element_annotation,
+                            annotation=list_type_annotation,
                             description=None,
+                            type_arguments=type_arguments,
                             globalns=globalns,
                             localns=localns,
                             recursion_guard=recursion_guard,
@@ -351,8 +369,8 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
 
                     if not_missing(element_specification):
                         specification = {
-                            "type": "object",
-                            "additionalProperties": element_specification,
+                            "type": "array",
+                            "items": element_specification,
                         }
 
                     else:
@@ -360,8 +378,8 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
                         # then the whole thing can't be represented in specification
                         return MISSING
 
-                case _:  # pyright: ignore[reportUnnecessaryComparison]
-                    raise TypeError("Unsupported dict type annotation", annotation)
+                case _:
+                    raise TypeError("Unsupported list type annotation: %s", annotation)
 
         case builtins.set | collections_abc.Set:
             match resolved_args:
@@ -370,6 +388,7 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
                         parameter_specification(
                             annotation=list_type_annotation,
                             description=None,
+                            type_arguments=type_arguments,
                             globalns=globalns,
                             localns=localns,
                             recursion_guard=recursion_guard,
@@ -390,13 +409,14 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
                 case _:
                     raise TypeError("Unsupported set type annotation: %s", annotation)
 
-        case builtins.list | collections_abc.Sequence:  # pyright: ignore[reportUnknownMemberType]
+        case builtins.dict | collections_abc.Mapping:  # pyright: ignore[reportUnknownMemberType]
             match resolved_args:
-                case [list_type_annotation]:
+                case (builtins.str, element_annotation):
                     element_specification: ParameterSpecification | Missing = (
                         parameter_specification(
-                            annotation=list_type_annotation,
+                            annotation=element_annotation,
                             description=None,
+                            type_arguments=type_arguments,
                             globalns=globalns,
                             localns=localns,
                             recursion_guard=recursion_guard,
@@ -405,8 +425,8 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
 
                     if not_missing(element_specification):
                         specification = {
-                            "type": "array",
-                            "items": element_specification,
+                            "type": "object",
+                            "additionalProperties": element_specification,
                         }
 
                     else:
@@ -414,8 +434,8 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
                         # then the whole thing can't be represented in specification
                         return MISSING
 
-                case _:
-                    raise TypeError("Unsupported list type annotation: %s", annotation)
+                case _:  # pyright: ignore[reportUnnecessaryComparison]
+                    raise TypeError("Unsupported dict type annotation", annotation)
 
         case typing.Literal:
             if all(isinstance(option, str) for option in resolved_args):
@@ -467,9 +487,19 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
                 "format": "uuid",
             }
 
-        case other:
+        case typing.Any:
+            specification = {
+                "oneOf": [
+                    {"type": "object", "additionalProperties": True},
+                    {"type": "array"},
+                    {"type": "string"},
+                    {"type": "number"},
+                    {"type": "boolean"},
+                ]
+            }
+
+        case _:
             return MISSING
-            raise TypeError("Unsupported type annotation", other)
 
     if description := description:
         specification["description"] = description
@@ -477,10 +507,11 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911
     return specification
 
 
-def _annotations_specification(
+def _annotations_specification(  # noqa: PLR0913
     annotations: dict[str, Any],
     /,
     required: Sequence[str],
+    type_arguments: dict[str, Any],
     globalns: dict[str, Any] | None,
     localns: dict[str, Any] | None,
     recursion_guard: frozenset[type[Any]],
@@ -491,6 +522,7 @@ def _annotations_specification(
             specification: ParameterSpecification | Missing = parameter_specification(
                 annotation=annotation,
                 description=None,
+                type_arguments=type_arguments,
                 globalns=globalns,
                 localns=localns,
                 recursion_guard=recursion_guard,

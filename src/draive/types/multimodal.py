@@ -3,11 +3,11 @@ from itertools import chain
 from typing import Self, final, overload
 
 from draive.parameters.model import DataModel
-from draive.types.audio import AudioBase64Content, AudioContent, AudioDataContent, AudioURLContent
+from draive.types.audio import AudioBase64Content, AudioContent, AudioURLContent
 from draive.types.frozenlist import frozenlist
-from draive.types.image import ImageBase64Content, ImageContent, ImageDataContent, ImageURLContent
+from draive.types.image import ImageBase64Content, ImageContent, ImageURLContent
 from draive.types.text import TextContent
-from draive.types.video import VideoBase64Content, VideoContent, VideoDataContent, VideoURLContent
+from draive.types.video import VideoBase64Content, VideoContent, VideoURLContent
 
 __all__ = [
     "MultimodalContent",
@@ -189,7 +189,7 @@ def _is_media(
             return True
 
 
-def _is_artifact(  # noqa: C901, PLR0911
+def _is_artifact(  # noqa: PLR0911
     element: MultimodalContentElement,
 ) -> bool:
     match element:
@@ -202,16 +202,10 @@ def _is_artifact(  # noqa: C901, PLR0911
         case ImageBase64Content():
             return False
 
-        case ImageDataContent():
-            return False
-
         case AudioURLContent():
             return False
 
         case AudioBase64Content():
-            return False
-
-        case AudioDataContent():
             return False
 
         case VideoURLContent():
@@ -220,14 +214,11 @@ def _is_artifact(  # noqa: C901, PLR0911
         case VideoBase64Content():
             return False
 
-        case VideoDataContent():
-            return False
-
         case _:
             return True
 
 
-def _as_string(  # noqa: PLR0911, C901
+def _as_string(  # noqa: PLR0911
     element: MultimodalContentElement,
 ) -> str:
     match element:
@@ -241,10 +232,6 @@ def _as_string(  # noqa: PLR0911, C901
             # we might want to use base64 content directly, but it would make a lot of tokens...
             return f"![{image_base64.image_description or 'IMAGE'}]()"
 
-        case ImageDataContent() as image_data:
-            # we might want to convert to base64 content, but it would make a lot of tokens...
-            return f"![{image_data.image_description or 'IMAGE'}]()"
-
         case AudioURLContent() as audio_url:
             return f"![{audio_url.audio_transcription or 'AUDIO'}]({audio_url.audio_url})"
 
@@ -252,20 +239,12 @@ def _as_string(  # noqa: PLR0911, C901
             # we might want to use base64 content directly, but it would make a lot of tokens...
             return f"![{audio_base64.audio_transcription or 'AUDIO'}]()"
 
-        case AudioDataContent() as audio_data:
-            # we might want to convert to base64 content, but it would make a lot of tokens...
-            return f"![{audio_data.audio_transcription or 'AUDIO'}]()"
-
         case VideoURLContent() as video_url:
             return f"![{video_url.video_transcription or 'VIDEO'}]({video_url.video_url})"
 
         case VideoBase64Content() as video_base64:
             # we might want to use base64 content directly, but it would make a lot of tokens...
             return f"![{video_base64.video_transcription or 'VIDEO'}]()"
-
-        case VideoDataContent() as video_data:
-            # we might want to convert to base64 content, but it would make a lot of tokens...
-            return f"![{video_data.video_transcription or 'VIDEO'}]()"
 
         case DataModel() as model:
             return str(model)

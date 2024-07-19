@@ -44,7 +44,7 @@ _DependenciesScope_Var = ContextVar[ScopeDependencies]("_DependenciesScope_Var")
 
 
 class _RootContext:
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         task_group: TaskGroup,
         dependencies: ScopeDependencies,

@@ -3,7 +3,6 @@ from draive.parameters.model import DataModel
 __all__ = [
     "VideoBase64Content",
     "VideoContent",
-    "VideoDataContent",
     "VideoURLContent",
 ]
 
@@ -20,10 +19,4 @@ class VideoBase64Content(DataModel):
     video_transcription: str | None = None
 
 
-class VideoDataContent(DataModel):
-    mime_type: str | None = None
-    video_data: bytes
-    video_transcription: str | None = None
-
-
-VideoContent = VideoURLContent | VideoBase64Content | VideoDataContent
+VideoContent = VideoURLContent | VideoBase64Content

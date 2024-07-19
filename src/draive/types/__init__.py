@@ -1,7 +1,7 @@
-from draive.types.audio import AudioBase64Content, AudioContent, AudioDataContent, AudioURLContent
+from draive.types.audio import AudioBase64Content, AudioContent, AudioURLContent
 from draive.types.errors import RateLimitError
 from draive.types.frozenlist import frozenlist
-from draive.types.image import ImageBase64Content, ImageContent, ImageDataContent, ImageURLContent
+from draive.types.image import ImageBase64Content, ImageContent, ImageURLContent
 from draive.types.instruction import Instruction
 from draive.types.json import JSON
 from draive.types.lmm import (
@@ -23,18 +23,16 @@ from draive.types.multimodal import (
     MultimodalContentElement,
 )
 from draive.types.text import TextContent
-from draive.types.video import VideoBase64Content, VideoContent, VideoDataContent, VideoURLContent
+from draive.types.video import VideoBase64Content, VideoContent, VideoURLContent
 
 __all__ = [
     "AudioBase64Content",
     "AudioContent",
-    "AudioDataContent",
     "AudioURLContent",
     "BasicMemory",
     "frozenlist",
     "ImageBase64Content",
     "ImageContent",
-    "ImageDataContent",
     "ImageURLContent",
     "Instruction",
     "JSON",
@@ -56,6 +54,5 @@ __all__ = [
     "TextContent",
     "VideoBase64Content",
     "VideoContent",
-    "VideoDataContent",
     "VideoURLContent",
 ]

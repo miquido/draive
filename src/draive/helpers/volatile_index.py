@@ -48,7 +48,7 @@ class VolatileVectorIndex(State):
         else:
             self.storage[model] = embedded_models
 
-    async def search[Model: DataModel](  # noqa: PLR0913
+    async def search[Model: DataModel](
         self,
         model: type[Model],
         /,

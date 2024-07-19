@@ -5,7 +5,6 @@ from draive.parameters.model import DataModel
 __all__ = [
     "ImageBase64Content",
     "ImageContent",
-    "ImageDataContent",
     "ImageURLContent",
 ]
 
@@ -22,10 +21,4 @@ class ImageBase64Content(DataModel):
     image_description: str | None = None
 
 
-class ImageDataContent(DataModel):
-    mime_type: Literal["image/jpeg", "image/png", "image/gif"] | None = None
-    image_data: bytes
-    image_description: str | None = None
-
-
-ImageContent = ImageURLContent | ImageBase64Content | ImageDataContent
+ImageContent = ImageURLContent | ImageBase64Content
