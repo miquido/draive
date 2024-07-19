@@ -1,15 +1,10 @@
-from draive.evaluation import evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.score import CommonScoreModel
 from draive.generation import generate_model
-from draive.parameters import DataModel
 
 __all__ = [
     "text_coverage_evaluator",
 ]
-
-
-class CoverageScore(DataModel):
-    score: float
-    comment: str | None = None
 
 
 INSTRUCTION: str = """\
@@ -46,10 +41,15 @@ Important: The score must be a decimal number from 0.0 to 4.0. 4.0 is the maximu
 do not exceed this value.
 """
 
-INPUT: str = """
-Reference text: {reference}
 
-Compered text: {compared}
+INPUT_TEMPLATE: str = """
+<REFERENCE_TEXT>
+{reference}
+</REFERENCE_TEXT>
+
+<COMPARED_TEXT>
+{compared}
+</COMPARED_TEXT>
 """
 
 
@@ -58,14 +58,29 @@ async def text_coverage_evaluator(
     compared: str,
     /,
     reference: str,
-) -> float:
-    model: CoverageScore = await generate_model(
-        CoverageScore,
+) -> EvaluationScore:
+    if not compared:
+        return EvaluationScore(
+            value=0,
+            comment="Input text was empty!",
+        )
+
+    if not reference:
+        return EvaluationScore(
+            value=0,
+            comment="Reference text was empty!",
+        )
+
+    score: CommonScoreModel = await generate_model(
+        CommonScoreModel,
         instruction=INSTRUCTION,
-        input=f"Reference text: {reference}\n\nCompered text: {compared}",
+        input=INPUT_TEMPLATE.format(
+            reference=reference,
+            compared=compared,
+        ),
         examples=[
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Smartphones are versatile devices. They can make calls, send messages, "
                         "access the internet, take photos, and run various apps. "
@@ -76,10 +91,10 @@ async def text_coverage_evaluator(
                         "Smartphones can make calls and send messages. They are popular devices."
                     ),
                 ),
-                CoverageScore(score=0.0),
+                CommonScoreModel(score=0.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Recycling helps protect the environment. It reduces waste in landfills, "
                         "conserves natural resources, and saves energy. Common recyclable items "
@@ -93,10 +108,10 @@ async def text_coverage_evaluator(
                         "Many cities have recycling programs."
                     ),
                 ),
-                CoverageScore(score=2.0),
+                CommonScoreModel(score=2.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Regular exercise is important for health. It strengthens the heart, "
                         "builds muscle, and improves flexibility. Exercise can also reduce stress "
@@ -114,9 +129,9 @@ async def text_coverage_evaluator(
                         "include walking, swimming, and cycling."
                     ),
                 ),
-                CoverageScore(score=4.0),
+                CommonScoreModel(score=4.0),
             ),
         ],
     )
 
-    return model.score / 4
+    return score.normalized(divider=4)

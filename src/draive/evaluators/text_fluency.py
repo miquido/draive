@@ -1,15 +1,10 @@
-from draive.evaluation import evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.score import CommonScoreModel
 from draive.generation import generate_model
-from draive.parameters import DataModel
 
 __all__ = [
     "text_fluency_evaluator",
 ]
-
-
-class FluencyScore(DataModel):
-    score: float
-    comment: str | None = None
 
 
 INSTRUCTION: str = """\
@@ -36,8 +31,11 @@ Important: The score must be a decimal number from 0.0 to 2.0. 2.0 is the maximu
 do not exceed this value.
 """
 
-INPUT: str = """
-Text: {text}
+
+INPUT_TEMPLATE: str = """
+<TEXT>
+{text}
+</TEXT>
 """
 
 
@@ -45,41 +43,47 @@ Text: {text}
 async def text_fluency_evaluator(
     text: str,
     /,
-) -> float:
-    model: FluencyScore = await generate_model(
-        FluencyScore,
+) -> EvaluationScore:
+    if not text:
+        return EvaluationScore(
+            value=0,
+            comment="Input text was empty!",
+        )
+
+    score: CommonScoreModel = await generate_model(
+        CommonScoreModel,
         instruction=INSTRUCTION,
-        input=text,
+        input=INPUT_TEMPLATE.format(text=text),
         examples=[
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     text=(
                         "The cat sitted on mat. It were very comfrotable. "
                         "The sun shine bright in sky."
                     ),
                 ),
-                FluencyScore(score=0.0),
+                CommonScoreModel(score=0.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     text=(
                         "The movie was good, but I didn't liked the ending. "
                         "It left me feeling confuse and unsatisfied."
                     ),
                 ),
-                FluencyScore(score=1.0),
+                CommonScoreModel(score=1.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     text=(
                         "The concert last night was amazing. "
                         "The band played all their hit songs, and the crowd was energetic "
                         "throughout the performance."
                     ),
                 ),
-                FluencyScore(score=2.0),
+                CommonScoreModel(score=2.0),
             ),
         ],
     )
-    print(model.score)
-    return model.score / 2
+
+    return score.normalized(divider=2)

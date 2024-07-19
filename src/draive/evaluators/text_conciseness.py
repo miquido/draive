@@ -1,15 +1,10 @@
-from draive.evaluation import evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.score import CommonScoreModel
 from draive.generation import generate_model
-from draive.parameters import DataModel
 
 __all__ = [
     "text_conciseness_evaluator",
 ]
-
-
-class ConcisenessScore(DataModel):
-    score: float
-    comment: str | None = None
 
 
 INSTRUCTION: str = """\
@@ -44,10 +39,15 @@ Important: The score must be a decimal number from 0.0 to 4.0. 4.0 is the maximu
 do not exceed this value.
 """
 
-INPUT: str = """
-Reference text: {reference}
 
-Compered text: {compared}
+INPUT_TEMPLATE: str = """
+<REFERENCE_TEXT>
+{reference}
+</REFERENCE_TEXT>
+
+<COMPARED_TEXT>
+{compared}
+</COMPARED_TEXT>
 """
 
 
@@ -56,14 +56,29 @@ async def text_conciseness_evaluator(
     compared: str,
     /,
     reference: str,
-) -> float:
-    model: ConcisenessScore = await generate_model(
-        ConcisenessScore,
+) -> EvaluationScore:
+    if not compared:
+        return EvaluationScore(
+            value=0,
+            comment="Input text was empty!",
+        )
+
+    if not reference:
+        return EvaluationScore(
+            value=0,
+            comment="Reference text was empty!",
+        )
+
+    score: CommonScoreModel = await generate_model(
+        CommonScoreModel,
         instruction=INSTRUCTION,
-        input=f"Reference text: {reference}\n\nCompered text: {compared}",
+        input=INPUT_TEMPLATE.format(
+            reference=reference,
+            compared=compared,
+        ),
         examples=[
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Solar energy is a renewable energy source that is gaining popularity. "
                         "Solar panels convert sunlight into electricity. "
@@ -85,10 +100,10 @@ async def text_conciseness_evaluator(
                         "but then you save on all those coffee shop visits."
                     ),
                 ),
-                ConcisenessScore(score=0.0),
+                CommonScoreModel(score=0.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Coffee is a popular beverage worldwide. "
                         "It's made from roasted coffee beans. Caffeine in coffee "
@@ -103,10 +118,10 @@ async def text_conciseness_evaluator(
                         "important to consume it in moderation."
                     ),
                 ),
-                ConcisenessScore(score=2.0),
+                CommonScoreModel(score=2.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "The water cycle, also known as the hydrologic cycle, "
                         "describes the continuous movement of water within the Earth and "
@@ -118,8 +133,8 @@ async def text_conciseness_evaluator(
                         "It includes evaporation, condensation, precipitation, and runoff."
                     ),
                 ),
-                ConcisenessScore(score=4.0),
+                CommonScoreModel(score=4.0),
             ),
         ],
     )
-    return model.score / 4
+    return score.normalized(divider=4)

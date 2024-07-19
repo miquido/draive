@@ -1,15 +1,10 @@
-from draive.evaluation import evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.score import CommonScoreModel
 from draive.generation import generate_model
-from draive.parameters import DataModel
 
 __all__ = [
     "text_relevance_evaluator",
 ]
-
-
-class RelevanceScore(DataModel):
-    score: float
-    comment: str | None = None
 
 
 INSTRUCTION: str = """\
@@ -47,10 +42,15 @@ Important: The score must be a decimal number from 0.0 to 4.0. 4.0 is the maximu
 do not exceed this value.
 """
 
-INPUT: str = """
-Reference text: {reference}
 
-Compered text: {compared}
+INPUT_TEMPLATE: str = """
+<REFERENCE_TEXT>
+{reference}
+</REFERENCE_TEXT>
+
+<COMPARED_TEXT>
+{compared}
+</COMPARED_TEXT>
 """
 
 
@@ -59,14 +59,29 @@ async def text_relevance_evaluator(
     compared: str,
     /,
     reference: str,
-) -> float:
-    model: RelevanceScore = await generate_model(
-        RelevanceScore,
+) -> EvaluationScore:
+    if not compared:
+        return EvaluationScore(
+            value=0,
+            comment="Input text was empty!",
+        )
+
+    if not reference:
+        return EvaluationScore(
+            value=0,
+            comment="Reference text was empty!",
+        )
+
+    score: CommonScoreModel = await generate_model(
+        CommonScoreModel,
         instruction=INSTRUCTION,
-        input=f"Reference text: {reference}\n\nCompered text: {compared}",
+        input=INPUT_TEMPLATE.format(
+            reference=reference,
+            compared=compared,
+        ),
         examples=[
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "The sun is the star at the center of our solar system. "
                         "It provides light and heat to Earth."
@@ -77,10 +92,10 @@ async def text_relevance_evaluator(
                         "Solar panels use energy from the sun."
                     ),
                 ),
-                RelevanceScore(score=0.0),
+                CommonScoreModel(score=0.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Elephants are the largest land animals. They have long trunks and tusks. "
                         "Elephants live in herds and are known for their intelligence."
@@ -92,10 +107,10 @@ async def text_relevance_evaluator(
                         "but this can be harmful to the animals."
                     ),
                 ),
-                RelevanceScore(score=2.0),
+                CommonScoreModel(score=2.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Bicycles are a popular mode of transportation. They are eco-friendly "
                         "and provide exercise. However, cyclists need to follow "
@@ -107,9 +122,9 @@ async def text_relevance_evaluator(
                         "Cyclists must obey traffic laws to stay safe."
                     ),
                 ),
-                RelevanceScore(score=4.0),
+                CommonScoreModel(score=4.0),
             ),
         ],
     )
 
-    return model.score / 4
+    return score.normalized(divider=4)

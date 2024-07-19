@@ -1,15 +1,10 @@
-from draive.evaluation import evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.score import CommonScoreModel
 from draive.generation import generate_model
-from draive.parameters import DataModel
 
 __all__ = [
     "text_coherence_evaluator",
 ]
-
-
-class CoherenceScore(DataModel):
-    score: float
-    comment: str | None = None
 
 
 INSTRUCTION: str = """\
@@ -45,10 +40,14 @@ Important: The score must be a decimal number from 0.0 to 4.0. 4.0 is the maximu
 do not exceed this value.
 """
 
-INPUT: str = """
-Reference text: {reference}
+INPUT_TEMPLATE: str = """
+<REFERENCE_TEXT>
+{reference}
+</REFERENCE_TEXT>
 
-Compered text: {compared}
+<COMPARED_TEXT>
+{compared}
+</COMPARED_TEXT>
 """
 
 
@@ -57,14 +56,29 @@ async def text_coherence_evaluator(
     compared: str,
     /,
     reference: str,
-) -> float:
-    model: CoherenceScore = await generate_model(
-        CoherenceScore,
+) -> EvaluationScore:
+    if not compared:
+        return EvaluationScore(
+            value=0,
+            comment="Input text was empty!",
+        )
+
+    if not reference:
+        return EvaluationScore(
+            value=0,
+            comment="Reference text was empty!",
+        )
+
+    score: CommonScoreModel = await generate_model(
+        CommonScoreModel,
         instruction=INSTRUCTION,
-        input=INPUT.format(reference=reference, compared=compared),
+        input=INPUT_TEMPLATE.format(
+            reference=reference,
+            compared=compared,
+        ),
         examples=[
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Solar energy is a renewable energy source that is gaining popularity. "
                         "Solar panels convert sunlight into electricity. "
@@ -78,10 +92,10 @@ async def text_coherence_evaluator(
                         "Technology is developing fast. People like to save money."
                     ),
                 ),
-                CoherenceScore(score=0.0),
+                CommonScoreModel(score=0.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Coffee is a popular beverage worldwide. "
                         "It's made from roasted coffee beans. Caffeine in coffee "
@@ -95,10 +109,10 @@ async def text_coherence_evaluator(
                         "Some people add milk or sugar to their coffee."
                     ),
                 ),
-                CoherenceScore(score=2.0),
+                CommonScoreModel(score=2.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Honey is a natural sweetener produced by bees. "
                         "It has antibacterial properties and is rich in antioxidants. "
@@ -113,8 +127,8 @@ async def text_coherence_evaluator(
                         "honey's high caloric content necessitates mindful consumption."
                     ),
                 ),
-                CoherenceScore(score=4.0),
+                CommonScoreModel(score=4.0),
             ),
         ],
     )
-    return model.score / 4
+    return score.normalized(divider=4)

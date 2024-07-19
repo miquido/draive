@@ -1,15 +1,10 @@
-from draive.evaluation import evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.score import CommonScoreModel
 from draive.generation import generate_model
-from draive.parameters import DataModel
 
 __all__ = [
     "text_readability_evaluator",
 ]
-
-
-class ReadabilityScore(DataModel):
-    score: float
-    comment: str | None = None
 
 
 INSTRUCTION: str = """\
@@ -45,8 +40,11 @@ Important: The score must be a decimal number from 0.0 to 4.0. 4.0 is the maximu
 do not exceed this value.
 """
 
-INPUT: str = """
-Text: {text}
+
+INPUT_TEMPLATE: str = """
+<TEXT>
+{text}
+</TEXT>
 """
 
 
@@ -54,14 +52,20 @@ Text: {text}
 async def text_readability_evaluator(
     text: str,
     /,
-) -> float:
-    model: ReadabilityScore = await generate_model(
-        ReadabilityScore,
+) -> EvaluationScore:
+    if not text:
+        return EvaluationScore(
+            value=0,
+            comment="Input text was empty!",
+        )
+
+    score: CommonScoreModel = await generate_model(
+        CommonScoreModel,
         instruction=INSTRUCTION,
-        input=text,
+        input=INPUT_TEMPLATE.format(text=text),
         examples=[
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     text=(
                         "The canine species, frequently domesticated for companionship purposes, "
                         "exhibit characteristics of fidelity and ludic propensities that engender "
@@ -69,10 +73,10 @@ async def text_readability_evaluator(
                         "animal companions."
                     ),
                 ),
-                ReadabilityScore(score=0.0),
+                CommonScoreModel(score=0.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     text=(
                         "Pizza, a widely consumed dish, consists of a circular bread foundation "
                         "adorned with various ingredients. Typically, it includes a layer of "
@@ -80,17 +84,17 @@ async def text_readability_evaluator(
                         "incorporated to suit individual preferences."
                     ),
                 ),
-                ReadabilityScore(score=2.0),
+                CommonScoreModel(score=2.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     text=(
                         "Exercise is good for health. It helps maintain fitness and reduces stress."
                     ),
                 ),
-                ReadabilityScore(score=4.0),
+                CommonScoreModel(score=4.0),
             ),
         ],
     )
 
-    return model.score / 4
+    return score.normalized(divider=4)

@@ -1,18 +1,13 @@
 from draive.embedding import Embedded, embed_texts
-from draive.evaluation import evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.score import CommonScoreModel
 from draive.generation import generate_model
-from draive.parameters import DataModel
 from draive.similarity.score import vector_similarity_score
 
 __all__ = [
     "text_similarity_evaluator",
     "text_vector_similarity_evaluator",
 ]
-
-
-class SimilarityScore(DataModel):
-    score: float
-    comment: str | None = None
 
 
 INSTRUCTION: str = """\
@@ -41,10 +36,15 @@ Important: The score must be a decimal number from 0.0 to 2.0. 2.0 is the maximu
 do not exceed this value.
 """
 
-INPUT: str = """
-Reference text: {reference}
 
-Compered text: {compared}
+INPUT_TEMPLATE: str = """
+<REFERENCE_TEXT>
+{reference}
+</REFERENCE_TEXT>
+
+<COMPARED_TEXT>
+{compared}
+</COMPARED_TEXT>
 """
 
 
@@ -53,14 +53,29 @@ async def text_similarity_evaluator(
     compared: str,
     /,
     reference: str,
-) -> float:
-    model: SimilarityScore = await generate_model(
-        SimilarityScore,
+) -> EvaluationScore:
+    if not compared:
+        return EvaluationScore(
+            value=0,
+            comment="Input text was empty!",
+        )
+
+    if not reference:
+        return EvaluationScore(
+            value=0,
+            comment="Reference text was empty!",
+        )
+
+    score: CommonScoreModel = await generate_model(
+        CommonScoreModel,
         instruction=INSTRUCTION,
-        input=f"Reference text: {reference}\n\nCompered text: {compared}",
+        input=INPUT_TEMPLATE.format(
+            reference=reference,
+            compared=compared,
+        ),
         examples=[
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Cats are popular pets. They are independent and like to groom themselves."
                     ),
@@ -68,10 +83,10 @@ async def text_similarity_evaluator(
                         "Bananas are a healthy fruit. They are rich in potassium and easy to peel."
                     ),
                 ),
-                SimilarityScore(score=0.0),
+                CommonScoreModel(score=0.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "The beach is a great place for relaxation. "
                         "People enjoy swimming and sunbathing."
@@ -81,10 +96,10 @@ async def text_similarity_evaluator(
                         "Parks are popular for picnics and walking."
                     ),
                 ),
-                SimilarityScore(score=1.0),
+                CommonScoreModel(score=1.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Coffee is a popular morning drink. It contains caffeine which helps "
                         "people feel more alert."
@@ -94,12 +109,12 @@ async def text_similarity_evaluator(
                         "The caffeine in coffee can increase alertness and energy."
                     ),
                 ),
-                SimilarityScore(score=2.0),
+                CommonScoreModel(score=2.0),
             ),
         ],
     )
 
-    return model.score / 2
+    return score.normalized(divider=2)
 
 
 @evaluator(name="text_vector_similarity")

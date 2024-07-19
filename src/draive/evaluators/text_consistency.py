@@ -1,15 +1,10 @@
-from draive.evaluation import evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.score import CommonScoreModel
 from draive.generation import generate_model
-from draive.parameters import DataModel
 
 __all__ = [
     "text_consistency_evaluator",
 ]
-
-
-class ConsistencyScore(DataModel):
-    score: float
-    comment: str | None = None
 
 
 INSTRUCTION: str = """\
@@ -47,10 +42,15 @@ Important: The score must be a decimal number from 0.0 to 4.0. 4.0 is the maximu
 do not exceed this value.
 """
 
-INPUT: str = """
-Reference text: {reference}
 
-Compered text: {compared}
+INPUT_TEMPLATE: str = """
+<REFERENCE_TEXT>
+{reference}
+</REFERENCE_TEXT>
+
+<COMPARED_TEXT>
+{compared}
+</COMPARED_TEXT>
 """
 
 
@@ -59,14 +59,29 @@ async def text_consistency_evaluator(
     compared: str,
     /,
     reference: str,
-) -> float:
-    model: ConsistencyScore = await generate_model(
-        ConsistencyScore,
+) -> EvaluationScore:
+    if not compared:
+        return EvaluationScore(
+            value=0,
+            comment="Input text was empty!",
+        )
+
+    if not reference:
+        return EvaluationScore(
+            value=0,
+            comment="Reference text was empty!",
+        )
+
+    score: CommonScoreModel = await generate_model(
+        CommonScoreModel,
         instruction=INSTRUCTION,
-        input=f"Reference text: {reference}\n\nCompered text: {compared}",
+        input=INPUT_TEMPLATE.format(
+            reference=reference,
+            compared=compared,
+        ),
         examples=[
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Dolphins are intelligent marine mammals. They use echolocation "
                         "to navigate and hunt. Dolphins live in social groups called pods."
@@ -77,10 +92,10 @@ async def text_consistency_evaluator(
                         "to learn hunting techniques."
                     ),
                 ),
-                ConsistencyScore(score=0.0),
+                CommonScoreModel(score=0.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Coffee is a popular beverage worldwide. "
                         "It's made from roasted coffee beans. Caffeine in coffee "
@@ -95,10 +110,10 @@ async def text_consistency_evaluator(
                         "the risk of certain diseases."
                     ),
                 ),
-                ConsistencyScore(score=2.0),
+                CommonScoreModel(score=2.0),
             ),
             (
-                INPUT.format(
+                INPUT_TEMPLATE.format(
                     reference=(
                         "Photosynthesis is the process by which plants use sunlight to "
                         "produce energy. It requires water, carbon dioxide, and chlorophyll. "
@@ -111,8 +126,8 @@ async def text_consistency_evaluator(
                         "they release oxygen into the environment."
                     ),
                 ),
-                ConsistencyScore(score=4.0),
+                CommonScoreModel(score=4.0),
             ),
         ],
     )
-    return model.score / 4
+    return score.normalized(divider=4)
