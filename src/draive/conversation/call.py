@@ -3,9 +3,10 @@ from typing import Literal, overload
 
 from draive.conversation.model import ConversationMessage, ConversationResponseStream
 from draive.conversation.state import Conversation
+from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
 from draive.scope import ctx
-from draive.types import Instruction, Memory, MultimodalContent, MultimodalContentConvertible
+from draive.types import Memory, MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
     "conversation_completion",

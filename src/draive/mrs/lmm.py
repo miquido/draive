@@ -9,6 +9,7 @@ from mistralrs import (  # type: ignore
     ResponseMessage,
 )
 
+from draive.instructions import Instruction
 from draive.lmm import LMMToolSelection, ToolSpecification
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.mrs.client import MRSClient
@@ -16,7 +17,6 @@ from draive.mrs.config import MRSChatConfig
 from draive.mrs.errors import MRSException
 from draive.scope import ctx
 from draive.types import (
-    Instruction,
     LMMCompletion,
     LMMCompletionChunk,
     LMMContextElement,

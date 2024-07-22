@@ -9,10 +9,10 @@ from draive.conversation.model import (
     ConversationResponseStream,
 )
 from draive.helpers import ConstantMemory
+from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox, ToolStatus, lmm_invocation
 from draive.scope import ctx
 from draive.types import (
-    Instruction,
     LMMCompletion,
     LMMCompletionChunk,
     LMMContextElement,

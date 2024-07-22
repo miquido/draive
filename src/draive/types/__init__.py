@@ -2,7 +2,6 @@ from draive.types.audio import AudioBase64Content, AudioContent, AudioURLContent
 from draive.types.errors import RateLimitError
 from draive.types.frozenlist import frozenlist
 from draive.types.image import ImageBase64Content, ImageContent, ImageURLContent
-from draive.types.instruction import Instruction
 from draive.types.json import JSON
 from draive.types.lmm import (
     LMMCompletion,
@@ -34,7 +33,6 @@ __all__ = [
     "ImageBase64Content",
     "ImageContent",
     "ImageURLContent",
-    "Instruction",
     "JSON",
     "LMMCompletion",
     "LMMCompletionChunk",

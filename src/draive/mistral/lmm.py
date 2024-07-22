@@ -2,6 +2,7 @@ import json
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any, Literal, cast, overload
 
+from draive.instructions import Instruction
 from draive.lmm import LMMToolSelection, ToolSpecification
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.mistral.client import MistralClient
@@ -10,7 +11,6 @@ from draive.mistral.errors import MistralException
 from draive.mistral.models import ChatCompletionResponse, ChatMessage, ChatMessageResponse
 from draive.scope import ctx
 from draive.types import (
-    Instruction,
     LMMCompletion,
     LMMCompletionChunk,
     LMMContextElement,

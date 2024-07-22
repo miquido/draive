@@ -1,8 +1,9 @@
 from typing import Any
 
 from draive.generation.image.state import ImageGeneration
+from draive.instructions import Instruction
 from draive.scope import ctx
-from draive.types import ImageContent, Instruction, MultimodalContent, MultimodalContentConvertible
+from draive.types import ImageContent, MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
     "generate_image",

@@ -7,8 +7,9 @@ from typing import (
     runtime_checkable,
 )
 
+from draive.instructions import Instruction
 from draive.lmm.tools import ToolSpecification
-from draive.types import Instruction, LMMContextElement, LMMOutput, LMMOutputStream
+from draive.types import LMMContextElement, LMMOutput, LMMOutputStream
 
 __all__ = [
     "LMMInvocation",

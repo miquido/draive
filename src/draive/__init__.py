@@ -52,6 +52,14 @@ from draive.helpers import (
     auto_retry,
     traced,
 )
+from draive.instructions import (
+    Instruction,
+    InstructionFetching,
+    InstructionsRepository,
+    MissingInstruction,
+    instruction,
+    instructions_file,
+)
 from draive.lmm import (
     LMM,
     Tool,
@@ -108,7 +116,6 @@ from draive.types import (
     ImageBase64Content,
     ImageContent,
     ImageURLContent,
-    Instruction,
     LMMCompletion,
     LMMCompletionChunk,
     LMMContextElement,
@@ -214,7 +221,12 @@ __all__ = [
     "ImageGeneration",
     "ImageGenerator",
     "ImageURLContent",
+    "instruction",
     "Instruction",
+    "Instruction",
+    "InstructionFetching",
+    "instructions_file",
+    "InstructionsRepository",
     "is_missing",
     "JSON",
     "lmm_conversation_completion",
@@ -239,6 +251,7 @@ __all__ = [
     "MetricsTraceReporter",
     "Missing",
     "MISSING",
+    "MissingInstruction",
     "mmr_vector_similarity_search",
     "ModelGeneration",
     "ModelGenerator",

@@ -1,10 +1,11 @@
-from typing import Self, final
-from uuid import uuid4
+from typing import Protocol, Self, final, runtime_checkable
+from uuid import UUID, uuid4
 
 from draive.utils import freeze
 
 __all__ = [
     "Instruction",
+    "InstructionFetching",
 ]
 
 
@@ -32,11 +33,11 @@ class Instruction:
         self,
         instruction: str,
         /,
-        identifier: str | None = None,
+        identifier: UUID | None = None,
         **variables: object,
     ) -> None:
         self.instruction: str = instruction
-        self.identifier: str = identifier or uuid4().hex
+        self.identifier: UUID = identifier or uuid4()
         self.variables: dict[str, object] = variables
 
         freeze(self)
@@ -106,3 +107,11 @@ class Instruction:
 
         except KeyError:
             return self.instruction
+
+
+@runtime_checkable
+class InstructionFetching(Protocol):
+    async def __call__(
+        self,
+        key: str,
+    ) -> Instruction: ...

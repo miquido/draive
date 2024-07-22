@@ -1,11 +1,12 @@
 from collections.abc import Sequence
 from typing import Any, Literal, overload
 
+from draive.instructions import Instruction
 from draive.lmm.invocation import LMMOutputStream, LMMToolSelection
 from draive.lmm.state import LMM
 from draive.lmm.tools import ToolSpecification
 from draive.scope import ctx
-from draive.types import Instruction, LMMContextElement, LMMOutput
+from draive.types import LMMContextElement, LMMOutput
 
 __all__ = [
     "lmm_invocation",

@@ -14,6 +14,7 @@ from anthropic.types import (
 from draive.anthropic.client import AnthropicClient
 from draive.anthropic.config import AnthropicConfig
 from draive.anthropic.errors import AnthropicException
+from draive.instructions import Instruction
 from draive.lmm import LMMToolSelection, ToolSpecification
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.parameters import DataModel
@@ -23,7 +24,6 @@ from draive.types import (
     AudioURLContent,
     ImageBase64Content,
     ImageURLContent,
-    Instruction,
     LMMCompletion,
     LMMCompletionChunk,
     LMMContextElement,

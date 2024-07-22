@@ -2,9 +2,10 @@ from collections.abc import Iterable, Sequence
 from typing import Any
 
 from draive.generation.text.state import TextGeneration
+from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
 from draive.scope import ctx
-from draive.types import Instruction, MultimodalContent, MultimodalContentConvertible
+from draive.types import MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
     "generate_text",
