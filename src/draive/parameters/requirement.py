@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Collection, Iterable
 from typing import Any, Literal, Self, cast, final
 
 from draive.parameters.errors import ParameterValidationError
@@ -74,7 +74,14 @@ class ParameterRequirement[Root]:
         cls,
         value: Parameter,
         /,
-        path: ParameterPath[Root, Parameter] | Parameter,
+        path: ParameterPath[
+            Root,
+            Collection[Parameter] | tuple[Parameter, ...] | list[Parameter] | set[Parameter],
+        ]
+        | Collection[Parameter]
+        | tuple[Parameter, ...]
+        | list[Parameter]
+        | set[Parameter],
     ) -> Self:
         assert isinstance(  # nosec: B101
             path, ParameterPath
@@ -98,9 +105,44 @@ class ParameterRequirement[Root]:
         )
 
     @classmethod
+    def contains_any[Parameter](
+        cls,
+        value: Collection[Parameter],
+        /,
+        path: ParameterPath[
+            Root,
+            Collection[Parameter] | tuple[Parameter, ...] | list[Parameter] | set[Parameter],
+        ]
+        | Collection[Parameter]
+        | tuple[Parameter, ...]
+        | list[Parameter]
+        | set[Parameter],
+    ) -> Self:
+        assert isinstance(  # nosec: B101
+            path, ParameterPath
+        ), "Prepare parameter path by using Self._.path.to.property"
+
+        def check_contains_any(root: Root) -> None:
+            checked: Any = cast(ParameterPath[Root, Parameter], path)(root)
+            if any(element in checked for element in value):
+                raise ParameterValidationError.invalid(
+                    context=ParameterValidationContext(
+                        path=cast(ParameterPath[Root, Parameter], path).components(),
+                    ),
+                    exception=ValueError(f"{checked} does not contain any of {value}"),
+                )
+
+        return cls(
+            path,
+            "contains_any",
+            value,
+            check=check_contains_any,
+        )
+
+    @classmethod
     def contained_in[Parameter](
         cls,
-        value: list[Parameter] | set[Parameter],
+        value: Collection[Parameter],
         /,
         path: ParameterPath[Root, Parameter] | Parameter,
     ) -> Self:
@@ -132,6 +174,7 @@ class ParameterRequirement[Root]:
             "equal",
             "not_equal",
             "contains",
+            "contains_any",
             "contained_in",
             "and",
             "or",
@@ -144,6 +187,7 @@ class ParameterRequirement[Root]:
             "equal",
             "not_equal",
             "contains",
+            "contains_any",
             "contained_in",
             "and",
             "or",
