@@ -1,9 +1,10 @@
 from collections.abc import Iterable, Sequence
 from typing import Any, Literal, Protocol, runtime_checkable
 
+from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
 from draive.parameters import DataModel
-from draive.types import Instruction, MultimodalContent, MultimodalContentConvertible
+from draive.types import MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
     "ModelGenerator",

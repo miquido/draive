@@ -1,6 +1,7 @@
 from typing import Any, Protocol, runtime_checkable
 
-from draive.types import ImageContent, Instruction, MultimodalContent, MultimodalContentConvertible
+from draive.instructions import Instruction
+from draive.types import ImageContent, MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
     "ImageGenerator",

@@ -77,6 +77,7 @@ def cache[**Args, Result](
 
     if function := function:
         return _wrap(function)
+
     else:
         return _wrap
 
@@ -160,6 +161,7 @@ class _SyncCache[**Args, Result]:
         if len(self._cached) > self._limit:
             # if still running let it complete if able
             self._cached.popitem(last=False)
+
         return result
 
     def __method_call__(
@@ -308,4 +310,5 @@ class _AsyncCache[**Args, Result]:
         if len(self._cached) > self._limit:
             # if still running let it complete if able
             self._cached.popitem(last=False)
+
         return await shield(task)

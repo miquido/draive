@@ -1,10 +1,10 @@
 from collections.abc import Iterable, Sequence
 from typing import Any
 
+from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox, lmm_invocation
 from draive.scope import ctx
 from draive.types import (
-    Instruction,
     LMMCompletion,
     LMMContextElement,
     LMMInput,

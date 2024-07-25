@@ -82,7 +82,7 @@ onnx==1.16.1
     # via fastembed
 onnxruntime==1.18.1
     # via fastembed
-openai==1.35.15
+openai==1.36.1
     # via draive (pyproject.toml)
 packaging==24.1
     # via

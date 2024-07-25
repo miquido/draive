@@ -2,13 +2,9 @@ from collections.abc import Sequence
 from typing import Any, Literal, Protocol, overload, runtime_checkable
 
 from draive.conversation.model import ConversationMessage, ConversationResponseStream
+from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
-from draive.types import (
-    Instruction,
-    Memory,
-    MultimodalContent,
-    MultimodalContentConvertible,
-)
+from draive.types import Memory, MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
     "ConversationCompletion",

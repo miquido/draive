@@ -3,10 +3,11 @@ from typing import Any, Literal
 
 from draive.generation.model.generator import ModelGeneratorDecoder
 from draive.generation.model.state import ModelGeneration
+from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
 from draive.parameters import DataModel
 from draive.scope import ctx
-from draive.types import Instruction, MultimodalContent, MultimodalContentConvertible
+from draive.types import MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
     "generate_model",

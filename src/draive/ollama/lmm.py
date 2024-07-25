@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any, Literal, overload
 
+from draive.instructions import Instruction
 from draive.lmm import LMMToolSelection, ToolSpecification
 from draive.metrics import ArgumentsTrace, ResultTrace
 from draive.metrics.tokens import TokenUsage
@@ -10,7 +11,6 @@ from draive.ollama.errors import OllamaException
 from draive.ollama.models import ChatCompletionResponse, ChatMessage
 from draive.scope import ctx
 from draive.types import (
-    Instruction,
     LMMCompletion,
     LMMCompletionChunk,
     LMMContextElement,

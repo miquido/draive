@@ -14,6 +14,7 @@ from openai.types.chat import (
 )
 from openai.types.chat.chat_completion_chunk import Choice, ChoiceDeltaToolCall
 
+from draive.instructions import Instruction
 from draive.lmm import LMMToolSelection, ToolSpecification
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
 from draive.openai.client import OpenAIClient
@@ -26,7 +27,6 @@ from draive.types import (
     AudioURLContent,
     ImageBase64Content,
     ImageURLContent,
-    Instruction,
     LMMCompletion,
     LMMCompletionChunk,
     LMMContextElement,
