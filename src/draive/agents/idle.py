@@ -49,6 +49,7 @@ class IdleMonitor:
     ) -> None:
         if self.idle:
             return  # already idle
+
         self._running_tasks = 0
         self._scheduled_handle.cancel()
         self._scheduled_handle = self._loop.call_soon(self._idle_status.set)
