@@ -333,7 +333,7 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
         self.finish(result=result)
         await self._wait()
 
-    async def execute(
+    async def execute(  # noqa: PLR0912
         self,
         input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
         timeout: float,
@@ -357,36 +357,45 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
 
             idle_monitor_task: Task[None] = ctx.spawn_subtask(self._idle_monitor)
 
-            async for element in self._workflow_queue:
-                try:
-                    match element:
-                        case AgentMessage() as message:
-                            if message.recipient.identifier == self._workflow.node.identifier:
-                                await self._handle(message)
+            try:
+                async for element in self._workflow_queue:
+                    try:
+                        match element:
+                            case AgentMessage() as message:
+                                if message.recipient.identifier == self._workflow.node.identifier:
+                                    await self._handle(message)
 
-                            elif runner := self._agent_runners.get(message.recipient.identifier):
-                                runner.send(message)
+                                elif runner := self._agent_runners.get(
+                                    message.recipient.identifier
+                                ):
+                                    runner.send(message)
 
-                            else:
-                                spawned_runner: AgentRunner = AgentRunner.run(
-                                    message.recipient,
-                                    output=self.send,
-                                    status=self._status.nested(),
-                                )
-                                self._agent_runners[message.recipient.identifier] = spawned_runner
-                                spawned_runner.send(message)
+                                else:
+                                    spawned_runner: AgentRunner = AgentRunner.run(
+                                        message.recipient,
+                                        output=self.send,
+                                        status=self._status.nested(),
+                                    )
+                                    self._agent_runners[message.recipient.identifier] = (
+                                        spawned_runner
+                                    )
+                                    spawned_runner.send(message)
 
-                        case error:
-                            await self._handle(error)
+                            case error:
+                                await self._handle(error)
 
-                finally:
-                    self._status.exit_task()
+                    finally:
+                        self._status.exit_task()
+
+            except CancelledError:
+                pass  # just end on cancel
+
+            finally:  # cleanup status when exiting
+                timeout_handle.cancel()  # cancel the timeout
+                idle_monitor_task.cancel()  # finish idle monitor
+                self._status.exit_all()
 
             await self._wait()  # wait for completion of all runners
-
-            timeout_handle.cancel()  # cancel the timeout
-
-            idle_monitor_task.cancel()  # finish idle monitor
 
             ctx.record(WorkflowHistory(history=tuple(self._history)))
 

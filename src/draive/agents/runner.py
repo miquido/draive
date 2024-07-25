@@ -142,7 +142,9 @@ class AgentRunner:
                             status.exit_task()
 
             except CancelledError:
-                # just finish when Cancelled
+                pass  # just end on cancel
+
+            finally:  # cleanup status when exiting
                 status.exit_all()
 
     @staticmethod
