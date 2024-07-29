@@ -43,7 +43,7 @@ class ScopeDependencies:
                     dependencies[type(dependency).interface()] = dependency
 
                 elif isinstance(dependency, type) and issubclass(dependency, ScopeDependency):
-                    dependencies[dependency.interface()] = dependency.__class__.prepare()
+                    dependencies[dependency.interface()] = dependency.prepare()
 
                 else:
                     dependencies[type(dependency)] = dependency
@@ -59,7 +59,7 @@ class ScopeDependencies:
         dependency: type[Dependency],
         /,
     ) -> Dependency:
-        if dependency in self._declared:
+        if dependency in self._dependencies:
             return cast(Dependency, self._dependencies[dependency])
 
         else:
@@ -87,7 +87,7 @@ class ScopeDependencies:
 
             # cleanup memory and prevent preparing again
             # can't simply replace with new instance due to freeze
-            for key in self._prepared.keys():
+            for key in list(self._prepared.keys()):
                 del self._prepared[key]
 
     async def __aenter__(self) -> Self:
