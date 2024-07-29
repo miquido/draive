@@ -17,7 +17,7 @@ __all__ = [
 async def conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,
@@ -30,7 +30,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,
@@ -43,7 +43,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,

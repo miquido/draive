@@ -43,7 +43,7 @@ httpx==0.27.0
     #   draive (pyproject.toml)
     #   anthropic
     #   openai
-huggingface-hub==0.24.0
+huggingface-hub==0.24.3
     # via
     #   fastembed
     #   tokenizers
@@ -82,7 +82,7 @@ onnx==1.16.1
     # via fastembed
 onnxruntime==1.18.1
     # via fastembed
-openai==1.36.1
+openai==1.37.1
     # via draive (pyproject.toml)
 packaging==24.1
     # via
@@ -124,7 +124,7 @@ pyyaml==6.0.1
     # via
     #   bandit
     #   huggingface-hub
-regex==2024.5.15
+regex==2024.7.24
     # via tiktoken
 requests==2.32.3
     # via
@@ -133,7 +133,7 @@ requests==2.32.3
     #   tiktoken
 rich==13.7.1
     # via bandit
-ruff==0.5.3
+ruff==0.5.5
     # via draive (pyproject.toml)
 sentencepiece==0.2.0
     # via draive (pyproject.toml)

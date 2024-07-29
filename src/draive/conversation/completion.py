@@ -18,7 +18,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: Instruction | str,
-        input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+        input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
         memory: Memory[Sequence[ConversationMessage], ConversationMessage]
         | Sequence[ConversationMessage]
         | None = None,
@@ -32,7 +32,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: Instruction | str,
-        input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+        input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
         memory: Memory[Sequence[ConversationMessage], ConversationMessage]
         | Sequence[ConversationMessage]
         | None = None,
@@ -46,7 +46,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: Instruction | str,
-        input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+        input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
         memory: Memory[Sequence[ConversationMessage], ConversationMessage]
         | Sequence[ConversationMessage]
         | None = None,
