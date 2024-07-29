@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
-from asyncio import gather
+from asyncio import gather, shield
+from types import TracebackType
 from typing import Self, cast, final
 
 from draive.scope.errors import MissingScopeDependency
+from draive.utils import freeze
 
 __all__ = [
     "ScopeDependencies",
@@ -27,28 +29,74 @@ class ScopeDependency(ABC):
 class ScopeDependencies:
     def __init__(
         self,
-        *dependencies: ScopeDependency | type[ScopeDependency],
+        *dependencies: type[ScopeDependency] | object,
     ) -> None:
-        self._dependencies: dict[type[ScopeDependency], ScopeDependency] = {}
-        for dependency in dependencies:
-            if isinstance(dependency, ScopeDependency):
-                self._dependencies[type(dependency).interface()] = dependency
-            else:
-                self._dependencies[dependency.interface()] = dependency.prepare()
+        self._declared: tuple[type[ScopeDependency] | object, ...] = dependencies
+        self._prepared: dict[type[object], object] | None = None
 
-    def dependency[Dependency_T: ScopeDependency](
+    @property
+    def _dependencies(self) -> dict[type[object], object]:
+        if self._prepared is None:
+            dependencies: dict[type[object], object] = {}
+            for dependency in self._declared:
+                if isinstance(dependency, ScopeDependency):
+                    dependencies[type(dependency).interface()] = dependency
+
+                elif isinstance(dependency, type) and issubclass(dependency, ScopeDependency):
+                    dependencies[dependency.interface()] = dependency.__class__.prepare()
+
+                else:
+                    dependencies[type(dependency)] = dependency
+
+            self._prepared = dependencies
+            del self._declared
+            freeze(self)
+
+        return self._prepared
+
+    def dependency[Dependency](
         self,
-        dependency: type[Dependency_T],
+        dependency: type[Dependency],
         /,
-    ) -> Dependency_T:
-        if dependency in self._dependencies:
-            return cast(Dependency_T, self._dependencies[dependency])
+    ) -> Dependency:
+        if dependency in self._declared:
+            return cast(Dependency, self._dependencies[dependency])
 
         else:
             raise MissingScopeDependency(
-                f"{dependency.__qualname__} is not defined!"
+                f"{dependency.__qualname__} is not defined or became disposed!"
                 " You have to define it when creating a new context."
             )
 
     async def dispose(self) -> None:
-        await gather(*[dependency.dispose() for dependency in self._dependencies.values()])
+        if self._prepared is None:
+            # prevent preparing again
+            self._prepared = {}
+            del self._declared
+            freeze(self)
+
+        elif self._prepared:
+            # avoid preparing when disposing
+            await gather(
+                *[
+                    dependency.dispose()
+                    for dependency in self._prepared.values()
+                    if isinstance(dependency, ScopeDependency)
+                ]
+            )
+
+            # cleanup memory and prevent preparing again
+            # can't simply replace with new instance due to freeze
+            for key in self._prepared.keys():
+                del self._prepared[key]
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        await shield(self.dispose())

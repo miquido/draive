@@ -34,7 +34,7 @@ __all__: list[str] = [
 async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,
@@ -48,7 +48,7 @@ async def lmm_conversation_completion(
 async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,
@@ -62,7 +62,7 @@ async def lmm_conversation_completion(
 async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
     memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     | Sequence[ConversationMessage]
     | None = None,
