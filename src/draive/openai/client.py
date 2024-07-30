@@ -39,6 +39,7 @@ class OpenAIClient(ScopeDependency):
     @classmethod
     def prepare(cls) -> Self:
         return cls(
+            base_url=getenv_str("OPENAI_BASE_URL"),
             api_key=getenv_str("AZURE_OPENAI_API_KEY") or getenv_str("OPENAI_API_KEY"),
             organization=getenv_str("OPENAI_ORGANIZATION"),
             azure_api_endpoint=getenv_str("AZURE_OPENAI_API_BASE"),
@@ -46,8 +47,9 @@ class OpenAIClient(ScopeDependency):
             azure_deployment=getenv_str("AZURE_OPENAI_DEPLOYMENT_NAME"),
         )
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
+        base_url: str | None,
         api_key: str | None,
         organization: str | None = None,
         azure_api_endpoint: str | None = None,
@@ -66,6 +68,7 @@ class OpenAIClient(ScopeDependency):
         # otherwise try using OpenAI
         else:
             self._client: AsyncOpenAI = AsyncOpenAI(
+                base_url=base_url,
                 api_key=api_key,
                 organization=organization,
             )
