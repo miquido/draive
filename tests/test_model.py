@@ -231,7 +231,7 @@ basic_conversation_message_json: str = (
     '"author": null, '
     '"created": null, '
     '"content": {'
-    '"parts": [{"text": "string"}]'
+    '"parts": [{"text": "string", "meta": null}]'
     "}}"
 )
 
@@ -248,7 +248,12 @@ image_conversation_message_json: str = (
     '"created": null, '
     '"content": {'
     '"parts": ['
-    '{"mime_type": null, "image_url": "https://miquido.com/image", "image_description": null}'
+    "{"
+    '"mime_type": null, '
+    '"image_url": "https://miquido.com/image", '
+    '"image_description": null, '
+    '"meta": null'
+    "}"
     "]"
     "}}"
 )
@@ -265,7 +270,12 @@ audio_conversation_message_json: str = (
     '"created": null, '
     '"content": {'
     '"parts": ['
-    '{"mime_type": null, "audio_url": "https://miquido.com/audio", "audio_transcription": null}'
+    "{"
+    '"mime_type": null, '
+    '"audio_url": "https://miquido.com/audio", '
+    '"audio_transcription": null, '
+    '"meta": null'
+    "}"
     "]"
     "}}"
 )
@@ -286,10 +296,20 @@ mixed_conversation_message_json: str = (
     '"author": null, '
     '"created": null, '
     '"content": {"parts": ['
-    '{"mime_type": null, "audio_url": "https://miquido.com/audio", "audio_transcription": null}, '
-    '{"text": "string"}, '
-    '{"mime_type": null, "image_url": "https://miquido.com/image", "image_description": null}, '
-    '{"text": "content"}'
+    "{"
+    '"mime_type": null, '
+    '"audio_url": "https://miquido.com/audio", '
+    '"audio_transcription": null, '
+    '"meta": null'
+    "}, "
+    '{"text": "string", "meta": null}, '
+    "{"
+    '"mime_type": null, '
+    '"image_url": "https://miquido.com/image", '
+    '"image_description": null, '
+    '"meta": null'
+    "}, "
+    '{"text": "content", "meta": null}'
     "]}}"
 )
 

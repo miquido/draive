@@ -261,7 +261,7 @@ def _merge_texts(
     last_text_element: TextContent | None = None
     while element := next(iterator, None):
         match element:
-            case TextContent() as text:
+            case TextContent() as text if not text.meta:  # do not merge texts with metadata
                 if last_text := last_text_element:
                     last_text_element = TextContent(text=last_text.text + text.text)
 

@@ -1,4 +1,4 @@
-from draive.parameters.model import DataModel
+from draive.parameters import DataModel
 
 __all__ = [
     "TextContent",
@@ -7,3 +7,4 @@ __all__ = [
 
 class TextContent(DataModel):
     text: str
+    meta: dict[str, str | float | int | bool | None] | None = None
