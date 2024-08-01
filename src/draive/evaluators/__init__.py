@@ -21,5 +21,5 @@ __all__ = [
     "text_relevance_evaluator",
     "text_keywords_evaluator",
     "text_similarity_evaluator",
-    "text_vector_similarity_evaluator"
+    "text_vector_similarity_evaluator",
 ]

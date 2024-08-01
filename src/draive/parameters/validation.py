@@ -7,7 +7,7 @@ import uuid
 from collections import abc as collections_abc
 from collections.abc import Callable, Sequence
 from dataclasses import is_dataclass
-from typing import Any
+from typing import Any, cast
 
 import draive.utils as draive_utils
 from draive.parameters.annotations import resolve_annotation
@@ -853,7 +853,7 @@ def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912, PLR0913
             validator = parametrized.validator
 
         case data_class if is_dataclass(data_class):
-            validator = _prepare_dataclass_validator(data_class)
+            validator = _prepare_dataclass_validator(cast(type[Any], data_class))
 
         case typed_dict if typing.is_typeddict(typed_dict):
             validator = _prepare_typed_dict_validator(

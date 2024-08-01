@@ -43,7 +43,7 @@ httpx==0.27.0
     #   draive (pyproject.toml)
     #   anthropic
     #   openai
-huggingface-hub==0.24.3
+huggingface-hub==0.24.5
     # via
     #   fastembed
     #   tokenizers
@@ -95,7 +95,7 @@ pillow==10.4.0
     # via fastembed
 pluggy==1.5.0
     # via pytest
-protobuf==5.27.2
+protobuf==5.27.3
     # via
     #   onnx
     #   onnxruntime
@@ -107,7 +107,7 @@ pydantic-core==2.20.1
     # via pydantic
 pygments==2.18.0
     # via rich
-pyright==1.1.372
+pyright==1.1.374
     # via draive (pyproject.toml)
 pystemmer==2.2.0.1
     # via fastembed

@@ -26,6 +26,8 @@ class MultimodalContent(DataModel):
         cls,
         *elements: Self | MultimodalContentConvertible,
         merge_text: bool = False,
+        skip_empty: bool = False,
+        meta: dict[str, str | float | int | bool | None] | None = None,
     ) -> Self:
         match elements:
             case [MultimodalContent() as content] if not merge_text:
@@ -37,7 +39,12 @@ class MultimodalContent(DataModel):
                         parts=tuple(
                             _merge_texts(
                                 *chain.from_iterable(
-                                    _extract_parts(element) for element in elements
+                                    _extract_parts(
+                                        element,
+                                        meta=meta,
+                                        skip_empty=skip_empty,
+                                    )
+                                    for element in elements
                                 )
                             )
                         ),
@@ -46,7 +53,14 @@ class MultimodalContent(DataModel):
                 else:
                     return cls(
                         parts=tuple(
-                            chain.from_iterable(_extract_parts(element) for element in elements)
+                            chain.from_iterable(
+                                _extract_parts(
+                                    element,
+                                    meta=meta,
+                                    skip_empty=skip_empty,
+                                )
+                                for element in elements
+                            )
                         ),
                     )
 
@@ -151,19 +165,55 @@ class MultimodalContent(DataModel):
         return bool(self.parts) and any(self.parts)
 
 
-def _extract_parts(
+def _extract_parts(  # noqa: PLR0911
     element: MultimodalContent | MultimodalContentConvertible,
     /,
+    skip_empty: bool = False,
+    meta: dict[str, str | float | int | bool | None] | None = None,
 ) -> frozenlist[MultimodalContentElement]:
     match element:
         case MultimodalContent() as content:
-            return content.parts
+            if skip_empty and not content:
+                return ()
+
+            elif meta:
+                return tuple(
+                    _update_meta(
+                        meta,
+                        element=part,
+                    )
+                    for part in content.parts
+                )
+
+            else:
+                return content.parts
 
         case str() as text:
-            return (TextContent(text=text),)
+            if skip_empty and not text:
+                return ()
+
+            else:
+                return (
+                    TextContent(
+                        text=text,
+                        meta=meta,
+                    ),
+                )
 
         case element:
-            return (element,)
+            if skip_empty and not element:
+                return ()
+
+            elif meta:
+                return (
+                    _update_meta(
+                        meta,
+                        element=element,
+                    ),
+                )
+
+            else:
+                return (element,)
 
 
 def _as_content(
@@ -261,9 +311,12 @@ def _merge_texts(
     last_text_element: TextContent | None = None
     while element := next(iterator, None):
         match element:
-            case TextContent() as text if not text.meta:  # do not merge texts with metadata
-                if last_text := last_text_element:
-                    last_text_element = TextContent(text=last_text.text + text.text)
+            case TextContent() as text:  # do not merge texts with different metadata
+                if (last_text := last_text_element) and last_text.meta == text.meta:
+                    last_text_element = TextContent(
+                        text=last_text.text + text.text,
+                        meta=text.meta,
+                    )
 
                 else:
                     last_text_element = text
@@ -279,3 +332,30 @@ def _merge_texts(
         result.append(last_text)
 
     return result
+
+
+def _update_meta(
+    meta: dict[str, str | float | int | bool | None],
+    /,
+    element: MultimodalContentElement,
+) -> MultimodalContentElement:
+    match element:
+        case (
+            (
+                TextContent()
+                | ImageURLContent()
+                | ImageBase64Content()
+                | AudioURLContent()
+                | AudioBase64Content()
+                | VideoURLContent()
+                | VideoBase64Content()
+            ) as content
+        ):
+            if current_meta := content.meta:
+                return content.updated(meta=current_meta | meta)
+
+            else:
+                return content.updated(meta=meta)
+
+        case DataModel() as model:
+            return model

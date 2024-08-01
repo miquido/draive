@@ -602,8 +602,8 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
         /,
         **parameters: Any,
     ) -> Self:
-        if not parameters:
-            return self
+        if not parameters or parameters.keys().isdisjoint(self.__PARAMETERS__.keys()):
+            return self  # do not make a copy when nothing will be updated
 
         updated: Self = self.__new__(self.__class__)
         for parameter in self.__PARAMETERS_LIST__:

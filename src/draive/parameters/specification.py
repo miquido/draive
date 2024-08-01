@@ -9,14 +9,7 @@ from collections.abc import Sequence
 from dataclasses import MISSING as DATACLASS_MISSING
 from dataclasses import fields as dataclass_fields
 from dataclasses import is_dataclass
-from typing import (
-    Any,
-    Literal,
-    NotRequired,
-    Required,
-    TypedDict,
-    final,
-)
+from typing import Any, Literal, NotRequired, Required, TypedDict, cast, final
 
 from draive import utils as draive_utils
 from draive.parameters.annotations import resolve_annotation
@@ -324,7 +317,10 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911, PLR0913
                 type_arguments=type_arguments,
                 globalns=globalns,
                 localns=localns,
-                recursion_guard=frozenset({*recursion_guard, data_class}),
+                recursion_guard=cast(
+                    frozenset[type[Any]],
+                    frozenset({*recursion_guard, data_class}),
+                ),
             )
 
             if not_missing(dataclass_specification):

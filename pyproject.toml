@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "draive"
-version = "0.22.3"
+version = "0.22.4"
 readme = "README.md"
 maintainers = [
-  {name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com"}
+  { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
 ]
 requires-python = ">=3.12"
 classifiers = [
@@ -19,43 +19,22 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
-license = {file = "LICENSE"}
-dependencies = [
-  "numpy~=1.26",
-]
+license = { file = "LICENSE" }
+dependencies = ["numpy~=1.26"]
 
 [project.urls]
 Homepage = "https://miquido.com"
 Repository = "https://github.com/miquido/draive.git"
 
 [project.optional-dependencies]
-sentencepiece = [
-  "sentencepiece~=0.2",
-]
-fastembed = [
-  "fastembed~=0.3.0",
-]
-openai = [
-  "openai~=1.32",
-  "tiktoken~=0.7",
-]
-anthropic = [
-  "anthropic~=0.29.0",
-]
-mistral = [
-  "httpx~=0.27",
-  "draive[sentencepiece]",
-]
-gemini = [
-  "httpx~=0.27",
-  "draive[sentencepiece]",
-]
-ollama = [
-  "httpx~=0.27",
-]
-mistralrs = [
-  "mistralrs~=0.1.19",
-]
+sentencepiece = ["sentencepiece~=0.2"]
+fastembed = ["fastembed~=0.3.0"]
+openai = ["openai~=1.32", "tiktoken~=0.7"]
+anthropic = ["anthropic~=0.29.0"]
+mistral = ["httpx~=0.27", "draive[sentencepiece]"]
+gemini = ["httpx~=0.27", "draive[sentencepiece]"]
+ollama = ["httpx~=0.27"]
+mistralrs = ["mistralrs~=0.1.19"]
 
 dev = [
   "draive[sentencepiece]",
@@ -89,14 +68,10 @@ extend-immutable-calls = ["Argument", "draive.Argument"]
 
 [tool.pyright]
 pythonVersion = "3.12"
-venvPath = "./.venv"
-include = [
-  "./src",
-]
-exclude = [
-  "**/node_modules",
-  "**/__pycache__",
-]
+venvPath = "."
+venv = ".venv"
+include = ["./src"]
+exclude = ["**/node_modules", "**/__pycache__"]
 ignore = []
 stubPath = "./stubs"
 reportMissingImports = true
