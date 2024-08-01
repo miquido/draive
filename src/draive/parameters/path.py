@@ -90,8 +90,8 @@ class ParameterPathAttributeComponent(ParameterPathComponent):
 
             return updated  # pyright: ignore[reportUnknownVariableType]
 
-        self._resolve: Callable[[Root], Parameter] = resolve
-        self._assign: Callable[[Root, Parameter], Root] = assign
+        self._resolve: Callable[[Any], Any] = resolve
+        self._assign: Callable[[Any, Any], Any] = assign
         self._attribute: str = attribute
 
         freeze(self)
@@ -182,8 +182,8 @@ class ParameterPathItemComponent(ParameterPathComponent):
             else:
                 raise RuntimeError(f"Unsupported item assignment - {type(value)} in {type(root)}")
 
-        self._resolve: Callable[[Root], Parameter] = resolve
-        self._assign: Callable[[Root, Parameter], Root] = assign
+        self._resolve: Callable[[Any], Any] = resolve
+        self._assign: Callable[[Any, Any], Any] = assign
         self._item: Any = item
 
     def path_str(

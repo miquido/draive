@@ -70,6 +70,7 @@ update:
 # Run formatter.
 format:
 	@ruff check --quiet --fix $(SOURCES_PATH) $(TESTS_PATH)
+	@ruff format --quiet $(SOURCES_PATH) $(TESTS_PATH)
 
 # Run linters and code checks.
 lint:

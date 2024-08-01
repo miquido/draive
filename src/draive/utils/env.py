@@ -11,13 +11,11 @@ __all__ = [
 
 
 @overload
-def getenv_bool(key: str) -> bool | None:
-    ...
+def getenv_bool(key: str) -> bool | None: ...
 
 
 @overload
-def getenv_bool(key: str, default: bool) -> bool:
-    ...
+def getenv_bool(key: str, default: bool) -> bool: ...
 
 
 def getenv_bool(
@@ -31,13 +29,11 @@ def getenv_bool(
 
 
 @overload
-def getenv_int(key: str) -> int | None:
-    ...
+def getenv_int(key: str) -> int | None: ...
 
 
 @overload
-def getenv_int(key: str, default: int) -> int:
-    ...
+def getenv_int(key: str, default: int) -> int: ...
 
 
 def getenv_int(
@@ -52,13 +48,11 @@ def getenv_int(
 
 
 @overload
-def getenv_float(key: str) -> float | None:
-    ...
+def getenv_float(key: str) -> float | None: ...
 
 
 @overload
-def getenv_float(key: str, default: float) -> float:
-    ...
+def getenv_float(key: str, default: float) -> float: ...
 
 
 def getenv_float(
@@ -73,13 +67,11 @@ def getenv_float(
 
 
 @overload
-def getenv_str(key: str) -> str | None:
-    ...
+def getenv_str(key: str) -> str | None: ...
 
 
 @overload
-def getenv_str(key: str, default: str) -> str:
-    ...
+def getenv_str(key: str, default: str) -> str: ...
 
 
 def getenv_str(
