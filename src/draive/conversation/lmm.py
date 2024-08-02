@@ -8,20 +8,17 @@ from draive.conversation.model import (
     ConversationMessageChunk,
     ConversationResponseStream,
 )
-from draive.helpers import ConstantMemory
 from draive.instructions import Instruction
-from draive.lmm import AnyTool, Toolbox, ToolStatus, lmm_invocation
+from draive.lmm import Toolbox, ToolStatus, lmm_invocation
 from draive.scope import ctx
 from draive.types import (
     LMMCompletion,
     LMMCompletionChunk,
     LMMContextElement,
-    LMMInput,
     LMMToolRequests,
     LMMToolResponse,
     Memory,
     MultimodalContent,
-    MultimodalContentConvertible,
 )
 from draive.utils import Missing, not_missing
 
@@ -34,11 +31,9 @@ __all__: list[str] = [
 async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
-    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
-    | Sequence[ConversationMessage]
-    | None = None,
-    tools: Toolbox | Sequence[AnyTool] | None = None,
+    message: ConversationMessage,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage],
+    toolbox: Toolbox,
     stream: Literal[True],
     **extra: Any,
 ) -> ConversationResponseStream: ...
@@ -48,11 +43,9 @@ async def lmm_conversation_completion(
 async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
-    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
-    | Sequence[ConversationMessage]
-    | None = None,
-    tools: Toolbox | Sequence[AnyTool] | None = None,
+    message: ConversationMessage,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage],
+    toolbox: Toolbox,
     stream: Literal[False] = False,
     **extra: Any,
 ) -> ConversationMessage: ...
@@ -62,11 +55,9 @@ async def lmm_conversation_completion(
 async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
-    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
-    | Sequence[ConversationMessage]
-    | None = None,
-    tools: Toolbox | Sequence[AnyTool] | None = None,
+    message: ConversationMessage,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage],
+    toolbox: Toolbox,
     stream: bool,
     **extra: Any,
 ) -> ConversationResponseStream | ConversationMessage: ...
@@ -75,65 +66,33 @@ async def lmm_conversation_completion(
 async def lmm_conversation_completion(
     *,
     instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
-    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
-    | Sequence[ConversationMessage]
-    | None = None,
-    tools: Toolbox | Sequence[AnyTool] | None = None,
+    message: ConversationMessage,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage],
+    toolbox: Toolbox,
     stream: bool = False,
     **extra: Any,
 ) -> ConversationResponseStream | ConversationMessage:
     with ctx.nested(
         "lmm_conversation_completion",
     ):
-        toolbox: Toolbox
-        match tools:
-            case None:
-                toolbox = Toolbox()
+        context: list[LMMContextElement]
 
-            case Toolbox() as tools:
-                toolbox = tools
+        messages: Sequence[ConversationMessage] | Missing = await memory.recall()
+        if not_missing(messages):
+            context = [
+                *(message.as_lmm_context_element() for message in messages),
+                message.as_lmm_context_element(),
+            ]
 
-            case [*tools]:
-                toolbox = Toolbox(*tools)
-
-        context: list[LMMContextElement] = []
-
-        conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage]
-        match memory:
-            case None:
-                conversation_memory = ConstantMemory([])
-
-            case Memory() as memory:
-                messages: Sequence[ConversationMessage] | Missing = await memory.recall()
-                if not_missing(messages):
-                    context.extend(message.as_lmm_context_element() for message in messages)
-                conversation_memory = memory
-
-            case [*memory_messages]:
-                context.extend(message.as_lmm_context_element() for message in memory_messages)
-                conversation_memory = ConstantMemory(memory_messages)
-
-        request_message: ConversationMessage
-        match input:
-            case ConversationMessage() as message:
-                context.append(LMMInput.of(message.content))
-                request_message = message
-
-            case content:
-                context.append(LMMInput.of(content))
-                request_message = ConversationMessage(
-                    role="user",
-                    created=datetime.now(UTC),
-                    content=MultimodalContent.of(content),
-                )
+        else:
+            context = [message.as_lmm_context_element()]
 
         if stream:
             return ctx.stream(
                 _lmm_conversation_completion_stream(
                     instruction=instruction,
-                    request_message=request_message,
-                    conversation_memory=conversation_memory,
+                    message=message,
+                    memory=memory,
                     context=context,
                     toolbox=toolbox,
                     **extra,
@@ -143,8 +102,8 @@ async def lmm_conversation_completion(
         else:
             return await _lmm_conversation_completion(
                 instruction=instruction,
-                request_message=request_message,
-                conversation_memory=conversation_memory,
+                message=message,
+                memory=memory,
                 context=context,
                 toolbox=toolbox,
                 **extra,
@@ -153,8 +112,8 @@ async def lmm_conversation_completion(
 
 async def _lmm_conversation_completion(
     instruction: Instruction | str,
-    request_message: ConversationMessage,
-    conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage],
+    message: ConversationMessage,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage],
     context: list[LMMContextElement],
     toolbox: Toolbox,
     **extra: Any,
@@ -177,8 +136,8 @@ async def _lmm_conversation_completion(
                     created=datetime.now(UTC),
                     content=completion.content,
                 )
-                await conversation_memory.remember(
-                    request_message,
+                await memory.remember(
+                    message,
                     response_message,
                 )
                 return response_message
@@ -196,8 +155,8 @@ async def _lmm_conversation_completion(
                         created=datetime.now(UTC),
                         content=MultimodalContent.of(*direct_content),
                     )
-                    await conversation_memory.remember(
-                        request_message,
+                    await memory.remember(
+                        message,
                         response_message,
                     )
                     return response_message
@@ -212,8 +171,8 @@ async def _lmm_conversation_completion(
 
 async def _lmm_conversation_completion_stream(
     instruction: Instruction | str,
-    request_message: ConversationMessage,
-    conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage],
+    message: ConversationMessage,
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage],
     context: list[LMMContextElement],
     toolbox: Toolbox,
     **extra: Any,
@@ -288,8 +247,8 @@ async def _lmm_conversation_completion_stream(
 
     ctx.log_debug("Remembering conversation result")
     # remember messages when finishing stream
-    await conversation_memory.remember(
-        request_message,
+    await memory.remember(
+        message,
         ConversationMessage(
             identifier=response_identifier,
             role="model",
