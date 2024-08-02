@@ -185,7 +185,7 @@ async def _lmm_conversation_completion(
 
             case LMMToolRequests() as tool_requests:
                 ctx.log_debug("Received conversation tool calls")
-                context.append(tool_requests)
+
                 responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
 
                 if direct_content := [
@@ -203,7 +203,7 @@ async def _lmm_conversation_completion(
                     return response_message
 
                 else:
-                    context.extend(responses)
+                    context.extend([tool_requests, *responses])
 
         recursion_level += 1  # continue with next recursion level
 

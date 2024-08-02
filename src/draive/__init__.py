@@ -106,6 +106,13 @@ from draive.similarity import (
     vector_similarity_search,
 )
 from draive.splitters import split_text
+from draive.steps import (
+    Step,
+    Steps,
+    StepsCompletion,
+    lmm_steps_completion,
+    steps_completion,
+)
 from draive.tokenization import TextTokenizer, Tokenization, count_text_tokens, tokenize_text
 from draive.types import (
     JSON,
@@ -231,6 +238,7 @@ __all__ = [
     "JSON",
     "lmm_conversation_completion",
     "lmm_invocation",
+    "lmm_steps_completion",
     "LMM",
     "LMMCompletion",
     "LMMCompletionChunk",
@@ -272,6 +280,10 @@ __all__ = [
     "ScopeDependencies",
     "ScopeDependency",
     "ScopeState",
+    "steps_completion",
+    "Step",
+    "Steps",
+    "StepsCompletion",
     "setup_logging",
     "split_sequence",
     "split_text",
