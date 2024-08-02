@@ -186,7 +186,7 @@ def _prepare_tuple_validator(
                 context: ParameterValidationContext,
             ) -> Any:
                 match value:
-                    case [*values] as value:
+                    case [*values]:
                         return tuple[Any, ...](
                             element_validator(element, context.appending_path(f"[{idx}]"))
                             for idx, element in enumerate(values)
@@ -222,7 +222,7 @@ def _prepare_tuple_validator(
                 context: ParameterValidationContext,
             ) -> Any:
                 match value:
-                    case [*values] as value if len(values) == len(element_validators):
+                    case [*values] if len(values) == len(element_validators):
                         return tuple[Any, ...](
                             validator(element, context.appending_path(f"[{idx}]"))
                             for (idx, element), validator in zip(
@@ -270,7 +270,7 @@ def _prepare_list_validator(
         context: ParameterValidationContext,
     ) -> Any:
         match value:
-            case [*values] as value:
+            case [*values]:
                 return list[Any](
                     element_validator(element, context.appending_path(f"[{idx}]"))
                     for idx, element in enumerate(values)
@@ -317,7 +317,13 @@ def _prepare_set_validator(
         context: ParameterValidationContext,
     ) -> Any:
         match value:
-            case [*values] as value:
+            case set() as set_value:  # pyright: ignore[reportUnknownVariableType]
+                return set[Any](
+                    element_validator(element, context)
+                    for element in set_value  # pyright: ignore[reportUnknownVariableType]
+                )
+
+            case [*values]:
                 return set[Any](
                     element_validator(element, context.appending_path(f"[{idx}]"))
                     for idx, element in enumerate(values)
@@ -328,7 +334,7 @@ def _prepare_set_validator(
 
             case _:
                 raise ParameterValidationError.invalid_type(
-                    expected=list,
+                    expected=set,
                     received=value,
                     context=context,
                 )
