@@ -7,6 +7,7 @@ __all__ = [
     "OpenAIChatConfig",
     "OpenAIEmbeddingConfig",
     "OpenAIImageGenerationConfig",
+    "OpenAIModerationConfig",
     "OpenAISystemFingerprint",
 ]
 
@@ -46,3 +47,17 @@ class OpenAIImageGenerationConfig(DataModel):
 
 class OpenAISystemFingerprint(DataModel):
     system_fingerprint: str
+
+
+class OpenAIModerationConfig(DataModel):
+    harassment_threshold: float | Missing = MISSING
+    harassment_threatening_threshold: float | Missing = MISSING
+    hate_threshold: float | Missing = MISSING
+    hate_threatening_threshold: float | Missing = MISSING
+    self_harm_threshold: float | Missing = MISSING
+    self_harm_instructions_threshold: float | Missing = MISSING
+    self_harm_intent_threshold: float | Missing = MISSING
+    sexual_threshold: float | Missing = MISSING
+    sexual_minors_threshold: float | Missing = MISSING
+    violence_threshold: float | Missing = MISSING
+    violence_graphic_threshold: float | Missing = MISSING
