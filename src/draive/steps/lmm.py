@@ -9,8 +9,8 @@ from draive.steps.model import Step
 from draive.types import (
     LMMContextElement,
     LMMInput,
+    Multimodal,
     MultimodalContent,
-    MultimodalContentConvertible,
 )
 from draive.types.lmm import LMMCompletion, LMMToolRequests, LMMToolResponse
 
@@ -22,7 +22,7 @@ __all__ = [
 async def lmm_steps_completion(
     *,
     instruction: Instruction | str,
-    steps: Iterable[Step | MultimodalContent | MultimodalContentConvertible],
+    steps: Iterable[Step | Multimodal],
     **extra: Any,
 ) -> MultimodalContent:
     with ctx.nested(
@@ -62,11 +62,10 @@ async def _lmm_process_step(
     context: list[LMMContextElement],
     **extra: Any,
 ) -> None:
-    recursion_level: int = 0
-
     context.append(LMMInput.of(step.input))
     toolbox: Toolbox = step.toolbox
 
+    recursion_level: int = 0
     while recursion_level <= toolbox.recursion_limit:
         match await lmm_invocation(
             instruction=instruction,

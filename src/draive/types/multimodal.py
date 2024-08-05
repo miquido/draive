@@ -13,6 +13,7 @@ __all__ = [
     "MultimodalContent",
     "MultimodalContentElement",
     "MultimodalContentConvertible",
+    "Multimodal",
 ]
 
 MultimodalContentElement = TextContent | ImageContent | AudioContent | VideoContent | DataModel
@@ -165,8 +166,11 @@ class MultimodalContent(DataModel):
         return bool(self.parts) and any(self.parts)
 
 
+Multimodal = MultimodalContent | MultimodalContentConvertible
+
+
 def _extract_parts(  # noqa: PLR0911
-    element: MultimodalContent | MultimodalContentConvertible,
+    element: Multimodal,
     /,
     skip_empty: bool = False,
     meta: dict[str, str | float | int | bool | None] | None = None,

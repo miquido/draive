@@ -57,24 +57,20 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
         extended_instruction: Instruction
         match schema_injection:
             case "auto":
-                extended_instruction = Instruction.of(
-                    generation_instruction.extended(
-                        DEFAULT_INSTRUCTION_EXTENSION.format(
-                            schema=generated.simplified_schema(indent=2),
-                        ),
-                        joiner="\n\n",
+                extended_instruction = generation_instruction.extended(
+                    DEFAULT_INSTRUCTION_EXTENSION.format(
+                        schema=generated.simplified_schema(indent=2),
                     ),
+                    joiner="\n\n",
                 )
 
             case "full":
-                extended_instruction = Instruction.of(
-                    generation_instruction,
+                extended_instruction = generation_instruction.updated(
                     schema=generated.json_schema(indent=2),
                 )
 
             case "simplified":
-                extended_instruction = Instruction.of(
-                    generation_instruction,
+                extended_instruction = generation_instruction.updated(
                     schema=generated.simplified_schema(indent=2),
                 )
 
@@ -149,7 +145,7 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
 
 
 DEFAULT_INSTRUCTION_EXTENSION: str = """\
-The output have to be a JSON conforming to the following schema:
+The result have to be a JSON conforming to the following schema:
 ```
 {schema}
 ```

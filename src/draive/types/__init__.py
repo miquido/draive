@@ -17,6 +17,7 @@ from draive.types.lmm import (
 )
 from draive.types.memory import BasicMemory, Memory
 from draive.types.multimodal import (
+    Multimodal,
     MultimodalContent,
     MultimodalContentConvertible,
     MultimodalContentElement,
@@ -48,6 +49,7 @@ __all__ = [
     "MultimodalContent",
     "MultimodalContentConvertible",
     "MultimodalContentElement",
+    "Multimodal",
     "RateLimitError",
     "TextContent",
     "VideoBase64Content",

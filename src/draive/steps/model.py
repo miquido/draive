@@ -14,7 +14,7 @@ class Step(State):
     @classmethod
     def of(
         cls,
-        input: MultimodalContentConvertible,  # noqa: A002
+        input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
         /,
         *,
         tools: Toolbox | Sequence[AnyTool] | None = None,

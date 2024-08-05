@@ -34,7 +34,7 @@ def xml_tags(  # noqa: C901
                 accumulator += char
                 if in_content and accumulator == closing_tag:
                     in_content = False
-                    yield content
+                    yield content.strip()
                     content = ""  # clear to be ready for next tag
 
                 elif check_opening(accumulator):

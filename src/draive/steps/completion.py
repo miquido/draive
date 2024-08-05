@@ -3,7 +3,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from draive.instructions import Instruction
 from draive.steps.model import Step
-from draive.types import MultimodalContent, MultimodalContentConvertible
+from draive.types import Multimodal, MultimodalContent
 
 __all__ = [
     "StepsCompletion",
@@ -16,6 +16,6 @@ class StepsCompletion(Protocol):
         self,
         *,
         instruction: Instruction | str,
-        steps: Iterable[Step | MultimodalContent | MultimodalContentConvertible],
+        steps: Iterable[Step | Multimodal],
         **extra: Any,
     ) -> MultimodalContent: ...
