@@ -5,7 +5,7 @@ from draive.instructions import Instruction
 from draive.scope import ctx
 from draive.steps.model import Step
 from draive.steps.state import Steps
-from draive.types import MultimodalContent, MultimodalContentConvertible
+from draive.types import Multimodal, MultimodalContent
 
 __all__ = [
     "steps_completion",
@@ -15,7 +15,7 @@ __all__ = [
 async def steps_completion(
     *,
     instruction: Instruction | str,
-    steps: Iterable[Step | MultimodalContent | MultimodalContentConvertible],
+    steps: Iterable[Step | Multimodal],
     **extra: Any,
 ) -> MultimodalContent:
     return await ctx.state(Steps).completion(

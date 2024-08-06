@@ -26,7 +26,7 @@ def markdown_blocks(  # noqa: C901, PLR0912
                 if char.isspace():
                     if in_content:
                         in_content = False
-                        yield content
+                        yield content.strip()
                         content = ""  # clear to be ready for next block
 
                     elif accumulator.startswith(opening_sequence):
@@ -78,7 +78,7 @@ def markdown_blocks(  # noqa: C901, PLR0912
 
     # when we hit the end while closing sequence was in place yield the last part
     if in_content and in_sequence and accumulator == boundary_sequence:
-        yield content
+        yield content.strip()
 
 
 def markdown_block(
