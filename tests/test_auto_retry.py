@@ -102,6 +102,41 @@ async def test_fails_with_cancellation():
 
 @mark.asyncio
 @ctx.wrap("test")
+async def test_retries_with_selected_errors():
+    executions: int = 0
+
+    @auto_retry
+    def compute(value: str, /) -> str:
+        nonlocal executions
+        executions += 1
+        if executions == 1:
+            raise FakeException()
+        else:
+            return value
+
+    assert compute("expected") == "expected"
+    assert executions == 2
+
+
+@mark.asyncio
+@ctx.wrap("test")
+async def test_fails_with_not_selected_errors():
+    executions: int = 0
+
+    @auto_retry(catching={ValueError})
+    def compute(value: str, /) -> str:
+        nonlocal executions
+        executions += 1
+        raise FakeException()
+
+    with raises(FakeException):
+        compute("expected")
+
+    assert executions == 1
+
+
+@mark.asyncio
+@ctx.wrap("test")
 async def test_async_returns_value_without_errors():
     executions: int = 0
 
@@ -244,3 +279,38 @@ async def test_async_logs_issue_with_errors():
             f"ERROR:test:[{metrics_trace}] Attempting to retry {compute.__name__}"
             " which failed due to an error"
         )
+
+
+@mark.asyncio
+@ctx.wrap("test")
+async def test_async_retries_with_selected_errors():
+    executions: int = 0
+
+    @auto_retry
+    async def compute(value: str, /) -> str:
+        nonlocal executions
+        executions += 1
+        if executions == 1:
+            raise FakeException()
+        else:
+            return value
+
+    assert await compute("expected") == "expected"
+    assert executions == 2
+
+
+@mark.asyncio
+@ctx.wrap("test")
+async def test_async_fails_with_not_selected_errors():
+    executions: int = 0
+
+    @auto_retry(catching={ValueError})
+    async def compute(value: str, /) -> str:
+        nonlocal executions
+        executions += 1
+        raise FakeException()
+
+    with raises(FakeException):
+        await compute("expected")
+
+    assert executions == 1
