@@ -126,6 +126,7 @@ class OpenAIClient(ScopeDependency):
                 top_p=config.top_p if not_missing(config.top_p) else NOT_GIVEN,
                 timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,
                 stream_options={"include_usage": True} if stream else NOT_GIVEN,
+                stop=config.stop_sequences if not_missing(config.stop_sequences) else NOT_GIVEN,
             )
 
         except OpenAIRateLimitError as exc:  # retry on rate limit after delay

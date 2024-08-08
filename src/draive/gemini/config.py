@@ -17,6 +17,7 @@ class GeminiConfig(DataModel):
     top_k: int | Missing = MISSING
     max_tokens: int = 2048
     timeout: float | Missing = MISSING
+    stop_sequences: list[str] | Missing = MISSING
 
 
 class GeminiEmbeddingConfig(DataModel):
