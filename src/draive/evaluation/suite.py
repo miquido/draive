@@ -1,10 +1,11 @@
 from asyncio import Lock, gather
 from collections.abc import Callable
 from pathlib import Path
-from typing import Protocol, overload, runtime_checkable
+from typing import Protocol, Self, overload, runtime_checkable
 from uuid import UUID, uuid4
 
-from draive.evaluation.scenario import ScenarioEvaluatorResult
+from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
+from draive.evaluation.scenario import PreparedScenarioEvaluator, ScenarioEvaluatorResult
 from draive.parameters import DataModel, Field
 from draive.scope import ctx
 from draive.types import frozenlist
@@ -33,7 +34,7 @@ class EvaluationSuiteCaseResult[CaseParameters: DataModel, Value: DataModel | st
     value: Value = Field(
         description="Evaluated value",
     )
-    results: frozenlist[ScenarioEvaluatorResult] = Field(
+    results: frozenlist[ScenarioEvaluatorResult | EvaluatorResult] = Field(
         description="Evaluation results",
     )
 
@@ -43,10 +44,40 @@ class EvaluationSuiteCaseResult[CaseParameters: DataModel, Value: DataModel | st
 
 
 class EvaluationCaseResult[Value: DataModel | str](DataModel):
+    @classmethod
+    def of(
+        cls,
+        results: ScenarioEvaluatorResult | EvaluatorResult,
+        *_results: ScenarioEvaluatorResult | EvaluatorResult,
+        value: Value,
+    ) -> Self:
+        return cls(
+            value=value,
+            results=(results, *_results),
+        )
+
+    @classmethod
+    async def evaluating(
+        cls,
+        value: Value,
+        /,
+        evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
+        *_evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
+    ) -> Self:
+        return cls(
+            value=value,
+            results=tuple(
+                await gather(
+                    *[evaluator(value) for evaluator in [evaluators, *_evaluators]],
+                    return_exceptions=False,
+                ),
+            ),
+        )
+
     value: Value = Field(
         description="Evaluated value",
     )
-    results: frozenlist[ScenarioEvaluatorResult] = Field(
+    results: frozenlist[ScenarioEvaluatorResult | EvaluatorResult] = Field(
         description="Evaluation results",
     )
 
@@ -55,7 +86,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
 class EvaluationSuiteDefinition[CaseParameters: DataModel, Value: DataModel | str](Protocol):
     async def __call__(
         self,
-        evaluation_case: CaseParameters,
+        parameters: CaseParameters,
     ) -> EvaluationCaseResult[Value]: ...
 
 
@@ -89,33 +120,36 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
     @overload
     async def __call__(
         self,
+        parameters: CaseParameters | UUID | None,
+        /,
         *,
-        evaluated_case: CaseParameters | UUID | None,
         reload: bool = False,
     ) -> EvaluationSuiteCaseResult[CaseParameters, Value]: ...
 
     @overload
     async def __call__(
         self,
+        /,
         *,
         reload: bool = False,
     ) -> list[EvaluationSuiteCaseResult[CaseParameters, Value]]: ...
 
     async def __call__(
         self,
+        parameters: CaseParameters | UUID | None = None,
+        /,
         *,
-        evaluated_case: CaseParameters | UUID | None = None,
         reload: bool = False,
     ) -> (
         list[EvaluationSuiteCaseResult[CaseParameters, Value]]
         | EvaluationSuiteCaseResult[CaseParameters, Value]
     ):
         async with self._lock:
-            match evaluated_case:
+            match parameters:
                 case None:
                     return await gather(
                         *[
-                            self._evaluate(evaluated_case=case)
+                            self._evaluate(case=case)
                             for case in (await self._data(reload=reload)).cases
                         ],
                         return_exceptions=False,
@@ -130,14 +164,14 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
                         iter([case for case in available_cases if case.identifier == identifier]),
                         None,
                     ):
-                        return await self._evaluate(evaluated_case=evaluation_case)
+                        return await self._evaluate(case=evaluation_case)
 
                     else:
                         raise ValueError(f"Evaluation case with ID {identifier} does not exists.")
 
                 case case_parameters:
                     return await self._evaluate(
-                        evaluated_case=EvaluationSuiteCase[CaseParameters](
+                        case=EvaluationSuiteCase[CaseParameters](
                             parameters=case_parameters,
                         )
                     )
@@ -145,27 +179,25 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
     async def _evaluate(
         self,
         *,
-        evaluated_case: EvaluationSuiteCase[CaseParameters],
+        case: EvaluationSuiteCase[CaseParameters],
     ) -> EvaluationSuiteCaseResult[CaseParameters, Value]:
-        case_result: EvaluationCaseResult[Value] = await self._definition(
-            evaluation_case=evaluated_case.parameters
-        )
+        result: EvaluationCaseResult[Value] = await self._definition(parameters=case.parameters)
 
         return EvaluationSuiteCaseResult[CaseParameters, Value](
-            case=evaluated_case,
-            value=case_result.value,
-            results=case_result.results,
+            case=case,
+            value=result.value,
+            results=result.results,
         )
 
     async def _data(
         self,
         reload: bool = False,
     ) -> EvaluationSuiteData[CaseParameters]:
-        if (data := self._data_cache) and not reload:
-            return data
+        if reload or self._data_cache is None:
+            self._data_cache = await self._storage.load()
+            return self._data_cache
 
         else:
-            self._data_cache = await self._storage.load()
             return self._data_cache
 
     async def cases(

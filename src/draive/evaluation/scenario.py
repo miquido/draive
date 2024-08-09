@@ -1,8 +1,7 @@
-from asyncio import gather
 from collections.abc import Callable, Sequence
 from typing import Protocol, overload, runtime_checkable
 
-from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
+from draive.evaluation.evaluator import EvaluatorResult
 from draive.parameters import DataModel, Field
 from draive.types import frozenlist
 from draive.utils import freeze
@@ -33,6 +32,7 @@ class PreparedScenarioEvaluator[Value](Protocol):
     async def __call__(
         self,
         value: Value,
+        /,
     ) -> ScenarioEvaluatorResult: ...
 
 
@@ -41,11 +41,13 @@ class ScenarioEvaluatorDefinition[Value, **Args](Protocol):
     @property
     def __name__(self) -> str: ...
 
-    def __call__(
+    async def __call__(
         self,
+        value: Value,
+        /,
         *args: Args.args,
         **kwargs: Args.kwargs,
-    ) -> Sequence[PreparedEvaluator[Value]] | PreparedEvaluator[Value]: ...
+    ) -> Sequence[EvaluatorResult]: ...
 
 
 class ScenarioEvaluator[Value, **Args]:
@@ -64,25 +66,13 @@ class ScenarioEvaluator[Value, **Args]:
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> PreparedScenarioEvaluator[Value]:
-        prepared_evaluators: Sequence[PreparedEvaluator[Value]]
-        match self._definition(*args, **kwargs):
-            case [*evaluators]:
-                prepared_evaluators = evaluators
-
-            case evaluator:
-                prepared_evaluators = (evaluator,)
-
         async def evaluate(
             value: Value,
         ) -> ScenarioEvaluatorResult:
-            return ScenarioEvaluatorResult(
-                name=self.name,
-                evaluations=tuple(
-                    await gather(
-                        *[evaluator(value) for evaluator in prepared_evaluators],
-                        return_exceptions=False,
-                    ),
-                ),
+            return await self(
+                value,
+                *args,
+                **kwargs,
             )
 
         return evaluate
@@ -94,21 +84,14 @@ class ScenarioEvaluator[Value, **Args]:
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> ScenarioEvaluatorResult:
-        prepared_evaluators: Sequence[PreparedEvaluator[Value]]
-        match self._definition(*args, **kwargs):
-            case [*evaluators]:
-                prepared_evaluators = evaluators
-
-            case evaluator:
-                prepared_evaluators = (evaluator,)
-
         return ScenarioEvaluatorResult(
             name=self.name,
             evaluations=tuple(
-                await gather(
-                    *[evaluator(value) for evaluator in prepared_evaluators],
-                    return_exceptions=False,
-                ),
+                await self._definition(
+                    value,
+                    *args,
+                    **kwargs,
+                )
             ),
         )
 
