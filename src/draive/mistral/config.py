@@ -21,6 +21,7 @@ class MistralChatConfig(DataModel):
     max_tokens: int = 2048
     response_format: ResponseFormat | Missing = MISSING
     timeout: float | Missing = MISSING
+    stop_sequences: list[str] | Missing = MISSING
 
 
 class MistralEmbeddingConfig(DataModel):

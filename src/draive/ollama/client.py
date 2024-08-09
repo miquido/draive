@@ -52,6 +52,7 @@ class OllamaClient(ScopeDependency):
             if not_missing(config.response_format)
             else "text",
             seed=config.seed if not_missing(config.seed) else None,
+            stop=config.stop_sequences if not_missing(config.stop_sequences) else None,
         )
 
     async def _create_chat_completion(  # noqa: PLR0913
@@ -64,6 +65,7 @@ class OllamaClient(ScopeDependency):
         max_tokens: int | None,
         response_format: Literal["text", "json"],
         messages: list[ChatMessage],
+        stop: list[str] | None,
     ) -> ChatCompletionResponse:
         request_body: dict[str, Any] = {
             "model": model,
@@ -82,6 +84,8 @@ class OllamaClient(ScopeDependency):
             request_body["options"]["top_p"] = top_p
         if seed is not None:
             request_body["options"]["seed"] = seed
+        if stop:
+            request_body["options"]["stop"] = stop
         if response_format == "json":
             request_body["format"] = "json"
 

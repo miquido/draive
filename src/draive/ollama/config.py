@@ -17,3 +17,4 @@ class OllamaChatConfig(DataModel):
     max_tokens: int = 2048
     response_format: Literal["text", "json"] | Missing = MISSING
     timeout: float | Missing = MISSING
+    stop_sequences: list[str] | Missing = MISSING

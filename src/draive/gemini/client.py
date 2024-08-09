@@ -75,6 +75,9 @@ class GeminiClient(ScopeDependency):
                         "maxOutputTokens": config.max_tokens,
                         "responseSchema": response_schema if response_schema else None,
                         "candidateCount": 1,
+                        "stopSequences": config.stop_sequences
+                        if not_missing(config.stop_sequences)
+                        else None,
                     },
                     "systemInstruction": {
                         "parts": ({"text": instruction},),

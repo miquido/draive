@@ -26,3 +26,4 @@ class AnthropicConfig(DataModel):
     top_p: float | Missing = MISSING
     max_tokens: int = 2048
     timeout: float | Missing = MISSING
+    stop_sequences: list[str] | Missing = MISSING

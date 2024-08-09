@@ -12,3 +12,4 @@ class MRSChatConfig(DataModel):
     top_p: float | Missing = MISSING
     top_k: int | Missing = MISSING
     max_tokens: int = 2048
+    stop_sequences: list[str] | Missing = MISSING

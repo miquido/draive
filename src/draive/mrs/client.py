@@ -103,6 +103,9 @@ class MRSClient(ScopeDependency):
                 top_p=config.top_p if not_missing(config.top_p) else None,
                 top_k=config.top_k if not_missing(config.top_k) else None,
                 max_tokens=config.max_tokens if not_missing(config.max_tokens) else None,
+                stop_sequences=config.stop_sequences
+                if not_missing(config.stop_sequences)
+                else None,
             )
 
         else:
@@ -113,6 +116,9 @@ class MRSClient(ScopeDependency):
                 top_p=config.top_p if not_missing(config.top_p) else None,
                 top_k=config.top_k if not_missing(config.top_k) else None,
                 max_tokens=config.max_tokens if not_missing(config.max_tokens) else None,
+                stop_sequences=config.stop_sequences
+                if not_missing(config.stop_sequences)
+                else None,
             )
 
     async def _create_chat_completion(  # noqa: PLR0913
@@ -123,6 +129,7 @@ class MRSClient(ScopeDependency):
         top_k: int | None,
         max_tokens: int | None,
         messages: list[dict[str, object]],
+        stop_sequences: list[str] | None,
     ) -> ChatCompletionResponse:
         return await self._send_chat_completion_request(
             runner=await self._get_runner(model),
@@ -132,6 +139,7 @@ class MRSClient(ScopeDependency):
             top_k=top_k,
             max_tokens=max_tokens,
             messages=messages,
+            stop_sequences=stop_sequences,
         )
 
     async def _create_chat_stream(  # noqa: PLR0913
@@ -142,6 +150,7 @@ class MRSClient(ScopeDependency):
         top_k: int | None,
         max_tokens: int | None,
         messages: list[dict[str, object]],
+        stop_sequences: list[str] | None,
     ) -> AsyncIterable[ChatCompletionChunkResponse]:
         return ctx.stream_sync(
             self._send_chat_completion_stream_request(
@@ -152,6 +161,7 @@ class MRSClient(ScopeDependency):
                 top_k=top_k,
                 max_tokens=max_tokens,
                 messages=messages,
+                stop_sequences=stop_sequences,
             ),
             executor=MRS_EXECUTOR,
         )
@@ -205,6 +215,7 @@ class MRSClient(ScopeDependency):
         top_k: int | None,
         max_tokens: int | None,
         messages: list[dict[Any, Any]],
+        stop_sequences: list[str] | None,
     ) -> ChatCompletionResponse:
         return cast(
             ChatCompletionResponse,
@@ -219,7 +230,7 @@ class MRSClient(ScopeDependency):
                     n_choices=1,
                     presence_penalty=None,
                     frequency_penalty=None,
-                    stop_seqs=None,
+                    stop_seqs=stop_sequences,
                     temperature=temperature,
                     top_p=top_p,
                     stream=False,
@@ -240,6 +251,7 @@ class MRSClient(ScopeDependency):
         top_k: int | None,
         max_tokens: int | None,
         messages: list[dict[Any, Any]],
+        stop_sequences: list[str] | None,
     ) -> Generator[ChatCompletionChunkResponse]:
         yield from cast(
             Iterator[ChatCompletionChunkResponse],
@@ -254,7 +266,7 @@ class MRSClient(ScopeDependency):
                     n_choices=1,
                     presence_penalty=None,
                     frequency_penalty=None,
-                    stop_seqs=None,
+                    stop_seqs=stop_sequences,
                     temperature=temperature,
                     top_p=top_p,
                     stream=True,

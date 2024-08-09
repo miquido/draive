@@ -26,6 +26,7 @@ class OpenAIChatConfig(DataModel):
     response_format: ResponseFormat | Missing = MISSING
     vision_details: Literal["auto", "low", "high"] | Missing = MISSING
     timeout: float | Missing = MISSING
+    stop_sequences: list[str] | Missing = MISSING
 
 
 class OpenAIEmbeddingConfig(DataModel):

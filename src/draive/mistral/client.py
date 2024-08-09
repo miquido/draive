@@ -92,6 +92,7 @@ class MistralClient(ScopeDependency):
                 seed=config.seed if not_missing(config.seed) else None,
                 tools=tools,
                 tool_choice=tool_choice if tools else None,
+                stop=config.stop_sequences if not_missing(config.stop_sequences) else None,
             )
 
     async def embedding(
@@ -124,6 +125,7 @@ class MistralClient(ScopeDependency):
         messages: list[ChatMessage],
         tools: list[dict[str, object]] | None,
         tool_choice: str | None,
+        stop: list[str] | None,
     ) -> ChatCompletionResponse:
         request_body: dict[str, Any] = {
             "model": model,
@@ -143,6 +145,8 @@ class MistralClient(ScopeDependency):
             request_body["top_p"] = top_p
         if seed is not None:
             request_body["random_seed"] = seed
+        if stop:
+            request_body["stop"] = stop
         if response_format is not None:
             request_body["response_format"] = response_format
 
