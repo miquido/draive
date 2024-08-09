@@ -360,7 +360,7 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
             else:
                 raise AnthropicException("Invalid Anthropic completion", completion)
 
-        case "end_turn":
+        case "end_turn" | "stop_sequence":
             if (tool_calls := tool_calls) and (tools := tools):
                 ctx.record(ResultTrace.of(tool_calls))
                 return LMMToolRequests(
