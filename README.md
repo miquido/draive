@@ -8,7 +8,7 @@ Are you looking for maximum flexibility and efficiency in your next Python libra
 
 ## 🚀 Quick start
 
-Dive straight into the code and learn how to use draive with our interactive [guides](https://github.com/miquido/draive/tree/main/guides). For quick solutions to common problems, explore our [cookbooks](https://github.com/miquido/draive/tree/main/cookbooks).
+Dive straight into the code and learn how to use draive with our interactive [guides](https://github.com/miquido/draive/tree/main/guides). Check out our [Draive AI Course on YouTube](https://www.youtube.com/watch?v=C257Y7-y3ok&list=PLbS8Yksu3iAoRpDOGwP_UmK5s6B3SDz8T) to understand our unique architecture and see real-world applications of Draive in action. For quick solutions to common problems, explore our [cookbooks](https://github.com/miquido/draive/tree/main/cookbooks). 
 
 Great, but how it looks like?
 
