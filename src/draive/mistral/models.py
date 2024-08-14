@@ -47,7 +47,6 @@ class ChatFunctionCall(TypedDict, total=False):
 
 class ChatToolCallRequest(TypedDict, total=False):
     id: Required[str]
-    type: Required[Literal["function"]]
     function: Required[ChatFunctionCall]
 
 
@@ -65,7 +64,6 @@ class ChatFunctionCallResponse(DataModel):
 
 class ChatToolCallResponse(DataModel):
     id: str
-    type: Literal["function"]
     function: ChatFunctionCallResponse
 
 
