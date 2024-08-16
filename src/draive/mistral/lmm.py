@@ -163,7 +163,6 @@ def _convert_context_element(
                 tool_calls=[
                     {
                         "id": request.identifier,
-                        "type": "function",
                         "function": {
                             "name": request.tool,
                             "arguments": json.dumps(request.arguments),
