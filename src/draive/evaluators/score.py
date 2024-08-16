@@ -39,13 +39,13 @@ def _score_validator(
 
 
 class CommonScoreModel(DataModel):
-    score: float = Field(
-        description="Decimal score value",
-        validator=_score_validator,
-    )
     comment: str | None = Field(
         description="Explanation of the score",
         default=None,
+    )
+    score: float = Field(
+        description="Decimal score value",
+        validator=_score_validator,
     )
 
     def normalized(

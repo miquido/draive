@@ -21,6 +21,8 @@ from draive.types.multimodal import (
     MultimodalContent,
     MultimodalContentConvertible,
     MultimodalContentElement,
+    MultimodalContentPlaceholder,
+    MultimodalTemplate,
 )
 from draive.types.text import TextContent
 from draive.types.video import VideoBase64Content, VideoContent, VideoURLContent
@@ -46,10 +48,12 @@ __all__ = [
     "LMMToolRequests",
     "LMMToolResponse",
     "Memory",
+    "Multimodal",
     "MultimodalContent",
     "MultimodalContentConvertible",
     "MultimodalContentElement",
-    "Multimodal",
+    "MultimodalContentPlaceholder",
+    "MultimodalTemplate",
     "RateLimitError",
     "TextContent",
     "VideoBase64Content",

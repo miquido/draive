@@ -1,9 +1,6 @@
-from typing import Protocol, runtime_checkable
-
 from draive.parameters import DataModel, Field
 
 __all__ = [
-    "Evaluation",
     "EvaluationScore",
 ]
 
@@ -24,17 +21,3 @@ class EvaluationScore(DataModel):
         description="Explanation of the score",
         default=None,
     )
-
-
-@runtime_checkable
-class Evaluation[Value, **Args](Protocol):
-    @property
-    def __name__(self) -> str: ...
-
-    async def __call__(
-        self,
-        value: Value,
-        /,
-        *args: Args.args,
-        **kwargs: Args.kwargs,
-    ) -> EvaluationScore | float | bool: ...

@@ -57,7 +57,9 @@ idna==3.7
 iniconfig==2.0.0
     # via pytest
 jiter==0.5.0
-    # via anthropic
+    # via
+    #   anthropic
+    #   openai
 loguru==0.7.2
     # via fastembed
 markdown-it-py==3.0.0
@@ -80,9 +82,9 @@ numpy==1.26.4
     #   onnxruntime
 onnx==1.16.2
     # via fastembed
-onnxruntime==1.18.1
+onnxruntime==1.19.0
     # via fastembed
-openai==1.38.0
+openai==1.41.0
     # via draive (pyproject.toml)
 packaging==24.1
     # via
@@ -107,7 +109,7 @@ pydantic-core==2.20.1
     # via pydantic
 pygments==2.18.0
     # via rich
-pyright==1.1.374
+pyright==1.1.375
     # via draive (pyproject.toml)
 pystemmer==2.2.0.1
     # via fastembed
@@ -120,7 +122,7 @@ pytest-asyncio==0.23.8
     # via draive (pyproject.toml)
 pytest-cov==4.1.0
     # via draive (pyproject.toml)
-pyyaml==6.0.1
+pyyaml==6.0.2
     # via
     #   bandit
     #   huggingface-hub
@@ -133,7 +135,7 @@ requests==2.32.3
     #   tiktoken
 rich==13.7.1
     # via bandit
-ruff==0.5.6
+ruff==0.5.7
     # via draive (pyproject.toml)
 sentencepiece==0.2.0
     # via draive (pyproject.toml)
@@ -147,11 +149,11 @@ snowballstemmer==2.2.0
     # via fastembed
 stevedore==5.2.0
     # via bandit
-sympy==1.13.1
+sympy==1.13.2
     # via onnxruntime
 tiktoken==0.7.0
     # via draive (pyproject.toml)
-tokenizers==0.19.1
+tokenizers==0.20.0
     # via
     #   anthropic
     #   fastembed
