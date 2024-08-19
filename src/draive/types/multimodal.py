@@ -10,11 +10,14 @@ from draive.types.text import TextContent
 from draive.types.video import VideoBase64Content, VideoContent, VideoURLContent
 
 __all__ = [
-    "MultimodalContent",
-    "MultimodalContentElement",
-    "MultimodalContentConvertible",
     "Multimodal",
+    "MultimodalContent",
+    "MultimodalContentConvertible",
+    "MultimodalContentElement",
+    "MultimodalContentPlaceholder",
+    "MultimodalTemplate",
 ]
+
 
 MultimodalContentElement = TextContent | ImageContent | AudioContent | VideoContent | DataModel
 MultimodalContentConvertible = str | MultimodalContentElement
@@ -165,8 +168,68 @@ class MultimodalContent(DataModel):
     def __bool__(self) -> bool:
         return bool(self.parts) and any(self.parts)
 
+    def __str__(self) -> str:
+        return self.as_string()
+
 
 Multimodal = MultimodalContent | MultimodalContentConvertible
+
+
+class MultimodalContentPlaceholder(DataModel):
+    identifier: str
+
+
+class MultimodalTemplate(DataModel):
+    @classmethod
+    def of(
+        cls,
+        *elements: Multimodal | MultimodalContentPlaceholder | tuple[str],
+        merge_text: bool = True,
+        skip_empty: bool = True,
+        meta: dict[str, str | float | int | bool | None] | None = None,
+    ) -> Self:
+        return cls(
+            parts=tuple(
+                [
+                    MultimodalContentPlaceholder(identifier=element[0])
+                    if isinstance(element, tuple)
+                    else element
+                    for element in elements
+                ]
+            ),
+            merge_text=merge_text,
+            skip_empty=skip_empty,
+            meta=meta,
+        )
+
+    parts: frozenlist[Multimodal | MultimodalContentPlaceholder]
+    merge_text: bool
+    skip_empty: bool
+    meta: dict[str, str | float | int | bool | None] | None
+
+    def format(
+        self,
+        **variables: Multimodal,
+    ) -> MultimodalContent:
+        parts: list[Multimodal] = []
+        for part in self.parts:
+            match part:
+                case MultimodalContentPlaceholder() as placeholder:
+                    if value := variables.get(placeholder.identifier):
+                        parts.append(value)
+
+                    else:
+                        raise ValueError("Missing format variable '%s'", placeholder.identifier)
+
+                case part:
+                    parts.append(part)
+
+        return MultimodalContent.of(
+            *parts,
+            merge_text=self.merge_text,
+            skip_empty=self.skip_empty,
+            meta=self.meta,
+        )
 
 
 def _extract_parts(  # noqa: PLR0911
@@ -315,12 +378,18 @@ def _merge_texts(
     last_text_element: TextContent | None = None
     while element := next(iterator, None):
         match element:
-            case TextContent() as text:  # do not merge texts with different metadata
-                if (last_text := last_text_element) and last_text.meta == text.meta:
-                    last_text_element = TextContent(
-                        text=last_text.text + text.text,
-                        meta=text.meta,
-                    )
+            case TextContent() as text:
+                # do not merge texts with different metadata
+                if last_text := last_text_element:
+                    if last_text.meta == text.meta:
+                        last_text_element = TextContent(
+                            text=last_text.text + text.text,
+                            meta=text.meta,
+                        )
+
+                    else:
+                        result.append(last_text)
+                        last_text_element = text
 
                 else:
                     last_text_element = text

@@ -1,36 +1,39 @@
 from draive.evaluation.evaluator import (
     Evaluator,
+    EvaluatorDefinition,
     EvaluatorResult,
     PreparedEvaluator,
     evaluator,
 )
 from draive.evaluation.scenario import (
+    EvaluationScenarioResult,
     PreparedScenarioEvaluator,
     ScenarioEvaluator,
     ScenarioEvaluatorDefinition,
     ScenarioEvaluatorResult,
     evaluation_scenario,
 )
-from draive.evaluation.score import Evaluation, EvaluationScore
+from draive.evaluation.score import EvaluationScore
 from draive.evaluation.suite import (
     EvaluationCaseResult,
     EvaluationSuite,
     EvaluationSuiteCase,
-    EvaluationSuiteCaseResult,
     EvaluationSuiteDefinition,
     EvaluationSuiteStorage,
+    SuiteEvaluatorCaseResult,
+    SuiteEvaluatorResult,
     evaluation_suite,
 )
 
 __all__ = [
     "evaluation_scenario",
     "evaluation_suite",
-    "Evaluation",
+    "EvaluatorDefinition",
     "EvaluationCaseResult",
+    "EvaluationScenarioResult",
     "EvaluationScore",
     "EvaluationSuite",
     "EvaluationSuiteCase",
-    "EvaluationSuiteCaseResult",
     "EvaluationSuiteDefinition",
     "EvaluationSuiteStorage",
     "evaluator",
@@ -41,4 +44,6 @@ __all__ = [
     "ScenarioEvaluator",
     "ScenarioEvaluatorDefinition",
     "ScenarioEvaluatorResult",
+    "SuiteEvaluatorCaseResult",
+    "SuiteEvaluatorResult",
 ]

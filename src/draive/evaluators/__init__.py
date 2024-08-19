@@ -1,25 +1,27 @@
-from draive.evaluators.text_coherence import text_coherence_evaluator
-from draive.evaluators.text_conciseness import text_conciseness_evaluator
-from draive.evaluators.text_consistency import text_consistency_evaluator
-from draive.evaluators.text_coverage import text_coverage_evaluator
-from draive.evaluators.text_fluency import text_fluency_evaluator
-from draive.evaluators.text_keywords import text_keywords_evaluator
-from draive.evaluators.text_readability import text_readability_evaluator
-from draive.evaluators.text_relevance import text_relevance_evaluator
-from draive.evaluators.text_similarity import (
-    text_similarity_evaluator,
+from draive.evaluators.coherence import coherence_evaluator
+from draive.evaluators.conciseness import conciseness_evaluator
+from draive.evaluators.consistency import consistency_evaluator
+from draive.evaluators.coverage import coverage_evaluator
+from draive.evaluators.fluency import fluency_evaluator
+from draive.evaluators.keywords import keywords_evaluator
+from draive.evaluators.readability import readability_evaluator
+from draive.evaluators.relevance import relevance_evaluator
+from draive.evaluators.similarity import (
+    image_vector_similarity_evaluator,
+    similarity_evaluator,
     text_vector_similarity_evaluator,
 )
 
 __all__ = [
-    "text_coherence_evaluator",
-    "text_conciseness_evaluator",
-    "text_consistency_evaluator",
-    "text_coverage_evaluator",
-    "text_fluency_evaluator",
-    "text_readability_evaluator",
-    "text_relevance_evaluator",
-    "text_keywords_evaluator",
-    "text_similarity_evaluator",
+    "coherence_evaluator",
+    "conciseness_evaluator",
+    "consistency_evaluator",
+    "coverage_evaluator",
+    "fluency_evaluator",
+    "image_vector_similarity_evaluator",
+    "keywords_evaluator",
+    "readability_evaluator",
+    "relevance_evaluator",
+    "similarity_evaluator",
     "text_vector_similarity_evaluator",
 ]

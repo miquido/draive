@@ -1,23 +1,24 @@
 from collections.abc import Callable, Sequence
 
 from draive.evaluation import EvaluationScore, evaluator
+from draive.types import Multimodal, MultimodalContent
 
 __all__ = [
-    "text_keywords_evaluator",
+    "keywords_evaluator",
 ]
 
 
-@evaluator(name="text_keywords")
-async def text_keywords_evaluator(
-    text: str,
+@evaluator(name="keywords")
+async def keywords_evaluator(
+    content: Multimodal,
     /,
     keywords: Sequence[str],
     normalization: Callable[[str], str] | None = None,
 ) -> EvaluationScore:
-    if not text:
+    if not content:
         return EvaluationScore(
             value=0,
-            comment="Input text was empty!",
+            comment="Input was empty!",
         )
 
     if not keywords:
@@ -33,7 +34,7 @@ async def text_keywords_evaluator(
     else:
         text_normalization = _lowercased
 
-    normalized_text: str = text_normalization(text)
+    normalized_text: str = text_normalization(MultimodalContent.of(content).as_string())
     return EvaluationScore(
         value=len(
             [keyword for keyword in keywords if text_normalization(keyword) in normalized_text]

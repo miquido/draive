@@ -15,9 +15,10 @@ __all__ = [
     "evaluation_suite",
     "EvaluationCaseResult",
     "EvaluationSuite",
-    "EvaluationSuiteCaseResult",
     "EvaluationSuiteDefinition",
     "EvaluationSuiteStorage",
+    "SuiteEvaluatorCaseResult",
+    "SuiteEvaluatorResult",
 ]
 
 
@@ -27,20 +28,33 @@ class EvaluationSuiteCase[CaseParameters: DataModel](DataModel):
     comment: str | None = None
 
 
-class EvaluationSuiteCaseResult[CaseParameters: DataModel, Value: DataModel | str](DataModel):
+class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str](DataModel):
     case: EvaluationSuiteCase[CaseParameters] = Field(
         description="Evaluated case",
     )
     value: Value = Field(
         description="Evaluated value",
     )
-    results: frozenlist[ScenarioEvaluatorResult | EvaluatorResult] = Field(
+    results: frozenlist[ScenarioEvaluatorResult] = Field(
         description="Evaluation results",
+    )
+    meta: dict[str, str | float | int | bool | None] | None = Field(
+        description="Additional evaluation metadata",
+        default=None,
     )
 
     @property
     def passed(self) -> bool:
-        return all(result.passed for result in self.results)
+        # empty results is equivalent of failure
+        return len(self.results) > 0 and all(result.passed for result in self.results)
+
+
+class SuiteEvaluatorResult[CaseParameters: DataModel, Value: DataModel | str](DataModel):
+    cases: list[SuiteEvaluatorCaseResult[CaseParameters, Value]]
+
+    @property
+    def passed(self) -> bool:
+        return all(case.passed for case in self.cases)
 
 
 class EvaluationCaseResult[Value: DataModel | str](DataModel):
@@ -50,10 +64,30 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
         results: ScenarioEvaluatorResult | EvaluatorResult,
         *_results: ScenarioEvaluatorResult | EvaluatorResult,
         value: Value,
+        meta: dict[str, str | float | int | bool | None] | None = None,
     ) -> Self:
+        free_results: list[EvaluatorResult] = []
+        scenario_results: list[ScenarioEvaluatorResult] = []
+        for result in (results, *_results):
+            match result:
+                case ScenarioEvaluatorResult() as scenario_result:
+                    scenario_results.append(scenario_result)
+
+                case EvaluatorResult() as evaluator_result:
+                    free_results.append(evaluator_result)
+
+        if free_results:
+            scenario_results.append(
+                ScenarioEvaluatorResult(
+                    name="EvaluationSuite",
+                    evaluations=tuple(free_results),
+                )
+            )
+
         return cls(
             value=value,
-            results=(results, *_results),
+            results=tuple(scenario_results),
+            meta=meta,
         )
 
     @classmethod
@@ -63,22 +97,26 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
         /,
         evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
         *_evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
+        meta: dict[str, str | float | int | bool | None] | None = None,
     ) -> Self:
-        return cls(
-            value=value,
-            results=tuple(
-                await gather(
-                    *[evaluator(value) for evaluator in [evaluators, *_evaluators]],
-                    return_exceptions=False,
-                ),
+        return cls.of(
+            *await gather(
+                *[evaluator(value) for evaluator in [evaluators, *_evaluators]],
+                return_exceptions=False,
             ),
+            value=value,
+            meta=meta,
         )
 
     value: Value = Field(
         description="Evaluated value",
     )
-    results: frozenlist[ScenarioEvaluatorResult | EvaluatorResult] = Field(
+    results: frozenlist[ScenarioEvaluatorResult] = Field(
         description="Evaluation results",
+    )
+    meta: dict[str, str | float | int | bool | None] | None = Field(
+        description="Additional evaluation metadata",
+        default=None,
     )
 
 
@@ -124,7 +162,7 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
         /,
         *,
         reload: bool = False,
-    ) -> EvaluationSuiteCaseResult[CaseParameters, Value]: ...
+    ) -> SuiteEvaluatorCaseResult[CaseParameters, Value]: ...
 
     @overload
     async def __call__(
@@ -132,7 +170,7 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
         /,
         *,
         reload: bool = False,
-    ) -> list[EvaluationSuiteCaseResult[CaseParameters, Value]]: ...
+    ) -> SuiteEvaluatorResult[CaseParameters, Value]: ...
 
     async def __call__(
         self,
@@ -141,18 +179,20 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
         *,
         reload: bool = False,
     ) -> (
-        list[EvaluationSuiteCaseResult[CaseParameters, Value]]
-        | EvaluationSuiteCaseResult[CaseParameters, Value]
+        SuiteEvaluatorResult[CaseParameters, Value]
+        | SuiteEvaluatorCaseResult[CaseParameters, Value]
     ):
         async with self._lock:
             match parameters:
                 case None:
-                    return await gather(
-                        *[
-                            self._evaluate(case=case)
-                            for case in (await self._data(reload=reload)).cases
-                        ],
-                        return_exceptions=False,
+                    return SuiteEvaluatorResult(
+                        cases=await gather(
+                            *[
+                                self._evaluate(case=case)
+                                for case in (await self._data(reload=reload)).cases
+                            ],
+                            return_exceptions=False,
+                        )
                     )
 
                 case UUID() as identifier:
@@ -180,10 +220,10 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
         self,
         *,
         case: EvaluationSuiteCase[CaseParameters],
-    ) -> EvaluationSuiteCaseResult[CaseParameters, Value]:
+    ) -> SuiteEvaluatorCaseResult[CaseParameters, Value]:
         result: EvaluationCaseResult[Value] = await self._definition(parameters=case.parameters)
 
-        return EvaluationSuiteCaseResult[CaseParameters, Value](
+        return SuiteEvaluatorCaseResult[CaseParameters, Value](
             case=case,
             value=result.value,
             results=result.results,
