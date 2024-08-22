@@ -89,6 +89,7 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
                 ]
             ],
             LMMInput.of(input),
+            LMMCompletion.of("{"),  # prefill with json opening
         ]
 
         recursion_level: int = 0
@@ -146,10 +147,10 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
 
 DEFAULT_INSTRUCTION_EXTENSION: str = """\
 <FORMAT>
-The result have to be a JSON object conforming to the following schema:
-```
+Provide the result using a single raw valid JSON object that adheres strictly to the given \
+SCHEMA without any comments, formatting, or additional elements.
+<SCHEMA>
 {schema}
-```
-Provide ONLY a single, raw, valid JSON without any comments, formatting or additional elements.
+</SCHEMA>
 </FORMAT>
 """

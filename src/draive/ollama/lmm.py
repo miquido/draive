@@ -7,7 +7,6 @@ from draive.metrics import ArgumentsTrace, ResultTrace
 from draive.metrics.tokens import TokenUsage
 from draive.ollama.client import OllamaClient
 from draive.ollama.config import OllamaChatConfig
-from draive.ollama.errors import OllamaException
 from draive.ollama.models import ChatCompletionResponse, ChatMessage
 from draive.scope import ctx
 from draive.types import (
@@ -162,6 +161,14 @@ async def _chat_completion(
     config: OllamaChatConfig,
     messages: list[ChatMessage],
 ) -> LMMOutput:
+    prefill: str = ""
+    if messages[-1].role == "assistant":
+        if config.response_format == "json":
+            del messages[-1]  # for json mode ignore prefill
+
+        else:
+            prefill = messages[-1].content
+
     completion: ChatCompletionResponse = await client.chat_completion(
         config=config,
         messages=messages,
@@ -175,12 +182,9 @@ async def _chat_completion(
         ),
     )
 
-    if message := completion.message.content:
-        ctx.record(ResultTrace.of(message))
-        return LMMCompletion.of(message)
-
-    else:
-        raise OllamaException("Invalid Ollama completion", completion)
+    completion_message: str = prefill + completion.message.content
+    ctx.record(ResultTrace.of(completion_message))
+    return LMMCompletion.of(completion_message)
 
 
 async def _chat_completion_stream(

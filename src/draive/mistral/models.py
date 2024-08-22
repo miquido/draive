@@ -55,6 +55,7 @@ class ChatMessage(TypedDict, total=False):
     content: Required[str | list[str]]
     name: NotRequired[str]
     tool_calls: NotRequired[list[ChatToolCallRequest]]
+    prefix: NotRequired[bool]
 
 
 class ChatFunctionCallResponse(DataModel):

@@ -13,12 +13,13 @@ __all__ = [
 
 @runtime_checkable
 class ChoiceCompletion(Protocol):
-    async def __call__(
+    async def __call__(  # noqa: PLR0913
         self,
         *,
         instruction: Instruction | str,
         options: Sequence[ChoiceOption],
         input: Multimodal,  # noqa: A002
+        prefill: str | None,
         toolbox: Toolbox,
         examples: Iterable[tuple[Multimodal, ChoiceOption]] | None,
         **extra: Any,
