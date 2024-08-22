@@ -257,7 +257,7 @@ def _convert_context_element(
             }
 
 
-async def _chat_completion(  # noqa: PLR0912, C901
+async def _chat_completion(  # noqa: C901, PLR0912, PLR0915
     *,
     client: OpenAIClient,
     config: OpenAIChatConfig,
@@ -265,6 +265,30 @@ async def _chat_completion(  # noqa: PLR0912, C901
     tools: Sequence[ToolSpecification] | None,
     tool_selection: LMMToolSelection,
 ) -> LMMOutput:
+    prefill: str = ""
+    match messages[-1]:
+        case {"role": "assistant", "content": str() as content_text}:
+            if config.response_format == {"type": "json_object"}:
+                del messages[-1]  # for json mode ignore prefill
+
+            else:
+                prefill = content_text
+
+        case {"role": "assistant", "content": list() as content_parts}:
+            if config.response_format == {"type": "json_object"}:
+                del messages[-1]  # for json mode ignore prefill
+
+            else:
+                for part in content_parts:
+                    match part:  # currently supporting only text prefills
+                        case {"text": str() as text}:
+                            prefill += text
+
+                        case _:
+                            continue
+        case _:
+            prefill = ""
+
     completion: ChatCompletion
     match tool_selection:
         case "auto":
@@ -348,12 +372,7 @@ async def _chat_completion(  # noqa: PLR0912, C901
                 raise OpenAIException("Invalid OpenAI completion", completion)
 
         case "stop":
-            if content := completion_message.content:
-                ctx.record(ResultTrace.of(content))
-                # TODO: OpenAI models generating media?
-                return LMMCompletion.of(content)
-
-            elif (tool_calls := completion_message.tool_calls) and (tools := tools):
+            if (tool_calls := completion_message.tool_calls) and (tools := tools):
                 ctx.record(ResultTrace.of(tool_calls))
                 return LMMToolRequests(
                     requests=[
@@ -365,6 +384,11 @@ async def _chat_completion(  # noqa: PLR0912, C901
                         for call in tool_calls
                     ]
                 )
+
+            elif content := completion_message.content:
+                completion_content: str = prefill + content
+                ctx.record(ResultTrace.of(completion_content))
+                return LMMCompletion.of(completion_content)
 
             else:
                 raise OpenAIException("Invalid OpenAI completion", completion)
@@ -381,6 +405,13 @@ async def _chat_completion_stream(  # noqa: C901, PLR0912, PLR0915
     tools: Sequence[ToolSpecification] | None,
     tool_selection: LMMToolSelection,
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
+    match messages[-1]:
+        case {"role": "assistant"}:
+            del messages[-1]  # not supporting prefill with streaming yet
+
+        case _:
+            pass
+
     completion_stream: OpenAIAsyncStream[ChatCompletionChunk]
     match tool_selection:
         case "auto":

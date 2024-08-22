@@ -16,6 +16,7 @@ async def generate_text(
     *,
     instruction: Instruction | str,
     input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+    prefill: str | None = None,
     tools: Toolbox | Sequence[AnyTool] | None = None,
     examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, str]] | None = None,
     **extra: Any,
@@ -23,6 +24,7 @@ async def generate_text(
     return await ctx.state(TextGeneration).generate(
         instruction=instruction,
         input=input,
+        prefill=prefill,
         tools=tools,
         examples=examples,
         **extra,

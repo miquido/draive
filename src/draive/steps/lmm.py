@@ -63,12 +63,16 @@ async def _lmm_process_step(
     **extra: Any,
 ) -> None:
     context.append(LMMInput.of(step.input))
+
+    if prefill := step.prefill:
+        context.append(LMMCompletion.of(prefill))
+
     toolbox: Toolbox = step.toolbox
 
     recursion_level: int = 0
     while recursion_level <= toolbox.recursion_limit:
         match await lmm_invocation(
-            instruction=instruction,
+            instruction=step.instruction or instruction,
             context=context,
             tools=toolbox.available_tools(),
             tool_selection=toolbox.tool_selection(recursion_level=recursion_level),

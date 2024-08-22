@@ -23,6 +23,7 @@ async def lmm_generate_text(
     *,
     instruction: Instruction | str,
     input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+    prefill: str | None = None,
     tools: Toolbox | Sequence[AnyTool] | None = None,
     examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, str]] | None = None,
     **extra: Any,
@@ -50,6 +51,11 @@ async def lmm_generate_text(
             ],
             LMMInput.of(input),
         ]
+
+        if prefill := prefill:
+            context.append(
+                LMMCompletion.of(prefill),
+            )
 
         recursion_level: int = 0
         while recursion_level <= toolbox.recursion_limit:

@@ -200,6 +200,7 @@ async def _chat_completion(
                 ),
                 tool_choice="auto",
             )
+
         case "none":
             completion = await client.chat_completion(
                 config=config,

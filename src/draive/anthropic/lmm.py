@@ -332,7 +332,21 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
         ),
     )
 
-    message_parts: list[TextBlock] = []
+    message_parts: list[TextBlock]
+    match messages[-1]:
+        case {"role": "assistant", "content": str() as content_text}:
+            message_parts = [TextBlock(type="text", text=content_text)]
+
+        case {"role": "assistant", "content": content_parts}:
+            message_parts = [  # currently supporting only text prefills
+                TextBlock(type="text", text=part.text)
+                for part in content_parts
+                if isinstance(part, TextBlock)
+            ]
+
+        case _:
+            message_parts = []
+
     tool_calls: list[ToolUseBlock] = []
     for part in completion.content:
         match part:
@@ -376,8 +390,12 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
 
             else:
                 ctx.record(ResultTrace.of(message_parts))
+
                 return LMMCompletion.of(
-                    MultimodalContent.of(*[TextContent(text=part.text) for part in message_parts])
+                    MultimodalContent.of(
+                        *[TextContent(text=part.text) for part in message_parts],
+                        merge_text=True,
+                    )
                 )
 
         case other:

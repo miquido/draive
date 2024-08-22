@@ -39,6 +39,7 @@ from draive.types import (
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
+    MultimodalContent,
     MultimodalContentElement,
     TextContent,
     VideoBase64Content,
@@ -359,6 +360,24 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
 
         converted_tools.append(tool_function)
 
+    prefill: str = ""
+    match messages[-1]:
+        case {"role": "model", "parts": content_parts}:
+            if config.response_format == "application/json":
+                del messages[-1]  # for json mode ignore prefill
+
+            else:
+                for part in content_parts:
+                    match part:  # currently supporting only text prefills
+                        case {"text": str() as text}:
+                            prefill += text
+
+                        case _:
+                            continue
+
+        case _:
+            pass
+
     match tool_selection:
         case "auto":
             result = await client.generate(
@@ -445,7 +464,8 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
 
     message_parts: list[
         GeminiTextMessageContent | GeminiDataReferenceMessageContent | GeminiDataMessageContent
-    ] = []
+    ] = [GeminiTextMessageContent(text=prefill)] if prefill else []
+
     tool_calls: list[GeminiFunctionCallMessageContent] = []
     for part in result_message.content:
         match part:
@@ -483,7 +503,12 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
 
     elif message_parts:
         ctx.record(ResultTrace.of(message_parts))
-        return LMMCompletion.of(*[_convert_content_part(part) for part in message_parts])
+        return LMMCompletion.of(
+            MultimodalContent.of(
+                *[_convert_content_part(part) for part in message_parts],
+                merge_text=True,
+            )
+        )
 
     else:
         raise GeminiException("Invalid Gemini completion", result)

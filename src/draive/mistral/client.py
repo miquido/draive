@@ -82,6 +82,13 @@ class MistralClient(ScopeDependency):
             raise NotImplementedError("Mistral streaming is not supported yet")
 
         else:
+            if messages[-1]["role"] == "assistant":
+                if config.response_format == {"type": "json_object"}:
+                    del messages[-1]  # for json mode ignore prefill
+
+                else:
+                    messages[-1]["prefix"] = True  # add prefill parameter indicator
+
             return await self._create_chat_completion(
                 messages=messages,
                 model=config.model,

@@ -23,19 +23,19 @@ __all__ = [
 ]
 
 
-async def lmm_choice_completion(  # noqa: C901
+async def lmm_choice_completion(  # noqa: C901, PLR0912, PLR0913
     *,
     instruction: Instruction | str,
     options: Sequence[ChoiceOption],
     input: Multimodal,  # noqa: A002
+    prefill: str | None,
     toolbox: Toolbox,
-    examples: Iterable[tuple[Multimodal, ChoiceOption]] | None = None,
+    examples: Iterable[tuple[Multimodal, ChoiceOption]] | None,
     **extra: Any,
 ) -> ChoiceOption:
     with ctx.nested(
         "lmm_choice_completion",
     ):
-        assert "select" in str(instruction).lower(), "Instruction have to contain a word 'select'"  # nosec: B101
         assert options, "Choice options cannot be empty"  # nosec: B101
         assert all(  # nosec: B101
             example[1] in options for example in examples or []
@@ -78,6 +78,9 @@ async def lmm_choice_completion(  # noqa: C901
             ),
         ]
 
+        if prefill := prefill:
+            context.append(LMMCompletion.of(prefill))
+
         recursion_level: int = 0
         while recursion_level <= toolbox.recursion_limit:
             match await lmm_invocation(
@@ -91,7 +94,7 @@ async def lmm_choice_completion(  # noqa: C901
             ):
                 case LMMCompletion() as completion:
                     ctx.log_debug("Received choice results")
-                    if selection := xml_tag("SELECTION", source=completion.content.as_string()):
+                    if selection := xml_tag("CHOICE", source=completion.content.as_string()):
                         if option := options_map.get(selection):
                             return option
 
@@ -105,7 +108,7 @@ async def lmm_choice_completion(  # noqa: C901
                         response.content for response in responses if response.direct
                     ]:
                         if selection := xml_tag(
-                            "SELECTION",
+                            "CHOICE",
                             source=MultimodalContent.of(*direct_content).as_string(),
                         ):
                             if option := options_map.get(selection):
@@ -161,6 +164,8 @@ def _format_example(
 
 
 INSTRUCTION_EXTENSION: str = """\
-Selection HAVE to contain an identifier of a chosen option inside a `SELECTION` \
-xml tag within the result i.e. `<SELECTION>identifier</SELECTION>`.
+<FORMAT>
+Place identifier of the final choice inside a <CHOICE> XML tag within the result, \
+like this: `<CHOICE>identifier</CHOICE>`.
+</FORMAT>
 """

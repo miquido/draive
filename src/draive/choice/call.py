@@ -13,11 +13,12 @@ __all__ = [
 ]
 
 
-async def choice_completion(
+async def choice_completion(  # noqa: PLR0913
     *,
     instruction: Instruction | str,
     options: Iterable[ChoiceOption | Multimodal],
     input: Multimodal,  # noqa: A002
+    prefill: str | None = None,
     tools: Toolbox | Sequence[AnyTool] | None = None,
     examples: Iterable[tuple[Multimodal, ChoiceOption]] | None = None,
     **extra: Any,
@@ -40,6 +41,7 @@ async def choice_completion(
             for option in options
         ],
         input=input,
+        prefill=prefill,
         toolbox=toolbox,
         examples=examples,
         **extra,

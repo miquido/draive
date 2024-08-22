@@ -17,6 +17,7 @@ class TextGenerator(Protocol):
         *,
         instruction: Instruction | str,
         input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+        prefill: str | None = None,
         tools: Toolbox | Sequence[AnyTool] | None = None,
         examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, str]]
         | None = None,
