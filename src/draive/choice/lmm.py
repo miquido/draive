@@ -14,9 +14,9 @@ from draive.types import (
     LMMToolRequests,
     Multimodal,
     MultimodalContent,
+    xml_tag,
 )
 from draive.types.lmm import LMMToolResponse
-from draive.utils import xml_tag
 
 __all__ = [
     "lmm_choice_completion",
@@ -94,7 +94,7 @@ async def lmm_choice_completion(  # noqa: C901, PLR0912, PLR0913
             ):
                 case LMMCompletion() as completion:
                     ctx.log_debug("Received choice results")
-                    if selection := xml_tag("CHOICE", source=completion.content.as_string()):
+                    if selection := xml_tag("CHOICE", source=completion.content):
                         if option := options_map.get(selection):
                             return option
 
@@ -109,7 +109,7 @@ async def lmm_choice_completion(  # noqa: C901, PLR0912, PLR0913
                     ]:
                         if selection := xml_tag(
                             "CHOICE",
-                            source=MultimodalContent.of(*direct_content).as_string(),
+                            source=MultimodalContent.of(*direct_content),
                         ):
                             if option := options_map.get(selection):
                                 return option

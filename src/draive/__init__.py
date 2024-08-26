@@ -156,6 +156,8 @@ from draive.types import (
     VideoContent,
     VideoURLContent,
     frozenlist,
+    xml_tag,
+    xml_tags,
 )
 from draive.utils import (
     MISSING,
@@ -181,8 +183,6 @@ from draive.utils import (
     setup_logging,
     split_sequence,
     with_timeout,
-    xml_tag,
-    xml_tags,
 )
 
 __all__ = [

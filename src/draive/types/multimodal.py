@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from itertools import chain
 from typing import Self, final, overload
 
@@ -374,9 +374,8 @@ def _merge_texts(
         return elements
 
     result: list[MultimodalContentElement] = []
-    iterator: Iterator[MultimodalContentElement] = iter(elements)
     last_text_element: TextContent | None = None
-    while element := next(iterator, None):
+    for element in elements:
         match element:
             case TextContent() as text:
                 # do not merge texts with different metadata
