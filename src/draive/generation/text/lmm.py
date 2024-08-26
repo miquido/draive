@@ -74,7 +74,6 @@ async def lmm_generate_text(
 
                 case LMMToolRequests() as tool_requests:
                     ctx.log_debug("Received text generation tool calls")
-                    context.append(tool_requests)
                     responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
 
                     if direct_responses := [response for response in responses if response.direct]:
@@ -82,8 +81,12 @@ async def lmm_generate_text(
                             *[response.content for response in direct_responses]
                         ).as_string()
 
+                    elif prefill := prefill:  # move prefill to the next completion if used tools
+                        del context[-1]
+                        context.extend([tool_requests, *responses, LMMCompletion.of(prefill)])
+
                     else:
-                        context.extend(responses)
+                        context.extend([tool_requests, *responses])
 
             recursion_level += 1  # continue with next recursion level
 

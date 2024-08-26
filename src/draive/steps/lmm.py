@@ -93,6 +93,10 @@ async def _lmm_process_step(
                 ]:
                     return context.append(LMMCompletion.of(MultimodalContent.of(*direct_content)))
 
+                elif prefill := step.prefill:  # move prefill to the next completion if used tools
+                    del context[-1]
+                    context.extend([tool_requests, *responses, LMMCompletion.of(prefill)])
+
                 else:
                     context.extend([tool_requests, *responses])
 

@@ -116,6 +116,10 @@ async def lmm_choice_completion(  # noqa: C901, PLR0912, PLR0913
 
                         raise SelectionException("Invalid or missing selection")
 
+                    elif prefill := prefill:  # move prefill to the next completion if used tools
+                        del context[-1]
+                        context.extend([tool_requests, *responses, LMMCompletion.of(prefill)])
+
                     else:
                         context.extend([tool_requests, *responses])
 
