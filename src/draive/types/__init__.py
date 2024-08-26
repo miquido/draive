@@ -26,6 +26,7 @@ from draive.types.multimodal import (
 )
 from draive.types.text import TextContent
 from draive.types.video import VideoBase64Content, VideoContent, VideoURLContent
+from draive.types.xml import xml_tag, xml_tags
 
 __all__ = [
     "AudioBase64Content",
@@ -59,4 +60,6 @@ __all__ = [
     "VideoBase64Content",
     "VideoContent",
     "VideoURLContent",
+    "xml_tag",
+    "xml_tags",
 ]

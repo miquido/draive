@@ -1,16 +1,29 @@
 from collections.abc import Generator
 
+from draive.types.multimodal import Multimodal, MultimodalContent
+
 __all__ = [
     "xml_tag",
     "xml_tags",
 ]
 
 
-def xml_tags(  # noqa: C901
+def xml_tags(  # noqa: C901, PLR0912
     tag: str,
     /,
-    source: str,
+    source: Multimodal,
 ) -> Generator[str, None]:
+    content_string: str  # TODO: refine to preserve multimodal output
+    match source:
+        case str() as string:
+            content_string = string
+
+        case MultimodalContent() as multimodal:
+            content_string = multimodal.as_string()
+
+        case _:
+            return  # can't process other types
+
     opening_tag_prefix: str = f"<{tag} "
     opening_tag: str = f"<{tag}>"
     closing_tag: str = f"</{tag}>"
@@ -28,7 +41,7 @@ def xml_tags(  # noqa: C901
     in_tag: bool = False
     in_content: bool = False
 
-    for char in source:
+    for char in content_string:
         if in_tag:
             if char == ">":
                 accumulator += char
@@ -68,7 +81,7 @@ def xml_tags(  # noqa: C901
 def xml_tag(
     tag: str,
     /,
-    source: str,
+    source: Multimodal,
 ) -> str | None:
     try:
         return next(

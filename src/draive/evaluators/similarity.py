@@ -8,8 +8,8 @@ from draive.types import (
     ImageBase64Content,
     Multimodal,
     MultimodalTemplate,
+    xml_tag,
 )
-from draive.utils import xml_tag
 
 __all__ = [
     "similarity_evaluator",

@@ -12,7 +12,6 @@ from draive.utils.queue import AsyncQueue
 from draive.utils.split_sequence import split_sequence
 from draive.utils.stream import AsyncStream
 from draive.utils.timeout import with_timeout
-from draive.utils.xml import xml_tag, xml_tags
 
 __all__ = [
     "always",
@@ -39,6 +38,4 @@ __all__ = [
     "setup_logging",
     "split_sequence",
     "with_timeout",
-    "xml_tag",
-    "xml_tags",
 ]
