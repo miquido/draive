@@ -105,8 +105,9 @@ def agent[AgentState, AgentStateScratch](
 ) -> PartialAgentWrapper[AgentState, AgentStateScratch]: ...
 
 
-def agent[AgentState, AgentStateScratch](  # noqa: C901
+def agent[AgentState, AgentStateScratch](  # noqa: C901 # pyright: ignore[reportInconsistentOverload] - this seems to be pyright false positive/error
     node: AgentNode | None = None,
+    /,
     *,
     name: str | None = None,
     description: str | None = None,

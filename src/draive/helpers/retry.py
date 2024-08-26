@@ -39,7 +39,7 @@ def auto_retry[**Args, Result](
     *,
     limit: int = 1,
     delay: Callable[[int], float] | float | None = None,
-    catching: set[type[Exception]] | type[Exception] = Exception,
+    catching: set[type[Exception]] | tuple[type[Exception], ...] | type[Exception] = Exception,
 ) -> Callable[[Callable[Args, Result]], Callable[Args, Result]]:
     """\
     Function wrapper retrying the wrapped function again on fail. \
@@ -72,7 +72,7 @@ def auto_retry[**Args, Result](
     *,
     limit: int = 1,
     delay: Callable[[int], float] | float | None = None,
-    catching: set[type[Exception]] | type[Exception] = Exception,
+    catching: set[type[Exception]] | tuple[type[Exception], ...] | type[Exception] = Exception,
 ) -> Callable[[Callable[Args, Result]], Callable[Args, Result]] | Callable[Args, Result]:
     """\
     Function wrapper retrying the wrapped function again on fail. \
@@ -113,7 +113,7 @@ def auto_retry[**Args, Result](
                     function,
                     limit=limit,
                     delay=delay,
-                    catching=catching if isinstance(catching, set) else {catching},
+                    catching=catching if isinstance(catching, set | tuple) else {catching},
                 ),
             )
         else:
@@ -121,7 +121,7 @@ def auto_retry[**Args, Result](
                 function,
                 limit=limit,
                 delay=delay,
-                catching=catching if isinstance(catching, set) else {catching},
+                catching=catching if isinstance(catching, set | tuple) else {catching},
             )
 
     if function := function:
@@ -135,7 +135,7 @@ def _wrap_sync[**Args, Result](
     *,
     limit: int,
     delay: Callable[[int], float] | float | None,
-    catching: set[type[Exception]],
+    catching: set[type[Exception]] | tuple[type[Exception], ...],
 ) -> Callable[Args, Result]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
     assert delay is None, "Delay is not supported in sync wrapper"  # nosec: B101
@@ -172,7 +172,7 @@ def _wrap_async[**Args, Result](
     *,
     limit: int,
     delay: Callable[[int], float] | float | None,
-    catching: set[type[Exception]],
+    catching: set[type[Exception]] | tuple[type[Exception], ...],
 ) -> Callable[Args, Coroutine[None, None, Result]]:
     assert limit > 0, "Limit has to be greater than zero"  # nosec: B101
 

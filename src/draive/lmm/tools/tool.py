@@ -330,7 +330,7 @@ def tool[**Args, Result](  # noqa: PLR0913
     format_failure: Callable[[Exception], MultimodalContent | MultimodalContentConvertible]
     | None = None,
     direct_result: bool = False,
-) -> ToolWrapper | Tool[Args, Result]:
+) -> PartialToolWrapper[Result] | ToolWrapper | Tool[Args, Result]:
     def wrap(
         function: Callable[Args, Coroutine[Any, Any, Result]],
     ) -> Tool[Args, Result]:

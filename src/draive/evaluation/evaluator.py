@@ -220,7 +220,7 @@ class Evaluator[Value, **Args]:
 
 @overload
 def evaluator[Value, **Args](
-    definition: EvaluatorDefinition[Value, Args] | None = None,
+    definition: EvaluatorDefinition[Value, Args],
     /,
 ) -> Evaluator[Value, Args]: ...
 
@@ -236,8 +236,9 @@ def evaluator[Value, **Args](
 ]: ...
 
 
-def evaluator[Value, **Args](
+def evaluator[Value, **Args](  # pyright: ignore[reportInconsistentOverload] - this seems to be pyright false positive/error
     evaluation: EvaluatorDefinition[Value, Args] | None = None,
+    /,
     *,
     name: str | None = None,
     threshold: float | None = None,
