@@ -26,7 +26,7 @@ distro==1.9.0
     # via
     #   anthropic
     #   openai
-fastembed==0.3.4
+fastembed==0.3.6
     # via draive (pyproject.toml)
 filelock==3.15.4
     # via huggingface-hub
@@ -43,13 +43,13 @@ httpx==0.27.0
     #   draive (pyproject.toml)
     #   anthropic
     #   openai
-huggingface-hub==0.24.5
+huggingface-hub==0.24.6
     # via
     #   fastembed
     #   tokenizers
 humanfriendly==10.0
     # via coloredlogs
-idna==3.7
+idna==3.8
     # via
     #   anyio
     #   httpx
@@ -84,7 +84,7 @@ onnx==1.16.2
     # via fastembed
 onnxruntime==1.19.0
     # via fastembed
-openai==1.41.0
+openai==1.42.0
     # via draive (pyproject.toml)
 packaging==24.1
     # via
@@ -109,7 +109,7 @@ pydantic-core==2.20.1
     # via pydantic
 pygments==2.18.0
     # via rich
-pyright==1.1.375
+pyright==1.1.377
     # via draive (pyproject.toml)
 pystemmer==2.2.0.1
     # via fastembed
@@ -147,7 +147,7 @@ sniffio==1.3.1
     #   openai
 snowballstemmer==2.2.0
     # via fastembed
-stevedore==5.2.0
+stevedore==5.3.0
     # via bandit
 sympy==1.13.2
     # via onnxruntime

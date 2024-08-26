@@ -169,8 +169,9 @@ def evaluation_scenario[Value, **Args](
 ]: ...
 
 
-def evaluation_scenario[Value, **Args](
+def evaluation_scenario[Value, **Args](  # pyright: ignore[reportInconsistentOverload] - this seems to be pyright false positive/error
     definition: ScenarioEvaluatorDefinition[Value, Args] | None = None,
+    /,
     *,
     name: str | None = None,
 ) -> (

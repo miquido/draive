@@ -106,9 +106,13 @@ class AnthropicClient(ScopeDependency):
 
         except AnthropicRateLimitError as exc:  # retry on rate limit after delay
             if delay := exc.response.headers.get("Retry-After"):
-                raise RateLimitError(
-                    retry_after=delay + uniform(0.0, 0.3)  # nosec: B311 # add small random delay
-                ) from exc
+                try:
+                    raise RateLimitError(
+                        retry_after=float(delay) + uniform(0.0, 0.3)  # nosec: B311 # add small random delay
+                    ) from exc
+
+                except ValueError:
+                    raise exc from None
 
             else:
                 raise exc
