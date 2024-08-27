@@ -28,6 +28,7 @@ class ConversationMessage(DataModel):
         identifier: str | None = None,
         author: str | None = None,
         created: datetime | None = None,
+        meta: dict[str, str | float | int | bool | None] | None = None,
     ) -> Self:
         return cls(
             identifier=identifier or uuid4().hex,
@@ -35,6 +36,7 @@ class ConversationMessage(DataModel):
             author=author,
             created=created,
             content=MultimodalContent.of(content),
+            meta=meta,
         )
 
     @classmethod
@@ -44,6 +46,7 @@ class ConversationMessage(DataModel):
         identifier: str | None = None,
         author: str | None = None,
         created: datetime | None = None,
+        meta: dict[str, str | float | int | bool | None] | None = None,
     ) -> Self:
         return cls(
             identifier=identifier or uuid4().hex,
@@ -51,6 +54,7 @@ class ConversationMessage(DataModel):
             author=author,
             created=created,
             content=MultimodalContent.of(content),
+            meta=meta,
         )
 
     identifier: str = Field(default_factory=lambda: uuid4().hex)
@@ -58,6 +62,7 @@ class ConversationMessage(DataModel):
     author: str | None = None
     created: datetime | None = None
     content: MultimodalContent
+    meta: dict[str, str | float | int | bool | None] | None = None
 
     def as_lmm_context_element(self) -> LMMContextElement:
         match self.role:

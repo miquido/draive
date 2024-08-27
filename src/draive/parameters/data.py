@@ -706,11 +706,41 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
             for key in self.__PARAMETERS__.keys()
         )
 
+    def __contains__(
+        self,
+        element: Any,
+    ) -> bool:
+        return element in vars(self)
+
     def __getitem__(
         self,
         name: str,
     ) -> Any | Missing:
         return vars(self).get(name, MISSING)
+
+    @overload
+    def get(
+        self,
+        name: str,
+    ) -> Any | Missing: ...
+
+    @overload
+    def get[Default](
+        self,
+        name: str,
+        default: Default,
+    ) -> Any | Default: ...
+
+    def get(
+        self,
+        name: str,
+        default: Any | Missing = MISSING,
+    ) -> Any | Missing:
+        if self.__contains__(name):
+            return self.__getitem__(name)
+
+        else:
+            return default
 
     def __setattr__(
         self,

@@ -72,13 +72,14 @@ async def consistency_evaluator(
 
     if result := xml_tag(
         "RESULT",
-        await generate_text(
+        source=await generate_text(
             instruction=INSTRUCTION,
             input=INPUT_TEMPLATE.format(
                 reference=reference,
                 evaluated=evaluated,
             ),
         ),
+        conversion=str,
     ):
         return EvaluationScore(
             value=float(result) / 4,

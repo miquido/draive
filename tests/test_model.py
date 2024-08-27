@@ -232,7 +232,9 @@ basic_conversation_message_json: str = (
     '"created": null, '
     '"content": {'
     '"parts": [{"text": "string", "meta": null}]'
-    "}}"
+    "}, "
+    '"meta": null'
+    "}"
 )
 
 image_conversation_message_instance: ConversationMessage = ConversationMessage(
@@ -255,7 +257,9 @@ image_conversation_message_json: str = (
     '"meta": null'
     "}"
     "]"
-    "}}"
+    "}, "
+    '"meta": null'
+    "}"
 )
 audio_conversation_message_instance: ConversationMessage = ConversationMessage(
     identifier="identifier",
@@ -277,7 +281,9 @@ audio_conversation_message_json: str = (
     '"meta": null'
     "}"
     "]"
-    "}}"
+    "}, "
+    '"meta": null'
+    "}"
 )
 mixed_conversation_message_instance: ConversationMessage = ConversationMessage(
     identifier="identifier",
@@ -310,7 +316,10 @@ mixed_conversation_message_json: str = (
     '"meta": null'
     "}, "
     '{"text": "content", "meta": null}'
-    "]}}"
+    "]"
+    "}, "
+    '"meta": null'
+    "}"
 )
 
 

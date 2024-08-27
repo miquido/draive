@@ -95,7 +95,7 @@ async def lmm_choice_completion(  # noqa: C901, PLR0912, PLR0913
                 case LMMCompletion() as completion:
                     ctx.log_debug("Received choice results")
                     if selection := xml_tag("CHOICE", source=completion.content):
-                        if option := options_map.get(selection):
+                        if option := options_map.get(selection.as_string()):
                             return option
 
                     raise SelectionException("Invalid or missing selection")
@@ -111,7 +111,7 @@ async def lmm_choice_completion(  # noqa: C901, PLR0912, PLR0913
                             "CHOICE",
                             source=MultimodalContent.of(*direct_content),
                         ):
-                            if option := options_map.get(selection):
+                            if option := options_map.get(selection.as_string()):
                                 return option
 
                         raise SelectionException("Invalid or missing selection")

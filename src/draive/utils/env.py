@@ -11,15 +11,23 @@ __all__ = [
 
 
 @overload
-def getenv_bool(key: str) -> bool | None: ...
+def getenv_bool(
+    key: str,
+    /,
+) -> bool | None: ...
 
 
 @overload
-def getenv_bool(key: str, default: bool) -> bool: ...
+def getenv_bool(
+    key: str,
+    /,
+    default: bool,
+) -> bool: ...
 
 
 def getenv_bool(
     key: str,
+    /,
     default: bool | None = None,
 ) -> bool | None:
     if value := getenv(key=key):
@@ -29,15 +37,23 @@ def getenv_bool(
 
 
 @overload
-def getenv_int(key: str) -> int | None: ...
+def getenv_int(
+    key: str,
+    /,
+) -> int | None: ...
 
 
 @overload
-def getenv_int(key: str, default: int) -> int: ...
+def getenv_int(
+    key: str,
+    /,
+    default: int,
+) -> int: ...
 
 
 def getenv_int(
     key: str,
+    /,
     default: int | None = None,
 ) -> int | None:
     if value := getenv(key=key):
@@ -48,15 +64,23 @@ def getenv_int(
 
 
 @overload
-def getenv_float(key: str) -> float | None: ...
+def getenv_float(
+    key: str,
+    /,
+) -> float | None: ...
 
 
 @overload
-def getenv_float(key: str, default: float) -> float: ...
+def getenv_float(
+    key: str,
+    /,
+    default: float,
+) -> float: ...
 
 
 def getenv_float(
     key: str,
+    /,
     default: float | None = None,
 ) -> float | None:
     if value := getenv(key=key):
@@ -67,15 +91,23 @@ def getenv_float(
 
 
 @overload
-def getenv_str(key: str) -> str | None: ...
+def getenv_str(
+    key: str,
+    /,
+) -> str | None: ...
 
 
 @overload
-def getenv_str(key: str, default: str) -> str: ...
+def getenv_str(
+    key: str,
+    /,
+    default: str,
+) -> str: ...
 
 
 def getenv_str(
     key: str,
+    /,
     default: str | None = None,
 ) -> str | None:
     if value := getenv(key=key):
