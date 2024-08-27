@@ -1,10 +1,11 @@
 from asyncio import Lock, gather
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Protocol, Self, overload, runtime_checkable
 from uuid import UUID, uuid4
 
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
+from draive.evaluation.generator import generate_case_parameters
 from draive.evaluation.scenario import PreparedScenarioEvaluator, ScenarioEvaluatorResult
 from draive.parameters import DataModel, Field
 from draive.scope import ctx
@@ -149,10 +150,12 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
         self,
         definition: EvaluationSuiteDefinition[CaseParameters, Value],
         storage: EvaluationSuiteStorage[CaseParameters],
+        parameters: type[CaseParameters],
     ) -> None:
         self._definition: EvaluationSuiteDefinition[CaseParameters, Value] = definition
         self._storage: EvaluationSuiteStorage[CaseParameters] = storage
         self._data_cache: EvaluationSuiteData[CaseParameters] | None = None
+        self._parameters: type[CaseParameters] = parameters
         self._lock: Lock = Lock()
 
     @overload
@@ -266,6 +269,32 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
             )
             await self._storage.save(self._data_cache)
 
+    async def generate_cases(
+        self,
+        *,
+        persist: bool = False,
+        count: int,
+        examples: Iterable[CaseParameters] | None = None,
+    ) -> None:
+        async with self._lock:
+            data: EvaluationSuiteData[CaseParameters] = await self._data(reload=True)
+            self._data_cache = data.updated(
+                cases=(
+                    *data.cases,
+                    *[
+                        EvaluationSuiteCase(parameters=parameters)
+                        for parameters in await generate_case_parameters(
+                            self._parameters,
+                            count=count,
+                            examples=examples or [case.parameters for case in data.cases],
+                        )
+                    ],
+                )
+            )
+
+            if persist:
+                await self._storage.save(self._data_cache)
+
     async def remove_case(
         self,
         identifier: UUID,
@@ -315,6 +344,7 @@ def evaluation_suite[CaseParameters: DataModel, Value: DataModel | str](
         return EvaluationSuite[CaseParameters, Value](
             definition=definition,
             storage=suite_storage,
+            parameters=case,
         )
 
     return wrap
