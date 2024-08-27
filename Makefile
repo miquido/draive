@@ -80,7 +80,7 @@ lint:
 
 # Run tests suite.
 test:
-	@$(PYTHON_ALIAS) -B -m pytest -v --cov=$(SOURCES_PATH) --rootdir=$(TESTS_PATH)
+	@$(PYTHON_ALIAS) -B -m pytest -vv --cov=$(SOURCES_PATH) --rootdir=$(TESTS_PATH)
 
 release: lint test
 	@echo '# Preparing release...'
