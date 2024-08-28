@@ -3,6 +3,7 @@ from collections.abc import Callable
 from typing import Protocol, Self, cast, final, overload, runtime_checkable
 
 from draive.evaluation.score import EvaluationScore
+from draive.evaluation.threshold import Threshold, threshold_value
 from draive.parameters import DataModel, Field, ParameterPath
 from draive.scope import ctx
 from draive.utils import freeze
@@ -123,12 +124,13 @@ class Evaluator[Value, **Args]:
 
     def with_threshold(
         self,
-        threshold: float,
+        value: Threshold,
+        /,
     ) -> Self:
         return self.__class__(
             name=self.name,
             definition=self._definition,
-            threshold=threshold,
+            threshold=threshold_value(value),
         )
 
     def prepared(
@@ -242,7 +244,7 @@ def evaluator[Value, **Args](
 def evaluator[Value, **Args](
     *,
     name: str | None = None,
-    threshold: float | None = None,
+    threshold: Threshold | None = None,
 ) -> Callable[
     [EvaluatorDefinition[Value, Args]],
     Evaluator[Value, Args],
@@ -254,7 +256,7 @@ def evaluator[Value, **Args](  # pyright: ignore[reportInconsistentOverload] - t
     /,
     *,
     name: str | None = None,
-    threshold: float | None = None,
+    threshold: Threshold | None = None,
 ) -> (
     Callable[
         [EvaluatorDefinition[Value, Args]],
@@ -268,7 +270,7 @@ def evaluator[Value, **Args](  # pyright: ignore[reportInconsistentOverload] - t
         return Evaluator(
             name=name or definition.__name__,
             definition=definition,
-            threshold=threshold,
+            threshold=threshold_value(threshold) if threshold is not None else None,
         )
 
     if evaluation:
