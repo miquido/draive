@@ -1,9 +1,10 @@
 from asyncio import gather
 from collections.abc import Callable, Sequence
-from typing import Protocol, Self, overload, runtime_checkable
+from typing import Protocol, Self, cast, overload, runtime_checkable
 
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.parameters import DataModel, Field
+from draive.parameters.path import ParameterPath
 from draive.scope import ctx
 from draive.types import frozenlist
 from draive.utils import freeze
@@ -113,6 +114,39 @@ class ScenarioEvaluator[Value, **Args]:
             )
 
         return evaluate
+
+    def contra_map[Mapped](
+        self,
+        mapping: Callable[[Mapped], Value] | ParameterPath[Mapped, Value] | Value,
+        /,
+    ) -> "ScenarioEvaluator[Mapped, Args]":
+        mapper: Callable[[Mapped], Value]
+        match mapping:
+            case Callable() as function:  # pyright: ignore[reportUnknownVariableType]
+                mapper = function
+
+            case path:
+                assert isinstance(  # nosec: B101
+                    path, ParameterPath
+                ), "Prepare parameter path by using Self._.path.to.property"
+                mapper = cast(ParameterPath[Mapped, Value], path).__call__
+
+        async def evaluation(
+            value: Mapped,
+            /,
+            *args: Args.args,
+            **kwargs: Args.kwargs,
+        ) -> Sequence[EvaluatorResult] | EvaluationScenarioResult:
+            return await self._definition(
+                mapper(value),
+                *args,
+                **kwargs,
+            )
+
+        return ScenarioEvaluator[Mapped, Args](
+            name=self.name,
+            definition=evaluation,
+        )
 
     async def __call__(
         self,

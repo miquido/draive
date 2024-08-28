@@ -1,3 +1,4 @@
+from asyncio import gather
 from collections.abc import Callable
 from typing import Protocol, Self, cast, final, overload, runtime_checkable
 
@@ -7,12 +8,21 @@ from draive.scope import ctx
 from draive.utils import freeze
 
 __all__ = [
+    "evaluator_highest",
+    "evaluator_lowest",
     "evaluator",
     "Evaluator",
+    "EvaluatorDefinition",
     "EvaluatorResult",
     "PreparedEvaluator",
-    "EvaluatorDefinition",
 ]
+
+
+def _verifier(
+    value: float,
+) -> None:
+    if not (0 <= value <= 1):
+        raise ValueError(f"Threshold has to have a value between 0 and 1, received: {value}")
 
 
 class EvaluatorResult(DataModel):
@@ -23,7 +33,9 @@ class EvaluatorResult(DataModel):
         description="Evaluation score",
     )
     threshold: float = Field(
-        description="Score threshold required to pass evaluation",
+        description="Score threshold required to pass evaluation, "
+        "a value between 0 (min) and 1 (max)",
+        verifier=_verifier,
     )
     meta: dict[str, str | float | int | bool | None] | None = Field(
         description="Additional evaluation metadata",
@@ -153,6 +165,7 @@ class Evaluator[Value, **Args]:
 
         async def evaluation(
             value: Mapped,
+            /,
             *args: Args.args,
             **kwargs: Args.kwargs,
         ) -> EvaluationResult | EvaluationScore | float | bool:
@@ -263,3 +276,59 @@ def evaluator[Value, **Args](  # pyright: ignore[reportInconsistentOverload] - t
 
     else:
         return wrap
+
+
+def evaluator_lowest[Value](
+    evaluators: PreparedEvaluator[Value],
+    /,
+    *_evaluators: PreparedEvaluator[Value],
+) -> PreparedEvaluator[Value]:
+    async def evaluate(
+        value: Value,
+    ) -> EvaluatorResult:
+        # Placeholder for the lowest result
+        lowest: EvaluatorResult = EvaluatorResult(
+            evaluator="lowest",
+            score=EvaluationScore(value=1),
+            threshold=0,
+            meta=None,
+        )
+
+        for result in await gather(
+            evaluators(value),
+            *[evaluator(value) for evaluator in _evaluators],
+        ):
+            if result.score <= lowest.score:
+                lowest = result
+
+        return lowest
+
+    return evaluate
+
+
+def evaluator_highest[Value](
+    evaluators: PreparedEvaluator[Value],
+    /,
+    *_evaluators: PreparedEvaluator[Value],
+) -> PreparedEvaluator[Value]:
+    async def evaluate(
+        value: Value,
+    ) -> EvaluatorResult:
+        # Placeholder for the highest result
+        highest: EvaluatorResult = EvaluatorResult(
+            evaluator="highest",
+            score=EvaluationScore(value=0),
+            threshold=1,
+            meta=None,
+        )
+
+        for result in await gather(
+            evaluators(value),
+            *[evaluator(value) for evaluator in _evaluators],
+        ):
+            if result.score >= highest.score:
+                highest = result
+
+        return highest
+
+    return evaluate
