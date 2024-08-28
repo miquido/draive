@@ -1,3 +1,5 @@
+from typing import Any
+
 from draive.parameters import DataModel, Field
 
 __all__ = [
@@ -21,3 +23,69 @@ class EvaluationScore(DataModel):
         description="Explanation of the score",
         default=None,
     )
+
+    def __eq__(self, other: Any) -> bool:
+        match other:
+            case float() as value:
+                return self.value == value
+
+            case EvaluationScore() as score:
+                return self.value == score.value
+
+            case _:
+                return NotImplemented
+
+    def __ne__(self, other: Any) -> bool:
+        match other:
+            case float() as value:
+                return self.value != value
+
+            case EvaluationScore() as score:
+                return self.value != score.value
+
+            case _:
+                return NotImplemented
+
+    def __lt__(self, other: Any) -> bool:
+        match other:
+            case float() as value:
+                return self.value < value
+
+            case EvaluationScore() as score:
+                return self.value < score.value
+
+            case _:
+                return NotImplemented
+
+    def __le__(self, other: Any) -> bool:
+        match other:
+            case float() as value:
+                return self.value <= value
+
+            case EvaluationScore() as score:
+                return self.value <= score.value
+
+            case _:
+                return NotImplemented
+
+    def __gt__(self, other: Any) -> bool:
+        match other:
+            case float() as value:
+                return self.value > value
+
+            case EvaluationScore() as score:
+                return self.value > score.value
+
+            case _:
+                return NotImplemented
+
+    def __ge__(self, other: Any) -> bool:
+        match other:
+            case float() as value:
+                return self.value >= value
+
+            case EvaluationScore() as score:
+                return self.value >= score.value
+
+            case _:
+                return NotImplemented
