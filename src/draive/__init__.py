@@ -182,6 +182,7 @@ from draive.utils import (
     not_missing,
     setup_logging,
     split_sequence,
+    throttle,
     with_timeout,
 )
 
@@ -320,6 +321,7 @@ __all__ = [
     "TextGeneration",
     "TextGenerator",
     "TextTokenizer",
+    "throttle",
     "Tokenization",
     "tokenize_text",
     "TokenUsage",
