@@ -49,6 +49,24 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
         # empty results is equivalent of failure
         return len(self.results) > 0 and all(result.passed for result in self.results)
 
+    def report(self) -> str:
+        report: str = "\n---\n".join(
+            [result.report() for result in self.results if not result.passed]
+        )
+
+        if report:  # nonempty report contains failing reports
+            return (
+                f"Evaluation case {self.case.identifier}:"
+                f"\nvalue: {self.value}"
+                f"\n{self.case.parameters}\n---\n{report}"
+            )
+
+        elif not self.results:
+            return f"Evaluation case {self.case.identifier} empty!"
+
+        else:
+            return f"Evaluation case {self.case.identifier} passed!"
+
 
 class SuiteEvaluatorResult[CaseParameters: DataModel, Value: DataModel | str](DataModel):
     cases: list[SuiteEvaluatorCaseResult[CaseParameters, Value]]
@@ -56,6 +74,20 @@ class SuiteEvaluatorResult[CaseParameters: DataModel, Value: DataModel | str](Da
     @property
     def passed(self) -> bool:
         return all(case.passed for case in self.cases)
+
+    def report(self) -> str:
+        report: str = "\n---\n".join(
+            [result.report() for result in self.cases if not result.passed]
+        )
+
+        if report:  # nonempty report contains failing reports
+            return f"Evaluation suite failed:\n\n{report}"
+
+        elif not self.cases:
+            return "Evaluation suite empty!"
+
+        else:
+            return "Evaluation suite passed!"
 
 
 class EvaluationCaseResult[Value: DataModel | str](DataModel):

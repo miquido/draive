@@ -35,6 +35,25 @@ class ScenarioEvaluatorResult(DataModel):
         # empty evaluations is equivalent of failure
         return len(self.evaluations) > 0 and all(case.passed for case in self.evaluations)
 
+    def report(self) -> str:
+        report: str = "\n- ".join(
+            result.report() for result in self.evaluations if not result.passed
+        )
+
+        if report:  # nonempty report contains failing reports
+            meta_values: str = (
+                f"\n{'\n'.join(f'{key}: {value}' for key, value in self.meta.items())}"
+                if self.meta
+                else "N/A"
+            )
+            return f"Scenario {self.name}, meta: {meta_values}\n---\n{report}"
+
+        elif not self.evaluations:
+            return f"Scenario {self.name} empty!"
+
+        else:
+            return f"Scenario {self.name} passed!"
+
 
 class EvaluationScenarioResult(DataModel):
     @classmethod
@@ -93,9 +112,11 @@ class ScenarioEvaluator[Value, **Args]:
         self,
         name: str,
         definition: ScenarioEvaluatorDefinition[Value, Args],
+        meta: dict[str, str | float | int | bool | None] | None = None,
     ) -> None:
         self.name: str = name
         self._definition: ScenarioEvaluatorDefinition[Value, Args] = definition
+        self.meta: dict[str, str | float | int | bool | None] | None = meta
 
         freeze(self)
 
@@ -114,6 +135,17 @@ class ScenarioEvaluator[Value, **Args]:
             )
 
         return evaluate
+
+    def with_meta(
+        self,
+        meta: dict[str, str | float | int | bool | None],
+        /,
+    ) -> Self:
+        return self.__class__(
+            name=self.name,
+            definition=self._definition,
+            meta=self.meta | meta if self.meta else meta,
+        )
 
     def contra_map[Mapped](
         self,
@@ -162,17 +194,33 @@ class ScenarioEvaluator[Value, **Args]:
                 **kwargs,
             ):
                 case EvaluationScenarioResult() as result:
+                    meta: dict[str, str | float | int | bool | None] | None
+                    if self.meta:
+                        if result.meta:
+                            meta = self.meta | result.meta
+
+                        else:
+                            meta = self.meta
+
+                    elif result.meta:
+                        meta = result.meta
+
+                    else:
+                        meta = None
+
                     return ScenarioEvaluatorResult(
                         name=self.name,
                         evaluations=result.evaluations,
-                        meta=result.meta,
+                        meta=meta,
                     )
 
                 case [*results]:
                     return ScenarioEvaluatorResult(
                         name=self.name,
                         evaluations=tuple(results),
+                        meta=self.meta,
                     )
+
         except Exception as exc:
             ctx.log_error(
                 f"Scenario evaluator `{self.name}` failed, using empty fallback result",
@@ -182,7 +230,7 @@ class ScenarioEvaluator[Value, **Args]:
             return ScenarioEvaluatorResult(
                 name=self.name,
                 evaluations=(),
-                meta={"exception": str(exc)},
+                meta=(self.meta or {}) | {"exception": str(exc)},
             )
 
 
