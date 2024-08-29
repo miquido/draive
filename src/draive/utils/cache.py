@@ -65,6 +65,7 @@ def cache[**Args, Result](
                     expiration=expiration,
                 ),
             )
+
         else:
             return cast(
                 Callable[Args, Result],
@@ -102,6 +103,7 @@ class _SyncCache[**Args, Result]:
 
             def next_expire_time() -> float | None:
                 return monotonic() + expiration
+
         else:
 
             def next_expire_time() -> float | None:
@@ -149,6 +151,7 @@ class _SyncCache[**Args, Result]:
                 if (expire := entry[1]) and expire < monotonic():
                     # if still running let it complete if able
                     del self._cached[key]  # continue the same way as if empty
+
                 else:
                     self._cached.move_to_end(key)
                     return entry[0]
@@ -158,6 +161,7 @@ class _SyncCache[**Args, Result]:
             value=result,
             expire=self._next_expire_time(),
         )
+
         if len(self._cached) > self._limit:
             # if still running let it complete if able
             self._cached.popitem(last=False)
@@ -184,6 +188,7 @@ class _SyncCache[**Args, Result]:
                 if (expire := entry[1]) and expire < monotonic():
                     # if still running let it complete if able
                     del self._cached[key]  # continue the same way as if empty
+
                 else:
                     self._cached.move_to_end(key)
                     return entry[0]
@@ -196,6 +201,7 @@ class _SyncCache[**Args, Result]:
         if len(self._cached) > self._limit:
             # if still running let it complete if able
             self._cached.popitem(last=False)
+
         return result  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
 
 
@@ -214,6 +220,7 @@ class _AsyncCache[**Args, Result]:
 
             def next_expire_time() -> float | None:
                 return monotonic() + expiration
+
         else:
 
             def next_expire_time() -> float | None:
@@ -232,6 +239,7 @@ class _AsyncCache[**Args, Result]:
     ) -> Callable[Args, Coroutine[None, None, Result]]:
         if owner is None:
             return self
+
         else:
             return mimic_function(
                 self._function,
@@ -261,6 +269,7 @@ class _AsyncCache[**Args, Result]:
                 if (expire := entry[1]) and expire < monotonic():
                     # if still running let it complete if able
                     del self._cached[key]  # continue the same way as if empty
+
                 else:
                     self._cached.move_to_end(key)
                     return await shield(entry[0])
@@ -273,6 +282,7 @@ class _AsyncCache[**Args, Result]:
         if len(self._cached) > self._limit:
             # if still running let it complete if able
             self._cached.popitem(last=False)
+
         return await shield(task)
 
     async def __method_call__(
@@ -296,6 +306,7 @@ class _AsyncCache[**Args, Result]:
                 if (expire := entry[1]) and expire < monotonic():
                     # if still running let it complete if able
                     del self._cached[key]  # continue the same way as if empty
+
                 else:
                     self._cached.move_to_end(key)
                     return await shield(entry[0])
@@ -307,6 +318,7 @@ class _AsyncCache[**Args, Result]:
             value=task,
             expire=self._next_expire_time(),
         )
+
         if len(self._cached) > self._limit:
             # if still running let it complete if able
             self._cached.popitem(last=False)
