@@ -47,6 +47,20 @@ class EvaluatorResult(DataModel):
     def passed(self) -> bool:
         return self.score.value >= self.threshold
 
+    def report(self) -> str:
+        meta_values: str = (
+            f"\n{'\n'.join(f'{key}: {value}' for key, value in self.meta.items())}"
+            if self.meta
+            else "N/A"
+        )
+        return (
+            f"{self.evaluator} {'passed' if self.passed else 'failed' }"
+            f" with score {self.score.value},"
+            f" required {self.threshold},"
+            f" comment: {f"'{self.score.comment}'" or 'N/A'}"
+            f" meta:\n{meta_values}"
+        )
+
 
 class EvaluationResult(DataModel):
     @classmethod
@@ -111,6 +125,7 @@ class Evaluator[Value, **Args]:
         name: str,
         definition: EvaluatorDefinition[Value, Args],
         threshold: float | None,
+        meta: dict[str, str | float | int | bool | None] | None = None,
     ) -> None:
         assert (  # nosec: B101
             threshold is None or 0 <= threshold <= 1
@@ -119,6 +134,7 @@ class Evaluator[Value, **Args]:
         self._definition: EvaluatorDefinition[Value, Args] = definition
         self.name: str = name
         self.threshold: float = threshold or 1
+        self.meta: dict[str, str | float | int | bool | None] | None = meta
 
         freeze(self)
 
@@ -131,6 +147,19 @@ class Evaluator[Value, **Args]:
             name=self.name,
             definition=self._definition,
             threshold=threshold_value(value),
+            meta=self.meta,
+        )
+
+    def with_meta(
+        self,
+        meta: dict[str, str | float | int | bool | None],
+        /,
+    ) -> Self:
+        return self.__class__(
+            name=self.name,
+            definition=self._definition,
+            threshold=self.threshold,
+            meta=self.meta | meta if self.meta else meta,
         )
 
     def prepared(
@@ -225,11 +254,25 @@ class Evaluator[Value, **Args]:
             )
             evaluation_meta = {"exception": str(exc)}
 
+        result_meta: dict[str, str | float | int | bool | None] | None
+        if self.meta:
+            if evaluation_meta:
+                result_meta = self.meta | evaluation_meta
+
+            else:
+                result_meta = self.meta
+
+        elif evaluation_meta:
+            result_meta = evaluation_meta
+
+        else:
+            result_meta = None
+
         return EvaluatorResult(
             evaluator=self.name,
             score=evaluation_score,
             threshold=self.threshold,
-            meta=evaluation_meta,
+            meta=result_meta,
         )
 
 
