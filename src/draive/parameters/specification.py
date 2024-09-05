@@ -456,13 +456,13 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911, PLR0913
                 raise TypeError("Unsupported literal type annotation: %s", annotation)
 
         case enum_type if isinstance(enum_type, enum.EnumType):
-            if isinstance(enum_type, enum.StrEnum):
+            if issubclass(enum_type, enum.StrEnum):
                 specification = {
                     "type": "string",
                     "enum": list(enum_type),
                 }
 
-            elif isinstance(enum_type, enum.IntEnum):
+            elif issubclass(enum_type, enum.IntEnum):
                 specification = {
                     "type": "integer",
                     "enum": list(enum_type),

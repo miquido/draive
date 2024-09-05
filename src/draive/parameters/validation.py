@@ -908,10 +908,10 @@ def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912, PLR0913
                 validator = _prepare_any_enum_validator(resolved_args)
 
         case enum_type if isinstance(enum_type, enum.EnumType):
-            if isinstance(enum_type, enum.StrEnum):
+            if issubclass(enum_type, enum.StrEnum):
                 validator = _prepare_str_enum_validator(resolved_args)
 
-            elif isinstance(enum_type, enum.IntEnum):
+            elif issubclass(enum_type, enum.IntEnum):
                 validator = _prepare_int_enum_validator(resolved_args)
 
             else:
