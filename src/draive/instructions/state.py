@@ -37,7 +37,8 @@ class InstructionsRepository(State):
     ) -> Instruction:
         try:
             if (cached := _instructions_cache.get(key, None)) and (
-                not self.cache_expiration or cached.timestamp + self.cache_expiration < monotonic()
+                self.cache_expiration is None
+                or cached.timestamp + self.cache_expiration >= monotonic()
             ):
                 return cached.instruction
 
