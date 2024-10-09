@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from time import monotonic
 from typing import NamedTuple
 
@@ -27,6 +28,7 @@ _instructions_cache: dict[str, _CacheEntry] = {}
 class InstructionsRepository(State):
     fetch: InstructionFetching = _missing
     cache_expiration: float | None = None
+    clock: Callable[[], float] = monotonic
 
     async def instruction(
         self,
@@ -37,7 +39,8 @@ class InstructionsRepository(State):
     ) -> Instruction:
         try:
             if (cached := _instructions_cache.get(key, None)) and (
-                not self.cache_expiration or cached.timestamp + self.cache_expiration < monotonic()
+                self.cache_expiration is None
+                or cached.timestamp + self.cache_expiration >= self.clock()
             ):
                 return cached.instruction
 
@@ -45,7 +48,7 @@ class InstructionsRepository(State):
                 instruction: Instruction = await self.fetch(key)
                 _instructions_cache[key] = _CacheEntry(
                     instruction=instruction,
-                    timestamp=monotonic(),
+                    timestamp=self.clock(),
                 )
                 return instruction
 
@@ -58,13 +61,13 @@ class InstructionsRepository(State):
                     instruction: Instruction = Instruction.of(string)
                     _instructions_cache[key] = _CacheEntry(
                         instruction=instruction,
-                        timestamp=monotonic(),
+                        timestamp=self.clock(),
                     )
                     return instruction
 
                 case instruction:
                     _instructions_cache[key] = _CacheEntry(
                         instruction=instruction,
-                        timestamp=monotonic(),
+                        timestamp=self.clock(),
                     )
                     return instruction
