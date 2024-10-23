@@ -8,7 +8,7 @@ from anthropic.types import Message, MessageParam, RawMessageStreamEvent, ToolPa
 from anthropic.types.message_create_params import ToolChoice, ToolChoiceToolChoiceTool
 
 from draive.anthropic.config import AnthropicConfig
-from draive.scope import ScopeDependency
+from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
 from draive.types import RateLimitError
 from draive.utils import getenv_str, not_missing
 
@@ -18,7 +18,7 @@ __all__ = [
 
 
 @final
-class AnthropicClient(ScopeDependency):
+class AnthropicClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
     @classmethod
     def prepare(cls) -> Self:
         return cls(

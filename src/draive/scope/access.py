@@ -20,15 +20,20 @@ from logging import Logger, getLogger
 from types import TracebackType
 from typing import Any, final
 
+from typing_extensions import deprecated
+
 from draive.metrics import (
     ExceptionTrace,
     Metric,
-    MetricsTrace,
+    MetricsTrace,  # pyright: ignore[reportDeprecated]
     MetricsTraceReporter,
     metrics_log_reporter,
 )
 from draive.parameters import ParametrizedData
-from draive.scope.dependencies import ScopeDependencies, ScopeDependency
+from draive.scope.dependencies import (
+    ScopeDependencies,  # pyright: ignore[reportDeprecated]
+    ScopeDependency,  # pyright: ignore[reportDeprecated]
+)
 from draive.scope.errors import MissingScopeContext
 from draive.scope.state import ScopeState
 from draive.utils import MISSING, AsyncStream, Missing, asynchronous, getenv_bool, mimic_function
@@ -38,29 +43,31 @@ __all__ = [
 ]
 
 _TaskGroup_Var = ContextVar[TaskGroup]("_TaskGroup_Var")
-_MetricsScope_Var = ContextVar[MetricsTrace]("_MetricsScope_Var")
+_MetricsScope_Var = ContextVar[MetricsTrace]("_MetricsScope_Var")  # pyright: ignore[reportDeprecated]
 _StateScope_Var = ContextVar[ScopeState]("_ScopeState_Var")
-_DependenciesScope_Var = ContextVar[ScopeDependencies]("_DependenciesScope_Var")
+_DependenciesScope_Var = ContextVar[ScopeDependencies]("_DependenciesScope_Var")  # pyright: ignore[reportDeprecated]
 
 
 class _RootContext:
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         task_group: TaskGroup,
-        dependencies: ScopeDependencies,
+        dependencies: ScopeDependencies,  # pyright: ignore[reportDeprecated]
         state: ScopeState,
-        metrics: MetricsTrace,
+        metrics: MetricsTrace,  # pyright: ignore[reportDeprecated]
         trace_reporting: MetricsTraceReporter | None,
+        completion: Callable[[MetricsTrace], Coroutine[None, None, None]] | None,  # pyright: ignore[reportDeprecated]
     ) -> None:
         self._task_group: TaskGroup = task_group
         self._task_group_token: Token[TaskGroup] | None = None
-        self._dependencies: ScopeDependencies = dependencies
-        self._dependencies_token: Token[ScopeDependencies] | None = None
+        self._dependencies: ScopeDependencies = dependencies  # pyright: ignore[reportDeprecated]
+        self._dependencies_token: Token[ScopeDependencies] | None = None  # pyright: ignore[reportDeprecated]
         self._state: ScopeState = state
         self._state_token: Token[ScopeState] | None = None
-        self._metrics: MetricsTrace = metrics
-        self._metrics_token: Token[MetricsTrace] | None = None
+        self._metrics: MetricsTrace = metrics  # pyright: ignore[reportDeprecated]
+        self._metrics_token: Token[MetricsTrace] | None = None  # pyright: ignore[reportDeprecated]
         self._report_trace: MetricsTraceReporter | None = trace_reporting
+        self._completion: Callable[[MetricsTrace], Coroutine[None, None, None]] | None = completion  # pyright: ignore[reportDeprecated]
 
     async def __aenter__(self) -> None:
         # start the task group first
@@ -130,6 +137,9 @@ class _RootContext:
                     )
                     return None
 
+            if completion := self._completion:
+                await completion(self._metrics)
+
             # cleanup dependencies next
             assert self._dependencies_token is not None, "Can't exit scope without entering"  # nosec: B101
             _DependenciesScope_Var.reset(self._dependencies_token)
@@ -142,15 +152,17 @@ class _PartialContext:
     def __init__(
         self,
         task_group: TaskGroup | None = None,
-        metrics: MetricsTrace | None = None,
+        metrics: MetricsTrace | None = None,  # pyright: ignore[reportDeprecated]
         state: ScopeState | None = None,
+        completion: Callable[[MetricsTrace], Coroutine[None, None, None]] | None = None,  # pyright: ignore[reportDeprecated]
     ) -> None:
         self._task_group: TaskGroup | None = task_group
         self._task_group_token: Token[TaskGroup] | None = None
-        self._metrics: MetricsTrace | None = metrics
-        self._metrics_token: Token[MetricsTrace] | None = None
+        self._metrics: MetricsTrace | None = metrics  # pyright: ignore[reportDeprecated]
+        self._metrics_token: Token[MetricsTrace] | None = None  # pyright: ignore[reportDeprecated]
         self._state: ScopeState | None = state
         self._state_token: Token[ScopeState] | None = None
+        self._completion: Callable[[MetricsTrace], Coroutine[None, None, None]] | None = completion  # pyright: ignore[reportDeprecated]
 
     def __enter__(self) -> None:
         if metrics := self._metrics:
@@ -215,29 +227,34 @@ class _PartialContext:
                 exc_tb=exc_tb,
             )
 
+        finally:
+            if completion := self._completion:
+                await completion(self._metrics or _MetricsScope_Var.get())
+
 
 @final
 class ctx:
+    @deprecated("`new` will be replaced by `scope`")
     @staticmethod
     def new(  # noqa: PLR0913
         label: str | None = None,
         /,
         *,
-        dependencies: ScopeDependencies
-        | Iterable[type[ScopeDependency] | ScopeDependency]
+        dependencies: ScopeDependencies  # pyright: ignore[reportDeprecated]
+        | Iterable[type[ScopeDependency] | ScopeDependency]  # pyright: ignore[reportDeprecated]
         | None = None,
         state: ScopeState | Iterable[ParametrizedData] | None = None,
         metrics: Iterable[Metric] | None = None,
         logger: Logger | None = None,
         trace_reporting: MetricsTraceReporter | None = None,
     ) -> _RootContext:
-        root_dependencies: ScopeDependencies
+        root_dependencies: ScopeDependencies  # pyright: ignore[reportDeprecated]
         if dependencies is None:
-            root_dependencies = ScopeDependencies()
-        elif isinstance(dependencies, ScopeDependencies):
+            root_dependencies = ScopeDependencies()  # pyright: ignore[reportDeprecated]
+        elif isinstance(dependencies, ScopeDependencies):  # pyright: ignore[reportDeprecated]
             root_dependencies = dependencies
         else:
-            root_dependencies = ScopeDependencies(*dependencies)
+            root_dependencies = ScopeDependencies(*dependencies)  # pyright: ignore[reportDeprecated]
 
         root_state: ScopeState
         if state is None:
@@ -264,22 +281,24 @@ class ctx:
             task_group=TaskGroup(),
             dependencies=root_dependencies,
             state=root_state,
-            metrics=MetricsTrace(
+            metrics=MetricsTrace(  # pyright: ignore[reportDeprecated]
                 label=label,
                 logger=root_logger,
                 parent=None,
                 metrics=metrics,
             ),
             trace_reporting=trace_reporter,
+            completion=None,
         )
 
+    @deprecated("`wrap` will be removed")
     @staticmethod
     def wrap[**Args, Result](  # noqa: PLR0913
         label: str | None = None,
         /,
         *,
-        dependencies: ScopeDependencies
-        | Iterable[type[ScopeDependency] | ScopeDependency]
+        dependencies: ScopeDependencies  # pyright: ignore[reportDeprecated]
+        | Iterable[type[ScopeDependency] | ScopeDependency]  # pyright: ignore[reportDeprecated]
         | None = None,
         state: ScopeState | Iterable[ParametrizedData] | None = None,
         metrics: Iterable[Metric] | None = None,
@@ -289,13 +308,13 @@ class ctx:
         [Callable[Args, Coroutine[None, None, Result]]],
         Callable[Args, Coroutine[None, None, Result]],
     ]:
-        root_dependencies: ScopeDependencies
+        root_dependencies: ScopeDependencies  # pyright: ignore[reportDeprecated]
         if dependencies is None:
-            root_dependencies = ScopeDependencies()
-        elif isinstance(dependencies, ScopeDependencies):
+            root_dependencies = ScopeDependencies()  # pyright: ignore[reportDeprecated]
+        elif isinstance(dependencies, ScopeDependencies):  # pyright: ignore[reportDeprecated]
             root_dependencies = dependencies
         else:
-            root_dependencies = ScopeDependencies(*dependencies)
+            root_dependencies = ScopeDependencies(*dependencies)  # pyright: ignore[reportDeprecated]
 
         root_state: ScopeState
         if state is None:
@@ -322,7 +341,7 @@ class ctx:
         ) -> Callable[Args, Coroutine[None, None, Result]]:
             @mimic_function(function)
             async def wrapped(*args: Args.args, **kwargs: Args.kwargs) -> Result:
-                async with ctx.new(
+                async with ctx.new(  # pyright: ignore[reportDeprecated]
                     label,
                     dependencies=root_dependencies,
                     state=root_state,
@@ -365,7 +384,7 @@ class ctx:
             raise MissingScopeContext("TaskGroup requested but not defined!") from exc
 
     @staticmethod
-    def _current_metrics() -> MetricsTrace:
+    def _current_metrics() -> MetricsTrace:  # pyright: ignore[reportDeprecated]
         try:
             return _MetricsScope_Var.get()
 
@@ -373,7 +392,7 @@ class ctx:
             raise MissingScopeContext("MetricsScope requested but not defined!") from exc
 
     @staticmethod
-    def _current_dependencies() -> ScopeDependencies:
+    def _current_dependencies() -> ScopeDependencies:  # pyright: ignore[reportDeprecated]
         try:
             return _DependenciesScope_Var.get()
 
@@ -395,7 +414,7 @@ class ctx:
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Task[Result]:
-        nested_context: _PartialContext = ctx.nested(function.__name__)
+        nested_context: _PartialContext = ctx.nested(function.__name__)  # pyright: ignore[reportDeprecated]
 
         async def wrapped(*args: Args.args, **kwargs: Args.kwargs) -> Result:
             with nested_context:
@@ -420,6 +439,7 @@ class ctx:
         else:
             raise RuntimeError("Attempting to cancel context out of asyncio task")
 
+    @deprecated("`nested` will be replaced by `scope`")
     @staticmethod
     def nested(
         label: str,
@@ -444,11 +464,61 @@ class ctx:
         )
 
     @staticmethod
+    def scope(
+        label: str,
+        /,
+        *state: ParametrizedData,
+        logger: Logger | None = None,
+        trace_id: str | None = None,
+        completion: Callable[[MetricsTrace], Coroutine[None, None, None]] | None = None,  # pyright: ignore[reportDeprecated]
+    ) -> _RootContext | _PartialContext:
+        try:
+            return _PartialContext(
+                task_group=TaskGroup(),
+                metrics=ctx._current_metrics().nested(
+                    label=label,
+                ),
+                state=ctx._current_state().updated(state),
+                completion=completion,
+            )
+
+        except MissingScopeContext:
+            root_dependencies = ScopeDependencies()  # pyright: ignore[reportDeprecated]
+            root_state = ScopeState(*state)
+
+            root_logger: Logger = logger or getLogger(name=label)
+
+            trace_reporter: MetricsTraceReporter | None
+            if getenv_bool("DEBUG_LOGGING", __debug__):
+                trace_reporter = metrics_log_reporter(
+                    list_items_limit=-4,
+                    item_character_limit=64,
+                )
+
+            else:
+                trace_reporter = None
+
+            return _RootContext(
+                task_group=TaskGroup(),
+                dependencies=root_dependencies,
+                state=root_state,
+                metrics=MetricsTrace(  # pyright: ignore[reportDeprecated]
+                    label=label,
+                    logger=root_logger,
+                    parent=None,
+                    metrics=None,
+                    trace_id=trace_id,
+                ),
+                trace_reporting=trace_reporter,
+                completion=completion,
+            )
+
+    @staticmethod
     def stream[Element](
         source: AsyncGenerator[Element, None],
         /,
     ) -> AsyncIterable[Element]:
-        metrics: MetricsTrace = ctx._current_metrics()
+        metrics: MetricsTrace = ctx._current_metrics()  # pyright: ignore[reportDeprecated]
         metrics.enter()
 
         stream: AsyncStream[Element] = AsyncStream()
@@ -473,13 +543,14 @@ class ctx:
 
         return stream
 
+    @deprecated("`stream_sync` will be removed")
     @staticmethod
     def stream_sync[Element](
         source: Generator[Element, None],
         /,
         executor: Executor | None = None,
     ) -> AsyncIterable[Element]:
-        metrics: MetricsTrace = ctx._current_metrics()
+        metrics: MetricsTrace = ctx._current_metrics()  # pyright: ignore[reportDeprecated]
         metrics.enter()
 
         loop: AbstractEventLoop = get_running_loop()
@@ -542,6 +613,7 @@ class ctx:
             default=default,
         )
 
+    @deprecated("dependencies will be removed in favor of context state propagation")
     @staticmethod
     def dependency[Dependency_T: ScopeDependency](
         dependency: type[Dependency_T],
@@ -549,6 +621,7 @@ class ctx:
     ) -> Dependency_T:
         return ctx._current_dependencies().dependency(dependency)
 
+    @deprecated("read will be removed")
     @staticmethod
     def read[Metric_T: Metric](
         metric: type[Metric_T],

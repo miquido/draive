@@ -105,7 +105,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
             tool=self.name,
             report_status=report_status,
         )
-        with ctx.nested(
+        with ctx.nested(  # pyright: ignore[reportDeprecated]
             self.name,
             state=[context],
             metrics=[ArgumentsTrace.of(**arguments)],
@@ -155,7 +155,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Result:
-        with ctx.nested(
+        with ctx.nested(  # pyright: ignore[reportDeprecated]
             self.name,
             state=[
                 ctx.state(  # when called as a function preserve current context

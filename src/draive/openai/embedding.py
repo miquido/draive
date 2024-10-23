@@ -16,8 +16,8 @@ async def openai_embed_text(
     **extra: Any,
 ) -> list[Embedded[str]]:
     config: OpenAIEmbeddingConfig = ctx.state(OpenAIEmbeddingConfig).updated(**extra)
-    with ctx.nested("openai_embed_text", metrics=[config]):
-        results: list[list[float]] = await ctx.dependency(OpenAIClient).embedding(
+    with ctx.nested("openai_embed_text", metrics=[config]):  # pyright: ignore[reportDeprecated]
+        results: list[list[float]] = await ctx.dependency(OpenAIClient).embedding(  # pyright: ignore[reportDeprecated]
             config=config,
             inputs=values,
         )

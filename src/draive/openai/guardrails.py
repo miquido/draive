@@ -22,7 +22,7 @@ async def openai_content_guardrails(  # noqa: C901, PLR0912, PLR0915
     **extra: Any,
 ) -> MultimodalContent:
     ctx.log_debug("Requested OpenAI content guardrails")
-    client: OpenAIClient = ctx.dependency(OpenAIClient)
+    client: OpenAIClient = ctx.dependency(OpenAIClient)  # pyright: ignore[reportDeprecated]
     config: OpenAIModerationConfig = ctx.state(OpenAIModerationConfig).updated(**extra)
 
     content_parts: list[str] = split_text(

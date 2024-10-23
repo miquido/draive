@@ -15,7 +15,7 @@ from draive.gemini.models import (
     GeminiRequestMessage,
 )
 from draive.parameters import DataModel
-from draive.scope import ScopeDependency
+from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
 from draive.utils import getenv_str, not_missing
 
 __all__ = [
@@ -24,7 +24,7 @@ __all__ = [
 
 
 @final
-class GeminiClient(ScopeDependency):
+class GeminiClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
     @classmethod
     def prepare(cls) -> Self:
         return cls(

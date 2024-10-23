@@ -27,7 +27,7 @@ and avoids complex or convoluted elements.
 Assign a readability score using value between 0.0 and 4.0 where:
 0.0 is very low readability - the content is extremely difficult to understand, \
 with complex language and convoluted structure.
-1.0 is low readability - the content is challenging to read, with frequent use of \
+1.0 is low readability - the content is challedraiveg to read, with frequent use of \
 complex sentences, unclear language or irrelevant parts.
 2.0 is moderate readability - the content is somewhat clear but has some areas \
 that are difficult to understand.

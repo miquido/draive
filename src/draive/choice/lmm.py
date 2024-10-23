@@ -33,7 +33,7 @@ async def lmm_choice_completion(  # noqa: C901, PLR0912, PLR0913
     examples: Iterable[tuple[Multimodal, ChoiceOption]] | None,
     **extra: Any,
 ) -> ChoiceOption:
-    with ctx.nested(
+    with ctx.nested(  # pyright: ignore[reportDeprecated]
         "lmm_choice_completion",
     ):
         assert options, "Choice options cannot be empty"  # nosec: B101

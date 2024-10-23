@@ -57,7 +57,8 @@ from draive.helpers import (
     VolatileAccumulativeMemory,
     VolatileMemory,
     VolatileVectorIndex,
-    auto_retry,
+    auto_retry,  # pyright: ignore[reportDeprecated]
+    retry,
     traced,
 )
 from draive.instructions import (
@@ -81,9 +82,10 @@ from draive.lmm import (
 )
 from draive.metrics import (
     Metric,
-    MetricsTrace,
+    MetricsTrace,  # pyright: ignore[reportDeprecated]
     MetricsTraceReport,
     MetricsTraceReporter,
+    ScopeMetrics,
     TokenUsage,
     metrics_log_reporter,
 )
@@ -107,8 +109,8 @@ from draive.safeguards import (
     GuardrailsException,
 )
 from draive.scope import (
-    ScopeDependencies,
-    ScopeDependency,
+    ScopeDependencies,  # pyright: ignore[reportDeprecated]
+    ScopeDependency,  # pyright: ignore[reportDeprecated]
     ScopeState,
     ctx,
 )
@@ -183,7 +185,8 @@ from draive.utils import (
     setup_logging,
     split_sequence,
     throttle,
-    with_timeout,
+    timeout,
+    with_timeout,  # pyright: ignore[reportDeprecated]
 )
 
 __all__ = [
@@ -303,8 +306,10 @@ __all__ = [
     "ParameterValidator",
     "ParameterVerifier",
     "RateLimitError",
+    "retry",
     "ScopeDependencies",
     "ScopeDependency",
+    "ScopeMetrics",
     "ScopeState",
     "SelectionException",
     "setup_logging",
@@ -322,6 +327,7 @@ __all__ = [
     "TextGenerator",
     "TextTokenizer",
     "throttle",
+    "timeout",
     "Tokenization",
     "tokenize_text",
     "TokenUsage",

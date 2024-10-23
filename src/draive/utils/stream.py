@@ -90,7 +90,7 @@ class AsyncStream[Element](AsyncIterable[Element]):
         finally:
             # cleanup waiting future
             self._waiting = None
-            if not self._ready.done():  # ensure not hanging on untracked future
+            if not self._ready.done():  # ensure not hadraiveg on untracked future
                 self._ready.set_result(None)
             # and create new waiting future afterwards
             self._ready = self._loop.create_future()

@@ -12,9 +12,10 @@ from draive.utils.queue import AsyncQueue
 from draive.utils.split_sequence import split_sequence
 from draive.utils.stream import AsyncStream
 from draive.utils.throttling import throttle
-from draive.utils.timeout import with_timeout
+from draive.utils.timeouted import timeout, with_timeout  # pyright: ignore[reportDeprecated]
 
 __all__ = [
+    "timeout",
     "always",
     "async_always",
     "async_noop",

@@ -156,7 +156,7 @@ def _raw_value_report(
     # workaround for pydantic models
     if hasattr(value, "model_dump") and callable(value.model_dump):
         return _dict_report(
-            value.model_dump(),
+            value.model_dump(),  # pyright: ignore[reportArgumentType]
             list_items_limit=list_items_limit,
             item_character_limit=item_character_limit,
         )

@@ -4,14 +4,18 @@ from time import monotonic
 from typing import Any, Self, cast, final
 from uuid import uuid4
 
+from typing_extensions import deprecated
+
 from draive.metrics.metric import Metric
 from draive.metrics.reporter import MetricsTraceReport
 
 __all__ = [
     "MetricsTrace",
+    "ScopeMetrics",
 ]
 
 
+@deprecated("`MetricsTrace` will be changed to `ScopeMetrics`")
 @final  # unstructured background tasks spawning may result in corrupted data
 class MetricsTrace:
     def __init__(
@@ -21,18 +25,19 @@ class MetricsTrace:
         logger: Logger | None,
         parent: Self | None,
         metrics: Iterable[Metric] | None,
+        trace_id: str | None = None,
     ) -> None:
         self._start: float = monotonic()
         self._end: float | None = None
         self._runners: int = 0
-        self._trace_id: str = parent._trace_id if parent else uuid4().hex
+        self._trace_id: str = parent._trace_id if parent else trace_id or uuid4().hex
         self._label: str = label or "metrics"
         self._parent: Self | None = parent
         self._logger: Logger = logger or (parent._logger if parent else getLogger(name=self._label))
         self._metrics: dict[type[Metric], Metric] = {
             type(metric): metric for metric in metrics or []
         }
-        self._nested_traces: list[MetricsTrace] = []
+        self._nested_traces: list[MetricsTrace] = []  # pyright: ignore[reportDeprecated]
         self.log_info("started...")
 
     # - STATE -
@@ -214,3 +219,6 @@ class MetricsTrace:
 
     def __str__(self) -> str:
         return f"{self._trace_id}|{self._label}"
+
+
+ScopeMetrics = MetricsTrace  # pyright: ignore[reportDeprecated]

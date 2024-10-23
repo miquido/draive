@@ -100,7 +100,7 @@ async def gemini_lmm_invocation(  # noqa: PLR0913
     stream: bool = False,
     **extra: Any,
 ) -> LMMOutputStream | LMMOutput:
-    with ctx.nested(
+    with ctx.nested(  # pyright: ignore[reportDeprecated]
         "gemini_lmm_invocation",
         metrics=[
             ArgumentsTrace.of(
@@ -115,7 +115,7 @@ async def gemini_lmm_invocation(  # noqa: PLR0913
         ],
     ):
         ctx.log_debug("Requested Gemini lmm")
-        client: GeminiClient = ctx.dependency(GeminiClient)
+        client: GeminiClient = ctx.dependency(GeminiClient)  # pyright: ignore[reportDeprecated]
         config: GeminiConfig = ctx.state(GeminiConfig).updated(**extra)
         ctx.record(config)
 

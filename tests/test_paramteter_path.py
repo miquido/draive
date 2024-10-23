@@ -141,6 +141,9 @@ def test_attribute_path_set_updates_attribute():
     updated: ExampleDataModel = path(data_model, updated="changed")
     assert updated != data_model
     assert updated.answer == "changed"
+    updating: ExampleDataModel = data_model.updating(ExampleDataModel._.answer, value="updating")
+    assert updating != data_model
+    assert updating.answer == "updating"
 
 
 def test_nested_attribute_path_set_updates_nested_attribute():
@@ -150,6 +153,9 @@ def test_nested_attribute_path_set_updates_nested_attribute():
     updated: ExampleDataModel = path(data_model, updated=11.0)
     assert updated != data_model
     assert updated.nested.value == 11
+    updating: ExampleDataModel = data_model.updating(ExampleDataModel._.nested.value, value=9.0)
+    assert updating != data_model
+    assert updating.nested.value == 9
 
 
 def test_recursive_attribute_set_updates_attribute():
@@ -159,6 +165,11 @@ def test_recursive_attribute_set_updates_attribute():
     updated: ExampleDataModel = path(data_model, updated=RecursiveDataModel(more=None))
     assert updated != data_model
     assert updated.recursive == RecursiveDataModel(more=None)
+    updating: ExampleDataModel = data_model.updating(
+        ExampleDataModel._.recursive, value=RecursiveDataModel(more=None)
+    )
+    assert updating != data_model
+    assert updating.recursive == RecursiveDataModel(more=None)
 
 
 def test_list_item_path_set_updates_item():
@@ -168,6 +179,11 @@ def test_list_item_path_set_updates_item():
     updated: ExampleDataModel = path(data_model, updated=SequenceDataModel(value=11))
     assert updated != data_model
     assert updated.list_models[1] == SequenceDataModel(value=11)
+    updating: ExampleDataModel = data_model.updating(
+        ExampleDataModel._.list_models[1], value=SequenceDataModel(value=11)
+    )
+    assert updating != data_model
+    assert updating.list_models[1] == SequenceDataModel(value=11)
 
 
 def test_tuple_item_path_set_updates_item():
@@ -177,6 +193,11 @@ def test_tuple_item_path_set_updates_item():
     updated: ExampleDataModel = path(data_model, updated=SequenceDataModel(value=11))
     assert updated != data_model
     assert updated.tuple_models[1] == SequenceDataModel(value=11)
+    updating: ExampleDataModel = data_model.updating(
+        ExampleDataModel._.tuple_models[1], value=SequenceDataModel(value=11)
+    )
+    assert updating != data_model
+    assert updating.tuple_models[1] == SequenceDataModel(value=11)
 
 
 def test_mixed_tuple_item_set_updates_item():
@@ -186,6 +207,11 @@ def test_mixed_tuple_item_set_updates_item():
     updated: ExampleDataModel = path(data_model, updated=DictDataModel(key="updated"))
     assert updated != data_model
     assert updated.tuple_mixed_models[1] == DictDataModel(key="updated")
+    updating: ExampleDataModel = data_model.updating(
+        ExampleDataModel._.tuple_mixed_models[1], value=DictDataModel(key="updated")
+    )
+    assert updating != data_model
+    assert updating.tuple_mixed_models[1] == DictDataModel(key="updated")
 
 
 def test_dict_item_path_set_updates_item():
@@ -195,3 +221,8 @@ def test_dict_item_path_set_updates_item():
     updated: ExampleDataModel = path(data_model, updated=DictDataModel(key="updated"))
     assert updated != data_model
     assert updated.dict_models["B"] == DictDataModel(key="updated")
+    updating: ExampleDataModel = data_model.updating(
+        ExampleDataModel._.dict_models["B"], value=DictDataModel(key="updated")
+    )
+    assert updating != data_model
+    assert updating.dict_models["B"] == DictDataModel(key="updated")

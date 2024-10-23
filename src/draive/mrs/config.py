@@ -1,3 +1,5 @@
+from typing_extensions import deprecated
+
 from draive.parameters import DataModel
 from draive.utils import MISSING, Missing
 
@@ -6,6 +8,7 @@ __all__ = [
 ]
 
 
+@deprecated("mistralrs support will be removed")
 class MRSChatConfig(DataModel):
     model: str
     temperature: float = 0.75

@@ -21,7 +21,7 @@ async def fastembed_image_embedding(
     **extra: Any,
 ) -> list[Embedded[bytes]]:
     config: FastembedImageConfig = ctx.state(FastembedImageConfig).updated(**extra)
-    with ctx.nested(
+    with ctx.nested(  # pyright: ignore[reportDeprecated]
         "fastembed_image_embedding",
         metrics=[config],
     ):

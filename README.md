@@ -125,14 +125,6 @@ Use Ollama services client.
 pip install draive[ollama]
 ```
 
-- Mistral.rs:
-
-Use locally running, in-process LLM. Requires Rust compiler to install, see [project](https://github.com/EricLBuehler/mistral.rs) page for details.
-
-```bash
-pip install draive[mistralrs]
-```
-
 - Fastembed:
 
 User Fastembed services client.
@@ -148,6 +140,12 @@ User SentencePiece model runner. It is used by Gemini and Mistral.
 ```bash
 pip install draive[sentencepiece]
 ```
+
+## Migration to haiway
+
+Beginning with version 0.29.0, Draive will initiate the migration to [haiway](https://github.com/miquido/haiway) for state and dependency management. Interfaces will be gradually updated to the new system, with a complete transition planned. Interfaces subject to change will be marked as deprecated and maintained for as long as feasible, though no later than the end of the migration period. Once the transition is complete, all deprecated interfaces will be fully removed.
+
+Direct support for mistralrs library will be also removed during the process.
 
 ## 👷 Contributing
 

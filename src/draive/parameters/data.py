@@ -495,11 +495,11 @@ class ParametrizedData(metaclass=ParametrizedDataMeta):
 
     def __class_getitem__(
         cls,
-        type_argument: tuple[type[Any], ...] | type[Any],
+        type_argument: tuple[Any, ...] | Any,
     ) -> type[Self]:
         assert Generic in cls.__bases__, "Can't specialize non generic type!"  # nosec: B101
 
-        type_arguments: tuple[type[Any], ...]
+        type_arguments: tuple[Any, ...]
         match type_argument:
             case [*arguments]:
                 type_arguments = tuple(arguments)
