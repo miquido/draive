@@ -25,7 +25,7 @@ async def lmm_steps_completion(
     steps: Iterable[Step | Multimodal],
     **extra: Any,
 ) -> MultimodalContent:
-    with ctx.nested(
+    with ctx.nested(  # pyright: ignore[reportDeprecated]
         "lmm_steps_completion",
     ):
         assert steps, "Steps cannot be empty"  # nosec: B101

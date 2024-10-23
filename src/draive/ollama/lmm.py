@@ -75,7 +75,7 @@ async def ollama_lmm_invocation(  # noqa: PLR0913
     stream: bool = False,
     **extra: Any,
 ) -> LMMOutputStream | LMMOutput:
-    with ctx.nested(
+    with ctx.nested(  # pyright: ignore[reportDeprecated]
         "ollama_lmm_invocation",
         metrics=[
             ArgumentsTrace.of(
@@ -90,7 +90,7 @@ async def ollama_lmm_invocation(  # noqa: PLR0913
         ],
     ):
         ctx.log_debug("Requested Ollama lmm")
-        client: OllamaClient = ctx.dependency(OllamaClient)
+        client: OllamaClient = ctx.dependency(OllamaClient)  # pyright: ignore[reportDeprecated]
         config: OllamaChatConfig = ctx.state(OllamaChatConfig).updated(**extra)
         ctx.record(config)
 

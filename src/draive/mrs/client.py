@@ -11,10 +11,11 @@ from mistralrs import (  # type: ignore
     Runner,
     Which,
 )
+from typing_extensions import deprecated
 
-from draive.mrs.config import MRSChatConfig
-from draive.mrs.errors import MRSException
-from draive.scope import ScopeDependency, ctx
+from draive.mrs.config import MRSChatConfig  # pyright: ignore[reportDeprecated]
+from draive.mrs.errors import MRSException  # pyright: ignore[reportDeprecated]
+from draive.scope import ScopeDependency, ctx  # pyright: ignore[reportDeprecated]
 from draive.utils import asynchronous, not_missing
 
 __all__ = [
@@ -24,8 +25,9 @@ __all__ = [
 MRS_EXECUTOR: Final[Executor | None] = ThreadPoolExecutor(max_workers=1)
 
 
+@deprecated("`MRSClient` and mistralrs support will be removed")
 @final
-class MRSClient(ScopeDependency):
+class MRSClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
     @classmethod
     def prepare(cls) -> Self:
         return cls(
@@ -75,7 +77,7 @@ class MRSClient(ScopeDependency):
     async def chat_completion(
         self,
         *,
-        config: MRSChatConfig,
+        config: MRSChatConfig,  # pyright: ignore[reportDeprecated]
         messages: list[dict[str, object]],
         stream: Literal[True],
     ) -> AsyncIterable[ChatCompletionChunkResponse]: ...
@@ -84,14 +86,14 @@ class MRSClient(ScopeDependency):
     async def chat_completion(
         self,
         *,
-        config: MRSChatConfig,
+        config: MRSChatConfig,  # pyright: ignore[reportDeprecated]
         messages: list[dict[str, object]],
     ) -> ChatCompletionResponse: ...
 
     async def chat_completion(
         self,
         *,
-        config: MRSChatConfig,
+        config: MRSChatConfig,  # pyright: ignore[reportDeprecated]
         messages: list[dict[str, object]],
         stream: bool = False,
     ) -> AsyncIterable[ChatCompletionChunkResponse] | ChatCompletionResponse:
@@ -152,7 +154,7 @@ class MRSClient(ScopeDependency):
         messages: list[dict[str, object]],
         stop_sequences: list[str] | None,
     ) -> AsyncIterable[ChatCompletionChunkResponse]:
-        return ctx.stream_sync(
+        return ctx.stream_sync(  # pyright: ignore[reportDeprecated]
             self._send_chat_completion_stream_request(
                 runner=await self._get_runner(model),
                 model=model,
@@ -184,7 +186,7 @@ class MRSClient(ScopeDependency):
                 return runner
 
             else:
-                raise MRSException(
+                raise MRSException(  # pyright: ignore[reportDeprecated]
                     "Requested unsupported model - %s",
                     model_name,
                 )

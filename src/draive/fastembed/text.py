@@ -18,7 +18,7 @@ async def fastembed_text_embedding(
     **extra: Any,
 ) -> list[Embedded[str]]:
     config: FastembedTextConfig = ctx.state(FastembedTextConfig).updated(**extra)
-    with ctx.nested(
+    with ctx.nested(  # pyright: ignore[reportDeprecated]
         "fastembed_text_embedding",
         metrics=[config],
     ):

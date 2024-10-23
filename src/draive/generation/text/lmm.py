@@ -28,7 +28,7 @@ async def lmm_generate_text(
     examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, str]] | None = None,
     **extra: Any,
 ) -> str:
-    with ctx.nested("lmm_generate_text"):
+    with ctx.nested("lmm_generate_text"):  # pyright: ignore[reportDeprecated]
         toolbox: Toolbox
         match tools:
             case None:

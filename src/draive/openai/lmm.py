@@ -98,7 +98,7 @@ async def openai_lmm_invocation(  # noqa: PLR0913
     stream: bool = False,
     **extra: Any,
 ) -> LMMOutputStream | LMMOutput:
-    with ctx.nested(
+    with ctx.nested(  # pyright: ignore[reportDeprecated]
         "openai_lmm_invocation",
         metrics=[
             ArgumentsTrace.of(
@@ -113,7 +113,7 @@ async def openai_lmm_invocation(  # noqa: PLR0913
         ],
     ):
         ctx.log_debug("Requested OpenAI lmm")
-        client: OpenAIClient = ctx.dependency(OpenAIClient)
+        client: OpenAIClient = ctx.dependency(OpenAIClient)  # pyright: ignore[reportDeprecated]
         config: OpenAIChatConfig = ctx.state(OpenAIChatConfig).updated(**extra)
         ctx.record(config)
 
@@ -131,6 +131,9 @@ async def openai_lmm_invocation(  # noqa: PLR0913
             },
             *[_convert_context_element(config=config, element=element) for element in context],
         ]
+
+        if messages[-1].get("role") == "assistant":
+            del messages[-1]  # OpenAI does not support prefill, simply ignore it
 
         if stream:
             return ctx.stream(
@@ -257,7 +260,7 @@ def _convert_context_element(
             }
 
 
-async def _chat_completion(  # noqa: C901, PLR0912, PLR0915
+async def _chat_completion(  # noqa: C901, PLR0912
     *,
     client: OpenAIClient,
     config: OpenAIChatConfig,
@@ -265,30 +268,6 @@ async def _chat_completion(  # noqa: C901, PLR0912, PLR0915
     tools: Sequence[ToolSpecification] | None,
     tool_selection: LMMToolSelection,
 ) -> LMMOutput:
-    prefill: str = ""
-    match messages[-1]:
-        case {"role": "assistant", "content": str() as content_text}:
-            if config.response_format == {"type": "json_object"}:
-                del messages[-1]  # for json mode ignore prefill
-
-            else:
-                prefill = content_text
-
-        case {"role": "assistant", "content": list() as content_parts}:
-            if config.response_format == {"type": "json_object"}:
-                del messages[-1]  # for json mode ignore prefill
-
-            else:
-                for part in content_parts:
-                    match part:  # currently supporting only text prefills
-                        case {"text": str() as text}:
-                            prefill += text
-
-                        case _:
-                            continue
-        case _:
-            prefill = ""
-
     completion: ChatCompletion
     match tool_selection:
         case "auto":
@@ -386,9 +365,8 @@ async def _chat_completion(  # noqa: C901, PLR0912, PLR0915
                 )
 
             elif content := completion_message.content:
-                completion_content: str = prefill + content
-                ctx.record(ResultTrace.of(completion_content))
-                return LMMCompletion.of(completion_content)
+                ctx.record(ResultTrace.of(content))
+                return LMMCompletion.of(content)
 
             else:
                 raise OpenAIException("Invalid OpenAI completion", completion)
@@ -405,13 +383,6 @@ async def _chat_completion_stream(  # noqa: C901, PLR0912, PLR0915
     tools: Sequence[ToolSpecification] | None,
     tool_selection: LMMToolSelection,
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
-    match messages[-1]:
-        case {"role": "assistant"}:
-            del messages[-1]  # not supporting prefill with streaming yet
-
-        case _:
-            pass
-
     completion_stream: OpenAIAsyncStream[ChatCompletionChunk]
     match tool_selection:
         case "auto":

@@ -113,7 +113,7 @@ class AgentRunner:
         output: AgentRunnerOutput,
         status: IdleMonitor,
     ) -> None:
-        async with ctx.nested(agent.__str__()):
+        async with ctx.nested(agent.__str__()):  # pyright: ignore[reportDeprecated]
             agent_instance: Agent = agent.initialize()
 
             try:

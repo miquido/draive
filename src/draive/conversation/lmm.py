@@ -72,7 +72,7 @@ async def lmm_conversation_completion(
     stream: bool = False,
     **extra: Any,
 ) -> ConversationResponseStream | ConversationMessage:
-    with ctx.nested(
+    with ctx.nested(  # pyright: ignore[reportDeprecated]
         "lmm_conversation_completion",
     ):
         context: list[LMMContextElement]

@@ -3,7 +3,9 @@ from asyncio import gather, shield
 from types import TracebackType
 from typing import Self, cast, final
 
-from draive.scope.errors import MissingScopeDependency
+from typing_extensions import deprecated
+
+from draive.scope.errors import MissingScopeDependency  # pyright: ignore[reportDeprecated]
 from draive.utils import freeze
 
 __all__ = [
@@ -12,6 +14,7 @@ __all__ = [
 ]
 
 
+@deprecated("`ScopeDependency` will be removed in favor of context state propagation")
 class ScopeDependency(ABC):
     @classmethod
     def interface(cls) -> type:
@@ -25,13 +28,14 @@ class ScopeDependency(ABC):
         pass
 
 
+@deprecated("`ScopeDependencies` will be removed in favor of context state propagation")
 @final
 class ScopeDependencies:
     def __init__(
         self,
-        *dependencies: type[ScopeDependency] | object,
+        *dependencies: type[ScopeDependency] | object,  # pyright: ignore[reportDeprecated]
     ) -> None:
-        self._declared: tuple[type[ScopeDependency] | object, ...] = dependencies
+        self._declared: tuple[type[ScopeDependency] | object, ...] = dependencies  # pyright: ignore[reportDeprecated]
         self._prepared: dict[type[object], object] | None = None
 
     @property
@@ -39,10 +43,10 @@ class ScopeDependencies:
         if self._prepared is None:
             dependencies: dict[type[object], object] = {}
             for dependency in self._declared:
-                if isinstance(dependency, ScopeDependency):
+                if isinstance(dependency, ScopeDependency):  # pyright: ignore[reportDeprecated]
                     dependencies[type(dependency).interface()] = dependency
 
-                elif isinstance(dependency, type) and issubclass(dependency, ScopeDependency):
+                elif isinstance(dependency, type) and issubclass(dependency, ScopeDependency):  # pyright: ignore[reportDeprecated]
                     dependencies[dependency.interface()] = dependency.prepare()
 
                 else:
@@ -63,7 +67,7 @@ class ScopeDependencies:
             return cast(Dependency, self._dependencies[dependency])
 
         else:
-            raise MissingScopeDependency(
+            raise MissingScopeDependency(  # pyright: ignore[reportDeprecated]
                 f"{dependency.__qualname__} is not defined or became disposed!"
                 " You have to define it when creating a new context."
             )
@@ -81,7 +85,7 @@ class ScopeDependencies:
                 *[
                     dependency.dispose()
                     for dependency in self._prepared.values()
-                    if isinstance(dependency, ScopeDependency)
+                    if isinstance(dependency, ScopeDependency)  # pyright: ignore[reportDeprecated]
                 ]
             )
 

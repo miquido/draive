@@ -8,13 +8,14 @@ from mistralrs import (  # type: ignore
     ChunkChoice,
     ResponseMessage,
 )
+from typing_extensions import deprecated
 
 from draive.instructions import Instruction
 from draive.lmm import LMMToolSelection, ToolSpecification
 from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
-from draive.mrs.client import MRSClient
-from draive.mrs.config import MRSChatConfig
-from draive.mrs.errors import MRSException
+from draive.mrs.client import MRSClient  # pyright: ignore[reportDeprecated]
+from draive.mrs.config import MRSChatConfig  # pyright: ignore[reportDeprecated]
+from draive.mrs.errors import MRSException  # pyright: ignore[reportDeprecated]
 from draive.scope import ctx
 from draive.types import (
     LMMCompletion,
@@ -33,6 +34,7 @@ __all__ = [
 ]
 
 
+@deprecated("`mistralrs support will be removed")
 @overload
 async def mrs_lmm_invocation(
     *,
@@ -46,6 +48,7 @@ async def mrs_lmm_invocation(
 ) -> LMMOutputStream: ...
 
 
+@deprecated("mistralrs support will be removed")
 @overload
 async def mrs_lmm_invocation(
     *,
@@ -59,6 +62,7 @@ async def mrs_lmm_invocation(
 ) -> LMMOutput: ...
 
 
+@deprecated("mistralrs support will be removed")
 @overload
 async def mrs_lmm_invocation(
     *,
@@ -72,6 +76,7 @@ async def mrs_lmm_invocation(
 ) -> LMMOutputStream | LMMOutput: ...
 
 
+@deprecated("mistralrs support will be removed")
 async def mrs_lmm_invocation(  # noqa: PLR0913
     *,
     instruction: Instruction | str,
@@ -82,7 +87,7 @@ async def mrs_lmm_invocation(  # noqa: PLR0913
     stream: bool = False,
     **extra: Any,
 ) -> LMMOutputStream | LMMOutput:
-    with ctx.nested(
+    with ctx.nested(  # pyright: ignore[reportDeprecated]
         "mrs_lmm_completion",
         metrics=[
             ArgumentsTrace.of(
@@ -97,8 +102,8 @@ async def mrs_lmm_invocation(  # noqa: PLR0913
         ],
     ):
         ctx.log_debug("Requested mistral.rs lmm")
-        client: MRSClient = ctx.dependency(MRSClient)
-        config: MRSChatConfig = ctx.state(MRSChatConfig).updated(**extra)
+        client: MRSClient = ctx.dependency(MRSClient)  # pyright: ignore[reportDeprecated]
+        config: MRSChatConfig = ctx.state(MRSChatConfig).updated(**extra)  # pyright: ignore[reportDeprecated]
         ctx.record(config)
 
         if tools:
@@ -183,8 +188,8 @@ def _convert_context_element(
 
 async def _chat_completion(
     *,
-    client: MRSClient,
-    config: MRSChatConfig,
+    client: MRSClient,  # pyright: ignore[reportDeprecated]
+    config: MRSChatConfig,  # pyright: ignore[reportDeprecated]
     messages: list[dict[str, object]],
 ) -> LMMOutput:
     completion: ChatCompletionResponse = await client.chat_completion(
@@ -202,7 +207,7 @@ async def _chat_completion(
         )
 
     if not completion.choices:
-        raise MRSException("Invalid mistral.rs completion - missing messages!", completion)
+        raise MRSException("Invalid mistral.rs completion - missing messages!", completion)  # pyright: ignore[reportDeprecated]
 
     completion_message: ResponseMessage = completion.choices[0].message
 
@@ -211,13 +216,13 @@ async def _chat_completion(
         return LMMCompletion.of(message)
 
     else:
-        raise MRSException("Invalid mistral.rs completion", completion)
+        raise MRSException("Invalid mistral.rs completion", completion)  # pyright: ignore[reportDeprecated]
 
 
 async def _chat_completion_stream(
     *,
-    client: MRSClient,
-    config: MRSChatConfig,
+    client: MRSClient,  # pyright: ignore[reportDeprecated]
+    config: MRSChatConfig,  # pyright: ignore[reportDeprecated]
     messages: list[dict[str, object]],
 ) -> AsyncGenerator[LMMOutputStreamChunk, None]:
     completion_stream: AsyncIterable[ChatCompletionChunkResponse] = await client.chat_completion(

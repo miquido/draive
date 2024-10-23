@@ -343,7 +343,7 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
         if self._workflow_queue.finished or not_missing(self._result):
             raise RuntimeError("WorkflowRunner can run only once!")
 
-        async with ctx.nested(self._workflow.node.__str__()):
+        async with ctx.nested(self._workflow.node.__str__()):  # pyright: ignore[reportDeprecated]
 
             def on_timeout() -> None:
                 self.finish(result=TimeoutError())

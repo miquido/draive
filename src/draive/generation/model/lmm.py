@@ -34,7 +34,7 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
     decoder: ModelGeneratorDecoder | None = None,
     **extra: Any,
 ) -> Generated:
-    with ctx.nested("lmm_generate_model"):
+    with ctx.nested("lmm_generate_model"):  # pyright: ignore[reportDeprecated]
         toolbox: Toolbox
         match tools:
             case None:

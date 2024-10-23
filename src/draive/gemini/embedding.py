@@ -16,8 +16,8 @@ async def gemini_embed_text(
     **extra: Any,
 ) -> list[Embedded[str]]:
     config: GeminiEmbeddingConfig = ctx.state(GeminiEmbeddingConfig).updated(**extra)
-    with ctx.nested("openai_embed_text", metrics=[config]):
-        results: list[list[float]] = await ctx.dependency(GeminiClient).embedding(
+    with ctx.nested("gemini_embed_text", metrics=[config]):  # pyright: ignore[reportDeprecated]
+        results: list[list[float]] = await ctx.dependency(GeminiClient).embedding(  # pyright: ignore[reportDeprecated]
             config=config,
             inputs=values,
         )

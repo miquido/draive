@@ -1,14 +1,17 @@
 from asyncio import AbstractEventLoop, Future, Task, TimerHandle, get_running_loop
 from collections.abc import Callable, Coroutine
 
+from typing_extensions import deprecated
+
 from draive.utils.mimic import mimic_function
 
 __all__ = [
     "with_timeout",
+    "timeout",
 ]
 
 
-def with_timeout[**Args, Result](
+def timeout[**Args, Result](
     timeout: float,
     /,
 ) -> Callable[
@@ -42,6 +45,17 @@ def with_timeout[**Args, Result](
         )
 
     return _wrap
+
+
+@deprecated("`with_timeout` will be renamed to `timeout`")
+def with_timeout[**Args, Result](
+    time: float,
+    /,
+) -> Callable[
+    [Callable[Args, Coroutine[None, None, Result]]],
+    Callable[Args, Coroutine[None, None, Result]],
+]:
+    return timeout(time)
 
 
 class _AsyncTimeout[**Args, Result]:

@@ -5,10 +5,14 @@ __all__ = [
 ]
 
 
+from typing_extensions import deprecated
+
+
 class MissingScopeContext(Exception):
     pass
 
 
+@deprecated("MissingScopeDependency will be removed")
 class MissingScopeDependency(Exception):
     pass
 

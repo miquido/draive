@@ -18,9 +18,9 @@ async def openai_generate_image(
     instruction: str,
     **extra: Any,
 ) -> ImageContent:
-    client: OpenAIClient = ctx.dependency(OpenAIClient)
+    client: OpenAIClient = ctx.dependency(OpenAIClient)  # pyright: ignore[reportDeprecated]
     config: OpenAIImageGenerationConfig = ctx.state(OpenAIImageGenerationConfig).updated(**extra)
-    with ctx.nested("openai_generate_image", metrics=[config]):
+    with ctx.nested("openai_generate_image", metrics=[config]):  # pyright: ignore[reportDeprecated]
         image: Image = await client.generate_image(
             config=config,
             instruction=instruction,

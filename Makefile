@@ -18,7 +18,7 @@ ifndef INSTALL_OPTIONS
 endif
 
 ifndef UV_VERSION
-	UV_VERSION := 0.3.3
+	UV_VERSION := 0.4.22
 endif
 
 .PHONY: install venv sync lock update format lint test release

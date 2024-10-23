@@ -95,7 +95,7 @@ async def anthropic_lmm_invocation(  # noqa: PLR0913
     stream: bool = False,
     **extra: Any,
 ) -> LMMOutputStream | LMMOutput:
-    with ctx.nested(
+    with ctx.nested(  # pyright: ignore[reportDeprecated]
         "anthropic_lmm_invocation",
         metrics=[
             ArgumentsTrace.of(
@@ -110,7 +110,7 @@ async def anthropic_lmm_invocation(  # noqa: PLR0913
         ],
     ):
         ctx.log_debug("Requested Anthropic lmm")
-        client: AnthropicClient = ctx.dependency(AnthropicClient)
+        client: AnthropicClient = ctx.dependency(AnthropicClient)  # pyright: ignore[reportDeprecated]
         config: AnthropicConfig = ctx.state(AnthropicConfig).updated(**extra)
         ctx.record(config)
 

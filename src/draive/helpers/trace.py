@@ -35,7 +35,7 @@ def _traced_sync[**Args, Result](
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Result:
-        with ctx.nested(
+        with ctx.nested(  # pyright: ignore[reportDeprecated]
             label,
             metrics=[ArgumentsTrace.of(*args, **kwargs)],
         ):
@@ -57,7 +57,7 @@ def _traced_async[**Args, Result](
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Result:
-        with ctx.nested(
+        with ctx.nested(  # pyright: ignore[reportDeprecated]
             label,
             metrics=[ArgumentsTrace.of(*args, **kwargs)],
         ):

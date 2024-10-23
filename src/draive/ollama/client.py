@@ -8,7 +8,7 @@ from draive.ollama.config import OllamaChatConfig
 from draive.ollama.errors import OllamaException
 from draive.ollama.models import ChatCompletionResponse, ChatMessage
 from draive.parameters import DataModel
-from draive.scope import ScopeDependency
+from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
 from draive.utils import getenv_str, not_missing
 
 __all__ = [
@@ -17,7 +17,7 @@ __all__ = [
 
 
 @final
-class OllamaClient(ScopeDependency):
+class OllamaClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
     @classmethod
     def prepare(cls) -> Self:
         return cls(

@@ -16,8 +16,8 @@ async def mistral_embed_text(
     **extra: Any,
 ) -> list[Embedded[str]]:
     config: MistralEmbeddingConfig = ctx.state(MistralEmbeddingConfig).updated(**extra)
-    with ctx.nested("mistral_embed_text", metrics=[config]):
-        results: list[list[float]] = await ctx.dependency(MistralClient).embedding(
+    with ctx.nested("mistral_embed_text", metrics=[config]):  # pyright: ignore[reportDeprecated]
+        results: list[list[float]] = await ctx.dependency(MistralClient).embedding(  # pyright: ignore[reportDeprecated]
             config=config,
             inputs=values,
         )

@@ -77,7 +77,7 @@ async def mistral_lmm_invocation(  # noqa: PLR0913
     stream: bool = False,
     **extra: Any,
 ) -> LMMOutputStream | LMMOutput:
-    with ctx.nested(
+    with ctx.nested(  # pyright: ignore[reportDeprecated]
         "mistral_lmm_invocation",
         metrics=[
             ArgumentsTrace.of(
@@ -92,7 +92,7 @@ async def mistral_lmm_invocation(  # noqa: PLR0913
         ],
     ):
         ctx.log_debug("Requested Mistral lmm")
-        client: MistralClient = ctx.dependency(MistralClient)
+        client: MistralClient = ctx.dependency(MistralClient)  # pyright: ignore[reportDeprecated]
         config: MistralChatConfig = ctx.state(MistralChatConfig).updated(**extra)
         ctx.record(config)
 
