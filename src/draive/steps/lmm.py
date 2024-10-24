@@ -64,16 +64,13 @@ async def _lmm_process_step(
 ) -> None:
     context.append(LMMInput.of(step.input))
 
-    if prefill := step.prefill:
-        context.append(LMMCompletion.of(prefill))
-
     toolbox: Toolbox = step.toolbox
 
     recursion_level: int = 0
     while recursion_level <= toolbox.recursion_limit:
         match await lmm_invocation(
             instruction=step.instruction or instruction,
-            context=context,
+            context=[*context, LMMCompletion.of(step.prefill)] if step.prefill else context,
             tools=toolbox.available_tools(),
             tool_selection=toolbox.tool_selection(recursion_level=recursion_level),
             output="text",
@@ -92,10 +89,6 @@ async def _lmm_process_step(
                     response.content for response in responses if response.direct
                 ]:
                     return context.append(LMMCompletion.of(MultimodalContent.of(*direct_content)))
-
-                elif prefill := step.prefill:  # move prefill to the next completion if used tools
-                    del context[-1]
-                    context.extend([tool_requests, *responses, LMMCompletion.of(prefill)])
 
                 else:
                     context.extend([tool_requests, *responses])

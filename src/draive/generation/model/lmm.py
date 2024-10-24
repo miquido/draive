@@ -89,14 +89,13 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
                 ]
             ],
             LMMInput.of(input),
-            LMMCompletion.of("{"),  # prefill with json opening
         ]
 
         recursion_level: int = 0
         while recursion_level <= toolbox.recursion_limit:
             match await lmm_invocation(
                 instruction=extended_instruction,
-                context=context,
+                context=[*context, LMMCompletion.of("{")],  # prefill with json opening
                 tools=toolbox.available_tools(),
                 tool_selection=toolbox.tool_selection(recursion_level=recursion_level),
                 output="json",

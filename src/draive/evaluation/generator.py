@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from typing import Any
 
 from draive.generation import generate_model
 from draive.parameters import DataModel
@@ -37,7 +38,7 @@ async def generate_case_parameters[Parameters: DataModel](
     examples: Iterable[Parameters],
 ) -> list[Parameters]:
     results: list[Parameters] = []
-    example_pairs: list[tuple[str, parameters]] = [(INPUT, example) for example in examples]
+    example_pairs: list[tuple[str, Any]] = [(INPUT, example) for example in examples]
 
     for _ in range(0, count):
         results.append(

@@ -52,16 +52,11 @@ async def lmm_generate_text(
             LMMInput.of(input),
         ]
 
-        if prefill := prefill:
-            context.append(
-                LMMCompletion.of(prefill),
-            )
-
         recursion_level: int = 0
         while recursion_level <= toolbox.recursion_limit:
             match await lmm_invocation(
                 instruction=instruction,
-                context=context,
+                context=[*context, LMMCompletion.of(prefill)] if prefill else context,
                 tools=toolbox.available_tools(),
                 tool_selection=toolbox.tool_selection(recursion_level=recursion_level),
                 output="text",
@@ -80,10 +75,6 @@ async def lmm_generate_text(
                         return MultimodalContent.of(
                             *[response.content for response in direct_responses]
                         ).as_string()
-
-                    elif prefill := prefill:  # move prefill to the next completion if used tools
-                        del context[-1]
-                        context.extend([tool_requests, *responses, LMMCompletion.of(prefill)])
 
                     else:
                         context.extend([tool_requests, *responses])

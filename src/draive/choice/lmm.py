@@ -23,7 +23,7 @@ __all__ = [
 ]
 
 
-async def lmm_choice_completion(  # noqa: C901, PLR0912, PLR0913
+async def lmm_choice_completion(  # noqa: C901, PLR0913
     *,
     instruction: Instruction | str,
     options: Sequence[ChoiceOption],
@@ -78,14 +78,11 @@ async def lmm_choice_completion(  # noqa: C901, PLR0912, PLR0913
             ),
         ]
 
-        if prefill := prefill:
-            context.append(LMMCompletion.of(prefill))
-
         recursion_level: int = 0
         while recursion_level <= toolbox.recursion_limit:
             match await lmm_invocation(
                 instruction=extended_instruction,
-                context=context,
+                context=[*context, LMMCompletion.of(prefill)] if prefill else context,
                 tools=toolbox.available_tools(),
                 tool_selection=toolbox.tool_selection(recursion_level=recursion_level),
                 output="text",
@@ -115,10 +112,6 @@ async def lmm_choice_completion(  # noqa: C901, PLR0912, PLR0913
                                 return option
 
                         raise SelectionException("Invalid or missing selection")
-
-                    elif prefill := prefill:  # move prefill to the next completion if used tools
-                        del context[-1]
-                        context.extend([tool_requests, *responses, LMMCompletion.of(prefill)])
 
                     else:
                         context.extend([tool_requests, *responses])
