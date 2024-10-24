@@ -57,6 +57,9 @@ ollama = [
 mistralrs = [
   "mistralrs~=0.1.19",
 ]
+bedrock = [
+  "boto3~=1.35.46",
+]
 
 dev = [
   "draive[sentencepiece]",
@@ -66,6 +69,7 @@ dev = [
   "draive[mistral]",
   "draive[ollama]",
   "draive[gemini]",
+  "draive[bedrock]",
   "ruff~=0.5.0",
   "pyright~=1.1",
   "bandit~=1.7",
