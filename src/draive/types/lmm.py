@@ -2,7 +2,7 @@ from collections.abc import AsyncIterable
 from typing import Any, Literal, Self
 
 from draive.parameters import DataModel, Field
-from draive.types.multimodal import MultimodalContent, MultimodalContentConvertible
+from draive.types.multimodal import Multimodal, MultimodalContent
 
 __all__ = [
     "LMMCompletion",
@@ -23,7 +23,7 @@ class LMMInput(DataModel):
     @classmethod
     def of(
         cls,
-        content: MultimodalContent | MultimodalContentConvertible,
+        content: Multimodal,
         /,
     ) -> Self:
         return cls(content=MultimodalContent.of(content))
@@ -38,7 +38,7 @@ class LMMCompletion(DataModel):
     @classmethod
     def of(
         cls,
-        content: MultimodalContent | MultimodalContentConvertible,
+        content: Multimodal,
         /,
     ) -> Self:
         return cls(content=MultimodalContent.of(content))
@@ -53,7 +53,7 @@ class LMMCompletionChunk(DataModel):
     @classmethod
     def of(
         cls,
-        content: MultimodalContent | MultimodalContentConvertible,
+        content: Multimodal,
         /,
     ) -> Self:
         return cls(content=MultimodalContent.of(content))

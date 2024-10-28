@@ -4,12 +4,8 @@ from draive.embedding import Embedded, embed_images, embed_texts
 from draive.evaluation import EvaluationScore, evaluator
 from draive.generation import generate_text
 from draive.similarity.score import vector_similarity_score
-from draive.types import (
-    ImageBase64Content,
-    Multimodal,
-    MultimodalTemplate,
-    xml_tag,
-)
+from draive.types import ImageBase64Content, Multimodal, MultimodalTemplate
+from draive.utils import xml_tag
 
 __all__ = [
     "similarity_evaluator",

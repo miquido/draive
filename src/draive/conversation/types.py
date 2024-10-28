@@ -1,22 +1,23 @@
-from collections.abc import AsyncIterable
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Literal, Self
+from typing import Any, Literal, Protocol, Self, runtime_checkable
 from uuid import uuid4
 
-from draive.lmm import ToolStatus
+from draive.instructions import Instruction
+from draive.lmm import Toolbox
 from draive.parameters import DataModel, Field
 from draive.types import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
+    Memory,
+    Multimodal,
     MultimodalContent,
-    MultimodalContentConvertible,
 )
 
 __all__ = [
+    "ConversationCompletion",
     "ConversationMessage",
-    "ConversationMessageChunk",
-    "ConversationResponseStream",
 ]
 
 
@@ -24,7 +25,7 @@ class ConversationMessage(DataModel):
     @classmethod
     def user(
         cls,
-        content: MultimodalContent | MultimodalContentConvertible,
+        content: Multimodal,
         identifier: str | None = None,
         author: str | None = None,
         created: datetime | None = None,
@@ -42,7 +43,7 @@ class ConversationMessage(DataModel):
     @classmethod
     def model(
         cls,
-        content: MultimodalContent | MultimodalContentConvertible,
+        content: Multimodal,
         identifier: str | None = None,
         author: str | None = None,
         created: datetime | None = None,
@@ -76,12 +77,14 @@ class ConversationMessage(DataModel):
         return bool(self.content)
 
 
-class ConversationMessageChunk(DataModel):
-    identifier: str
-    content: MultimodalContent
-
-    def __bool__(self) -> bool:
-        return bool(self.content)
-
-
-ConversationResponseStream = AsyncIterable[ConversationMessageChunk | ToolStatus]
+@runtime_checkable
+class ConversationCompletion(Protocol):
+    async def __call__(
+        self,
+        *,
+        instruction: Instruction | str | None,
+        message: ConversationMessage,
+        memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+        toolbox: Toolbox,
+        **extra: Any,
+    ) -> ConversationMessage: ...

@@ -1,44 +1,36 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from typing import Any
+
+from haiway import ctx
 
 from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox, lmm_invocation
-from draive.scope import ctx
 from draive.types import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
     LMMToolRequests,
     LMMToolResponse,
+    Multimodal,
     MultimodalContent,
-    MultimodalContentConvertible,
 )
 
 __all__: list[str] = [
-    "lmm_generate_text",
+    "default_generate_text",
 ]
 
 
-async def lmm_generate_text(
+async def default_generate_text(
     *,
-    instruction: Instruction | str,
-    input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
-    prefill: str | None = None,
-    tools: Toolbox | Sequence[AnyTool] | None = None,
-    examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, str]] | None = None,
+    instruction: Instruction | str | None,
+    input: Multimodal,  # noqa: A002
+    prefill: str | None,
+    tools: Toolbox | Iterable[AnyTool] | None,
+    examples: Iterable[tuple[Multimodal, str]] | None,
     **extra: Any,
 ) -> str:
-    with ctx.nested("lmm_generate_text"):  # pyright: ignore[reportDeprecated]
-        toolbox: Toolbox
-        match tools:
-            case None:
-                toolbox = Toolbox()
-
-            case Toolbox() as tools:
-                toolbox = tools
-
-            case [*tools]:
-                toolbox = Toolbox(*tools)
+    with ctx.scope("generate_text"):
+        toolbox: Toolbox = Toolbox.of(tools)
 
         context: list[LMMContextElement] = [
             *[
@@ -60,7 +52,6 @@ async def lmm_generate_text(
                 tools=toolbox.available_tools(),
                 tool_selection=toolbox.tool_selection(recursion_level=recursion_level),
                 output="text",
-                stream=False,
                 **extra,
             ):
                 case LMMCompletion() as completion:

@@ -13,7 +13,7 @@ Dive straight into the code and learn how to use draive with our interactive [gu
 Great, but how it looks like?
 
 ```python
-from draive import ctx, generate_text, LMM, tool, Toolbox
+from draive import ctx, generate_text, LMM, tool
 from draive.openai import OpenAIClient, openai_lmm_invocation
 
 
@@ -21,14 +21,14 @@ from draive.openai import OpenAIClient, openai_lmm_invocation
 async def current_time(location: str) -> str:
     return f"Time in {location} is 9:53:22"
 
-async with ctx.new( # create execution context
-    dependencies=[OpenAIClient], # define client for llm provider
-    state=[LMM(invocation=openai_lmm_invocation)], # and use it for this scope
+async with  ctx.scope( # create execution context
+    "example", # give it a name
+    LMM(invocation=openai_lmm()), # define llm provider for this scope
 ):
-    result: str = await generate_text( # choose the right abstraction, like simple `generate_text`
+    result: str = await generate_text( # choose the right abstraction, i.e. `generate_text`
         instruction="You are a helpful assistant", # provide clear instructions
         input="What is the time in Kraków?", # give it some input (including multimodal)
-        tools=Toolbox(current_time), # and select any tools you like
+        tools=[current_time], # and select any tools you like
     )
 
     print(result) # to finally get the result!
@@ -144,8 +144,6 @@ pip install draive[sentencepiece]
 ## Migration to haiway
 
 Beginning with version 0.29.0, Draive will initiate the migration to [haiway](https://github.com/miquido/haiway) for state and dependency management. Interfaces will be gradually updated to the new system, with a complete transition planned. Interfaces subject to change will be marked as deprecated and maintained for as long as feasible, though no later than the end of the migration period. Once the transition is complete, all deprecated interfaces will be fully removed.
-
-Direct support for mistralrs library will be also removed during the process.
 
 ## 👷 Contributing
 

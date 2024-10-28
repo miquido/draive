@@ -1,30 +1,24 @@
 from pathlib import Path
-from typing import Any
 
-from haiway import cache
-
-from draive.mistral.config import MistralChatConfig
-from draive.scope import ctx
-from draive.sentencepiece import sentencepiece_tokenize_text
+from draive.sentencepiece import sentencepiece_processor, sentencepiece_text_tokenizer
+from draive.tokenization import TextTokenizing
 
 __all__ = [
-    "mistral_tokenize_text",
+    "mistral_text_tokenizer",
 ]
 
 
-def mistral_tokenize_text(
-    text: str,
-    **extra: Any,
-) -> list[int]:
-    return sentencepiece_tokenize_text(
-        text=text,
-        model_path=_model_path(ctx.state(MistralChatConfig).model),
-        **extra,
-    )
+def mistral_text_tokenizer(
+    model_name: str,
+    /,
+) -> TextTokenizing:
+    return sentencepiece_text_tokenizer(sentencepiece_processor(model_path=_model_path(model_name)))
 
 
-@cache(limit=4)
-def _model_path(model_name: str) -> str:
+def _model_path(
+    model_name: str,
+    /,
+) -> str:
     model_file: str = _mapping.get(model_name, "mistral_v3_tokenizer.model")
     return str(Path(__file__).parent / "tokens" / model_file)
 

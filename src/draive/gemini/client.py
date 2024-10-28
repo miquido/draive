@@ -3,28 +3,28 @@ from asyncio import gather
 from collections.abc import Sequence
 from http import HTTPStatus
 from itertools import chain
-from typing import Any, Literal, Self, final, overload
+from typing import Any, Final, Literal, Self, final, overload
 
 from haiway import getenv_str, not_missing
 from httpx import AsyncClient, Response
 
 from draive.gemini.config import GeminiConfig, GeminiEmbeddingConfig
-from draive.gemini.errors import GeminiException
 from draive.gemini.models import (
     GeminiFunctionsTool,
     GeminiGenerationResult,
     GeminiRequestMessage,
 )
+from draive.gemini.types import GeminiException
 from draive.parameters import DataModel
-from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
 
 __all__ = [
     "GeminiClient",
+    "SHARED",
 ]
 
 
 @final
-class GeminiClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
+class GeminiClient:
     @classmethod
     def prepare(cls) -> Self:
         return cls(
@@ -72,7 +72,9 @@ class GeminiClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
                         "temperature": config.temperature,
                         "topP": config.top_p if not_missing(config.top_p) else None,
                         "topK": config.top_k if not_missing(config.top_k) else None,
-                        "maxOutputTokens": config.max_tokens,
+                        "maxOutputTokens": config.max_tokens
+                        if not_missing(config.max_tokens)
+                        else None,
                         "responseSchema": response_schema if response_schema else None,
                         "candidateCount": 1,
                         "stopSequences": config.stop_sequences
@@ -174,6 +176,9 @@ class GeminiClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
         assert len(texts) == len(result)  # nosec: B101
         return result
 
+    async def initialize(self) -> None:
+        pass  # Disposable protocol requirement
+
     async def dispose(self) -> None:
         await self._client.aclose()
 
@@ -274,3 +279,6 @@ class GeminiClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
 
         else:
             raise GeminiException("Network request failed: %s", response)
+
+
+SHARED: Final[GeminiClient] = GeminiClient.prepare()

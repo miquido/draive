@@ -2,9 +2,10 @@ from collections.abc import Callable
 from time import monotonic
 from typing import NamedTuple
 
+from haiway import State
+
 from draive.instructions.errors import MissingInstruction
 from draive.instructions.types import Instruction, InstructionFetching
-from draive.parameters import State
 
 __all__ = [
     "InstructionsRepository",

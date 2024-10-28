@@ -1,8 +1,6 @@
 from typing import Literal, TypedDict
 
-from haiway import MISSING, Missing
-
-from draive.parameters import DataModel
+from haiway import MISSING, Missing, State
 
 __all__ = [
     "OpenAIChatConfig",
@@ -17,12 +15,12 @@ class ResponseFormat(TypedDict):
     type: Literal["text", "json_object"]
 
 
-class OpenAIChatConfig(DataModel):
+class OpenAIChatConfig(State):
     model: str = "gpt-4o-mini"
-    temperature: float = 0.75
+    temperature: float = 1.0
     top_p: float | Missing = MISSING
     frequency_penalty: float | Missing = MISSING
-    max_tokens: int = 2048
+    max_tokens: int | Missing = MISSING
     seed: int | None | Missing = MISSING
     response_format: ResponseFormat | Missing = MISSING
     vision_details: Literal["auto", "low", "high"] | Missing = MISSING
@@ -30,7 +28,7 @@ class OpenAIChatConfig(DataModel):
     stop_sequences: list[str] | Missing = MISSING
 
 
-class OpenAIEmbeddingConfig(DataModel):
+class OpenAIEmbeddingConfig(State):
     model: str = "text-embedding-3-small"
     dimensions: int | Missing = MISSING
     batch_size: int = 128
@@ -38,7 +36,7 @@ class OpenAIEmbeddingConfig(DataModel):
     timeout: float | Missing = MISSING
 
 
-class OpenAIImageGenerationConfig(DataModel):
+class OpenAIImageGenerationConfig(State):
     model: str = "dall-e-2"
     quality: Literal["standard", "hd"] = "standard"
     size: Literal["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"] = "1024x1024"
@@ -47,11 +45,11 @@ class OpenAIImageGenerationConfig(DataModel):
     response_format: Literal["url", "b64_json"] = "b64_json"
 
 
-class OpenAISystemFingerprint(DataModel):
+class OpenAISystemFingerprint(State):
     system_fingerprint: str
 
 
-class OpenAIModerationConfig(DataModel):
+class OpenAIModerationConfig(State):
     harassment_threshold: float | Missing = MISSING
     harassment_threatening_threshold: float | Missing = MISSING
     hate_threshold: float | Missing = MISSING

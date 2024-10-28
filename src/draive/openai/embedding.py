@@ -1,35 +1,42 @@
 from collections.abc import Sequence
 from typing import Any
 
-from draive.embedding import Embedded
-from draive.openai.client import OpenAIClient
+from haiway import ctx
+
+from draive.embedding import Embedded, ValueEmbedder
+from draive.openai.client import SHARED, OpenAIClient
 from draive.openai.config import OpenAIEmbeddingConfig
-from draive.scope import ctx
 
 __all__ = [
-    "openai_embed_text",
+    "openai_text_embedding",
 ]
 
 
-async def openai_embed_text(
-    values: Sequence[str],
-    **extra: Any,
-) -> list[Embedded[str]]:
-    config: OpenAIEmbeddingConfig = ctx.state(OpenAIEmbeddingConfig).updated(**extra)
-    with ctx.nested("openai_embed_text", metrics=[config]):  # pyright: ignore[reportDeprecated]
-        results: list[list[float]] = await ctx.dependency(OpenAIClient).embedding(  # pyright: ignore[reportDeprecated]
-            config=config,
-            inputs=values,
-        )
+def openai_text_embedding(
+    client: OpenAIClient = SHARED,
+    /,
+) -> ValueEmbedder[str]:
+    async def openai_embed_text(
+        values: Sequence[str],
+        **extra: Any,
+    ) -> list[Embedded[str]]:
+        with ctx.scope("embed_text"):
+            config: OpenAIEmbeddingConfig = ctx.state(OpenAIEmbeddingConfig).updated(**extra)
+            results: list[list[float]] = await client.embedding(  # pyright: ignore[reportDeprecated]
+                config=config,
+                inputs=values,
+            )
 
-        return [
-            Embedded(
-                value=embedded[0],
-                vector=embedded[1],
-            )
-            for embedded in zip(
-                values,
-                results,
-                strict=True,
-            )
-        ]
+            return [
+                Embedded(
+                    value=embedded[0],
+                    vector=embedded[1],
+                )
+                for embedded in zip(
+                    values,
+                    results,
+                    strict=True,
+                )
+            ]
+
+    return openai_embed_text

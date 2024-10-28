@@ -1,5 +1,6 @@
-from draive.parameters import State
-from draive.tokenization.text import TextTokenizer
+from haiway import State
+
+from draive.tokenization.types import TextTokenizing
 
 __all__ = [
     "Tokenization",
@@ -7,4 +8,4 @@ __all__ = [
 
 
 class Tokenization(State):
-    tokenize_text: TextTokenizer
+    tokenize_text: TextTokenizing

@@ -1,5 +1,5 @@
 from random import uniform
-from typing import Literal, Self, final, overload
+from typing import Final, Literal, Self, final, overload
 
 from anthropic import AsyncAnthropic, AsyncStream
 from anthropic import RateLimitError as AnthropicRateLimitError
@@ -9,16 +9,16 @@ from anthropic.types.message_create_params import ToolChoice, ToolChoiceToolChoi
 from haiway import getenv_str, not_missing
 
 from draive.anthropic.config import AnthropicConfig
-from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
 from draive.types import RateLimitError
 
 __all__ = [
     "AnthropicClient",
+    "SHARED",
 ]
 
 
 @final
-class AnthropicClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
+class AnthropicClient:
     @classmethod
     def prepare(cls) -> Self:
         return cls(
@@ -43,7 +43,7 @@ class AnthropicClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
         self,
         *,
         config: AnthropicConfig,
-        instruction: str,
+        instruction: str | None,
         messages: list[MessageParam],
         tools: list[ToolParam] | None = None,
         tool_choice: ToolChoiceToolChoiceTool | Literal["auto", "any", "none"] = "auto",
@@ -55,7 +55,7 @@ class AnthropicClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
         self,
         *,
         config: AnthropicConfig,
-        instruction: str,
+        instruction: str | None,
         messages: list[MessageParam],
         tools: list[ToolParam] | None = None,
         tool_choice: ToolChoiceToolChoiceTool | Literal["auto", "any", "none"] = "auto",
@@ -65,7 +65,7 @@ class AnthropicClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
         self,
         *,
         config: AnthropicConfig,
-        instruction: str,
+        instruction: str | None,
         messages: list[MessageParam],
         tools: list[ToolParam] | None = None,
         tool_choice: ToolChoiceToolChoiceTool | Literal["auto", "any", "none"] = "auto",
@@ -90,7 +90,7 @@ class AnthropicClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
         try:
             return await self._client.messages.create(
                 model=config.model,
-                system=instruction,
+                system=instruction or NOT_GIVEN,
                 messages=messages,
                 tools=tools or NOT_GIVEN,
                 tool_choice=selected_tool_choice,
@@ -117,5 +117,11 @@ class AnthropicClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
             else:
                 raise exc
 
+    async def initialize(self) -> None:
+        pass  # Disposable protocol requirement
+
     async def dispose(self) -> None:
         await self._client.close()
+
+
+SHARED: Final[AnthropicClient] = AnthropicClient.prepare()

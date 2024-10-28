@@ -1,5 +1,4 @@
-from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 __all__ = [
     "Memory",
@@ -7,14 +6,13 @@ __all__ = [
 ]
 
 
-class Memory[Recalled, Remembered](ABC):
-    @abstractmethod
+@runtime_checkable
+class Memory[Recalled, Remembered](Protocol):
     async def recall(
         self,
         **extra: Any,
     ) -> Recalled: ...
 
-    @abstractmethod
     async def remember(
         self,
         *items: Remembered,

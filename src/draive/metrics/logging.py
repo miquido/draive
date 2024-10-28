@@ -1,45 +1,58 @@
-from logging import Logger
+from collections.abc import Callable, Coroutine
+from logging import INFO
 from typing import Any, cast
 
-from haiway import is_missing
+from haiway import MISSING, Missing, ScopeMetrics, State, is_missing
 
-from draive.metrics.reporter import MetricsTraceReport, MetricsTraceReporter
-from draive.parameters import ParametrizedData
+from draive.metrics.tokens import TokenUsage
 
 __all__ = [
-    "metrics_log_reporter",
+    "usage_metrics_logger",
 ]
 
 
-def metrics_log_reporter(
+def usage_metrics_logger(
     list_items_limit: int | None = None,
     item_character_limit: int | None = None,
-) -> MetricsTraceReporter:
-    async def reporter(
-        trace_id: str,
-        logger: Logger,
-        report: MetricsTraceReport,
-    ) -> None:
-        report_log: str | None = _report(
-            report.with_combined_metrics(),
+) -> Callable[[ScopeMetrics], Coroutine[None, None, None]]:
+    async def logger(metrics: ScopeMetrics) -> None:
+        report_log: str | None = _usage_log(
+            metrics,
             list_items_limit=list_items_limit,
             item_character_limit=item_character_limit,
         )
-        logger.info(f"[{trace_id}] Metrics report:\n{report_log or 'N/A'}")
+        metrics.log(
+            INFO,
+            f"Usage metrics:\n{report_log or 'N/A'}",
+        )
 
-    return reporter
+    return logger
 
 
-def _report(
-    report: MetricsTraceReport,
+def _usage_metrics_merge(
+    current: State | Missing,
+    nested: State,
+) -> State | Missing:
+    if not isinstance(nested, TokenUsage):
+        return MISSING  # do not merge other metrics than TokenUsage
+
+    if not isinstance(current, TokenUsage):
+        return nested  # use nested TokenUsage
+
+    return current + nested  # add TokenUsage from current and nested
+
+
+def _usage_log(
+    metrics: ScopeMetrics,
     list_items_limit: int | None,
     item_character_limit: int | None,
 ) -> str:
-    report_log: str = f"@{report.label}({report.duration:.2f}s):"
-    for metric_name, metric in report.metrics.items():
+    log: str = f"@{metrics.label}[{metrics.identifier}]({metrics.time:.2f}s):"
+
+    for metric in metrics.metrics(merge=_usage_metrics_merge):
         metric_log: str = ""
         for key, value in vars(metric).items():
-            if value_log := _value_report(
+            if value_log := _value_log(
                 value,
                 list_items_limit=list_items_limit,
                 item_character_limit=item_character_limit,
@@ -52,45 +65,49 @@ def _report(
         if not metric_log:
             continue  # skip empty logs
 
-        report_log += f"\n• {metric_name}:{metric_log}"
+        log += f"\n• {type(metric).__qualname__}:{metric_log}"
 
-    for nested in report.nested:
-        nested_log: str = _report(
+    # making use of private api of haiway - draive is very entangled already
+    for nested in metrics._nested:  # pyright: ignore[reportPrivateUsage]
+        nested_log: str = _usage_log(
             nested,
             list_items_limit=list_items_limit,
             item_character_limit=item_character_limit,
         ).replace("\n", "\n|  ")
 
-        report_log += f"\n{nested_log}"
+        log += f"\n{nested_log}"
 
-    return report_log.strip()
+    return log.strip()
 
 
-def _state_report(
-    value: ParametrizedData,
+def _state_log(
+    value: State,
     /,
     list_items_limit: int | None,
     item_character_limit: int | None,
 ) -> str | None:
     state_log: str = ""
     for key, element in vars(value).items():
-        element_log: str | None = _value_report(
+        element_log: str | None = _value_log(
             element,
             list_items_limit=list_items_limit,
             item_character_limit=item_character_limit,
         )
+
         if element_log:
             state_log += f"\n|  + {key}: {element_log}"
+
         else:
             continue  # skip empty logs
 
     if state_log:
         return state_log.replace("\n", "\n|  ")
+
     else:
         return None  # skip empty logs
 
 
-def _dict_report(
+def _dict_log(
     value: dict[Any, Any],
     /,
     list_items_limit: int | None,
@@ -98,83 +115,78 @@ def _dict_report(
 ) -> str | None:
     dict_log: str = ""
     for key, element in value.items():
-        element_log: str | None = _value_report(
+        element_log: str | None = _value_log(
             element,
             list_items_limit=list_items_limit,
             item_character_limit=item_character_limit,
         )
         if element_log:
             dict_log += f"\n|  + {key}: {element_log}"
+
         else:
             continue  # skip empty logs
 
     if dict_log:
         return dict_log.replace("\n", "\n|  ")
+
     else:
         return None  # skip empty logs
 
 
-def _list_report(
+def _list_log(
     value: list[Any],
     /,
     list_items_limit: int | None,
     item_character_limit: int | None,
 ) -> str | None:
     list_log: str = ""
-    enumerared: list[tuple[int, Any]] = list(enumerate(value))
+    enumerated: list[tuple[int, Any]] = list(enumerate(value))
     if list_items_limit:
         if list_items_limit > 0:
-            enumerared = enumerared[:list_items_limit]
-        else:
-            enumerared = enumerared[list_items_limit:]
+            enumerated = enumerated[:list_items_limit]
 
-    for idx, element in enumerared:
-        element_log: str | None = _value_report(
+        else:
+            enumerated = enumerated[list_items_limit:]
+
+    for idx, element in enumerated:
+        element_log: str | None = _value_log(
             element,
             list_items_limit=list_items_limit,
             item_character_limit=item_character_limit,
         )
         if element_log:
             list_log += f"\n|  [{idx}] {element_log}"
+
         else:
             continue  # skip empty logs
 
     if list_log:
         return list_log.replace("\n", "\n|  ")
+
     else:
         return None  # skip empty logs
 
 
-def _raw_value_report(
+def _raw_value_log(
     value: Any,
     /,
-    list_items_limit: int | None,
     item_character_limit: int | None,
 ) -> str | None:
     if is_missing(value):
         return None  # skip missing
 
-    # workaround for pydantic models
-    if hasattr(value, "model_dump") and callable(value.model_dump):
-        return _dict_report(
-            value.model_dump(),  # pyright: ignore[reportArgumentType]
-            list_items_limit=list_items_limit,
-            item_character_limit=item_character_limit,
-        )
+    value_log = str(value)
+    if not value_log:
+        return None  # skip empty logs
+
+    if (item_character_limit := item_character_limit) and len(value_log) > item_character_limit:
+        return value_log.replace("\n", " ")[:item_character_limit] + "..."
 
     else:
-        value_log = str(value)
-        if not value_log:
-            return None  # skip empty logs
-
-        if (item_character_limit := item_character_limit) and len(value_log) > item_character_limit:
-            return value_log.replace("\n", " ")[:item_character_limit] + "..."
-
-        else:
-            return value_log.replace("\n", "\n|  ")
+        return value_log.replace("\n", "\n|  ")
 
 
-def _value_report(
+def _value_log(
     value: Any,
     /,
     list_items_limit: int | None,
@@ -182,7 +194,7 @@ def _value_report(
 ) -> str | None:
     # try unpack dicts
     if isinstance(value, dict):
-        return _dict_report(
+        return _dict_log(
             cast(dict[Any, Any], value),
             list_items_limit=list_items_limit,
             item_character_limit=item_character_limit,
@@ -190,23 +202,22 @@ def _value_report(
 
     # try unpack lists
     elif isinstance(value, list):
-        return _list_report(
+        return _list_log(
             cast(list[Any], value),
             list_items_limit=list_items_limit,
             item_character_limit=item_character_limit,
         )
 
     # try unpack state
-    elif isinstance(value, ParametrizedData):
-        return _state_report(
+    elif isinstance(value, State):
+        return _state_log(
             value,
             list_items_limit=list_items_limit,
             item_character_limit=item_character_limit,
         )
 
     else:
-        return _raw_value_report(
+        return _raw_value_log(
             value,
-            list_items_limit=list_items_limit,
             item_character_limit=item_character_limit,
         )

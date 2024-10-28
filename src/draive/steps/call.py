@@ -1,10 +1,10 @@
-from collections.abc import Iterable
 from typing import Any
 
+from haiway import ctx
+
 from draive.instructions import Instruction
-from draive.scope import ctx
-from draive.steps.model import Step
 from draive.steps.state import Steps
+from draive.steps.types import Step
 from draive.types import Multimodal, MultimodalContent
 
 __all__ = [
@@ -13,13 +13,12 @@ __all__ = [
 
 
 async def steps_completion(
-    *,
-    instruction: Instruction | str,
-    steps: Iterable[Step | Multimodal],
+    *steps: Step | Multimodal,
+    instruction: Instruction | str | None = None,
     **extra: Any,
 ) -> MultimodalContent:
     return await ctx.state(Steps).completion(
+        *steps,
         instruction=instruction,
-        steps=steps,
         **extra,
     )

@@ -2,7 +2,7 @@ from asyncio import gather
 from collections.abc import Sequence
 from itertools import chain
 from random import uniform
-from typing import Literal, Self, cast, final, overload
+from typing import Final, Literal, Self, cast, final, overload
 
 from haiway import freeze, getenv_str, not_missing
 from openai import AsyncAzureOpenAI, AsyncOpenAI, AsyncStream
@@ -26,7 +26,6 @@ from draive.openai.config import (
     OpenAIEmbeddingConfig,
     OpenAIImageGenerationConfig,
 )
-from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
 from draive.types import RateLimitError
 
 __all__ = [
@@ -35,7 +34,7 @@ __all__ = [
 
 
 @final
-class OpenAIClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
+class OpenAIClient:
     @classmethod
     def prepare(cls) -> Self:
         return cls(
@@ -226,5 +225,11 @@ class OpenAIClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
         )
         return response.data[0]
 
+    async def initialize(self) -> None:
+        pass  # Disposable protocol requirement
+
     async def dispose(self) -> None:
         await self._client.close()
+
+
+SHARED: Final[OpenAIClient] = OpenAIClient.prepare()

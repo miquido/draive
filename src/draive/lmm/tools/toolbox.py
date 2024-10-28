@@ -1,21 +1,19 @@
-from asyncio import FIRST_COMPLETED, Task, gather, wait
-from collections.abc import AsyncIterable, Callable, Coroutine
-from typing import Any, Literal, final
+from asyncio import gather
+from collections.abc import Callable, Coroutine, Iterable
+from typing import Any, Literal, Self, final
 
-from haiway import async_noop, freeze
+from haiway import async_noop, ctx, freeze
 
-from draive.lmm.tools.errors import ToolError, ToolException
 from draive.lmm.tools.specification import ToolSpecification
 from draive.lmm.tools.status import ToolStatus
 from draive.lmm.tools.tool import AnyTool
-from draive.scope import ctx
+from draive.lmm.tools.types import ToolError, ToolException
 from draive.types import (
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
     MultimodalContent,
 )
-from draive.utils import AsyncStream
 
 __all__ = [
     "Toolbox",
@@ -24,6 +22,22 @@ __all__ = [
 
 @final
 class Toolbox:
+    @classmethod
+    def of(
+        cls,
+        tools: Self | Iterable[AnyTool] | None,
+        /,
+    ) -> Self:
+        match tools:
+            case None:
+                return cls()
+
+            case Toolbox() as tools:
+                return tools
+
+            case tools:
+                return cls(*tools)
+
     def __init__(
         self,
         *tools: AnyTool,
@@ -139,39 +153,3 @@ class Toolbox:
                 direct=False,
                 error=True,
             )
-
-    def stream(
-        self,
-        requests: LMMToolRequests,
-        /,
-    ) -> AsyncIterable[LMMToolResponse | ToolStatus]:
-        stream: AsyncStream[LMMToolResponse | ToolStatus] = AsyncStream()
-
-        async def tools_stream() -> None:
-            try:
-                pending_tasks: set[Task[LMMToolResponse]] = {
-                    ctx.spawn_subtask(
-                        self._respond,
-                        request,
-                        stream.send,
-                    )
-                    for request in requests.requests
-                }
-
-                while pending_tasks:
-                    done, pending_tasks = await wait(
-                        pending_tasks,
-                        return_when=FIRST_COMPLETED,
-                    )
-
-                    for task in done:
-                        await stream.send(task.result())
-
-            except BaseException as exc:
-                stream.finish(exception=exc)
-
-            else:
-                stream.finish()
-
-        ctx.spawn_subtask(tools_stream)
-        return stream

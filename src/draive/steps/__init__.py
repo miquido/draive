@@ -1,13 +1,12 @@
 from draive.steps.call import steps_completion
-from draive.steps.completion import StepsCompletion
-from draive.steps.lmm import lmm_steps_completion
-from draive.steps.model import Step
+from draive.steps.default import default_steps_completion
 from draive.steps.state import Steps
+from draive.steps.types import Step, StepsCompleting
 
 __all__ = [
-    "lmm_steps_completion",
+    "default_steps_completion",
     "steps_completion",
     "Steps",
-    "StepsCompletion",
+    "StepsCompleting",
     "Step",
 ]

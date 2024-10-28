@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from typing import Any, final
 
-from draive.types import Memory
+from haiway import freeze
 
 __all__ = [
     "ConstantMemory",
@@ -11,13 +11,15 @@ __all__ = [
 
 
 @final
-class ConstantMemory[Recalled, Remembered](Memory[Recalled, Remembered]):
+class ConstantMemory[Recalled, Remembered]:
     def __init__(
         self,
         item: Recalled,
         /,
     ) -> None:
         self._item: Recalled = item
+
+        freeze(self)
 
     async def recall(
         self,
@@ -34,7 +36,7 @@ class ConstantMemory[Recalled, Remembered](Memory[Recalled, Remembered]):
 
 
 @final
-class VolatileMemory[Item](Memory[Item, Item]):
+class VolatileMemory[Item]:
     def __init__(
         self,
         item: Item,
@@ -58,7 +60,7 @@ class VolatileMemory[Item](Memory[Item, Item]):
 
 
 @final
-class VolatileAccumulativeMemory[Item](Memory[list[Item], Item]):
+class VolatileAccumulativeMemory[Item]:
     def __init__(
         self,
         items: Iterable[Item] | None = None,

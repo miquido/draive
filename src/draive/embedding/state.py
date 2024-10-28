@@ -1,5 +1,6 @@
-from draive.embedding.embedder import ValueEmbedder
-from draive.parameters import State
+from haiway import State
+
+from draive.embedding.types import ValueEmbedder
 
 __all__ = [
     "TextEmbedding",

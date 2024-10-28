@@ -1,4 +1,4 @@
-from typing import Protocol, Self, final, runtime_checkable
+from typing import Protocol, Self, final, overload, runtime_checkable
 from uuid import UUID, uuid4
 
 from haiway import freeze
@@ -11,6 +11,53 @@ __all__ = [
 
 @final
 class Instruction:
+    @overload
+    @classmethod
+    def formatted(
+        cls,
+        instruction: None,
+        /,
+    ) -> None: ...
+
+    @overload
+    @classmethod
+    def formatted(
+        cls,
+        instruction: Self | str,
+        /,
+        **variables: object,
+    ) -> str: ...
+
+    @overload
+    @classmethod
+    def formatted(
+        cls,
+        instruction: Self | str | None,
+        /,
+        **variables: object,
+    ) -> str | None: ...
+
+    @classmethod
+    def formatted(
+        cls,
+        instruction: Self | str | None,
+        /,
+        **variables: object,
+    ) -> str | None:
+        match instruction:
+            case None:
+                return None
+
+            case str() as string:
+                if variables:
+                    return string.format_map(variables)
+
+                else:
+                    return string
+
+            case instruction:
+                return instruction.format(**variables)
+
     @classmethod
     def of(
         cls,

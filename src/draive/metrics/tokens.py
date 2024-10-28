@@ -1,6 +1,6 @@
 from typing import Self, overload
 
-from draive.parameters import DataModel
+from haiway import State
 
 __all__ = [
     "ModelTokenUsage",
@@ -8,7 +8,7 @@ __all__ = [
 ]
 
 
-class ModelTokenUsage(DataModel):
+class ModelTokenUsage(State):
     input_tokens: int
     output_tokens: int
 
@@ -22,7 +22,7 @@ class ModelTokenUsage(DataModel):
         )
 
 
-class TokenUsage(DataModel):
+class TokenUsage(State):
     @overload
     @classmethod
     def for_model(
@@ -78,6 +78,7 @@ class TokenUsage(DataModel):
         for key, value in other.usage.items():
             if current := usage.get(key):
                 usage[key] = current + value
+
             else:
                 usage[key] = value
 

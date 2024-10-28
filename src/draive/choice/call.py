@@ -1,11 +1,12 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from typing import Any
 
-from draive.choice.model import ChoiceOption
+from haiway import ctx
+
 from draive.choice.state import Choice
+from draive.choice.types import ChoiceOption
 from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
-from draive.scope import ctx
 from draive.types import Multimodal
 
 __all__ = [
@@ -19,21 +20,10 @@ async def choice_completion(  # noqa: PLR0913
     options: Iterable[ChoiceOption | Multimodal],
     input: Multimodal,  # noqa: A002
     prefill: str | None = None,
-    tools: Toolbox | Sequence[AnyTool] | None = None,
+    tools: Toolbox | Iterable[AnyTool] | None = None,
     examples: Iterable[tuple[Multimodal, ChoiceOption]] | None = None,
     **extra: Any,
 ) -> ChoiceOption:
-    toolbox: Toolbox
-    match tools:
-        case None:
-            toolbox = Toolbox()
-
-        case Toolbox() as tools:
-            toolbox = tools
-
-        case sequence:
-            toolbox = Toolbox(*sequence)
-
     return await ctx.state(Choice).completion(
         instruction=instruction,
         options=[
@@ -42,7 +32,7 @@ async def choice_completion(  # noqa: PLR0913
         ],
         input=input,
         prefill=prefill,
-        toolbox=toolbox,
+        toolbox=Toolbox.of(tools),
         examples=examples,
         **extra,
     )

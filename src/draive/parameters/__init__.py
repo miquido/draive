@@ -9,7 +9,6 @@ from draive.parameters.model import DataModel
 from draive.parameters.path import ParameterPath
 from draive.parameters.requirement import ParameterRequirement
 from draive.parameters.specification import ParameterSpecification, ParametersSpecification
-from draive.parameters.state import State, Stateless
 from draive.parameters.validation import ParameterValidator, ParameterVerifier
 
 __all__ = [
@@ -30,6 +29,4 @@ __all__ = [
     "ParametrizedData",
     "ParametrizedData",
     "ParametrizedFunction",
-    "State",
-    "Stateless",
 ]

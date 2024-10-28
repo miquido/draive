@@ -1,11 +1,12 @@
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import Iterable, Sequence
 from copy import copy
-from typing import Any, Literal, cast, overload
+from typing import Any, Literal, cast
 from uuid import uuid4
 
-from draive.gemini.client import GeminiClient
+from haiway import ArgumentsTrace, ResultTrace, ctx
+
+from draive.gemini.client import SHARED, GeminiClient
 from draive.gemini.config import GeminiConfig
-from draive.gemini.errors import GeminiException
 from draive.gemini.models import (
     GeminiChoice,
     GeminiDataMessageContent,
@@ -19,23 +20,20 @@ from draive.gemini.models import (
     GeminiRequestMessage,
     GeminiTextMessageContent,
 )
+from draive.gemini.types import GeminiException
 from draive.instructions import Instruction
-from draive.lmm import LMMToolSelection, ToolSpecification
-from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
-from draive.parameters import DataModel
-from draive.scope import ctx
+from draive.lmm import LMMInvocation, LMMToolSelection, ToolSpecification
+from draive.metrics import TokenUsage
+from draive.parameters import DataModel, ParametersSpecification
 from draive.types import (
     AudioBase64Content,
     AudioURLContent,
     ImageBase64Content,
     ImageURLContent,
     LMMCompletion,
-    LMMCompletionChunk,
     LMMContextElement,
     LMMInput,
     LMMOutput,
-    LMMOutputStream,
-    LMMOutputStreamChunk,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
@@ -47,118 +45,68 @@ from draive.types import (
 )
 
 __all__ = [
-    "gemini_lmm_invocation",
+    "gemini_lmm",
 ]
 
 
-@overload
-async def gemini_lmm_invocation(
-    *,
-    instruction: Instruction | str,
-    context: Sequence[LMMContextElement],
-    tools: Sequence[ToolSpecification] | None = None,
-    tool_selection: LMMToolSelection = "auto",
-    output: Literal["text", "json"] = "text",
-    stream: Literal[True],
-    **extra: Any,
-) -> LMMOutputStream: ...
-
-
-@overload
-async def gemini_lmm_invocation(
-    *,
-    instruction: Instruction | str,
-    context: Sequence[LMMContextElement],
-    tools: Sequence[ToolSpecification] | None = None,
-    tool_selection: LMMToolSelection = "auto",
-    output: Literal["text", "json"] = "text",
-    stream: Literal[False] = False,
-    **extra: Any,
-) -> LMMOutput: ...
-
-
-@overload
-async def gemini_lmm_invocation(
-    *,
-    instruction: Instruction | str,
-    context: Sequence[LMMContextElement],
-    tools: Sequence[ToolSpecification] | None = None,
-    tool_selection: LMMToolSelection = "auto",
-    output: Literal["text", "json"] = "text",
-    stream: bool = False,
-    **extra: Any,
-) -> LMMOutputStream | LMMOutput: ...
-
-
-async def gemini_lmm_invocation(  # noqa: PLR0913
-    *,
-    instruction: Instruction | str,
-    context: Sequence[LMMContextElement],
-    tools: Sequence[ToolSpecification] | None = None,
-    tool_selection: LMMToolSelection = "auto",
-    output: Literal["text", "json"] = "text",
-    stream: bool = False,
-    **extra: Any,
-) -> LMMOutputStream | LMMOutput:
-    with ctx.nested(  # pyright: ignore[reportDeprecated]
-        "gemini_lmm_invocation",
-        metrics=[
-            ArgumentsTrace.of(
-                instruction=instruction,
-                context=context,
-                tools=tools,
-                tool_selection=tool_selection,
-                output=output,
-                stream=stream,
-                **extra,
-            ),
-        ],
-    ):
-        ctx.log_debug("Requested Gemini lmm")
-        client: GeminiClient = ctx.dependency(GeminiClient)  # pyright: ignore[reportDeprecated]
-        config: GeminiConfig = ctx.state(GeminiConfig).updated(**extra)
-        ctx.record(config)
-
-        match output:
-            case "text":
-                config = config.updated(response_format="text/plain")
-
-            case "json":
-                if tools:
-                    ctx.log_warning(
-                        "Attempting to use Gemini in JSON mode with tools which is not supported."
-                        " Using text mode instead..."
-                    )
-                    config = config.updated(response_format="text/plain")
-
-                else:
-                    config = config.updated(response_format="application/json")
-
-        messages: list[GeminiRequestMessage] = [
-            _convert_context_element(element=element) for element in context
-        ]
-
-        if stream:
-            return ctx.stream(
-                _generation_stream(
-                    client=client,
-                    config=config,
-                    instruction=Instruction.of(instruction).format(),
-                    messages=messages,
-                    tools=tools,
+def gemini_lmm(
+    client: GeminiClient = SHARED,
+    /,
+) -> LMMInvocation:
+    async def gemini_lmm_invocation(  # noqa: PLR0913
+        *,
+        instruction: Instruction | str | None,
+        context: Iterable[LMMContextElement],
+        prefill: MultimodalContent | None,
+        tool_selection: LMMToolSelection,
+        tools: Iterable[ToolSpecification] | None,
+        output: Literal["auto", "text"] | ParametersSpecification,
+        **extra: Any,
+    ) -> LMMOutput:
+        with ctx.scope("gemini_lmm_invocation"):
+            ctx.record(
+                ArgumentsTrace.of(
+                    instruction=instruction,
+                    context=context,
+                    prefill=prefill,
                     tool_selection=tool_selection,
+                    tools=tools,
+                    output=output,
+                    **extra,
                 ),
             )
 
-        else:
+            config: GeminiConfig = ctx.state(GeminiConfig).updated(**extra)
+            ctx.record(config)
+
+            match output:
+                case "auto" | "text":
+                    config = config.updated(response_format="text/plain")
+
+                case _:  # TODO: utilize json schema within API
+                    if tools:
+                        ctx.log_warning(
+                            "Attempting to use Gemini in JSON mode with tools which is"
+                            " not supported. Using text mode instead..."
+                        )
+                        config = config.updated(response_format="text/plain")
+
+                    else:
+                        config = config.updated(response_format="application/json")
+
+            if prefill:
+                context = [*context, LMMCompletion.of(prefill)]
+
             return await _generate(
                 client=client,
                 config=config,
-                instruction=Instruction.of(instruction).format(),
-                messages=messages,
-                tools=tools,
+                instruction=Instruction.formatted(instruction) or "",
+                messages=[_convert_context_element(element=element) for element in context],
                 tool_selection=tool_selection,
+                tools=tools,
             )
+
+    return gemini_lmm_invocation
 
 
 def _convert_content_element(  # noqa: PLR0911
@@ -342,8 +290,8 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
     config: GeminiConfig,
     instruction: str,
     messages: list[GeminiRequestMessage],
-    tools: Sequence[ToolSpecification] | None,
     tool_selection: LMMToolSelection,
+    tools: Iterable[ToolSpecification] | None,
 ) -> LMMOutput:
     result: GeminiGenerationResult
     converted_tools: Sequence[GeminiFunctionToolSpecification] = []
@@ -512,30 +460,3 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
 
     else:
         raise GeminiException("Invalid Gemini completion", result)
-
-
-async def _generation_stream(  # noqa: PLR0913
-    *,
-    client: GeminiClient,
-    config: GeminiConfig,
-    instruction: str,
-    messages: list[GeminiRequestMessage],
-    tools: Sequence[ToolSpecification] | None,
-    tool_selection: LMMToolSelection,
-) -> AsyncGenerator[LMMOutputStreamChunk, None]:
-    ctx.log_debug("Gemini streaming api is not supported yet, using regular response...")
-    output: LMMOutput = await _generate(
-        client=client,
-        config=config,
-        instruction=instruction,
-        messages=messages,
-        tools=tools,
-        tool_selection=tool_selection,
-    )
-
-    match output:
-        case LMMCompletion() as completion:
-            yield LMMCompletionChunk.of(completion.content)
-
-        case other:
-            yield other

@@ -1,6 +1,7 @@
 from draive.evaluation import EvaluationScore, evaluator
 from draive.generation import generate_text
-from draive.types import Multimodal, MultimodalTemplate, xml_tag
+from draive.types import Multimodal, MultimodalTemplate
+from draive.utils import xml_tag
 
 __all__ = [
     "consistency_evaluator",

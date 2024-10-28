@@ -5,11 +5,10 @@ from asyncio import (
 from collections.abc import AsyncIterator
 from typing import Protocol, Self, final, overload, runtime_checkable
 
-from haiway import AsyncQueue, freeze
+from haiway import AsyncQueue, ctx, freeze
 
 from draive.agents.idle import IdleMonitor
 from draive.agents.node import Agent, AgentError, AgentMessage, AgentNode
-from draive.scope import ctx
 
 __all__ = [
     "AgentRunner",
@@ -55,7 +54,7 @@ class AgentRunner:
         queue: AsyncQueue[AgentMessage] = AsyncQueue()
         return cls(
             queue=queue,
-            task=ctx.spawn_subtask(
+            task=ctx.spawn(
                 cls._draive,
                 agent,
                 queue,
@@ -114,13 +113,13 @@ class AgentRunner:
         output: AgentRunnerOutput,
         status: IdleMonitor,
     ) -> None:
-        async with ctx.nested(agent.__str__()):  # pyright: ignore[reportDeprecated]
+        async with ctx.scope(agent.__str__()):  # pyright: ignore[reportDeprecated]
             agent_instance: Agent = agent.initialize()
 
             try:
                 if agent.concurrent:
                     async for message in input:
-                        task: Task[None] = ctx.spawn_subtask(
+                        task: Task[None] = ctx.spawn(
                             AgentRunner._handle,
                             message,
                             node=agent,
