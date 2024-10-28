@@ -1,9 +1,10 @@
 from logging import Logger
 from typing import Any, cast
 
+from haiway import is_missing
+
 from draive.metrics.reporter import MetricsTraceReport, MetricsTraceReporter
 from draive.parameters import ParametrizedData
-from draive.utils import is_missing
 
 __all__ = [
     "metrics_log_reporter",

@@ -7,7 +7,7 @@ from collections.abc import Callable, Mapping, Sequence
 from copy import copy
 from typing import Any, final, get_args, get_origin, overload
 
-from draive.utils import MISSING, Missing, freeze, not_missing
+from haiway import MISSING, Missing, freeze, not_missing
 
 __all__ = [
     "ParameterPath",

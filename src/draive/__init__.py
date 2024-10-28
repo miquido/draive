@@ -1,3 +1,28 @@
+# exporting haiway symbols for easier usage
+from haiway import (
+    MISSING,
+    AsyncQueue,
+    Missing,
+    always,
+    async_always,
+    async_noop,
+    asynchronous,
+    cache,
+    freeze,
+    getenv_bool,
+    getenv_float,
+    getenv_int,
+    getenv_str,
+    is_missing,
+    load_env,
+    noop,
+    not_missing,
+    retry,
+    setup_logging,
+    throttle,
+    timeout,
+)
+
 from draive.agents import (
     Agent,
     AgentError,
@@ -57,8 +82,6 @@ from draive.helpers import (
     VolatileAccumulativeMemory,
     VolatileMemory,
     VolatileVectorIndex,
-    auto_retry,  # pyright: ignore[reportDeprecated]
-    retry,
     traced,
 )
 from draive.instructions import (
@@ -162,31 +185,10 @@ from draive.types import (
     xml_tags,
 )
 from draive.utils import (
-    MISSING,
-    AsyncQueue,
     AsyncStream,
-    Missing,
-    always,
-    async_always,
-    async_noop,
-    asynchronous,
-    cache,
-    freeze,
-    getenv_bool,
-    getenv_float,
-    getenv_int,
-    getenv_str,
-    is_missing,
-    load_env,
     markdown_block,
     markdown_blocks,
-    noop,
-    not_missing,
-    setup_logging,
     split_sequence,
-    throttle,
-    timeout,
-    with_timeout,  # pyright: ignore[reportDeprecated]
 )
 
 __all__ = [
@@ -212,7 +214,6 @@ __all__ = [
     "AudioBase64Content",
     "AudioContent",
     "AudioURLContent",
-    "auto_retry",
     "BasicMemory",
     "BasicValue",
     "cache",
@@ -349,7 +350,6 @@ __all__ = [
     "VolatileAccumulativeMemory",
     "VolatileMemory",
     "VolatileVectorIndex",
-    "with_timeout",
     "workflow",
     "xml_tag",
     "xml_tags",

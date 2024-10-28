@@ -1,6 +1,7 @@
 from asyncio import gather
 from typing import Any
 
+from haiway import not_missing
 from openai.types.moderation import Moderation
 
 from draive.openai.client import OpenAIClient
@@ -9,7 +10,6 @@ from draive.safeguards import GuardrailsException
 from draive.scope import ctx
 from draive.splitters import split_text
 from draive.types import MultimodalContent
-from draive.utils.missing import not_missing
 
 __all__ = [
     "openai_content_guardrails",

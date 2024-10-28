@@ -16,7 +16,7 @@ from typing import (
     get_type_hints,
 )
 
-import draive.utils.missing as draive_missing
+from haiway.types import missing
 
 __all__ = [
     "object_annotations",
@@ -58,11 +58,11 @@ def allows_missing(
     )
 
     match resolved_type:
-        case draive_missing.Missing:
+        case missing.Missing:
             return True
 
         case types.UnionType:
-            return draive_missing.Missing in resolved_args
+            return missing.Missing in resolved_args
 
         case _:
             return False

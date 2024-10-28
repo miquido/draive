@@ -1,9 +1,8 @@
 from typing import Any
 
 from anthropic import Anthropic
+from haiway import cache
 from tokenizers import Tokenizer
-
-from draive.utils import cache
 
 __all__ = [
     "anthropic_tokenize_text",

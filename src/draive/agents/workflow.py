@@ -3,6 +3,8 @@ from inspect import isfunction
 from typing import Protocol, cast, final, overload, runtime_checkable
 from uuid import UUID, uuid4
 
+from haiway import MISSING, AsyncQueue, Missing, freeze, not_missing
+
 from draive.agents.definition import AgentMessage, AgentNode
 from draive.agents.errors import AgentException
 from draive.agents.idle import IdleMonitor
@@ -18,7 +20,6 @@ from draive.types import (
     MultimodalContentConvertible,
     frozenlist,
 )
-from draive.utils import MISSING, AsyncQueue, Missing, freeze, not_missing
 
 __all__ = [
     "workflow",

@@ -1,9 +1,10 @@
 from typing import Any, Self, final
 
+from haiway import asynchronous, getenv_str, not_missing
+
 from draive.bedrock.config import BedrockChatConfig
 from draive.bedrock.models import ChatCompletionResponse, ChatMessage, ChatTool
 from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
-from draive.utils import asynchronous, getenv_str, not_missing
 
 __all__ = [
     "BedrockClient",
@@ -35,7 +36,8 @@ class BedrockClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
         if not hasattr(self, "_client"):
             await self._prepare_client()
 
-    @asynchronous  # preparing it lazily on demand, boto does a lot of stuff on initialization
+    # preparing it lazily on demand, boto does a lot of stuff on initialization
+    @asynchronous
     def _prepare_client(self) -> None:
         import boto3  # pyright: ignore[reportMissingTypeStubs]
 

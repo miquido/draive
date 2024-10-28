@@ -1,6 +1,6 @@
 from collections.abc import Generator
 
-from draive import MultimodalContent, async_noop, auto_retry, cache, ctx, tool
+from draive import MultimodalContent, async_noop, cache, ctx, retry, tool
 from pytest import mark, raises
 
 
@@ -90,7 +90,7 @@ async def test_retries_with_auto_retry():
     executions: int = 0
 
     @tool
-    @auto_retry
+    @retry
     async def compute(value: int) -> int:
         nonlocal executions
         executions += 1

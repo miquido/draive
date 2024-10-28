@@ -11,9 +11,9 @@ anyio==4.6.2.post1
     #   openai
 bandit==1.7.10
     # via draive (pyproject.toml)
-boto3==1.35.47
+boto3==1.35.49
     # via draive (pyproject.toml)
-botocore==1.35.47
+botocore==1.35.49
     # via
     #   boto3
     #   s3transfer
@@ -42,6 +42,8 @@ fsspec==2024.10.0
     # via huggingface-hub
 h11==0.14.0
     # via httpcore
+haiway @ git+https://github.com/miquido/haiway@b5cc7ff925bd87f808e97af70ebb76568394e322
+    # via draive (pyproject.toml)
 httpcore==1.0.6
     # via httpx
 httpx==0.27.2
@@ -76,8 +78,6 @@ markdown-it-py==3.0.0
     # via rich
 mdurl==0.1.2
     # via markdown-it-py
-mistralrs==0.1.24
-    # via draive (pyproject.toml)
 mmh3==4.1.0
     # via fastembed
 mpmath==1.3.0

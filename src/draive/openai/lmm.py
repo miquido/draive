@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator, Sequence
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
+from haiway import not_missing
 from openai import AsyncStream as OpenAIAsyncStream
 from openai.types.chat import (
     ChatCompletion,
@@ -42,7 +43,6 @@ from draive.types import (
     VideoBase64Content,
     VideoURLContent,
 )
-from draive.utils import not_missing
 
 __all__ = [
     "openai_lmm_invocation",

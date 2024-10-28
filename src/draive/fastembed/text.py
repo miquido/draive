@@ -2,11 +2,11 @@ from collections.abc import Sequence
 from typing import Any
 
 from fastembed.text.text_embedding import TextEmbedding  # pyright: ignore[reportMissingTypeStubs]
+from haiway import asynchronous, cache
 
 from draive.embedding import Embedded
 from draive.fastembed.config import FastembedTextConfig
 from draive.scope import ctx
-from draive.utils import asynchronous, cache
 
 __all__ = [
     "fastembed_text_embedding",
@@ -39,7 +39,7 @@ def _text_embedding_model(
     )
 
 
-@asynchronous(executor=None)
+@asynchronous
 def _fastembed_text_embedding(
     config: FastembedTextConfig,
     texts: Sequence[str],

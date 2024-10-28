@@ -1,9 +1,10 @@
 from collections.abc import Callable, Coroutine
 from typing import Literal
 
+from haiway import async_noop
+
 from draive.parameters import DataModel, State
 from draive.types import MultimodalContent
-from draive.utils import async_noop
 
 __all__ = [
     "ToolStatus",

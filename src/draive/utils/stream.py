@@ -2,7 +2,7 @@ from asyncio import AbstractEventLoop, CancelledError, Future, get_running_loop
 from collections.abc import AsyncIterable
 from typing import Self
 
-from draive.utils.freeze import freeze
+from haiway import freeze
 
 __all__ = [
     "AsyncStream",

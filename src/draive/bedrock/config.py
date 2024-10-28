@@ -1,5 +1,6 @@
+from haiway import MISSING, Missing
+
 from draive.parameters import DataModel
-from draive.utils import MISSING, Missing
 
 __all__ = [
     "BedrockChatConfig",

@@ -5,10 +5,11 @@ from asyncio import (
 from collections.abc import AsyncIterator
 from typing import Protocol, Self, final, overload, runtime_checkable
 
+from haiway import AsyncQueue, freeze
+
 from draive.agents.idle import IdleMonitor
 from draive.agents.node import Agent, AgentError, AgentMessage, AgentNode
 from draive.scope import ctx
-from draive.utils import AsyncQueue, freeze
 
 __all__ = [
     "AgentRunner",

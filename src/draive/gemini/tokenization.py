@@ -1,10 +1,11 @@
 from pathlib import Path
 from typing import Any
 
+from haiway import cache
+
 from draive.gemini.config import GeminiConfig
 from draive.scope import ctx
 from draive.sentencepiece import sentencepiece_tokenize_text
-from draive.utils import cache
 
 __all__ = [
     "gemini_tokenize_text",

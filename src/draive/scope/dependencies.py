@@ -3,10 +3,10 @@ from asyncio import gather, shield
 from types import TracebackType
 from typing import Self, cast, final
 
+from haiway import freeze
 from typing_extensions import deprecated
 
 from draive.scope.errors import MissingScopeDependency  # pyright: ignore[reportDeprecated]
-from draive.utils import freeze
 
 __all__ = [
     "ScopeDependencies",

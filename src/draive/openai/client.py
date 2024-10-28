@@ -4,6 +4,7 @@ from itertools import chain
 from random import uniform
 from typing import Literal, Self, cast, final, overload
 
+from haiway import freeze, getenv_str, not_missing
 from openai import AsyncAzureOpenAI, AsyncOpenAI, AsyncStream
 from openai import RateLimitError as OpenAIRateLimitError
 from openai._types import NOT_GIVEN, NotGiven
@@ -27,7 +28,6 @@ from draive.openai.config import (
 )
 from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
 from draive.types import RateLimitError
-from draive.utils import freeze, getenv_str, not_missing
 
 __all__ = [
     "OpenAIClient",

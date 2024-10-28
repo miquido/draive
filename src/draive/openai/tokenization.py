@@ -1,10 +1,10 @@
 from typing import Any
 
+from haiway import cache
 from tiktoken import Encoding, encoding_for_model
 
 from draive.openai.config import OpenAIChatConfig
 from draive.scope import ctx
-from draive.utils import cache
 
 __all__ = [
     "openai_tokenize_text",

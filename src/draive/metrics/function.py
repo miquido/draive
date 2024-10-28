@@ -1,8 +1,9 @@
 from collections.abc import Sequence
 from typing import Any, Self
 
+from haiway import MISSING, Missing
+
 from draive.parameters import State
-from draive.utils import MISSING, Missing
 
 __all__ = [
     "ArgumentsTrace",

@@ -5,6 +5,7 @@ from http import HTTPStatus
 from itertools import chain
 from typing import Any, Literal, Self, final, overload
 
+from haiway import getenv_str, not_missing
 from httpx import AsyncClient, Response
 
 from draive.gemini.config import GeminiConfig, GeminiEmbeddingConfig
@@ -16,7 +17,6 @@ from draive.gemini.models import (
 )
 from draive.parameters import DataModel
 from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
-from draive.utils import getenv_str, not_missing
 
 __all__ = [
     "GeminiClient",

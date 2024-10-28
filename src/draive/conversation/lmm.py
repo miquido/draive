@@ -3,6 +3,8 @@ from datetime import UTC, datetime
 from typing import Any, Literal, overload
 from uuid import uuid4
 
+from haiway import Missing, not_missing
+
 from draive.conversation.model import (
     ConversationMessage,
     ConversationMessageChunk,
@@ -20,7 +22,6 @@ from draive.types import (
     Memory,
     MultimodalContent,
 )
-from draive.utils import Missing, not_missing
 
 __all__: list[str] = [
     "lmm_conversation_completion",
