@@ -2,11 +2,12 @@ from asyncio import gather
 from collections.abc import Callable
 from typing import Protocol, Self, cast, final, overload, runtime_checkable
 
+from haiway import freeze
+
 from draive.evaluation.score import EvaluationScore
 from draive.evaluation.threshold import Threshold, threshold_value
 from draive.parameters import DataModel, Field, ParameterPath
 from draive.scope import ctx
-from draive.utils import freeze
 
 __all__ = [
     "evaluator_highest",

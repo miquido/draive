@@ -18,8 +18,9 @@ from concurrent.futures import Executor
 from contextvars import ContextVar, Token
 from logging import Logger, getLogger
 from types import TracebackType
-from typing import Any, final
+from typing import Any, Literal, final
 
+from haiway import MISSING, Missing, asynchronous, getenv_bool, mimic_function
 from typing_extensions import deprecated
 
 from draive.metrics import (
@@ -36,7 +37,7 @@ from draive.scope.dependencies import (
 )
 from draive.scope.errors import MissingScopeContext
 from draive.scope.state import ScopeState
-from draive.utils import MISSING, AsyncStream, Missing, asynchronous, getenv_bool, mimic_function
+from draive.utils import AsyncStream
 
 __all__ = [
     "ctx",
@@ -548,14 +549,14 @@ class ctx:
     def stream_sync[Element](
         source: Generator[Element, None],
         /,
-        executor: Executor | None = None,
+        executor: Executor | Literal["default"] | Missing = "default",
     ) -> AsyncIterable[Element]:
         metrics: MetricsTrace = ctx._current_metrics()  # pyright: ignore[reportDeprecated]
         metrics.enter()
 
         loop: AbstractEventLoop = get_running_loop()
 
-        @asynchronous(loop=loop, executor=executor)
+        @asynchronous(loop=loop, executor=executor)  # pyright: ignore[reportArgumentType]
         def source_next() -> Element:
             try:
                 return next(source)

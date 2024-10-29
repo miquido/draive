@@ -2,6 +2,7 @@ import json
 from http import HTTPStatus
 from typing import Any, Literal, Self, cast, final
 
+from haiway import getenv_str, not_missing
 from httpx import AsyncClient, Response
 
 from draive.ollama.config import OllamaChatConfig
@@ -9,7 +10,6 @@ from draive.ollama.errors import OllamaException
 from draive.ollama.models import ChatCompletionResponse, ChatMessage
 from draive.parameters import DataModel
 from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
-from draive.utils import getenv_str, not_missing
 
 __all__ = [
     "OllamaClient",

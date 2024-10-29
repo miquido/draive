@@ -6,11 +6,11 @@ from anthropic import RateLimitError as AnthropicRateLimitError
 from anthropic._types import NOT_GIVEN, NotGiven
 from anthropic.types import Message, MessageParam, RawMessageStreamEvent, ToolParam
 from anthropic.types.message_create_params import ToolChoice, ToolChoiceToolChoiceTool
+from haiway import getenv_str, not_missing
 
 from draive.anthropic.config import AnthropicConfig
 from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
 from draive.types import RateLimitError
-from draive.utils import getenv_str, not_missing
 
 __all__ = [
     "AnthropicClient",

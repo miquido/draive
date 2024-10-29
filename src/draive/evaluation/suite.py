@@ -4,13 +4,14 @@ from pathlib import Path
 from typing import Protocol, Self, overload, runtime_checkable
 from uuid import UUID, uuid4
 
+from haiway import asynchronous
+
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.evaluation.generator import generate_case_parameters
 from draive.evaluation.scenario import PreparedScenarioEvaluator, ScenarioEvaluatorResult
 from draive.parameters import DataModel, Field
 from draive.scope import ctx
 from draive.types import frozenlist
-from draive.utils import asynchronous
 
 __all__ = [
     "evaluation_suite",
@@ -431,7 +432,7 @@ class _EvaluationSuiteFileStorage[CaseParameters: DataModel]:
             )
             return self._data_type()
 
-    @asynchronous(executor=None)
+    @asynchronous
     def _file_load(
         self,
         data_type: type[EvaluationSuiteData[CaseParameters]],
@@ -449,7 +450,7 @@ class _EvaluationSuiteFileStorage[CaseParameters: DataModel]:
     ) -> None:
         await self._file_save(data=data)
 
-    @asynchronous(executor=None)
+    @asynchronous
     def _file_save(
         self,
         data: EvaluationSuiteData[CaseParameters],

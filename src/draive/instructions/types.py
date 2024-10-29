@@ -1,7 +1,7 @@
 from typing import Protocol, Self, final, runtime_checkable
 from uuid import UUID, uuid4
 
-from draive.utils import freeze
+from haiway import freeze
 
 __all__ = [
     "Instruction",

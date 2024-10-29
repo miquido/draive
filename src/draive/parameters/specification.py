@@ -11,9 +11,10 @@ from dataclasses import fields as dataclass_fields
 from dataclasses import is_dataclass
 from typing import Any, Literal, NotRequired, Required, TypedDict, cast, final
 
-from draive import utils as draive_utils
+from haiway import MISSING, Missing, not_missing
+from haiway.types import missing
+
 from draive.parameters.annotations import resolve_annotation
-from draive.utils import MISSING, Missing, not_missing
 
 __all__ = [
     "parameter_specification",
@@ -206,7 +207,7 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911, PLR0913
                 "type": "boolean",
             }
 
-        case types.NoneType | draive_utils.Missing:
+        case types.NoneType | missing.Missing:
             specification = {
                 "type": "null",
             }

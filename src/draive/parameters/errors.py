@@ -1,6 +1,6 @@
 from typing import Any, Self
 
-from draive.utils import freeze
+from haiway import freeze
 
 __all__ = [
     "ParameterValidationContext",

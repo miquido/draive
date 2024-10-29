@@ -21,6 +21,8 @@ from typing import (
 )
 from weakref import WeakValueDictionary
 
+from haiway import MISSING, Missing, freeze, is_missing, not_missing
+
 from draive.parameters.annotations import (
     ParameterDefaultFactory,
     allows_missing,
@@ -39,7 +41,6 @@ from draive.parameters.validation import (
     ParameterVerifier,
     parameter_validator,
 )
-from draive.utils import MISSING, Missing, freeze, is_missing, not_missing
 
 __all__ = [
     "Field",

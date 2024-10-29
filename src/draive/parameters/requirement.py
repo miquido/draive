@@ -1,10 +1,11 @@
 from collections.abc import Callable, Collection, Iterable
 from typing import Any, Literal, Self, cast, final
 
+from haiway import freeze
+
 from draive.parameters.errors import ParameterValidationError
 from draive.parameters.path import ParameterPath
 from draive.parameters.validation import ParameterValidationContext
-from draive.utils import freeze
 
 __all__ = [
     "ParameterRequirement",

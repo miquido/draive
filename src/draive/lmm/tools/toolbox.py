@@ -2,6 +2,8 @@ from asyncio import FIRST_COMPLETED, Task, gather, wait
 from collections.abc import AsyncIterable, Callable, Coroutine
 from typing import Any, Literal, final
 
+from haiway import async_noop, freeze
+
 from draive.lmm.tools.errors import ToolError, ToolException
 from draive.lmm.tools.specification import ToolSpecification
 from draive.lmm.tools.status import ToolStatus
@@ -13,7 +15,7 @@ from draive.types import (
     LMMToolResponse,
     MultimodalContent,
 )
-from draive.utils import AsyncStream, async_noop, freeze
+from draive.utils import AsyncStream
 
 __all__ = [
     "Toolbox",

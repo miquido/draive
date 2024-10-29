@@ -1,10 +1,10 @@
 from typing import Any, cast
 
+from haiway import cache, not_missing
 from sentencepiece import SentencePieceProcessor  # pyright: ignore[reportMissingTypeStubs]
 
 from draive.scope import ctx
 from draive.sentencepiece.config import SentencePieceConfig
-from draive.utils import cache, not_missing
 
 __all__ = [
     "sentencepiece_tokenize_text",

@@ -1,10 +1,11 @@
 from typing import Protocol, Self, final, runtime_checkable
 from uuid import UUID, uuid4
 
+from haiway import MISSING, Missing, freeze, is_missing, not_missing
+
 from draive.agents.errors import AgentException
 from draive.parameters import ParametrizedData
 from draive.types import MultimodalContent, MultimodalContentConvertible, frozenlist
-from draive.utils import MISSING, Missing, freeze, is_missing, not_missing
 
 __all__ = [
     "Agent",

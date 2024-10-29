@@ -9,7 +9,9 @@ from collections.abc import Callable, Sequence
 from dataclasses import is_dataclass
 from typing import Any, cast
 
-import draive.utils as draive_utils
+import haiway
+from haiway import MISSING, Missing
+
 from draive.parameters.annotations import resolve_annotation
 from draive.parameters.errors import ParameterValidationContext, ParameterValidationError
 
@@ -65,15 +67,15 @@ def _missing_validator(
     context: ParameterValidationContext,
 ) -> Any:
     match value:
-        case missing if isinstance(missing, draive_utils.Missing):
+        case missing if isinstance(missing, Missing):
             return missing
 
         case None:
-            return draive_utils.MISSING
+            return MISSING
 
         case _:
             raise ParameterValidationError.invalid_type(
-                expected=draive_utils.Missing,
+                expected=Missing,
                 received=value,
                 context=context,
             )
@@ -926,7 +928,7 @@ def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912, PLR0913
         case collections_abc.Callable:  # pyright: ignore[reportUnknownMemberType, reportUnnecessaryComparison]
             validator = _callable_validator
 
-        case draive_utils.Missing:
+        case haiway.Missing:
             validator = _missing_validator
 
         case builtins.type:

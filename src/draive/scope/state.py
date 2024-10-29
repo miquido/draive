@@ -1,9 +1,10 @@
 from collections.abc import Iterable
 from typing import Self, cast, final
 
+from haiway import MISSING, Missing, not_missing
+
 from draive.parameters import ParametrizedData
 from draive.scope.errors import MissingScopeState
-from draive.utils import MISSING, Missing, not_missing
 
 __all__ = [
     "ScopeState",

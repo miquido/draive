@@ -2,6 +2,8 @@ from collections.abc import Callable, Coroutine
 from typing import Any, Protocol, cast, final, overload
 from uuid import uuid4
 
+from haiway import freeze, not_missing
+
 from draive.lmm.tools.errors import ToolError, ToolException
 from draive.lmm.tools.specification import ToolSpecification
 from draive.lmm.tools.status import ToolContext, ToolStatus
@@ -9,7 +11,6 @@ from draive.metrics import ArgumentsTrace, ResultTrace
 from draive.parameters import ParameterSpecification, ParametrizedFunction
 from draive.scope import ctx
 from draive.types import MultimodalContent, MultimodalContentConvertible
-from draive.utils import freeze, not_missing
 
 __all__ = [
     "AnyTool",

@@ -4,6 +4,8 @@ from inspect import Parameter, signature
 from inspect import _empty as INSPECT_EMPTY  # pyright: ignore[reportPrivateUsage]
 from typing import Any, Self, cast, final, overload
 
+from haiway import MISSING, Missing, freeze, is_missing, mimic_function, not_missing
+
 from draive.parameters.annotations import ParameterDefaultFactory, allows_missing
 from draive.parameters.specification import ParameterSpecification, parameter_specification
 from draive.parameters.validation import (
@@ -13,7 +15,6 @@ from draive.parameters.validation import (
     ParameterVerifier,
     parameter_validator,
 )
-from draive.utils import MISSING, Missing, freeze, is_missing, mimic_function, not_missing
 
 __all__ = [
     "Argument",

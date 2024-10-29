@@ -4,10 +4,11 @@ from datetime import datetime
 from typing import Any, ClassVar, Self
 from uuid import UUID
 
+from haiway import Missing, cache, not_missing
+
 from draive.parameters.data import ParametrizedData
 from draive.parameters.schema import json_schema, simplified_schema
 from draive.parameters.specification import ParametersSpecification
-from draive.utils import Missing, cache, not_missing
 
 __all__ = [
     "DataModel",

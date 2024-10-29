@@ -1,10 +1,11 @@
 from pathlib import Path
 from uuid import UUID
 
+from haiway import asynchronous
+
 from draive.instructions.errors import MissingInstruction
 from draive.instructions.types import Instruction, InstructionFetching
 from draive.parameters import DataModel
-from draive.utils import asynchronous
 
 __all__ = [
     "instructions_file",
@@ -79,7 +80,7 @@ class _InstructionsFileStorage:
     ) -> _Storage:
         return await self._file_load()
 
-    @asynchronous(executor=None)
+    @asynchronous
     def _file_load(
         self,
     ) -> _Storage:
