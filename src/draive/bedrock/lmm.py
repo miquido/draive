@@ -1,29 +1,26 @@
 from base64 import b64decode, b64encode
-from collections.abc import AsyncGenerator, Sequence
-from typing import Any, Literal, cast, overload
+from collections.abc import Iterable
+from typing import Any, Literal, cast
 
-from draive.bedrock.client import BedrockClient
+from haiway import ArgumentsTrace, ResultTrace, ctx
+
+from draive.bedrock.client import SHARED, BedrockClient
 from draive.bedrock.config import BedrockChatConfig
-from draive.bedrock.errors import BedrockException
 from draive.bedrock.models import ChatCompletionResponse, ChatMessage, ChatMessageContent, ChatTool
+from draive.bedrock.types import BedrockException
 from draive.instructions import Instruction
-from draive.lmm import LMMToolSelection, ToolSpecification
-from draive.metrics import ArgumentsTrace, ResultTrace
+from draive.lmm import LMMInvocation, LMMToolSelection, ToolSpecification
 from draive.metrics.tokens import TokenUsage
-from draive.parameters import DataModel
-from draive.scope import ctx
+from draive.parameters import DataModel, ParametersSpecification
 from draive.types import (
     AudioBase64Content,
     AudioURLContent,
     ImageBase64Content,
     ImageURLContent,
     LMMCompletion,
-    LMMCompletionChunk,
     LMMContextElement,
     LMMInput,
     LMMOutput,
-    LMMOutputStream,
-    LMMOutputStreamChunk,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
@@ -35,121 +32,60 @@ from draive.types import (
 )
 
 __all__ = [
-    "bedrock_lmm_invocation",
+    "bedrock_lmm",
 ]
 
 
-@overload
-async def bedrock_lmm_invocation(
-    *,
-    instruction: Instruction | str,
-    context: Sequence[LMMContextElement],
-    tools: Sequence[ToolSpecification] | None = None,
-    tool_selection: LMMToolSelection = "auto",
-    output: Literal["text", "json"] = "text",
-    stream: Literal[True],
-    **extra: Any,
-) -> LMMOutputStream: ...
-
-
-@overload
-async def bedrock_lmm_invocation(
-    *,
-    instruction: Instruction | str,
-    context: Sequence[LMMContextElement],
-    tools: Sequence[ToolSpecification] | None = None,
-    tool_selection: LMMToolSelection = "auto",
-    output: Literal["text", "json"] = "text",
-    stream: Literal[False] = False,
-    **extra: Any,
-) -> LMMOutput: ...
-
-
-@overload
-async def bedrock_lmm_invocation(
-    *,
-    instruction: Instruction | str,
-    context: Sequence[LMMContextElement],
-    tools: Sequence[ToolSpecification] | None = None,
-    tool_selection: LMMToolSelection = "auto",
-    output: Literal["text", "json"] = "text",
-    stream: bool = False,
-    **extra: Any,
-) -> LMMOutputStream | LMMOutput: ...
-
-
-async def bedrock_lmm_invocation(  # noqa: PLR0913
-    *,
-    instruction: Instruction | str,
-    context: Sequence[LMMContextElement],
-    tools: Sequence[ToolSpecification] | None = None,
-    tool_selection: LMMToolSelection = "auto",
-    output: Literal["text", "json"] = "text",
-    stream: bool = False,
-    **extra: Any,
-) -> LMMOutputStream | LMMOutput:
-    with ctx.nested(  # pyright: ignore[reportDeprecated]
-        "bedrock_lmm_invocation",
-        metrics=[
-            ArgumentsTrace.of(
-                instruction=instruction,
-                context=context,
-                tools=tools,
-                tool_selection=tool_selection,
-                output=output,
-                stream=stream,
-                **extra,
-            ),
-        ],
-    ):
-        ctx.log_debug("Requested Bedrock lmm")
-        client: BedrockClient = ctx.dependency(BedrockClient)  # pyright: ignore[reportDeprecated]
-        config: BedrockChatConfig = ctx.state(BedrockChatConfig).updated(**extra)
-        ctx.record(config)
-
-        instruction_string: str
-        match instruction:
-            case str() as string:
-                instruction_string = string
-
-            case instruction:
-                instruction_string = instruction.format()
-
-        messages: list[ChatMessage] = [_convert_context_element(element) for element in context]
-
-        if messages[-1].get("role") == "assistant":
-            del messages[-1]  # ignore prefill
-
-        tools_list: list[ChatTool] = [_convert_tool(tool) for tool in tools or []]
-        require_tool: bool
-        match tool_selection:
-            case "required":
-                require_tool = True
-
-            case _:
-                require_tool = False
-
-        if stream:
-            return ctx.stream(
-                _chat_completion_stream(
-                    client=client,
-                    config=config,
-                    instruction=instruction_string,
-                    messages=messages,
-                    tools_list=tools_list,
-                    require_tool=require_tool,
+def bedrock_lmm(
+    client: BedrockClient = SHARED,
+    /,
+) -> LMMInvocation:
+    async def bedrock_lmm_invocation(  # noqa: PLR0913
+        *,
+        instruction: Instruction | str | None,
+        context: Iterable[LMMContextElement],
+        prefill: MultimodalContent | None,
+        tool_selection: LMMToolSelection,
+        tools: Iterable[ToolSpecification] | None,
+        output: Literal["auto", "text"] | ParametersSpecification,
+        **extra: Any,
+    ) -> LMMOutput:
+        with ctx.scope("bedrock_lmm_invocation"):
+            ctx.record(
+                ArgumentsTrace.of(
+                    instruction=instruction,
+                    context=context,
+                    prefill=prefill,
+                    tools=tools,
+                    tool_selection=tool_selection,
+                    output=output,
+                    **extra,
                 ),
             )
+            config: BedrockChatConfig = ctx.state(BedrockChatConfig).updated(**extra)
+            ctx.record(config)
 
-        else:
+            messages: list[ChatMessage] = [_convert_context_element(element) for element in context]
+
+            tools_list: list[ChatTool] = [_convert_tool(tool) for tool in tools or []]
+            require_tool: bool
+            match tool_selection:
+                case "required":
+                    require_tool = True
+
+                case _:
+                    require_tool = False
+
             return await _chat_completion(
                 client=client,
                 config=config,
-                instruction=instruction_string,
+                instruction=Instruction.formatted(instruction),
                 messages=messages,
                 tools_list=tools_list,
                 require_tool=require_tool,
             )
+
+    return bedrock_lmm_invocation
 
 
 def _convert_content_element(  # noqa: C901
@@ -261,7 +197,7 @@ async def _chat_completion(  # noqa: PLR0913
     *,
     client: BedrockClient,
     config: BedrockChatConfig,
-    instruction: str,
+    instruction: str | None,
     messages: list[ChatMessage],
     tools_list: list[ChatTool],
     require_tool: bool,
@@ -273,7 +209,6 @@ async def _chat_completion(  # noqa: PLR0913
         tools=tools_list,
         require_tool=require_tool,
     )
-    print(completion)
 
     ctx.record(
         TokenUsage.for_model(
@@ -343,30 +278,3 @@ async def _chat_completion(  # noqa: PLR0913
 
         case _:
             raise BedrockException("Invalid Bedrock response")
-
-
-async def _chat_completion_stream(  # noqa: PLR0913
-    *,
-    client: BedrockClient,
-    config: BedrockChatConfig,
-    instruction: str,
-    messages: list[ChatMessage],
-    tools_list: list[ChatTool],
-    require_tool: bool,
-) -> AsyncGenerator[LMMOutputStreamChunk, None]:
-    ctx.log_debug("Bedrock streaming api is not supported yet, using regular response...")
-    output: LMMOutput = await _chat_completion(
-        client=client,
-        config=config,
-        instruction=instruction,
-        messages=messages,
-        tools_list=tools_list,
-        require_tool=require_tool,
-    )
-
-    match output:
-        case LMMCompletion() as completion:
-            yield LMMCompletionChunk.of(completion.content)
-
-        case other:
-            yield other

@@ -1,9 +1,9 @@
 from collections.abc import Callable, Coroutine
 from typing import Literal
 
-from haiway import async_noop
+from haiway import State, async_noop
 
-from draive.parameters import DataModel, State
+from draive.parameters import DataModel
 from draive.types import MultimodalContent
 
 __all__ = [

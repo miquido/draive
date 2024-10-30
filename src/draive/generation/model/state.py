@@ -1,6 +1,7 @@
-from draive.generation.model.generator import ModelGenerator
-from draive.generation.model.lmm import lmm_generate_model
-from draive.parameters import State
+from haiway import State
+
+from draive.generation.model.default import default_generate_model
+from draive.generation.model.types import ModelGenerator
 
 __all__ = [
     "ModelGeneration",
@@ -8,4 +9,4 @@ __all__ = [
 
 
 class ModelGeneration(State):
-    generate: ModelGenerator = lmm_generate_model
+    generate: ModelGenerator = default_generate_model

@@ -2,11 +2,9 @@ from collections.abc import Sequence
 from typing import Any
 
 from fastembed.text.text_embedding import TextEmbedding  # pyright: ignore[reportMissingTypeStubs]
-from haiway import asynchronous, cache
+from haiway import asynchronous, ctx
 
-from draive.embedding import Embedded
-from draive.fastembed.config import FastembedTextConfig
-from draive.scope import ctx
+from draive.embedding import Embedded, ValueEmbedder
 
 __all__ = [
     "fastembed_text_embedding",
@@ -14,24 +12,32 @@ __all__ = [
 
 
 async def fastembed_text_embedding(
-    values: Sequence[str],
-    **extra: Any,
-) -> list[Embedded[str]]:
-    config: FastembedTextConfig = ctx.state(FastembedTextConfig).updated(**extra)
-    with ctx.nested(  # pyright: ignore[reportDeprecated]
-        "fastembed_text_embedding",
-        metrics=[config],
-    ):
-        return await _fastembed_text_embedding(
-            config,
-            values,
-        )
+    model_name: str = "nomic-ai/nomic-embed-text-v1.5",
+    cache_dir: str | None = "./embedding_models/",
+) -> ValueEmbedder[str]:
+    # TODO: verify if loading model should be asynchronous here
+    embedding_model: TextEmbedding = await _text_embedding_model(
+        model_name=model_name,
+        cache_dir=cache_dir,
+    )
+
+    async def fastembed_embed_text(
+        values: Sequence[str],
+        **extra: Any,
+    ) -> list[Embedded[str]]:
+        with ctx.scope("text_embedding"):
+            return await _fastembed_text_embedding(
+                embedding_model,
+                values,
+            )
+
+    return fastembed_embed_text
 
 
-@cache(limit=1)
+@asynchronous
 def _text_embedding_model(
     model_name: str,
-    cache_dir: str | None,
+    cache_dir: str | None = "./embedding_models/",
 ) -> TextEmbedding:
     return TextEmbedding(
         model_name=model_name,
@@ -41,14 +47,10 @@ def _text_embedding_model(
 
 @asynchronous
 def _fastembed_text_embedding(
-    config: FastembedTextConfig,
+    embedding_model: TextEmbedding,
     texts: Sequence[str],
     /,
 ) -> list[Embedded[str]]:
-    embedding_model: TextEmbedding = _text_embedding_model(
-        model_name=config.model,
-        cache_dir=config.cache_dir,
-    )
     return [
         Embedded(
             value=value,

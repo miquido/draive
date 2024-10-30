@@ -2,9 +2,10 @@ from collections.abc import Iterable
 from itertools import chain
 from typing import Self, final, overload
 
+from haiway import frozenlist
+
 from draive.parameters.model import DataModel
 from draive.types.audio import AudioBase64Content, AudioContent, AudioURLContent
-from draive.types.frozenlist import frozenlist
 from draive.types.image import ImageBase64Content, ImageContent, ImageURLContent
 from draive.types.text import TextContent
 from draive.types.video import VideoBase64Content, VideoContent, VideoURLContent
@@ -298,41 +299,30 @@ def _as_content(
 def _is_media(
     element: MultimodalContentElement,
 ) -> bool:
-    match element:
-        case TextContent():
-            return False
+    return isinstance(
+        element,
+        ImageURLContent
+        | ImageBase64Content
+        | AudioURLContent
+        | AudioBase64Content
+        | VideoURLContent
+        | VideoBase64Content,
+    )
 
-        case _:
-            return True
 
-
-def _is_artifact(  # noqa: PLR0911
+def _is_artifact(
     element: MultimodalContentElement,
 ) -> bool:
-    match element:
-        case TextContent():
-            return False
-
-        case ImageURLContent():
-            return False
-
-        case ImageBase64Content():
-            return False
-
-        case AudioURLContent():
-            return False
-
-        case AudioBase64Content():
-            return False
-
-        case VideoURLContent():
-            return False
-
-        case VideoBase64Content():
-            return False
-
-        case _:
-            return True
+    return not isinstance(
+        element,
+        TextContent
+        | ImageURLContent
+        | ImageBase64Content
+        | AudioURLContent
+        | AudioBase64Content
+        | VideoURLContent
+        | VideoBase64Content,
+    )
 
 
 def _as_string(  # noqa: PLR0911

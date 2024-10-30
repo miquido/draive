@@ -1,5 +1,6 @@
-from draive.lmm.invocation import LMMInvocation
-from draive.parameters import State
+from haiway import State
+
+from draive.lmm.types import LMMInvocation
 
 __all__: list[str] = [
     "LMM",

@@ -1,5 +1,5 @@
-from collections.abc import AsyncGenerator, Sequence
-from typing import Any, Literal, cast, overload
+from collections.abc import Iterable
+from typing import Any, Literal, cast
 
 from anthropic.types import (
     ImageBlockParam,
@@ -10,27 +10,24 @@ from anthropic.types import (
     ToolParam,
     ToolUseBlock,
 )
+from haiway import ArgumentsTrace, ResultTrace, ctx
 
-from draive.anthropic.client import AnthropicClient
+from draive.anthropic.client import SHARED, AnthropicClient
 from draive.anthropic.config import AnthropicConfig
-from draive.anthropic.errors import AnthropicException
+from draive.anthropic.types import AnthropicException
 from draive.instructions import Instruction
-from draive.lmm import LMMToolSelection, ToolSpecification
-from draive.metrics import ArgumentsTrace, ResultTrace, TokenUsage
-from draive.parameters import DataModel
-from draive.scope import ctx
+from draive.lmm import LMMInvocation, LMMToolSelection, ToolSpecification
+from draive.metrics import TokenUsage
+from draive.parameters import DataModel, ParametersSpecification
 from draive.types import (
     AudioBase64Content,
     AudioURLContent,
     ImageBase64Content,
     ImageURLContent,
     LMMCompletion,
-    LMMCompletionChunk,
     LMMContextElement,
     LMMInput,
     LMMOutput,
-    LMMOutputStream,
-    LMMOutputStreamChunk,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
@@ -42,103 +39,52 @@ from draive.types import (
 )
 
 __all__ = [
-    "anthropic_lmm_invocation",
+    "anthropic_lmm",
 ]
 
 
-@overload
-async def anthropic_lmm_invocation(
-    *,
-    instruction: Instruction | str,
-    context: Sequence[LMMContextElement],
-    tools: Sequence[ToolSpecification] | None = None,
-    tool_selection: LMMToolSelection = "auto",
-    output: Literal["text", "json"] = "text",
-    stream: Literal[True],
-    **extra: Any,
-) -> LMMOutputStream: ...
-
-
-@overload
-async def anthropic_lmm_invocation(
-    *,
-    instruction: Instruction | str,
-    context: Sequence[LMMContextElement],
-    tools: Sequence[ToolSpecification] | None = None,
-    tool_selection: LMMToolSelection = "auto",
-    output: Literal["text", "json"] = "text",
-    stream: Literal[False] = False,
-    **extra: Any,
-) -> LMMOutput: ...
-
-
-@overload
-async def anthropic_lmm_invocation(
-    *,
-    instruction: Instruction | str,
-    context: Sequence[LMMContextElement],
-    tools: Sequence[ToolSpecification] | None = None,
-    tool_selection: LMMToolSelection = "auto",
-    output: Literal["text", "json"] = "text",
-    stream: bool = False,
-    **extra: Any,
-) -> LMMOutputStream | LMMOutput: ...
-
-
-async def anthropic_lmm_invocation(  # noqa: PLR0913
-    *,
-    instruction: Instruction | str,
-    context: Sequence[LMMContextElement],
-    tools: Sequence[ToolSpecification] | None = None,
-    tool_selection: LMMToolSelection = "auto",
-    output: Literal["text", "json"] = "text",
-    stream: bool = False,
-    **extra: Any,
-) -> LMMOutputStream | LMMOutput:
-    with ctx.nested(  # pyright: ignore[reportDeprecated]
-        "anthropic_lmm_invocation",
-        metrics=[
-            ArgumentsTrace.of(
-                instruction=instruction,
-                context=context,
-                tools=tools,
-                tool_selection=tool_selection,
-                output=output,
-                stream=stream,
-                **extra,
-            ),
-        ],
-    ):
-        ctx.log_debug("Requested Anthropic lmm")
-        client: AnthropicClient = ctx.dependency(AnthropicClient)  # pyright: ignore[reportDeprecated]
-        config: AnthropicConfig = ctx.state(AnthropicConfig).updated(**extra)
-        ctx.record(config)
-
-        messages: list[MessageParam] = [
-            _convert_context_element(element=element) for element in context
-        ]
-
-        if stream:
-            return ctx.stream(
-                _completion_stream(
-                    client=client,
-                    config=config,
-                    instruction=Instruction.of(instruction).format(),
-                    messages=messages,
-                    tools=tools,
+def anthropic_lmm(
+    client: AnthropicClient = SHARED,
+    /,
+) -> LMMInvocation:
+    async def anthropic_lmm_invocation(  # noqa: PLR0913
+        *,
+        instruction: Instruction | str | None,
+        context: Iterable[LMMContextElement],
+        prefill: MultimodalContent | None,
+        tool_selection: LMMToolSelection,
+        tools: Iterable[ToolSpecification] | None,
+        output: Literal["auto", "text"] | ParametersSpecification,
+        **extra: Any,
+    ) -> LMMOutput:
+        with ctx.scope("anthropic_lmm_invocation"):
+            ctx.record(
+                ArgumentsTrace.of(
+                    instruction=instruction,
+                    context=context,
+                    prefill=prefill,
                     tool_selection=tool_selection,
-                ),
+                    tools=tools,
+                    output=output,
+                    **extra,
+                )
             )
+            config: AnthropicConfig = ctx.state(AnthropicConfig).updated(**extra)
+            ctx.record(config)
 
-        else:
+            if prefill:
+                context = [*context, LMMCompletion.of(prefill)]
+
             return await _completion(
                 client=client,
                 config=config,
-                instruction=Instruction.of(instruction).format(),
-                messages=messages,
+                instruction=Instruction.formatted(instruction),
+                messages=[_convert_context_element(element=element) for element in context],
                 tools=tools,
                 tool_selection=tool_selection,
             )
+
+    return anthropic_lmm_invocation
 
 
 def _convert_content_element(
@@ -238,9 +184,9 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
     *,
     client: AnthropicClient,
     config: AnthropicConfig,
-    instruction: str,
+    instruction: str | None,
     messages: list[MessageParam],
-    tools: Sequence[ToolSpecification] | None,
+    tools: Iterable[ToolSpecification] | None,
     tool_selection: LMMToolSelection,
 ) -> LMMOutput:
     completion: Message
@@ -400,30 +346,3 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
 
         case other:
             raise AnthropicException(f"Unexpected finish reason: {other}")
-
-
-async def _completion_stream(  # noqa: PLR0913
-    *,
-    client: AnthropicClient,
-    config: AnthropicConfig,
-    instruction: str,
-    messages: list[MessageParam],
-    tools: Sequence[ToolSpecification] | None,
-    tool_selection: LMMToolSelection,
-) -> AsyncGenerator[LMMOutputStreamChunk, None]:
-    ctx.log_debug("Anthropic streaming api is not supported yet, using regular response...")
-    output: LMMOutput = await _completion(
-        client=client,
-        config=config,
-        instruction=instruction,
-        messages=messages,
-        tools=tools,
-        tool_selection=tool_selection,
-    )
-
-    match output:
-        case LMMCompletion() as completion:
-            yield LMMCompletionChunk.of(completion.content)
-
-        case other:
-            yield other

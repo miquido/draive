@@ -1,5 +1,4 @@
 from draive.lmm.call import lmm_invocation
-from draive.lmm.invocation import LMMInvocation, LMMToolSelection
 from draive.lmm.state import LMM
 from draive.lmm.tools import (
     AnyTool,
@@ -12,6 +11,7 @@ from draive.lmm.tools import (
     ToolStatus,
     tool,
 )
+from draive.lmm.types import LMMInvocation, LMMToolSelection
 
 __all__ = [
     "AnyTool",

@@ -1,9 +1,10 @@
 from typing import Any
 
+from haiway import ctx
+
 from draive.generation.image.state import ImageGeneration
 from draive.instructions import Instruction
-from draive.scope import ctx
-from draive.types import ImageContent, MultimodalContent, MultimodalContentConvertible
+from draive.types import ImageContent, Multimodal
 
 __all__ = [
     "generate_image",
@@ -13,7 +14,7 @@ __all__ = [
 async def generate_image(
     *,
     instruction: Instruction | str,
-    input: MultimodalContent | MultimodalContentConvertible | None = None,  # noqa: A002
+    input: Multimodal | None = None,  # noqa: A002
     **extra: Any,
 ) -> ImageContent:
     return await ctx.state(ImageGeneration).generate(

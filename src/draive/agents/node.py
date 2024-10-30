@@ -1,11 +1,11 @@
 from typing import Protocol, Self, final, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import MISSING, Missing, freeze, is_missing, not_missing
+from haiway import MISSING, Missing, freeze, frozenlist, is_missing, not_missing
 
 from draive.agents.errors import AgentException
 from draive.parameters import ParametrizedData
-from draive.types import MultimodalContent, MultimodalContentConvertible, frozenlist
+from draive.types import Multimodal, MultimodalContent
 
 __all__ = [
     "Agent",
@@ -66,9 +66,9 @@ class AgentNode:
 
     def address(
         self,
-        content: MultimodalContent | MultimodalContentConvertible,
+        content: Multimodal,
         /,
-        *_content: MultimodalContent | MultimodalContentConvertible,
+        *_content: Multimodal,
         addressee: "AgentNode | None" = None,
     ) -> "AgentMessage":
         return AgentMessage(
@@ -130,9 +130,9 @@ class AgentMessage(ParametrizedData):
 
     def respond(
         self,
-        content: MultimodalContent | MultimodalContentConvertible,
+        content: Multimodal,
         /,
-        *_content: MultimodalContent | MultimodalContentConvertible,
+        *_content: Multimodal,
         addressee: AgentNode | None = None,
     ) -> Self:
         assert not_missing(self.sender), "Missing message sender, can't respond to message drafts!"  # nosec: B101

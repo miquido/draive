@@ -3,7 +3,7 @@ from inspect import isfunction
 from typing import Protocol, cast, final, overload, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import MISSING, AsyncQueue, Missing, freeze, not_missing
+from haiway import MISSING, AsyncQueue, Missing, State, ctx, freeze, frozenlist, not_missing
 
 from draive.agents.definition import AgentMessage, AgentNode
 from draive.agents.errors import AgentException
@@ -11,14 +11,12 @@ from draive.agents.idle import IdleMonitor
 from draive.agents.node import Agent, AgentOutput
 from draive.agents.runner import AgentRunner
 from draive.helpers import VolatileMemory
-from draive.parameters import DataModel, ParametrizedData, State
-from draive.scope import ctx
+from draive.parameters import DataModel, ParametrizedData
 from draive.types import (
     BasicMemory,
     Memory,
+    Multimodal,
     MultimodalContent,
-    MultimodalContentConvertible,
-    frozenlist,
 )
 
 __all__ = [
@@ -91,7 +89,7 @@ class AgentWorkflow[AgentWorkflowState, AgentWorkflowResult: ParametrizedData | 
 
     async def run(
         self,
-        input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+        input: Multimodal,  # noqa: A002
         state: AgentWorkflowState | None = None,
         timeout: float = 120,  # default timeout is 2 minutes
     ) -> AgentWorkflowResult:
@@ -104,9 +102,9 @@ class AgentWorkflow[AgentWorkflowState, AgentWorkflowResult: ParametrizedData | 
 
     def address(
         self,
-        content: MultimodalContent | MultimodalContentConvertible,
+        content: Multimodal,
         /,
-        *_content: MultimodalContent | MultimodalContentConvertible,
+        *_content: Multimodal,
         addressee: AgentNode | None = None,
     ) -> AgentMessage:
         return AgentMessage(
@@ -243,7 +241,7 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
         cls,
         workflow: AgentWorkflow[WorkflowState, WorkflowResult],
         /,
-        input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+        input: Multimodal,  # noqa: A002
         memory: Memory[WorkflowState, WorkflowState],
         timeout: float,
     ) -> WorkflowResult:
@@ -336,7 +334,7 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
 
     async def execute(  # noqa: PLR0912
         self,
-        input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
+        input: Multimodal,  # noqa: A002
         timeout: float,
     ) -> WorkflowResult:
         assert not self._agent_runners, "WorkflowRunner can run only once!"  # nosec: B101
@@ -344,7 +342,7 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
         if self._workflow_queue.finished or not_missing(self._result):
             raise RuntimeError("WorkflowRunner can run only once!")
 
-        async with ctx.nested(self._workflow.node.__str__()):  # pyright: ignore[reportDeprecated]
+        async with ctx.scope(self._workflow.node.__str__()):
 
             def on_timeout() -> None:
                 self.finish(result=TimeoutError())
@@ -356,7 +354,7 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
 
             self.send(self._workflow.address(input))
 
-            idle_monitor_task: Task[None] = ctx.spawn_subtask(self._idle_monitor)
+            idle_monitor_task: Task[None] = ctx.spawn(self._idle_monitor)
 
             try:
                 async for element in self._workflow_queue:

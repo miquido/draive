@@ -2,15 +2,13 @@ from collections.abc import Callable, Coroutine
 from typing import Any, Protocol, cast, final, overload
 from uuid import uuid4
 
-from haiway import freeze, not_missing
+from haiway import ArgumentsTrace, ResultTrace, ctx, freeze, not_missing
 
-from draive.lmm.tools.errors import ToolError, ToolException
 from draive.lmm.tools.specification import ToolSpecification
 from draive.lmm.tools.status import ToolContext, ToolStatus
-from draive.metrics import ArgumentsTrace, ResultTrace
+from draive.lmm.tools.types import ToolError, ToolException
 from draive.parameters import ParameterSpecification, ParametrizedFunction
-from draive.scope import ctx
-from draive.types import MultimodalContent, MultimodalContentConvertible
+from draive.types import Multimodal, MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
     "AnyTool",
@@ -34,8 +32,8 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         function: Callable[Args, Coroutine[Any, Any, Result]],
         description: str | None = None,
         availability_check: ToolAvailabilityCheck | None = None,
-        format_result: Callable[[Result], MultimodalContent | MultimodalContentConvertible],
-        format_failure: Callable[[Exception], MultimodalContent | MultimodalContentConvertible],
+        format_result: Callable[[Result], Multimodal],
+        format_failure: Callable[[Exception], Multimodal],
         direct_result: bool = False,
     ) -> None:
         super().__init__(function=function)
@@ -72,12 +70,8 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         self._check_availability: ToolAvailabilityCheck = availability_check or (
             lambda: True  # available by default
         )
-        self.format_result: Callable[[Result], MultimodalContent | MultimodalContentConvertible] = (
-            format_result
-        )
-        self.format_failure: Callable[
-            [Exception], MultimodalContent | MultimodalContentConvertible
-        ] = format_failure
+        self.format_result: Callable[[Result], Multimodal] = format_result
+        self.format_failure: Callable[[Exception], Multimodal] = format_failure
 
         freeze(self)
 
@@ -106,11 +100,11 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
             tool=self.name,
             report_status=report_status,
         )
-        with ctx.nested(  # pyright: ignore[reportDeprecated]
+        with ctx.scope(
             self.name,
-            state=[context],
-            metrics=[ArgumentsTrace.of(**arguments)],
+            context,
         ):
+            ctx.record(ArgumentsTrace.of(**arguments))
             await context.report_status(
                 ToolStatus(
                     identifier=context.call_id,
@@ -156,19 +150,17 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Result:
-        with ctx.nested(  # pyright: ignore[reportDeprecated]
+        with ctx.scope(
             self.name,
-            state=[
-                ctx.state(  # when called as a function preserve current context
-                    ToolContext,
-                    default=ToolContext(
-                        call_id=uuid4().hex,
-                        tool=self.name,
-                    ),
-                )
-            ],
-            metrics=[ArgumentsTrace.of(*args, **kwargs)],
+            ctx.state(  # when called as a function preserve current context
+                ToolContext,
+                default=ToolContext(
+                    call_id=uuid4().hex,
+                    tool=self.name,
+                ),
+            ),
         ):
+            ctx.record(ArgumentsTrace.of(*args, **kwargs))
             result: Result = await super().__call__(
                 *args,
                 **kwargs,
@@ -225,9 +217,8 @@ def tool[Result](
     name: str | None = None,
     description: str | None = None,
     availability_check: ToolAvailabilityCheck | None = None,
-    format_result: Callable[[Result], MultimodalContent | MultimodalContentConvertible],
-    format_failure: Callable[[Exception], MultimodalContent | MultimodalContentConvertible]
-    | None = None,
+    format_result: Callable[[Result], Multimodal],
+    format_failure: Callable[[Exception], Multimodal] | None = None,
     direct_result: bool = False,
 ) -> PartialToolWrapper[Result]:
     """
@@ -276,8 +267,7 @@ def tool(
     name: str | None = None,
     description: str | None = None,
     availability_check: ToolAvailabilityCheck | None = None,
-    format_failure: Callable[[Exception], MultimodalContent | MultimodalContentConvertible]
-    | None = None,
+    format_failure: Callable[[Exception], Multimodal] | None = None,
     direct_result: bool = False,
 ) -> ToolWrapper:
     """
@@ -326,10 +316,8 @@ def tool[**Args, Result](  # noqa: PLR0913
     name: str | None = None,
     description: str | None = None,
     availability_check: ToolAvailabilityCheck | None = None,
-    format_result: Callable[[Result], MultimodalContent | MultimodalContentConvertible]
-    | None = None,
-    format_failure: Callable[[Exception], MultimodalContent | MultimodalContentConvertible]
-    | None = None,
+    format_result: Callable[[Result], Multimodal] | None = None,
+    format_failure: Callable[[Exception], Multimodal] | None = None,
     direct_result: bool = False,
 ) -> PartialToolWrapper[Result] | ToolWrapper | Tool[Args, Result]:
     def wrap(

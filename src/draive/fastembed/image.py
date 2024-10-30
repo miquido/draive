@@ -5,11 +5,9 @@ from typing import Any
 from fastembed.image.image_embedding import (  # pyright: ignore[reportMissingTypeStubs]
     ImageEmbedding,
 )
-from haiway import asynchronous, cache
+from haiway import asynchronous, ctx
 
-from draive.embedding import Embedded
-from draive.fastembed.config import FastembedImageConfig
-from draive.scope import ctx
+from draive.embedding import Embedded, ValueEmbedder
 
 __all__ = [
     "fastembed_image_embedding",
@@ -17,21 +15,30 @@ __all__ = [
 
 
 async def fastembed_image_embedding(
-    values: Sequence[bytes],
-    **extra: Any,
-) -> list[Embedded[bytes]]:
-    config: FastembedImageConfig = ctx.state(FastembedImageConfig).updated(**extra)
-    with ctx.nested(  # pyright: ignore[reportDeprecated]
-        "fastembed_image_embedding",
-        metrics=[config],
-    ):
-        return await _fastembed_image_embedding(
-            config,
-            values,
-        )
+    model_name: str,
+    cache_dir: str | None = "./embedding_models/",
+    /,
+) -> ValueEmbedder[bytes]:
+    # TODO: verify if loading model should be asynchronous here
+    embedding_model: ImageEmbedding = await _image_embedding_model(
+        model_name=model_name,
+        cache_dir=cache_dir,
+    )
+
+    async def fastembed_embed_image(
+        values: Sequence[bytes],
+        **extra: Any,
+    ) -> list[Embedded[bytes]]:
+        with ctx.scope("image_embedding"):
+            return await _fastembed_image_embedding(
+                embedding_model,
+                values,
+            )
+
+    return fastembed_embed_image
 
 
-@cache(limit=1)
+@asynchronous
 def _image_embedding_model(
     model_name: str,
     cache_dir: str | None,
@@ -44,14 +51,10 @@ def _image_embedding_model(
 
 @asynchronous
 def _fastembed_image_embedding(
-    config: FastembedImageConfig,
+    embedding_model: ImageEmbedding,
     images: Sequence[bytes],
     /,
 ) -> list[Embedded[bytes]]:
-    embedding_model: ImageEmbedding = _image_embedding_model(
-        model_name=config.model,
-        cache_dir=config.cache_dir,
-    )
     return [
         Embedded(
             value=value,  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]

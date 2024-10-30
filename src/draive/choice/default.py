@@ -2,11 +2,11 @@ from collections.abc import Iterable, Sequence
 from itertools import chain
 from typing import Any
 
-from draive.choice.errors import SelectionException
-from draive.choice.model import ChoiceOption
+from haiway import ctx
+
+from draive.choice.types import ChoiceOption, SelectionException
 from draive.instructions import Instruction
 from draive.lmm import Toolbox, lmm_invocation
-from draive.scope import ctx
 from draive.types import (
     LMMCompletion,
     LMMContextElement,
@@ -14,16 +14,16 @@ from draive.types import (
     LMMToolRequests,
     Multimodal,
     MultimodalContent,
-    xml_tag,
 )
 from draive.types.lmm import LMMToolResponse
+from draive.utils import xml_tag
 
 __all__ = [
-    "lmm_choice_completion",
+    "default_choice_completion",
 ]
 
 
-async def lmm_choice_completion(  # noqa: C901, PLR0913
+async def default_choice_completion(  # noqa: C901, PLR0913
     *,
     instruction: Instruction | str,
     options: Sequence[ChoiceOption],
@@ -33,9 +33,7 @@ async def lmm_choice_completion(  # noqa: C901, PLR0913
     examples: Iterable[tuple[Multimodal, ChoiceOption]] | None,
     **extra: Any,
 ) -> ChoiceOption:
-    with ctx.nested(  # pyright: ignore[reportDeprecated]
-        "lmm_choice_completion",
-    ):
+    with ctx.scope("choice_completion"):
         assert options, "Choice options cannot be empty"  # nosec: B101
         assert all(  # nosec: B101
             example[1] in options for example in examples or []
@@ -82,11 +80,11 @@ async def lmm_choice_completion(  # noqa: C901, PLR0913
         while recursion_level <= toolbox.recursion_limit:
             match await lmm_invocation(
                 instruction=extended_instruction,
-                context=[*context, LMMCompletion.of(prefill)] if prefill else context,
-                tools=toolbox.available_tools(),
+                context=context,
+                prefill=MultimodalContent.of(prefill) if prefill else None,
                 tool_selection=toolbox.tool_selection(recursion_level=recursion_level),
+                tools=toolbox.available_tools(),
                 output="text",
-                stream=False,
                 **extra,
             ):
                 case LMMCompletion() as completion:
@@ -141,8 +139,7 @@ def _format_input(
         MultimodalContent.of(
             "<INPUT>",
             input,
-            "</INPUT>",
-            "<OPTIONS>",
+            "</INPUT>/n/n<OPTIONS>",
             options,
             "</OPTIONS>",
         )
@@ -162,7 +159,10 @@ def _format_example(
 
 INSTRUCTION_EXTENSION: str = """\
 <FORMAT>
-Place identifier of the final choice inside a <CHOICE> XML tag within the result, \
-like this: `<CHOICE>identifier</CHOICE>`.
+Ensure the result is following the strict format:
+Place only the identifier of the chosen option inside a <CHOICE> tag, as shown here:
+
+<CHOICE>option_identifier</CHOICE>
+
 </FORMAT>
 """

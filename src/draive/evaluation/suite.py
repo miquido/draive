@@ -4,14 +4,12 @@ from pathlib import Path
 from typing import Protocol, Self, overload, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import asynchronous
+from haiway import asynchronous, ctx, frozenlist
 
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.evaluation.generator import generate_case_parameters
 from draive.evaluation.scenario import PreparedScenarioEvaluator, ScenarioEvaluatorResult
 from draive.parameters import DataModel, Field
-from draive.scope import ctx
-from draive.types import frozenlist
 
 __all__ = [
     "evaluation_suite",

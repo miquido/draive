@@ -1,50 +1,41 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from typing import Any, Literal
 
-from draive.generation.model.generator import ModelGeneratorDecoder
+from haiway import ctx
+
+from draive.generation.model.types import ModelGeneratorDecoder
 from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox, lmm_invocation
 from draive.parameters import DataModel
-from draive.scope import ctx
 from draive.types import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
     LMMToolRequests,
     LMMToolResponse,
+    Multimodal,
     MultimodalContent,
-    MultimodalContentConvertible,
 )
 
 __all__: list[str] = [
-    "lmm_generate_model",
+    "default_generate_model",
 ]
 
 
-async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0912
+async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0912
     generated: type[Generated],
     /,
     *,
     instruction: Instruction | str,
-    input: MultimodalContent | MultimodalContentConvertible,  # noqa: A002
-    schema_injection: Literal["auto", "full", "simplified", "skip"] = "auto",
-    tools: Toolbox | Sequence[AnyTool] | None = None,
-    examples: Iterable[tuple[MultimodalContent | MultimodalContentConvertible, Generated]]
-    | None = None,
-    decoder: ModelGeneratorDecoder | None = None,
+    input: Multimodal,  # noqa: A002
+    schema_injection: Literal["auto", "full", "simplified", "skip"],
+    tools: Toolbox | Iterable[AnyTool] | None,
+    examples: Iterable[tuple[Multimodal, Generated]] | None,
+    decoder: ModelGeneratorDecoder | None,
     **extra: Any,
 ) -> Generated:
-    with ctx.nested("lmm_generate_model"):  # pyright: ignore[reportDeprecated]
-        toolbox: Toolbox
-        match tools:
-            case None:
-                toolbox = Toolbox()
-
-            case Toolbox() as tools:
-                toolbox = tools
-
-            case [*tools]:
-                toolbox = Toolbox(*tools)
+    with ctx.scope("generate_model"):
+        toolbox: Toolbox = Toolbox.of(tools)
 
         generation_instruction: Instruction
         match instruction:
@@ -95,15 +86,14 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
         while recursion_level <= toolbox.recursion_limit:
             match await lmm_invocation(
                 instruction=extended_instruction,
-                context=[*context, LMMCompletion.of("{")],  # prefill with json opening
-                tools=toolbox.available_tools(),
+                context=context,
+                prefill=MultimodalContent.of("{"),  # prefill with json opening
                 tool_selection=toolbox.tool_selection(recursion_level=recursion_level),
-                output="json",
-                stream=False,
+                tools=toolbox.available_tools(),
+                output=generated.__PARAMETERS_SPECIFICATION__,  # provide model specification
                 **extra,
             ):
                 case LMMCompletion() as completion:
-                    ctx.log_debug("Received model generation result")
                     if decoder := decoder:
                         return generated.from_dict(decoder(completion.content))
 
@@ -111,7 +101,6 @@ async def lmm_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0
                         return generated.from_json(completion.content.as_string())
 
                 case LMMToolRequests() as tool_requests:
-                    ctx.log_debug("Received model generation tool calls")
                     context.append(tool_requests)
                     responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
 

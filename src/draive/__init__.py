@@ -2,13 +2,19 @@
 from haiway import (
     MISSING,
     AsyncQueue,
+    Disposable,
+    Disposables,
     Missing,
+    ScopeMetrics,
+    State,
     always,
     async_always,
     async_noop,
     asynchronous,
     cache,
+    ctx,
     freeze,
+    frozenlist,
     getenv_bool,
     getenv_float,
     getenv_int,
@@ -21,6 +27,7 @@ from haiway import (
     setup_logging,
     throttle,
     timeout,
+    traced,
 )
 
 from draive.agents import (
@@ -44,16 +51,13 @@ from draive.choice import (
     ChoiceOption,
     SelectionException,
     choice_completion,
-    lmm_choice_completion,
+    default_choice_completion,
 )
 from draive.conversation import (
     Conversation,
-    ConversationCompletion,
     ConversationMessage,
-    ConversationMessageChunk,
-    ConversationResponseStream,
     conversation_completion,
-    lmm_conversation_completion,
+    default_conversation_completion,
 )
 from draive.embedding import (
     Embedded,
@@ -82,7 +86,6 @@ from draive.helpers import (
     VolatileAccumulativeMemory,
     VolatileMemory,
     VolatileVectorIndex,
-    traced,
 )
 from draive.instructions import (
     Instruction,
@@ -104,13 +107,8 @@ from draive.lmm import (
     tool,
 )
 from draive.metrics import (
-    Metric,
-    MetricsTrace,  # pyright: ignore[reportDeprecated]
-    MetricsTraceReport,
-    MetricsTraceReporter,
-    ScopeMetrics,
     TokenUsage,
-    metrics_log_reporter,
+    usage_metrics_logger,
 )
 from draive.parameters import (
     Argument,
@@ -124,18 +122,10 @@ from draive.parameters import (
     ParameterValidationError,
     ParameterValidator,
     ParameterVerifier,
-    State,
-    Stateless,
 )
 from draive.safeguards import (
     ContentGuardrails,
     GuardrailsException,
-)
-from draive.scope import (
-    ScopeDependencies,  # pyright: ignore[reportDeprecated]
-    ScopeDependency,  # pyright: ignore[reportDeprecated]
-    ScopeState,
-    ctx,
 )
 from draive.similarity import (
     mmr_vector_similarity_search,
@@ -146,13 +136,12 @@ from draive.splitters import split_text
 from draive.steps import (
     Step,
     Steps,
-    StepsCompletion,
-    lmm_steps_completion,
+    StepsCompleting,
+    default_steps_completion,
     steps_completion,
 )
-from draive.tokenization import TextTokenizer, Tokenization, count_text_tokens, tokenize_text
+from draive.tokenization import TextTokenizing, Tokenization, count_text_tokens, tokenize_text
 from draive.types import (
-    JSON,
     AudioBase64Content,
     AudioContent,
     AudioURLContent,
@@ -180,15 +169,13 @@ from draive.types import (
     VideoBase64Content,
     VideoContent,
     VideoURLContent,
-    frozenlist,
-    xml_tag,
-    xml_tags,
 )
 from draive.utils import (
-    AsyncStream,
     markdown_block,
     markdown_blocks,
     split_sequence,
+    xml_tag,
+    xml_tags,
 )
 
 __all__ = [
@@ -210,7 +197,6 @@ __all__ = [
     "async_noop",
     "asynchronous",
     "AsyncQueue",
-    "AsyncStream",
     "AudioBase64Content",
     "AudioContent",
     "AudioURLContent",
@@ -225,13 +211,13 @@ __all__ = [
     "ContentGuardrails",
     "conversation_completion",
     "Conversation",
-    "ConversationCompletion",
     "ConversationMessage",
-    "ConversationMessageChunk",
-    "ConversationResponseStream",
     "count_text_tokens",
     "ctx",
     "DataModel",
+    "default_steps_completion",
+    "Disposable",
+    "Disposables",
     "embed_image",
     "embed_images",
     "embed_text",
@@ -261,11 +247,9 @@ __all__ = [
     "instructions_file",
     "InstructionsRepository",
     "is_missing",
-    "JSON",
-    "lmm_choice_completion",
-    "lmm_conversation_completion",
+    "default_choice_completion",
+    "default_conversation_completion",
     "lmm_invocation",
-    "lmm_steps_completion",
     "LMM",
     "LMMCompletion",
     "LMMCompletionChunk",
@@ -279,11 +263,6 @@ __all__ = [
     "markdown_block",
     "markdown_blocks",
     "Memory",
-    "Metric",
-    "metrics_log_reporter",
-    "MetricsTrace",
-    "MetricsTraceReport",
-    "MetricsTraceReporter",
     "Missing",
     "MISSING",
     "MissingInstruction",
@@ -308,25 +287,21 @@ __all__ = [
     "ParameterVerifier",
     "RateLimitError",
     "retry",
-    "ScopeDependencies",
-    "ScopeDependency",
     "ScopeMetrics",
-    "ScopeState",
     "SelectionException",
     "setup_logging",
     "split_sequence",
     "split_text",
     "State",
-    "Stateless",
     "Step",
     "steps_completion",
     "Steps",
-    "StepsCompletion",
+    "StepsCompleting",
     "TextContent",
     "TextEmbedding",
     "TextGeneration",
     "TextGenerator",
-    "TextTokenizer",
+    "TextTokenizing",
     "throttle",
     "timeout",
     "Tokenization",
@@ -341,6 +316,7 @@ __all__ = [
     "ToolException",
     "ToolStatus",
     "traced",
+    "usage_metrics_logger",
     "ValueEmbedder",
     "vector_similarity_score",
     "vector_similarity_search",

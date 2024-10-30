@@ -1,5 +1,5 @@
 from draive.safeguards.content import ContentGuardrails
-from draive.safeguards.errors import GuardrailsException
+from draive.safeguards.types import GuardrailsException
 
 __all__ = [
     "ContentGuardrails",

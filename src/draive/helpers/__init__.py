@@ -1,4 +1,3 @@
-from draive.helpers.trace import traced
 from draive.helpers.volatile_index import VolatileVectorIndex
 from draive.helpers.volatile_memory import (
     ConstantMemory,
@@ -8,7 +7,6 @@ from draive.helpers.volatile_memory import (
 
 __all__ = [
     "ConstantMemory",
-    "traced",
     "VolatileAccumulativeMemory",
     "VolatileMemory",
     "VolatileVectorIndex",

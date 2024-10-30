@@ -1,10 +1,10 @@
 from draive.tokenization.call import count_text_tokens, tokenize_text
 from draive.tokenization.state import Tokenization
-from draive.tokenization.text import TextTokenizer
+from draive.tokenization.types import TextTokenizing
 
 __all__ = [
     "count_text_tokens",
-    "TextTokenizer",
+    "TextTokenizing",
     "Tokenization",
     "tokenize_text",
 ]

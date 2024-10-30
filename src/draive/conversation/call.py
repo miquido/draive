@@ -1,69 +1,30 @@
-from collections.abc import Sequence
+from collections.abc import Iterable
 from datetime import UTC, datetime
-from typing import Literal, overload
+from typing import Any, Final
 
-from draive.conversation.model import ConversationMessage, ConversationResponseStream
+from haiway import ctx
+
 from draive.conversation.state import Conversation
+from draive.conversation.types import ConversationMessage
 from draive.helpers import ConstantMemory
 from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
-from draive.scope import ctx
-from draive.types import Memory, MultimodalContent, MultimodalContentConvertible
+from draive.types import Memory, Multimodal, MultimodalContent
 
 __all__ = [
     "conversation_completion",
 ]
 
 
-@overload
 async def conversation_completion(
     *,
-    instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
-    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
-    | Sequence[ConversationMessage]
+    instruction: Instruction | str | None = None,
+    input: ConversationMessage | Multimodal,  # noqa: A002
+    memory: Memory[Iterable[ConversationMessage], ConversationMessage]
+    | Iterable[ConversationMessage]
     | None = None,
-    tools: Toolbox | Sequence[AnyTool] | None = None,
-    stream: Literal[True],
-) -> ConversationResponseStream: ...
-
-
-@overload
-async def conversation_completion(
-    *,
-    instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
-    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
-    | Sequence[ConversationMessage]
-    | None = None,
-    tools: Toolbox | Sequence[AnyTool] | None = None,
-    stream: Literal[False] = False,
-) -> ConversationMessage: ...
-
-
-@overload
-async def conversation_completion(
-    *,
-    instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,
-    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
-    | Sequence[ConversationMessage]
-    | None = None,
-    tools: Toolbox | Sequence[AnyTool] | None = None,
-    stream: bool,
-) -> ConversationResponseStream | ConversationMessage: ...
-
-
-async def conversation_completion(
-    *,
-    instruction: Instruction | str,
-    input: ConversationMessage | MultimodalContent | MultimodalContentConvertible,  # noqa: A002
-    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
-    | Sequence[ConversationMessage]
-    | None = None,
-    tools: Toolbox | Sequence[AnyTool] | None = None,
-    stream: bool = False,
-) -> ConversationResponseStream | ConversationMessage:
+    tools: Toolbox | Iterable[AnyTool] | None = None,
+) -> ConversationMessage:
     conversation: Conversation = ctx.state(Conversation)
 
     # prepare message
@@ -94,34 +55,24 @@ async def conversation_completion(
                 )
 
     # prepare memory
-    conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+    conversation_memory: Memory[Iterable[ConversationMessage], ConversationMessage]
     match memory or conversation.memory:
         case None:
-            conversation_memory = ConstantMemory([])
+            conversation_memory = _EMPTY_MEMORY
 
         case Memory() as memory:
             conversation_memory = memory
 
-        case [*memory_messages]:
+        case memory_messages:
             conversation_memory = ConstantMemory(memory_messages)
-
-    # prepare tools
-    toolbox: Toolbox
-    match tools:
-        case None:
-            toolbox = Toolbox()
-
-        case Toolbox() as tools:
-            toolbox = tools
-
-        case [*tools]:
-            toolbox = Toolbox(*tools)
 
     # request completion
     return await conversation.completion(
         instruction=instruction,
         message=message,
         memory=conversation_memory,
-        toolbox=toolbox,
-        stream=stream,
+        toolbox=Toolbox.of(tools),
     )
+
+
+_EMPTY_MEMORY: Final[ConstantMemory[Any, Any]] = ConstantMemory(tuple[Any]())

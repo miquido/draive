@@ -1,18 +1,18 @@
-from typing import Any, Self, final
+from typing import Any, Final, Self, final
 
 from haiway import asynchronous, getenv_str, not_missing
 
 from draive.bedrock.config import BedrockChatConfig
 from draive.bedrock.models import ChatCompletionResponse, ChatMessage, ChatTool
-from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
 
 __all__ = [
     "BedrockClient",
+    "SHARED",
 ]
 
 
 @final
-class BedrockClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
+class BedrockClient:
     @classmethod
     def prepare(cls) -> Self:
         return cls(
@@ -32,10 +32,6 @@ class BedrockClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
         self._access_key: str | None = access_key
         self._client: Any
 
-    async def _initialize(self) -> None:
-        if not hasattr(self, "_client"):
-            await self._prepare_client()
-
     # preparing it lazily on demand, boto does a lot of stuff on initialization
     @asynchronous
     def _prepare_client(self) -> None:
@@ -51,12 +47,12 @@ class BedrockClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
         self,
         *,
         config: BedrockChatConfig,
-        instruction: str,
+        instruction: str | None,
         messages: list[ChatMessage],
         tools: list[ChatTool],
         require_tool: str | bool,
     ) -> ChatCompletionResponse:
-        await self._initialize()
+        await self.initialize()
         return await self._create_chat_completion(
             model=config.model,
             temperature=config.temperature,
@@ -76,7 +72,7 @@ class BedrockClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
         temperature: float,
         top_p: float | None,
         max_tokens: int | None,
-        instruction: str,
+        instruction: str | None,
         messages: list[ChatMessage],
         tools: list[ChatTool],
         require_tool: str | bool,
@@ -123,5 +119,12 @@ class BedrockClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
 
         return self._client.converse(**parameters)
 
+    async def initialize(self) -> None:
+        if not hasattr(self, "_client"):
+            await self._prepare_client()
+
     async def dispose(self) -> None:
         pass
+
+
+SHARED: Final[BedrockClient] = BedrockClient.prepare()

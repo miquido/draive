@@ -1,8 +1,10 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, MutableMapping, Sequence
 from typing import Any, cast
 
+from haiway import State
+
 from draive.embedding import Embedded, embed_text, embed_texts
-from draive.parameters import DataModel, Field, ParameterPath, ParameterRequirement, State
+from draive.parameters import DataModel, ParameterPath, ParameterRequirement
 from draive.similarity import mmr_vector_similarity_search, vector_similarity_search
 
 __all__ = [
@@ -11,7 +13,7 @@ __all__ = [
 
 
 class VolatileVectorIndex(State):
-    storage: dict[type[Any], list[Embedded[Any]]] = Field(default_factory=dict)
+    storage: MutableMapping[type[Any], list[Embedded[Any]]]
 
     async def index[Model: DataModel, Value: str](
         self,

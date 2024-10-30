@@ -1,11 +1,11 @@
-from collections.abc import Iterable
 from typing import Any
+
+from haiway import ctx
 
 from draive.instructions import Instruction
 from draive.lmm import lmm_invocation
 from draive.lmm.tools.toolbox import Toolbox
-from draive.scope import ctx
-from draive.steps.model import Step
+from draive.steps.types import Step
 from draive.types import (
     LMMContextElement,
     LMMInput,
@@ -15,19 +15,16 @@ from draive.types import (
 from draive.types.lmm import LMMCompletion, LMMToolRequests, LMMToolResponse
 
 __all__ = [
-    "lmm_steps_completion",
+    "default_steps_completion",
 ]
 
 
-async def lmm_steps_completion(
-    *,
-    instruction: Instruction | str,
-    steps: Iterable[Step | Multimodal],
+async def default_steps_completion(
+    *steps: Step | Multimodal,
+    instruction: Instruction | str | None = None,
     **extra: Any,
 ) -> MultimodalContent:
-    with ctx.nested(  # pyright: ignore[reportDeprecated]
-        "lmm_steps_completion",
-    ):
+    with ctx.scope("steps_completion"):
         assert steps, "Steps cannot be empty"  # nosec: B101
 
         context: list[LMMContextElement] = []
@@ -40,7 +37,7 @@ async def lmm_steps_completion(
                 case input_content:
                     current_step = Step.of(input_content)
 
-            await _lmm_process_step(
+            await _process_step(
                 current_step,
                 instruction=instruction,
                 context=context,
@@ -55,10 +52,11 @@ async def lmm_steps_completion(
                 raise RuntimeError("Invalid steps completion state!")
 
 
-async def _lmm_process_step(
+async def _process_step(
     step: Step,
     /,
-    instruction: Instruction | str,
+    *,
+    instruction: Instruction | str | None,
     context: list[LMMContextElement],
     **extra: Any,
 ) -> None:
@@ -70,19 +68,16 @@ async def _lmm_process_step(
     while recursion_level <= toolbox.recursion_limit:
         match await lmm_invocation(
             instruction=step.instruction or instruction,
-            context=[*context, LMMCompletion.of(step.prefill)] if step.prefill else context,
+            context=context,
+            prefill=step.prefill,
             tools=toolbox.available_tools(),
             tool_selection=toolbox.tool_selection(recursion_level=recursion_level),
-            output="text",
-            stream=False,
             **extra,
         ):
             case LMMCompletion() as completion:
-                ctx.log_debug("Received step result")
                 return context.append(completion)
 
             case LMMToolRequests() as tool_requests:
-                ctx.log_debug("Received step tool calls")
                 responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
 
                 if direct_content := [

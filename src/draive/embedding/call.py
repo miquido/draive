@@ -1,9 +1,10 @@
 from collections.abc import Sequence
 from typing import Any
 
-from draive.embedding.embedded import Embedded
+from haiway import ctx
+
 from draive.embedding.state import ImageEmbedding, TextEmbedding
-from draive.scope import ctx
+from draive.embedding.types import Embedded
 
 __all__ = [
     "embed_text",

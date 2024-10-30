@@ -1,12 +1,12 @@
 from typing import Any, Protocol, runtime_checkable
 
 __all__ = [
-    "TextTokenizer",
+    "TextTokenizing",
 ]
 
 
 @runtime_checkable
-class TextTokenizer(Protocol):
+class TextTokenizing(Protocol):
     def __call__(
         self,
         text: str,

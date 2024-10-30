@@ -1,6 +1,7 @@
-from draive.choice.completion import ChoiceCompletion
-from draive.choice.lmm import lmm_choice_completion
-from draive.parameters import State
+from haiway import State
+
+from draive.choice.default import default_choice_completion
+from draive.choice.types import ChoiceCompletion
 
 __all__: list[str] = [
     "Choice",
@@ -8,4 +9,4 @@ __all__: list[str] = [
 
 
 class Choice(State):
-    completion: ChoiceCompletion = lmm_choice_completion
+    completion: ChoiceCompletion = default_choice_completion

@@ -3,29 +3,29 @@ from asyncio import gather
 from collections.abc import AsyncIterable, Sequence
 from http import HTTPStatus
 from itertools import chain
-from typing import Any, Literal, Self, cast, final, overload
+from typing import Any, Final, Literal, Self, cast, final, overload
 
 from haiway import getenv_str, not_missing
 from httpx import AsyncClient, Response
 
 from draive.mistral.config import MistralChatConfig, MistralEmbeddingConfig
-from draive.mistral.errors import MistralException
 from draive.mistral.models import (
     ChatCompletionResponse,
     ChatCompletionStreamResponse,
     ChatMessage,
     EmbeddingResponse,
 )
+from draive.mistral.types import MistralException
 from draive.parameters import DataModel
-from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
 
 __all__ = [
     "MistralClient",
+    "SHARED",
 ]
 
 
 @final
-class MistralClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
+class MistralClient:
     @classmethod
     def prepare(cls) -> Self:
         return cls(
@@ -180,6 +180,9 @@ class MistralClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
         )
         return [element.embedding for element in response.data]
 
+    async def initialize(self) -> None:
+        pass  # Disposable protocol requirement
+
     async def dispose(self) -> None:
         await self._client.aclose()
 
@@ -250,3 +253,6 @@ class MistralClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
 
         else:
             raise MistralException("Network request failed %s", response)
+
+
+SHARED: Final[MistralClient] = MistralClient.prepare()

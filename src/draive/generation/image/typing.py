@@ -1,7 +1,7 @@
 from typing import Any, Protocol, runtime_checkable
 
 from draive.instructions import Instruction
-from draive.types import ImageContent, MultimodalContent, MultimodalContentConvertible
+from draive.types import ImageContent, Multimodal
 
 __all__ = [
     "ImageGenerator",
@@ -14,6 +14,6 @@ class ImageGenerator(Protocol):
         self,
         *,
         instruction: Instruction | str,
-        input: MultimodalContent | MultimodalContentConvertible | None = None,  # noqa: A002
+        input: Multimodal | None,  # noqa: A002
         **extra: Any,
     ) -> ImageContent: ...

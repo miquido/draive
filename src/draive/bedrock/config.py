@@ -1,16 +1,14 @@
-from haiway import MISSING, Missing
-
-from draive.parameters import DataModel
+from haiway import MISSING, Missing, State
 
 __all__ = [
     "BedrockChatConfig",
 ]
 
 
-class BedrockChatConfig(DataModel):
+class BedrockChatConfig(State):
     model: str
-    temperature: float = 0.75
+    temperature: float = 1.0
     top_p: float | Missing = MISSING
-    max_tokens: int = 2048
+    max_tokens: int | Missing = MISSING
     timeout: float | Missing = MISSING
     stop_sequences: list[str] | Missing = MISSING

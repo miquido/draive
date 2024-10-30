@@ -1,23 +1,23 @@
 import json
 from http import HTTPStatus
-from typing import Any, Literal, Self, cast, final
+from typing import Any, Final, Literal, Self, cast, final
 
 from haiway import getenv_str, not_missing
 from httpx import AsyncClient, Response
 
 from draive.ollama.config import OllamaChatConfig
-from draive.ollama.errors import OllamaException
 from draive.ollama.models import ChatCompletionResponse, ChatMessage
+from draive.ollama.types import OllamaException
 from draive.parameters import DataModel
-from draive.scope import ScopeDependency  # pyright: ignore[reportDeprecated]
 
 __all__ = [
     "OllamaClient",
+    "SHARED",
 ]
 
 
 @final
-class OllamaClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
+class OllamaClient:
     @classmethod
     def prepare(cls) -> Self:
         return cls(
@@ -96,6 +96,9 @@ class OllamaClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
             body=request_body,
         )
 
+    async def initialize(self) -> None:
+        pass  # Disposable protocol requirement
+
     async def dispose(self) -> None:
         await self._client.aclose()
 
@@ -165,3 +168,6 @@ class OllamaClient(ScopeDependency):  # pyright: ignore[reportDeprecated]
 
         else:
             raise OllamaException("Network request failed", response)
+
+
+SHARED: Final[OllamaClient] = OllamaClient.prepare()

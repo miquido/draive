@@ -1,6 +1,7 @@
-from draive.generation.text.generator import TextGenerator
-from draive.generation.text.lmm import lmm_generate_text
-from draive.parameters import State
+from haiway import State
+
+from draive.generation.text.default import default_generate_text
+from draive.generation.text.types import TextGenerator
 
 __all__ = [
     "TextGeneration",
@@ -8,4 +9,4 @@ __all__ = [
 
 
 class TextGeneration(State):
-    generate: TextGenerator = lmm_generate_text
+    generate: TextGenerator = default_generate_text

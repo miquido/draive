@@ -2,13 +2,11 @@ from asyncio import gather
 from collections.abc import Callable, Sequence
 from typing import Protocol, Self, cast, overload, runtime_checkable
 
-from haiway import freeze
+from haiway import ctx, freeze, frozenlist
 
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.parameters import DataModel, Field
 from draive.parameters.path import ParameterPath
-from draive.scope import ctx
-from draive.types import frozenlist
 
 __all__ = [
     "evaluation_scenario",

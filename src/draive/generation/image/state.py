@@ -1,5 +1,6 @@
-from draive.generation.image.generator import ImageGenerator
-from draive.parameters import State
+from haiway import State
+
+from draive.generation.image.typing import ImageGenerator
 
 __all__ = [
     "ImageGeneration",
