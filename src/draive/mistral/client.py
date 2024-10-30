@@ -1,6 +1,6 @@
 import json
 from asyncio import gather
-from collections.abc import AsyncIterable, Sequence
+from collections.abc import AsyncIterator, Sequence
 from http import HTTPStatus
 from itertools import chain
 from typing import Any, Final, Literal, Self, cast, final, overload
@@ -57,7 +57,7 @@ class MistralClient:
         tools: list[dict[str, object]] | None = None,
         tool_choice: Literal["auto", "any", "none"] = "auto",
         stream: Literal[True],
-    ) -> AsyncIterable[ChatCompletionStreamResponse]: ...
+    ) -> AsyncIterator[ChatCompletionStreamResponse]: ...
 
     @overload
     async def chat_completion(
@@ -77,7 +77,7 @@ class MistralClient:
         tools: list[dict[str, object]] | None = None,
         tool_choice: Literal["auto", "any", "none"] = "auto",
         stream: bool = False,
-    ) -> AsyncIterable[ChatCompletionStreamResponse] | ChatCompletionResponse:
+    ) -> AsyncIterator[ChatCompletionStreamResponse] | ChatCompletionResponse:
         if stream:
             raise NotImplementedError("Mistral streaming is not supported yet")
 

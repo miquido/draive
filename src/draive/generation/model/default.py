@@ -5,7 +5,7 @@ from haiway import ctx
 
 from draive.generation.model.types import ModelGeneratorDecoder
 from draive.instructions import Instruction
-from draive.lmm import AnyTool, Toolbox, lmm_invocation
+from draive.lmm import AnyTool, Toolbox, lmm_invoke
 from draive.parameters import DataModel
 from draive.types import (
     LMMCompletion,
@@ -40,7 +40,7 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
         generation_instruction: Instruction
         match instruction:
             case str(instruction):
-                generation_instruction = Instruction(instruction)
+                generation_instruction = Instruction.of(instruction)
 
             case Instruction() as instruction:
                 generation_instruction = instruction
@@ -83,12 +83,11 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
         ]
 
         recursion_level: int = 0
-        while recursion_level <= toolbox.recursion_limit:
-            match await lmm_invocation(
+        while recursion_level <= toolbox.repeated_calls_limit:
+            match await lmm_invoke(
                 instruction=extended_instruction,
                 context=context,
-                prefill=MultimodalContent.of("{"),  # prefill with json opening
-                tool_selection=toolbox.tool_selection(recursion_level=recursion_level),
+                tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
                 tools=toolbox.available_tools(),
                 output=generated.__PARAMETERS_SPECIFICATION__,  # provide model specification
                 **extra,
@@ -102,7 +101,7 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
 
                 case LMMToolRequests() as tool_requests:
                     context.append(tool_requests)
-                    responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
+                    responses: list[LMMToolResponse] = await toolbox.respond_all(tool_requests)
 
                     if direct_responses := [response for response in responses if response.direct]:
                         for response in direct_responses:

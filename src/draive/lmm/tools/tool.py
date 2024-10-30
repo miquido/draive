@@ -1,11 +1,9 @@
 from collections.abc import Callable, Coroutine
 from typing import Any, Protocol, cast, final, overload
-from uuid import uuid4
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze, not_missing
 
 from draive.lmm.tools.specification import ToolSpecification
-from draive.lmm.tools.status import ToolContext, ToolStatus
 from draive.lmm.tools.types import ToolError, ToolException
 from draive.parameters import ParameterSpecification, ParametrizedFunction
 from draive.types import Multimodal, MultimodalContent, MultimodalContentConvertible
@@ -93,25 +91,9 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         call_id: str,
         /,
         arguments: dict[str, Any],
-        report_status: Callable[[ToolStatus], Coroutine[None, None, None]],
     ) -> MultimodalContent:
-        context: ToolContext = ToolContext(
-            call_id=call_id,
-            tool=self.name,
-            report_status=report_status,
-        )
-        with ctx.scope(
-            self.name,
-            context,
-        ):
+        with ctx.scope(self.name):
             ctx.record(ArgumentsTrace.of(**arguments))
-            await context.report_status(
-                ToolStatus(
-                    identifier=context.call_id,
-                    tool=context.tool,
-                    status="STARTED",
-                )
-            )
 
             try:
                 if not self.available:
@@ -120,24 +102,9 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
                 result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
                 ctx.record(ResultTrace.of(result))
 
-                await context.report_status(
-                    ToolStatus(
-                        identifier=context.call_id,
-                        tool=context.tool,
-                        status="FINISHED",
-                    )
-                )
-
                 return MultimodalContent.of(self.format_result(result))
 
             except Exception as exc:
-                await context.report_status(
-                    ToolStatus(
-                        identifier=context.call_id,
-                        tool=context.tool,
-                        status="FAILED",
-                    )
-                )
                 # return an error with formatted content
                 raise ToolError(
                     f"Tool {self.name}[{call_id}] failed",
@@ -150,16 +117,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Result:
-        with ctx.scope(
-            self.name,
-            ctx.state(  # when called as a function preserve current context
-                ToolContext,
-                default=ToolContext(
-                    call_id=uuid4().hex,
-                    tool=self.name,
-                ),
-            ),
-        ):
+        with ctx.scope(self.name):
             ctx.record(ArgumentsTrace.of(*args, **kwargs))
             result: Result = await super().__call__(
                 *args,

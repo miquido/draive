@@ -1,11 +1,10 @@
 from asyncio import gather
-from collections.abc import Callable, Coroutine, Iterable
+from collections.abc import Iterable
 from typing import Any, Literal, Self, final
 
-from haiway import async_noop, ctx, freeze
+from haiway import ctx, freeze
 
 from draive.lmm.tools.specification import ToolSpecification
-from draive.lmm.tools.status import ToolStatus
 from draive.lmm.tools.tool import AnyTool
 from draive.lmm.tools.types import ToolError, ToolException
 from draive.types import (
@@ -42,10 +41,10 @@ class Toolbox:
         self,
         *tools: AnyTool,
         suggest: AnyTool | Literal[True] | None = None,
-        recursive_calls_limit: int | None = None,
+        repeated_calls_limit: int | None = None,
     ) -> None:
         self._tools: dict[str, AnyTool] = {tool.name: tool for tool in tools}
-        self.recursion_limit: int = recursive_calls_limit or 1
+        self.repeated_calls_limit: int = repeated_calls_limit or 1
         self.suggest_tools: bool
         self._suggested_tool: AnyTool | None
         match suggest:
@@ -65,12 +64,12 @@ class Toolbox:
     def tool_selection(
         self,
         *,
-        recursion_level: int = 0,
+        repetition_level: int = 0,
     ) -> ToolSpecification | Literal["auto", "required", "none"]:
-        if recursion_level >= self.recursion_limit:
+        if repetition_level >= self.repeated_calls_limit:
             return "none"  # require no tools if reached the limit
 
-        elif recursion_level != 0:
+        elif repetition_level != 0:
             return "auto"  # require tools only for the first call, use auto otherwise
 
         elif self._suggested_tool is not None and self._suggested_tool.available:
@@ -93,27 +92,25 @@ class Toolbox:
             return await tool._toolbox_call(  # pyright: ignore[reportPrivateUsage]
                 call_id,
                 arguments=arguments,
-                report_status=async_noop,
             )
 
         else:
             raise ToolException("Requested tool (%s) is not defined", name)
 
-    async def respond(
+    async def respond_all(
         self,
         requests: LMMToolRequests,
         /,
     ) -> list[LMMToolResponse]:
         return await gather(
-            *[self._respond(request) for request in requests.requests],
+            *[self.respond(request) for request in requests.requests],
             return_exceptions=False,  # toolbox calls handle errors if able
         )
 
-    async def _respond(
+    async def respond(
         self,
         request: LMMToolRequest,
         /,
-        report_status: Callable[[ToolStatus], Coroutine[None, None, None]] | None = None,
     ) -> LMMToolResponse:
         if tool := self._tools.get(request.tool):
             try:
@@ -123,7 +120,6 @@ class Toolbox:
                     content=await tool._toolbox_call(  # pyright: ignore[reportPrivateUsage]
                         request.identifier,
                         arguments=request.arguments or {},
-                        report_status=report_status or async_noop,
                     ),
                     direct=tool.requires_direct_result,
                     error=False,

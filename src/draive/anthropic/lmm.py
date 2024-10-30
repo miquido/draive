@@ -47,14 +47,14 @@ def anthropic_lmm(
     client: AnthropicClient = SHARED,
     /,
 ) -> LMMInvocation:
-    async def anthropic_lmm_invocation(  # noqa: PLR0913
+    async def lmm_invocation(  # noqa: PLR0913
         *,
         instruction: Instruction | str | None,
         context: Iterable[LMMContextElement],
-        prefill: MultimodalContent | None,
         tool_selection: LMMToolSelection,
         tools: Iterable[ToolSpecification] | None,
         output: Literal["auto", "text"] | ParametersSpecification,
+        prefill: MultimodalContent | None,
         **extra: Any,
     ) -> LMMOutput:
         with ctx.scope("anthropic_lmm_invocation"):
@@ -84,7 +84,7 @@ def anthropic_lmm(
                 tool_selection=tool_selection,
             )
 
-    return anthropic_lmm_invocation
+    return LMMInvocation(invoke=lmm_invocation)
 
 
 def _convert_content_element(

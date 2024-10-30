@@ -1,7 +1,7 @@
 from typing import Protocol, Self, final, overload, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import freeze
+from haiway import State
 
 __all__ = [
     "Instruction",
@@ -10,7 +10,7 @@ __all__ = [
 
 
 @final
-class Instruction:
+class Instruction(State):
     @overload
     @classmethod
     def formatted(
@@ -63,31 +63,23 @@ class Instruction:
         cls,
         instruction: Self | str,
         /,
+        identifier: UUID | None = None,
         **variables: object,
     ) -> Self:
         match instruction:
             case str() as content:
                 return cls(
-                    content,
-                    identifier=None,
-                    **variables,
+                    instruction=content,
+                    identifier=identifier or uuid4(),
+                    variables=variables,
                 )
 
             case instruction:
                 return instruction.updated(**variables)
 
-    def __init__(
-        self,
-        instruction: str,
-        /,
-        identifier: UUID | None = None,
-        **variables: object,
-    ) -> None:
-        self.instruction: str = instruction
-        self.identifier: UUID = identifier or uuid4()
-        self.variables: dict[str, object] = variables
-
-        freeze(self)
+    instruction: str
+    identifier: UUID
+    variables: dict[str, object]
 
     def format(
         self,
@@ -116,9 +108,9 @@ class Instruction:
     ) -> Self:
         if variables:
             return self.__class__(
-                (joiner or " ").join((self.instruction, instruction)),
+                instruction=(joiner or " ").join((self.instruction, instruction)),
                 identifier=self.identifier,
-                **{
+                variables={
                     **self.variables,
                     **variables,
                 },
@@ -126,9 +118,9 @@ class Instruction:
 
         else:
             return self.__class__(
-                (joiner or " ").join((self.instruction, instruction)),
+                instruction=(joiner or " ").join((self.instruction, instruction)),
                 identifier=self.identifier,
-                **self.variables,
+                variables=self.variables,
             )
 
     def updated(
@@ -137,9 +129,9 @@ class Instruction:
     ) -> Self:
         if variables:
             return self.__class__(
-                self.instruction,
+                instruction=self.instruction,
                 identifier=self.identifier,
-                **{
+                variables={
                     **self.variables,
                     **variables,
                 },

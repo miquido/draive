@@ -4,7 +4,7 @@ from typing import Any
 from haiway import ctx
 
 from draive.instructions import Instruction
-from draive.lmm import AnyTool, Toolbox, lmm_invocation
+from draive.lmm import AnyTool, Toolbox, lmm_invoke
 from draive.types import (
     LMMCompletion,
     LMMContextElement,
@@ -24,7 +24,6 @@ async def default_generate_text(
     *,
     instruction: Instruction | str | None,
     input: Multimodal,  # noqa: A002
-    prefill: str | None,
     tools: Toolbox | Iterable[AnyTool] | None,
     examples: Iterable[tuple[Multimodal, str]] | None,
     **extra: Any,
@@ -45,12 +44,12 @@ async def default_generate_text(
         ]
 
         recursion_level: int = 0
-        while recursion_level <= toolbox.recursion_limit:
-            match await lmm_invocation(
+        while recursion_level <= toolbox.repeated_calls_limit:
+            match await lmm_invoke(
                 instruction=instruction,
-                context=[*context, LMMCompletion.of(prefill)] if prefill else context,
+                context=context,
                 tools=toolbox.available_tools(),
-                tool_selection=toolbox.tool_selection(recursion_level=recursion_level),
+                tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
                 output="text",
                 **extra,
             ):
@@ -60,7 +59,7 @@ async def default_generate_text(
 
                 case LMMToolRequests() as tool_requests:
                     ctx.log_debug("Received text generation tool calls")
-                    responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
+                    responses: list[LMMToolResponse] = await toolbox.respond_all(tool_requests)
 
                     if direct_responses := [response for response in responses if response.direct]:
                         return MultimodalContent.of(

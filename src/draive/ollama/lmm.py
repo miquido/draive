@@ -17,7 +17,6 @@ from draive.types import (
     LMMOutput,
     LMMToolRequests,
     LMMToolResponse,
-    MultimodalContent,
 )
 
 __all__ = [
@@ -29,11 +28,10 @@ def ollama_lmm(
     client: OllamaClient = SHARED,
     /,
 ) -> LMMInvocation:
-    async def ollama_lmm_invocation(  # noqa: PLR0913
+    async def lmm_invocation(
         *,
         instruction: Instruction | str | None,
         context: Iterable[LMMContextElement],
-        prefill: MultimodalContent | None,
         tool_selection: LMMToolSelection,
         tools: Iterable[ToolSpecification] | None,
         output: Literal["auto", "text"] | ParametersSpecification,
@@ -67,9 +65,6 @@ def ollama_lmm(
                 case _:
                     config = config.updated(response_format="json")
 
-            if prefill:
-                context = [*context, LMMCompletion.of(prefill)]
-
             messages: list[ChatMessage] = [
                 _convert_context_element(element=element) for element in context
             ]
@@ -89,7 +84,7 @@ def ollama_lmm(
                 messages=messages,
             )
 
-    return ollama_lmm_invocation
+    return LMMInvocation(invoke=lmm_invocation)
 
 
 def _convert_context_element(
@@ -121,14 +116,6 @@ async def _chat_completion(
     config: OllamaChatConfig,
     messages: list[ChatMessage],
 ) -> LMMOutput:
-    prefill: str = ""
-    if messages[-1].role == "assistant":
-        if config.response_format == "json":
-            del messages[-1]  # for json mode ignore prefill
-
-        else:
-            prefill = messages[-1].content
-
     completion: ChatCompletionResponse = await client.chat_completion(
         config=config,
         messages=messages,
@@ -142,6 +129,5 @@ async def _chat_completion(
         ),
     )
 
-    completion_message: str = prefill + completion.message.content
-    ctx.record(ResultTrace.of(completion_message))
-    return LMMCompletion.of(completion_message)
+    ctx.record(ResultTrace.of(completion.message.content))
+    return LMMCompletion.of(completion.message.content)

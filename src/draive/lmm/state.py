@@ -1,11 +1,16 @@
 from haiway import State
 
-from draive.lmm.types import LMMInvocation
+from draive.lmm.types import LMMInvocating, LMMStreaming
 
 __all__: list[str] = [
-    "LMM",
+    "LMMInvocating",
+    "LMMStream",
 ]
 
 
-class LMM(State):
-    invocation: LMMInvocation
+class LMMInvocation(State):
+    invoke: LMMInvocating
+
+
+class LMMStream(State):
+    prepare: LMMStreaming

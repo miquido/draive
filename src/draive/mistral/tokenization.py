@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from draive.sentencepiece import sentencepiece_processor, sentencepiece_text_tokenizer
-from draive.tokenization import TextTokenizing
+from draive.sentencepiece import sentencepiece_processor, sentencepiece_tokenizer
+from draive.tokenization import Tokenization
 
 __all__ = [
     "mistral_text_tokenizer",
@@ -11,8 +11,12 @@ __all__ = [
 def mistral_text_tokenizer(
     model_name: str,
     /,
-) -> TextTokenizing:
-    return sentencepiece_text_tokenizer(sentencepiece_processor(model_path=_model_path(model_name)))
+) -> Tokenization:
+    return Tokenization(
+        tokenize_text=sentencepiece_tokenizer(
+            sentencepiece_processor(model_path=_model_path(model_name))
+        )
+    )
 
 
 def _model_path(

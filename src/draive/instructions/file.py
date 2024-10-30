@@ -54,7 +54,7 @@ class _InstructionsFileStorage:
         key: str,
     ) -> Instruction:
         if instruction := (await self.storage).instructions.get(key):
-            return Instruction(
+            return Instruction.of(
                 instruction.content,
                 identifier=instruction.identifier,
             )

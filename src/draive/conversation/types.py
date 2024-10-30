@@ -1,6 +1,6 @@
-from collections.abc import Iterable
+from collections.abc import AsyncIterator, Iterable
 from datetime import datetime
-from typing import Any, Literal, Protocol, Self, runtime_checkable
+from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
 from uuid import uuid4
 
 from draive.instructions import Instruction
@@ -10,6 +10,7 @@ from draive.types import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
+    LMMStreamChunk,
     Memory,
     Multimodal,
     MultimodalContent,
@@ -79,6 +80,7 @@ class ConversationMessage(DataModel):
 
 @runtime_checkable
 class ConversationCompletion(Protocol):
+    @overload
     async def __call__(
         self,
         *,
@@ -86,5 +88,41 @@ class ConversationCompletion(Protocol):
         message: ConversationMessage,
         memory: Memory[Iterable[ConversationMessage], ConversationMessage],
         toolbox: Toolbox,
+        stream: Literal[True],
+        **extra: Any,
+    ) -> AsyncIterator[LMMStreamChunk]: ...
+
+    @overload
+    async def __call__(
+        self,
+        *,
+        instruction: Instruction | str | None,
+        message: ConversationMessage,
+        memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+        toolbox: Toolbox,
+        stream: Literal[False] = False,
         **extra: Any,
     ) -> ConversationMessage: ...
+
+    @overload
+    async def __call__(
+        self,
+        *,
+        instruction: Instruction | str | None,
+        message: ConversationMessage,
+        memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+        toolbox: Toolbox,
+        stream: bool,
+        **extra: Any,
+    ) -> AsyncIterator[LMMStreamChunk] | ConversationMessage: ...
+
+    async def __call__(
+        self,
+        *,
+        instruction: Instruction | str | None,
+        message: ConversationMessage,
+        memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+        toolbox: Toolbox,
+        stream: bool = False,
+        **extra: Any,
+    ) -> AsyncIterator[LMMStreamChunk] | ConversationMessage: ...
