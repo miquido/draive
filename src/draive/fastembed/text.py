@@ -1,10 +1,12 @@
 from collections.abc import Sequence
 from typing import Any
 
-from fastembed.text.text_embedding import TextEmbedding  # pyright: ignore[reportMissingTypeStubs]
+from fastembed.text.text_embedding import (  # pyright: ignore[reportMissingTypeStubs]
+    TextEmbedding as FastembedTextEmbedding,
+)
 from haiway import asynchronous, ctx
 
-from draive.embedding import Embedded, ValueEmbedder
+from draive.embedding import Embedded, TextEmbedding
 
 __all__ = [
     "fastembed_text_embedding",
@@ -14,9 +16,9 @@ __all__ = [
 async def fastembed_text_embedding(
     model_name: str = "nomic-ai/nomic-embed-text-v1.5",
     cache_dir: str | None = "./embedding_models/",
-) -> ValueEmbedder[str]:
+) -> TextEmbedding:
     # TODO: verify if loading model should be asynchronous here
-    embedding_model: TextEmbedding = await _text_embedding_model(
+    embedding_model: FastembedTextEmbedding = await _text_embedding_model(
         model_name=model_name,
         cache_dir=cache_dir,
     )
@@ -31,15 +33,15 @@ async def fastembed_text_embedding(
                 values,
             )
 
-    return fastembed_embed_text
+    return TextEmbedding(embed=fastembed_embed_text)
 
 
 @asynchronous
 def _text_embedding_model(
     model_name: str,
     cache_dir: str | None = "./embedding_models/",
-) -> TextEmbedding:
-    return TextEmbedding(
+) -> FastembedTextEmbedding:
+    return FastembedTextEmbedding(
         model_name=model_name,
         cache_dir=cache_dir,
     )
@@ -47,7 +49,7 @@ def _text_embedding_model(
 
 @asynchronous
 def _fastembed_text_embedding(
-    embedding_model: TextEmbedding,
+    embedding_model: FastembedTextEmbedding,
     texts: Sequence[str],
     /,
 ) -> list[Embedded[str]]:
