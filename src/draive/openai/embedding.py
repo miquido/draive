@@ -3,7 +3,7 @@ from typing import Any
 
 from haiway import ctx
 
-from draive.embedding import Embedded, ValueEmbedder
+from draive.embedding import Embedded, TextEmbedding
 from draive.openai.client import SHARED, OpenAIClient
 from draive.openai.config import OpenAIEmbeddingConfig
 
@@ -15,7 +15,7 @@ __all__ = [
 def openai_text_embedding(
     client: OpenAIClient = SHARED,
     /,
-) -> ValueEmbedder[str]:
+) -> TextEmbedding:
     async def openai_embed_text(
         values: Sequence[str],
         **extra: Any,
@@ -39,4 +39,4 @@ def openai_text_embedding(
                 )
             ]
 
-    return openai_embed_text
+    return TextEmbedding(embed=openai_embed_text)

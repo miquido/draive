@@ -1,6 +1,6 @@
-from collections.abc import Iterable
+from collections.abc import AsyncIterator, Iterable
 from datetime import UTC, datetime
-from typing import Any, Final
+from typing import Any, Final, Literal, overload
 
 from haiway import ctx
 
@@ -9,11 +9,44 @@ from draive.conversation.types import ConversationMessage
 from draive.helpers import ConstantMemory
 from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
-from draive.types import Memory, Multimodal, MultimodalContent
+from draive.types import (
+    LMMStreamChunk,
+    Memory,
+    Multimodal,
+    MultimodalContent,
+)
 
 __all__ = [
     "conversation_completion",
 ]
+
+
+@overload
+async def conversation_completion(
+    *,
+    instruction: Instruction | str | None = None,
+    input: ConversationMessage | Multimodal,
+    memory: Memory[Iterable[ConversationMessage], ConversationMessage]
+    | Iterable[ConversationMessage]
+    | None = None,
+    tools: Toolbox | Iterable[AnyTool] | None = None,
+    stream: Literal[True],
+    **extra: Any,
+) -> AsyncIterator[LMMStreamChunk]: ...
+
+
+@overload
+async def conversation_completion(
+    *,
+    instruction: Instruction | str | None = None,
+    input: ConversationMessage | Multimodal,
+    memory: Memory[Iterable[ConversationMessage], ConversationMessage]
+    | Iterable[ConversationMessage]
+    | None = None,
+    tools: Toolbox | Iterable[AnyTool] | None = None,
+    stream: Literal[False] = False,
+    **extra: Any,
+) -> ConversationMessage: ...
 
 
 async def conversation_completion(
@@ -24,7 +57,9 @@ async def conversation_completion(
     | Iterable[ConversationMessage]
     | None = None,
     tools: Toolbox | Iterable[AnyTool] | None = None,
-) -> ConversationMessage:
+    stream: bool = False,
+    **extra: Any,
+) -> AsyncIterator[LMMStreamChunk] | ConversationMessage:
     conversation: Conversation = ctx.state(Conversation)
 
     # prepare message
@@ -72,6 +107,7 @@ async def conversation_completion(
         message=message,
         memory=conversation_memory,
         toolbox=Toolbox.of(tools),
+        stream=stream,
     )
 
 

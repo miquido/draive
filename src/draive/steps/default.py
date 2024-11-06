@@ -3,7 +3,7 @@ from typing import Any
 from haiway import ctx
 
 from draive.instructions import Instruction
-from draive.lmm import lmm_invocation
+from draive.lmm import lmm_invoke
 from draive.lmm.tools.toolbox import Toolbox
 from draive.steps.types import Step
 from draive.types import (
@@ -65,20 +65,20 @@ async def _process_step(
     toolbox: Toolbox = step.toolbox
 
     recursion_level: int = 0
-    while recursion_level <= toolbox.recursion_limit:
-        match await lmm_invocation(
+    while recursion_level <= toolbox.repeated_calls_limit:
+        match await lmm_invoke(
             instruction=step.instruction or instruction,
             context=context,
-            prefill=step.prefill,
             tools=toolbox.available_tools(),
-            tool_selection=toolbox.tool_selection(recursion_level=recursion_level),
+            tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
+            **step.extra,
             **extra,
         ):
             case LMMCompletion() as completion:
                 return context.append(completion)
 
             case LMMToolRequests() as tool_requests:
-                responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
+                responses: list[LMMToolResponse] = await toolbox.respond_all(tool_requests)
 
                 if direct_content := [
                     response.content for response in responses if response.direct

@@ -17,7 +17,6 @@ class TextGenerator(Protocol):
         *,
         instruction: Instruction | str | None,
         input: Multimodal,  # noqa: A002
-        prefill: str | None,
         tools: Toolbox | Iterable[AnyTool] | None,
         examples: Iterable[tuple[Multimodal, str]] | None,
         **extra: Any,

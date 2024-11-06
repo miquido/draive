@@ -53,11 +53,10 @@ def gemini_lmm(
     client: GeminiClient = SHARED,
     /,
 ) -> LMMInvocation:
-    async def gemini_lmm_invocation(  # noqa: PLR0913
+    async def lmm_invocation(
         *,
         instruction: Instruction | str | None,
         context: Iterable[LMMContextElement],
-        prefill: MultimodalContent | None,
         tool_selection: LMMToolSelection,
         tools: Iterable[ToolSpecification] | None,
         output: Literal["auto", "text"] | ParametersSpecification,
@@ -68,7 +67,6 @@ def gemini_lmm(
                 ArgumentsTrace.of(
                     instruction=instruction,
                     context=context,
-                    prefill=prefill,
                     tool_selection=tool_selection,
                     tools=tools,
                     output=output,
@@ -94,9 +92,6 @@ def gemini_lmm(
                     else:
                         config = config.updated(response_format="application/json")
 
-            if prefill:
-                context = [*context, LMMCompletion.of(prefill)]
-
             return await _generate(
                 client=client,
                 config=config,
@@ -106,7 +101,7 @@ def gemini_lmm(
                 tools=tools,
             )
 
-    return gemini_lmm_invocation
+    return LMMInvocation(invoke=lmm_invocation)
 
 
 def _convert_content_element(  # noqa: PLR0911
@@ -308,24 +303,6 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
 
         converted_tools.append(tool_function)
 
-    prefill: str = ""
-    match messages[-1]:
-        case {"role": "model", "parts": content_parts}:
-            if config.response_format == "application/json":
-                del messages[-1]  # for json mode ignore prefill
-
-            else:
-                for part in content_parts:
-                    match part:  # currently supporting only text prefills
-                        case {"text": str() as text}:
-                            prefill += text
-
-                        case _:
-                            continue
-
-        case _:
-            pass
-
     match tool_selection:
         case "auto":
             result = await client.generate(
@@ -412,7 +389,7 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
 
     message_parts: list[
         GeminiTextMessageContent | GeminiDataReferenceMessageContent | GeminiDataMessageContent
-    ] = [GeminiTextMessageContent(text=prefill)] if prefill else []
+    ] = []
 
     tool_calls: list[GeminiFunctionCallMessageContent] = []
     for part in result_message.content:

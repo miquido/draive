@@ -7,11 +7,11 @@ from draive.tokenization import TextTokenizing
 
 __all__ = [
     "sentencepiece_processor",
-    "sentencepiece_text_tokenizer",
+    "sentencepiece_tokenizer",
 ]
 
 
-def sentencepiece_text_tokenizer(
+def sentencepiece_tokenizer(
     processor: SentencePieceProcessor,
     /,
 ) -> TextTokenizing:

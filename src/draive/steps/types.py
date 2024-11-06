@@ -22,23 +22,23 @@ class Step(State):
         /,
         *,
         instruction: Instruction | str | None = None,
-        prefill: Multimodal | None = None,
         tools: Toolbox | Iterable[AnyTool] | None = None,
         output: Literal["auto", "text"] | ParametersSpecification = "auto",
+        **extra: Any,
     ) -> Self:
         return cls(
             instruction=Instruction.of(instruction) if instruction else None,
             input=MultimodalContent.of(input),
-            prefill=MultimodalContent.of(prefill) if prefill else None,
             toolbox=Toolbox.of(tools),
             output=output,
+            extra=extra,
         )
 
     instruction: Instruction | None
     input: MultimodalContent
-    prefill: MultimodalContent | None
     toolbox: Toolbox
     output: Literal["auto", "text"] | ParametersSpecification
+    extra: dict[str, Any]
 
 
 @runtime_checkable

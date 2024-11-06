@@ -6,7 +6,7 @@ from haiway import ctx
 
 from draive.choice.types import ChoiceOption, SelectionException
 from draive.instructions import Instruction
-from draive.lmm import Toolbox, lmm_invocation
+from draive.lmm import Toolbox, lmm_invoke
 from draive.types import (
     LMMCompletion,
     LMMContextElement,
@@ -23,12 +23,11 @@ __all__ = [
 ]
 
 
-async def default_choice_completion(  # noqa: C901, PLR0913
+async def default_choice_completion(  # noqa: C901
     *,
     instruction: Instruction | str,
     options: Sequence[ChoiceOption],
     input: Multimodal,  # noqa: A002
-    prefill: str | None,
     toolbox: Toolbox,
     examples: Iterable[tuple[Multimodal, ChoiceOption]] | None,
     **extra: Any,
@@ -77,12 +76,11 @@ async def default_choice_completion(  # noqa: C901, PLR0913
         ]
 
         recursion_level: int = 0
-        while recursion_level <= toolbox.recursion_limit:
-            match await lmm_invocation(
+        while recursion_level <= toolbox.repeated_calls_limit:
+            match await lmm_invoke(
                 instruction=extended_instruction,
                 context=context,
-                prefill=MultimodalContent.of(prefill) if prefill else None,
-                tool_selection=toolbox.tool_selection(recursion_level=recursion_level),
+                tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
                 tools=toolbox.available_tools(),
                 output="text",
                 **extra,
@@ -97,7 +95,7 @@ async def default_choice_completion(  # noqa: C901, PLR0913
 
                 case LMMToolRequests() as tool_requests:
                     ctx.log_debug("Received choice tool calls")
-                    responses: list[LMMToolResponse] = await toolbox.respond(tool_requests)
+                    responses: list[LMMToolResponse] = await toolbox.respond_all(tool_requests)
 
                     if direct_content := [
                         response.content for response in responses if response.direct

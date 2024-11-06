@@ -40,11 +40,10 @@ def bedrock_lmm(
     client: BedrockClient = SHARED,
     /,
 ) -> LMMInvocation:
-    async def bedrock_lmm_invocation(  # noqa: PLR0913
+    async def lmm_invocation(
         *,
         instruction: Instruction | str | None,
         context: Iterable[LMMContextElement],
-        prefill: MultimodalContent | None,
         tool_selection: LMMToolSelection,
         tools: Iterable[ToolSpecification] | None,
         output: Literal["auto", "text"] | ParametersSpecification,
@@ -55,7 +54,6 @@ def bedrock_lmm(
                 ArgumentsTrace.of(
                     instruction=instruction,
                     context=context,
-                    prefill=prefill,
                     tools=tools,
                     tool_selection=tool_selection,
                     output=output,
@@ -85,7 +83,7 @@ def bedrock_lmm(
                 require_tool=require_tool,
             )
 
-    return bedrock_lmm_invocation
+    return LMMInvocation(invoke=lmm_invocation)
 
 
 def _convert_content_element(  # noqa: C901

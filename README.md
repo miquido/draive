@@ -13,7 +13,7 @@ Dive straight into the code and learn how to use draive with our interactive [gu
 Great, but how it looks like?
 
 ```python
-from draive import ctx, generate_text, LMM, tool
+from draive import ctx, generate_text, tool
 from draive.openai import OpenAIClient, openai_lmm_invocation
 
 
@@ -23,7 +23,7 @@ async def current_time(location: str) -> str:
 
 async with  ctx.scope( # create execution context
     "example", # give it a name
-    LMM(invocation=openai_lmm()), # define llm provider for this scope
+    openai_lmm_invocation(), # define llm provider for this scope
 ):
     result: str = await generate_text( # choose the right abstraction, i.e. `generate_text`
         instruction="You are a helpful assistant", # provide clear instructions

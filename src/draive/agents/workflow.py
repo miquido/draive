@@ -339,7 +339,7 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
     ) -> WorkflowResult:
         assert not self._agent_runners, "WorkflowRunner can run only once!"  # nosec: B101
 
-        if self._workflow_queue.finished or not_missing(self._result):
+        if self._workflow_queue.is_finished or not_missing(self._result):
             raise RuntimeError("WorkflowRunner can run only once!")
 
         async with ctx.scope(self._workflow.node.__str__()):

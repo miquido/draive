@@ -2,7 +2,7 @@ from collections.abc import Callable, Coroutine
 from logging import INFO
 from typing import Any, cast
 
-from haiway import MISSING, Missing, ScopeMetrics, State, is_missing
+from haiway import Missing, ScopeMetrics, State, is_missing
 
 from draive.metrics.tokens import TokenUsage
 
@@ -34,10 +34,10 @@ def _usage_metrics_merge(
     nested: State,
 ) -> State | Missing:
     if not isinstance(nested, TokenUsage):
-        return MISSING  # do not merge other metrics than TokenUsage
+        return current  # do not merge other metrics than TokenUsage
 
     if not isinstance(current, TokenUsage):
-        return nested  # use nested TokenUsage
+        return nested  # use nested TokenUsage if missing current
 
     return current + nested  # add TokenUsage from current and nested
 
