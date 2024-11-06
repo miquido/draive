@@ -54,7 +54,7 @@ def anthropic_lmm(
         tool_selection: LMMToolSelection,
         tools: Iterable[ToolSpecification] | None,
         output: Literal["auto", "text"] | ParametersSpecification,
-        prefill: MultimodalContent | None,
+        prefill: MultimodalContent | None = None,
         **extra: Any,
     ) -> LMMOutput:
         with ctx.scope("anthropic_lmm_invocation"):
