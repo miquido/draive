@@ -22,7 +22,7 @@ from draive.lmm import (
     ToolSpecification,
 )
 from draive.metrics import TokenUsage
-from draive.openai.client import SHARED, OpenAIClient
+from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig, OpenAISystemFingerprint
 from draive.openai.types import OpenAIException
 from draive.parameters import DataModel, ParametersSpecification
@@ -53,9 +53,11 @@ __all__ = [
 
 
 def openai_lmm(
-    client: OpenAIClient = SHARED,
+    client: OpenAIClient | None = None,
     /,
 ) -> LMMInvocation:
+    client = client or OpenAIClient.shared()
+
     async def lmm_invocation(
         *,
         instruction: Instruction | str | None,
@@ -111,9 +113,11 @@ def openai_lmm(
 
 
 def openai_streaming_lmm(
-    client: OpenAIClient = SHARED,
+    client: OpenAIClient | None = None,
     /,
 ) -> LMMStream:
+    client = client or OpenAIClient.shared()
+
     async def lmm_stream(
         *,
         properties: AsyncIterator[LMMStreamProperties],

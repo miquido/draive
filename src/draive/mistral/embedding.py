@@ -4,7 +4,7 @@ from typing import Any
 from haiway import ctx
 
 from draive.embedding import Embedded, TextEmbedding
-from draive.mistral.client import SHARED, MistralClient
+from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralEmbeddingConfig
 
 __all__ = [
@@ -13,9 +13,11 @@ __all__ = [
 
 
 def mistral_text_embedding(
-    client: MistralClient = SHARED,
+    client: MistralClient | None = None,
     /,
 ) -> TextEmbedding:
+    client = client or MistralClient.shared()
+
     async def mistral_embed_text(
         values: Sequence[str],
         **extra: Any,

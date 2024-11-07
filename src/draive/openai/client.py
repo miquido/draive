@@ -2,7 +2,7 @@ from asyncio import gather
 from collections.abc import Sequence
 from itertools import chain
 from random import uniform
-from typing import Final, Literal, Self, cast, final, overload
+from typing import ClassVar, Literal, Self, cast, final, overload
 
 from haiway import freeze, getenv_str, not_missing
 from openai import AsyncAzureOpenAI, AsyncOpenAI, AsyncStream
@@ -35,41 +35,49 @@ __all__ = [
 
 @final
 class OpenAIClient:
+    _SHARED: ClassVar[Self]
+
     @classmethod
-    def prepare(cls) -> Self:
-        return cls(
-            base_url=getenv_str("OPENAI_BASE_URL"),
-            api_key=getenv_str("AZURE_OPENAI_API_KEY") or getenv_str("OPENAI_API_KEY"),
-            organization=getenv_str("OPENAI_ORGANIZATION"),
-            azure_api_endpoint=getenv_str("AZURE_OPENAI_API_BASE"),
-            azure_api_version=getenv_str("AZURE_OPENAI_API_VERSION"),
-            azure_deployment=getenv_str("AZURE_OPENAI_DEPLOYMENT_NAME"),
-        )
+    def shared(cls) -> Self:
+        if shared := getattr(cls, "_SHARED", None):
+            return shared
+
+        else:
+            cls._SHARED = cls()  # pyright: ignore[reportConstantRedefinition]
+            return cls._SHARED
 
     def __init__(  # noqa: PLR0913
         self,
-        base_url: str | None,
-        api_key: str | None,
+        base_url: str | None = None,
+        api_key: str | None = None,
         organization: str | None = None,
         azure_api_endpoint: str | None = None,
         azure_api_version: str | None = None,
         azure_deployment: str | None = None,
     ) -> None:
         # if all AZURE settings were provided use it as provider
-        if azure_api_endpoint and azure_deployment and azure_api_version:
+        if (
+            (azure_api_endpoint := azure_api_endpoint or getenv_str("AZURE_OPENAI_API_BASE"))
+            and (azure_deployment := azure_deployment or getenv_str("AZURE_OPENAI_DEPLOYMENT_NAME"))
+            and (azure_api_version := azure_api_version or getenv_str("AZURE_OPENAI_API_VERSION"))
+        ):
             self._client: AsyncOpenAI = AsyncAzureOpenAI(
-                api_key=api_key,
+                api_key=api_key
+                or getenv_str("AZURE_OPENAI_API_KEY")
+                or getenv_str("OPENAI_API_KEY"),
                 azure_endpoint=azure_api_endpoint,
                 azure_deployment=azure_deployment,
                 api_version=azure_api_version,
-                organization=organization,
+                organization=organization or getenv_str("OPENAI_ORGANIZATION"),
             )
         # otherwise try using OpenAI
         else:
             self._client: AsyncOpenAI = AsyncOpenAI(
-                base_url=base_url,
-                api_key=api_key,
-                organization=organization,
+                base_url=base_url or getenv_str("OPENAI_BASE_URL"),
+                api_key=api_key
+                or getenv_str("AZURE_OPENAI_API_KEY")
+                or getenv_str("OPENAI_API_KEY"),
+                organization=organization or getenv_str("OPENAI_ORGANIZATION"),
             )
 
         freeze(self)
@@ -230,6 +238,3 @@ class OpenAIClient:
 
     async def dispose(self) -> None:
         await self._client.close()
-
-
-SHARED: Final[OpenAIClient] = OpenAIClient.prepare()

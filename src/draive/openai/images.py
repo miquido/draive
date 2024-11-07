@@ -5,7 +5,7 @@ from openai.types.image import Image
 
 from draive.generation import ImageGenerator
 from draive.instructions import Instruction
-from draive.openai.client import SHARED, OpenAIClient
+from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIImageGenerationConfig
 from draive.openai.types import OpenAIException
 from draive.types import (
@@ -21,9 +21,11 @@ __all__ = [
 
 
 async def openai_image_generator(
-    client: OpenAIClient = SHARED,
+    client: OpenAIClient | None = None,
     /,
 ) -> ImageGenerator:
+    client = client or OpenAIClient.shared()
+
     async def openai_generate_image(
         *,
         instruction: Instruction | str,

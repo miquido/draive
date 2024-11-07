@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from haiway import ArgumentsTrace, ResultTrace, ctx
 
-from draive.gemini.client import SHARED, GeminiClient
+from draive.gemini.client import GeminiClient
 from draive.gemini.config import GeminiConfig
 from draive.gemini.models import (
     GeminiChoice,
@@ -50,9 +50,11 @@ __all__ = [
 
 
 def gemini_lmm(
-    client: GeminiClient = SHARED,
+    client: GeminiClient | None = None,
     /,
 ) -> LMMInvocation:
+    client = client or GeminiClient.shared()
+
     async def lmm_invocation(
         *,
         instruction: Instruction | str | None,

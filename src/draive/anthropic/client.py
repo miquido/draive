@@ -1,5 +1,5 @@
 from random import uniform
-from typing import Final, Literal, Self, final, overload
+from typing import ClassVar, Literal, Self, final, overload
 
 from anthropic import AsyncAnthropic, AsyncStream
 from anthropic import RateLimitError as AnthropicRateLimitError
@@ -13,24 +13,28 @@ from draive.types import RateLimitError
 
 __all__ = [
     "AnthropicClient",
-    "SHARED",
 ]
 
 
 @final
 class AnthropicClient:
+    _SHARED: ClassVar[Self]
+
     @classmethod
-    def prepare(cls) -> Self:
-        return cls(
-            api_key=getenv_str("ANTHROPIC_API_KEY"),
-        )
+    def shared(cls) -> Self:
+        if shared := getattr(cls, "_SHARED", None):
+            return shared
+
+        else:
+            cls._SHARED = cls()  # pyright: ignore[reportConstantRedefinition]
+            return cls._SHARED
 
     def __init__(
         self,
-        api_key: str | None,
+        api_key: str | None = None,
     ) -> None:
         self._client: AsyncAnthropic = AsyncAnthropic(
-            api_key=api_key,
+            api_key=api_key or getenv_str("ANTHROPIC_API_KEY"),
             max_retries=0,  # disable library retries
         )
 
@@ -122,6 +126,3 @@ class AnthropicClient:
 
     async def dispose(self) -> None:
         await self._client.close()
-
-
-SHARED: Final[AnthropicClient] = AnthropicClient.prepare()

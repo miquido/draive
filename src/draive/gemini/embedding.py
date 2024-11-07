@@ -4,7 +4,7 @@ from typing import Any
 from haiway import ctx
 
 from draive.embedding import Embedded, TextEmbedding
-from draive.gemini.client import SHARED, GeminiClient
+from draive.gemini.client import GeminiClient
 from draive.gemini.config import GeminiEmbeddingConfig
 
 __all__ = [
@@ -13,9 +13,11 @@ __all__ = [
 
 
 def gemini_text_embedding(
-    client: GeminiClient = SHARED,
+    client: GeminiClient | None = None,
     /,
 ) -> TextEmbedding:
+    client = client or GeminiClient.shared()
+
     async def gemini_embed_text(
         values: Sequence[str],
         **extra: Any,
