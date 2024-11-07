@@ -1,4 +1,4 @@
-from typing import Any, Final, Self, final
+from typing import Any, ClassVar, Self, final
 
 from haiway import asynchronous, getenv_str, not_missing
 
@@ -7,29 +7,31 @@ from draive.bedrock.models import ChatCompletionResponse, ChatMessage, ChatTool
 
 __all__ = [
     "BedrockClient",
-    "SHARED",
 ]
 
 
 @final
 class BedrockClient:
+    _SHARED: ClassVar[Self]
+
     @classmethod
-    def prepare(cls) -> Self:
-        return cls(
-            region_name=getenv_str("AWS_DEFAULT_REGION"),
-            access_key_id=getenv_str("AWS_ACCESS_KEY_ID"),
-            access_key=getenv_str("AWS_ACCESS_KEY"),
-        )
+    def shared(cls) -> Self:
+        if shared := getattr(cls, "_SHARED", None):
+            return shared
+
+        else:
+            cls._SHARED = cls()  # pyright: ignore[reportConstantRedefinition]
+            return cls._SHARED
 
     def __init__(
         self,
-        region_name: str | None,
+        region_name: str | None = None,
         access_key_id: str | None = None,
         access_key: str | None = None,
     ) -> None:
-        self._region_name: str | None = region_name
-        self._access_key_id: str | None = access_key_id
-        self._access_key: str | None = access_key
+        self._region_name: str | None = region_name or getenv_str("AWS_DEFAULT_REGION")
+        self._access_key_id: str | None = access_key_id or getenv_str("AWS_ACCESS_KEY_ID")
+        self._access_key: str | None = access_key or getenv_str("AWS_ACCESS_KEY")
         self._client: Any
 
     # preparing it lazily on demand, boto does a lot of stuff on initialization
@@ -125,6 +127,3 @@ class BedrockClient:
 
     async def dispose(self) -> None:
         pass
-
-
-SHARED: Final[BedrockClient] = BedrockClient.prepare()

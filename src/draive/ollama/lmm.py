@@ -6,7 +6,7 @@ from haiway import ArgumentsTrace, ResultTrace, ctx
 from draive.instructions import Instruction
 from draive.lmm import LMMInvocation, LMMToolSelection, ToolSpecification
 from draive.metrics.tokens import TokenUsage
-from draive.ollama.client import SHARED, OllamaClient
+from draive.ollama.client import OllamaClient
 from draive.ollama.config import OllamaChatConfig
 from draive.ollama.models import ChatCompletionResponse, ChatMessage
 from draive.parameters import ParametersSpecification
@@ -25,9 +25,11 @@ __all__ = [
 
 
 def ollama_lmm(
-    client: OllamaClient = SHARED,
+    client: OllamaClient | None = None,
     /,
 ) -> LMMInvocation:
+    client = client or OllamaClient.shared()
+
     async def lmm_invocation(
         *,
         instruction: Instruction | str | None,

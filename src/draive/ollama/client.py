@@ -1,6 +1,6 @@
 import json
 from http import HTTPStatus
-from typing import Any, Final, Literal, Self, cast, final
+from typing import Any, ClassVar, Literal, Self, cast, final
 
 from haiway import getenv_str, not_missing
 from httpx import AsyncClient, Response
@@ -12,27 +12,30 @@ from draive.parameters import DataModel
 
 __all__ = [
     "OllamaClient",
-    "SHARED",
 ]
 
 
 @final
 class OllamaClient:
+    _SHARED: ClassVar[Self]
+
     @classmethod
-    def prepare(cls) -> Self:
-        return cls(
-            endpoint=getenv_str("OLLAMA_ENDPOINT", "http://localhost:11434"),
-            timeout=90,
-        )
+    def shared(cls) -> Self:
+        if shared := getattr(cls, "_SHARED", None):
+            return shared
+
+        else:
+            cls._SHARED = cls()  # pyright: ignore[reportConstantRedefinition]
+            return cls._SHARED
 
     def __init__(
         self,
-        endpoint: str,
+        endpoint: str | None = None,
         timeout: float | None = None,
     ) -> None:
-        self._client: AsyncClient = AsyncClient(
-            base_url=endpoint,
-            timeout=timeout,
+        self._client: AsyncClient = AsyncClient(  # nosec: B113 - false positive
+            base_url=endpoint or getenv_str("OLLAMA_ENDPOINT", "http://localhost:11434"),
+            timeout=timeout or 60,
         )
 
     async def chat_completion(
@@ -168,6 +171,3 @@ class OllamaClient:
 
         else:
             raise OllamaException("Network request failed", response)
-
-
-SHARED: Final[OllamaClient] = OllamaClient.prepare()

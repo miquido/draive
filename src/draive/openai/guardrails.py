@@ -4,7 +4,7 @@ from typing import Any
 from haiway import ctx, not_missing
 from openai.types.moderation import Moderation
 
-from draive.openai.client import SHARED, OpenAIClient
+from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIModerationConfig
 from draive.safeguards import ContentGuardrails, GuardrailsException
 from draive.splitters import split_text
@@ -16,9 +16,11 @@ __all__ = [
 
 
 async def openai_content_guardrails(  # noqa: C901, PLR0915
-    client: OpenAIClient = SHARED,
+    client: OpenAIClient | None = None,
     /,
 ) -> ContentGuardrails:
+    client = client or OpenAIClient.shared()
+
     async def openai_content_guardrails(  # noqa: C901, PLR0912
         content: MultimodalContent,
         /,

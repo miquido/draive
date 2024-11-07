@@ -7,7 +7,7 @@ from haiway import ArgumentsTrace, ResultTrace, ctx
 from draive.instructions import Instruction
 from draive.lmm import LMMInvocation, LMMToolSelection, ToolSpecification
 from draive.metrics import TokenUsage
-from draive.mistral.client import SHARED, MistralClient
+from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralChatConfig
 from draive.mistral.models import ChatCompletionResponse, ChatMessage, ChatMessageResponse
 from draive.mistral.types import MistralException
@@ -29,9 +29,11 @@ __all__ = [
 
 
 def mistral_lmm(
-    client: MistralClient = SHARED,
+    client: MistralClient | None = None,
     /,
 ) -> LMMInvocation:
+    client = client or MistralClient.shared()
+
     async def lmm_invocation(  # noqa: PLR0913
         *,
         instruction: Instruction | str | None,

@@ -12,7 +12,7 @@ from anthropic.types import (
 )
 from haiway import ArgumentsTrace, ResultTrace, ctx
 
-from draive.anthropic.client import SHARED, AnthropicClient
+from draive.anthropic.client import AnthropicClient
 from draive.anthropic.config import AnthropicConfig
 from draive.anthropic.types import AnthropicException
 from draive.instructions import Instruction
@@ -44,9 +44,11 @@ __all__ = [
 
 
 def anthropic_lmm(
-    client: AnthropicClient = SHARED,
+    client: AnthropicClient | None = None,
     /,
 ) -> LMMInvocation:
+    client = client or AnthropicClient.shared()
+
     async def lmm_invocation(  # noqa: PLR0913
         *,
         instruction: Instruction | str | None,

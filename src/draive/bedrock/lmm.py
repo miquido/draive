@@ -4,7 +4,7 @@ from typing import Any, Literal, cast
 
 from haiway import ArgumentsTrace, ResultTrace, ctx
 
-from draive.bedrock.client import SHARED, BedrockClient
+from draive.bedrock.client import BedrockClient
 from draive.bedrock.config import BedrockChatConfig
 from draive.bedrock.models import ChatCompletionResponse, ChatMessage, ChatMessageContent, ChatTool
 from draive.bedrock.types import BedrockException
@@ -37,9 +37,11 @@ __all__ = [
 
 
 def bedrock_lmm(
-    client: BedrockClient = SHARED,
+    client: BedrockClient | None = None,
     /,
 ) -> LMMInvocation:
+    client = client or BedrockClient.shared()
+
     async def lmm_invocation(
         *,
         instruction: Instruction | str | None,

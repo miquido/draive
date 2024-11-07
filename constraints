@@ -119,7 +119,7 @@ pydantic-core==2.23.4
     # via pydantic
 pygments==2.18.0
     # via rich
-pyright==1.1.387
+pyright==1.1.388
     # via draive (pyproject.toml)
 pystemmer==2.2.0.3
     # via fastembed
@@ -169,7 +169,7 @@ sympy==1.13.3
     # via onnxruntime
 tiktoken==0.8.0
     # via draive (pyproject.toml)
-tokenizers==0.20.2
+tokenizers==0.20.3
     # via
     #   anthropic
     #   fastembed
