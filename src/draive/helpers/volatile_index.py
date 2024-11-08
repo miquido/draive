@@ -50,6 +50,38 @@ class VolatileVectorIndex(State):
         else:
             self.storage[model] = embedded_models
 
+    def find[Model: DataModel](
+        self,
+        model: type[Model],
+        /,
+        requirements: ParameterRequirement[Model] | None = None,
+        limit: int | None = None,
+        **extra: Any,
+    ) -> list[Model]:
+        stored: list[Embedded[Model]] | None = self.storage.get(model)
+        if not stored:
+            return []
+
+        filtered: list[Model]
+        if requirements:
+            filtered = [
+                element.value
+                for element in stored
+                if requirements.check(
+                    element.value,
+                    raise_exception=False,
+                )
+            ]
+
+        else:
+            filtered = [element.value for element in stored]
+
+        if limit:
+            return filtered[:limit]
+
+        else:
+            return filtered
+
     async def search[Model: DataModel](
         self,
         model: type[Model],
