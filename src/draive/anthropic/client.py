@@ -1,4 +1,5 @@
 from random import uniform
+from types import TracebackType
 from typing import ClassVar, Literal, Self, final, overload
 
 from anthropic import AsyncAnthropic, AsyncStream
@@ -33,8 +34,12 @@ class AnthropicClient:
         self,
         api_key: str | None = None,
     ) -> None:
-        self._client: AsyncAnthropic = AsyncAnthropic(
-            api_key=api_key or getenv_str("ANTHROPIC_API_KEY"),
+        self._api_key: str | None = api_key or getenv_str("ANTHROPIC_API_KEY")
+        self._client: AsyncAnthropic = self._initialize_client()
+
+    def _initialize_client(self) -> AsyncAnthropic:
+        return AsyncAnthropic(
+            api_key=self._api_key,
             max_retries=0,  # disable library retries
         )
 
@@ -121,8 +126,14 @@ class AnthropicClient:
             else:
                 raise exc
 
-    async def initialize(self) -> None:
-        pass  # Disposable protocol requirement
+    async def __aenter__(self) -> None:
+        if self._client.is_closed():
+            self._client = self._initialize_client()
 
-    async def dispose(self) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         await self._client.close()

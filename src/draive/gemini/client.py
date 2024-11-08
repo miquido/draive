@@ -3,6 +3,7 @@ from asyncio import gather
 from collections.abc import Sequence
 from http import HTTPStatus
 from itertools import chain
+from types import TracebackType
 from typing import Any, ClassVar, Literal, Self, final, overload
 
 from haiway import getenv_str, not_missing
@@ -41,13 +42,21 @@ class GeminiClient:
         api_key: str | None = None,
         timeout: float | None = None,
     ) -> None:
-        self._client: AsyncClient = AsyncClient(  # nosec: B113 - false positive
-            base_url=endpoint
-            or getenv_str("GEMINI_ENDPOINT", "https://generativelanguage.googleapis.com"),
+        self._endpoint: str = endpoint or getenv_str(
+            "GEMINI_ENDPOINT",
+            default="https://generativelanguage.googleapis.com",
+        )
+        self._api_key: str | None = api_key or getenv_str("GEMINI_API_KEY")
+        self._timeout: float = timeout or 60
+        self._client: AsyncClient = self._initialize_client()
+
+    def _initialize_client(self) -> AsyncClient:
+        return AsyncClient(  # nosec: B113 - false positive
+            base_url=self._endpoint,
             params={
-                "key": api_key or getenv_str("GEMINI_API_KEY"),
+                "key": self._api_key,
             },
-            timeout=timeout or 60,
+            timeout=self._timeout,
         )
 
     async def generate(  # noqa: PLR0913
@@ -179,10 +188,16 @@ class GeminiClient:
         assert len(texts) == len(result)  # nosec: B101
         return result
 
-    async def initialize(self) -> None:
-        pass  # Disposable protocol requirement
+    async def __aenter__(self) -> None:
+        if self._client.is_closed:
+            self._client = self._initialize_client()
 
-    async def dispose(self) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         await self._client.aclose()
 
     @overload

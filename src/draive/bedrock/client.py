@@ -1,3 +1,4 @@
+from types import TracebackType
 from typing import Any, ClassVar, Self, final
 
 from haiway import asynchronous, getenv_str, not_missing
@@ -36,7 +37,10 @@ class BedrockClient:
 
     # preparing it lazily on demand, boto does a lot of stuff on initialization
     @asynchronous
-    def _prepare_client(self) -> None:
+    def initialize(self) -> None:
+        if hasattr(self, "_client"):
+            return  # already initialized
+
         import boto3  # pyright: ignore[reportMissingTypeStubs]
 
         self._client = boto3.Session(  # pyright: ignore[reportUnknownMemberType]
@@ -54,7 +58,6 @@ class BedrockClient:
         tools: list[ChatTool],
         require_tool: str | bool,
     ) -> ChatCompletionResponse:
-        await self.initialize()
         return await self._create_chat_completion(
             model=config.model,
             temperature=config.temperature,
@@ -121,9 +124,13 @@ class BedrockClient:
 
         return self._client.converse(**parameters)
 
-    async def initialize(self) -> None:
-        if not hasattr(self, "_client"):
-            await self._prepare_client()
+    async def __aenter__(self) -> None:
+        await self.initialize()
 
-    async def dispose(self) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         pass
