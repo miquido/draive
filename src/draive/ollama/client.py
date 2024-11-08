@@ -1,5 +1,6 @@
 import json
 from http import HTTPStatus
+from types import TracebackType
 from typing import Any, ClassVar, Literal, Self, cast, final
 
 from haiway import getenv_str, not_missing
@@ -33,9 +34,17 @@ class OllamaClient:
         endpoint: str | None = None,
         timeout: float | None = None,
     ) -> None:
-        self._client: AsyncClient = AsyncClient(  # nosec: B113 - false positive
-            base_url=endpoint or getenv_str("OLLAMA_ENDPOINT", "http://localhost:11434"),
-            timeout=timeout or 60,
+        self._endpoint: str = endpoint or getenv_str(
+            "OLLAMA_ENDPOINT",
+            default="http://localhost:11434",
+        )
+        self._timeout: float = timeout or 60
+        self._client: AsyncClient = self._initialize_client()
+
+    def _initialize_client(self) -> AsyncClient:
+        return AsyncClient(  # nosec: B113 - false positive
+            base_url=self._endpoint,
+            timeout=self._timeout,
         )
 
     async def chat_completion(
@@ -99,10 +108,16 @@ class OllamaClient:
             body=request_body,
         )
 
-    async def initialize(self) -> None:
-        pass  # Disposable protocol requirement
+    async def __aenter__(self) -> None:
+        if self._client.is_closed:
+            self._client = self._initialize_client()
 
-    async def dispose(self) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         await self._client.aclose()
 
     async def _request[Requested: DataModel](  # noqa: PLR0913

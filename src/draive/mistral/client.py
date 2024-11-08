@@ -3,6 +3,7 @@ from asyncio import gather
 from collections.abc import AsyncIterator, Sequence
 from http import HTTPStatus
 from itertools import chain
+from types import TracebackType
 from typing import Any, ClassVar, Literal, Self, cast, final, overload
 
 from haiway import getenv_str, not_missing
@@ -42,12 +43,21 @@ class MistralClient:
         api_key: str | None = None,
         timeout: float | None = None,
     ) -> None:
-        self._client: AsyncClient = AsyncClient(  # nosec: B113 - false positive
-            base_url=endpoint or getenv_str("MISTRAL_ENDPOINT", "https://api.mistral.ai"),
+        self._endpoint: str = endpoint or getenv_str(
+            "MISTRAL_ENDPOINT",
+            default="https://api.mistral.ai",
+        )
+        self._api_key: str | None = api_key or getenv_str("MISTRAL_API_KEY")
+        self._timeout: float = timeout or 60
+        self._client: AsyncClient = self._initialize_client()
+
+    def _initialize_client(self) -> AsyncClient:
+        return AsyncClient(  # nosec: B113 - false positive
+            base_url=self._endpoint,
             headers={
-                "Authorization": f"Bearer {api_key or getenv_str('MISTRAL_API_KEY')}",
+                "Authorization": f"Bearer {self._api_key}",
             },
-            timeout=timeout or 60,
+            timeout=self._timeout,
         )
 
     @overload
@@ -182,10 +192,16 @@ class MistralClient:
         )
         return [element.embedding for element in response.data]
 
-    async def initialize(self) -> None:
-        pass  # Disposable protocol requirement
+    async def __aenter__(self) -> None:
+        if self._client.is_closed:
+            self._client = self._initialize_client()
 
-    async def dispose(self) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         await self._client.aclose()
 
     async def _request[Requested: DataModel](  # noqa: PLR0913
