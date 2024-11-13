@@ -4,8 +4,8 @@ from uuid import UUID, uuid4
 from haiway import MISSING, Missing, freeze, frozenlist, is_missing, not_missing
 
 from draive.agents.errors import AgentException
+from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import ParametrizedData
-from draive.types import Multimodal, MultimodalContent
 
 __all__ = [
     "Agent",

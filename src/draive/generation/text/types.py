@@ -3,7 +3,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
-from draive.types import Multimodal
+from draive.multimodal import Multimodal
 
 __all__ = [
     "TextGenerator",

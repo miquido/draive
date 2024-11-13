@@ -3,9 +3,9 @@ from typing import Any
 from haiway import ctx
 
 from draive.instructions import Instruction
+from draive.multimodal import Multimodal, MultimodalContent
 from draive.steps.state import Steps
 from draive.steps.types import Step
-from draive.types import Multimodal, MultimodalContent
 
 __all__ = [
     "steps_completion",

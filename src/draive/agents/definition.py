@@ -3,7 +3,7 @@ from typing import Protocol, cast, overload, runtime_checkable
 
 from draive.agents.node import Agent, AgentError, AgentMessage, AgentNode, AgentOutput
 from draive.helpers import VolatileMemory
-from draive.types import Memory
+from draive.utils import Memory
 
 __all__ = [
     "agent",

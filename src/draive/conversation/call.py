@@ -8,13 +8,12 @@ from draive.conversation.state import Conversation
 from draive.conversation.types import ConversationMessage
 from draive.helpers import ConstantMemory
 from draive.instructions import Instruction
-from draive.lmm import AnyTool, Toolbox
-from draive.types import (
-    LMMStreamChunk,
-    Memory,
+from draive.lmm import AnyTool, LMMStreamChunk, Toolbox
+from draive.multimodal import (
     Multimodal,
     MultimodalContent,
 )
+from draive.utils import Memory
 
 __all__ = [
     "conversation_completion",

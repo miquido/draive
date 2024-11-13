@@ -1,6 +1,6 @@
 from typing import Any, Protocol, runtime_checkable
 
-from draive.types import MultimodalContent
+from draive.multimodal import MultimodalContent
 
 __all__ = [
     "ContentGuardrails",

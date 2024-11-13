@@ -7,7 +7,7 @@ from draive.choice.state import Choice
 from draive.choice.types import ChoiceOption
 from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
-from draive.types import Multimodal
+from draive.multimodal import Multimodal
 
 __all__ = [
     "choice_completion",

@@ -11,12 +11,14 @@ from draive.agents.idle import IdleMonitor
 from draive.agents.node import Agent, AgentOutput
 from draive.agents.runner import AgentRunner
 from draive.helpers import VolatileMemory
-from draive.parameters import DataModel, ParametrizedData
-from draive.types import (
-    BasicMemory,
-    Memory,
+from draive.multimodal import (
     Multimodal,
     MultimodalContent,
+)
+from draive.parameters import DataModel, ParametrizedData
+from draive.utils import (
+    BasicMemory,
+    Memory,
 )
 
 __all__ = [

@@ -1,3 +1,4 @@
+from base64 import b64encode
 from collections.abc import Iterable
 from typing import Any, Literal, cast
 
@@ -16,27 +17,21 @@ from draive.anthropic.client import AnthropicClient
 from draive.anthropic.config import AnthropicConfig
 from draive.anthropic.types import AnthropicException
 from draive.instructions import Instruction
-from draive.lmm import LMMInvocation, LMMToolSelection, ToolSpecification
-from draive.metrics import TokenUsage
-from draive.parameters import DataModel, ParametersSpecification
-from draive.types import (
-    AudioBase64Content,
-    AudioURLContent,
-    ImageBase64Content,
-    ImageURLContent,
+from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
+    LMMInvocation,
     LMMOutput,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
-    MultimodalContent,
-    MultimodalContentElement,
-    TextContent,
-    VideoBase64Content,
-    VideoURLContent,
+    LMMToolSelection,
+    ToolSpecification,
 )
+from draive.metrics import TokenUsage
+from draive.multimodal import MediaContent, MultimodalContent, MultimodalContentElement, TextContent
+from draive.parameters import DataModel, ParametersSpecification
 
 __all__ = [
     "anthropic_lmm",
@@ -99,31 +94,18 @@ def _convert_content_element(
                 "text": text.text,
             }
 
-        case ImageURLContent() as image:
-            # TODO: we could download the media to have data instead
-            raise ValueError("Unsupported message content", element)
+        case MediaContent() as media:
+            if media.kind != "image" or isinstance(media.source, str):
+                raise ValueError("Unsupported message content", media)
 
-        case ImageBase64Content() as image:
             return {
                 "type": "image",
                 "source": {
                     "type": "base64",
-                    "media_type": image.mime_type or "image/png",
-                    "data": image.image_base64,
+                    "media_type": cast(Any, media.mime_type),
+                    "data": b64encode(media.source).decode(),
                 },
             }
-
-        case AudioURLContent():
-            raise ValueError("Unsupported message content", element)
-
-        case AudioBase64Content():
-            raise ValueError("Unsupported message content", element)
-
-        case VideoURLContent():
-            raise ValueError("Unsupported message content", element)
-
-        case VideoBase64Content():
-            raise ValueError("Unsupported message content", element)
 
         case DataModel() as data:
             return {
@@ -342,7 +324,6 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
                 return LMMCompletion.of(
                     MultimodalContent.of(
                         *[TextContent(text=part.text) for part in message_parts],
-                        merge_text=True,
                     )
                 )
 

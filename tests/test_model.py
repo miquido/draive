@@ -5,11 +5,10 @@ from uuid import UUID
 
 from draive import (
     MISSING,
-    AudioURLContent,
     ConversationMessage,
     DataModel,
     Field,
-    ImageURLContent,
+    MediaContent,
     Missing,
     MultimodalContent,
 )
@@ -237,85 +236,50 @@ basic_conversation_message_json: str = (
     "}"
 )
 
-image_conversation_message_instance: ConversationMessage = ConversationMessage(
-    identifier="identifier",
-    role="model",
-    content=MultimodalContent.of(ImageURLContent(image_url="https://miquido.com/image")),
-)
-image_conversation_message_json: str = (
-    "{"
-    '"identifier": "identifier", '
-    '"role": "model", '
-    '"author": null, '
-    '"created": null, '
-    '"content": {'
-    '"parts": ['
-    "{"
-    '"mime_type": null, '
-    '"image_url": "https://miquido.com/image", '
-    '"image_description": null, '
-    '"meta": null'
-    "}"
-    "]"
-    "}, "
-    '"meta": null'
-    "}"
-)
-audio_conversation_message_instance: ConversationMessage = ConversationMessage(
-    identifier="identifier",
-    role="model",
-    content=MultimodalContent.of(AudioURLContent(audio_url="https://miquido.com/audio")),
-)
-audio_conversation_message_json: str = (
-    "{"
-    '"identifier": "identifier", '
-    '"role": "model", '
-    '"author": null, '
-    '"created": null, '
-    '"content": {'
-    '"parts": ['
-    "{"
-    '"mime_type": null, '
-    '"audio_url": "https://miquido.com/audio", '
-    '"audio_transcription": null, '
-    '"meta": null'
-    "}"
-    "]"
-    "}, "
-    '"meta": null'
-    "}"
-)
-mixed_conversation_message_instance: ConversationMessage = ConversationMessage(
+media_url_conversation_message_instance: ConversationMessage = ConversationMessage(
     identifier="identifier",
     role="model",
     content=MultimodalContent.of(
-        AudioURLContent(audio_url="https://miquido.com/audio"),
-        "string",
-        ImageURLContent(image_url="https://miquido.com/image"),
-        "content",
+        MediaContent.url("https://miquido.com/image", mime_type="image/png")
     ),
 )
-mixed_conversation_message_json: str = (
+media_url_conversation_message_json: str = (
     "{"
     '"identifier": "identifier", '
     '"role": "model", '
     '"author": null, '
     '"created": null, '
-    '"content": {"parts": ['
+    '"content": {'
+    '"parts": ['
     "{"
-    '"mime_type": null, '
-    '"audio_url": "https://miquido.com/audio", '
-    '"audio_transcription": null, '
+    '"mime_type": "image/png", '
+    '"source": "https://miquido.com/image", '
     '"meta": null'
+    "}"
+    "]"
     "}, "
-    '{"text": "string", "meta": null}, '
+    '"meta": null'
+    "}"
+)
+
+media_data_conversation_message_instance: ConversationMessage = ConversationMessage(
+    identifier="identifier",
+    role="model",
+    content=MultimodalContent.of(MediaContent.data(b"image_data", mime_type="image/png")),
+)
+media_data_conversation_message_json: str = (
     "{"
-    '"mime_type": null, '
-    '"image_url": "https://miquido.com/image", '
-    '"image_description": null, '
+    '"identifier": "identifier", '
+    '"role": "model", '
+    '"author": null, '
+    '"created": null, '
+    '"content": {'
+    '"parts": ['
+    "{"
+    '"mime_type": "image/png", '
+    '"source": "aW1hZ2VfZGF0YQ==", '
     '"meta": null'
-    "}, "
-    '{"text": "content", "meta": null}'
+    "}"
     "]"
     "}, "
     '"meta": null'
@@ -329,24 +293,21 @@ def test_llm_message_decoding() -> None:
         == basic_conversation_message_instance
     )
     assert (
-        ConversationMessage.from_json(image_conversation_message_json)
-        == image_conversation_message_instance
+        ConversationMessage.from_json(media_url_conversation_message_json)
+        == media_url_conversation_message_instance
     )
     assert (
-        ConversationMessage.from_json(audio_conversation_message_json)
-        == audio_conversation_message_instance
-    )
-    assert (
-        ConversationMessage.from_json(mixed_conversation_message_json)
-        == mixed_conversation_message_instance
+        ConversationMessage.from_json(media_data_conversation_message_json)
+        == media_data_conversation_message_instance
     )
 
 
 def test_llm_message_encoding() -> None:
     assert basic_conversation_message_instance.as_json() == basic_conversation_message_json
-    assert image_conversation_message_instance.as_json() == image_conversation_message_json
-    assert audio_conversation_message_instance.as_json() == audio_conversation_message_json
-    assert mixed_conversation_message_instance.as_json() == mixed_conversation_message_json
+    assert media_url_conversation_message_instance.as_json() == media_url_conversation_message_json
+    assert (
+        media_data_conversation_message_instance.as_json() == media_data_conversation_message_json
+    )
 
 
 class AnyModelNested(DataModel):

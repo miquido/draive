@@ -6,16 +6,21 @@ from haiway import AsyncQueue, Missing, ctx, not_missing
 
 from draive.conversation.types import ConversationMessage
 from draive.instructions import Instruction
-from draive.lmm import LMMStreamProperties, Toolbox, lmm_invoke, lmm_stream
-from draive.types import (
+from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
+    LMMStreamChunk,
+    LMMStreamInput,
+    LMMStreamProperties,
+    LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
-    Memory,
-    MultimodalContent,
+    Toolbox,
+    lmm_invoke,
+    lmm_stream,
 )
-from draive.types.lmm import LMMStreamChunk, LMMStreamInput, LMMToolRequest
+from draive.multimodal import MultimodalContent
+from draive.utils import Memory
 
 __all__: list[str] = [
     "default_conversation_completion",
@@ -172,7 +177,7 @@ async def _conversation_stream(
     input_stream.enqueue(
         LMMStreamChunk.of(
             message.content,
-            final=True,  # we provide single input chunk here
+            eod=True,  # we provide single input chunk here
         )
     )
     accumulated_content: MultimodalContent = MultimodalContent.of()
@@ -192,7 +197,7 @@ async def _conversation_stream(
                     merge_text=True,
                 )
                 # on turn end finalize the stream - we are streaming only a single response here
-                if chunk.is_final:
+                if chunk.eod:
                     input_stream.finish()
                     response_message: ConversationMessage = ConversationMessage(
                         role="model",

@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from draive.parameters import DataModel
 
 __all__ = [
@@ -7,7 +9,7 @@ __all__ = [
 
 class TextContent(DataModel):
     text: str
-    meta: dict[str, str | float | int | bool | None] | None = None
+    meta: Mapping[str, str | float | int | bool | None] | None = None
 
     def __bool__(self) -> bool:
-        return bool(self.text)
+        return len(self.text) > 0

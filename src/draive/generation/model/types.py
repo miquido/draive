@@ -3,8 +3,8 @@ from typing import Any, Literal, Protocol, runtime_checkable
 
 from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
+from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel
-from draive.types import Multimodal, MultimodalContent
 
 __all__ = [
     "ModelGenerator",

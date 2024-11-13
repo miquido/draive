@@ -3,16 +3,17 @@ from typing import Any
 from haiway import ctx
 
 from draive.instructions import Instruction
-from draive.lmm import lmm_invoke
-from draive.lmm.tools.toolbox import Toolbox
-from draive.steps.types import Step
-from draive.types import (
+from draive.lmm import (
+    LMMCompletion,
     LMMContextElement,
     LMMInput,
-    Multimodal,
-    MultimodalContent,
+    LMMToolRequests,
+    LMMToolResponse,
+    lmm_invoke,
 )
-from draive.types.lmm import LMMCompletion, LMMToolRequests, LMMToolResponse
+from draive.lmm.toolbox import Toolbox
+from draive.multimodal import Multimodal, MultimodalContent
+from draive.steps.types import Step
 
 __all__ = [
     "default_steps_completion",

@@ -4,11 +4,11 @@ from typing import Any
 from haiway import ctx, not_missing
 from openai.types.moderation import Moderation
 
+from draive.multimodal import MultimodalContent
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIModerationConfig
 from draive.safeguards import ContentGuardrails, GuardrailsException
 from draive.splitters import split_text
-from draive.types import MultimodalContent
 
 __all__ = [
     "openai_content_guardrails",

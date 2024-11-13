@@ -10,7 +10,7 @@ from anthropic.types.message_create_params import ToolChoice, ToolChoiceToolChoi
 from haiway import getenv_str, not_missing
 
 from draive.anthropic.config import AnthropicConfig
-from draive.types import RateLimitError
+from draive.utils import RateLimitError
 
 __all__ = [
     "AnthropicClient",

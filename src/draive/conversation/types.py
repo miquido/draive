@@ -1,20 +1,22 @@
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Iterable, Mapping
 from datetime import datetime
 from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
 from uuid import uuid4
 
 from draive.instructions import Instruction
-from draive.lmm import Toolbox
-from draive.parameters import DataModel, Field
-from draive.types import (
+from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
     LMMStreamChunk,
-    Memory,
+    Toolbox,
+)
+from draive.multimodal import (
     Multimodal,
     MultimodalContent,
 )
+from draive.parameters import DataModel, Field
+from draive.utils import Memory
 
 __all__ = [
     "ConversationCompletion",
@@ -30,7 +32,7 @@ class ConversationMessage(DataModel):
         identifier: str | None = None,
         author: str | None = None,
         created: datetime | None = None,
-        meta: dict[str, str | float | int | bool | None] | None = None,
+        meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> Self:
         return cls(
             identifier=identifier or uuid4().hex,
@@ -48,7 +50,7 @@ class ConversationMessage(DataModel):
         identifier: str | None = None,
         author: str | None = None,
         created: datetime | None = None,
-        meta: dict[str, str | float | int | bool | None] | None = None,
+        meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> Self:
         return cls(
             identifier=identifier or uuid4().hex,
@@ -64,7 +66,7 @@ class ConversationMessage(DataModel):
     author: str | None = None
     created: datetime | None = None
     content: MultimodalContent
-    meta: dict[str, str | float | int | bool | None] | None = None
+    meta: Mapping[str, str | float | int | bool | None] | None = None
 
     def as_lmm_context_element(self) -> LMMContextElement:
         match self.role:

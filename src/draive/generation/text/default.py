@@ -4,13 +4,17 @@ from typing import Any
 from haiway import ctx
 
 from draive.instructions import Instruction
-from draive.lmm import AnyTool, Toolbox, lmm_invoke
-from draive.types import (
+from draive.lmm import (
+    AnyTool,
     LMMCompletion,
     LMMContextElement,
     LMMInput,
     LMMToolRequests,
     LMMToolResponse,
+    Toolbox,
+    lmm_invoke,
+)
+from draive.multimodal import (
     Multimodal,
     MultimodalContent,
 )

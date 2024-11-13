@@ -5,23 +5,25 @@ from typing import Any, Literal, cast
 from haiway import ArgumentsTrace, ResultTrace, ctx
 
 from draive.instructions import Instruction
-from draive.lmm import LMMInvocation, LMMToolSelection, ToolSpecification
+from draive.lmm import (
+    LMMCompletion,
+    LMMContextElement,
+    LMMInput,
+    LMMInvocation,
+    LMMOutput,
+    LMMToolRequest,
+    LMMToolRequests,
+    LMMToolResponse,
+    LMMToolSelection,
+    ToolSpecification,
+)
 from draive.metrics import TokenUsage
 from draive.mistral.client import MistralClient
 from draive.mistral.config import MistralChatConfig
 from draive.mistral.models import ChatCompletionResponse, ChatMessage, ChatMessageResponse
 from draive.mistral.types import MistralException
+from draive.multimodal import MultimodalContent
 from draive.parameters import ParametersSpecification
-from draive.types import (
-    LMMCompletion,
-    LMMContextElement,
-    LMMInput,
-    LMMOutput,
-    LMMToolRequest,
-    LMMToolRequests,
-    LMMToolResponse,
-)
-from draive.types.multimodal import MultimodalContent
 
 __all__ = [
     "mistral_lmm",
