@@ -5,7 +5,7 @@ from haiway import State
 from draive.conversation.default import default_conversation_completion
 from draive.conversation.types import ConversationCompletion, ConversationMessage
 from draive.safeguards import ContentGuardrails
-from draive.types import Memory
+from draive.utils import Memory
 
 __all__: list[str] = [
     "Conversation",

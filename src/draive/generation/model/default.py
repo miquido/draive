@@ -5,17 +5,21 @@ from haiway import ctx
 
 from draive.generation.model.types import ModelGeneratorDecoder
 from draive.instructions import Instruction
-from draive.lmm import AnyTool, Toolbox, lmm_invoke
-from draive.parameters import DataModel
-from draive.types import (
+from draive.lmm import (
+    AnyTool,
     LMMCompletion,
     LMMContextElement,
     LMMInput,
     LMMToolRequests,
     LMMToolResponse,
+    Toolbox,
+    lmm_invoke,
+)
+from draive.multimodal import (
     Multimodal,
     MultimodalContent,
 )
+from draive.parameters import DataModel
 
 __all__: list[str] = [
     "default_generate_model",

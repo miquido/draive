@@ -4,15 +4,16 @@ from typing import Any, Literal, Self, final
 
 from haiway import ctx, freeze
 
-from draive.lmm.tools.specification import ToolSpecification
-from draive.lmm.tools.tool import AnyTool
-from draive.lmm.tools.types import ToolError, ToolException
-from draive.types import (
+from draive.lmm.tool import AnyTool
+from draive.lmm.types import (
+    LMMToolError,
+    LMMToolException,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
-    MultimodalContent,
+    ToolSpecification,
 )
+from draive.multimodal import MultimodalContent
 
 __all__ = [
     "Toolbox",
@@ -95,7 +96,7 @@ class Toolbox:
             )
 
         else:
-            raise ToolException("Requested tool (%s) is not defined", name)
+            raise LMMToolException("Requested tool (%s) is not defined", name)
 
     async def respond_all(
         self,
@@ -125,7 +126,7 @@ class Toolbox:
                     error=False,
                 )
 
-            except ToolError as error:  # use formatted error, blow up on other exception
+            except LMMToolError as error:  # use formatted error, blow up on other exception
                 ctx.log_error(
                     "Tool (%s) returned an error",
                     request.tool,

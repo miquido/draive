@@ -4,20 +4,22 @@ from typing import Any, Literal
 from haiway import ArgumentsTrace, ResultTrace, ctx
 
 from draive.instructions import Instruction
-from draive.lmm import LMMInvocation, LMMToolSelection, ToolSpecification
+from draive.lmm import (
+    LMMCompletion,
+    LMMContextElement,
+    LMMInput,
+    LMMInvocation,
+    LMMOutput,
+    LMMToolRequests,
+    LMMToolResponse,
+    LMMToolSelection,
+    ToolSpecification,
+)
 from draive.metrics.tokens import TokenUsage
 from draive.ollama.client import OllamaClient
 from draive.ollama.config import OllamaChatConfig
 from draive.ollama.models import ChatCompletionResponse, ChatMessage
 from draive.parameters import ParametersSpecification
-from draive.types import (
-    LMMCompletion,
-    LMMContextElement,
-    LMMInput,
-    LMMOutput,
-    LMMToolRequests,
-    LMMToolResponse,
-)
 
 __all__ = [
     "ollama_lmm",

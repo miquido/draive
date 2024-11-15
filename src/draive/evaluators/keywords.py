@@ -1,7 +1,7 @@
 from collections.abc import Callable, Sequence
 
 from draive.evaluation import EvaluationScore, evaluator
-from draive.types import Multimodal, MultimodalContent
+from draive.multimodal import Multimodal, MultimodalContent
 
 __all__ = [
     "keywords_evaluator",

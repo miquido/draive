@@ -6,17 +6,19 @@ from haiway import ctx
 
 from draive.choice.types import ChoiceOption, SelectionException
 from draive.instructions import Instruction
-from draive.lmm import Toolbox, lmm_invoke
-from draive.types import (
+from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
     LMMToolRequests,
+    LMMToolResponse,
+    Toolbox,
+    lmm_invoke,
+)
+from draive.multimodal import (
     Multimodal,
     MultimodalContent,
 )
-from draive.types.lmm import LMMToolResponse
-from draive.utils import xml_tag
 
 __all__ = [
     "default_choice_completion",
@@ -87,7 +89,7 @@ async def default_choice_completion(  # noqa: C901
             ):
                 case LMMCompletion() as completion:
                     ctx.log_debug("Received choice results")
-                    if selection := xml_tag("CHOICE", source=completion.content):
+                    if selection := completion.content.extract_first("CHOICE"):
                         if option := options_map.get(selection.as_string()):
                             return option
 
@@ -100,9 +102,8 @@ async def default_choice_completion(  # noqa: C901
                     if direct_content := [
                         response.content for response in responses if response.direct
                     ]:
-                        if selection := xml_tag(
-                            "CHOICE",
-                            source=MultimodalContent.of(*direct_content),
+                        if selection := MultimodalContent.of(*direct_content).extract_first(
+                            "CHOICE"
                         ):
                             if option := options_map.get(selection.as_string()):
                                 return option

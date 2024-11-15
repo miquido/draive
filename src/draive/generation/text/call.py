@@ -6,7 +6,7 @@ from haiway import ctx
 from draive.generation.text.state import TextGeneration
 from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
-from draive.types import Multimodal
+from draive.multimodal import Multimodal
 
 __all__ = [
     "generate_text",

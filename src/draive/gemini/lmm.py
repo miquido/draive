@@ -1,6 +1,7 @@
+from base64 import b64encode
 from collections.abc import Iterable, Sequence
 from copy import copy
-from typing import Any, Literal, cast
+from typing import Any, Literal, cast, get_args
 from uuid import uuid4
 
 from haiway import ArgumentsTrace, ResultTrace, ctx
@@ -22,27 +23,22 @@ from draive.gemini.models import (
 )
 from draive.gemini.types import GeminiException
 from draive.instructions import Instruction
-from draive.lmm import LMMInvocation, LMMToolSelection, ToolSpecification
-from draive.metrics import TokenUsage
-from draive.parameters import DataModel, ParametersSpecification
-from draive.types import (
-    AudioBase64Content,
-    AudioURLContent,
-    ImageBase64Content,
-    ImageURLContent,
+from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
+    LMMInvocation,
     LMMOutput,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
-    MultimodalContent,
-    MultimodalContentElement,
-    TextContent,
-    VideoBase64Content,
-    VideoURLContent,
+    LMMToolSelection,
+    ToolSpecification,
 )
+from draive.metrics import TokenUsage
+from draive.multimodal import MediaContent, MultimodalContent, MultimodalContentElement, TextContent
+from draive.multimodal.media import MediaType
+from draive.parameters import DataModel, ParametersSpecification
 
 __all__ = [
     "gemini_lmm",
@@ -106,60 +102,30 @@ def gemini_lmm(
     return LMMInvocation(invoke=lmm_invocation)
 
 
-def _convert_content_element(  # noqa: PLR0911
+def _convert_content_element(
     element: MultimodalContentElement,
 ) -> dict[str, Any]:
     match element:
         case TextContent() as text:
             return {"text": text.text}
 
-        case ImageURLContent() as image:
-            return {
-                "fileData": {
-                    "mimeType": image.mime_type or "image",
-                    "fileUri": image.image_url,
-                }
-            }
+        case MediaContent() as media:
+            match media.source:
+                case str() as reference:
+                    return {
+                        "fileData": {
+                            "mimeType": media.mime_type,
+                            "fileUri": reference,
+                        }
+                    }
 
-        case ImageBase64Content() as image:
-            return {
-                "inlineData": {
-                    "mimeType": image.mime_type or "image",
-                    "data": image.image_base64,
-                }
-            }
-
-        case AudioURLContent() as audio:
-            return {
-                "fileData": {
-                    "mimeType": audio.mime_type or "audio",
-                    "fileUri": audio.audio_url,
-                }
-            }
-
-        case AudioBase64Content() as audio:
-            return {
-                "inlineData": {
-                    "mimeType": audio.mime_type or "audio",
-                    "data": audio.audio_base64,
-                }
-            }
-
-        case VideoURLContent() as video:
-            return {
-                "fileData": {
-                    "mimeType": video.mime_type or "video",
-                    "fileUri": video.video_url,
-                }
-            }
-
-        case VideoBase64Content() as video:
-            return {
-                "inlineData": {
-                    "mimeType": video.mime_type or "video",
-                    "data": video.video_base64,
-                }
-            }
+                case bytes() as data:
+                    return {
+                        "inlineData": {
+                            "mimeType": media.mime_type,
+                            "data": b64encode(data).decode(),
+                        }
+                    }
 
         case DataModel() as data:
             return {"text": data.as_json()}
@@ -214,7 +180,7 @@ def _convert_context_element(
             }
 
 
-def _convert_content_part(  # noqa: PLR0911
+def _convert_content_part(
     part: GeminiMessageContent,
 ) -> MultimodalContentElement:
     match part:
@@ -223,27 +189,10 @@ def _convert_content_part(  # noqa: PLR0911
 
         case GeminiDataMessageContent() as data:
             mime_type: str = data.data.mime_type
-            if mime_type.startswith("image"):
-                return ImageBase64Content(
-                    mime_type=cast(
-                        Literal["image/jpeg", "image/png", "image/gif"] | None,
-                        mime_type
-                        if mime_type in {"image/jpeg", "image/png", "image/gif"}
-                        else None,
-                    ),
-                    image_base64=data.data.data,
-                )
-
-            elif mime_type.startswith("audio"):
-                return AudioBase64Content(
-                    mime_type=mime_type,
-                    audio_base64=data.data.data,
-                )
-
-            elif mime_type.startswith("video"):
-                return VideoBase64Content(
-                    mime_type=mime_type,
-                    video_base64=data.data.data,
+            if mime_type in get_args(MediaType):
+                return MediaContent.base64(
+                    data.data.data,
+                    mime_type=cast(MediaType, mime_type),
                 )
 
             else:
@@ -251,27 +200,10 @@ def _convert_content_part(  # noqa: PLR0911
 
         case GeminiDataReferenceMessageContent() as reference:
             mime_type: str = reference.reference.mime_type
-            if mime_type.startswith("image"):
-                return ImageURLContent(
-                    mime_type=cast(
-                        Literal["image/jpeg", "image/png", "image/gif"] | None,
-                        mime_type
-                        if mime_type in {"image/jpeg", "image/png", "image/gif"}
-                        else None,
-                    ),
-                    image_url=reference.reference.uri,
-                )
-
-            elif mime_type.startswith("audio"):
-                return AudioURLContent(
-                    mime_type=mime_type,
-                    audio_url=reference.reference.uri,
-                )
-
-            elif mime_type.startswith("video"):
-                return VideoURLContent(
-                    mime_type=mime_type,
-                    video_url=reference.reference.uri,
+            if mime_type in get_args(MediaType):
+                return MediaContent.url(
+                    reference.reference.uri,
+                    mime_type=cast(MediaType, mime_type),
                 )
 
             else:
@@ -433,7 +365,6 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
         return LMMCompletion.of(
             MultimodalContent.of(
                 *[_convert_content_part(part) for part in message_parts],
-                merge_text=True,
             )
         )
 

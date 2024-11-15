@@ -3,10 +3,9 @@ from typing import Any, Protocol, cast, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze, not_missing
 
-from draive.lmm.tools.specification import ToolSpecification
-from draive.lmm.tools.types import ToolError, ToolException
+from draive.lmm.types import LMMToolError, LMMToolException, ToolSpecification
+from draive.multimodal import Multimodal, MultimodalContent, MultimodalContentConvertible
 from draive.parameters import ParameterSpecification, ParametrizedFunction
-from draive.types import Multimodal, MultimodalContent, MultimodalContentConvertible
 
 __all__ = [
     "AnyTool",
@@ -97,7 +96,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
 
             try:
                 if not self.available:
-                    raise ToolException(f"{self.name} is not available!")
+                    raise LMMToolException(f"{self.name} is not available!")
 
                 result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
                 ctx.record(ResultTrace.of(result))
@@ -106,7 +105,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
 
             except Exception as exc:
                 # return an error with formatted content
-                raise ToolError(
+                raise LMMToolError(
                     f"Tool {self.name}[{call_id}] failed",
                     content=MultimodalContent.of(self.format_failure(exc)),
                 ) from exc

@@ -1,5 +1,5 @@
 from asyncio import gather
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import ctx, freeze
@@ -38,7 +38,7 @@ class EvaluatorResult(DataModel):
         "a value between 0 (min) and 1 (max)",
         verifier=_verifier,
     )
-    meta: dict[str, str | float | int | bool | None] | None = Field(
+    meta: Mapping[str, str | float | int | bool | None] | None = Field(
         description="Additional evaluation metadata",
         default=None,
     )
@@ -68,7 +68,7 @@ class EvaluationResult(DataModel):
         cls,
         score: EvaluationScore | float | bool,
         /,
-        meta: dict[str, str | float | int | bool | None] | None = None,
+        meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> Self:
         evaluation_score: EvaluationScore
         match score:
@@ -89,7 +89,7 @@ class EvaluationResult(DataModel):
     score: EvaluationScore = Field(
         description="Evaluation score",
     )
-    meta: dict[str, str | float | int | bool | None] | None = Field(
+    meta: Mapping[str, str | float | int | bool | None] | None = Field(
         description="Additional evaluation metadata",
         default=None,
     )
@@ -125,7 +125,7 @@ class Evaluator[Value, **Args]:
         name: str,
         definition: EvaluatorDefinition[Value, Args],
         threshold: float | None,
-        meta: dict[str, str | float | int | bool | None] | None = None,
+        meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> None:
         assert (  # nosec: B101
             threshold is None or 0 <= threshold <= 1
@@ -134,7 +134,7 @@ class Evaluator[Value, **Args]:
         self._definition: EvaluatorDefinition[Value, Args] = definition
         self.name: str = name
         self.threshold: float = threshold or 1
-        self.meta: dict[str, str | float | int | bool | None] | None = meta
+        self.meta: Mapping[str, str | float | int | bool | None] | None = meta
 
         freeze(self)
 
@@ -152,14 +152,14 @@ class Evaluator[Value, **Args]:
 
     def with_meta(
         self,
-        meta: dict[str, str | float | int | bool | None],
+        meta: Mapping[str, str | float | int | bool | None],
         /,
     ) -> Self:
         return self.__class__(
             name=self.name,
             definition=self._definition,
             threshold=self.threshold,
-            meta=self.meta | meta if self.meta else meta,
+            meta={**self.meta, **meta} if self.meta else meta,
         )
 
     def prepared(
@@ -220,7 +220,7 @@ class Evaluator[Value, **Args]:
         **kwargs: Args.kwargs,
     ) -> EvaluatorResult:
         evaluation_score: EvaluationScore
-        evaluation_meta: dict[str, str | float | int | bool | None] | None
+        evaluation_meta: Mapping[str, str | float | int | bool | None] | None
         try:
             match await self._definition(
                 value,
@@ -254,10 +254,10 @@ class Evaluator[Value, **Args]:
             )
             evaluation_meta = {"exception": str(exc)}
 
-        result_meta: dict[str, str | float | int | bool | None] | None
+        result_meta: Mapping[str, str | float | int | bool | None] | None
         if self.meta:
             if evaluation_meta:
-                result_meta = self.meta | evaluation_meta
+                result_meta = {**self.meta, **evaluation_meta}
 
             else:
                 result_meta = self.meta

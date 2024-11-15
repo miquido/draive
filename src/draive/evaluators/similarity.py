@@ -1,11 +1,8 @@
-from base64 import b64decode
-
 from draive.embedding import Embedded, embed_images, embed_texts
 from draive.evaluation import EvaluationScore, evaluator
-from draive.generation import generate_text
+from draive.multimodal import MediaContent, Multimodal, MultimodalContent
 from draive.similarity.score import vector_similarity_score
-from draive.types import ImageBase64Content, Multimodal, MultimodalTemplate
-from draive.utils import xml_tag
+from draive.steps import steps_completion
 
 __all__ = [
     "similarity_evaluator",
@@ -44,16 +41,6 @@ xml tag within the result i.e. `<RESULT>score</RESULT>`.
 """
 
 
-INPUT_TEMPLATE: MultimodalTemplate = MultimodalTemplate.of(
-    "<REFERENCE>",
-    ("reference",),
-    "</REFERENCE>",
-    "<EVALUATED>",
-    ("evaluated",),
-    "</EVALUATED>",
-)
-
-
 @evaluator(name="similarity")
 async def similarity_evaluator(
     evaluated: Multimodal,
@@ -72,15 +59,19 @@ async def similarity_evaluator(
             comment="Reference was empty!",
         )
 
-    if result := xml_tag(
-        "RESULT",
-        source=await generate_text(
-            instruction=INSTRUCTION,
-            input=INPUT_TEMPLATE.format(
-                reference=reference,
-                evaluated=evaluated,
-            ),
+    completion: MultimodalContent = await steps_completion(
+        MultimodalContent.of(
+            "<REFERENCE>",
+            reference,
+            "</REFERENCE>\n<EVALUATED>",
+            evaluated,
+            "</EVALUATED>",
         ),
+        instruction=INSTRUCTION,
+    )
+
+    if result := completion.extract_first(
+        "RESULT",
         conversion=str,
     ):
         return EvaluationScore(
@@ -105,22 +96,32 @@ async def text_vector_similarity_evaluator(
 
 @evaluator(name="image_vector_similarity")
 async def image_vector_similarity_evaluator(
-    evaluated: ImageBase64Content | bytes,
+    evaluated: MediaContent | bytes,
     /,
-    reference: ImageBase64Content | bytes,
+    reference: MediaContent | bytes,
 ) -> float:
     evaluated_data: bytes
     match evaluated:
-        case ImageBase64Content() as base64_data:
-            evaluated_data = b64decode(base64_data.image_base64)
+        case MediaContent() as media:
+            match media.source:
+                case bytes() as data:
+                    evaluated_data = data
+
+                case str():
+                    raise ValueError("Unsupported media source")
 
         case raw_data:
             evaluated_data = raw_data
 
     reference_data: bytes
     match reference:
-        case ImageBase64Content() as base64_data:
-            reference_data = b64decode(base64_data.image_base64)
+        case MediaContent() as media:
+            match media.source:
+                case bytes() as data:
+                    reference_data = data
+
+                case str():
+                    raise ValueError("Unsupported media source")
 
         case raw_data:
             reference_data = raw_data

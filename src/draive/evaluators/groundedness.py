@@ -1,7 +1,6 @@
 from draive.evaluation import EvaluationScore, evaluator
-from draive.generation import generate_text
-from draive.types import Multimodal, MultimodalTemplate
-from draive.utils import xml_tag
+from draive.multimodal import Multimodal, MultimodalContent
+from draive.steps import steps_completion
 
 __all__ = [
     "groundedness_evaluator",
@@ -44,16 +43,6 @@ xml tag within the result i.e. `<RESULT>score</RESULT>`.
 """  # noqa: E501
 
 
-INPUT_TEMPLATE: MultimodalTemplate = MultimodalTemplate.of(
-    "<REFERENCE>",
-    ("reference",),
-    "</REFERENCE>",
-    "<EVALUATED>",
-    ("evaluated",),
-    "</EVALUATED>",
-)
-
-
 @evaluator(name="groundedness")
 async def groundedness_evaluator(
     evaluated: Multimodal,
@@ -72,15 +61,19 @@ async def groundedness_evaluator(
             comment="Reference was empty!",
         )
 
-    if result := xml_tag(
-        "RESULT",
-        source=await generate_text(
-            instruction=INSTRUCTION,
-            input=INPUT_TEMPLATE.format(
-                reference=reference,
-                evaluated=evaluated,
-            ),
+    completion: MultimodalContent = await steps_completion(
+        MultimodalContent.of(
+            "<REFERENCE>",
+            reference,
+            "</REFERENCE>\n<EVALUATED>",
+            evaluated,
+            "</EVALUATED>",
         ),
+        instruction=INSTRUCTION,
+    )
+
+    if result := completion.extract_first(
+        "RESULT",
         conversion=str,
     ):
         return EvaluationScore(

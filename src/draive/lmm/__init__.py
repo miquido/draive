@@ -1,30 +1,50 @@
 from draive.lmm.call import lmm_invoke, lmm_stream
 from draive.lmm.state import LMMInvocation, LMMStream
-from draive.lmm.tools import (
-    AnyTool,
-    Tool,
-    ToolAvailabilityCheck,
-    Toolbox,
-    ToolException,
+from draive.lmm.tool import AnyTool, Tool, ToolAvailabilityCheck, tool
+from draive.lmm.toolbox import Toolbox
+from draive.lmm.types import (
+    LMMCompletion,
+    LMMContextElement,
+    LMMInput,
+    LMMInvocating,
+    LMMOutput,
+    LMMStreamChunk,
+    LMMStreaming,
+    LMMStreamInput,
+    LMMStreamOutput,
+    LMMStreamProperties,
+    LMMToolException,
+    LMMToolRequest,
+    LMMToolRequests,
+    LMMToolResponse,
+    LMMToolSelection,
     ToolSpecification,
-    tool,
 )
-from draive.lmm.types import LMMInvocating, LMMStreaming, LMMStreamProperties, LMMToolSelection
 
 __all__ = [
     "AnyTool",
     "lmm_invoke",
     "lmm_stream",
+    "LMMCompletion",
+    "LMMContextElement",
+    "LMMInput",
     "LMMInvocating",
     "LMMInvocation",
+    "LMMOutput",
     "LMMStream",
+    "LMMStreamChunk",
     "LMMStreaming",
+    "LMMStreamInput",
+    "LMMStreamOutput",
     "LMMStreamProperties",
+    "LMMToolRequest",
+    "LMMToolRequests",
+    "LMMToolResponse",
     "LMMToolSelection",
     "tool",
     "Tool",
     "ToolAvailabilityCheck",
     "Toolbox",
-    "ToolException",
+    "LMMToolException",
     "ToolSpecification",
 ]

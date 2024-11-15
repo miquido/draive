@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Protocol, Self, runtime_checkable
 from uuid import uuid4
 
@@ -6,7 +6,7 @@ from haiway import State
 
 from draive.instructions import Instruction
 from draive.lmm import Toolbox
-from draive.types import Multimodal, MultimodalContent
+from draive.multimodal import Multimodal, MultimodalContent
 
 __all__ = [
     "ChoiceOption",
@@ -34,7 +34,7 @@ class ChoiceOption(State):
 
     identifier: str
     content: MultimodalContent
-    meta: dict[str, Any]
+    meta: Mapping[str, Any]
 
 
 @runtime_checkable

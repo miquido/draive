@@ -1,4 +1,5 @@
 import json
+from base64 import b64encode
 from collections.abc import AsyncGenerator, AsyncIterator, Iterable
 from typing import Any, Literal, cast
 from uuid import uuid4
@@ -15,36 +16,33 @@ from openai.types.chat.chat_completion_chunk import Choice, ChoiceDeltaToolCall
 
 from draive.instructions import Instruction
 from draive.lmm import (
+    LMMCompletion,
+    LMMContextElement,
+    LMMInput,
     LMMInvocation,
+    LMMOutput,
     LMMStream,
+    LMMStreamChunk,
+    LMMStreamInput,
+    LMMStreamOutput,
     LMMStreamProperties,
+    LMMToolRequest,
+    LMMToolRequests,
+    LMMToolResponse,
     LMMToolSelection,
     ToolSpecification,
 )
 from draive.metrics import TokenUsage
+from draive.multimodal import (
+    MediaContent,
+    MultimodalContent,
+    MultimodalContentElement,
+    TextContent,
+)
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig, OpenAISystemFingerprint
 from draive.openai.types import OpenAIException
 from draive.parameters import DataModel, ParametersSpecification
-from draive.types import (
-    AudioBase64Content,
-    AudioURLContent,
-    ImageBase64Content,
-    ImageURLContent,
-    LMMCompletion,
-    LMMContextElement,
-    LMMInput,
-    LMMOutput,
-    LMMToolRequest,
-    LMMToolRequests,
-    LMMToolResponse,
-    MultimodalContentElement,
-    TextContent,
-    VideoBase64Content,
-    VideoURLContent,
-)
-from draive.types.lmm import LMMStreamChunk, LMMStreamInput, LMMStreamOutput
-from draive.types.multimodal import MultimodalContent
 
 __all__ = [
     "openai_lmm",
@@ -154,43 +152,27 @@ def _convert_content_element(
                 "text": text.text,
             }
 
-        case ImageURLContent() as image:
+        case MediaContent() as media:
+            if media.kind != "image":
+                raise ValueError("Unsupported message content", media)
+
+            url: str
+            match media.source:
+                case str() as string:
+                    url = string
+
+                case bytes() as data:
+                    url = f"data:{media.mime_type};base64,{b64encode(data).decode()}"
+
             return {
                 "type": "image_url",
                 "image_url": {
-                    "url": image.image_url,
+                    "url": url,
                     "detail": cast(Literal["auto", "low", "high"], config.vision_details)
                     if not_missing(config.vision_details)
                     else "auto",
                 },
             }
-
-        case ImageBase64Content() as image:
-            return {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:{image.mime_type or 'image/jpeg'};base64,{image.image_base64}",
-                    "detail": cast(Literal["auto", "low", "high"], config.vision_details)
-                    if not_missing(config.vision_details)
-                    else "auto",
-                },
-            }
-
-        case AudioURLContent():
-            # TODO: OpenAI models with audio?
-            raise ValueError("Unsupported message content", element)
-
-        case AudioBase64Content():
-            # TODO: we could upload media using openAI endpoint to have url instead
-            raise ValueError("Unsupported message content", element)
-
-        case VideoURLContent():
-            # TODO: OpenAI models with video?
-            raise ValueError("Unsupported message content", element)
-
-        case VideoBase64Content():
-            # TODO: we could upload media using openAI endpoint to have url instead
-            raise ValueError("Unsupported message content", element)
 
         case DataModel() as data:
             return {
@@ -381,7 +363,7 @@ async def _chat_stream(  # noqa: C901, PLR0912, PLR0915
                 # gether input content chunks until marked as end
                 case LMMStreamChunk() as content_chunk:
                     input_buffer = input_buffer.appending(content_chunk.content)
-                    if content_chunk.is_final:
+                    if content_chunk.eod:
                         context.append(
                             {
                                 "role": "user",
@@ -502,7 +484,7 @@ async def _chat_stream(  # noqa: C901, PLR0912, PLR0915
                             # send completion chunk - openAI sends it without an actual content
                             yield LMMStreamChunk.of(
                                 MultimodalContent.of(),
-                                final=True,
+                                eod=True,
                             )
 
                         case "tool_calls":

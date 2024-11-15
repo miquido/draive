@@ -1,5 +1,5 @@
 from asyncio import gather
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Protocol, Self, cast, overload, runtime_checkable
 
 from haiway import ctx, freeze, frozenlist
@@ -24,7 +24,7 @@ class ScenarioEvaluatorResult(DataModel):
     evaluations: frozenlist[EvaluatorResult] = Field(
         description="Scenario evaluation results",
     )
-    meta: dict[str, str | float | int | bool | None] | None = Field(
+    meta: Mapping[str, str | float | int | bool | None] | None = Field(
         description="Additional evaluation metadata",
         default=None,
     )
@@ -62,7 +62,7 @@ class EvaluationScenarioResult(DataModel):
         /,
         evaluators: PreparedEvaluator[Value],
         *_evaluators: PreparedEvaluator[Value],
-        meta: dict[str, str | float | int | bool | None] | None = None,
+        meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> Self:
         return cls(
             evaluations=tuple(
@@ -77,7 +77,7 @@ class EvaluationScenarioResult(DataModel):
     evaluations: frozenlist[EvaluatorResult] = Field(
         description="Scenario evaluation results",
     )
-    meta: dict[str, str | float | int | bool | None] | None = Field(
+    meta: Mapping[str, str | float | int | bool | None] | None = Field(
         description="Additional evaluation metadata",
         default=None,
     )
@@ -111,11 +111,11 @@ class ScenarioEvaluator[Value, **Args]:
         self,
         name: str,
         definition: ScenarioEvaluatorDefinition[Value, Args],
-        meta: dict[str, str | float | int | bool | None] | None = None,
+        meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> None:
         self.name: str = name
         self._definition: ScenarioEvaluatorDefinition[Value, Args] = definition
-        self.meta: dict[str, str | float | int | bool | None] | None = meta
+        self.meta: Mapping[str, str | float | int | bool | None] | None = meta
 
         freeze(self)
 
@@ -137,13 +137,13 @@ class ScenarioEvaluator[Value, **Args]:
 
     def with_meta(
         self,
-        meta: dict[str, str | float | int | bool | None],
+        meta: Mapping[str, str | float | int | bool | None],
         /,
     ) -> Self:
         return self.__class__(
             name=self.name,
             definition=self._definition,
-            meta=self.meta | meta if self.meta else meta,
+            meta={**self.meta, **meta} if self.meta else meta,
         )
 
     def contra_map[Mapped](
@@ -193,10 +193,10 @@ class ScenarioEvaluator[Value, **Args]:
                 **kwargs,
             ):
                 case EvaluationScenarioResult() as result:
-                    meta: dict[str, str | float | int | bool | None] | None
+                    meta: Mapping[str, str | float | int | bool | None] | None
                     if self.meta:
                         if result.meta:
-                            meta = self.meta | result.meta
+                            meta = {**self.meta, **result.meta}
 
                         else:
                             meta = self.meta
@@ -229,7 +229,7 @@ class ScenarioEvaluator[Value, **Args]:
             return ScenarioEvaluatorResult(
                 name=self.name,
                 evaluations=(),
-                meta=(self.meta or {}) | {"exception": str(exc)},
+                meta={**(self.meta or {}), "exception": str(exc)},
             )
 
 

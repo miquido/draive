@@ -5,8 +5,8 @@ from haiway import State
 
 from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
+from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import ParametersSpecification
-from draive.types import Multimodal, MultimodalContent
 
 __all__ = [
     "StepsCompleting",

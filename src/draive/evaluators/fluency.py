@@ -1,7 +1,6 @@
 from draive.evaluation import EvaluationScore, evaluator
-from draive.generation import generate_text
-from draive.types import Multimodal, MultimodalTemplate
-from draive.utils import xml_tag
+from draive.multimodal import Multimodal, MultimodalContent
+from draive.steps import steps_completion
 
 __all__ = [
     "fluency_evaluator",
@@ -38,13 +37,6 @@ xml tag within the result i.e. `<RESULT>score</RESULT>`.
 """
 
 
-INPUT_TEMPLATE: MultimodalTemplate = MultimodalTemplate.of(
-    "<CONTENT>",
-    ("content",),
-    "</CONTENT>",
-)
-
-
 @evaluator(name="fluency")
 async def fluency_evaluator(
     content: Multimodal,
@@ -56,14 +48,16 @@ async def fluency_evaluator(
             comment="Input was empty!",
         )
 
-    if result := xml_tag(
-        "RESULT",
-        source=await generate_text(
-            instruction=INSTRUCTION,
-            input=INPUT_TEMPLATE.format(
-                content=content,
-            ),
+    completion: MultimodalContent = await steps_completion(
+        MultimodalContent.of(
+            "<CONTENT>",
+            content,
+            "</CONTENT>",
         ),
+        instruction=INSTRUCTION,
+    )
+    if result := completion.extract_first(
+        "RESULT",
         conversion=str,
     ):
         return EvaluationScore(

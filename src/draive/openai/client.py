@@ -27,7 +27,7 @@ from draive.openai.config import (
     OpenAIEmbeddingConfig,
     OpenAIImageGenerationConfig,
 )
-from draive.types import RateLimitError
+from draive.utils import RateLimitError
 
 __all__ = [
     "OpenAIClient",

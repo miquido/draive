@@ -1,4 +1,3 @@
-from base64 import b64decode, b64encode
 from collections.abc import Iterable
 from typing import Any, Literal, cast
 
@@ -9,27 +8,26 @@ from draive.bedrock.config import BedrockChatConfig
 from draive.bedrock.models import ChatCompletionResponse, ChatMessage, ChatMessageContent, ChatTool
 from draive.bedrock.types import BedrockException
 from draive.instructions import Instruction
-from draive.lmm import LMMInvocation, LMMToolSelection, ToolSpecification
-from draive.metrics.tokens import TokenUsage
-from draive.parameters import DataModel, ParametersSpecification
-from draive.types import (
-    AudioBase64Content,
-    AudioURLContent,
-    ImageBase64Content,
-    ImageURLContent,
+from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
+    LMMInvocation,
     LMMOutput,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
+    LMMToolSelection,
+    ToolSpecification,
+)
+from draive.metrics.tokens import TokenUsage
+from draive.multimodal import (
+    MediaContent,
     MultimodalContent,
     MultimodalContentElement,
     TextContent,
-    VideoBase64Content,
-    VideoURLContent,
 )
+from draive.parameters import DataModel, ParametersSpecification
 
 __all__ = [
     "bedrock_lmm",
@@ -88,19 +86,19 @@ def bedrock_lmm(
     return LMMInvocation(invoke=lmm_invocation)
 
 
-def _convert_content_element(  # noqa: C901
+def _convert_content_element(
     element: MultimodalContentElement,
 ) -> ChatMessageContent:
     match element:
         case TextContent() as text:
             return {"text": text.text}
 
-        case ImageURLContent() as image:
-            raise ValueError("Unsupported message content", element)
+        case MediaContent() as media:
+            if media.kind != "image" or isinstance(media.source, str):
+                raise ValueError("Unsupported message content", media)
 
-        case ImageBase64Content() as image:
             image_format: Literal["png", "jpeg", "gif"]
-            match image.mime_type:
+            match media.mime_type:
                 case "image/png":
                     image_format = "png"
 
@@ -111,26 +109,14 @@ def _convert_content_element(  # noqa: C901
                     image_format = "gif"
 
                 case _:
-                    image_format = "png"
+                    raise ValueError("Unsupported message content", media)
 
             return {
                 "image": {
                     "format": image_format,
-                    "source": {"bytes": b64decode(image.image_base64)},
+                    "source": {"bytes": media.source},
                 }
             }
-
-        case AudioURLContent():
-            raise ValueError("Unsupported message content", element)
-
-        case AudioBase64Content():
-            raise ValueError("Unsupported message content", element)
-
-        case VideoURLContent():
-            raise ValueError("Unsupported message content", element)
-
-        case VideoBase64Content():
-            raise ValueError("Unsupported message content", element)
 
         case DataModel() as data:
             return {"text": data.as_json()}
@@ -241,9 +227,9 @@ async def _chat_completion(  # noqa: PLR0913
                         mime_type = None
 
                 message_parts.append(
-                    ImageBase64Content(
+                    MediaContent.data(
+                        data,
                         mime_type=mime_type,
-                        image_base64=b64encode(data).decode(),
                     )
                 )
 

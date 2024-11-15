@@ -1,5 +1,5 @@
 from asyncio import Lock, gather
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Protocol, Self, overload, runtime_checkable
 from uuid import UUID, uuid4
@@ -38,7 +38,7 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
     results: frozenlist[ScenarioEvaluatorResult] = Field(
         description="Evaluation results",
     )
-    meta: dict[str, str | float | int | bool | None] | None = Field(
+    meta: Mapping[str, str | float | int | bool | None] | None = Field(
         description="Additional evaluation metadata",
         default=None,
     )
@@ -96,7 +96,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
         results: ScenarioEvaluatorResult | EvaluatorResult,
         *_results: ScenarioEvaluatorResult | EvaluatorResult,
         value: Value,
-        meta: dict[str, str | float | int | bool | None] | None = None,
+        meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> Self:
         free_results: list[EvaluatorResult] = []
         scenario_results: list[ScenarioEvaluatorResult] = []
@@ -129,7 +129,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
         /,
         evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
         *_evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
-        meta: dict[str, str | float | int | bool | None] | None = None,
+        meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> Self:
         return cls.of(
             *await gather(
@@ -146,7 +146,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
     results: frozenlist[ScenarioEvaluatorResult] = Field(
         description="Evaluation results",
     )
-    meta: dict[str, str | float | int | bool | None] | None = Field(
+    meta: Mapping[str, str | float | int | bool | None] | None = Field(
         description="Additional evaluation metadata",
         default=None,
     )

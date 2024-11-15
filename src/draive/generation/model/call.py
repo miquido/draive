@@ -7,8 +7,8 @@ from draive.generation.model.state import ModelGeneration
 from draive.generation.model.types import ModelGeneratorDecoder
 from draive.instructions import Instruction
 from draive.lmm import AnyTool, Toolbox
+from draive.multimodal import Multimodal
 from draive.parameters import DataModel
-from draive.types import Multimodal
 
 __all__ = [
     "generate_model",
