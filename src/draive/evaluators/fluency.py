@@ -1,5 +1,5 @@
 from draive.evaluation import EvaluationScore, evaluator
-from draive.multimodal import Multimodal, MultimodalContent
+from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
 from draive.steps import steps_completion
 
 __all__ = [
@@ -56,12 +56,13 @@ async def fluency_evaluator(
         ),
         instruction=INSTRUCTION,
     )
-    if result := completion.extract_first(
-        "RESULT",
-        conversion=str,
+
+    if result := MultimodalTagElement.parse_first(
+        completion,
+        tag="RESULT",
     ):
         return EvaluationScore(
-            value=float(result) / 2,
+            value=float(result.content.as_string()) / 2,
             comment=None,
         )
 

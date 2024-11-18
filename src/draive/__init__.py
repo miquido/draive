@@ -128,6 +128,7 @@ from draive.multimodal import (
     MultimodalContent,
     MultimodalContentConvertible,
     MultimodalContentElement,
+    MultimodalTagElement,
     TextContent,
 )
 from draive.parameters import (
@@ -252,6 +253,8 @@ __all__ = [
     "LMMStreamInput",
     "LMMStreamOutput",
     "LMMStreamProperties",
+    "LMMToolException",
+    "LMMToolException",
     "LMMToolRequest",
     "LMMToolResponse",
     "load_env",
@@ -269,6 +272,7 @@ __all__ = [
     "MultimodalContent",
     "MultimodalContentConvertible",
     "MultimodalContentElement",
+    "MultimodalTagElement",
     "noop",
     "not_missing",
     "ParameterDefaultFactory",
@@ -304,8 +308,6 @@ __all__ = [
     "Tool",
     "ToolAvailabilityCheck",
     "Toolbox",
-    "LMMToolException",
-    "LMMToolException",
     "traced",
     "usage_metrics_logger",
     "ValueEmbedder",

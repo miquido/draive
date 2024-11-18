@@ -1,6 +1,6 @@
 from draive.embedding import Embedded, embed_images, embed_texts
 from draive.evaluation import EvaluationScore, evaluator
-from draive.multimodal import MediaContent, Multimodal, MultimodalContent
+from draive.multimodal import MediaContent, Multimodal, MultimodalContent, MultimodalTagElement
 from draive.similarity.score import vector_similarity_score
 from draive.steps import steps_completion
 
@@ -70,12 +70,12 @@ async def similarity_evaluator(
         instruction=INSTRUCTION,
     )
 
-    if result := completion.extract_first(
-        "RESULT",
-        conversion=str,
+    if result := MultimodalTagElement.parse_first(
+        completion,
+        tag="RESULT",
     ):
         return EvaluationScore(
-            value=float(result) / 2,
+            value=float(result.content.as_string()) / 2,
             comment=None,
         )
 

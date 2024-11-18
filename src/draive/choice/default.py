@@ -15,10 +15,7 @@ from draive.lmm import (
     Toolbox,
     lmm_invoke,
 )
-from draive.multimodal import (
-    Multimodal,
-    MultimodalContent,
-)
+from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
 
 __all__ = [
     "default_choice_completion",
@@ -89,8 +86,10 @@ async def default_choice_completion(  # noqa: C901
             ):
                 case LMMCompletion() as completion:
                     ctx.log_debug("Received choice results")
-                    if selection := completion.content.extract_first("CHOICE"):
-                        if option := options_map.get(selection.as_string()):
+                    if selection := MultimodalTagElement.parse_first(
+                        completion.content, tag="CHOICE"
+                    ):
+                        if option := options_map.get(selection.content.as_string()):
                             return option
 
                     raise SelectionException("Invalid or missing selection")
@@ -102,10 +101,10 @@ async def default_choice_completion(  # noqa: C901
                     if direct_content := [
                         response.content for response in responses if response.direct
                     ]:
-                        if selection := MultimodalContent.of(*direct_content).extract_first(
-                            "CHOICE"
+                        if selection := MultimodalTagElement.parse_first(
+                            MultimodalContent.of(*direct_content), tag="CHOICE"
                         ):
-                            if option := options_map.get(selection.as_string()):
+                            if option := options_map.get(selection.content.as_string()):
                                 return option
 
                         raise SelectionException("Invalid or missing selection")
