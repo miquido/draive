@@ -1,5 +1,5 @@
 from draive.evaluation import EvaluationScore, evaluator
-from draive.multimodal import Multimodal, MultimodalContent
+from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
 from draive.steps import steps_completion
 
 __all__ = [
@@ -72,12 +72,12 @@ async def relevance_evaluator(
         instruction=INSTRUCTION,
     )
 
-    if result := completion.extract_first(
-        "RESULT",
-        conversion=str,
+    if result := MultimodalTagElement.parse_first(
+        completion,
+        tag="RESULT",
     ):
         return EvaluationScore(
-            value=float(result) / 4,
+            value=float(result.content.as_string()) / 4,
             comment=None,
         )
 
