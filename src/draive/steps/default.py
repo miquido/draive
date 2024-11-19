@@ -76,15 +76,32 @@ async def _process_step(
             **extra,
         ):
             case LMMCompletion() as completion:
-                return context.append(completion)
+                if step.result_processing is None:
+                    return context.append(completion)
+
+                else:
+                    return context.append(
+                        LMMCompletion.of(
+                            await step.result_processing(completion.content),
+                        )
+                    )
 
             case LMMToolRequests() as tool_requests:
                 responses: list[LMMToolResponse] = await toolbox.respond_all(tool_requests)
 
-                if direct_content := [
+                if direct_results := [
                     response.content for response in responses if response.direct
                 ]:
-                    return context.append(LMMCompletion.of(MultimodalContent.of(*direct_content)))
+                    direct_content: MultimodalContent = MultimodalContent.of(*direct_results)
+                    if step.result_processing is None:
+                        return context.append(LMMCompletion.of(direct_content))
+
+                    else:
+                        return context.append(
+                            LMMCompletion.of(
+                                await step.result_processing(direct_content),
+                            )
+                        )
 
                 else:
                     context.extend([tool_requests, *responses])
