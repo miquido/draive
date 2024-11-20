@@ -121,14 +121,16 @@ class MultimodalTagElement(State):
         /,
         tag: str,
         replacement: Multimodal,
-        content_only: bool = True,
+        strip_tags: bool = False,
+        replace_all: bool = False,
     ) -> MultimodalContent:
         # TODO: add support for tag id attribute or custom matching?
         # TODO: add support for split meta tag opening and closing?
-        replacement_content: MultimodalContent = MultimodalContent.of(replacement)
+        replacement_content = MultimodalContent.of(replacement).parts
         result_content: list[MultimodalContentElement] = []
         current_tag: _MultimodalTag | None = None
         current_tag_content: list[MultimodalContentElement] = []
+        replaced: bool = False
         for part in MultimodalContent.of(content).parts:
             match part:
                 case TextContent() as text_content:
@@ -170,18 +172,22 @@ class MultimodalTagElement(State):
                                 match element:
                                     case _MultimodalTag() as closing:
                                         # check if it is the tag we are looking for
-                                        if not tag or current_tag.name == tag:
-                                            if content_only:
+                                        if (not tag or current_tag.name == tag) and (
+                                            replace_all or not replaced
+                                        ):
+                                            replaced = True
+
+                                            if strip_tags:
+                                                result_content.extend(replacement_content)
+
+                                            else:
                                                 result_content.extend(
                                                     (
                                                         current_tag.raw,
-                                                        replacement_content,
+                                                        *replacement_content,
                                                         closing.raw,
                                                     ),
                                                 )
-
-                                            else:
-                                                result_content.append(replacement_content)
 
                                         else:
                                             if text_accumulator:
@@ -195,7 +201,7 @@ class MultimodalTagElement(State):
                                             result_content.extend(
                                                 (
                                                     current_tag.raw,
-                                                    MultimodalContent.of(*current_tag_content),
+                                                    *current_tag_content,
                                                     closing.raw,
                                                 ),
                                             )
