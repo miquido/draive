@@ -39,14 +39,14 @@ def test_returns_unchanged_without_tag():
     assert MultimodalTagElement.replace(
         MultimodalContent.of(
             "Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum",
         ),
         tag="test",
         replacement="replaced",
     ) == MultimodalContent.of(
         "Lorem",
-        MediaContent.url("http://image", mime_type="image/png"),
+        MediaContent.url("http://image", media="image/png"),
         "ipsum",
     )
 
@@ -68,14 +68,14 @@ def test_returns_unchanged_with_other_tag():
     assert MultimodalTagElement.replace(
         MultimodalContent.of(
             "<other>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</other>",
         ),
         tag="test",
         replacement="replaced",
     ) == MultimodalContent.of(
         "<other>Lorem",
-        MediaContent.url("http://image", mime_type="image/png"),
+        MediaContent.url("http://image", media="image/png"),
         "ipsum</other>",
     )
 
@@ -97,14 +97,14 @@ def test_returns_unchanged_without_closing_tag():
     assert MultimodalTagElement.replace(
         MultimodalContent.of(
             "<test>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum",
         ),
         tag="test",
         replacement="replaced",
     ) == MultimodalContent.of(
         "<test>Lorem",
-        MediaContent.url("http://image", mime_type="image/png"),
+        MediaContent.url("http://image", media="image/png"),
         "ipsum",
     )
 
@@ -126,14 +126,14 @@ def test_returns_unchanged_with_only_closing_tag():
     assert MultimodalTagElement.replace(
         MultimodalContent.of(
             "Lorem </test> ",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum",
         ),
         tag="test",
         replacement="replaced",
     ) == MultimodalContent.of(
         "Lorem </test> ",
-        MediaContent.url("http://image", mime_type="image/png"),
+        MediaContent.url("http://image", media="image/png"),
         "ipsum",
     )
 
@@ -155,14 +155,14 @@ def test_returns_unchanged_with_reversed_tags():
     assert MultimodalTagElement.replace(
         MultimodalContent.of(
             "</test>Lorem <test> ",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum",
         ),
         tag="test",
         replacement="replaced",
     ) == MultimodalContent.of(
         "</test>Lorem <test> ",
-        MediaContent.url("http://image", mime_type="image/png"),
+        MediaContent.url("http://image", media="image/png"),
         "ipsum",
     )
 
@@ -184,14 +184,14 @@ def test_returns_unchanged_with_malformed_opening_tag():
     assert MultimodalTagElement.replace(
         MultimodalContent.of(
             "<testx>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</test>",
         ),
         tag="test",
         replacement="replaced",
     ) == MultimodalContent.of(
         "<testx>Lorem",
-        MediaContent.url("http://image", mime_type="image/png"),
+        MediaContent.url("http://image", media="image/png"),
         "ipsum</test>",
     )
 
@@ -213,14 +213,14 @@ def test_returns_unchanged_with_malformed_closing_tag():
     assert MultimodalTagElement.replace(
         MultimodalContent.of(
             "<test>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</testx>",
         ),
         tag="test",
         replacement="replaced",
     ) == MultimodalContent.of(
         "<test>Lorem",
-        MediaContent.url("http://image", mime_type="image/png"),
+        MediaContent.url("http://image", media="image/png"),
         "ipsum</testx>",
     )
 
@@ -242,7 +242,7 @@ def test_returns_replaced_with_valid_tag():
     assert MultimodalTagElement.replace(
         MultimodalContent.of(
             "<test>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</test>",
         ),
         tag="test",
@@ -269,7 +269,7 @@ def test_returns_replaced_outer_with_multiple_nested_tags():
     assert MultimodalTagElement.replace(
         MultimodalContent.of(
             "<test>Other<test>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</test></test>",
         ),
         tag="test",
@@ -295,18 +295,18 @@ def test_returns_replaced_with_surrounded_tag():
 
     assert MultimodalTagElement.replace(
         MultimodalContent.of(
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "Lorem<test>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</test>ipsum",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
         ),
         tag="test",
         replacement="replaced",
     ) == MultimodalContent.of(
-        MediaContent.url("http://image", mime_type="image/png"),
+        MediaContent.url("http://image", media="image/png"),
         "Lorem<test>replaced</test>ipsum",
-        MediaContent.url("http://image", mime_type="image/png"),
+        MediaContent.url("http://image", media="image/png"),
     )
 
 
@@ -327,7 +327,7 @@ def test_returns_all_replaced_with_multiple_tags():
     assert MultimodalTagElement.replace(
         MultimodalContent.of(
             "<test>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</test><test>Other</test>",
         ),
         tag="test",
@@ -354,14 +354,14 @@ def test_returns_unchanged_with_nested_in_tags():
     assert MultimodalTagElement.replace(
         MultimodalContent.of(
             "<other>Other<test>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</test></other>",
         ),
         tag="test",
         replacement="replaced",
     ) == MultimodalContent.of(
         "<other>Other<test>Lorem",
-        MediaContent.url("http://image", mime_type="image/png"),
+        MediaContent.url("http://image", media="image/png"),
         "ipsum</test></other>",
     )
 
@@ -396,7 +396,7 @@ def test_returns_replaced_content_with_fake_tags():
     assert MultimodalTagElement.replace(
         MultimodalContent.of(
             "<test>Lorem<",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</test>",
         ),
         tag="test",
@@ -407,7 +407,7 @@ def test_returns_replaced_content_with_fake_tags():
 
     assert MultimodalContent.of(
         "<te<test>Lorem<",
-        MediaContent.url("http://image", mime_type="image/png"),
+        MediaContent.url("http://image", media="image/png"),
         "ipsum</test>",
     ).replacing(
         "test",
@@ -435,7 +435,7 @@ def test_returns_replaced_with_other_tags():
 
     assert MultimodalContent.of(
         "<other>Other<more><test>Lorem</more>",
-        MediaContent.url("http://image", mime_type="image/png"),
+        MediaContent.url("http://image", media="image/png"),
         "ipsum</test></other>",
     ).replacing(
         "test",

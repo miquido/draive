@@ -102,7 +102,7 @@ def _convert_content_element(
                 "type": "image",
                 "source": {
                     "type": "base64",
-                    "media_type": cast(Any, media.mime_type),
+                    "media_type": cast(Any, media.media),
                     "data": b64encode(media.source).decode(),
                 },
             }

@@ -41,13 +41,13 @@ async def openai_image_generator(
             if url := image.url:
                 return MediaContent.url(
                     url,
-                    mime_type="image/png",
+                    media="image/png",
                 )
 
             elif b64data := image.b64_json:
                 return MediaContent.base64(
                     b64data,
-                    mime_type="image/png",
+                    media="image/png",
                 )
 
             else:

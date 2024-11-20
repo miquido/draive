@@ -239,9 +239,7 @@ basic_conversation_message_json: str = (
 media_url_conversation_message_instance: ConversationMessage = ConversationMessage(
     identifier="identifier",
     role="model",
-    content=MultimodalContent.of(
-        MediaContent.url("https://miquido.com/image", mime_type="image/png")
-    ),
+    content=MultimodalContent.of(MediaContent.url("https://miquido.com/image", media="image/png")),
 )
 media_url_conversation_message_json: str = (
     "{"
@@ -252,7 +250,7 @@ media_url_conversation_message_json: str = (
     '"content": {'
     '"parts": ['
     "{"
-    '"mime_type": "image/png", '
+    '"media": "image/png", '
     '"source": "https://miquido.com/image", '
     '"meta": null'
     "}"
@@ -265,7 +263,7 @@ media_url_conversation_message_json: str = (
 media_data_conversation_message_instance: ConversationMessage = ConversationMessage(
     identifier="identifier",
     role="model",
-    content=MultimodalContent.of(MediaContent.data(b"image_data", mime_type="image/png")),
+    content=MultimodalContent.of(MediaContent.data(b"image_data", media="image/png")),
 )
 media_data_conversation_message_json: str = (
     "{"
@@ -276,7 +274,7 @@ media_data_conversation_message_json: str = (
     '"content": {'
     '"parts": ['
     "{"
-    '"mime_type": "image/png", '
+    '"media": "image/png", '
     '"source": "aW1hZ2VfZGF0YQ==", '
     '"meta": null'
     "}"

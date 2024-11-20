@@ -98,7 +98,7 @@ def _convert_content_element(
                 raise ValueError("Unsupported message content", media)
 
             image_format: Literal["png", "jpeg", "gif"]
-            match media.mime_type:
+            match media.media:
                 case "image/png":
                     image_format = "png"
 
@@ -212,24 +212,24 @@ async def _chat_completion(  # noqa: PLR0913
                 message_parts.append(TextContent(text=text))
 
             case {"image": {"format": str() as data_format, "source": {"bytes": bytes() as data}}}:
-                mime_type: Any
+                media_type: Any
                 match data_format:
                     case "png":
-                        mime_type = "image/png"
+                        media_type = "image/png"
 
                     case "jpeg":
-                        mime_type = "image/jpeg"
+                        media_type = "image/jpeg"
 
                     case "gif":
-                        mime_type = "image/gif"
+                        media_type = "image/gif"
 
                     case _:  # pyright: ignore[reportUnnecessaryComparison]
-                        mime_type = None
+                        media_type = "image"
 
                 message_parts.append(
                     MediaContent.data(
                         data,
-                        mime_type=mime_type,
+                        media=media_type,
                     )
                 )
 

@@ -162,7 +162,7 @@ def _convert_content_element(
                     url = string
 
                 case bytes() as data:
-                    url = f"data:{media.mime_type};base64,{b64encode(data).decode()}"
+                    url = f"data:{media.media};base64,{b64encode(data).decode()}"
 
             return {
                 "type": "image_url",

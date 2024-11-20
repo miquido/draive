@@ -7,6 +7,7 @@ from draive.parameters import DataModel
 
 __all__ = [
     "MediaContent",
+    "MediaKind",
     "MediaType",
 ]
 
@@ -24,6 +25,12 @@ MediaType = Literal[
     "video/ogg",
 ]
 
+MediaKind = Literal[
+    "image",
+    "audio",
+    "video",
+]
+
 
 class MediaContent(DataModel):
     @classmethod
@@ -31,11 +38,11 @@ class MediaContent(DataModel):
         cls,
         url: str,
         /,
-        mime_type: MediaType,
+        media: MediaType | MediaKind,
         meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> Self:
         return cls(
-            mime_type=mime_type,
+            media=media,
             source=url,
             meta=meta,
         )
@@ -45,11 +52,11 @@ class MediaContent(DataModel):
         cls,
         data: str,
         /,
-        mime_type: MediaType,
+        media: MediaType,
         meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> Self:
         return cls(
-            mime_type=mime_type,
+            media=media,
             source=b64decode(data),
             meta=meta,
         )
@@ -59,30 +66,30 @@ class MediaContent(DataModel):
         cls,
         data: bytes,
         /,
-        mime_type: MediaType,
+        media: MediaType,
         meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> Self:
         return cls(
-            mime_type=mime_type,
+            media=media,
             source=data,
             meta=meta,
         )
 
-    mime_type: MediaType
+    media: MediaType | MediaKind
     # special field - url string or base64 content auto converted to bytes
     source: str | bytes = b64_or_url_field()
     meta: Mapping[str, str | float | int | bool | None] | None = None
 
     @property
-    def kind(self) -> Literal["image", "audio", "video"]:
-        match self.mime_type:
-            case "image/jpeg" | "image/png" | "image/bmp" | "image/gif":
+    def kind(self) -> MediaKind:
+        match self.media:
+            case "image" | "image/jpeg" | "image/png" | "image/bmp" | "image/gif":
                 return "image"
 
-            case "audio/aac" | "audio/mpeg" | "audio/ogg" | "audio/wav":
+            case "audio" | "audio/aac" | "audio/mpeg" | "audio/ogg" | "audio/wav":
                 return "audio"
 
-            case "video/mp4" | "video/mpeg" | "video/ogg":
+            case "video" | "video/mp4" | "video/mpeg" | "video/ogg":
                 return "video"
 
     def as_string(
@@ -96,9 +103,7 @@ class MediaContent(DataModel):
 
             case bytes() as data:
                 if include_data:
-                    return (
-                        f"![{self.kind}](data:{self.mime_type};base64,{b64encode(data).decode()})"
-                    )
+                    return f"![{self.kind}](data:{self.media};base64,{b64encode(data).decode()})"
 
                 else:
                     return f"![{self.kind}]()"
