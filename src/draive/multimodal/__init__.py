@@ -4,12 +4,13 @@ from draive.multimodal.content import (
     MultimodalContentConvertible,
     MultimodalContentElement,
 )
-from draive.multimodal.media import MediaContent, MediaType
+from draive.multimodal.media import MediaContent, MediaKind, MediaType
 from draive.multimodal.tags import MultimodalTagElement
 from draive.multimodal.text import TextContent
 
 __all__ = [
     "MediaContent",
+    "MediaKind",
     "MediaType",
     "Multimodal",
     "MultimodalContent",

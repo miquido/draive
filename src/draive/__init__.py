@@ -123,6 +123,7 @@ from draive.metrics import (
 )
 from draive.multimodal import (
     MediaContent,
+    MediaKind,
     MediaType,
     Multimodal,
     MultimodalContent,
@@ -259,6 +260,7 @@ __all__ = [
     "LMMToolResponse",
     "load_env",
     "MediaContent",
+    "MediaKind",
     "MediaType",
     "Memory",
     "Missing",

@@ -24,7 +24,7 @@ def test_returns_none_without_tag():
         MultimodalTagElement.parse_first(
             MultimodalContent.of(
                 "Lorem",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum",
             ),
             tag="test",
@@ -46,7 +46,7 @@ def test_returns_none_with_other_tag():
         MultimodalTagElement.parse_first(
             MultimodalContent.of(
                 "<other>Lorem",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum</other>",
             ),
             tag="test",
@@ -68,7 +68,7 @@ def test_returns_none_with_closing_tag():
         MultimodalTagElement.parse_first(
             MultimodalContent.of(
                 "Lorem",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum</test>",
             ),
             tag="test",
@@ -90,7 +90,7 @@ def test_returns_none_with_reversed_tags():
         MultimodalTagElement.parse_first(
             MultimodalContent.of(
                 "</test>Lorem",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum<test>",
             ),
             tag="test",
@@ -112,7 +112,7 @@ def test_returns_none_without_closing_tag():
         MultimodalTagElement.parse_first(
             MultimodalContent.of(
                 "<test>Lorem",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum",
             ),
             tag="test",
@@ -134,7 +134,7 @@ def test_returns_none_with_malformed_opening_tag():
         MultimodalTagElement.parse_first(
             MultimodalContent.of(
                 "<testx>Lorem",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum</test>",
             ),
             tag="test",
@@ -156,7 +156,7 @@ def test_returns_none_with_malformed_closing_tag():
         MultimodalTagElement.parse_first(
             MultimodalContent.of(
                 "<test>Lorem",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum</testx>",
             ),
             tag="test",
@@ -177,7 +177,7 @@ def test_returns_content_with_valid_tag():
     assert MultimodalTagElement.parse_first(
         MultimodalContent.of(
             "<test>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</test>",
         ),
         tag="test",
@@ -185,7 +185,7 @@ def test_returns_content_with_valid_tag():
         name="test",
         content=MultimodalContent.of(
             "Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum",
         ),
     )
@@ -202,18 +202,18 @@ def test_returns_content_with_surrounded_tag():
 
     assert MultimodalTagElement.parse_first(
         MultimodalContent.of(
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "Lorem<test>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</test>ipsum",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
         ),
         tag="test",
     ) == MultimodalTagElement(
         name="test",
         content=MultimodalContent.of(
             "Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum",
         ),
     )
@@ -235,7 +235,7 @@ def test_returns_first_content_with_multiple_tags():
     assert MultimodalTagElement.parse_first(
         MultimodalContent.of(
             "<test>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</test><test>Other</test>",
         ),
         tag="test",
@@ -243,7 +243,7 @@ def test_returns_first_content_with_multiple_tags():
         name="test",
         content=MultimodalContent.of(
             "Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum",
         ),
     )
@@ -261,7 +261,7 @@ def test_returns_outer_content_with_multiple_nested_tags():
     assert MultimodalTagElement.parse_first(
         MultimodalContent.of(
             "<test>Other<test>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</test></test>",
         ),
         tag="test",
@@ -269,7 +269,7 @@ def test_returns_outer_content_with_multiple_nested_tags():
         name="test",
         content=MultimodalContent.of(
             "Other<test>Lorem",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum",
         ),
     )
@@ -287,7 +287,7 @@ def test_returns_nested_content_with_fake_tags():
     assert MultimodalTagElement.parse_first(
         MultimodalContent.of(
             "<test>Lorem<",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum</test>",
         ),
         tag="test",
@@ -295,7 +295,7 @@ def test_returns_nested_content_with_fake_tags():
         name="test",
         content=MultimodalContent.of(
             "Lorem<",
-            MediaContent.url("http://image", mime_type="image/png"),
+            MediaContent.url("http://image", media="image/png"),
             "ipsum",
         ),
     )
@@ -314,7 +314,7 @@ def test_returns_none_with_nested_in_other_tags():
         MultimodalTagElement.parse_first(
             MultimodalContent.of(
                 "<other>Other<more><test>Lorem</more>",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum</test></other>",
             ),
             tag="test",
@@ -349,9 +349,9 @@ def test_returns_content_with_multiple_tags():
         MultimodalTagElement.parse(
             MultimodalContent.of(
                 "<test>Lorem ",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum</test><other>Dolor</other><another>Sit ",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "amet</another>",
             ),
         )
@@ -360,7 +360,7 @@ def test_returns_content_with_multiple_tags():
             name="test",
             content=MultimodalContent.of(
                 "Lorem ",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum",
             ),
         ),
@@ -374,7 +374,7 @@ def test_returns_content_with_multiple_tags():
             name="another",
             content=MultimodalContent.of(
                 "Sit ",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "amet",
             ),
         ),
@@ -406,9 +406,9 @@ def test_returns_content_with_multiple_filtered_tags():
         MultimodalTagElement.parse(
             MultimodalContent.of(
                 "<test>Lorem ",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum</test><test>Dolor</test><test>Sit ",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "amet</test>",
             ),
             tag="test",
@@ -418,7 +418,7 @@ def test_returns_content_with_multiple_filtered_tags():
             name="test",
             content=MultimodalContent.of(
                 "Lorem ",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum",
             ),
         ),
@@ -432,7 +432,7 @@ def test_returns_content_with_multiple_filtered_tags():
             name="test",
             content=MultimodalContent.of(
                 "Sit ",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "amet",
             ),
         ),
@@ -460,9 +460,9 @@ def test_skips_content_from_different_filtered_tags():
         MultimodalTagElement.parse(
             MultimodalContent.of(
                 "<test>Lorem ",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum</test><other>Other</other><test>Sit ",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "amet</test>",
             ),
             tag="test",
@@ -472,7 +472,7 @@ def test_skips_content_from_different_filtered_tags():
             name="test",
             content=MultimodalContent.of(
                 "Lorem ",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "ipsum",
             ),
         ),
@@ -480,7 +480,7 @@ def test_skips_content_from_different_filtered_tags():
             name="test",
             content=MultimodalContent.of(
                 "Sit ",
-                MediaContent.url("http://image", mime_type="image/png"),
+                MediaContent.url("http://image", media="image/png"),
                 "amet",
             ),
         ),

@@ -114,7 +114,7 @@ def _convert_content_element(
                 case str() as reference:
                     return {
                         "fileData": {
-                            "mimeType": media.mime_type,
+                            "mimeType": media.media,
                             "fileUri": reference,
                         }
                     }
@@ -122,7 +122,7 @@ def _convert_content_element(
                 case bytes() as data:
                     return {
                         "inlineData": {
-                            "mimeType": media.mime_type,
+                            "mimeType": media.media,
                             "data": b64encode(data).decode(),
                         }
                     }
@@ -192,7 +192,7 @@ def _convert_content_part(
             if mime_type in get_args(MediaType):
                 return MediaContent.base64(
                     data.data.data,
-                    mime_type=cast(MediaType, mime_type),
+                    media=cast(MediaType, mime_type),
                 )
 
             else:
@@ -203,7 +203,7 @@ def _convert_content_part(
             if mime_type in get_args(MediaType):
                 return MediaContent.url(
                     reference.reference.uri,
-                    mime_type=cast(MediaType, mime_type),
+                    media=cast(MediaType, mime_type),
                 )
 
             else:

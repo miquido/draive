@@ -5,7 +5,7 @@ input_text: TextContent = TextContent(text=input_string)
 input_text_merged: TextContent = TextContent(text=input_string + input_string)
 input_image: MediaContent = MediaContent.url(
     "http://image_url",
-    mime_type="image/png",
+    media="image/png",
 )
 input_multimodal: MultimodalContent = MultimodalContent.of(
     input_text,
