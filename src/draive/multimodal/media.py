@@ -99,7 +99,7 @@ class MediaContent(DataModel):
     ) -> str:
         match self.source:
             case str() as string:
-                return f"![{self.kind}({string})"
+                return f"![{self.kind}]({string})"
 
             case bytes() as data:
                 if include_data:
