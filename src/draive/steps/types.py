@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any, Literal, Protocol, Self, runtime_checkable
 
 from haiway import State
@@ -14,6 +14,14 @@ __all__ = [
 ]
 
 
+@runtime_checkable
+class StepResultProcessing(Protocol):
+    async def __call__(
+        self,
+        content: MultimodalContent,
+    ) -> MultimodalContent: ...
+
+
 class Step(State):
     @classmethod
     def of(
@@ -24,6 +32,7 @@ class Step(State):
         instruction: Instruction | str | None = None,
         tools: Toolbox | Iterable[AnyTool] | None = None,
         output: Literal["auto", "text"] | ParametersSpecification = "auto",
+        result_processing: StepResultProcessing | None = None,
         **extra: Any,
     ) -> Self:
         return cls(
@@ -31,6 +40,7 @@ class Step(State):
             input=MultimodalContent.of(input),
             toolbox=Toolbox.of(tools),
             output=output,
+            result_processing=result_processing,
             extra=extra,
         )
 
@@ -38,7 +48,8 @@ class Step(State):
     input: MultimodalContent
     toolbox: Toolbox
     output: Literal["auto", "text"] | ParametersSpecification
-    extra: dict[str, Any]
+    result_processing: StepResultProcessing | None
+    extra: Mapping[str, Any]
 
 
 @runtime_checkable

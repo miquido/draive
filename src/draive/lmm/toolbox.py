@@ -52,9 +52,11 @@ class Toolbox:
             case None:
                 self.suggest_tools = False
                 self._suggested_tool = None
+
             case True:
                 self.suggest_tools = True if self._tools else False
                 self._suggested_tool = None
+
             case tool:
                 self.suggest_tools = True
                 self._suggested_tool = tool
