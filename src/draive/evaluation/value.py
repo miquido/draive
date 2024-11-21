@@ -7,11 +7,11 @@ __all__ = [
     "NONE",
     "PERFECT",
     "POOR",
-    "threshold_value",
-    "Threshold",
+    "evaluation_score_value",
+    "EvaluationScoreValue",
 ]
 
-type Threshold = Literal["none", "poor", "fair", "good", "excellent", "perfect"] | float
+type EvaluationScoreValue = Literal["none", "poor", "fair", "good", "excellent", "perfect"] | float
 
 NONE: Final[float] = 0.0
 POOR: Final[float] = 0.1
@@ -21,11 +21,11 @@ EXCELLENT: Final[float] = 0.7
 PERFECT: Final[float] = 0.9
 
 
-def threshold_value(  # noqa: PLR0911
-    threshold: Threshold,
+def evaluation_score_value(  # noqa: PLR0911
+    value: EvaluationScoreValue,
     /,
 ) -> float:
-    match threshold:
+    match value:
         case "none":
             return NONE
 
@@ -44,6 +44,9 @@ def threshold_value(  # noqa: PLR0911
         case "perfect":
             return PERFECT
 
-        case value:
+        case float() as value:
             assert 0 <= value <= 1, "Threshold value has to be in range from 0 to 1"  # nosec: B101
             return value
+
+        case _:
+            raise ValueError("Invalid evaluation score value - %s", value)

@@ -9,12 +9,12 @@ __all__ = [
 ]
 
 INSTRUCTION: str = """\
-Assistant is a test data generation bot.
+You are preparing automated evaluation test scenarios.
 
 <INSTRUCTION>
 Familiarize yourself with the SCHEMA describing desired data structure.
-Generate diversified and high quality data according to the provided SCHEMA.
-Generated data should cover various possible valid outcomes.
+Prepare diversified and high quality test scenarios according to the provided SCHEMA.
+Result should cover various possible valid outcomes to cover multiple possible scenarios.
 </INSTRUCTION>
 
 <SCHEMA>
@@ -27,7 +27,7 @@ SCHEMA without any comments, formatting, or additional elements.
 </FORMAT>
 """
 
-INPUT: str = "Generate next"
+INPUT: str = "Prepare next"
 
 
 async def generate_case_parameters[Parameters: DataModel](

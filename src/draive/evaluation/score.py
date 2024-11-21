@@ -1,5 +1,6 @@
-from typing import Any
+from typing import Any, Self
 
+from draive.evaluation.value import EvaluationScoreValue, evaluation_score_value
 from draive.parameters import DataModel, Field
 
 __all__ = [
@@ -15,6 +16,19 @@ def _verifier(
 
 
 class EvaluationScore(DataModel):
+    @classmethod
+    def of(
+        cls,
+        score: EvaluationScoreValue,
+        /,
+        *,
+        comment: str | None = None,
+    ) -> Self:
+        return cls(
+            value=evaluation_score_value(score),
+            comment=comment,
+        )
+
     value: float = Field(
         description="Score value, between 0 (failure) and 1 (success)",
         verifier=_verifier,

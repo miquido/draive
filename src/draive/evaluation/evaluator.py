@@ -5,7 +5,7 @@ from typing import Protocol, Self, cast, final, overload, runtime_checkable
 from haiway import ctx, freeze
 
 from draive.evaluation.score import EvaluationScore
-from draive.evaluation.threshold import Threshold, threshold_value
+from draive.evaluation.value import EvaluationScoreValue, evaluation_score_value
 from draive.parameters import DataModel, Field, ParameterPath
 
 __all__ = [
@@ -27,6 +27,27 @@ def _verifier(
 
 
 class EvaluatorResult(DataModel):
+    @classmethod
+    def of(
+        cls,
+        evaluator: str,
+        /,
+        *,
+        score: EvaluationScoreValue,
+        score_comment: str | None = None,
+        threshold: EvaluationScoreValue,
+        meta: Mapping[str, str | float | int | bool | None] | None = None,
+    ) -> Self:
+        return cls(
+            evaluator=evaluator,
+            score=EvaluationScore.of(
+                score,
+                comment=score_comment,
+            ),
+            threshold=evaluation_score_value(threshold),
+            meta=meta,
+        )
+
     evaluator: str = Field(
         description="Name of evaluator",
     )
@@ -133,20 +154,20 @@ class Evaluator[Value, **Args]:
 
         self._definition: EvaluatorDefinition[Value, Args] = definition
         self.name: str = name
-        self.threshold: float = threshold or 1
+        self.threshold: float = 1 if threshold is None else threshold
         self.meta: Mapping[str, str | float | int | bool | None] | None = meta
 
         freeze(self)
 
     def with_threshold(
         self,
-        value: Threshold,
+        value: EvaluationScoreValue,
         /,
     ) -> Self:
         return self.__class__(
             name=self.name,
             definition=self._definition,
-            threshold=threshold_value(value),
+            threshold=evaluation_score_value(value),
             meta=self.meta,
         )
 
@@ -287,7 +308,7 @@ def evaluator[Value, **Args](
 def evaluator[Value, **Args](
     *,
     name: str | None = None,
-    threshold: Threshold | None = None,
+    threshold: EvaluationScoreValue | None = None,
 ) -> Callable[
     [EvaluatorDefinition[Value, Args]],
     Evaluator[Value, Args],
@@ -299,7 +320,7 @@ def evaluator[Value, **Args](  # pyright: ignore[reportInconsistentOverload] - t
     /,
     *,
     name: str | None = None,
-    threshold: Threshold | None = None,
+    threshold: EvaluationScoreValue | None = None,
 ) -> (
     Callable[
         [EvaluatorDefinition[Value, Args]],
@@ -313,7 +334,7 @@ def evaluator[Value, **Args](  # pyright: ignore[reportInconsistentOverload] - t
         return Evaluator(
             name=name or definition.__name__,
             definition=definition,
-            threshold=threshold_value(threshold) if threshold is not None else None,
+            threshold=evaluation_score_value(threshold) if threshold is not None else None,
         )
 
     if evaluation:

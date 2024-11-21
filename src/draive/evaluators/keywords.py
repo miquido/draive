@@ -12,6 +12,7 @@ __all__ = [
 async def keywords_evaluator(
     content: Multimodal,
     /,
+    *,
     keywords: Sequence[str],
     normalization: Callable[[str], str] | None = None,
 ) -> EvaluationScore:

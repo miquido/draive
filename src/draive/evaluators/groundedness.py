@@ -1,4 +1,6 @@
-from draive.evaluation import EvaluationScore, evaluator
+from typing import cast
+
+from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
 from draive.steps import steps_completion
 
@@ -8,37 +10,38 @@ __all__ = [
 
 
 INSTRUCTION: str = """\
-Assistant is an evaluator scoring the provided content.
+You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
-Compare the REFERENCE and the EVALUATED content by carefully examining them, then rate \
-the EVALUATED content using solely a groundedness metric according to the EVALUATION_CRITERIA.
+Compare the REFERENCE and the EVALUATED content by carefully examining them, then rate\
+ the EVALUATED content using solely a groundedness metric according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
-Evaluated metric is groundedness - this metric assesses the extent to which the evaluated content \
-directly ties back to and is anchored in the source data. Grounded content should demonstrate a clear \
-and traceable connection to the provided source material, ensuring that the information presented is \
-not only accurate but also faithfully represents the original context. This metric focuses on how well \
-the content reflects the source material without introducing extraneous information, unsupported claims, \
-or interpretations that stray from the source. Groundedness is about maintaining fidelity to the original \
-data, ensuring that every detail and conclusion is rooted in the provided information.
+Evaluated metric is groundedness - this metric assesses the extent to which the evaluated content\
+ directly ties back to and is anchored in the source data. Grounded content should demonstrate a clear\
+ and traceable connection to the provided source material, ensuring that the information presented is\
+ not only accurate but also faithfully represents the original context. This metric focuses on how well\
+ the content reflects the source material without introducing extraneous information, unsupported claims,\
+ or interpretations that stray from the source. Groundedness is about maintaining fidelity to the original\
+ data, ensuring that every detail and conclusion is rooted in the provided information.
 </EVALUATION_CRITERIA>
 
 <RATING>
-Assign a groundedness score using value between 0.0 and 4.0 where:
-0.0 is very low groundedness - the content is mostly ungrounded with many unsupported claims.
-1.0 is low groundedness - the content contains some accurate information but also significant ungrounded content.
-2.0 is moderate groundedness - the content is somewhat grounded but with noticeable ungrounded elements.
-3.0 is good groundedness - the content is mostly grounded with minimal unverified or unsupported claims.
-4.0 is excellent groundedness - the content is fully grounded, accurately reflecting the source information.
+Assign a groundedness score using exact name of one of the following values:
+- "poor" is very low groundedness, the content is mostly ungrounded with many unsupported claims.
+- "fair" is low groundedness, the content contains some accurate information but also significant ungrounded content.
+- "good" is moderate groundedness, the content is somewhat grounded but with noticeable ungrounded elements.
+- "excellent" is high groundedness, the content is mostly grounded with minimal unverified or unsupported claims.
+- "perfect" is very high groundedness, the content is fully grounded, accurately reflecting the source information.
+Use the "none" value for content that cannot be rated at all.
 </RATING>
 
 <FORMAT>
 The final result containing only the numerical score value HAVE to be put inside a `RESULT` \
-xml tag within the result i.e. `<RESULT>score</RESULT>`.
+xml tag within the result i.e. `<RESULT>good</RESULT>`.
 </FORMAT>
 """  # noqa: E501
 
@@ -47,6 +50,7 @@ xml tag within the result i.e. `<RESULT>score</RESULT>`.
 async def groundedness_evaluator(
     evaluated: Multimodal,
     /,
+    *,
     reference: Multimodal,
 ) -> EvaluationScore:
     if not evaluated:
@@ -76,10 +80,10 @@ async def groundedness_evaluator(
         completion,
         tag="RESULT",
     ):
-        return EvaluationScore(
-            value=float(result.content.as_string()) / 4,
-            comment=None,
+        return EvaluationScore.of(
+            cast(EvaluationScoreValue, result.content.as_string()),
+            comment=completion.as_string(),
         )
 
     else:
-        raise ValueError("Invalid result")
+        raise ValueError("Invalid evaluator result")
