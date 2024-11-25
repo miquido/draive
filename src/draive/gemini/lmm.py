@@ -1,7 +1,7 @@
 from base64 import b64encode
 from collections.abc import Iterable, Sequence
 from copy import copy
-from typing import Any, Literal, cast, get_args
+from typing import Any, cast, get_args
 from uuid import uuid4
 
 from haiway import ArgumentsTrace, ResultTrace, ctx
@@ -29,16 +29,17 @@ from draive.lmm import (
     LMMInput,
     LMMInvocation,
     LMMOutput,
+    LMMOutputSelection,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
     LMMToolSelection,
-    ToolSpecification,
+    LMMToolSpecification,
 )
 from draive.metrics import TokenUsage
 from draive.multimodal import MediaContent, MultimodalContent, MultimodalContentElement, TextContent
 from draive.multimodal.media import MediaType
-from draive.parameters import DataModel, ParametersSpecification
+from draive.parameters import DataModel
 
 __all__ = [
     "gemini_lmm",
@@ -56,8 +57,8 @@ def gemini_lmm(
         instruction: Instruction | str | None,
         context: Iterable[LMMContextElement],
         tool_selection: LMMToolSelection,
-        tools: Iterable[ToolSpecification] | None,
-        output: Literal["auto", "text"] | ParametersSpecification,
+        tools: Iterable[LMMToolSpecification] | None,
+        output: LMMOutputSelection,
         **extra: Any,
     ) -> LMMOutput:
         with ctx.scope("gemini_lmm_invocation"):
@@ -78,6 +79,15 @@ def gemini_lmm(
             match output:
                 case "auto" | "text":
                     config = config.updated(response_format="text/plain")
+
+                case "image":
+                    raise NotImplementedError("image output is not supported by gemini")
+
+                case "audio":
+                    raise NotImplementedError("audio output is not supported by gemini")
+
+                case "video":
+                    raise NotImplementedError("video output is not supported by gemini")
 
                 case _:  # TODO: utilize json schema within API
                     if tools:
@@ -220,16 +230,16 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
     instruction: str,
     messages: list[GeminiRequestMessage],
     tool_selection: LMMToolSelection,
-    tools: Iterable[ToolSpecification] | None,
+    tools: Iterable[LMMToolSpecification] | None,
 ) -> LMMOutput:
     result: GeminiGenerationResult
     converted_tools: Sequence[GeminiFunctionToolSpecification] = []
     for tool in tools or []:
-        tool_function: GeminiFunctionToolSpecification = cast(
-            # those models are the same, can safely cast
-            GeminiFunctionToolSpecification,
-            tool["function"],
-        )
+        tool_function: GeminiFunctionToolSpecification = {
+            "name": tool.name,
+            "description": tool.description or "",
+            "parameters": cast(dict[str, Any], tool.parameters),
+        }
         # AIStudio api requires to delete properties if those are empty...
         if "parameters" in tool_function and not tool_function["parameters"]["properties"]:
             tool_function = copy(tool_function)
@@ -267,11 +277,12 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
 
         case tool:
             assert tool in (tools or []), "Can't suggest a tool without using it"  # nosec: B101
-            tool_function: GeminiFunctionToolSpecification = cast(
-                # those models are the same, can safely cast
-                GeminiFunctionToolSpecification,
-                tool["function"],
-            )
+            tool_function: GeminiFunctionToolSpecification = {
+                "name": tool.name,
+                "description": tool.description or "",
+                "parameters": cast(dict[str, Any], tool.parameters),
+            }
+
             # AIStudio api requires to delete properties if those are empty...
             if "parameters" in tool_function and not tool_function["parameters"]["properties"]:
                 tool_function = copy(tool_function)

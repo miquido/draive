@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterator, Iterable
-from typing import Any, Literal
+from typing import Any
 
 from haiway import ctx
 
@@ -8,13 +8,13 @@ from draive.lmm.state import LMMInvocation, LMMStream
 from draive.lmm.types import (
     LMMContextElement,
     LMMOutput,
+    LMMOutputSelection,
     LMMStreamInput,
     LMMStreamOutput,
     LMMStreamProperties,
     LMMToolSelection,
-    ToolSpecification,
+    LMMToolSpecification,
 )
-from draive.parameters import ParametersSpecification
 from draive.utils import ConstantStream
 
 __all__ = [
@@ -28,8 +28,8 @@ async def lmm_invoke(
     instruction: Instruction | str | None = None,
     context: Iterable[LMMContextElement],
     tool_selection: LMMToolSelection = "auto",
-    tools: Iterable[ToolSpecification] | None = None,
-    output: Literal["auto", "text"] | ParametersSpecification = "auto",
+    tools: Iterable[LMMToolSpecification] | None = None,
+    output: LMMOutputSelection = "auto",
     **extra: Any,
 ) -> LMMOutput:
     return await ctx.state(LMMInvocation).invoke(

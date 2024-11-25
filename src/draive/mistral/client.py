@@ -66,6 +66,7 @@ class MistralClient:
         *,
         config: MistralChatConfig,
         messages: list[ChatMessage],
+        response_format: dict[str, str] | None,
         tools: list[dict[str, object]] | None = None,
         tool_choice: Literal["auto", "any", "none"] = "auto",
         stream: Literal[True],
@@ -77,15 +78,17 @@ class MistralClient:
         *,
         config: MistralChatConfig,
         messages: list[ChatMessage],
+        response_format: dict[str, str] | None,
         tools: list[dict[str, object]] | None = None,
         tool_choice: Literal["auto", "any", "none"] = "auto",
     ) -> ChatCompletionResponse: ...
 
-    async def chat_completion(
+    async def chat_completion(  # noqa: PLR0913
         self,
         *,
         config: MistralChatConfig,
         messages: list[ChatMessage],
+        response_format: dict[str, str] | None,
         tools: list[dict[str, object]] | None = None,
         tool_choice: Literal["auto", "any", "none"] = "auto",
         stream: bool = False,
@@ -95,7 +98,7 @@ class MistralClient:
 
         else:
             if messages[-1]["role"] == "assistant":
-                if config.response_format == {"type": "json_object"}:
+                if response_format == {"type": "json_object"}:
                     del messages[-1]  # for json mode ignore prefill
 
                 else:
@@ -107,7 +110,7 @@ class MistralClient:
                 temperature=config.temperature,
                 top_p=config.top_p if not_missing(config.top_p) else None,
                 max_tokens=config.max_tokens if not_missing(config.max_tokens) else None,
-                response_format=cast(dict[str, str], config.response_format),
+                response_format=cast(dict[str, str], response_format),
                 seed=config.seed if not_missing(config.seed) else None,
                 tools=tools,
                 tool_choice=tool_choice if tools else None,
@@ -261,7 +264,7 @@ class MistralClient:
             except Exception as exc:
                 raise MistralException("Failed to decode Mistral response %s", response) from exc
 
-        elif status.is_client_error:
+        elif status.is_client_error or status.is_server_error:
             error_body: bytes = await response.aread()
             raise MistralException(
                 "Mistral request error: %s %s",

@@ -11,7 +11,7 @@ from draive.lmm.types import (
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
-    ToolSpecification,
+    LMMToolSpecification,
 )
 from draive.multimodal import MultimodalContent
 
@@ -68,7 +68,7 @@ class Toolbox:
         self,
         *,
         repetition_level: int = 0,
-    ) -> ToolSpecification | Literal["auto", "required", "none"]:
+    ) -> LMMToolSpecification | Literal["auto", "required", "none"]:
         if repetition_level >= self.repeated_calls_limit:
             return "none"  # require no tools if reached the limit
 
@@ -81,7 +81,7 @@ class Toolbox:
         else:  # use suggestion mode if no specific tool was available
             return "required" if self.suggest_tools else "auto"
 
-    def available_tools(self) -> list[ToolSpecification]:
+    def available_tools(self) -> list[LMMToolSpecification]:
         return [tool.specification for tool in self._tools.values() if tool.available]
 
     async def call_tool(

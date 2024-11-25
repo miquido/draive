@@ -1,14 +1,8 @@
-from typing import Literal, TypedDict
-
 from haiway import MISSING, Missing, State
 
 __all__ = [
     "AnthropicConfig",
 ]
-
-
-class ResponseFormat(TypedDict):
-    type: Literal["text", "json_object"]
 
 
 class AnthropicConfig(State):

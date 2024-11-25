@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import Any
 
 from haiway import ArgumentsTrace, ResultTrace, ctx
 
@@ -10,16 +10,16 @@ from draive.lmm import (
     LMMInput,
     LMMInvocation,
     LMMOutput,
+    LMMOutputSelection,
     LMMToolRequests,
     LMMToolResponse,
     LMMToolSelection,
-    ToolSpecification,
+    LMMToolSpecification,
 )
 from draive.metrics.tokens import TokenUsage
 from draive.ollama.client import OllamaClient
 from draive.ollama.config import OllamaChatConfig
 from draive.ollama.models import ChatCompletionResponse, ChatMessage
-from draive.parameters import ParametersSpecification
 
 __all__ = [
     "ollama_lmm",
@@ -37,8 +37,8 @@ def ollama_lmm(
         instruction: Instruction | str | None,
         context: Iterable[LMMContextElement],
         tool_selection: LMMToolSelection,
-        tools: Iterable[ToolSpecification] | None,
-        output: Literal["auto", "text"] | ParametersSpecification,
+        tools: Iterable[LMMToolSpecification] | None,
+        output: LMMOutputSelection,
         **extra: Any,
     ) -> LMMOutput:
         with ctx.scope("ollama_lmm_invocation"):
@@ -65,6 +65,15 @@ def ollama_lmm(
             match output:
                 case "auto" | "text":
                     config = config.updated(response_format="text")
+
+                case "image":
+                    raise NotImplementedError("image output is not supported by ollama")
+
+                case "audio":
+                    raise NotImplementedError("audio output is not supported by ollama")
+
+                case "video":
+                    raise NotImplementedError("video output is not supported by ollama")
 
                 case _:
                     config = config.updated(response_format="json")

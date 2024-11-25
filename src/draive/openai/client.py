@@ -12,12 +12,12 @@ from openai._types import NOT_GIVEN, NotGiven
 from openai.types import Moderation, ModerationCreateResponse
 from openai.types.chat import (
     ChatCompletion,
+    ChatCompletionAudioParam,
     ChatCompletionChunk,
     ChatCompletionMessageParam,
     ChatCompletionToolChoiceOptionParam,
     ChatCompletionToolParam,
 )
-from openai.types.chat.completion_create_params import ResponseFormat
 from openai.types.create_embedding_response import CreateEmbeddingResponse
 from openai.types.image import Image
 from openai.types.images_response import ImagesResponse
@@ -27,6 +27,7 @@ from draive.openai.config import (
     OpenAIEmbeddingConfig,
     OpenAIImageGenerationConfig,
 )
+from draive.parameters import DataModel
 from draive.utils import RateLimitError
 
 __all__ = [
@@ -111,15 +112,19 @@ class OpenAIClient:
         *,
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
+        response_format: Literal["auto", "text", "image", "audio", "video"]
+        | type[DataModel] = "auto",
         tools: list[ChatCompletionToolParam] | None = None,
         tool_choice: ChatCompletionToolChoiceOptionParam | NotGiven = NOT_GIVEN,
     ) -> ChatCompletion: ...
 
-    async def chat_completion(
+    async def chat_completion(  # noqa: PLR0913
         self,
         *,
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
+        response_format: Literal["auto", "text", "image", "audio", "video"]
+        | type[DataModel] = "auto",
         tools: list[ChatCompletionToolParam] | None = None,
         tool_choice: ChatCompletionToolChoiceOptionParam | NotGiven = NOT_GIVEN,
         stream: bool = False,
@@ -128,13 +133,20 @@ class OpenAIClient:
             return await self._client.chat.completions.create(
                 messages=messages,
                 model=config.model,
+                modalities=["audio"] if response_format == "audio" else NOT_GIVEN,
+                audio=cast(ChatCompletionAudioParam, config.audio_response_format)
+                if not_missing(config.audio_response_format)
+                else NOT_GIVEN,
                 frequency_penalty=config.frequency_penalty
                 if not_missing(config.frequency_penalty)
                 else NOT_GIVEN,
                 max_tokens=config.max_tokens if not_missing(config.max_tokens) else NOT_GIVEN,
                 n=1,
-                response_format=cast(ResponseFormat, config.response_format)
-                if not_missing(config.response_format)
+                response_format={
+                    # TODO: allow json schema: response_format.__PARAMETERS_SPECIFICATION__
+                    "type": "json_object",
+                }
+                if isinstance(response_format, type)
                 else NOT_GIVEN,
                 seed=config.seed if not_missing(config.seed) else NOT_GIVEN,
                 stream=stream,

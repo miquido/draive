@@ -21,6 +21,7 @@ from draive.lmm import (
     LMMInput,
     LMMInvocation,
     LMMOutput,
+    LMMOutputSelection,
     LMMStream,
     LMMStreamChunk,
     LMMStreamInput,
@@ -30,7 +31,7 @@ from draive.lmm import (
     LMMToolRequests,
     LMMToolResponse,
     LMMToolSelection,
-    ToolSpecification,
+    LMMToolSpecification,
 )
 from draive.metrics import TokenUsage
 from draive.multimodal import (
@@ -42,7 +43,7 @@ from draive.multimodal import (
 from draive.openai.client import OpenAIClient
 from draive.openai.config import OpenAIChatConfig, OpenAISystemFingerprint
 from draive.openai.types import OpenAIException
-from draive.parameters import DataModel, ParametersSpecification
+from draive.parameters import DataModel
 
 __all__ = [
     "openai_lmm",
@@ -61,8 +62,8 @@ def openai_lmm(
         instruction: Instruction | str | None,
         context: Iterable[LMMContextElement],
         tool_selection: LMMToolSelection,
-        tools: Iterable[ToolSpecification] | None,
-        output: Literal["auto", "text"] | ParametersSpecification,
+        tools: Iterable[LMMToolSpecification] | None,
+        output: LMMOutputSelection,
         **extra: Any,
     ) -> LMMOutput:
         with ctx.scope("openai_lmm_invocation"):
@@ -78,13 +79,6 @@ def openai_lmm(
             )
             config: OpenAIChatConfig = ctx.state(OpenAIChatConfig).updated(**extra)
             ctx.record(config)
-
-            match output:
-                case "auto" | "text":
-                    config = config.updated(response_format={"type": "text"})
-
-                case _:  # TODO: utilize json schema within api
-                    config = config.updated(response_format={"type": "json_object"})
 
             messages: list[ChatCompletionMessageParam] = [
                 _convert_context_element(config=config, element=element) for element in context
@@ -102,6 +96,7 @@ def openai_lmm(
             return await _chat_completion(
                 client=client,
                 config=config,
+                output=output,
                 messages=messages,
                 tools=tools,
                 tool_selection=tool_selection,
@@ -229,12 +224,13 @@ def _convert_context_element(
             }
 
 
-async def _chat_completion(  # noqa: C901, PLR0912
+async def _chat_completion(  # noqa: C901, PLR0912, PLR0913
     *,
     client: OpenAIClient,
     config: OpenAIChatConfig,
+    output: LMMOutputSelection,
     messages: list[ChatCompletionMessageParam],
-    tools: Iterable[ToolSpecification] | None,
+    tools: Iterable[LMMToolSpecification] | None,
     tool_selection: LMMToolSelection,
 ) -> LMMOutput:
     completion: ChatCompletion
@@ -243,10 +239,20 @@ async def _chat_completion(  # noqa: C901, PLR0912
             completion = await client.chat_completion(
                 config=config,
                 messages=messages,
-                tools=cast(
-                    list[ChatCompletionToolParam],
-                    tools,
-                ),
+                response_format=output,
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": tool.name,
+                            "description": tool.description or "",
+                            "parameters": cast(dict[str, object], tool.parameters),
+                        },
+                    }
+                    for tool in tools
+                ]
+                if tools
+                else None,
                 tool_choice="auto",
             )
 
@@ -254,6 +260,7 @@ async def _chat_completion(  # noqa: C901, PLR0912
             completion = await client.chat_completion(
                 config=config,
                 messages=messages,
+                response_format=output,
                 tools=None,
                 tool_choice="none",
             )
@@ -262,10 +269,20 @@ async def _chat_completion(  # noqa: C901, PLR0912
             completion = await client.chat_completion(
                 config=config,
                 messages=messages,
-                tools=cast(
-                    list[ChatCompletionToolParam],
-                    tools,
-                ),
+                response_format=output,
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": tool.name,
+                            "description": tool.description or "",
+                            "parameters": cast(dict[str, object], tool.parameters),
+                        },
+                    }
+                    for tool in tools
+                ]
+                if tools
+                else None,
                 tool_choice="required",
             )
 
@@ -273,14 +290,24 @@ async def _chat_completion(  # noqa: C901, PLR0912
             completion = await client.chat_completion(
                 config=config,
                 messages=messages,
-                tools=cast(
-                    list[ChatCompletionToolParam],
-                    tools,
-                ),
+                response_format=output,
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": tool.name,
+                            "description": tool.description or "",
+                            "parameters": cast(dict[str, object], tool.parameters),
+                        },
+                    }
+                    for tool in tools
+                ]
+                if tools
+                else None,
                 tool_choice={
                     "type": "function",
                     "function": {
-                        "name": tool["function"]["name"],
+                        "name": tool.name,
                     },
                 },
             )

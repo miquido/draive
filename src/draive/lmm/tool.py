@@ -3,7 +3,12 @@ from typing import Any, Protocol, cast, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze, not_missing
 
-from draive.lmm.types import LMMToolError, LMMToolException, ToolSpecification
+from draive.lmm.types import (
+    LMMToolError,
+    LMMToolException,
+    LMMToolFunctionSpecification,
+    LMMToolSpecification,
+)
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalContentConvertible
 from draive.parameters import ParameterSpecification, ParametrizedFunction
 
@@ -49,18 +54,15 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
             if not (parameter.has_default or parameter.allows_missing):
                 aliased_required.append(parameter.aliased or parameter.name)
 
-        self.specification: ToolSpecification = {
-            "type": "function",
-            "function": {
-                "name": name,
-                "parameters": {
-                    "type": "object",
-                    "properties": parameters,
-                    "required": aliased_required,
-                },
-                "description": description or "",
+        self.specification: LMMToolSpecification = LMMToolFunctionSpecification(
+            name=name,
+            description=description,
+            parameters={
+                "type": "object",
+                "properties": parameters,
+                "required": aliased_required,
             },
-        }
+        )
 
         self.name: str = name
         self._direct_result: bool = direct_result

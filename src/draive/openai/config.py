@@ -11,8 +11,9 @@ __all__ = [
 ]
 
 
-class ResponseFormat(TypedDict):
-    type: Literal["text", "json_object"]
+class AudioResponseFormat(TypedDict):
+    format: Literal["wav", "mp3"]
+    voice: Literal["ash", "ballad", "coral", "sage", "verse"]
 
 
 class OpenAIChatConfig(State):
@@ -22,7 +23,7 @@ class OpenAIChatConfig(State):
     frequency_penalty: float | Missing = MISSING
     max_tokens: int | Missing = MISSING
     seed: int | None | Missing = MISSING
-    response_format: ResponseFormat | Missing = MISSING
+    audio_response_format: AudioResponseFormat | Missing = MISSING
     vision_details: Literal["auto", "low", "high"] | Missing = MISSING
     timeout: float | Missing = MISSING
     stop_sequences: list[str] | Missing = MISSING

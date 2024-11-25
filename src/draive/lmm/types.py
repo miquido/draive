@@ -3,9 +3,7 @@ from typing import (
     Any,
     Literal,
     Protocol,
-    Required,
     Self,
-    TypedDict,
     runtime_checkable,
 )
 
@@ -32,23 +30,20 @@ __all__ = [
     "LMMStreaming",
     "LMMToolException",
     "LMMToolError",
-    "ToolFunctionSpecification",
-    "ToolSpecification",
+    "LMMToolFunctionSpecification",
+    "LMMToolSpecification",
 ]
 
 
-class ToolFunctionSpecification(TypedDict, total=False):
-    name: Required[str]
-    description: Required[str]
-    parameters: Required[ParametersSpecification]
+class LMMToolFunctionSpecification(State):
+    name: str
+    description: str | None
+    parameters: ParametersSpecification
 
 
-class ToolSpecification(TypedDict, total=False):
-    type: Required[Literal["function"]]
-    function: Required[ToolFunctionSpecification]
-
-
-LMMToolSelection = ToolSpecification | Literal["auto", "required", "none"]
+LMMToolSpecification = LMMToolFunctionSpecification
+LMMOutputSelection = Literal["auto", "text", "image", "audio", "video"] | type[DataModel]
+LMMToolSelection = Literal["auto", "required", "none"] | LMMToolSpecification
 
 
 class LMMToolException(Exception):
@@ -149,15 +144,15 @@ class LMMInvocating(Protocol):
         instruction: Instruction | str | None,
         context: Iterable[LMMContextElement],
         tool_selection: LMMToolSelection,
-        tools: Iterable[ToolSpecification] | None,
-        output: Literal["auto", "text"] | ParametersSpecification,
+        tools: Iterable[LMMToolSpecification] | None,
+        output: LMMOutputSelection,
         **extra: Any,
     ) -> LMMOutput: ...
 
 
 class LMMStreamProperties(State):
     instruction: Instruction | str | None = None
-    tools: Iterable[ToolSpecification] | None
+    tools: Iterable[LMMToolSpecification] | None
 
 
 @runtime_checkable

@@ -1,6 +1,6 @@
 from base64 import b64encode
 from collections.abc import Iterable
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 from anthropic.types import (
     ImageBlockParam,
@@ -23,15 +23,16 @@ from draive.lmm import (
     LMMInput,
     LMMInvocation,
     LMMOutput,
+    LMMOutputSelection,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
     LMMToolSelection,
-    ToolSpecification,
+    LMMToolSpecification,
 )
 from draive.metrics import TokenUsage
 from draive.multimodal import MediaContent, MultimodalContent, MultimodalContentElement, TextContent
-from draive.parameters import DataModel, ParametersSpecification
+from draive.parameters import DataModel
 
 __all__ = [
     "anthropic_lmm",
@@ -49,8 +50,8 @@ def anthropic_lmm(
         instruction: Instruction | str | None,
         context: Iterable[LMMContextElement],
         tool_selection: LMMToolSelection,
-        tools: Iterable[ToolSpecification] | None,
-        output: Literal["auto", "text"] | ParametersSpecification,
+        tools: Iterable[LMMToolSpecification] | None,
+        output: LMMOutputSelection,
         prefill: MultimodalContent | None = None,
         **extra: Any,
     ) -> LMMOutput:
@@ -68,6 +69,22 @@ def anthropic_lmm(
             )
             config: AnthropicConfig = ctx.state(AnthropicConfig).updated(**extra)
             ctx.record(config)
+
+            match output:
+                case "auto" | "text":
+                    pass
+
+                case "image":
+                    raise NotImplementedError("image output is not supported by anthropic")
+
+                case "audio":
+                    raise NotImplementedError("audio output is not supported by anthropic")
+
+                case "video":
+                    raise NotImplementedError("video output is not supported by anthropic")
+
+                case _:
+                    pass  # model output is not normalized but we can use prefill
 
             if prefill:
                 context = [*context, LMMCompletion.of(prefill)]
@@ -170,7 +187,7 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
     config: AnthropicConfig,
     instruction: str | None,
     messages: list[MessageParam],
-    tools: Iterable[ToolSpecification] | None,
+    tools: Iterable[LMMToolSpecification] | None,
     tool_selection: LMMToolSelection,
 ) -> LMMOutput:
     completion: Message
@@ -182,11 +199,11 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
                 messages=messages,
                 tools=[
                     ToolParam(
-                        name=tool["function"]["name"],
-                        description=tool["function"]["description"],
+                        name=tool.name,
+                        description=tool.description or "",
                         input_schema=cast(
                             dict[str, Any],
-                            tool["function"]["parameters"],
+                            tool.parameters,
                         ),
                     )
                     for tool in tools or []
@@ -201,11 +218,11 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
                 messages=messages,
                 tools=[
                     ToolParam(
-                        name=tool["function"]["name"],
-                        description=tool["function"]["description"],
+                        name=tool.name,
+                        description=tool.description or "",
                         input_schema=cast(
                             dict[str, Any],
-                            tool["function"]["parameters"],
+                            tool.parameters,
                         ),
                     )
                     for tool in tools or []
@@ -220,11 +237,11 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
                 messages=messages,
                 tools=[
                     ToolParam(
-                        name=tool["function"]["name"],
-                        description=tool["function"]["description"],
+                        name=tool.name,
+                        description=tool.description or "",
                         input_schema=cast(
                             dict[str, Any],
-                            tool["function"]["parameters"],
+                            tool.parameters,
                         ),
                     )
                     for tool in tools or []
@@ -239,18 +256,18 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
                 messages=messages,
                 tools=[
                     ToolParam(
-                        name=tool["function"]["name"],
-                        description=tool["function"]["description"],
+                        name=tool.name,
+                        description=tool.description or "",
                         input_schema=cast(
                             dict[str, Any],
-                            tool["function"]["parameters"],
+                            tool.parameters,
                         ),
                     )
                     for tool in tools or []
                 ],
                 tool_choice={
                     "type": "tool",
-                    "name": tool["function"]["name"],
+                    "name": tool.name,
                 },
             )
 
