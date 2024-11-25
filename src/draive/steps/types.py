@@ -1,12 +1,11 @@
-from collections.abc import Iterable, Mapping
-from typing import Any, Literal, Protocol, Self, runtime_checkable
+from collections.abc import Callable, Iterable, Mapping
+from typing import Any, Protocol, Self, runtime_checkable
 
 from haiway import State
 
 from draive.instructions import Instruction
-from draive.lmm import AnyTool, Toolbox
+from draive.lmm import AnyTool, LMMOutputSelection, Toolbox
 from draive.multimodal import Multimodal, MultimodalContent
-from draive.parameters import ParametersSpecification
 
 __all__ = [
     "StepsCompleting",
@@ -24,14 +23,17 @@ class StepResultProcessing(Protocol):
 
 class Step(State):
     @classmethod
-    def of(
+    def of(  # noqa: PLR0913
         cls,
         input: Multimodal,  # noqa: A002
         /,
         *,
         instruction: Instruction | str | None = None,
         tools: Toolbox | Iterable[AnyTool] | None = None,
-        output: Literal["auto", "text"] | ParametersSpecification = "auto",
+        output: LMMOutputSelection = "auto",
+        volatile: bool = False,
+        inclusive: bool = False,
+        condition: Callable[[], bool] | None = None,
         result_processing: StepResultProcessing | None = None,
         **extra: Any,
     ) -> Self:
@@ -40,6 +42,9 @@ class Step(State):
             input=MultimodalContent.of(input),
             toolbox=Toolbox.of(tools),
             output=output,
+            volatile=volatile,
+            inclusive=inclusive,
+            condition=condition,
             result_processing=result_processing,
             extra=extra,
         )
@@ -47,7 +52,10 @@ class Step(State):
     instruction: Instruction | None
     input: MultimodalContent
     toolbox: Toolbox
-    output: Literal["auto", "text"] | ParametersSpecification
+    output: LMMOutputSelection
+    volatile: bool
+    inclusive: bool
+    condition: Callable[[], bool] | None
     result_processing: StepResultProcessing | None
     extra: Mapping[str, Any]
 

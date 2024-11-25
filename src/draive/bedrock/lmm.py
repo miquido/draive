@@ -14,11 +14,12 @@ from draive.lmm import (
     LMMInput,
     LMMInvocation,
     LMMOutput,
+    LMMOutputSelection,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
     LMMToolSelection,
-    ToolSpecification,
+    LMMToolSpecification,
 )
 from draive.metrics.tokens import TokenUsage
 from draive.multimodal import (
@@ -27,7 +28,7 @@ from draive.multimodal import (
     MultimodalContentElement,
     TextContent,
 )
-from draive.parameters import DataModel, ParametersSpecification
+from draive.parameters import DataModel
 
 __all__ = [
     "bedrock_lmm",
@@ -45,8 +46,8 @@ def bedrock_lmm(
         instruction: Instruction | str | None,
         context: Iterable[LMMContextElement],
         tool_selection: LMMToolSelection,
-        tools: Iterable[ToolSpecification] | None,
-        output: Literal["auto", "text"] | ParametersSpecification,
+        tools: Iterable[LMMToolSpecification] | None,
+        output: LMMOutputSelection,
         **extra: Any,
     ) -> LMMOutput:
         with ctx.scope("bedrock_lmm_invocation"):
@@ -62,6 +63,22 @@ def bedrock_lmm(
             )
             config: BedrockChatConfig = ctx.state(BedrockChatConfig).updated(**extra)
             ctx.record(config)
+
+            match output:
+                case "auto" | "text":
+                    pass
+
+                case "image":
+                    raise NotImplementedError("image output is not supported by bedrock")
+
+                case "audio":
+                    raise NotImplementedError("audio output is not supported by bedrock")
+
+                case "video":
+                    raise NotImplementedError("video output is not supported by bedrock")
+
+                case _:
+                    raise NotImplementedError("model output is not supported by bedrock")
 
             messages: list[ChatMessage] = [_convert_context_element(element) for element in context]
 
@@ -171,11 +188,11 @@ def _convert_context_element(
             )
 
 
-def _convert_tool(tool: ToolSpecification) -> ChatTool:
+def _convert_tool(tool: LMMToolSpecification) -> ChatTool:
     return {
-        "name": tool["function"]["name"],
-        "description": tool["function"]["description"],
-        "inputSchema": {"json": tool["function"]["parameters"]},
+        "name": tool.name,
+        "description": tool.description or "",
+        "inputSchema": {"json": tool.parameters},
     }
 
 

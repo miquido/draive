@@ -93,7 +93,7 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
                 context=context,
                 tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
                 tools=toolbox.available_tools(),
-                output=generated.__PARAMETERS_SPECIFICATION__,  # provide model specification
+                output=generated,  # provide model specification
                 **extra,
             ):
                 case LMMCompletion() as completion:

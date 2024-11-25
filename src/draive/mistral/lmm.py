@@ -1,6 +1,6 @@
 import json
 from collections.abc import Iterable
-from typing import Any, Literal, cast
+from typing import Any
 
 from haiway import ArgumentsTrace, ResultTrace, ctx
 
@@ -11,11 +11,12 @@ from draive.lmm import (
     LMMInput,
     LMMInvocation,
     LMMOutput,
+    LMMOutputSelection,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
     LMMToolSelection,
-    ToolSpecification,
+    LMMToolSpecification,
 )
 from draive.metrics import TokenUsage
 from draive.mistral.client import MistralClient
@@ -23,7 +24,6 @@ from draive.mistral.config import MistralChatConfig
 from draive.mistral.models import ChatCompletionResponse, ChatMessage, ChatMessageResponse
 from draive.mistral.types import MistralException
 from draive.multimodal import MultimodalContent
-from draive.parameters import ParametersSpecification
 
 __all__ = [
     "mistral_lmm",
@@ -41,9 +41,9 @@ def mistral_lmm(
         instruction: Instruction | str | None,
         context: Iterable[LMMContextElement],
         tool_selection: LMMToolSelection,
-        tools: Iterable[ToolSpecification] | None,
-        output: Literal["auto", "text"] | ParametersSpecification,
-        prefill: MultimodalContent | None,
+        tools: Iterable[LMMToolSpecification] | None,
+        output: LMMOutputSelection,
+        prefill: MultimodalContent | None = None,
         **extra: Any,
     ) -> LMMOutput:
         with ctx.scope("mistral_lmm_invocation"):
@@ -60,9 +60,19 @@ def mistral_lmm(
             config: MistralChatConfig = ctx.state(MistralChatConfig).updated(**extra)
             ctx.record(config)
 
+            response_format: dict[str, str]
             match output:
                 case "auto" | "text":
-                    config = config.updated(response_format={"type": "text"})
+                    response_format = {"type": "text"}
+
+                case "image":
+                    raise NotImplementedError("image output is not supported by mistral")
+
+                case "audio":
+                    raise NotImplementedError("audio output is not supported by mistral")
+
+                case "video":
+                    raise NotImplementedError("video output is not supported by mistral")
 
                 case _:
                     if tools:
@@ -70,10 +80,10 @@ def mistral_lmm(
                             "Attempting to use Mistral in JSON mode with tools which is not"
                             " supported. Using text mode instead..."
                         )
-                        config = config.updated(response_format={"type": "text"})
+                        response_format = {"type": "text"}
 
                     else:
-                        config = config.updated(response_format={"type": "json_object"})
+                        response_format = {"type": "json_object"}
 
             if prefill:
                 context = [*context, LMMCompletion.of(prefill)]
@@ -95,6 +105,7 @@ def mistral_lmm(
                 client=client,
                 config=config,
                 messages=messages,
+                response_format=response_format,
                 tools=tools,
                 tool_selection=tool_selection,
             )
@@ -142,12 +153,13 @@ def _convert_context_element(
             )
 
 
-async def _chat_completion(
+async def _chat_completion(  # noqa: PLR0913
     *,
     client: MistralClient,
     config: MistralChatConfig,
     messages: list[ChatMessage],
-    tools: Iterable[ToolSpecification] | None,
+    response_format: dict[str, str],
+    tools: Iterable[LMMToolSpecification] | None,
     tool_selection: LMMToolSelection,
 ) -> LMMOutput:
     completion: ChatCompletionResponse
@@ -156,10 +168,20 @@ async def _chat_completion(
             completion = await client.chat_completion(
                 config=config,
                 messages=messages,
-                tools=cast(
-                    list[dict[str, object]],
-                    tools,
-                ),
+                response_format=response_format,
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": tool.name,
+                            "description": tool.description or "",
+                            "parameters": tool.parameters,
+                        },
+                    }
+                    for tool in tools
+                ]
+                if tools
+                else None,
                 tool_choice="auto",
             )
 
@@ -167,6 +189,7 @@ async def _chat_completion(
             completion = await client.chat_completion(
                 config=config,
                 messages=messages,
+                response_format=response_format,
                 tools=[],
                 tool_choice="none",
             )
@@ -175,10 +198,20 @@ async def _chat_completion(
             completion = await client.chat_completion(
                 config=config,
                 messages=messages,
-                tools=cast(
-                    list[dict[str, object]],
-                    tools,
-                ),
+                response_format=response_format,
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": tool.name,
+                            "description": tool.description or "",
+                            "parameters": tool.parameters,
+                        },
+                    }
+                    for tool in tools
+                ]
+                if tools
+                else None,
                 tool_choice="any",
             )
 
@@ -187,10 +220,17 @@ async def _chat_completion(
             completion = await client.chat_completion(
                 config=config,
                 messages=messages,
-                tools=cast(
-                    list[dict[str, object]],
-                    [tool],  # mistral can't be suggested with concrete tool
-                ),
+                response_format=response_format,
+                tools=[  # mistral can't be suggested with concrete tool
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": tool.name,
+                            "description": tool.description or "",
+                            "parameters": tool.parameters,
+                        },
+                    }
+                ],
                 tool_choice="any",
             )
 

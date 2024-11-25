@@ -78,9 +78,7 @@ class GeminiClient:
                 model=config.model,
                 request={
                     "generationConfig": {
-                        "responseMimeType": config.response_format
-                        if not_missing(config.response_format)
-                        else "text/plain",
+                        "responseMimeType": "application/json" if response_schema else "text/plain",
                         "temperature": config.temperature,
                         "topP": config.top_p if not_missing(config.top_p) else None,
                         "topK": config.top_k if not_missing(config.top_k) else None,

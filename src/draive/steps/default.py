@@ -27,8 +27,10 @@ async def default_steps_completion(
 ) -> MultimodalContent:
     with ctx.scope("steps_completion"):
         assert steps, "Steps cannot be empty"  # nosec: B101
-
+        result_parts: list[MultimodalContent] = []
+        last_step_result: MultimodalContent | None = None
         context: list[LMMContextElement] = []
+        volatile_context_range: range | None = None
         for step in steps:
             current_step: Step
             match step:
@@ -38,19 +40,43 @@ async def default_steps_completion(
                 case input_content:
                     current_step = Step.of(input_content)
 
-            await _process_step(
+            if current_step.condition is not None and not current_step.condition():
+                continue  # skip unavailable steps
+
+            context_end_index: int = len(context)
+            step_result: MultimodalContent = await _process_step(
                 current_step,
                 instruction=instruction,
                 context=context,
                 **extra,
             )
 
-        match context[-1]:  # the last element of the context should be the result
-            case LMMCompletion() as result:
-                return result.content
+            # remove volatile parts of context after using it
+            if volatile_context_range is not None:
+                del context[volatile_context_range.start : volatile_context_range.stop]
+                # adjust end index if removed stuff
+                context_end_index -= volatile_context_range.stop - volatile_context_range.start
+                volatile_context_range = None
 
-            case _:
-                raise RuntimeError("Invalid steps completion state!")
+            # mark new volatile parts of context if any to be removed
+            if current_step.volatile:
+                volatile_context_range = range(
+                    context_end_index,
+                    len(context),
+                )
+
+            # include step result as part of the final result if needed
+            if current_step.inclusive:
+                result_parts.append(step_result)
+                last_step_result = None  # make sure we won't make duplicates
+
+            else:
+                last_step_result = step_result
+
+        if last_step_result is not None:
+            result_parts.append(last_step_result)
+
+        return MultimodalContent.of(*result_parts)
 
 
 async def _process_step(
@@ -60,7 +86,7 @@ async def _process_step(
     instruction: Instruction | str | None,
     context: list[LMMContextElement],
     **extra: Any,
-) -> None:
+) -> MultimodalContent:
     context.append(LMMInput.of(step.input))
 
     toolbox: Toolbox = step.toolbox
@@ -70,6 +96,7 @@ async def _process_step(
         match await lmm_invoke(
             instruction=step.instruction or instruction,
             context=context,
+            output=step.output,
             tools=toolbox.available_tools(),
             tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
             **step.extra,
@@ -77,14 +104,15 @@ async def _process_step(
         ):
             case LMMCompletion() as completion:
                 if step.result_processing is None:
-                    return context.append(completion)
+                    context.append(completion)
+                    return completion.content
 
                 else:
-                    return context.append(
-                        LMMCompletion.of(
-                            await step.result_processing(completion.content),
-                        )
+                    processed_content: MultimodalContent = await step.result_processing(
+                        completion.content
                     )
+                    context.append(LMMCompletion.of(processed_content))
+                    return processed_content
 
             case LMMToolRequests() as tool_requests:
                 responses: list[LMMToolResponse] = await toolbox.respond_all(tool_requests)
@@ -94,14 +122,15 @@ async def _process_step(
                 ]:
                     direct_content: MultimodalContent = MultimodalContent.of(*direct_results)
                     if step.result_processing is None:
-                        return context.append(LMMCompletion.of(direct_content))
+                        context.append(LMMCompletion.of(direct_content))
+                        return direct_content
 
                     else:
-                        return context.append(
-                            LMMCompletion.of(
-                                await step.result_processing(direct_content),
-                            )
+                        processed_content: MultimodalContent = await step.result_processing(
+                            direct_content
                         )
+                        context.append(LMMCompletion.of(processed_content))
+                        return processed_content
 
                 else:
                     context.extend([tool_requests, *responses])

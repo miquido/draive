@@ -1,5 +1,3 @@
-from typing import Literal
-
 from haiway import MISSING, Missing, State
 
 __all__ = [
@@ -11,7 +9,6 @@ __all__ = [
 class GeminiConfig(State):
     model: str = "gemini-1.5-flash"
     temperature: float = 1.0
-    response_format: Literal["text/plain", "application/json"] | Missing = MISSING
     top_p: float | Missing = MISSING
     top_k: int | Missing = MISSING
     max_tokens: int | Missing = MISSING
