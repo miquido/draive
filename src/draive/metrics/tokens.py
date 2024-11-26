@@ -1,3 +1,4 @@
+from copy import copy
 from typing import Self, overload
 
 from haiway import State
@@ -74,7 +75,7 @@ class TokenUsage(State):
         self,
         other: Self,
     ) -> Self:
-        usage: dict[str, ModelTokenUsage] = self.usage
+        usage: dict[str, ModelTokenUsage] = copy(self.usage)
         for key, value in other.usage.items():
             if current := usage.get(key):
                 usage[key] = current + value

@@ -7,7 +7,7 @@ __all__ = [
 
 
 class MistralChatConfig(State):
-    model: str = "open-mistral-7b"
+    model: str
     temperature: float = 1.0
     top_p: float | Missing = MISSING
     seed: int | None | Missing = MISSING
@@ -17,5 +17,5 @@ class MistralChatConfig(State):
 
 
 class MistralEmbeddingConfig(State):
-    model: str = "mistral-embed"
+    model: str
     batch_size: int = 128

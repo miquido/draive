@@ -17,7 +17,7 @@ class AudioResponseFormat(TypedDict):
 
 
 class OpenAIChatConfig(State):
-    model: str = "gpt-4o-mini"
+    model: str
     temperature: float = 1.0
     top_p: float | Missing = MISSING
     frequency_penalty: float | Missing = MISSING
@@ -30,7 +30,7 @@ class OpenAIChatConfig(State):
 
 
 class OpenAIEmbeddingConfig(State):
-    model: str = "text-embedding-3-small"
+    model: str
     dimensions: int | Missing = MISSING
     batch_size: int = 128
     encoding_format: Literal["float", "base64"] | Missing = MISSING
@@ -38,7 +38,7 @@ class OpenAIEmbeddingConfig(State):
 
 
 class OpenAIImageGenerationConfig(State):
-    model: str = "dall-e-2"
+    model: str
     quality: Literal["standard", "hd"] = "standard"
     size: Literal["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"] = "1024x1024"
     style: Literal["vivid", "natural"] = "vivid"

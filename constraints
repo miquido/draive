@@ -11,9 +11,9 @@ anyio==4.6.2.post1
     #   openai
 bandit==1.7.10
     # via draive (pyproject.toml)
-boto3==1.35.66
+boto3==1.35.69
     # via draive (pyproject.toml)
-botocore==1.35.66
+botocore==1.35.69
     # via
     #   boto3
     #   s3transfer
@@ -26,7 +26,7 @@ charset-normalizer==3.4.0
     # via requests
 coloredlogs==15.0.1
     # via onnxruntime
-coverage==7.6.7
+coverage==7.6.8
     # via pytest-cov
 distro==1.9.0
     # via
@@ -42,7 +42,7 @@ fsspec==2024.10.0
     # via huggingface-hub
 h11==0.14.0
     # via httpcore
-haiway==0.5.1
+haiway==0.5.2
     # via draive (pyproject.toml)
 httpcore==1.0.7
     # via httpx
@@ -94,7 +94,7 @@ onnx==1.17.0
     # via fastembed
 onnxruntime==1.20.1
     # via fastembed
-openai==1.55.0
+openai==1.55.1
     # via draive (pyproject.toml)
 packaging==24.2
     # via
@@ -111,11 +111,11 @@ protobuf==5.28.3
     # via
     #   onnx
     #   onnxruntime
-pydantic==2.10.0
+pydantic==2.10.1
     # via
     #   anthropic
     #   openai
-pydantic-core==2.27.0
+pydantic-core==2.27.1
     # via pydantic
 pygments==2.18.0
     # via rich
@@ -173,7 +173,7 @@ tokenizers==0.20.3
     # via
     #   anthropic
     #   fastembed
-tqdm==4.67.0
+tqdm==4.67.1
     # via
     #   fastembed
     #   huggingface-hub

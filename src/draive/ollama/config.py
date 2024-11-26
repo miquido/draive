@@ -8,7 +8,7 @@ __all__ = [
 
 
 class OllamaChatConfig(State):
-    model: str = "llama3:8b"
+    model: str
     temperature: float = 1.0
     top_k: float | Missing = MISSING
     top_p: float | Missing = MISSING
