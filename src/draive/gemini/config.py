@@ -7,7 +7,7 @@ __all__ = [
 
 
 class GeminiConfig(State):
-    model: str = "gemini-1.5-flash"
+    model: str
     temperature: float = 1.0
     top_p: float | Missing = MISSING
     top_k: int | Missing = MISSING
@@ -17,5 +17,5 @@ class GeminiConfig(State):
 
 
 class GeminiEmbeddingConfig(State):
-    model: str = "embedding-gecko-001"
+    model: str
     batch_size: int = 128
