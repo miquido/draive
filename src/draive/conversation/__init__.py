@@ -4,8 +4,8 @@ from draive.conversation.state import Conversation
 from draive.conversation.types import ConversationMessage
 
 __all__ = [
-    "conversation_completion",
     "Conversation",
     "ConversationMessage",
+    "conversation_completion",
     "default_conversation_completion",
 ]

@@ -12,7 +12,7 @@ from draive.lmm import (
     LMMOutput,
     LMMOutputSelection,
     LMMToolRequests,
-    LMMToolResponse,
+    LMMToolResponses,
     LMMToolSelection,
     LMMToolSpecification,
 )
@@ -119,7 +119,7 @@ def _convert_context_element(
         case LMMToolRequests():
             raise NotImplementedError("Tools use is not supported by Ollama")
 
-        case LMMToolResponse():
+        case LMMToolResponses():
             raise NotImplementedError("Tools use is not supported by Ollama")
 
 

@@ -9,9 +9,10 @@ from draive.lmm import (
     LMMInput,
     LMMToolRequests,
     LMMToolResponse,
+    LMMToolResponses,
+    Toolbox,
     lmm_invoke,
 )
-from draive.lmm.toolbox import Toolbox
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.steps.types import Step
 
@@ -133,7 +134,12 @@ async def _process_step(
                         return processed_content
 
                 else:
-                    context.extend([tool_requests, *responses])
+                    context.extend(
+                        [
+                            tool_requests,
+                            LMMToolResponses(responses=responses),
+                        ]
+                    )
 
         recursion_level += 1  # continue with next recursion level
 

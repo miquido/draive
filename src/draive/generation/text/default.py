@@ -11,6 +11,7 @@ from draive.lmm import (
     LMMInput,
     LMMToolRequests,
     LMMToolResponse,
+    LMMToolResponses,
     Toolbox,
     lmm_invoke,
 )
@@ -71,7 +72,12 @@ async def default_generate_text(
                         ).as_string()
 
                     else:
-                        context.extend([tool_requests, *responses])
+                        context.extend(
+                            [
+                                tool_requests,
+                                LMMToolResponses(responses=responses),
+                            ]
+                        )
 
             recursion_level += 1  # continue with next recursion level
 

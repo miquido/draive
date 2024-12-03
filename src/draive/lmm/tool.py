@@ -1,4 +1,4 @@
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Mapping
 from typing import Any, Protocol, cast, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze, not_missing
@@ -14,9 +14,9 @@ from draive.parameters import ParameterSpecification, ParametrizedFunction
 
 __all__ = [
     "AnyTool",
-    "tool",
     "Tool",
     "ToolAvailabilityCheck",
+    "tool",
 ]
 
 
@@ -91,7 +91,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         self,
         call_id: str,
         /,
-        arguments: dict[str, Any],
+        arguments: Mapping[str, Any],
     ) -> MultimodalContent:
         with ctx.scope(self.name):
             ctx.record(ArgumentsTrace.of(**arguments))

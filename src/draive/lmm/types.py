@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Iterable, Mapping
 from typing import (
     Any,
     Literal,
@@ -14,23 +14,24 @@ from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel, Field, ParametersSpecification
 
 __all__ = [
-    "LMMInvocating",
-    "LMMToolSelection",
-    "LMMStreamProperties",
     "LMMCompletion",
     "LMMContextElement",
     "LMMInput",
+    "LMMInvocating",
     "LMMOutput",
-    "LMMToolRequest",
-    "LMMToolRequests",
-    "LMMToolResponse",
     "LMMStreamChunk",
     "LMMStreamInput",
     "LMMStreamOutput",
+    "LMMStreamProperties",
     "LMMStreaming",
-    "LMMToolException",
     "LMMToolError",
+    "LMMToolException",
     "LMMToolFunctionSpecification",
+    "LMMToolRequest",
+    "LMMToolRequests",
+    "LMMToolResponse",
+    "LMMToolResponses",
+    "LMMToolSelection",
     "LMMToolSpecification",
 ]
 
@@ -98,17 +99,21 @@ class LMMToolResponse(DataModel):
     error: bool
 
 
+class LMMToolResponses(DataModel):
+    responses: Iterable[LMMToolResponse]
+
+
 class LMMToolRequest(DataModel):
     identifier: str
     tool: str
-    arguments: dict[str, Any] = Field(default_factory=dict)
+    arguments: Mapping[str, Any] = Field(default_factory=dict)
 
 
 class LMMToolRequests(DataModel):
-    requests: list[LMMToolRequest]
+    requests: Iterable[LMMToolRequest]
 
 
-LMMContextElement = LMMInput | LMMCompletion | LMMToolRequests | LMMToolResponse
+LMMContextElement = LMMInput | LMMCompletion | LMMToolRequests | LMMToolResponses
 LMMOutput = LMMCompletion | LMMToolRequests
 
 

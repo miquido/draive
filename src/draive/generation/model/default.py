@@ -12,6 +12,7 @@ from draive.lmm import (
     LMMInput,
     LMMToolRequests,
     LMMToolResponse,
+    LMMToolResponses,
     Toolbox,
     lmm_invoke,
 )
@@ -129,7 +130,7 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
                             return generated.from_json(direct_responses_content.as_string())
 
                     else:
-                        context.extend(responses)
+                        context.append(LMMToolResponses(responses=responses))
 
             recursion_level += 1  # continue with next recursion level
 

@@ -26,7 +26,7 @@ from draive.lmm import (
     LMMOutputSelection,
     LMMToolRequest,
     LMMToolRequests,
-    LMMToolResponse,
+    LMMToolResponses,
     LMMToolSelection,
     LMMToolSpecification,
 )
@@ -164,19 +164,20 @@ def _convert_context_element(
                 ],
             }
 
-        case LMMToolResponse() as tool_response:
+        case LMMToolResponses() as tool_responses:
             return {
                 "role": "user",
                 "content": [
                     {
-                        "tool_use_id": tool_response.identifier,
+                        "tool_use_id": response.identifier,
                         "type": "tool_result",
-                        "is_error": tool_response.error,
+                        "is_error": response.error,
                         "content": [
                             _convert_content_element(element=part)
-                            for part in tool_response.content.parts
+                            for part in response.content.parts
                         ],
                     }
+                    for response in tool_responses.responses
                 ],
             }
 

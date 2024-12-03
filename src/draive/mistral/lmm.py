@@ -1,5 +1,6 @@
 import json
 from collections.abc import Iterable
+from itertools import chain
 from typing import Any
 
 from haiway import ArgumentsTrace, ResultTrace, ctx
@@ -14,7 +15,7 @@ from draive.lmm import (
     LMMOutputSelection,
     LMMToolRequest,
     LMMToolRequests,
-    LMMToolResponse,
+    LMMToolResponses,
     LMMToolSelection,
     LMMToolSpecification,
 )
@@ -88,9 +89,11 @@ def mistral_lmm(
             if prefill:
                 context = [*context, LMMCompletion.of(prefill)]
 
-            messages: list[ChatMessage] = [
-                _convert_context_element(element=element) for element in context
-            ]
+            messages: list[ChatMessage] = list(
+                chain.from_iterable(
+                    [_convert_context_element(element=element) for element in context]
+                )
+            )
 
             if instruction:
                 messages = [
@@ -115,41 +118,51 @@ def mistral_lmm(
 
 def _convert_context_element(
     element: LMMContextElement,
-) -> ChatMessage:
+) -> Iterable[ChatMessage]:
     match element:
         case LMMInput() as input:
-            return ChatMessage(
-                role="user",
-                content=input.content.as_string(),
+            return (
+                ChatMessage(
+                    role="user",
+                    content=input.content.as_string(),
+                ),
             )
 
         case LMMCompletion() as completion:
-            return ChatMessage(
-                role="assistant",
-                content=completion.content.as_string(),
+            return (
+                ChatMessage(
+                    role="assistant",
+                    content=completion.content.as_string(),
+                ),
             )
 
         case LMMToolRequests() as tool_requests:
-            return ChatMessage(
-                role="assistant",
-                content="",
-                tool_calls=[
-                    {
-                        "id": request.identifier,
-                        "function": {
-                            "name": request.tool,
-                            "arguments": json.dumps(request.arguments),
-                        },
-                    }
-                    for request in tool_requests.requests
-                ],
+            return (
+                ChatMessage(
+                    role="assistant",
+                    content="",
+                    tool_calls=[
+                        {
+                            "id": request.identifier,
+                            "function": {
+                                "name": request.tool,
+                                "arguments": json.dumps(request.arguments),
+                            },
+                        }
+                        for request in tool_requests.requests
+                    ],
+                ),
             )
 
-        case LMMToolResponse() as tool_response:
-            return ChatMessage(
-                role="tool",
-                name=tool_response.tool,
-                content=tool_response.content.as_string(),
+        case LMMToolResponses() as tool_responses:
+            return (
+                ChatMessage(
+                    role="tool",
+                    tool_call_id=response.identifier,
+                    name=response.tool,
+                    content=response.content.as_string(),
+                )
+                for response in tool_responses.responses
             )
 
 

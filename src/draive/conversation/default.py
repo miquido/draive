@@ -15,6 +15,7 @@ from draive.lmm import (
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
+    LMMToolResponses,
     Toolbox,
     lmm_invoke,
     lmm_stream,
@@ -158,7 +159,12 @@ async def _conversation_completion(
                     return response_message
 
                 else:
-                    context.extend([tool_requests, *responses])
+                    context.extend(
+                        [
+                            tool_requests,
+                            LMMToolResponses(responses=responses),
+                        ]
+                    )
 
         recursion_level += 1  # continue with next recursion level
 

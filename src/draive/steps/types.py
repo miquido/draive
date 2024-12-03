@@ -8,8 +8,8 @@ from draive.lmm import AnyTool, LMMOutputSelection, Toolbox
 from draive.multimodal import Multimodal, MultimodalContent
 
 __all__ = [
-    "StepsCompleting",
     "Step",
+    "StepsCompleting",
 ]
 
 
