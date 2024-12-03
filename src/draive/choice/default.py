@@ -12,6 +12,7 @@ from draive.lmm import (
     LMMInput,
     LMMToolRequests,
     LMMToolResponse,
+    LMMToolResponses,
     Toolbox,
     lmm_invoke,
 )
@@ -110,7 +111,12 @@ async def default_choice_completion(  # noqa: C901
                         raise SelectionException("Invalid or missing selection")
 
                     else:
-                        context.extend([tool_requests, *responses])
+                        context.extend(
+                            [
+                                tool_requests,
+                                LMMToolResponses(responses=responses),
+                            ]
+                        )
 
             recursion_level += 1  # continue with next recursion level
 

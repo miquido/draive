@@ -3,20 +3,20 @@ from typing import Any, Literal, NotRequired, Required, TypedDict
 from draive.parameters import DataModel
 
 __all__ = [
-    "UsageInfo",
-    "EmbeddingObject",
-    "EmbeddingResponse",
-    "ChatFunctionCall",
-    "ChatToolCallRequest",
-    "ChatMessage",
-    "ChatFunctionCallResponse",
-    "ChatToolCallResponse",
-    "ChatMessageResponse",
-    "ChatCompletionResponseChoice",
     "ChatCompletionResponse",
-    "ChatDeltaMessageResponse",
+    "ChatCompletionResponseChoice",
     "ChatCompletionResponseStreamChoice",
     "ChatCompletionStreamResponse",
+    "ChatDeltaMessageResponse",
+    "ChatFunctionCall",
+    "ChatFunctionCallResponse",
+    "ChatMessage",
+    "ChatMessageResponse",
+    "ChatToolCallRequest",
+    "ChatToolCallResponse",
+    "EmbeddingObject",
+    "EmbeddingResponse",
+    "UsageInfo",
 ]
 
 
@@ -52,6 +52,7 @@ class ChatToolCallRequest(TypedDict, total=False):
 
 class ChatMessage(TypedDict, total=False):
     role: Required[str]
+    tool_call_id: NotRequired[str]
     content: Required[str | list[str]]
     name: NotRequired[str]
     tool_calls: NotRequired[list[ChatToolCallRequest]]

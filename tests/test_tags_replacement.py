@@ -378,12 +378,13 @@ def test_returns_replaced_content_with_fake_tags():
         "<test>replaced</test>",
     )
 
-    assert MultimodalContent.of(
-        "<te<test>Lorem<",
-        MediaContent.url("http://image", media="image/png"),
-        "ipsum</test>",
-    ).replacing(
-        "test",
+    assert MultimodalTagElement.replace(
+        MultimodalContent.of(
+            "<te<test>Lorem<",
+            MediaContent.url("http://image", media="image/png"),
+            "ipsum</test>",
+        ),
+        tag="test",
         replacement="replaced",
     ) == MultimodalContent.of(
         "<te<test>replaced</test>",
@@ -391,30 +392,29 @@ def test_returns_replaced_content_with_fake_tags():
 
 
 def test_returns_replaced_with_other_tags():
-    assert MultimodalContent.of(
-        "<other>Other<more><test>Lorem</more>ipsum</test></other>"
-    ).replacing(
-        "test",
+    assert MultimodalTagElement.replace(
+        MultimodalContent.of("<other>Other</other><test>Lorem</more>ipsum</test><more>"),
+        tag="test",
         replacement="replaced",
-    ) == MultimodalContent.of("<other>Other<more><test>replaced</test></other>")
+    ) == MultimodalContent.of("<other>Other</other><test>replaced</test><more>")
 
-    assert MultimodalContent.of(
-        "<other>Other<more><test>Lorem</more>ipsum</test></other>"
-    ).replacing(
-        "test",
+    assert MultimodalTagElement.replace(
+        MultimodalContent.of("<other>Other</other><test>Lorem</more>ipsum</test><more>"),
+        tag="test",
         replacement="replaced",
-        remove_tags=True,
-    ) == MultimodalContent.of("<other>Other<more>replaced</other>")
+        strip_tags=True,
+    ) == MultimodalContent.of("<other>Other</other>replaced<more>")
 
-    assert MultimodalContent.of(
-        "<other>Other<more><test>Lorem</more>",
-        MediaContent.url("http://image", media="image/png"),
-        "ipsum</test></other>",
-    ).replacing(
-        "test",
+    assert MultimodalTagElement.replace(
+        MultimodalContent.of(
+            "<other>Other</other><test>Lorem</more>",
+            MediaContent.url("http://image", media="image/png"),
+            "ipsum</test><more>",
+        ),
+        tag="test",
         replacement="replaced",
     ) == MultimodalContent.of(
-        "<other>Other<more><test>replaced</test></other>",
+        "<other>Other</other><test>replaced</test><more>",
     )
 
 

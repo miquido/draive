@@ -16,10 +16,10 @@ from draive.parameters.annotations import resolve_annotation
 from draive.parameters.errors import ParameterValidationContext, ParameterValidationError
 
 __all__ = [
-    "as_validator",
-    "parameter_validator",
     "ParameterValidator",
     "ParameterVerifier",
+    "as_validator",
+    "parameter_validator",
 ]
 
 
@@ -890,7 +890,7 @@ def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912, PLR0913
                 recursion_guard=recursion_guard,
             )
 
-        case builtins.list | collections_abc.Sequence:  # pyright: ignore[reportUnknownMemberType]
+        case builtins.list | collections_abc.Sequence | collections_abc.Iterable:  # pyright: ignore[reportUnknownMemberType]
             validator = _prepare_list_validator(
                 resolved_args,
                 type_arguments=type_arguments,

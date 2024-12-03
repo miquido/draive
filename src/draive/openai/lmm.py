@@ -1,6 +1,7 @@
 import json
 from base64 import b64encode
 from collections.abc import AsyncGenerator, AsyncIterator, Iterable
+from itertools import chain
 from typing import Any, Literal, cast
 from uuid import uuid4
 
@@ -29,10 +30,10 @@ from draive.lmm import (
     LMMStreamProperties,
     LMMToolRequest,
     LMMToolRequests,
-    LMMToolResponse,
     LMMToolSelection,
     LMMToolSpecification,
 )
+from draive.lmm.types import LMMToolResponses
 from draive.metrics import TokenUsage
 from draive.multimodal import (
     MediaContent,
@@ -80,9 +81,14 @@ def openai_lmm(
             config: OpenAIChatConfig = ctx.state(OpenAIChatConfig).updated(**extra)
             ctx.record(config)
 
-            messages: list[ChatCompletionMessageParam] = [
-                _convert_context_element(config=config, element=element) for element in context
-            ]
+            messages: list[ChatCompletionMessageParam] = list(
+                chain.from_iterable(
+                    [
+                        _convert_context_element(config=config, element=element)
+                        for element in context
+                    ]
+                )
+            )
 
             if instruction:
                 messages = [
@@ -126,9 +132,14 @@ def openai_streaming_lmm(
             config=config,
             properties=properties,
             input=input,
-            context=[
-                _convert_context_element(config=config, element=element) for element in context
-            ]
+            context=list(
+                chain.from_iterable(
+                    [
+                        _convert_context_element(config=config, element=element)
+                        for element in context
+                    ]
+                )
+            )
             if context
             else [],
         )
@@ -179,49 +190,58 @@ def _convert_content_element(
 def _convert_context_element(
     element: LMMContextElement,
     config: OpenAIChatConfig,
-) -> ChatCompletionMessageParam:
+) -> Iterable[ChatCompletionMessageParam]:
     match element:
         case LMMInput() as input:
-            return {
-                "role": "user",
-                "content": [
-                    _convert_content_element(
-                        element=element,
-                        config=config,
-                    )
-                    for element in input.content.parts
-                ],
-            }
+            return (
+                {
+                    "role": "user",
+                    "content": [
+                        _convert_content_element(
+                            element=element,
+                            config=config,
+                        )
+                        for element in input.content.parts
+                    ],
+                },
+            )
 
         case LMMCompletion() as completion:
             # TODO: OpenAI models generating media?
-            return {
-                "role": "assistant",
-                "content": completion.content.as_string(),
-            }
+            return (
+                {
+                    "role": "assistant",
+                    "content": completion.content.as_string(),
+                },
+            )
 
         case LMMToolRequests() as tool_requests:
-            return {
-                "role": "assistant",
-                "tool_calls": [
-                    {
-                        "id": request.identifier,
-                        "type": "function",
-                        "function": {
-                            "name": request.tool,
-                            "arguments": json.dumps(request.arguments),
-                        },
-                    }
-                    for request in tool_requests.requests
-                ],
-            }
+            return (
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": request.identifier,
+                            "type": "function",
+                            "function": {
+                                "name": request.tool,
+                                "arguments": json.dumps(request.arguments),
+                            },
+                        }
+                        for request in tool_requests.requests
+                    ],
+                },
+            )
 
-        case LMMToolResponse() as tool_response:
-            return {
-                "role": "tool",
-                "tool_call_id": tool_response.identifier,
-                "content": tool_response.content.as_string(),
-            }
+        case LMMToolResponses() as tool_responses:
+            return (
+                {
+                    "role": "tool",
+                    "tool_call_id": response.identifier,
+                    "content": response.content.as_string(),
+                }
+                for response in tool_responses.responses
+            )
 
 
 async def _chat_completion(  # noqa: C901, PLR0912, PLR0913

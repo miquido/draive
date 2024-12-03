@@ -17,9 +17,9 @@ from haiway.types import missing
 from draive.parameters.annotations import resolve_annotation
 
 __all__ = [
-    "parameter_specification",
     "ParameterSpecification",
     "ParametersSpecification",
+    "parameter_specification",
 ]
 
 
@@ -350,7 +350,7 @@ def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911, PLR0913
                 # then the whole thing can't be represented in specification
                 return MISSING
 
-        case builtins.list | collections_abc.Sequence:  # pyright: ignore[reportUnknownMemberType]
+        case builtins.list | collections_abc.Sequence | collections_abc.Iterable:  # pyright: ignore[reportUnknownMemberType]
             match resolved_args:
                 case [list_type_annotation]:
                     element_specification: ParameterSpecification | Missing = (

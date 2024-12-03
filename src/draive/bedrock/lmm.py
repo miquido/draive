@@ -17,7 +17,7 @@ from draive.lmm import (
     LMMOutputSelection,
     LMMToolRequest,
     LMMToolRequests,
-    LMMToolResponse,
+    LMMToolResponses,
     LMMToolSelection,
     LMMToolSpecification,
 )
@@ -170,7 +170,7 @@ def _convert_context_element(
                 ],
             )
 
-        case LMMToolResponse() as response:
+        case LMMToolResponses() as tool_responses:
             return ChatMessage(
                 role="user",
                 content=[
@@ -184,6 +184,7 @@ def _convert_context_element(
                             "status": "error" if response.error else "success",
                         },
                     }
+                    for response in tool_responses.responses
                 ],
             )
 
