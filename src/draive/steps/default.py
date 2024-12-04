@@ -67,7 +67,7 @@ async def default_steps_completion(
                 )
 
             # include step result as part of the final result if needed
-            if current_step.inclusive:
+            if current_step.extends_result:
                 result_parts.append(step_result)
                 last_step_result = None  # make sure we won't make duplicates
 
@@ -90,9 +90,14 @@ async def _process_step(
 ) -> MultimodalContent:
     context.append(LMMInput.of(step.input))
 
+    if step.completion is not None:
+        context.append(step.completion)
+        return step.completion.content
+
     toolbox: Toolbox = step.toolbox
 
     recursion_level: int = 0
+    context_end_index: int = len(context)
     while recursion_level <= toolbox.repeated_calls_limit:
         match await lmm_invoke(
             instruction=step.instruction or instruction,
@@ -104,6 +109,7 @@ async def _process_step(
             **extra,
         ):
             case LMMCompletion() as completion:
+                del context[context_end_index:]  # remove tool calls from context
                 if step.result_processing is None:
                     context.append(completion)
                     return completion.content
@@ -121,6 +127,7 @@ async def _process_step(
                 if direct_results := [
                     response.content for response in responses if response.direct
                 ]:
+                    del context[context_end_index:]  # remove tool calls from context
                     direct_content: MultimodalContent = MultimodalContent.of(*direct_results)
                     if step.result_processing is None:
                         context.append(LMMCompletion.of(direct_content))

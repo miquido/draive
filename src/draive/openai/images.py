@@ -3,7 +3,7 @@ from typing import Any
 from haiway import ctx
 from openai.types.image import Image
 
-from draive.generation import ImageGenerator
+from draive.generation import ImageGeneration
 from draive.instructions import Instruction
 from draive.multimodal import (
     MediaContent,
@@ -18,10 +18,10 @@ __all__ = [
 ]
 
 
-async def openai_image_generator(
+def openai_image_generator(
     client: OpenAIClient | None = None,
     /,
-) -> ImageGenerator:
+) -> ImageGeneration:
     client = client or OpenAIClient.shared()
 
     async def openai_generate_image(
@@ -53,4 +53,4 @@ async def openai_image_generator(
             else:
                 raise OpenAIException("Invalid OpenAI response - missing image content")
 
-    return openai_generate_image
+    return ImageGeneration(generate=openai_generate_image)
