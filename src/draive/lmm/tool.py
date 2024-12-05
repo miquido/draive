@@ -307,10 +307,21 @@ def _default_result_format(result: Any) -> MultimodalContent:
         case element if isinstance(element, MultimodalContentConvertible):
             return MultimodalContent.of(element)
 
+        case [*elements]:
+            return MultimodalContent.of(
+                *[
+                    element if isinstance(element, MultimodalContentConvertible) else str(element)
+                    for element in elements
+                ]
+            )
+
         case other:
             return MultimodalContent.of(str(other))
 
 
 def _default_failure_result(exception: Exception) -> MultimodalContent:
-    ctx.log_error("Tool call failure", exception=exception)
+    ctx.log_error(
+        "Tool call failure",
+        exception=exception,
+    )
     return MultimodalContent.of("ERROR")
