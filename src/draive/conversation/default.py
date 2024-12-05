@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator, AsyncIterator, Iterable
+from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from datetime import UTC, datetime
 from typing import Any, Literal, overload
 
@@ -33,7 +33,7 @@ async def default_conversation_completion(
     *,
     instruction: Instruction | str | None,
     message: ConversationMessage,
-    memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage],
     toolbox: Toolbox,
     stream: Literal[True],
     **extra: Any,
@@ -45,7 +45,7 @@ async def default_conversation_completion(
     *,
     instruction: Instruction | str | None,
     message: ConversationMessage,
-    memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage],
     toolbox: Toolbox,
     stream: Literal[False] = False,
     **extra: Any,
@@ -57,7 +57,7 @@ async def default_conversation_completion(
     *,
     instruction: Instruction | str | None,
     message: ConversationMessage,
-    memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage],
     toolbox: Toolbox,
     stream: bool,
     **extra: Any,
@@ -68,7 +68,7 @@ async def default_conversation_completion(
     *,
     instruction: Instruction | str | None,
     message: ConversationMessage,
-    memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage],
     toolbox: Toolbox,
     stream: bool = False,
     **extra: Any,
@@ -76,7 +76,7 @@ async def default_conversation_completion(
     with ctx.scope("conversation_completion"):
         context: list[LMMContextElement]
 
-        messages: Iterable[ConversationMessage] | Missing = await memory.recall()
+        messages: Sequence[ConversationMessage] | Missing = await memory.recall()
         if not_missing(messages):
             context = [
                 *(message.as_lmm_context_element() for message in messages),
@@ -111,7 +111,7 @@ async def default_conversation_completion(
 async def _conversation_completion(
     instruction: Instruction | str | None,
     message: ConversationMessage,
-    memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage],
     context: list[LMMContextElement],
     toolbox: Toolbox,
     **extra: Any,
@@ -174,7 +174,7 @@ async def _conversation_completion(
 async def _conversation_stream(
     instruction: Instruction | str | None,
     message: ConversationMessage,
-    memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage],
     context: list[LMMContextElement],
     toolbox: Toolbox,
     **extra: Any,

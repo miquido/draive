@@ -2,18 +2,18 @@ from asyncio import gather
 from collections.abc import Callable, Mapping, Sequence
 from typing import Protocol, Self, cast, overload, runtime_checkable
 
-from haiway import ctx, freeze, frozenlist
+from haiway import ctx, freeze
 
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.parameters import DataModel, Field
 from draive.parameters.path import ParameterPath
 
 __all__ = [
-    "evaluation_scenario",
+    "EvaluationScenarioResult",
     "ScenarioEvaluator",
     "ScenarioEvaluatorDefinition",
     "ScenarioEvaluatorResult",
-    "EvaluationScenarioResult",
+    "evaluation_scenario",
 ]
 
 
@@ -21,7 +21,7 @@ class ScenarioEvaluatorResult(DataModel):
     name: str = Field(
         description="Name of evaluated scenario",
     )
-    evaluations: frozenlist[EvaluatorResult] = Field(
+    evaluations: Sequence[EvaluatorResult] = Field(
         description="Scenario evaluation results",
     )
     meta: Mapping[str, str | float | int | bool | None] | None = Field(
@@ -74,7 +74,7 @@ class EvaluationScenarioResult(DataModel):
             meta=meta,
         )
 
-    evaluations: frozenlist[EvaluatorResult] = Field(
+    evaluations: Sequence[EvaluatorResult] = Field(
         description="Scenario evaluation results",
     )
     meta: Mapping[str, str | float | int | bool | None] | None = Field(

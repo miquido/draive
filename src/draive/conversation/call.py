@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Iterable, Sequence
 from datetime import UTC, datetime
 from typing import Any, Final, Literal, overload
 
@@ -25,8 +25,8 @@ async def conversation_completion(
     *,
     instruction: Instruction | str | None = None,
     input: ConversationMessage | Multimodal,
-    memory: Memory[Iterable[ConversationMessage], ConversationMessage]
-    | Iterable[ConversationMessage]
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+    | Sequence[ConversationMessage]
     | None = None,
     tools: Toolbox | Iterable[AnyTool] | None = None,
     stream: Literal[True],
@@ -39,8 +39,8 @@ async def conversation_completion(
     *,
     instruction: Instruction | str | None = None,
     input: ConversationMessage | Multimodal,
-    memory: Memory[Iterable[ConversationMessage], ConversationMessage]
-    | Iterable[ConversationMessage]
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+    | Sequence[ConversationMessage]
     | None = None,
     tools: Toolbox | Iterable[AnyTool] | None = None,
     stream: Literal[False] = False,
@@ -52,8 +52,8 @@ async def conversation_completion(
     *,
     instruction: Instruction | str | None = None,
     input: ConversationMessage | Multimodal,  # noqa: A002
-    memory: Memory[Iterable[ConversationMessage], ConversationMessage]
-    | Iterable[ConversationMessage]
+    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
+    | Sequence[ConversationMessage]
     | None = None,
     tools: Toolbox | Iterable[AnyTool] | None = None,
     stream: bool = False,
@@ -89,7 +89,7 @@ async def conversation_completion(
                 )
 
     # prepare memory
-    conversation_memory: Memory[Iterable[ConversationMessage], ConversationMessage]
+    conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     match memory or conversation.memory:
         case None:
             conversation_memory = _EMPTY_MEMORY

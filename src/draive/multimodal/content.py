@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from itertools import chain
 from typing import Self, final, overload
 
@@ -48,7 +48,7 @@ class MultimodalContent(DataModel):
                     ),
                 )
 
-    parts: frozenlist[MultimodalContentElement]
+    parts: Sequence[MultimodalContentElement]
 
     @property
     def has_media(self) -> bool:
@@ -66,13 +66,13 @@ class MultimodalContent(DataModel):
         self,
         model: type[Artifact],
         /,
-    ) -> frozenlist[Artifact]: ...
+    ) -> Iterable[Artifact]: ...
 
     def artifacts[Artifact: DataModel](
         self,
         model: type[Artifact] | None = None,
         /,
-    ) -> frozenlist[Artifact] | frozenlist[DataModel]:
+    ) -> Iterable[Artifact] | Iterable[DataModel]:
         if model:
             return tuple(part for part in self.parts if isinstance(part, model))
 
@@ -166,7 +166,7 @@ def _extract_parts(  # noqa: PLR0911
     element: Multimodal,
     /,
     meta: Mapping[str, str | float | int | bool | None] | None = None,
-) -> frozenlist[MultimodalContentElement]:
+) -> Iterable[MultimodalContentElement]:
     match element:
         case MultimodalContent() as content:
             if not content:

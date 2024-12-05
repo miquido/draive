@@ -55,7 +55,7 @@ def gemini_lmm(
     async def lmm_invocation(
         *,
         instruction: Instruction | str | None,
-        context: Iterable[LMMContextElement],
+        context: Sequence[LMMContextElement],
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,

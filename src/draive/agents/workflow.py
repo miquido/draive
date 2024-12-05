@@ -1,9 +1,10 @@
 from asyncio import AbstractEventLoop, CancelledError, Task, TimerHandle, gather, get_running_loop
+from collections.abc import Sequence
 from inspect import isfunction
 from typing import Protocol, cast, final, overload, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import MISSING, AsyncQueue, Missing, State, ctx, freeze, frozenlist, not_missing
+from haiway import MISSING, AsyncQueue, Missing, State, ctx, freeze, not_missing
 
 from draive.agents.definition import AgentMessage, AgentNode
 from draive.agents.errors import AgentException
@@ -22,18 +23,18 @@ from draive.utils import (
 )
 
 __all__ = [
-    "workflow",
     "AgentWorkflow",
-    "AgentWorkflowInvocation",
-    "AgentWorkflowOutput",
     "AgentWorkflowIdle",
     "AgentWorkflowInput",
+    "AgentWorkflowInvocation",
+    "AgentWorkflowOutput",
+    "workflow",
 ]
 
 
 type AgentWorkflowInput = AgentMessage | AgentException
 type AgentWorkflowOutput[Result: ParametrizedData | str] = (
-    frozenlist[AgentMessage] | AgentMessage | Result | None
+    Sequence[AgentMessage] | AgentMessage | Result | None
 )
 
 
@@ -234,7 +235,7 @@ class WorkflowRunnerResultOutput[WorkflowResult: ParametrizedData | str](Protoco
 
 
 class WorkflowHistory(State):
-    history: frozenlist[AgentMessage]
+    history: Sequence[AgentMessage]
 
 
 class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:

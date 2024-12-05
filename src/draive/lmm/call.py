@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Iterable, Sequence
 from typing import Any
 
 from haiway import ctx
@@ -26,7 +26,7 @@ __all__ = [
 async def lmm_invoke(
     *,
     instruction: Instruction | str | None = None,
-    context: Iterable[LMMContextElement],
+    context: Sequence[LMMContextElement],
     tool_selection: LMMToolSelection = "auto",
     tools: Iterable[LMMToolSpecification] | None = None,
     output: LMMOutputSelection = "auto",
@@ -46,7 +46,7 @@ async def lmm_stream(
     *,
     properties: AsyncIterator[LMMStreamProperties] | LMMStreamProperties,
     input: AsyncIterator[LMMStreamInput],  # noqa: A002
-    context: Iterable[LMMContextElement] | None = None,
+    context: Sequence[LMMContextElement] | None = None,
     **extra: Any,
 ) -> AsyncIterator[LMMStreamOutput]:
     properties_stream: AsyncIterator[LMMStreamProperties]

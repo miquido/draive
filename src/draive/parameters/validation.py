@@ -291,6 +291,53 @@ def _prepare_list_validator(
     return list_validator
 
 
+def _prepare_sequence_validator(
+    elements_annotation: tuple[Any, ...],
+    /,
+    type_arguments: dict[str, Any],
+    globalns: dict[str, Any] | None,
+    localns: dict[str, Any] | None,
+    recursion_guard: frozenset[type[Any]],
+) -> ParameterValidator[Any]:
+    element_validator: ParameterValidator[Any]
+    match elements_annotation:
+        case [element]:
+            element_validator = parameter_validator(
+                element,
+                verifier=None,
+                type_arguments=type_arguments,
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
+            )
+
+        case other:
+            raise TypeError(f"Unsupported annotation - Sequence[{other}]")
+
+    def sequence_validator(
+        value: Any,
+        context: ParameterValidationContext,
+    ) -> Any:
+        match value:
+            case [*values]:
+                return tuple[Any, ...](
+                    element_validator(element, context.appending_path(f"[{idx}]"))
+                    for idx, element in enumerate(values)
+                )
+
+            case []:
+                return tuple[Any, ...]()
+
+            case _:
+                raise ParameterValidationError.invalid_type(
+                    expected=list,
+                    received=value,
+                    context=context,
+                )
+
+    return sequence_validator
+
+
 def _prepare_set_validator(
     elements_annotation: tuple[Any, ...],
     /,
@@ -890,8 +937,17 @@ def parameter_validator[Value](  # noqa: C901, PLR0915, PLR0912, PLR0913
                 recursion_guard=recursion_guard,
             )
 
-        case builtins.list | collections_abc.Sequence | collections_abc.Iterable:  # pyright: ignore[reportUnknownMemberType]
+        case builtins.list:  # pyright: ignore[reportUnknownMemberType]
             validator = _prepare_list_validator(
+                resolved_args,
+                type_arguments=type_arguments,
+                globalns=globalns,
+                localns=localns,
+                recursion_guard=recursion_guard,
+            )
+
+        case collections_abc.Sequence:  # pyright: ignore[reportUnknownMemberType]
+            validator = _prepare_sequence_validator(
                 resolved_args,
                 type_arguments=type_arguments,
                 globalns=globalns,

@@ -1,7 +1,8 @@
+from collections.abc import Sequence
 from typing import Protocol, Self, final, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import MISSING, Missing, freeze, frozenlist, is_missing, not_missing
+from haiway import MISSING, Missing, freeze, is_missing, not_missing
 
 from draive.agents.errors import AgentException
 from draive.multimodal import Multimodal, MultimodalContent
@@ -163,7 +164,7 @@ class AgentMessage(ParametrizedData):
         )
 
 
-type AgentOutput = frozenlist[AgentMessage] | AgentMessage | None
+type AgentOutput = Sequence[AgentMessage] | AgentMessage | None
 
 
 class AgentError(AgentException):
