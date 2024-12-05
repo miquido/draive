@@ -3,8 +3,8 @@ from collections.abc import Callable, Sequence
 from re import Match, Pattern
 
 __all__ = [
-    "exhaustive_split_text",
     "exhaustive_regex_split_text",
+    "exhaustive_split_text",
 ]
 
 

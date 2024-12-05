@@ -9,13 +9,13 @@ from draive.evaluation.value import EvaluationScoreValue, evaluation_score_value
 from draive.parameters import DataModel, Field, ParameterPath
 
 __all__ = [
-    "evaluator_highest",
-    "evaluator_lowest",
-    "evaluator",
     "Evaluator",
     "EvaluatorDefinition",
     "EvaluatorResult",
     "PreparedEvaluator",
+    "evaluator",
+    "evaluator_highest",
+    "evaluator_lowest",
 ]
 
 

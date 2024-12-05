@@ -19,10 +19,10 @@ from typing import (
 from haiway.types import missing
 
 __all__ = [
+    "ParameterDefaultFactory",
+    "allows_missing",
     "object_annotations",
     "resolve_annotation",
-    "allows_missing",
-    "ParameterDefaultFactory",
 ]
 
 

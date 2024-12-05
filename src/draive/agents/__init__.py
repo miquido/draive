@@ -11,7 +11,6 @@ from draive.agents.workflow import (
 )
 
 __all__ = [
-    "agent",
     "Agent",
     "AgentError",
     "AgentException",
@@ -24,5 +23,6 @@ __all__ = [
     "AgentWorkflowInput",
     "AgentWorkflowInvocation",
     "AgentWorkflowOutput",
+    "agent",
     "workflow",
 ]

@@ -4,8 +4,8 @@ from draive.ollama.lmm import ollama_lmm
 from draive.ollama.types import OllamaException
 
 __all__ = [
-    "ollama_lmm",
     "OllamaChatConfig",
     "OllamaClient",
     "OllamaException",
+    "ollama_lmm",
 ]

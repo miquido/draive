@@ -5,8 +5,8 @@ from haiway import freeze
 
 __all__ = [
     "ConstantMemory",
-    "VolatileMemory",
     "VolatileAccumulativeMemory",
+    "VolatileMemory",
 ]
 
 

@@ -3,7 +3,7 @@ from draive.generation.text.state import TextGeneration
 from draive.generation.text.types import TextGenerator
 
 __all__ = [
-    "generate_text",
     "TextGeneration",
     "TextGenerator",
+    "generate_text",
 ]

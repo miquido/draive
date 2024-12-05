@@ -4,10 +4,10 @@ from draive.choice.state import Choice
 from draive.choice.types import ChoiceCompletion, ChoiceOption, SelectionException
 
 __all__ = [
-    "choice_completion",
     "Choice",
     "ChoiceCompletion",
     "ChoiceOption",
-    "default_choice_completion",
     "SelectionException",
+    "choice_completion",
+    "default_choice_completion",
 ]

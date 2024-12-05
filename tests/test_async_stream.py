@@ -1,8 +1,9 @@
 from asyncio import CancelledError, Task
 
 import pytest
-from draive import AsyncStream, ctx
 from pytest import raises
+
+from draive import AsyncStream, ctx
 
 
 class FakeException(Exception):

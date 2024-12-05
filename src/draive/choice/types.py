@@ -9,8 +9,8 @@ from draive.lmm import Toolbox
 from draive.multimodal import Multimodal, MultimodalContent
 
 __all__ = [
-    "ChoiceOption",
     "ChoiceCompletion",
+    "ChoiceOption",
     "SelectionException",
 ]
 

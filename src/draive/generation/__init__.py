@@ -8,9 +8,6 @@ from draive.generation.model import (
 from draive.generation.text import TextGeneration, TextGenerator, generate_text
 
 __all__ = [
-    "generate_image",
-    "generate_model",
-    "generate_text",
     "ImageGeneration",
     "ImageGenerator",
     "ModelGeneration",
@@ -18,4 +15,7 @@ __all__ = [
     "ModelGeneratorDecoder",
     "TextGeneration",
     "TextGenerator",
+    "generate_image",
+    "generate_model",
+    "generate_text",
 ]

@@ -1,8 +1,8 @@
 from draive.parameters import DataModel
 
 __all__ = [
-    "ChatMessage",
     "ChatCompletionResponse",
+    "ChatMessage",
 ]
 
 
