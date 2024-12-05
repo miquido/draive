@@ -1,10 +1,10 @@
 from asyncio import Lock, gather
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Protocol, Self, overload, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import asynchronous, ctx, frozenlist
+from haiway import asynchronous, ctx
 
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.evaluation.generator import generate_case_parameters
@@ -12,13 +12,13 @@ from draive.evaluation.scenario import PreparedScenarioEvaluator, ScenarioEvalua
 from draive.parameters import DataModel, Field
 
 __all__ = [
-    "evaluation_suite",
     "EvaluationCaseResult",
     "EvaluationSuite",
     "EvaluationSuiteDefinition",
     "EvaluationSuiteStorage",
     "SuiteEvaluatorCaseResult",
     "SuiteEvaluatorResult",
+    "evaluation_suite",
 ]
 
 
@@ -35,7 +35,7 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
     value: Value = Field(
         description="Evaluated value",
     )
-    results: frozenlist[ScenarioEvaluatorResult] = Field(
+    results: Sequence[ScenarioEvaluatorResult] = Field(
         description="Evaluation results",
     )
     meta: Mapping[str, str | float | int | bool | None] | None = Field(
@@ -143,7 +143,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
     value: Value = Field(
         description="Evaluated value",
     )
-    results: frozenlist[ScenarioEvaluatorResult] = Field(
+    results: Sequence[ScenarioEvaluatorResult] = Field(
         description="Evaluation results",
     )
     meta: Mapping[str, str | float | int | bool | None] | None = Field(
@@ -161,7 +161,7 @@ class EvaluationSuiteDefinition[CaseParameters: DataModel, Value: DataModel | st
 
 
 class EvaluationSuiteData[CaseParameters: DataModel](DataModel):
-    cases: frozenlist[EvaluationSuiteCase[CaseParameters]] = Field(default_factory=tuple)
+    cases: Sequence[EvaluationSuiteCase[CaseParameters]] = Field(default_factory=tuple)
 
 
 @runtime_checkable
@@ -230,7 +230,7 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
                     )
 
                 case UUID() as identifier:
-                    available_cases: frozenlist[EvaluationSuiteCase[CaseParameters]] = (
+                    available_cases: Sequence[EvaluationSuiteCase[CaseParameters]] = (
                         await self._data(reload=reload)
                     ).cases
 
@@ -277,7 +277,7 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
     async def cases(
         self,
         reload: bool = False,
-    ) -> frozenlist[EvaluationSuiteCase[CaseParameters]]:
+    ) -> Sequence[EvaluationSuiteCase[CaseParameters]]:
         async with self._lock:
             return (await self._data(reload=reload)).cases
 
@@ -386,7 +386,7 @@ class _EvaluationSuiteMemoryStorage[CaseParameters: DataModel]:
         self,
         data_type: type[EvaluationSuiteData[CaseParameters]],
     ) -> None:
-        self.store: frozenlist[EvaluationSuiteCase[CaseParameters]] = ()
+        self.store: Sequence[EvaluationSuiteCase[CaseParameters]] = ()
         self._data_type: type[EvaluationSuiteData[CaseParameters]] = data_type
 
     async def load(

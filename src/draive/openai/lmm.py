@@ -1,6 +1,6 @@
 import json
 from base64 import b64encode
-from collections.abc import AsyncGenerator, AsyncIterator, Iterable
+from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Sequence
 from itertools import chain
 from typing import Any, Literal, cast
 from uuid import uuid4
@@ -61,7 +61,7 @@ def openai_lmm(
     async def lmm_invocation(
         *,
         instruction: Instruction | str | None,
-        context: Iterable[LMMContextElement],
+        context: Sequence[LMMContextElement],
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
@@ -121,7 +121,7 @@ def openai_streaming_lmm(
         *,
         properties: AsyncIterator[LMMStreamProperties],
         input: AsyncIterator[LMMStreamInput],  # noqa: A002
-        context: Iterable[LMMContextElement] | None,
+        context: Sequence[LMMContextElement] | None,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput]:
         config: OpenAIChatConfig = ctx.state(OpenAIChatConfig).updated(**extra)

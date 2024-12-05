@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Iterable, Mapping
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from typing import (
     Any,
     Literal,
@@ -100,7 +100,7 @@ class LMMToolResponse(DataModel):
 
 
 class LMMToolResponses(DataModel):
-    responses: Iterable[LMMToolResponse]
+    responses: Sequence[LMMToolResponse]
 
 
 class LMMToolRequest(DataModel):
@@ -110,7 +110,7 @@ class LMMToolRequest(DataModel):
 
 
 class LMMToolRequests(DataModel):
-    requests: Iterable[LMMToolRequest]
+    requests: Sequence[LMMToolRequest]
 
 
 LMMContextElement = LMMInput | LMMCompletion | LMMToolRequests | LMMToolResponses
@@ -147,7 +147,7 @@ class LMMInvocating(Protocol):
         self,
         *,
         instruction: Instruction | str | None,
-        context: Iterable[LMMContextElement],
+        context: Sequence[LMMContextElement],
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
@@ -167,6 +167,6 @@ class LMMStreaming(Protocol):
         *,
         properties: AsyncIterator[LMMStreamProperties],
         input: AsyncIterator[LMMStreamInput],  # noqa: A002
-        context: Iterable[LMMContextElement] | None,
+        context: Sequence[LMMContextElement] | None,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput]: ...

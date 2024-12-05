@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Iterable, Mapping
+from collections.abc import AsyncIterator, Mapping, Sequence
 from datetime import datetime
 from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
 from uuid import uuid4
@@ -88,7 +88,7 @@ class ConversationCompletion(Protocol):
         *,
         instruction: Instruction | str | None,
         message: ConversationMessage,
-        memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+        memory: Memory[Sequence[ConversationMessage], ConversationMessage],
         toolbox: Toolbox,
         stream: Literal[True],
         **extra: Any,
@@ -100,7 +100,7 @@ class ConversationCompletion(Protocol):
         *,
         instruction: Instruction | str | None,
         message: ConversationMessage,
-        memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+        memory: Memory[Sequence[ConversationMessage], ConversationMessage],
         toolbox: Toolbox,
         stream: Literal[False] = False,
         **extra: Any,
@@ -112,7 +112,7 @@ class ConversationCompletion(Protocol):
         *,
         instruction: Instruction | str | None,
         message: ConversationMessage,
-        memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+        memory: Memory[Sequence[ConversationMessage], ConversationMessage],
         toolbox: Toolbox,
         stream: bool,
         **extra: Any,
@@ -123,7 +123,7 @@ class ConversationCompletion(Protocol):
         *,
         instruction: Instruction | str | None,
         message: ConversationMessage,
-        memory: Memory[Iterable[ConversationMessage], ConversationMessage],
+        memory: Memory[Sequence[ConversationMessage], ConversationMessage],
         toolbox: Toolbox,
         stream: bool = False,
         **extra: Any,

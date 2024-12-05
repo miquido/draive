@@ -1,5 +1,5 @@
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from itertools import chain
 from typing import Any
 
@@ -40,7 +40,7 @@ def mistral_lmm(
     async def lmm_invocation(  # noqa: PLR0913
         *,
         instruction: Instruction | str | None,
-        context: Iterable[LMMContextElement],
+        context: Sequence[LMMContextElement],
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
