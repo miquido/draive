@@ -2,9 +2,9 @@
 #    uv --no-cache pip compile pyproject.toml -o constraints --all-extras
 annotated-types==0.7.0
     # via pydantic
-anthropic==0.37.1
+anthropic==0.40.0
     # via draive (pyproject.toml)
-anyio==4.6.2.post1
+anyio==4.7.0
     # via
     #   anthropic
     #   httpx
@@ -32,7 +32,7 @@ distro==1.9.0
     # via
     #   anthropic
     #   openai
-fastembed==0.3.6
+fastembed==0.4.2
     # via draive (pyproject.toml)
 filelock==3.16.1
     # via huggingface-hub
@@ -46,7 +46,7 @@ haiway==0.5.3
     # via draive (pyproject.toml)
 httpcore==1.0.7
     # via httpx
-httpx==0.27.2
+httpx==0.28.0
     # via
     #   draive (pyproject.toml)
     #   anthropic
@@ -92,9 +92,9 @@ numpy==1.26.4
     #   onnxruntime
 onnx==1.17.0
     # via fastembed
-onnxruntime==1.20.1
+onnxruntime==1.19.2
     # via fastembed
-openai==1.56.2
+openai==1.57.0
     # via draive (pyproject.toml)
 packaging==24.2
     # via
@@ -111,6 +111,8 @@ protobuf==5.29.1
     # via
     #   onnx
     #   onnxruntime
+py-rust-stemmers==0.1.3
+    # via fastembed
 pydantic==2.10.3
     # via
     #   anthropic
@@ -121,8 +123,6 @@ pygments==2.18.0
     # via rich
 pyright==1.1.390
     # via draive (pyproject.toml)
-pystemmer==2.2.0.3
-    # via fastembed
 pytest==7.4.4
     # via
     #   draive (pyproject.toml)
@@ -159,10 +159,7 @@ sniffio==1.3.1
     # via
     #   anthropic
     #   anyio
-    #   httpx
     #   openai
-snowballstemmer==2.2.0
-    # via fastembed
 stevedore==5.4.0
     # via bandit
 sympy==1.13.3
@@ -171,7 +168,7 @@ tiktoken==0.8.0
     # via draive (pyproject.toml)
 tokenizers==0.21.0
     # via
-    #   anthropic
+    #   draive (pyproject.toml)
     #   fastembed
 tqdm==4.67.1
     # via
@@ -181,6 +178,7 @@ tqdm==4.67.1
 typing-extensions==4.12.2
     # via
     #   anthropic
+    #   anyio
     #   huggingface-hub
     #   openai
     #   pydantic
