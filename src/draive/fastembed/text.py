@@ -14,10 +14,9 @@ __all__ = [
 
 
 async def fastembed_text_embedding(
-    model_name: str = "nomic-ai/nomic-embed-text-v1.5",
+    model_name: str,
     cache_dir: str | None = "./embedding_models/",
 ) -> TextEmbedding:
-    # TODO: verify if loading model should be asynchronous here
     embedding_model: FastembedTextEmbedding = await _text_embedding_model(
         model_name=model_name,
         cache_dir=cache_dir,

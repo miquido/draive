@@ -8,13 +8,13 @@ __all__ = [
 ]
 
 
-def mistral_text_tokenizer(
+async def mistral_text_tokenizer(
     model_name: str,
     /,
 ) -> Tokenization:
     return Tokenization(
         tokenize_text=sentencepiece_tokenizer(
-            sentencepiece_processor(model_path=_model_path(model_name))
+            await sentencepiece_processor(model_path=_model_path(model_name))
         )
     )
 
