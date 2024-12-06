@@ -1,8 +1,8 @@
 from typing import Any, Protocol, runtime_checkable
 
 __all__ = [
-    "Memory",
     "BasicMemory",
+    "Memory",
 ]
 
 

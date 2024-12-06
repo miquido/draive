@@ -7,10 +7,10 @@ from draive.embedding.state import ImageEmbedding, TextEmbedding
 from draive.embedding.types import Embedded
 
 __all__ = [
-    "embed_text",
-    "embed_texts",
     "embed_image",
     "embed_images",
+    "embed_text",
+    "embed_texts",
 ]
 
 

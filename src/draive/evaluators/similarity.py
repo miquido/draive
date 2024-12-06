@@ -7,9 +7,9 @@ from draive.similarity.score import vector_similarity_score
 from draive.steps import steps_completion
 
 __all__ = [
+    "image_vector_similarity_evaluator",
     "similarity_evaluator",
     "text_vector_similarity_evaluator",
-    "image_vector_similarity_evaluator",
 ]
 
 

@@ -1,7 +1,8 @@
 from asyncio import Task, sleep
 
-from draive.agents.idle import IdleMonitor
 from pytest import mark
+
+from draive.agents.idle import IdleMonitor
 
 
 @mark.asyncio

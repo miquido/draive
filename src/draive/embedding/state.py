@@ -3,8 +3,8 @@ from haiway import State
 from draive.embedding.types import ValueEmbedder
 
 __all__ = [
-    "TextEmbedding",
     "ImageEmbedding",
+    "TextEmbedding",
 ]
 
 

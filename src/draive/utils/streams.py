@@ -3,9 +3,9 @@ from collections import deque
 from collections.abc import AsyncIterator
 
 __all__ = [
+    "AsyncStream",
     "ConstantStream",
     "FixedStream",
-    "AsyncStream",
 ]
 
 

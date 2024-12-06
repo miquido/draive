@@ -5,10 +5,10 @@ from draive.instructions.state import InstructionsRepository
 from draive.instructions.types import Instruction, InstructionFetching
 
 __all__ = [
-    "instruction",
     "Instruction",
     "InstructionFetching",
-    "instructions_file",
     "InstructionsRepository",
     "MissingInstruction",
+    "instruction",
+    "instructions_file",
 ]

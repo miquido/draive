@@ -11,9 +11,9 @@ anyio==4.6.2.post1
     #   openai
 bandit==1.8.0
     # via draive (pyproject.toml)
-boto3==1.35.74
+boto3==1.35.76
     # via draive (pyproject.toml)
-botocore==1.35.74
+botocore==1.35.76
     # via
     #   boto3
     #   s3transfer
@@ -107,7 +107,7 @@ pillow==10.4.0
     # via fastembed
 pluggy==1.5.0
     # via pytest
-protobuf==5.29.0
+protobuf==5.29.1
     # via
     #   onnx
     #   onnxruntime
@@ -147,7 +147,7 @@ requests==2.32.3
     #   tiktoken
 rich==13.9.4
     # via bandit
-ruff==0.5.7
+ruff==0.8.2
     # via draive (pyproject.toml)
 s3transfer==0.10.4
     # via boto3

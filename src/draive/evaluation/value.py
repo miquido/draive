@@ -7,8 +7,8 @@ __all__ = [
     "NONE",
     "PERFECT",
     "POOR",
-    "evaluation_score_value",
     "EvaluationScoreValue",
+    "evaluation_score_value",
 ]
 
 type EvaluationScoreValue = Literal["none", "poor", "fair", "good", "excellent", "perfect"] | float

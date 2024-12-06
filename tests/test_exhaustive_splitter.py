@@ -1,4 +1,5 @@
 import pytest
+
 from draive.splitters.exhaustive import exhaustive_split_text
 
 

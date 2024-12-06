@@ -1,7 +1,8 @@
 from collections.abc import Generator
 
-from draive import MultimodalContent, cache, ctx, retry, tool
 from pytest import mark, raises
+
+from draive import MultimodalContent, cache, ctx, retry, tool
 
 
 class FakeException(Exception):
