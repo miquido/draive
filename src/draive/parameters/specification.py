@@ -1,20 +1,15 @@
 import builtins
-import datetime
-import enum
-import types
-import typing
-import uuid
-from collections import abc as collections_abc
-from collections.abc import Sequence
-from dataclasses import MISSING as DATACLASS_MISSING
-from dataclasses import fields as dataclass_fields
-from dataclasses import is_dataclass
-from typing import Any, Literal, NotRequired, Required, TypedDict, cast, final
+from collections.abc import Callable, Mapping, Sequence
+from datetime import date, datetime, time
+from enum import IntEnum, StrEnum
+from types import NoneType, UnionType
+from typing import Any, Literal, NotRequired, Required, TypedDict, Union, cast, final
+from typing import Mapping as MappingType  # noqa: UP035
+from typing import Sequence as SequenceType  # noqa: UP035
+from uuid import UUID
 
-from haiway import MISSING, Missing, not_missing
-from haiway.types import missing
-
-from draive.parameters.annotations import resolve_annotation
+from haiway import Missing
+from haiway.state import AttributeAnnotation
 
 __all__ = [
     "ParameterSpecification",
@@ -163,381 +158,413 @@ ParameterSpecification = (
 ParametersSpecification = ParameterObjectSpecification | ParameterAnyObjectSpecification
 
 
-def parameter_specification(  # noqa: C901, PLR0912, PLR0915, PLR0911, PLR0913
-    annotation: Any,
-    description: str | None,
-    type_arguments: dict[str, Any],
-    globalns: dict[str, Any] | None,
-    localns: dict[str, Any] | None,
-    recursion_guard: frozenset[type[Any]],
-) -> ParameterSpecification | Missing:
-    resolved_origin, resolved_args = resolve_annotation(
-        annotation,
-        type_arguments=type_arguments,
-        globalns=globalns,
-        localns=localns,
-    )
-
-    if resolved_origin in recursion_guard:
-        # TODO: FIXME: recursive specification is not properly supported
-        reference: ReferenceParameterSpecification = {"$ref": resolved_origin.__qualname__}
-        if description := description:
-            reference["description"] = description
-        return reference
-
-    specification: ParameterSpecification
-    match resolved_origin:
-        case builtins.str:
-            specification = {
-                "type": "string",
-            }
-
-        case builtins.int:
-            specification = {
-                "type": "integer",
-            }
-
-        case builtins.float:
-            specification = {
-                "type": "number",
-            }
-
-        case builtins.bool:
-            specification = {
-                "type": "boolean",
-            }
-
-        case types.NoneType | missing.Missing:
-            specification = {
-                "type": "null",
-            }
-
-        case types.UnionType:
-            alternatives: list[ParameterSpecification] = []
-            for arg in resolved_args:
-                alternative_specification: ParameterSpecification | Missing = (
-                    parameter_specification(
-                        annotation=arg,
-                        description=None,
-                        type_arguments=type_arguments,
-                        globalns=globalns,
-                        localns=localns,
-                        recursion_guard=recursion_guard,
-                    )
-                )
-
-                if not_missing(alternative_specification):
-                    alternatives.append(alternative_specification)
-
-                else:
-                    # when at least one element can't be represented in specification
-                    # then the whole thing can't be represented in specification
-                    return MISSING
-
-            specification = {"oneOf": alternatives}
-
-        case builtins.tuple:  # pyright: ignore[reportUnknownMemberType]
-            match resolved_args:
-                case [tuple_type_annotation, builtins.Ellipsis]:
-                    element_specification: ParameterSpecification | Missing = (
-                        parameter_specification(
-                            annotation=tuple_type_annotation,
-                            description=None,
-                            type_arguments=type_arguments,
-                            globalns=globalns,
-                            localns=localns,
-                            recursion_guard=recursion_guard,
-                        )
-                    )
-
-                    if not_missing(element_specification):
-                        specification = {
-                            "type": "array",
-                            "items": element_specification,
-                        }
-
-                    else:
-                        # when at least one element can't be represented in specification
-                        # then the whole thing can't be represented in specification
-                        return MISSING
-
-                case [*elements_annotations]:
-                    elements: list[ParameterSpecification] = []
-                    for arg in elements_annotations:
-                        element_specification: ParameterSpecification | Missing = (
-                            parameter_specification(
-                                annotation=arg,
-                                description=None,
-                                type_arguments=type_arguments,
-                                globalns=globalns,
-                                localns=localns,
-                                recursion_guard=recursion_guard,
-                            )
-                        )
-
-                        if not_missing(element_specification):
-                            elements.append(element_specification)
-
-                        else:
-                            # when at least one element can't be represented in specification
-                            # then the whole thing can't be represented in specification
-                            return MISSING
-
-                    specification = {
-                        "type": "array",
-                        "prefixItems": elements,
-                    }
-
-        case parametrized if hasattr(parametrized, "__PARAMETERS_SPECIFICATION__"):
-            nested_specification: ParameterSpecification | Missing = (
-                parametrized.__PARAMETERS_SPECIFICATION__
-            )
-
-            if not_missing(nested_specification):
-                specification = nested_specification
-
-            else:
-                # when at least one element can't be represented in specification
-                # then the whole thing can't be represented in specification
-                return MISSING
-
-        case data_class if is_dataclass(data_class):
-            required: list[str] = []
-            annotations: dict[str, Any] = {}
-            for field in dataclass_fields(data_class):
-                annotations[field.name] = field.type
-                if (
-                    field.default is not DATACLASS_MISSING
-                    or field.default_factory is not DATACLASS_MISSING
-                ):
-                    required.append(field.name)
-
-            dataclass_specification: ParameterSpecification | Missing = _annotations_specification(
-                annotations,
-                required=required,
-                type_arguments=type_arguments,
-                globalns=globalns,
-                localns=localns,
-                recursion_guard=cast(
-                    frozenset[type[Any]],
-                    frozenset({*recursion_guard, data_class}),
-                ),
-            )
-
-            if not_missing(dataclass_specification):
-                specification = dataclass_specification
-
-            else:
-                # when at least one element can't be represented in specification
-                # then the whole thing can't be represented in specification
-                return MISSING
-
-        case typed_dict if typing.is_typeddict(typed_dict):
-            dict_specification: ParameterSpecification | Missing = _annotations_specification(
-                typed_dict.__annotations__,
-                required=typed_dict.__required_keys__,
-                type_arguments=type_arguments,
-                globalns=globalns,
-                localns=localns,
-                recursion_guard=frozenset({*recursion_guard, typed_dict}),
-            )
-
-            if not_missing(dict_specification):
-                specification = dict_specification
-
-            else:
-                # when at least one element can't be represented in specification
-                # then the whole thing can't be represented in specification
-                return MISSING
-
-        case builtins.list | collections_abc.Sequence:  # pyright: ignore[reportUnknownMemberType]
-            match resolved_args:
-                case [list_type_annotation]:
-                    element_specification: ParameterSpecification | Missing = (
-                        parameter_specification(
-                            annotation=list_type_annotation,
-                            description=None,
-                            type_arguments=type_arguments,
-                            globalns=globalns,
-                            localns=localns,
-                            recursion_guard=recursion_guard,
-                        )
-                    )
-
-                    if not_missing(element_specification):
-                        specification = {
-                            "type": "array",
-                            "items": element_specification,
-                        }
-
-                    else:
-                        # when at least one element can't be represented in specification
-                        # then the whole thing can't be represented in specification
-                        return MISSING
-
-                case _:
-                    raise TypeError("Unsupported list type annotation: %s", annotation)
-
-        case builtins.set | collections_abc.Set:
-            match resolved_args:
-                case [list_type_annotation]:
-                    element_specification: ParameterSpecification | Missing = (
-                        parameter_specification(
-                            annotation=list_type_annotation,
-                            description=None,
-                            type_arguments=type_arguments,
-                            globalns=globalns,
-                            localns=localns,
-                            recursion_guard=recursion_guard,
-                        )
-                    )
-
-                    if not_missing(element_specification):
-                        specification = {
-                            "type": "array",
-                            "items": element_specification,
-                        }
-
-                    else:
-                        # when at least one element can't be represented in specification
-                        # then the whole thing can't be represented in specification
-                        return MISSING
-
-                case _:
-                    raise TypeError("Unsupported set type annotation: %s", annotation)
-
-        case builtins.dict | collections_abc.Mapping:  # pyright: ignore[reportUnknownMemberType]
-            match resolved_args:
-                case (builtins.str, element_annotation):
-                    element_specification: ParameterSpecification | Missing = (
-                        parameter_specification(
-                            annotation=element_annotation,
-                            description=None,
-                            type_arguments=type_arguments,
-                            globalns=globalns,
-                            localns=localns,
-                            recursion_guard=recursion_guard,
-                        )
-                    )
-
-                    if not_missing(element_specification):
-                        specification = {
-                            "type": "object",
-                            "additionalProperties": element_specification,
-                        }
-
-                    else:
-                        # when at least one element can't be represented in specification
-                        # then the whole thing can't be represented in specification
-                        return MISSING
-
-                case _:  # pyright: ignore[reportUnnecessaryComparison]
-                    raise TypeError("Unsupported dict type annotation", annotation)
-
-        case typing.Literal:
-            if all(isinstance(option, str) for option in resolved_args):
-                specification = {
-                    "type": "string",
-                    "enum": list(resolved_args),
-                }
-
-            elif all(isinstance(option, int) for option in resolved_args):
-                specification = {
-                    "type": "integer",
-                    "enum": list(resolved_args),
-                }
-
-            elif all(isinstance(option, int | float) for option in resolved_args):
-                specification = {
-                    "type": "number",
-                    "enum": list(resolved_args),
-                }
-
-            else:
-                raise TypeError("Unsupported literal type annotation: %s", annotation)
-
-        case enum_type if isinstance(enum_type, enum.EnumType):
-            if issubclass(enum_type, enum.StrEnum):
-                specification = {
-                    "type": "string",
-                    "enum": list(enum_type),
-                }
-
-            elif issubclass(enum_type, enum.IntEnum):
-                specification = {
-                    "type": "integer",
-                    "enum": list(enum_type),
-                }
-
-            else:
-                raise TypeError("Unsupported enum type annotation: %s", annotation)
-
-        case datetime.datetime:
-            specification = {
-                "type": "string",
-                "format": "date-time",
-            }
-
-        case uuid.UUID:
-            specification = {
-                "type": "string",
-                "format": "uuid",
-            }
-
-        case typing.Any:
-            specification = {
-                "oneOf": [
-                    {"type": "object", "additionalProperties": True},
-                    {"type": "array"},
-                    {"type": "string"},
-                    {"type": "number"},
-                    {"type": "boolean"},
-                ]
-            }
-
-        case _:
-            return MISSING
-
-    if description := description:
-        specification["description"] = description
-
-    return specification
-
-
-def _annotations_specification(  # noqa: PLR0913
-    annotations: dict[str, Any],
+def parameter_specification(  # noqa: PLR0911
+    annotation: AttributeAnnotation,
     /,
-    required: Sequence[str],
-    type_arguments: dict[str, Any],
-    globalns: dict[str, Any] | None,
-    localns: dict[str, Any] | None,
-    recursion_guard: frozenset[type[Any]],
-) -> ParametersSpecification | Missing:
-    parameters: dict[str, ParameterSpecification] = {}
-    for name, annotation in annotations.items():
-        try:
-            specification: ParameterSpecification | Missing = parameter_specification(
-                annotation=annotation,
-                description=None,
-                type_arguments=type_arguments,
-                globalns=globalns,
-                localns=localns,
-                recursion_guard=recursion_guard,
+    description: str | None,
+) -> ParameterSpecification:
+    if specification := SPECIFICATIONS.get(annotation.origin):
+        return specification(annotation, description)
+
+    elif hasattr(annotation.origin, "__PARAMETERS_SPECIFICATION__"):
+        if description := description:
+            return cast(
+                ParameterSpecification,
+                {
+                    **annotation.origin.__PARAMETERS_SPECIFICATION__,
+                    "description": description,
+                },
             )
 
-            if not_missing(specification):
-                parameters[name] = specification
+        else:
+            return annotation.origin.__PARAMETERS_SPECIFICATION__
+
+    elif issubclass(annotation.origin, IntEnum):
+        if description := description:
+            return {
+                "type": "integer",
+                "enum": list(annotation.origin),
+                "description": description,
+            }
+
+        else:
+            return {
+                "type": "integer",
+                "enum": list(annotation.origin),
+            }
+
+    elif issubclass(annotation.origin, StrEnum):
+        if description := description:
+            return {
+                "type": "string",
+                "enum": list(annotation.origin),
+                "description": description,
+            }
+
+        else:
+            return {
+                "type": "string",
+                "enum": list(annotation.origin),
+            }
+
+    else:
+        raise TypeError(f"Unsupported type annotation: {annotation}")
+
+
+def _prepare_specification_of_any(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if description := description:
+        return {
+            "type": "object",
+            "additionalProperties": True,
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "object",
+            "additionalProperties": True,
+        }
+
+
+def _prepare_specification_of_none(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if description := description:
+        return {
+            "type": "null",
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "null",
+        }
+
+
+def _prepare_specification_of_missing(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    # TODO: FIXME: not required???
+    if description := description:
+        return {
+            "type": "null",
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "null",
+        }
+
+
+def _prepare_specification_of_literal(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if all(isinstance(element, str) for element in annotation.arguments):
+        if description := description:
+            return {
+                "type": "string",
+                "enum": annotation.arguments,
+                "description": description,
+            }
+
+        else:
+            return {
+                "type": "string",
+                "enum": annotation.arguments,
+            }
+    else:
+        raise TypeError(f"Unsupported type annotation: {annotation}")
+
+
+def _prepare_specification_of_sequence(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if description := description:
+        return {
+            "type": "array",
+            "items": parameter_specification(
+                annotation.arguments[0],
+                description=None,
+            ),
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "array",
+            "items": parameter_specification(
+                annotation.arguments[0],
+                description=None,
+            ),
+        }
+
+
+def _prepare_specification_of_mapping(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if description := description:
+        return {
+            "type": "object",
+            "additionalProperties": parameter_specification(
+                annotation.arguments[1],
+                description=None,
+            ),
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "object",
+            "additionalProperties": parameter_specification(
+                annotation.arguments[1],
+                description=None,
+            ),
+        }
+
+
+def _prepare_specification_of_tuple(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    match annotation.arguments:
+        case [element_annotation, builtins.Ellipsis]:
+            if description := description:
+                return {
+                    "type": "array",
+                    "items": parameter_specification(element_annotation, description=None),
+                    "description": description,
+                }
 
             else:
-                # when at least one element can't be represented in specification
-                # then the whole thing can't be represented in specification
-                return MISSING
+                return {
+                    "type": "array",
+                    "items": parameter_specification(element_annotation, description=None),
+                }
 
-        except Exception as exc:
-            raise TypeError(f"Failed to extract parameter: {name}") from exc
+        case [*element_annotations]:
+            if description := description:
+                return {
+                    "type": "array",
+                    "prefixItems": [
+                        parameter_specification(element, description=None)
+                        for element in element_annotations
+                    ],
+                    "description": description,
+                }
 
-    return {
-        "type": "object",
-        "properties": parameters,
-        "required": list(required),
-    }
+            else:
+                return {
+                    "type": "array",
+                    "prefixItems": [
+                        parameter_specification(element, description=None)
+                        for element in element_annotations
+                    ],
+                }
+
+
+def _prepare_specification_of_union(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if description := description:
+        return {
+            "oneOf": [
+                parameter_specification(cast(AttributeAnnotation, argument), description=None)
+                for argument in annotation.arguments
+            ],
+            "description": description,
+        }
+
+    else:
+        return {
+            "oneOf": [
+                parameter_specification(cast(AttributeAnnotation, argument), description=None)
+                for argument in annotation.arguments
+            ],
+        }
+
+
+def _prepare_specification_of_bool(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if description := description:
+        return {
+            "type": "boolean",
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "boolean",
+        }
+
+
+def _prepare_specification_of_int(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if description := description:
+        return {
+            "type": "integer",
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "integer",
+        }
+
+
+def _prepare_specification_of_float(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if description := description:
+        return {
+            "type": "number",
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "number",
+        }
+
+
+def _prepare_specification_of_str(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if description := description:
+        return {
+            "type": "string",
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "string",
+        }
+
+
+def _prepare_specification_of_uuid(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if description := description:
+        return {
+            "type": "string",
+            "format": "uuid",
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "string",
+            "format": "uuid",
+        }
+
+
+def _prepare_specification_of_date(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if description := description:
+        return {
+            "type": "string",
+            "format": "date",
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "string",
+            "format": "date",
+        }
+
+
+def _prepare_specification_of_datetime(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if description := description:
+        return {
+            "type": "string",
+            "format": "date-time",
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "string",
+            "format": "date-time",
+        }
+
+
+def _prepare_specification_of_time(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    if description := description:
+        return {
+            "type": "string",
+            "format": "time",
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "string",
+            "format": "time",
+        }
+
+
+SPECIFICATIONS: Mapping[
+    Any, Callable[[AttributeAnnotation, str | None], ParameterSpecification]
+] = {
+    Any: _prepare_specification_of_any,
+    NoneType: _prepare_specification_of_none,
+    Missing: _prepare_specification_of_missing,
+    bool: _prepare_specification_of_bool,
+    int: _prepare_specification_of_int,
+    float: _prepare_specification_of_float,
+    str: _prepare_specification_of_str,
+    tuple: _prepare_specification_of_tuple,
+    Literal: _prepare_specification_of_literal,
+    Sequence: _prepare_specification_of_sequence,
+    SequenceType: _prepare_specification_of_sequence,
+    Mapping: _prepare_specification_of_mapping,
+    MappingType: _prepare_specification_of_mapping,
+    UUID: _prepare_specification_of_uuid,
+    date: _prepare_specification_of_date,
+    datetime: _prepare_specification_of_datetime,
+    time: _prepare_specification_of_time,
+    Union: _prepare_specification_of_union,
+    UnionType: _prepare_specification_of_union,
+}

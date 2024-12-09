@@ -1,0 +1,80 @@
+from collections import deque
+from collections.abc import Callable, Mapping, Sequence
+from types import TracebackType
+from typing import Any, Protocol
+
+__all__ = [
+    "BasicValue",
+    "ParameterConverter",
+    "ParameterDefaultFactory",
+    "ParameterValidationContext",
+    "ParameterValidationError",
+    "ParameterValidator",
+    "ParameterVerifier",
+]
+
+type BasicValue = (
+    Mapping[str, "BasicValue"] | Sequence["BasicValue"] | str | float | int | bool | None
+)
+
+type ParameterConverter[Type] = Callable[[Type], BasicValue]
+type ParameterVerifier[Type] = Callable[[Type], None]
+type ParameterDefaultFactory[Type] = Callable[[], Type]
+
+
+class ParameterValidationContext:
+    def __init__(self) -> None:
+        self._path: deque[str] = deque()
+
+    def __str__(self) -> str:
+        return "".join(self._path)
+
+    def scope(
+        self,
+        path: str,
+        /,
+    ) -> "ParameterValidationContextScope":
+        return ParameterValidationContextScope(self, component=path)
+
+
+class ParameterValidationContextScope:
+    def __init__(
+        self,
+        context: ParameterValidationContext,
+        /,
+        component: str,
+    ) -> None:
+        self.context: ParameterValidationContext = context
+        self.component: str = component
+
+    def __enter__(self) -> ParameterValidationContext:
+        self.context._path.append(self.component)  # pyright: ignore # FIXME
+        return self.context
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        try:
+            if exc_val is not None:
+                raise ParameterValidationError(
+                    f"Validation error at {self.context}",
+                ) from exc_val
+
+        finally:
+            self.context._path.pop()  # pyright: ignore # FIXME
+
+
+class ParameterValidator[Type](Protocol):
+    def __call__(
+        self,
+        value: Any,
+        /,
+        context: ParameterValidationContext,
+    ) -> Type: ...
+
+
+class ParameterValidationError(Exception):
+    pass

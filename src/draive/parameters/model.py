@@ -1,14 +1,13 @@
 import json
 from dataclasses import asdict
 from datetime import datetime
-from typing import Any, ClassVar, Self
+from typing import Any, Self
 from uuid import UUID
 
 from haiway import Missing, cache, not_missing
 
 from draive.parameters.data import ParametrizedData
 from draive.parameters.schema import json_schema, simplified_schema
-from draive.parameters.specification import ParametersSpecification
 
 __all__ = [
     "DataModel",
@@ -28,21 +27,12 @@ class ModelJSONEncoder(json.JSONEncoder):
 
 
 class DataModel(ParametrizedData):
-    __PARAMETERS_SPECIFICATION__: ClassVar[ParametersSpecification] = {
-        "type": "object",
-        "additionalProperties": True,
-    }
-
     @classmethod
     @cache(limit=2)
     def json_schema(
         cls,
         indent: int | None = None,
     ) -> str:
-        assert not_missing(  # nosec: B101
-            cls.__PARAMETERS_SPECIFICATION__
-        ), f"{cls.__qualname__} can't be represented using json schema"
-
         return json_schema(
             cls.__PARAMETERS_SPECIFICATION__,
             indent=indent,

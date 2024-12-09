@@ -1,10 +1,10 @@
-from collections.abc import Callable, MutableMapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, cast
 
-from haiway import State
+from haiway import AttributePath, AttributeRequirement, State
 
 from draive.embedding import Embedded, embed_text, embed_texts
-from draive.parameters import DataModel, ParameterPath, ParameterRequirement
+from draive.parameters import DataModel
 from draive.similarity import mmr_vector_similarity_search, vector_similarity_search
 
 __all__ = [
@@ -13,14 +13,14 @@ __all__ = [
 
 
 class VolatileVectorIndex(State):
-    storage: MutableMapping[type[Any], list[Embedded[Any]]]
+    storage: Mapping[type[Any], list[Embedded[Any]]]
 
     async def index[Model: DataModel, Value: str](
         self,
         model: type[Model],
         /,
         values: Sequence[Model],
-        indexed_value: Callable[[Model], Value] | ParameterPath[Model, Value] | Value,
+        indexed_value: Callable[[Model], Value] | AttributePath[Model, Value] | Value,
         **extra: Any,
     ) -> None:
         text_selector: Callable[[Model], Value]
@@ -30,9 +30,9 @@ class VolatileVectorIndex(State):
 
             case path:
                 assert isinstance(  # nosec: B101
-                    path, ParameterPath
+                    path, AttributePath
                 ), "Prepare parameter path by using Self._.path.to.property"
-                text_selector = cast(ParameterPath[Model, Value], path).__call__
+                text_selector = cast(AttributePath[Model, Value], path).__call__
 
         embedded_texts: list[Embedded[str]] = await embed_texts(
             [text_selector(value) for value in values],
@@ -48,13 +48,13 @@ class VolatileVectorIndex(State):
             self.storage[model].extend(embedded_models)
 
         else:
-            self.storage[model] = embedded_models
+            self.storage[model] = embedded_models  # pyright: ignore # TODO: FIXME: !!!
 
     def find[Model: DataModel](
         self,
         model: type[Model],
         /,
-        requirements: ParameterRequirement[Model] | None = None,
+        requirements: AttributeRequirement[Model] | None = None,
         limit: int | None = None,
         **extra: Any,
     ) -> list[Model]:
@@ -87,7 +87,7 @@ class VolatileVectorIndex(State):
         model: type[Model],
         /,
         query: str,
-        requirements: ParameterRequirement[Model] | None = None,
+        requirements: AttributeRequirement[Model] | None = None,
         score_threshold: float | None = None,
         limit: int = 10,
         **extra: Any,

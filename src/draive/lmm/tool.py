@@ -38,12 +38,12 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         format_failure: Callable[[Exception], Multimodal],
         direct_result: bool = False,
     ) -> None:
-        super().__init__(function=function)
+        super().__init__(function)
         aliased_required: list[str] = []
         parameters: dict[str, ParameterSpecification] = {}
         for parameter in self._parameters.values():
             if not_missing(parameter.specification):
-                parameters[parameter.aliased or parameter.name] = parameter.specification
+                parameters[parameter.alias or parameter.name] = parameter.specification
 
             else:
                 raise TypeError(
@@ -51,8 +51,9 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
                     f" - argument '{parameter.name}' is missing specification."
                 )
 
-            if not (parameter.has_default or parameter.allows_missing):
-                aliased_required.append(parameter.aliased or parameter.name)
+            # if not (parameter.has_default or parameter.allows_missing):
+            #     aliased_required.append(parameter.aliased or parameter.name)
+            # TODO: FIXME: required
 
         self.specification: LMMToolSpecification = LMMToolFunctionSpecification(
             name=name,
