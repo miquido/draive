@@ -5,6 +5,7 @@ from haiway import State
 
 from draive.multimodal.content import Multimodal, MultimodalContent, MultimodalContentElement
 from draive.multimodal.text import TextContent
+from draive.parameters import DataModel
 
 __all__ = [
     "MultimodalTagElement",
@@ -12,7 +13,7 @@ __all__ = [
 
 
 # TODO: add streaming support with content input as async iterator
-class MultimodalTagElement(State):
+class MultimodalTagElement(DataModel):
     name: str
     attributes: Mapping[str, str] | None = None
     content: MultimodalContent

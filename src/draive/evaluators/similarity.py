@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import cast
 
 from draive.embedding import Embedded, embed_images, embed_texts
@@ -94,7 +95,7 @@ async def text_vector_similarity_evaluator(
     *,
     reference: str,
 ) -> float:
-    embedding: list[Embedded[str]] = await embed_texts([reference, evaluated])
+    embedding: Sequence[Embedded[str]] = await embed_texts([reference, evaluated])
 
     return vector_similarity_score(
         value_vector=embedding[0].vector,
@@ -135,7 +136,7 @@ async def image_vector_similarity_evaluator(
         case raw_data:
             reference_data = raw_data
 
-    embedding: list[Embedded[bytes]] = await embed_images([reference_data, evaluated_data])
+    embedding: Sequence[Embedded[bytes]] = await embed_images([reference_data, evaluated_data])
 
     return vector_similarity_score(
         value_vector=embedding[0].vector,

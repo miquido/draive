@@ -6,7 +6,6 @@ from haiway import MISSING, Missing, freeze, is_missing, not_missing
 
 from draive.agents.errors import AgentException
 from draive.multimodal import Multimodal, MultimodalContent
-from draive.parameters import ParametrizedData
 
 __all__ = [
     "Agent",
@@ -104,13 +103,22 @@ class AgentNode:
 
 
 @final
-class AgentMessage(ParametrizedData):
-    identifier: UUID
-    sender: AgentNode | Missing
-    recipient: AgentNode
-    addressee: AgentNode | None
-    content: MultimodalContent
-    responding: "AgentMessage | None"
+class AgentMessage:
+    def __init__(  # noqa: PLR0913
+        self,
+        identifier: UUID,
+        sender: AgentNode | Missing,
+        recipient: AgentNode,
+        addressee: AgentNode | None,
+        content: MultimodalContent,
+        responding: Self | None,
+    ) -> None:
+        self.identifier: UUID = identifier
+        self.sender: AgentNode | Missing = sender
+        self.recipient: AgentNode = recipient
+        self.addressee: AgentNode | None = addressee
+        self.content: MultimodalContent = content
+        self.responding: Self | None = responding
 
     def __hash__(self) -> int:
         return hash(self.identifier)
@@ -124,6 +132,14 @@ class AgentMessage(ParametrizedData):
 
         else:
             return False
+
+    def _with_sender(
+        self,
+        sender: AgentNode,
+        /,
+    ) -> Self:
+        self.sender = sender
+        return self
 
     @property
     def should_respond(self) -> bool:

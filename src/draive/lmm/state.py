@@ -2,7 +2,7 @@ from haiway import State
 
 from draive.lmm.types import LMMInvocating, LMMStreaming
 
-__all__: list[str] = [
+__all__ = [
     "LMMInvocating",
     "LMMStream",
 ]

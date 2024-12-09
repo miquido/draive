@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from pathlib import Path
 from uuid import UUID
 
@@ -31,7 +32,7 @@ class _Instruction(DataModel):
 
 
 class _Storage(DataModel):
-    instructions: dict[str, _Instruction]
+    instructions: Mapping[str, _Instruction]
 
 
 class _InstructionsFileStorage:

@@ -19,7 +19,6 @@ async def fastembed_image_embedding(
     cache_dir: str | None = "./embedding_models/",
     /,
 ) -> ValueEmbedder[bytes]:
-    # TODO: verify if loading model should be asynchronous here
     embedding_model: ImageEmbedding = await _image_embedding_model(
         model_name=model_name,
         cache_dir=cache_dir,
@@ -28,7 +27,7 @@ async def fastembed_image_embedding(
     async def fastembed_embed_image(
         values: Sequence[bytes],
         **extra: Any,
-    ) -> list[Embedded[bytes]]:
+    ) -> Sequence[Embedded[bytes]]:
         with ctx.scope("image_embedding"):
             return await _fastembed_image_embedding(
                 embedding_model,
@@ -54,7 +53,7 @@ def _fastembed_image_embedding(
     embedding_model: ImageEmbedding,
     images: Sequence[bytes],
     /,
-) -> list[Embedded[bytes]]:
+) -> Sequence[Embedded[bytes]]:
     return [
         Embedded(
             value=value,  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]

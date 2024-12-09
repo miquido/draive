@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import numpy as np
@@ -12,8 +12,8 @@ __all__ = [
 
 
 def vector_similarity_score(
-    value_vector: NDArray[Any] | list[float],
-    reference_vector: NDArray[Any] | list[float],
+    value_vector: NDArray[Any] | Sequence[float],
+    reference_vector: NDArray[Any] | Sequence[float],
     similarity: Callable[
         [list[NDArray[Any]] | NDArray[Any], list[NDArray[Any]] | NDArray[Any]], NDArray[Any]
     ] = cosine_similarity,

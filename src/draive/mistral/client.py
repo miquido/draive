@@ -121,7 +121,7 @@ class MistralClient:
         self,
         config: MistralEmbeddingConfig,
         inputs: Sequence[str],
-    ) -> list[list[float]]:
+    ) -> list[Sequence[float]]:
         return list(
             chain(
                 *await gather(
@@ -147,7 +147,7 @@ class MistralClient:
         messages: list[ChatMessage],
         tools: list[dict[str, object]] | None,
         tool_choice: str | None,
-        stop: list[str] | None,
+        stop: Sequence[str] | None,
     ) -> ChatCompletionResponse:
         request_body: dict[str, Any] = {
             "model": model,
@@ -183,7 +183,7 @@ class MistralClient:
         self,
         model: str,
         texts: Sequence[str],
-    ) -> list[list[float]]:
+    ) -> list[Sequence[float]]:
         response: EmbeddingResponse = await self._request(
             model=EmbeddingResponse,
             method="POST",

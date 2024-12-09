@@ -21,10 +21,10 @@ def mistral_text_embedding(
     async def mistral_embed_text(
         values: Sequence[str],
         **extra: Any,
-    ) -> list[Embedded[str]]:
+    ) -> Sequence[Embedded[str]]:
         config: MistralEmbeddingConfig = ctx.state(MistralEmbeddingConfig).updated(**extra)
         with ctx.scope("mistral_embed_text", config):
-            results: list[list[float]] = await client.embedding(  # pyright: ignore[reportDeprecated]
+            results: list[Sequence[float]] = await client.embedding(  # pyright: ignore[reportDeprecated]
                 config=config,
                 inputs=values,
             )
