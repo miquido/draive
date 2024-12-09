@@ -25,7 +25,7 @@ class OpenAIChatConfig(State):
     seed: int | None | Missing = MISSING
     audio_response_format: AudioResponseFormat | Missing = MISSING
     vision_details: Literal["auto", "low", "high"] | Missing = MISSING
-    parallel_tool_calls: bool = True
+    parallel_tool_calls: bool | Missing = MISSING
     timeout: float | Missing = MISSING
     stop_sequences: list[str] | Missing = MISSING
 
