@@ -161,10 +161,10 @@ class AgentRunner:
                     pass  # nothing to do
 
                 case [*results]:
-                    output(*[result.updated(sender=node) for result in results])
+                    output(*[result._with_sender(node) for result in results])  # pyright: ignore[reportPrivateUsage]
 
                 case result:
-                    output(result.updated(sender=node))
+                    output(result._with_sender(node))  # pyright: ignore[reportPrivateUsage]
 
         except CancelledError:
             pass  # ignore when Cancelled

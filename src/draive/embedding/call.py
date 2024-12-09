@@ -31,7 +31,7 @@ async def embed_texts(
     texts: Sequence[str],
     /,
     **extra: Any,
-) -> list[Embedded[str]]:
+) -> Sequence[Embedded[str]]:
     return await ctx.state(TextEmbedding).embed(
         texts,
         **extra,
@@ -55,7 +55,7 @@ async def embed_images(
     images: Sequence[bytes],
     /,
     **extra: Any,
-) -> list[Embedded[bytes]]:
+) -> Sequence[Embedded[bytes]]:
     return await ctx.state(ImageEmbedding).embed(
         images,
         **extra,

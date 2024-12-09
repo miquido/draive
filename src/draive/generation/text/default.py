@@ -20,7 +20,7 @@ from draive.multimodal import (
     MultimodalContent,
 )
 
-__all__: list[str] = [
+__all__ = [
     "default_generate_text",
 ]
 

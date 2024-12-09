@@ -11,7 +11,6 @@ from openai.types.chat import (
     ChatCompletionContentPartParam,
     ChatCompletionMessage,
     ChatCompletionMessageParam,
-    ChatCompletionToolParam,
 )
 from openai.types.chat.chat_completion_chunk import Choice, ChoiceDeltaToolCall
 
@@ -225,7 +224,7 @@ def _convert_context_element(
                             "type": "function",
                             "function": {
                                 "name": request.tool,
-                                "arguments": json.dumps(request.arguments),
+                                "arguments": json.dumps(dict(request.arguments)),
                             },
                         }
                         for request in tool_requests.requests
@@ -264,9 +263,9 @@ async def _chat_completion(  # noqa: C901, PLR0912, PLR0913
                     {
                         "type": "function",
                         "function": {
-                            "name": tool.name,
-                            "description": tool.description or "",
-                            "parameters": cast(dict[str, object], tool.parameters),
+                            "name": tool["name"],
+                            "description": tool["description"] or "",
+                            "parameters": dict[str, object](tool["parameters"]),
                         },
                     }
                     for tool in tools
@@ -294,9 +293,9 @@ async def _chat_completion(  # noqa: C901, PLR0912, PLR0913
                     {
                         "type": "function",
                         "function": {
-                            "name": tool.name,
-                            "description": tool.description or "",
-                            "parameters": cast(dict[str, object], tool.parameters),
+                            "name": tool["name"],
+                            "description": tool["description"] or "",
+                            "parameters": dict[str, object](tool["parameters"]),
                         },
                     }
                     for tool in tools
@@ -315,9 +314,9 @@ async def _chat_completion(  # noqa: C901, PLR0912, PLR0913
                     {
                         "type": "function",
                         "function": {
-                            "name": tool.name,
-                            "description": tool.description or "",
-                            "parameters": cast(dict[str, object], tool.parameters),
+                            "name": tool["name"],
+                            "description": tool["description"] or "",
+                            "parameters": dict[str, object](tool["parameters"]),
                         },
                     }
                     for tool in tools
@@ -327,7 +326,7 @@ async def _chat_completion(  # noqa: C901, PLR0912, PLR0913
                 tool_choice={
                     "type": "function",
                     "function": {
-                        "name": tool.name,
+                        "name": tool["name"],
                     },
                 },
             )
@@ -461,10 +460,19 @@ async def _chat_stream(  # noqa: C901, PLR0912, PLR0915
         async for part in await client.chat_completion(
             config=config,
             messages=request_context,
-            tools=cast(
-                list[ChatCompletionToolParam],
-                current_properties.tools or [],
-            ),
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool["name"],
+                        "description": tool["description"] or "",
+                        "parameters": dict[str, object](tool["parameters"]),
+                    },
+                }
+                for tool in current_properties.tools
+            ]
+            if current_properties.tools
+            else None,
             tool_choice="auto" if current_properties.tools else "none",
             stream=True,
         ):

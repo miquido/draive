@@ -22,7 +22,7 @@ from draive.multimodal import (
 )
 from draive.parameters import DataModel
 
-__all__: list[str] = [
+__all__ = [
     "default_generate_model",
 ]
 

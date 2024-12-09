@@ -2,6 +2,8 @@
 from haiway import (
     MISSING,
     AsyncQueue,
+    AttributePath,
+    AttributeRequirement,
     Disposable,
     Disposables,
     Missing,
@@ -82,8 +84,9 @@ from draive.generation import (
     generate_text,
 )
 from draive.helpers import (
-    ConstantMemory,
-    VolatileAccumulativeMemory,
+    VectorIndex,
+    VectorIndexing,
+    VectorSearching,
     VolatileMemory,
     VolatileVectorIndex,
 )
@@ -135,16 +138,10 @@ from draive.multimodal import (
 )
 from draive.parameters import (
     Argument,
-    BasicValue,
     DataModel,
     Field,
-    ParameterDefaultFactory,
-    ParameterPath,
-    ParameterRequirement,
-    ParameterValidationContext,
-    ParameterValidationError,
     ParameterValidator,
-    ParameterVerifier,
+    ParameterVerification,
 )
 from draive.safeguards import (
     ContentGuardrails,
@@ -166,7 +163,6 @@ from draive.steps import (
 from draive.tokenization import TextTokenizing, Tokenization, count_text_tokens, tokenize_text
 from draive.utils import (
     AsyncStream,
-    BasicMemory,
     ConstantStream,
     FixedStream,
     Memory,
@@ -190,12 +186,11 @@ __all__ = [
     "Argument",
     "AsyncQueue",
     "AsyncStream",
-    "BasicMemory",
-    "BasicValue",
+    "AttributePath",
+    "AttributeRequirement",
     "Choice",
     "ChoiceCompletion",
     "ChoiceOption",
-    "ConstantMemory",
     "ConstantStream",
     "ContentGuardrails",
     "Conversation",
@@ -244,13 +239,8 @@ __all__ = [
     "MultimodalContentConvertible",
     "MultimodalContentElement",
     "MultimodalTagElement",
-    "ParameterDefaultFactory",
-    "ParameterPath",
-    "ParameterRequirement",
-    "ParameterValidationContext",
-    "ParameterValidationError",
     "ParameterValidator",
-    "ParameterVerifier",
+    "ParameterVerification",
     "RateLimitError",
     "ScopeMetrics",
     "SelectionException",
@@ -269,7 +259,9 @@ __all__ = [
     "ToolAvailabilityCheck",
     "Toolbox",
     "ValueEmbedder",
-    "VolatileAccumulativeMemory",
+    "VectorIndex",
+    "VectorIndexing",
+    "VectorSearching",
     "VolatileMemory",
     "VolatileVectorIndex",
     "agent",

@@ -1,3 +1,4 @@
+from collections.abc import Mapping, Sequence
 from typing import Any, Literal, NotRequired, Required, TypedDict
 
 from draive.parameters import DataModel
@@ -28,14 +29,14 @@ class UsageInfo(DataModel):
 
 class EmbeddingObject(DataModel):
     object: str
-    embedding: list[float]
+    embedding: Sequence[float]
     index: int
 
 
 class EmbeddingResponse(DataModel):
     id: str
     object: str
-    data: list[EmbeddingObject]
+    data: Sequence[EmbeddingObject]
     model: str
     usage: UsageInfo
 
@@ -61,7 +62,7 @@ class ChatMessage(TypedDict, total=False):
 
 class ChatFunctionCallResponse(DataModel):
     name: str
-    arguments: dict[str, Any] | str
+    arguments: Mapping[str, Any] | str
 
 
 class ChatToolCallResponse(DataModel):
@@ -72,7 +73,7 @@ class ChatToolCallResponse(DataModel):
 class ChatDeltaMessageResponse(DataModel):
     role: str | None = None
     content: str | None = None
-    tool_calls: list[ChatToolCallResponse] | None = None
+    tool_calls: Sequence[ChatToolCallResponse] | None = None
 
 
 class ChatCompletionResponseStreamChoice(DataModel):
@@ -84,15 +85,15 @@ class ChatCompletionResponseStreamChoice(DataModel):
 class ChatCompletionStreamResponse(DataModel):
     id: str
     model: str
-    choices: list[ChatCompletionResponseStreamChoice]
+    choices: Sequence[ChatCompletionResponseStreamChoice]
     created: int | None = None
     usage: UsageInfo | None = None
 
 
 class ChatMessageResponse(DataModel):
     role: str
-    content: list[str] | str | None = None
-    tool_calls: list[ChatToolCallResponse] | None = None
+    content: Sequence[str] | str | None = None
+    tool_calls: Sequence[ChatToolCallResponse] | None = None
 
 
 class ChatCompletionResponseChoice(DataModel):
@@ -106,5 +107,5 @@ class ChatCompletionResponse(DataModel):
     object: str
     created: int
     model: str
-    choices: list[ChatCompletionResponseChoice]
+    choices: Sequence[ChatCompletionResponseChoice]
     usage: UsageInfo

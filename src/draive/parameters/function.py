@@ -1,20 +1,22 @@
-import sys
 from collections.abc import Callable
-from inspect import Parameter, signature
+from inspect import Parameter as InspectParameter
 from inspect import _empty as INSPECT_EMPTY  # pyright: ignore[reportPrivateUsage]
-from typing import Any, Self, cast, final, overload
+from inspect import signature
+from types import EllipsisType
+from typing import Any, ClassVar, cast, final, overload
 
-from haiway import MISSING, Missing, freeze, is_missing, mimic_function, not_missing
+from haiway import MISSING, Missing, mimic_function
+from haiway.state import AttributeAnnotation
+from haiway.state.attributes import resolve_attribute_annotation
 
-from draive.parameters.annotations import ParameterDefaultFactory, allows_missing
-from draive.parameters.specification import ParameterSpecification, parameter_specification
-from draive.parameters.validation import (
-    ParameterValidationContext,
-    ParameterValidationError,
-    ParameterValidator,
-    ParameterVerifier,
-    parameter_validator,
+from draive.parameters.parameter import Parameter
+from draive.parameters.specification import ParameterSpecification
+from draive.parameters.types import (
+    ParameterDefaultFactory,
+    ParameterValidation,
+    ParameterVerification,
 )
+from draive.parameters.validation import ParameterValidationContext
 
 __all__ = [
     "Argument",
@@ -26,9 +28,9 @@ __all__ = [
 def Argument[Value](
     *,
     aliased: str | None = None,
-    description: str | None = None,
+    description: str | Missing = MISSING,
     default: Value | Missing = MISSING,
-    validator: ParameterValidator[Value] | Missing = MISSING,
+    validator: ParameterValidation[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
 
@@ -37,9 +39,9 @@ def Argument[Value](
 def Argument[Value](
     *,
     aliased: str | None = None,
-    description: str | None = None,
+    description: str | Missing = MISSING,
     default_factory: ParameterDefaultFactory[Value] | Missing = MISSING,
-    validator: ParameterValidator[Value] | Missing = MISSING,
+    validator: ParameterValidation[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
 
@@ -48,9 +50,9 @@ def Argument[Value](
 def Argument[Value](
     *,
     aliased: str | None = None,
-    description: str | None = None,
+    description: str | Missing = MISSING,
     default: Value | Missing = MISSING,
-    verifier: ParameterVerifier[Value] | None = None,
+    verifier: ParameterVerification[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
 
@@ -59,28 +61,31 @@ def Argument[Value](
 def Argument[Value](
     *,
     aliased: str | None = None,
-    description: str | None = None,
+    description: str | Missing = MISSING,
     default_factory: ParameterDefaultFactory[Value] | Missing = MISSING,
-    verifier: ParameterVerifier[Value] | None = None,
+    verifier: ParameterVerification[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
 
 
-def Argument[Value](  # noqa: PLR0913 # Ruff - noqa: B008
+def Argument[Value](  # noqa: PLR0913
     *,
     aliased: str | None = None,
-    description: str | None = None,
+    description: str | Missing = MISSING,
     default: Value | Missing = MISSING,
     default_factory: ParameterDefaultFactory[Value] | Missing = MISSING,
-    validator: ParameterValidator[Value] | Missing = MISSING,
-    verifier: ParameterVerifier[Value] | None = None,
+    validator: ParameterValidation[Value] | Missing = MISSING,
+    verifier: ParameterVerification[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
 ) -> Value:  # it is actually a FunctionArgument, but type checker has to be fooled
     assert (  # nosec: B101
-        is_missing(default_factory) or is_missing(default)
+        default is MISSING or default_factory is MISSING
     ), "Can't specify both default value and factory"
     assert (  # nosec: B101
-        is_missing(validator) or verifier is None
+        description is MISSING or specification is MISSING
+    ), "Can't specify both description and specification"
+    assert (  # nosec: B101
+        validator is MISSING or verifier is MISSING
     ), "Can't specify both validator and verifier"
 
     return cast(
@@ -102,45 +107,40 @@ class FunctionArgument:
     def __init__(  # noqa: PLR0913
         self,
         aliased: str | None,
-        description: str | None,
+        description: str | Missing,
         default: Any | Missing,
         default_factory: ParameterDefaultFactory[Any] | Missing,
-        validator: ParameterValidator[Any] | Missing,
-        verifier: ParameterVerifier[Any] | None,
+        validator: ParameterValidation[Any] | Missing,
+        verifier: ParameterVerification[Any] | Missing,
         specification: ParameterSpecification | Missing,
     ) -> None:
         self.aliased: str | None = aliased
-        self.description: str | None = description
+        self.description: str | Missing = description
         self.default: Any | Missing = default
         self.default_factory: Callable[[], Any] | Missing = default_factory
-        self.validator: ParameterValidator[Any] | Missing = validator
-        self.verifier: ParameterVerifier[Any] | None = verifier
+        self.validator: ParameterValidation[Any] | Missing = validator
+        self.verifier: ParameterVerification[Any] | Missing = verifier
         self.specification: ParameterSpecification | Missing = specification
 
 
 class ParametrizedFunction[**Args, Result]:
+    __IMMUTABLE__: ClassVar[EllipsisType] = ...
+
     def __init__(
         self,
         function: Callable[Args, Result],
+        /,
     ) -> None:
         assert (  # nosec: B101
             not isinstance(function, ParametrizedFunction)
         ), "Cannot parametrize the same function more than once!"
 
         self._call: Callable[Args, Result] = function
-        globalns: dict[str, Any]
-        if hasattr(function, "__globals__"):
-            globalns = function.__globals__  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
-
-        else:
-            globalns = sys.modules.get(function.__module__).__dict__
-
-        self._parameters: dict[str, FunctionParameter] = {
-            parameter.name: FunctionParameter.of(
+        self._name: str = function.__name__
+        self._parameters: dict[str, Parameter[Any]] = {
+            parameter.name: _resolve_argument(
                 parameter,
-                type_arguments={},  # TODO: verify if we should get type parameters
-                globalns=globalns,  # pyright: ignore[reportUnknownArgumentType]
-                localns=None,
+                module=function.__module__,
             )
             for parameter in signature(function).parameters.values()
         }
@@ -149,28 +149,18 @@ class ParametrizedFunction[**Args, Result]:
 
     def validate_arguments(
         self,
-        **arguments: Any,
+        **kwargs: Any,
     ) -> dict[str, Any]:
-        # TODO: add support for positional and parametrized arguments
-        context: ParameterValidationContext = ParameterValidationContext(
-            path=(self.__class__.__qualname__,),
-        )
-        validated: dict[str, Any] = {}
-        for parameter in self._parameters.values():
-            validated[parameter.name] = parameter.validated(
-                arguments.get(
-                    parameter.name,
-                    arguments.get(
-                        parameter.aliased,
-                        MISSING,
-                    )
-                    if parameter.aliased
-                    else MISSING,
-                ),
-                context=context,
-            )
+        # TODO: add support for positional arguments
+        with ParameterValidationContext().scope(self.__class__.__qualname__) as context:
+            validated: dict[str, Any] = {}
+            for parameter in self._parameters.values():
+                validated[parameter.name] = parameter.validated(
+                    parameter.find(kwargs),
+                    context=context,
+                )
 
-        return validated
+            return validated
 
     def __call__(
         self,
@@ -181,142 +171,54 @@ class ParametrizedFunction[**Args, Result]:
         return self._call(*args, **self.validate_arguments(**kwargs))  # pyright: ignore[reportCallIssue]
 
 
-@final
-class FunctionParameter:
-    def __init__(  # noqa: PLR0913
-        self,
-        name: str,
-        aliased: str | None,
-        description: str | None,
-        annotation: Any,
-        default: Any | Missing,
-        default_factory: ParameterDefaultFactory[Any] | Missing,
-        allows_missing: bool,
-        validator: ParameterValidator[Any],
-        specification: ParameterSpecification | Missing,
-    ) -> None:
-        self.name: str = name
-        self.aliased: str | None = aliased
-        self.description: str | None = description
-        self.annotation: Any = annotation
-        self.default_value: Callable[[], Any | Missing]
-        if not_missing(default_factory):
-            self.default_value = default_factory
+def _resolve_argument(
+    parameter: InspectParameter,
+    /,
+    *,
+    module: str,
+) -> Parameter[Any]:
+    if parameter.annotation is INSPECT_EMPTY:
+        raise TypeError(
+            "Untyped argument %s",
+            parameter.name,
+        )
 
-        elif not_missing(default):
-            self.default_value = lambda: default
+    attribute: AttributeAnnotation = resolve_attribute_annotation(
+        parameter.annotation,
+        module=module,
+        type_parameters={},
+        self_annotation=None,
+        recursion_guard={},
+    )
 
-        else:
-            self.default_value = lambda: MISSING
-
-        self.has_default: bool = not_missing(default_factory) or not_missing(default)
-        self.allows_missing: bool = allows_missing
-        self.validator: ParameterValidator[Any] = validator
-        self.specification: ParameterSpecification | Missing = specification
-
-        freeze(self)
-
-    def validated(
-        self,
-        value: Any,
-        /,
-        context: ParameterValidationContext,
-    ) -> Any:
-        if is_missing(value):
-            if self.has_default:
-                return self.validator(self.default_value(), context.appending_path(f"@{self.name}"))
-
-            elif self.allows_missing:
-                return MISSING
-
-            else:
-                raise ParameterValidationError.missing(
-                    context=context.appending_path(f"@{self.name}")
-                )
-
-        else:
-            return self.validator(value, context.appending_path(f"@{self.name}"))
-
-    @classmethod
-    def of(
-        cls,
-        parameter: Parameter,
-        /,
-        type_arguments: dict[str, Any],
-        globalns: dict[str, Any],
-        localns: dict[str, Any] | None,
-    ) -> Self:
-        if parameter.annotation is INSPECT_EMPTY:
-            raise TypeError(
-                "Untyped argument %s",
-                parameter.name,
+    match parameter.default:
+        case FunctionArgument() as argument:
+            return Parameter[Any].of(
+                attribute,
+                name=parameter.name,
+                alias=argument.aliased,
+                description=argument.description,
+                default_value=argument.default,
+                default_factory=argument.default_factory,
+                validator=argument.validator,
+                verifier=argument.verifier,
+                converter=MISSING,
+                specification=argument.specification,
+                required=attribute.required
+                and argument.default is MISSING
+                and argument.default_factory is MISSING,
             )
-
-        match parameter.default:
-            case FunctionArgument() as argument:
-                return cls(
-                    name=parameter.name,
-                    aliased=argument.aliased,
-                    description=argument.description,
-                    annotation=parameter.annotation,
-                    default=argument.default,
-                    default_factory=argument.default_factory,
-                    allows_missing=allows_missing(
-                        parameter.annotation,
-                        type_arguments=type_arguments,
-                        globalns=globalns,
-                        localns=localns,
-                    ),
-                    validator=argument.validator
-                    if not_missing(argument.validator)
-                    else parameter_validator(
-                        parameter.annotation,
-                        verifier=argument.verifier,
-                        type_arguments=type_arguments,
-                        globalns=globalns,
-                        localns=localns,
-                        recursion_guard=frozenset(),
-                    ),
-                    specification=argument.specification
-                    if not_missing(argument.specification)
-                    else parameter_specification(
-                        parameter.annotation,
-                        description=argument.description,
-                        type_arguments=type_arguments,
-                        globalns=globalns,
-                        localns=localns,
-                        recursion_guard=frozenset(),
-                    ),
-                )
-
-            case default:
-                return cls(
-                    name=parameter.name,
-                    aliased=None,
-                    description=None,
-                    annotation=parameter.annotation,
-                    default=MISSING if default is INSPECT_EMPTY else default,
-                    default_factory=MISSING,
-                    allows_missing=allows_missing(
-                        parameter.annotation,
-                        type_arguments=type_arguments,
-                        globalns=globalns,
-                        localns=localns,
-                    ),
-                    validator=parameter_validator(
-                        parameter.annotation,
-                        verifier=None,
-                        type_arguments=type_arguments,
-                        globalns=globalns,
-                        localns=localns,
-                        recursion_guard=frozenset(),
-                    ),
-                    specification=parameter_specification(
-                        parameter.annotation,
-                        description=None,
-                        type_arguments=type_arguments,
-                        globalns=globalns,
-                        localns=localns,
-                        recursion_guard=frozenset(),
-                    ),
-                )
+        case default:
+            return Parameter[Any].of(
+                attribute,
+                name=parameter.name,
+                alias=None,
+                description=MISSING,
+                default_value=MISSING if default is INSPECT_EMPTY else default,
+                default_factory=MISSING,
+                validator=MISSING,
+                verifier=MISSING,
+                converter=MISSING,
+                specification=MISSING,
+                required=attribute.required and default is INSPECT_EMPTY,
+            )

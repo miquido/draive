@@ -68,7 +68,7 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
 
 
 class SuiteEvaluatorResult[CaseParameters: DataModel, Value: DataModel | str](DataModel):
-    cases: list[SuiteEvaluatorCaseResult[CaseParameters, Value]]
+    cases: Sequence[SuiteEvaluatorCaseResult[CaseParameters, Value]]
 
     @property
     def passed(self) -> bool:

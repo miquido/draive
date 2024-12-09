@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from haiway import MISSING, Missing, State
 
 __all__ = [
@@ -13,7 +15,7 @@ class GeminiConfig(State):
     top_k: int | Missing = MISSING
     max_tokens: int | Missing = MISSING
     timeout: float | Missing = MISSING
-    stop_sequences: list[str] | Missing = MISSING
+    stop_sequences: Sequence[str] | Missing = MISSING
 
 
 class GeminiEmbeddingConfig(State):
