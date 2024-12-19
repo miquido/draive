@@ -1,8 +1,8 @@
 from asyncio import gather
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any, Literal, Self, final
 
-from haiway import ctx, freeze
+from haiway import State, ctx
 
 from draive.lmm.tool import AnyTool
 from draive.lmm.types import (
@@ -21,48 +21,63 @@ __all__ = [
 
 
 @final
-class Toolbox:
+class Toolbox(State):
     @classmethod
     def of(
+        cls,
+        *tools: AnyTool,
+        suggest: AnyTool | Literal[True] | None = None,
+        repeated_calls_limit: int | None = None,
+    ) -> Self:
+        match suggest:
+            case None:
+                return cls(
+                    tools={tool.name: tool for tool in tools},
+                    suggest_tool=False,
+                    repeated_calls_limit=repeated_calls_limit or 1,
+                )
+
+            case True:
+                return cls(
+                    tools={tool.name: tool for tool in tools},
+                    suggest_tool=True,
+                    repeated_calls_limit=repeated_calls_limit or 1,
+                )
+
+            case tool:
+                return cls(
+                    tools={**{tool.name: tool for tool in tools}, tool.name: tool},
+                    suggest_tool=tool,
+                    repeated_calls_limit=repeated_calls_limit or 1,
+                )
+
+    @classmethod
+    def out_of(
         cls,
         tools: Self | Iterable[AnyTool] | None,
         /,
     ) -> Self:
         match tools:
             case None:
-                return cls()
+                return cls(
+                    tools={},
+                    suggest_tool=False,
+                    repeated_calls_limit=1,
+                )
 
-            case Toolbox() as tools:
-                return tools
+            case Toolbox() as toolbox:
+                return toolbox
 
             case tools:
-                return cls(*tools)
+                return cls(
+                    tools={tool.name: tool for tool in tools},
+                    suggest_tool=False,
+                    repeated_calls_limit=1,
+                )
 
-    def __init__(
-        self,
-        *tools: AnyTool,
-        suggest: AnyTool | Literal[True] | None = None,
-        repeated_calls_limit: int | None = None,
-    ) -> None:
-        self._tools: dict[str, AnyTool] = {tool.name: tool for tool in tools}
-        self.repeated_calls_limit: int = repeated_calls_limit or 1
-        self.suggest_tools: bool
-        self._suggested_tool: AnyTool | None
-        match suggest:
-            case None:
-                self.suggest_tools = False
-                self._suggested_tool = None
-
-            case True:
-                self.suggest_tools = True if self._tools else False
-                self._suggested_tool = None
-
-            case tool:
-                self.suggest_tools = True
-                self._suggested_tool = tool
-                self._tools[tool.name] = tool
-
-        freeze(self)
+    tools: Mapping[str, AnyTool]
+    suggest_tool: AnyTool | bool
+    repeated_calls_limit: int
 
     def tool_selection(
         self,
@@ -75,14 +90,20 @@ class Toolbox:
         elif repetition_level != 0:
             return "auto"  # require tools only for the first call, use auto otherwise
 
-        elif self._suggested_tool is not None and self._suggested_tool.available:
-            return self._suggested_tool.specification  # use suggested tool if able
+        elif self.suggest_tool is False:
+            return "auto"
 
-        else:  # use suggestion mode if no specific tool was available
-            return "required" if self.suggest_tools else "auto"
+        elif self.suggest_tool is True:
+            return "required"
+
+        elif self.suggest_tool.available:
+            return self.suggest_tool.specification  # use suggested tool if able
+
+        else:
+            return "auto"
 
     def available_tools(self) -> list[LMMToolSpecification]:
-        return [tool.specification for tool in self._tools.values() if tool.available]
+        return [tool.specification for tool in self.tools.values() if tool.available]
 
     async def call_tool(
         self,
@@ -91,7 +112,7 @@ class Toolbox:
         call_id: str,
         arguments: dict[str, Any],
     ) -> MultimodalContent:
-        if tool := self._tools.get(name):
+        if tool := self.tools.get(name):
             return await tool._toolbox_call(  # pyright: ignore[reportPrivateUsage]
                 call_id,
                 arguments=arguments,
@@ -115,7 +136,7 @@ class Toolbox:
         request: LMMToolRequest,
         /,
     ) -> LMMToolResponse:
-        if tool := self._tools.get(request.tool):
+        if tool := self.tools.get(request.tool):
             try:
                 return LMMToolResponse(
                     identifier=request.identifier,

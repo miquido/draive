@@ -82,7 +82,7 @@ class Step(State):
         return cls(
             instruction=Instruction.of(instruction) if instruction else None,
             input=MultimodalContent.of(input),
-            toolbox=Toolbox.of(tools),
+            toolbox=Toolbox.out_of(tools),
             output=output,
             completion=None if completion is None else LMMCompletion.of(completion),
             volatile=volatile,

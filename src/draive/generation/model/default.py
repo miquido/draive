@@ -22,7 +22,7 @@ from draive.multimodal import (
 )
 from draive.parameters import DataModel
 
-__all__: list[str] = [
+__all__ = [
     "default_generate_model",
 ]
 
@@ -40,7 +40,7 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
     **extra: Any,
 ) -> Generated:
     with ctx.scope("generate_model"):
-        toolbox: Toolbox = Toolbox.of(tools)
+        toolbox: Toolbox = Toolbox.out_of(tools)
 
         generation_instruction: Instruction
         match instruction:

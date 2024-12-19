@@ -11,16 +11,12 @@ from draive.agents.errors import AgentException
 from draive.agents.idle import IdleMonitor
 from draive.agents.node import Agent, AgentOutput
 from draive.agents.runner import AgentRunner
-from draive.helpers import VolatileMemory
 from draive.multimodal import (
     Multimodal,
     MultimodalContent,
 )
-from draive.parameters import DataModel, ParametrizedData
-from draive.utils import (
-    BasicMemory,
-    Memory,
-)
+from draive.parameters import DataModel
+from draive.utils import Memory
 
 __all__ = [
     "AgentWorkflow",
@@ -33,7 +29,7 @@ __all__ = [
 
 
 type AgentWorkflowInput = AgentMessage | AgentException
-type AgentWorkflowOutput[Result: ParametrizedData | str] = (
+type AgentWorkflowOutput[Result: DataModel | State | str] = (
     Sequence[AgentMessage] | AgentMessage | Result | None
 )
 
@@ -44,12 +40,12 @@ class AgentWorkflowStateInitializer[AgentWorkflowState](Protocol):
 
 
 @runtime_checkable
-class AgentWorkflowInvocation[AgentWorkflowState, AgentWorkflowResult: ParametrizedData | str](
+class AgentWorkflowInvocation[AgentWorkflowState, AgentWorkflowResult: DataModel | State | str](
     Protocol
 ):
     async def __call__(
         self,
-        memory: BasicMemory[AgentWorkflowState],
+        memory: Memory[AgentWorkflowState, AgentWorkflowState],
         input: AgentWorkflowInput,  # noqa: A002
     ) -> AgentWorkflowOutput[AgentWorkflowResult]: ...
 
@@ -59,7 +55,7 @@ class AgentWorkflowIdle(AgentException):
 
 
 @final
-class AgentWorkflow[AgentWorkflowState, AgentWorkflowResult: ParametrizedData | str]:
+class AgentWorkflow[AgentWorkflowState, AgentWorkflowResult: DataModel | State | str]:
     def __init__(
         self,
         node: AgentNode,
@@ -82,7 +78,7 @@ class AgentWorkflow[AgentWorkflowState, AgentWorkflowResult: ParametrizedData | 
 
     async def __call__(
         self,
-        memory: BasicMemory[AgentWorkflowState],
+        memory: Memory[AgentWorkflowState, AgentWorkflowState],
         input: AgentWorkflowInput,  # noqa: A002
     ) -> AgentWorkflowOutput[AgentWorkflowResult]:
         return await self._invocation(
@@ -99,7 +95,7 @@ class AgentWorkflow[AgentWorkflowState, AgentWorkflowResult: ParametrizedData | 
         return await WorkflowRunner[AgentWorkflowState, AgentWorkflowResult].run(
             self,
             input=input,
-            memory=VolatileMemory(state or self._state_initializer()),
+            memory=Memory.volatile(state or self._state_initializer()),
             timeout=timeout,
         )
 
@@ -121,7 +117,7 @@ class AgentWorkflow[AgentWorkflowState, AgentWorkflowResult: ParametrizedData | 
 
 
 class PartialAgentWorkflowWrapper[AgentWorkflowState](Protocol):
-    def __call__[AgentWorkflowResult: ParametrizedData | str](
+    def __call__[AgentWorkflowResult: DataModel | State | str](
         self,
         invocation: AgentWorkflowInvocation[AgentWorkflowState, AgentWorkflowResult],
     ) -> AgentWorkflow[AgentWorkflowState, AgentWorkflowResult]: ...
@@ -159,7 +155,7 @@ def workflow[AgentWorkflowState](
         description is not None or node is not None
     ), "Either agent node or description has to be provided"
 
-    def wrap[AgentWorkflowResult: ParametrizedData | str](
+    def wrap[AgentWorkflowResult: DataModel | State | str](
         invocation: AgentWorkflowInvocation[AgentWorkflowState, AgentWorkflowResult],
     ) -> AgentWorkflow[AgentWorkflowState, AgentWorkflowResult]:
         assert isfunction(invocation), "workflow has to be defined from a function"  # nosec: B101
@@ -170,9 +166,7 @@ def workflow[AgentWorkflowState](
         )
 
         def initialize_agent() -> Agent:
-            agent_memory: BasicMemory[AgentWorkflowState] = cast(
-                BasicMemory[AgentWorkflowState], VolatileMemory(state())
-            )
+            agent_memory: Memory[AgentWorkflowState, AgentWorkflowState] = Memory.volatile(state())
 
             async def agent(message: AgentMessage) -> AgentOutput:
                 match await cast(  # pyright fails to properly type this function
@@ -226,7 +220,7 @@ class WorkflowRunnerOutput(Protocol):
 
 
 @runtime_checkable
-class WorkflowRunnerResultOutput[WorkflowResult: ParametrizedData | str](Protocol):
+class WorkflowRunnerResultOutput[WorkflowResult: DataModel | State | str](Protocol):
     def __call__(
         self,
         result: WorkflowResult,
@@ -234,11 +228,7 @@ class WorkflowRunnerResultOutput[WorkflowResult: ParametrizedData | str](Protoco
     ) -> None: ...
 
 
-class WorkflowHistory(State):
-    history: Sequence[AgentMessage]
-
-
-class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
+class WorkflowRunner[WorkflowState, WorkflowResult: DataModel | State | str]:
     @classmethod
     async def run(
         cls,
@@ -399,8 +389,6 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
 
             await self._wait()  # wait for completion of all runners
 
-            ctx.record(WorkflowHistory(history=tuple(self._history)))
-
             match self._result:
                 case BaseException() as exc:
                     raise exc
@@ -425,12 +413,10 @@ class WorkflowRunner[WorkflowState, WorkflowResult: ParametrizedData | str]:
                     pass  # nothing to do
 
                 case [*messages]:
-                    self.send(
-                        *[message.updated(sender=self._workflow.node) for message in messages]
-                    )
+                    self.send(*[message._with_sender(self._workflow.node) for message in messages])  # pyright: ignore[reportPrivateUsage]
 
                 case AgentMessage() as message:
-                    self.send(message.updated(sender=self._workflow.node))
+                    self.send(message._with_sender(self._workflow.node))  # pyright: ignore[reportPrivateUsage]
 
                 case result:
                     self.finish(result=cast(WorkflowResult, result))

@@ -200,11 +200,11 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
                 messages=messages,
                 tools=[
                     ToolParam(
-                        name=tool.name,
-                        description=tool.description or "",
+                        name=tool["name"],
+                        description=tool["description"] or "",
                         input_schema=cast(
                             dict[str, Any],
-                            tool.parameters,
+                            tool["parameters"],
                         ),
                     )
                     for tool in tools or []
@@ -219,11 +219,11 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
                 messages=messages,
                 tools=[
                     ToolParam(
-                        name=tool.name,
-                        description=tool.description or "",
+                        name=tool["name"],
+                        description=tool["description"] or "",
                         input_schema=cast(
                             dict[str, Any],
-                            tool.parameters,
+                            tool["parameters"],
                         ),
                     )
                     for tool in tools or []
@@ -238,11 +238,11 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
                 messages=messages,
                 tools=[
                     ToolParam(
-                        name=tool.name,
-                        description=tool.description or "",
+                        name=tool["name"],
+                        description=tool["description"] or "",
                         input_schema=cast(
                             dict[str, Any],
-                            tool.parameters,
+                            tool["parameters"],
                         ),
                     )
                     for tool in tools or []
@@ -257,18 +257,18 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
                 messages=messages,
                 tools=[
                     ToolParam(
-                        name=tool.name,
-                        description=tool.description or "",
+                        name=tool["name"],
+                        description=tool["description"] or "",
                         input_schema=cast(
                             dict[str, Any],
-                            tool.parameters,
+                            tool["parameters"],
                         ),
                     )
                     for tool in tools or []
                 ],
                 tool_choice={
                     "type": "tool",
-                    "name": tool.name,
+                    "name": tool["name"],
                 },
             )
 

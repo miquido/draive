@@ -7,7 +7,7 @@ from draive.conversation.types import ConversationCompletion, ConversationMessag
 from draive.safeguards import ContentGuardrails
 from draive.utils import Memory
 
-__all__: list[str] = [
+__all__ = [
     "Conversation",
 ]
 

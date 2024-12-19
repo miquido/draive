@@ -30,7 +30,7 @@ async def choice_completion(
             for option in options
         ],
         input=input,
-        toolbox=Toolbox.of(tools),
+        toolbox=Toolbox.out_of(tools),
         examples=examples,
         **extra,
     )

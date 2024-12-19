@@ -21,7 +21,7 @@ def openai_text_embedding(
     async def openai_embed_text(
         values: Sequence[str],
         **extra: Any,
-    ) -> list[Embedded[str]]:
+    ) -> Sequence[Embedded[str]]:
         with ctx.scope("embed_text"):
             config: OpenAIEmbeddingConfig = ctx.state(OpenAIEmbeddingConfig).updated(**extra)
             results: list[list[float]] = await client.embedding(  # pyright: ignore[reportDeprecated]

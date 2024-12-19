@@ -6,7 +6,6 @@ from haiway import MISSING, Missing, not_missing
 from draive.parameters import (
     Field,
     ParameterValidationContext,
-    ParameterValidationError,
 )
 
 __all__ = [
@@ -53,11 +52,7 @@ def _b64_or_url_validator(
             return data
 
         case _:
-            raise ParameterValidationError.invalid_type(
-                expected=str | bytes,
-                received=value,
-                context=context,
-            )
+            raise TypeError(f"Expected 'str | bytes', received '{type(value).__name__}'")
 
 
 def _b64_or_url_converter(

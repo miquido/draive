@@ -25,7 +25,7 @@ async def fastembed_text_embedding(
     async def fastembed_embed_text(
         values: Sequence[str],
         **extra: Any,
-    ) -> list[Embedded[str]]:
+    ) -> Sequence[Embedded[str]]:
         with ctx.scope("text_embedding"):
             return await _fastembed_text_embedding(
                 embedding_model,
@@ -51,7 +51,7 @@ def _fastembed_text_embedding(
     embedding_model: FastembedTextEmbedding,
     texts: Sequence[str],
     /,
-) -> list[Embedded[str]]:
+) -> Sequence[Embedded[str]]:
     return [
         Embedded(
             value=value,

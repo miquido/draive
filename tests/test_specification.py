@@ -1,5 +1,7 @@
 from collections.abc import Mapping, Sequence
-from typing import TypeVar
+from types import EllipsisType, NoneType, UnionType
+
+from haiway.state import AttributeAnnotation
 
 from draive import DataModel
 from draive.parameters import ParametersSpecification
@@ -8,131 +10,93 @@ from draive.parameters.specification import parameter_specification
 
 def test_specifications() -> None:
     assert parameter_specification(
-        annotation=str,
+        AttributeAnnotation(origin=str),
         description=None,
-        type_arguments={},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
     ) == {
         "type": "string",
     }
     assert parameter_specification(
-        annotation=int,
+        AttributeAnnotation(origin=int),
         description=None,
-        type_arguments={},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
     ) == {
         "type": "integer",
     }
     assert parameter_specification(
-        annotation=float,
+        AttributeAnnotation(origin=float),
         description=None,
-        type_arguments={},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
     ) == {
         "type": "number",
     }
     assert parameter_specification(
-        annotation=bool,
+        AttributeAnnotation(origin=bool),
         description=None,
-        type_arguments={},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
     ) == {
         "type": "boolean",
     }
     assert parameter_specification(
-        annotation=None,
+        AttributeAnnotation(origin=NoneType),
         description=None,
-        type_arguments={},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
     ) == {
         "type": "null",
     }
     assert parameter_specification(
-        annotation=list[str],
+        AttributeAnnotation(
+            origin=Sequence,
+            arguments=[
+                AttributeAnnotation(origin=str),
+            ],
+        ),
         description=None,
-        type_arguments={},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
     ) == {"type": "array", "items": {"type": "string"}}
     assert parameter_specification(
-        annotation=tuple[str, ...],
+        AttributeAnnotation(
+            origin=tuple,
+            arguments=[
+                AttributeAnnotation(origin=str),
+                AttributeAnnotation(origin=EllipsisType),
+            ],
+        ),
         description=None,
-        type_arguments={},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
     ) == {"type": "array", "items": {"type": "string"}}
     assert parameter_specification(
-        annotation=tuple[str, str],
+        AttributeAnnotation(
+            origin=tuple,
+            arguments=[
+                AttributeAnnotation(origin=str),
+                AttributeAnnotation(origin=str),
+            ],
+        ),
         description=None,
-        type_arguments={},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
     ) == {"type": "array", "prefixItems": [{"type": "string"}, {"type": "string"}]}
     assert parameter_specification(
-        annotation=Sequence[str],
+        AttributeAnnotation(
+            origin=Sequence,
+            arguments=[
+                AttributeAnnotation(origin=str),
+            ],
+        ),
         description=None,
-        type_arguments={},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
     ) == {"type": "array", "items": {"type": "string"}}
     assert parameter_specification(
-        annotation=dict[str, str],
+        AttributeAnnotation(
+            origin=Mapping,
+            arguments=[
+                AttributeAnnotation(origin=str),
+                AttributeAnnotation(origin=str),
+            ],
+        ),
         description=None,
-        type_arguments={},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
     ) == {"type": "object", "additionalProperties": {"type": "string"}}
     assert parameter_specification(
-        annotation=Mapping[str, str],
+        AttributeAnnotation(
+            origin=UnionType,
+            arguments=[
+                AttributeAnnotation(origin=str),
+                AttributeAnnotation(origin=int),
+            ],
+        ),
         description=None,
-        type_arguments={},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
-    ) == {"type": "object", "additionalProperties": {"type": "string"}}
-    assert parameter_specification(
-        annotation=str | int,
-        description=None,
-        type_arguments={},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
     ) == {"oneOf": [{"type": "string"}, {"type": "integer"}]}
-    assert parameter_specification(
-        annotation=TypeVar("Parameter", bound=int),
-        description=None,
-        type_arguments={},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
-    ) == {
-        "type": "integer",
-    }
-    assert parameter_specification(
-        annotation=TypeVar("Parameter"),
-        description=None,
-        type_arguments={"Parameter": int},
-        globalns=globals(),
-        localns=None,
-        recursion_guard=frozenset(),
-    ) == {
-        "type": "integer",
-    }
 
 
 def test_basic_specification() -> None:
@@ -142,8 +106,8 @@ def test_basic_specification() -> None:
         float_value: float
         bool_value: bool
         none_value: None
-        list_value: list[str]
-        dict_value: dict[str, str]
+        list_value: Sequence[str]
+        dict_value: Mapping[str, str]
 
     specification: ParametersSpecification = {
         "type": "object",
@@ -177,16 +141,8 @@ def test_parametrized_specification() -> None:
         "type": "object",
         "properties": {
             "param": {
-                "oneOf": [
-                    {
-                        "type": "object",
-                        "additionalProperties": True,
-                    },
-                    {"type": "array"},
-                    {"type": "string"},
-                    {"type": "number"},
-                    {"type": "boolean"},
-                ],
+                "type": "object",
+                "additionalProperties": True,
             },
         },
         "required": ["param"],

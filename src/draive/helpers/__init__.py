@@ -1,13 +1,13 @@
-from draive.helpers.volatile_index import VolatileVectorIndex
-from draive.helpers.volatile_memory import (
-    ConstantMemory,
-    VolatileAccumulativeMemory,
-    VolatileMemory,
+from draive.helpers.volatile_index import (
+    VectorIndex,
+    VectorIndexing,
+    VectorSearching,
 )
+from draive.helpers.volatile_memory import VolatileMemory
 
 __all__ = [
-    "ConstantMemory",
-    "VolatileAccumulativeMemory",
+    "VectorIndex",
+    "VectorIndexing",
+    "VectorSearching",
     "VolatileMemory",
-    "VolatileVectorIndex",
 ]

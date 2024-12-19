@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, Literal, NotRequired, Required, TypedDict
 from uuid import UUID
@@ -21,7 +22,7 @@ def invalid(value: str) -> None:
 
 class ExampleNestedModel(DataModel):
     nested_alias: str = Field(aliased="string", default="default")
-    more: list[int] | None = None
+    more: Sequence[int] | None = None
 
 
 class ExampleModel(DataModel):
@@ -31,7 +32,7 @@ class ExampleModel(DataModel):
     value_default: int = Field(default=9)
     invalid: str = Field(verifier=invalid, default="valid")
     nested: ExampleNestedModel = Field(aliased="answer", default=ExampleNestedModel())
-    full: Literal["A", "B"] | list[int] | str | bool | None = Field(
+    full: Literal["A", "B"] | Sequence[int] | str | bool | None = Field(
         aliased="all",
         description="complex",
         default="",
@@ -99,11 +100,11 @@ class MissingModel(DataModel):
 missing_model_instance: MissingModel = MissingModel(
     value=MISSING,
 )
-missing_model_json: str = '{"value": null}'
+missing_model_json: str = "{}"
 
 
 def test_missing_encoding() -> None:
-    assert missing_model_instance.as_json() == missing_model_json
+    assert missing_model_instance.as_json(indent=4) == missing_model_json
 
 
 def test_missing_decoding() -> None:
@@ -139,14 +140,20 @@ typed_dict_model_instance: TypedDictModel = TypedDictModel(
     },
     total_value={"total": True},
 )
-typed_dict_model_json: str = (
-    '{"value":'
-    ' {"dict_int": 42, "dict_str": "answer", "dict_nested":'
-    ' {"value": 21}'
-    "},"
-    ' "total_value": {"total": true}'
-    "}"
-)
+typed_dict_model_json: str = """\
+{
+    "value": {
+        "dict_int": 42,
+        "dict_str": "answer",
+        "dict_nested": {
+            "value": 21
+        }
+    },
+    "total_value": {
+        "total": true
+    }
+}\
+"""
 typed_dict_not_required_model_instance: TypedDictModel = TypedDictModel(
     value={
         "dict_int": 42,
@@ -156,17 +163,27 @@ typed_dict_not_required_model_instance: TypedDictModel = TypedDictModel(
     },
     total_value={"total": True},
 )
-typed_dict_not_required_model_json: str = (
-    '{"value":'
-    ' {"dict_int": 42, "dict_nested":'
-    ' {"value": 21}},'
-    ' "total_value": {"total": true}}'
-)
+typed_dict_not_required_model_json: str = """\
+{
+    "value": {
+        "dict_int": 42,
+        "dict_nested": {
+            "value": 21
+        }
+    },
+    "total_value": {
+        "total": true
+    }
+}\
+"""
 
 
 def test_typed_dict_encoding() -> None:
-    assert typed_dict_model_instance.as_json() == typed_dict_model_json
-    assert typed_dict_not_required_model_instance.as_json() == typed_dict_not_required_model_json
+    assert typed_dict_model_instance.as_json(indent=4) == typed_dict_model_json
+    assert (
+        typed_dict_not_required_model_instance.as_json(indent=4)
+        == typed_dict_not_required_model_json
+    )
 
 
 def test_typed_dict_decoding() -> None:
@@ -179,11 +196,11 @@ def test_typed_dict_decoding() -> None:
 
 class BasicsModel(DataModel):
     string: str
-    string_list: list[str]
+    string_list: Sequence[str]
     integer: int
-    integer_or_float_list: list[int | float]
+    integer_or_float_list: Sequence[int | float]
     floating: float
-    floating_dict: dict[str, float]
+    floating_dict: Mapping[str, float]
     optional: str | None
     none: None
 
@@ -198,20 +215,33 @@ basic_model_instance: BasicsModel = BasicsModel(
     optional="some",
     none=None,
 )
-basic_model_json: str = (
-    '{"string": "test",'
-    ' "string_list": ["basic", "list"],'
-    ' "integer": 42,'
-    ' "integer_or_float_list": [12, 3.14, 7],'
-    ' "floating": 9.99,'
-    ' "floating_dict": {"a": 65.0, "b": 66.0, "c": 67.5},'
-    ' "optional": "some",'
-    ' "none": null}'
-)
+basic_model_json: str = """\
+{
+    "string": "test",
+    "string_list": [
+        "basic",
+        "list"
+    ],
+    "integer": 42,
+    "integer_or_float_list": [
+        12,
+        3.14,
+        7
+    ],
+    "floating": 9.99,
+    "floating_dict": {
+        "a": 65.0,
+        "b": 66.0,
+        "c": 67.5
+    },
+    "optional": "some",
+    "none": null
+}\
+"""
 
 
 def test_basic_encoding() -> None:
-    assert basic_model_instance.as_json() == basic_model_json
+    assert basic_model_instance.as_json(indent=4) == basic_model_json
 
 
 def test_basic_decoding() -> None:
@@ -223,66 +253,71 @@ basic_conversation_message_instance: ConversationMessage = ConversationMessage(
     role="model",
     content=MultimodalContent.of("string"),
 )
-basic_conversation_message_json: str = (
-    "{"
-    '"identifier": "identifier", '
-    '"role": "model", '
-    '"author": null, '
-    '"created": null, '
-    '"content": {'
-    '"parts": [{"text": "string", "meta": null}]'
-    "}, "
-    '"meta": null'
-    "}"
-)
+basic_conversation_message_json: str = """\
+{
+    "identifier": "identifier",
+    "role": "model",
+    "author": null,
+    "created": null,
+    "content": {
+        "parts": [
+            {
+                "text": "string",
+                "meta": null
+            }
+        ]
+    },
+    "meta": null
+}\
+"""
 
 media_url_conversation_message_instance: ConversationMessage = ConversationMessage(
     identifier="identifier",
     role="model",
     content=MultimodalContent.of(MediaContent.url("https://miquido.com/image", media="image/png")),
 )
-media_url_conversation_message_json: str = (
-    "{"
-    '"identifier": "identifier", '
-    '"role": "model", '
-    '"author": null, '
-    '"created": null, '
-    '"content": {'
-    '"parts": ['
-    "{"
-    '"media": "image/png", '
-    '"source": "https://miquido.com/image", '
-    '"meta": null'
-    "}"
-    "]"
-    "}, "
-    '"meta": null'
-    "}"
-)
+media_url_conversation_message_json: str = """\
+{
+    "identifier": "identifier",
+    "role": "model",
+    "author": null,
+    "created": null,
+    "content": {
+        "parts": [
+            {
+                "media": "image/png",
+                "source": "https://miquido.com/image",
+                "meta": null
+            }
+        ]
+    },
+    "meta": null
+}\
+"""
 
 media_data_conversation_message_instance: ConversationMessage = ConversationMessage(
     identifier="identifier",
     role="model",
     content=MultimodalContent.of(MediaContent.data(b"image_data", media="image/png")),
 )
-media_data_conversation_message_json: str = (
-    "{"
-    '"identifier": "identifier", '
-    '"role": "model", '
-    '"author": null, '
-    '"created": null, '
-    '"content": {'
-    '"parts": ['
-    "{"
-    '"media": "image/png", '
-    '"source": "aW1hZ2VfZGF0YQ==", '
-    '"meta": null'
-    "}"
-    "]"
-    "}, "
-    '"meta": null'
-    "}"
-)
+media_data_conversation_message_json: str = """\
+{
+    "identifier": "identifier",
+    "role": "model",
+    "author": null,
+    "created": null,
+    "content": {
+        "parts": [
+            {
+                "media": "image/png",
+                "source": "aW1hZ2VfZGF0YQ==",
+                "meta": null
+            }
+        ]
+    },
+    "meta": null
+}\
+"""
 
 
 def test_llm_message_decoding() -> None:
@@ -301,10 +336,14 @@ def test_llm_message_decoding() -> None:
 
 
 def test_llm_message_encoding() -> None:
-    assert basic_conversation_message_instance.as_json() == basic_conversation_message_json
-    assert media_url_conversation_message_instance.as_json() == media_url_conversation_message_json
+    assert basic_conversation_message_instance.as_json(indent=4) == basic_conversation_message_json
     assert (
-        media_data_conversation_message_instance.as_json() == media_data_conversation_message_json
+        media_url_conversation_message_instance.as_json(indent=4)
+        == media_url_conversation_message_json
+    )
+    assert (
+        media_data_conversation_message_instance.as_json(indent=4)
+        == media_data_conversation_message_json
     )
 
 
@@ -321,11 +360,17 @@ any_model_instance: AnyModel = AnyModel(
         answer=42,
     ),
 )
-any_model_json: str = '{"any_model": {"answer": 42}}'
+any_model_json: str = """\
+{
+    "any_model": {
+        "answer": 42
+    }
+}\
+"""
 
 
 def test_any_encoding() -> None:
-    assert any_model_instance.as_json() == any_model_json
+    assert any_model_instance.as_json(indent=4) == any_model_json
 
 
 def test_any_dict_decoding() -> None:

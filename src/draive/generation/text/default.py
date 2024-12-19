@@ -20,7 +20,7 @@ from draive.multimodal import (
     MultimodalContent,
 )
 
-__all__: list[str] = [
+__all__ = [
     "default_generate_text",
 ]
 
@@ -34,7 +34,7 @@ async def default_generate_text(
     **extra: Any,
 ) -> str:
     with ctx.scope("generate_text"):
-        toolbox: Toolbox = Toolbox.of(tools)
+        toolbox: Toolbox = Toolbox.out_of(tools)
 
         context: list[LMMContextElement] = [
             *[

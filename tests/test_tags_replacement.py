@@ -419,13 +419,6 @@ def test_returns_replaced_with_other_tags():
 
 
 def test_returns_first_replaced_with_multiple_valid_tags():
-    print(
-        MultimodalTagElement.replace(
-            MultimodalContent.of("<test>Lorem ipsum</test><test>Lorem ipsum</test>"),
-            tag="test",
-            replacement="replaced",
-        )
-    )
     assert MultimodalTagElement.replace(
         MultimodalContent.of("<test>Lorem ipsum</test><test>Lorem ipsum</test>"),
         tag="test",

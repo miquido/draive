@@ -15,7 +15,6 @@ def sentencepiece_tokenizer(
     processor: SentencePieceProcessor,
     /,
 ) -> TextTokenizing:
-
     def sentencepiece_tokenize_text(
         text: str,
         **extra: Any,

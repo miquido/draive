@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from draive.parameters import DataModel
 
 __all__ = [
@@ -9,7 +11,7 @@ __all__ = [
 class ChatMessage(DataModel):
     role: str
     content: str
-    images: list[str] | None = None
+    images: Sequence[str] | None = None
 
 
 class ChatCompletionResponse(DataModel):

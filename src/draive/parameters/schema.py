@@ -191,5 +191,8 @@ def _simplified_schema_property(  # noqa: C901, PLR0912, PLR0911
                 for key, specification in properties.items()
             }
 
+        case {"type": "object", "additionalProperties": True}:
+            return {}
+
         case other:
             raise ValueError("Unsupported basic specification element: %s", other)

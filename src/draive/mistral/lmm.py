@@ -146,7 +146,7 @@ def _convert_context_element(
                             "id": request.identifier,
                             "function": {
                                 "name": request.tool,
-                                "arguments": json.dumps(request.arguments),
+                                "arguments": json.dumps(dict(request.arguments)),
                             },
                         }
                         for request in tool_requests.requests
@@ -186,9 +186,9 @@ async def _chat_completion(  # noqa: PLR0913
                     {
                         "type": "function",
                         "function": {
-                            "name": tool.name,
-                            "description": tool.description or "",
-                            "parameters": tool.parameters,
+                            "name": tool["name"],
+                            "description": tool["description"] or "",
+                            "parameters": tool["parameters"],
                         },
                     }
                     for tool in tools
@@ -216,9 +216,9 @@ async def _chat_completion(  # noqa: PLR0913
                     {
                         "type": "function",
                         "function": {
-                            "name": tool.name,
-                            "description": tool.description or "",
-                            "parameters": tool.parameters,
+                            "name": tool["name"],
+                            "description": tool["description"] or "",
+                            "parameters": tool["parameters"],
                         },
                     }
                     for tool in tools
@@ -238,9 +238,9 @@ async def _chat_completion(  # noqa: PLR0913
                     {
                         "type": "function",
                         "function": {
-                            "name": tool.name,
-                            "description": tool.description or "",
-                            "parameters": tool.parameters,
+                            "name": tool["name"],
+                            "description": tool["description"] or "",
+                            "parameters": tool["parameters"],
                         },
                     }
                 ],

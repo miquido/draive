@@ -1,12 +1,10 @@
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from itertools import chain
 from typing import Self, final, overload
 
-from haiway import frozenlist
-
-from draive.multimodal.media import MediaContent
+from draive.multimodal.media import MediaContent, MediaKind
 from draive.multimodal.text import TextContent
-from draive.parameters.model import DataModel
+from draive.parameters import DataModel
 
 __all__ = [
     "Multimodal",
@@ -58,28 +56,43 @@ class MultimodalContent(DataModel):
     def has_artifacts(self) -> bool:
         return any(_is_artifact(part) for part in self.parts)
 
+    def media(
+        self,
+        media: MediaKind | None = None,
+    ) -> Sequence[MediaContent]:
+        if media is None:
+            return tuple(part for part in self.parts if isinstance(part, MediaContent))
+
+        else:
+            return tuple(
+                part for part in self.parts if isinstance(part, MediaContent) and part.kind == media
+            )
+
     @overload
-    def artifacts(self, /) -> frozenlist[DataModel]: ...
+    def artifacts(
+        self,
+        /,
+    ) -> Sequence[DataModel]: ...
 
     @overload
     def artifacts[Artifact: DataModel](
         self,
         model: type[Artifact],
         /,
-    ) -> Iterable[Artifact]: ...
+    ) -> Sequence[Artifact]: ...
 
     def artifacts[Artifact: DataModel](
         self,
         model: type[Artifact] | None = None,
         /,
-    ) -> Iterable[Artifact] | Iterable[DataModel]:
-        if model:
-            return tuple(part for part in self.parts if isinstance(part, model))
-
-        else:
+    ) -> Sequence[Artifact] | Sequence[DataModel]:
+        if model is None:
             return tuple(part for part in self.parts if _is_artifact(part))
 
-    def excluding_artifacts(self) -> Self:
+        else:
+            return tuple(part for part in self.parts if isinstance(part, model))
+
+    def without_artifacts(self) -> Self:
         return self.__class__(
             parts=tuple(part for part in self.parts if not _is_artifact(part)),
         )
@@ -89,7 +102,7 @@ class MultimodalContent(DataModel):
         joiner: str | None = None,
         include_data: bool = False,
     ) -> str:
-        return (joiner or "\n").join(
+        return (joiner if joiner is not None else "").join(
             _as_string(
                 element,
                 include_data=include_data,
@@ -166,7 +179,7 @@ def _extract_parts(  # noqa: PLR0911
     element: Multimodal,
     /,
     meta: Mapping[str, str | float | int | bool | None] | None = None,
-) -> Iterable[MultimodalContentElement]:
+) -> Sequence[MultimodalContentElement]:
     match element:
         case MultimodalContent() as content:
             if not content:
@@ -261,7 +274,7 @@ def _as_string(
 
 def _merge_texts(
     *elements: MultimodalContentElement,
-) -> Iterable[MultimodalContentElement]:
+) -> Sequence[MultimodalContentElement]:
     if len(elements) <= 1:
         return elements
 
