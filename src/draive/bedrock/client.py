@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from types import TracebackType
 from typing import Any, ClassVar, Self, final
 
@@ -81,7 +82,7 @@ class BedrockClient:
         messages: list[ChatMessage],
         tools: list[ChatTool],
         require_tool: str | bool,
-        stop: list[str] | None,
+        stop: Sequence[str] | None,
     ) -> ChatCompletionResponse:
         parameters: dict[str, Any] = {
             "modelId": model,

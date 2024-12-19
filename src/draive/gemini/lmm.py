@@ -237,9 +237,9 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
     converted_tools: Sequence[GeminiFunctionToolSpecification] = []
     for tool in tools or []:
         tool_function: GeminiFunctionToolSpecification = {
-            "name": tool.name,
-            "description": tool.description or "",
-            "parameters": cast(dict[str, Any], tool.parameters),
+            "name": tool["name"],
+            "description": tool["description"] or "",
+            "parameters": cast(dict[str, Any], tool["parameters"]),
         }
         # AIStudio api requires to delete properties if those are empty...
         if "parameters" in tool_function and not tool_function["parameters"]["properties"]:
@@ -279,9 +279,9 @@ async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
         case tool:
             assert tool in (tools or []), "Can't suggest a tool without using it"  # nosec: B101
             tool_function: GeminiFunctionToolSpecification = {
-                "name": tool.name,
-                "description": tool.description or "",
-                "parameters": cast(dict[str, Any], tool.parameters),
+                "name": tool["name"],
+                "description": tool["description"] or "",
+                "parameters": cast(dict[str, Any], tool["parameters"]),
             }
 
             # AIStudio api requires to delete properties if those are empty...

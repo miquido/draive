@@ -1,3 +1,4 @@
+from collections.abc import Mapping, Sequence
 from typing import Any, Literal, NotRequired, Required, TypedDict
 
 from draive.parameters import DataModel, Field
@@ -41,7 +42,7 @@ class GeminiDataReferenceMessageContent(DataModel):
 
 class GeminiFunctionCall(DataModel):
     name: str
-    arguments: dict[str, Any] = Field(aliased="args")
+    arguments: Mapping[str, Any] = Field(aliased="args")
 
 
 class GeminiFunctionCallMessageContent(DataModel):
@@ -50,7 +51,7 @@ class GeminiFunctionCallMessageContent(DataModel):
 
 class GeminiFunctionResponse(DataModel):
     name: str
-    response: dict[str, Any]
+    response: Mapping[str, Any]
 
 
 class GeminiFunctionResponseMessageContent(DataModel):
@@ -68,7 +69,7 @@ GeminiMessageContent = (
 
 class GeminiMessage(DataModel):
     role: Literal["user", "model"]
-    content: list[GeminiMessageContent] = Field(aliased="parts")
+    content: Sequence[GeminiMessageContent] = Field(aliased="parts")
 
 
 class GeminiRequestMessage(TypedDict, total=False):
@@ -111,5 +112,5 @@ class GeminiChoice(DataModel):
 
 
 class GeminiGenerationResult(DataModel):
-    choices: list[GeminiChoice] = Field(aliased="candidates")
+    choices: Sequence[GeminiChoice] = Field(aliased="candidates")
     usage: GeminiUsage = Field(aliased="usageMetadata")

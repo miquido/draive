@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Literal
 
 from draive import DataModel, Field
@@ -13,7 +14,7 @@ class SchemaModel(DataModel):
     int_value: int
     float_value: float
     bool_value: bool
-    list_value: list[str]
+    list_value: Sequence[str]
     optional_value: str | None = Field(description="alternative")
     nested: SchemaNestedModel = Field(aliased="nested_value", description="alternative")
 

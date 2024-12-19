@@ -6,7 +6,6 @@ from haiway import ctx
 
 from draive.conversation.state import Conversation
 from draive.conversation.types import ConversationMessage
-from draive.helpers import ConstantMemory
 from draive.instructions import Instruction
 from draive.lmm import AnyTool, LMMStreamChunk, Toolbox
 from draive.multimodal import (
@@ -98,7 +97,10 @@ async def conversation_completion(
             conversation_memory = memory
 
         case memory_messages:
-            conversation_memory = ConstantMemory(memory_messages)
+            conversation_memory = Memory[
+                Sequence[ConversationMessage],
+                ConversationMessage,
+            ].constant(recalled=memory_messages)
 
     # request completion
     return await conversation.completion(
@@ -110,4 +112,12 @@ async def conversation_completion(
     )
 
 
-_EMPTY_MEMORY: Final[ConstantMemory[Any, Any]] = ConstantMemory(tuple[Any]())
+_EMPTY_MEMORY: Final[
+    Memory[
+        Sequence[ConversationMessage],
+        ConversationMessage,
+    ]
+] = Memory[
+    Sequence[ConversationMessage],
+    ConversationMessage,
+].constant(recalled=())

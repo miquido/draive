@@ -4,6 +4,7 @@ from typing import (
     Literal,
     Protocol,
     Self,
+    TypedDict,
     runtime_checkable,
 )
 
@@ -36,15 +37,15 @@ __all__ = [
 ]
 
 
-class LMMToolFunctionSpecification(State):
+class LMMToolFunctionSpecification(TypedDict):
     name: str
     description: str | None
     parameters: ParametersSpecification
 
 
-LMMToolSpecification = LMMToolFunctionSpecification
-LMMOutputSelection = Literal["auto", "text", "image", "audio", "video"] | type[DataModel]
-LMMToolSelection = Literal["auto", "required", "none"] | LMMToolSpecification
+type LMMToolSpecification = LMMToolFunctionSpecification
+type LMMOutputSelection = Literal["auto", "text", "image", "audio", "video"] | type[DataModel]
+type LMMToolSelection = Literal["auto", "required", "none"] | LMMToolSpecification
 
 
 class LMMToolException(Exception):
@@ -157,7 +158,7 @@ class LMMInvocating(Protocol):
 
 class LMMStreamProperties(State):
     instruction: Instruction | str | None = None
-    tools: Iterable[LMMToolSpecification] | None
+    tools: Sequence[LMMToolSpecification] | None
 
 
 @runtime_checkable

@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Literal
 
 from haiway import MISSING, Missing, State
@@ -16,4 +17,4 @@ class OllamaChatConfig(State):
     max_tokens: int | Missing = MISSING
     response_format: Literal["text", "json"] | Missing = MISSING
     timeout: float | Missing = MISSING
-    stop_sequences: list[str] | Missing = MISSING
+    stop_sequences: Sequence[str] | Missing = MISSING

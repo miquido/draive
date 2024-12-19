@@ -2,11 +2,11 @@ from asyncio import gather
 from collections.abc import Callable, Mapping
 from typing import Protocol, Self, cast, final, overload, runtime_checkable
 
-from haiway import ctx, freeze
+from haiway import AttributePath, ctx, freeze
 
 from draive.evaluation.score import EvaluationScore
 from draive.evaluation.value import EvaluationScoreValue, evaluation_score_value
-from draive.parameters import DataModel, Field, ParameterPath
+from draive.parameters import DataModel, Field
 
 __all__ = [
     "Evaluator",
@@ -201,7 +201,7 @@ class Evaluator[Value, **Args]:
 
     def contra_map[Mapped](
         self,
-        mapping: Callable[[Mapped], Value] | ParameterPath[Mapped, Value] | Value,
+        mapping: Callable[[Mapped], Value] | AttributePath[Mapped, Value] | Value,
         /,
     ) -> "Evaluator[Mapped, Args]":
         mapper: Callable[[Mapped], Value]
@@ -211,9 +211,9 @@ class Evaluator[Value, **Args]:
 
             case path:
                 assert isinstance(  # nosec: B101
-                    path, ParameterPath
+                    path, AttributePath
                 ), "Prepare parameter path by using Self._.path.to.property"
-                mapper = cast(ParameterPath[Mapped, Value], path).__call__
+                mapper = cast(AttributePath[Mapped, Value], path).__call__
 
         async def evaluation(
             value: Mapped,

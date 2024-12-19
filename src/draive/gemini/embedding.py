@@ -21,7 +21,7 @@ def gemini_text_embedding(
     async def gemini_embed_text(
         values: Sequence[str],
         **extra: Any,
-    ) -> list[Embedded[str]]:
+    ) -> Sequence[Embedded[str]]:
         config: GeminiEmbeddingConfig = ctx.state(GeminiEmbeddingConfig).updated(**extra)
         with ctx.scope("embed_text"):
             results: list[list[float]] = await client.embedding(

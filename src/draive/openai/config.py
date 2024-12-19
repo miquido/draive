@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Literal, TypedDict
 
 from haiway import MISSING, Missing, State
@@ -27,7 +28,7 @@ class OpenAIChatConfig(State):
     vision_details: Literal["auto", "low", "high"] | Missing = MISSING
     parallel_tool_calls: bool | Missing = MISSING
     timeout: float | Missing = MISSING
-    stop_sequences: list[str] | Missing = MISSING
+    stop_sequences: Sequence[str] | Missing = MISSING
 
 
 class OpenAIEmbeddingConfig(State):

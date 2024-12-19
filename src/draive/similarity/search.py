@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import numpy as np
@@ -12,14 +12,14 @@ __all__ = [
 
 
 def vector_similarity_search(
-    query_vector: NDArray[Any] | list[float],
-    values_vectors: list[NDArray[Any]] | list[list[float]],
+    query_vector: NDArray[Any] | Sequence[float],
+    values_vectors: Sequence[NDArray[Any]] | Sequence[Sequence[float]],
     limit: int,
     score_threshold: float | None = None,
     similarity: Callable[
         [list[NDArray[Any]] | NDArray[Any], list[NDArray[Any]] | NDArray[Any]], NDArray[Any]
     ] = cosine_similarity,
-) -> list[int]:
+) -> Sequence[int]:
     assert limit > 0  # nosec: B101
     if not values_vectors:
         return []

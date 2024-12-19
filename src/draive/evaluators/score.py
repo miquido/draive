@@ -1,7 +1,7 @@
 from typing import Any
 
 from draive.evaluation import EvaluationScore
-from draive.parameters import DataModel, Field, ParameterValidationContext, ParameterValidationError
+from draive.parameters import DataModel, Field, ParameterValidationContext
 
 __all__ = [
     "CommonScoreModel",
@@ -24,18 +24,10 @@ def _score_validator(
                 return float(str_value)
 
             except Exception as exc:
-                raise ParameterValidationError.invalid_type(
-                    context=context,
-                    expected=float,
-                    received=str,
-                ) from exc
+                raise TypeError(f"Expected 'float', received '{type(value).__name__}'") from exc
 
         case _:
-            raise ParameterValidationError.invalid_type(
-                context=context,
-                expected=float,
-                received=type(value),
-            )
+            raise TypeError(f"Expected 'float', received '{type(value).__name__}'")
 
 
 class CommonScoreModel(DataModel):

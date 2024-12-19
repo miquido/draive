@@ -1,4 +1,5 @@
 import json
+from collections.abc import Sequence
 from http import HTTPStatus
 from types import TracebackType
 from typing import Any, ClassVar, Literal, Self, cast, final
@@ -77,7 +78,7 @@ class OllamaClient:
         max_tokens: int | None,
         response_format: Literal["text", "json"],
         messages: list[ChatMessage],
-        stop: list[str] | None,
+        stop: Sequence[str] | None,
     ) -> ChatCompletionResponse:
         request_body: dict[str, Any] = {
             "model": model,

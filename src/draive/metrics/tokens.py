@@ -1,4 +1,4 @@
-from copy import copy
+from collections.abc import Mapping
 from typing import Self, overload
 
 from haiway import State
@@ -69,13 +69,13 @@ class TokenUsage(State):
             },
         )
 
-    usage: dict[str, ModelTokenUsage]
+    usage: Mapping[str, ModelTokenUsage]
 
     def __add__(
         self,
         other: Self,
     ) -> Self:
-        usage: dict[str, ModelTokenUsage] = copy(self.usage)
+        usage: dict[str, ModelTokenUsage] = dict(self.usage)
         for key, value in other.usage.items():
             if current := usage.get(key):
                 usage[key] = current + value

@@ -1,4 +1,5 @@
-from typing import Protocol, Self, final, overload, runtime_checkable
+from collections.abc import Mapping
+from typing import Any, Protocol, Self, final, overload, runtime_checkable
 from uuid import UUID, uuid4
 
 from haiway import State
@@ -79,11 +80,11 @@ class Instruction(State):
 
     instruction: str
     identifier: UUID
-    variables: dict[str, object]
+    variables: Mapping[str, Any]
 
     def format(
         self,
-        **variables: object,
+        **variables: Any,
     ) -> str:
         if variables:
             return self.instruction.format_map(
@@ -125,7 +126,7 @@ class Instruction(State):
 
     def updated(
         self,
-        **variables: object,
+        **variables: Any,
     ) -> Self:
         if variables:
             return self.__class__(

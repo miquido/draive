@@ -23,7 +23,7 @@ from draive.lmm import (
 from draive.multimodal import MultimodalContent
 from draive.utils import Memory
 
-__all__: list[str] = [
+__all__ = [
     "default_conversation_completion",
 ]
 

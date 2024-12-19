@@ -191,9 +191,9 @@ def _convert_context_element(
 
 def _convert_tool(tool: LMMToolSpecification) -> ChatTool:
     return {
-        "name": tool.name,
-        "description": tool.description or "",
-        "inputSchema": {"json": tool.parameters},
+        "name": tool["name"],
+        "description": tool["description"] or "",
+        "inputSchema": {"json": tool["parameters"]},
     }
 
 

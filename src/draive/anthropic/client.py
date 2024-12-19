@@ -107,7 +107,7 @@ class AnthropicClient:
                 max_tokens=config.max_tokens,
                 top_p=config.top_p if not_missing(config.top_p) else NOT_GIVEN,
                 timeout=config.timeout if not_missing(config.timeout) else NOT_GIVEN,
-                stop_sequences=config.stop_sequences
+                stop_sequences=list(config.stop_sequences)
                 if not_missing(config.stop_sequences)
                 else NOT_GIVEN,
                 stream=stream,
