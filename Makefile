@@ -9,62 +9,62 @@ TESTS_PATH := tests
 # load environment config from .env if able
 -include .env
 
-ifndef PYTHON_ALIAS
-	PYTHON_ALIAS := python
-endif
-
-ifndef INSTALL_OPTIONS
-	INSTALL_OPTIONS := .[dev]
-endif
-
 ifndef UV_VERSION
-	UV_VERSION := 0.5.9
+	UV_VERSION := 0.5.12
 endif
 
-.PHONY: install venv sync lock update format lint test release
+.PHONY: uv_check venv sync update format lint test release
 
-# Install in system without virtual environment and extras. DO NOT USE FOR DEVELOPMENT
-install:
-	@echo '# Installing...'
-	@echo '...installing uv...'
-	@curl -LsSf https://github.com/astral-sh/uv/releases/download/$(UV_VERSION)/uv-installer.sh | sh
-	@echo '...preparing dependencies...'
-	@uv pip install $(INSTALL_OPTIONS) --system --constraint constraints
-	@echo '...finished!'
+# Check installed UV version and install if needed
+uv_check:
+	@echo 'Checking uv version...'
+
+	# Install if not present
+	@if ! command -v uv > /dev/null; then \
+		echo '...installing uv...'; \
+		curl -LsSf https://github.com/astral-sh/uv/releases/download/$(UV_VERSION)/uv-installer.sh | sh; \
+		if [ $$? -ne 0 ]; then \
+			echo "...installing uv failed!"; \
+			exit 1; \
+		fi; \
+	fi
+
+	# Check version and update if needed
+	@if command -v uv > /dev/null; then \
+		CURRENT_VERSION=$$(uv --version | head -n1 | cut -d" " -f2); \
+		if [ "$$(printf "%s\n%s" "$(UV_VERSION)" "$$CURRENT_VERSION" | sort -V | head -n1)" != "$(UV_VERSION)" ]; then \
+			echo '...updating uv...'; \
+			curl -LsSf https://github.com/astral-sh/uv/releases/download/$(UV_VERSION)/uv-installer.sh | sh; \
+			if [ $$? -ne 0 ]; then \
+				echo "...updating uv failed!"; \
+				exit 1; \
+			fi; \
+		else \
+			echo '...uv version is up-to-date!'; \
+		fi; \
+	fi
 
 # Setup virtual environment for local development.
-venv:
+venv: uv_check
 	@echo '# Preparing development environment...'
 	@echo '...cloning .env...'
 	@cp -n ./config/.env.example ./.env || :
 	@echo '...preparing git hooks...'
 	@cp -n ./config/pre-push ./.git/hooks/pre-push || :
-	@echo '...installing uv...'
-	@curl -LsSf https://github.com/astral-sh/uv/releases/download/$(UV_VERSION)/uv-installer.sh | sh
 	@echo '...preparing venv...'
-	@$(PYTHON_ALIAS) -m venv .venv --prompt="VENV[DEV]" --clear --upgrade-deps
-	@. ./.venv/bin/activate && pip install --upgrade pip && uv pip install --editable $(INSTALL_OPTIONS) --constraint constraints
+	@uv sync --all-groups --all-extras --frozen --reinstall
 	@echo '...development environment ready! Activate venv using `. ./.venv/bin/activate`.'
 
 # Sync environment with uv based on constraints
-sync:
+sync: uv_check
 	@echo '# Synchronizing dependencies...'
-	@$(if $(findstring $(UV_VERSION), $(shell uv --version | head -n1 | cut -d" " -f2)), , @echo '...updating uv...' && curl -LsSf https://github.com/astral-sh/uv/releases/download/$(UV_VERSION)/uv-installer.sh | sh)
-	@uv pip install --editable $(INSTALL_OPTIONS) --constraint constraints
-	@echo '...finished!'
-
-# Generate a set of locked dependencies from pyproject.toml
-lock:
-	@echo '# Locking dependencies...'
-	@uv pip compile pyproject.toml -o constraints --all-extras
+	@uv sync --all-groups --all-extras --frozen
 	@echo '...finished!'
 
 # Update and lock dependencies from pyproject.toml
 update:
 	@echo '# Updating dependencies...'
-	@$(if $(findstring $(UV_VERSION), $(shell uv --version | head -n1 | cut -d" " -f2)), , @echo '...updating uv...' && curl -LsSf https://github.com/astral-sh/uv/releases/download/$(UV_VERSION)/uv-installer.sh | sh)
-	@uv --no-cache pip compile pyproject.toml -o constraints --all-extras --upgrade
-	@uv pip install --editable $(INSTALL_OPTIONS) --constraint constraints
+	@uv sync --all-groups --all-extras --upgrade
 	@echo '...finished!'
 
 # Run formatter.
@@ -80,7 +80,7 @@ lint:
 
 # Run tests suite.
 test:
-	@$(PYTHON_ALIAS) -B -m pytest -vv --cov=$(SOURCES_PATH) --rootdir=$(TESTS_PATH)
+	@python -B -m pytest -v --cov=$(SOURCES_PATH) --rootdir=$(TESTS_PATH)
 
 release: lint test
 	@echo '# Preparing release...'

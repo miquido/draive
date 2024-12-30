@@ -161,10 +161,9 @@ def agent[AgentState, AgentStateScratch](  # noqa: C901 # pyright: ignore[report
 
             def initialize() -> Agent:
                 # in this case AgentState has to be the same as AgentStateScratch
-                agent_memory: Memory[AgentState, AgentStateScratch] = Memory[
-                    AgentState,
-                    AgentStateScratch,
-                ].volatile(state_initializer())
+                agent_memory: Memory[AgentState, AgentStateScratch] = Memory.volatile(
+                    initial=state_initializer()
+                )
 
                 async def agent(message: AgentMessage) -> AgentOutput:
                     try:

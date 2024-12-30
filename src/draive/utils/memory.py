@@ -51,9 +51,9 @@ class Memory[Recalled, Remembered](State):
     @classmethod
     def volatile[Item](
         cls,
-        initial: Item,
         /,
         *,
+        initial: Item,
         limit: int | None = None,
     ) -> "Memory[Item, Item]":
         storage: Item = initial
@@ -75,7 +75,7 @@ class Memory[Recalled, Remembered](State):
 
             storage = items[-1]
 
-        return Memory(
+        return Memory[Item, Item](
             recall=recall,
             remember=remember,
         )
@@ -83,9 +83,9 @@ class Memory[Recalled, Remembered](State):
     @classmethod
     def accumulative_volatile[Item](
         cls,
-        initial: Sequence[Item] | None = None,
         /,
         *,
+        initial: Sequence[Item] | None = None,
         limit: int | None = None,
     ) -> "Memory[Sequence[Item], Item]":
         storage: list[Item] = list(initial) if initial else []
@@ -110,7 +110,7 @@ class Memory[Recalled, Remembered](State):
             if limit > 0:
                 storage = storage[-limit:]
 
-        return Memory(
+        return Memory[Sequence[Item], Item](
             recall=recall,
             remember=remember,
         )
