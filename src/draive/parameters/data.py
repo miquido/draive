@@ -1,5 +1,6 @@
 import json
-from collections.abc import Callable, Iterator
+import typing
+from collections.abc import Callable, Iterator, Mapping
 from copy import deepcopy
 from dataclasses import fields as dataclass_fields
 from dataclasses import is_dataclass
@@ -236,10 +237,12 @@ class DataModelMeta(type):
 
         if bases:
             data_type.__PARAMETERS__ = parameters  # pyright: ignore[reportAttributeAccessIssue]
+            data_type.__TYPE_PARAMETERS__ = type_parameters  # pyright: ignore[reportAttributeAccessIssue]
 
         else:
             assert len(parameters) == 0  # nosec: B101
             data_type.__PARAMETERS__ = MISSING  # pyright: ignore[reportAttributeAccessIssue]
+            data_type.__TYPE_PARAMETERS__ = None  # pyright: ignore[reportAttributeAccessIssue]
 
         if parameters_specification:
             data_type.__PARAMETERS_SPECIFICATION__ = {  # pyright: ignore[reportAttributeAccessIssue]
@@ -259,6 +262,88 @@ class DataModelMeta(type):
         data_type._ = AttributePath(data_type, attribute=data_type)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportCallIssue]
 
         return data_type
+
+    def __instancecheck__(
+        self,
+        instance: Any,
+    ) -> bool:
+        # check for type match
+        if self.__subclasscheck__(type(instance)):  # pyright: ignore[reportUnknownArgumentType]
+            return True
+
+        # otherwise check if we are dealing with unparametrized base
+        # against the parametrized one, our generic subtypes have base of unparametrized type
+        if type(instance) not in self.__bases__:
+            return False
+
+        try:
+            # validate instance to check unparametrized fields
+            _ = self(**vars(instance))
+
+        except Exception:
+            return False
+
+        else:
+            return True
+
+    def __subclasscheck__(  # noqa: C901, PLR0911, PLR0912
+        self,
+        subclass: type[Any],
+    ) -> bool:
+        # check if we are the same class for early exit
+        if self == subclass:
+            return True
+
+        # then check if we are parametrized
+        checked_parameters: Mapping[str, Any] | None = getattr(
+            self,
+            "__TYPE_PARAMETERS__",
+            None,
+        )
+        if checked_parameters is None:
+            # if we are not parametrized allow any subclass
+            return self in subclass.__bases__
+
+        # verify if we have common base next - our generic subtypes have the same base
+        if self.__bases__ == subclass.__bases__:
+            # if we have the same bases we have different generic subtypes
+            # we can verify all of the attributes to check if we have common base
+            available_parameters: Mapping[str, Any] | None = getattr(
+                subclass,
+                "__TYPE_PARAMETERS__",
+                None,
+            )
+
+            if available_parameters is None:
+                # if we have no parameters at this stage this is a serious bug
+                raise RuntimeError("Invalid type parametrization for %s", subclass)
+
+            for key, param in checked_parameters.items():
+                match available_parameters.get(key):
+                    case None:  # if any parameter is missing we should not be there already
+                        return False
+
+                    case typing.Any:
+                        continue  # Any ignores type checks
+
+                    case checked:
+                        if param is Any:
+                            continue  # Any ignores type checks
+
+                        elif issubclass(checked, param):
+                            continue  # if we have matching type we are fine
+
+                        else:
+                            return False  # types are not matching
+
+            return True  # when all parameters were matching we have matching subclass
+
+        elif subclass in self.__bases__:  # our generic subtypes have base of unparametrized type
+            # if subclass parameters were not provided then we can be valid ony if all were Any
+            return all(param is Any for param in checked_parameters.values())
+
+        else:
+            return False  # we have different base / comparing to not parametrized
 
 
 def _check_required(default: Any) -> bool:
@@ -286,12 +371,14 @@ class DataModel(metaclass=DataModelMeta):
     __IMMUTABLE__: ClassVar[EllipsisType] = ...
     __PARAMETERS__: ClassVar[dict[str, Parameter[Any]]]
     __PARAMETERS_SPECIFICATION__: ClassVar[ParametersSpecification]
+    __TYPE_PARAMETERS__: ClassVar[Mapping[str, Any] | None] = None
 
     def __class_getitem__(
         cls,
         type_argument: tuple[type[Any], ...] | type[Any],
     ) -> type[Self]:
         assert Generic in cls.__bases__, "Can't specialize non generic type!"  # nosec: B101
+        assert cls.__TYPE_PARAMETERS__ is None, "Can't specialize already specialized type!"  # nosec: B101
 
         type_arguments: tuple[type[Any], ...]
         match type_argument:

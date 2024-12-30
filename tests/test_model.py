@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from typing import Any, Literal, NotRequired, Required, TypedDict
 from uuid import UUID
 
+from pytest import raises
+
 from draive import (
     MISSING,
     ConversationMessage,
@@ -12,6 +14,7 @@ from draive import (
     MediaContent,
     Missing,
     MultimodalContent,
+    ParameterValidationError,
 )
 
 
@@ -375,3 +378,40 @@ def test_any_encoding() -> None:
 
 def test_any_dict_decoding() -> None:
     assert DataModel.from_json(any_model_json).as_dict() == any_model_instance.as_dict()
+
+
+def test_generic_subtypes_validation() -> None:
+    class NestedGeneric[T](DataModel):
+        value: T
+
+    class Generic[T](DataModel):
+        nested: NestedGeneric[T]
+
+    class Container(DataModel):
+        generic: Generic[str]
+
+    assert isinstance(Generic[str](nested=NestedGeneric[str](value="ok")), Generic)
+    assert isinstance(Generic(nested=NestedGeneric[str](value="ok")), Generic)
+    assert isinstance(Generic(nested=NestedGeneric(value="ok")), Generic)
+
+    assert isinstance(Generic[str](nested=NestedGeneric[str](value="ok")), Generic[Any])
+    assert isinstance(Generic(nested=NestedGeneric[str](value="ok")), Generic[Any])
+    assert isinstance(Generic[str](nested=NestedGeneric(value="ok")), Generic[Any])
+    assert isinstance(Generic(nested=NestedGeneric(value="ok")), Generic[Any])
+
+    assert isinstance(Generic[str](nested=NestedGeneric[str](value="ok")), Generic[str])
+    assert isinstance(Generic(nested=NestedGeneric[str](value="ok")), Generic[str])
+    assert isinstance(Generic[str](nested=NestedGeneric(value="ok")), Generic[str])
+    assert isinstance(Generic(nested=NestedGeneric(value="ok")), Generic[str])
+
+    with raises(ParameterValidationError):
+        _ = Generic[int](nested=NestedGeneric[str](value="ok"))
+
+    with raises(ParameterValidationError):
+        _ = Container(generic=Generic(nested=NestedGeneric(value=42)))
+
+    with raises(ParameterValidationError):
+        _ = Container(generic=Generic[int](nested=NestedGeneric[str](value="ok")))
+
+    # not raises
+    _ = Container(generic=Generic(nested=NestedGeneric(value="ok")))

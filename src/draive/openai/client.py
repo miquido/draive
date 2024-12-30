@@ -78,8 +78,8 @@ class OpenAIClient:
         self._client: AsyncOpenAI = self._initialize_client()
 
     def _initialize_client(self) -> AsyncOpenAI:
-        # if all AZURE settings were provided use it as provider
-        if self._azure_api_endpoint and self._azure_deployment and self._azure_api_version:
+        # if AZURE settings were provided use it as provider
+        if self._azure_api_endpoint:
             return AsyncAzureOpenAI(
                 api_key=self._api_key,
                 azure_endpoint=self._azure_api_endpoint,

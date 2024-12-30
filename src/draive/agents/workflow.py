@@ -95,7 +95,7 @@ class AgentWorkflow[AgentWorkflowState, AgentWorkflowResult: DataModel | State |
         return await WorkflowRunner[AgentWorkflowState, AgentWorkflowResult].run(
             self,
             input=input,
-            memory=Memory.volatile(state or self._state_initializer()),
+            memory=Memory.volatile(initial=state or self._state_initializer()),
             timeout=timeout,
         )
 
@@ -166,7 +166,9 @@ def workflow[AgentWorkflowState](
         )
 
         def initialize_agent() -> Agent:
-            agent_memory: Memory[AgentWorkflowState, AgentWorkflowState] = Memory.volatile(state())
+            agent_memory: Memory[AgentWorkflowState, AgentWorkflowState] = Memory.volatile(
+                initial=state()
+            )
 
             async def agent(message: AgentMessage) -> AgentOutput:
                 match await cast(  # pyright fails to properly type this function
