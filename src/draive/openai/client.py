@@ -69,10 +69,10 @@ class OpenAIClient:
         self._azure_api_endpoint: str | None = azure_api_endpoint or getenv_str(
             "AZURE_OPENAI_API_BASE"
         )
-        self._azure_api_version: str | None = azure_deployment or getenv_str(
+        self._azure_deployment: str | None = azure_deployment or getenv_str(
             "AZURE_OPENAI_DEPLOYMENT_NAME"
         )
-        self._azure_deployment: str | None = azure_api_version or getenv_str(
+        self._azure_api_version: str | None = azure_api_version or getenv_str(
             "AZURE_OPENAI_API_VERSION"
         )
         self._client: AsyncOpenAI = self._initialize_client()
