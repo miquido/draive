@@ -68,6 +68,11 @@ class MultimodalContent(DataModel):
                 part for part in self.parts if isinstance(part, MediaContent) and part.kind == media
             )
 
+    def without_media(self) -> Self:
+        return self.__class__(
+            parts=tuple(part for part in self.parts if not isinstance(part, MediaContent)),
+        )
+
     @overload
     def artifacts(
         self,

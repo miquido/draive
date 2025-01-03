@@ -202,6 +202,9 @@ async def _conversation_stream(
                     chunk.content,
                     merge_text=True,
                 )
+
+                yield chunk
+
                 # on turn end finalize the stream - we are streaming only a single response here
                 if chunk.eod:
                     input_stream.finish()
@@ -215,11 +218,7 @@ async def _conversation_stream(
                         response_message,
                     )
 
-                    yield chunk
                     return  # end of streaming for conversation completion
-
-                else:
-                    yield chunk
 
             case LMMToolRequest() as tool_request:
                 ctx.spawn(
