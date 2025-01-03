@@ -6,8 +6,17 @@ from haiway import (
     AttributeRequirement,
     Disposable,
     Disposables,
+    MetricsContext,
+    MetricsHandler,
+    MetricsLogger,
+    MetricsRecording,
+    MetricsScopeEntering,
+    MetricsScopeExiting,
     Missing,
-    ScopeMetrics,
+    MissingContext,
+    MissingState,
+    ResultTrace,
+    ScopeIdentifier,
     State,
     always,
     async_always,
@@ -30,6 +39,8 @@ from haiway import (
     throttle,
     timeout,
     traced,
+    when_missing,
+    wrap_async,
 )
 
 from draive.agents import (
@@ -120,10 +131,7 @@ from draive.lmm import (
     lmm_stream,
     tool,
 )
-from draive.metrics import (
-    TokenUsage,
-    usage_metrics_logger,
-)
+from draive.metrics import TokenUsage
 from draive.multimodal import (
     MediaContent,
     MediaKind,
@@ -232,8 +240,16 @@ __all__ = [
     "MediaKind",
     "MediaType",
     "Memory",
+    "MetricsContext",
+    "MetricsHandler",
+    "MetricsLogger",
+    "MetricsRecording",
+    "MetricsScopeEntering",
+    "MetricsScopeExiting",
     "Missing",
+    "MissingContext",
     "MissingInstruction",
+    "MissingState",
     "ModelGeneration",
     "ModelGenerator",
     "ModelGeneratorDecoder",
@@ -247,7 +263,8 @@ __all__ = [
     "ParameterValidator",
     "ParameterVerification",
     "RateLimitError",
-    "ScopeMetrics",
+    "ResultTrace",
+    "ScopeIdentifier",
     "SelectionException",
     "State",
     "Step",
@@ -313,8 +330,9 @@ __all__ = [
     "tokenize_text",
     "tool",
     "traced",
-    "usage_metrics_logger",
     "vector_similarity_score",
     "vector_similarity_search",
+    "when_missing",
     "workflow",
+    "wrap_async",
 ]
