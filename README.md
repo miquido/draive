@@ -8,7 +8,7 @@ Are you looking for maximum flexibility and efficiency in your next Python libra
 
 ## 🚀 Quick start
 
-Dive straight into the code and learn how to use draive with our interactive [guides](https://github.com/miquido/draive/tree/main/guides). Check out [Draive AI Course on YouTube](https://www.youtube.com/watch?v=C257Y7-y3ok&list=PLbS8Yksu3iAoRpDOGwP_UmK5s6B3SDz8T) to understand our unique architecture and see real-world applications of Draive in action. For quick solutions to common problems, explore our [cookbooks](https://github.com/miquido/draive/tree/main/cookbooks). 
+Dive straight into the code and learn how to use draive with our interactive [guides](https://github.com/miquido/draive/tree/main/guides). Check out [Draive AI Course on YouTube](https://www.youtube.com/watch?v=C257Y7-y3ok&list=PLbS8Yksu3iAoRpDOGwP_UmK5s6B3SDz8T) to understand our unique architecture and see real-world applications of Draive in action. For quick solutions to common problems, explore our [cookbooks](https://github.com/miquido/draive/tree/main/cookbooks).
 
 Great, but how it looks like?
 
@@ -141,10 +141,6 @@ User SentencePiece model runner. It is used by Gemini and Mistral.
 pip install draive[sentencepiece]
 ```
 
-## Migration to haiway
-
-Beginning with version 0.29.0, Draive will initiate the migration to [haiway](https://github.com/miquido/haiway) for state and dependency management. Interfaces will be gradually updated to the new system, with a complete transition planned. Interfaces subject to change will be marked as deprecated and maintained for as long as feasible, though no later than the end of the migration period. Once the transition is complete, all deprecated interfaces will be fully removed.
-
 ## 👷 Contributing
 
 As an open-source project in a rapidly evolving field, we welcome all contributions. Whether you can add a new feature, enhance our infrastructure, or improve our documentation, your input is valuable to us.
@@ -155,7 +151,7 @@ We welcome any feedback and suggestions! Feel free to open an issue or pull requ
 
 MIT License
 
-Copyright (c) 2024 Miquido
+Copyright (c) 2024-2025 Miquido
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
