@@ -1,5 +1,5 @@
-from collections.abc import Generator, Iterable, Iterator, Mapping
-from typing import Final, Self, cast
+from collections.abc import Generator, Iterator, Mapping
+from typing import Self
 
 from haiway import State
 
@@ -15,8 +15,8 @@ __all__ = [
 # TODO: add streaming support with content input as async iterator
 class MultimodalTagElement(DataModel):
     name: str
-    attributes: Mapping[str, str] | None = None
     content: MultimodalContent
+    attributes: Mapping[str, str] | None = None
 
     @classmethod
     def parse_first(
@@ -40,13 +40,12 @@ class MultimodalTagElement(DataModel):
         /,
         tag: str | None = None,
     ) -> Generator[Self]:
-        # TODO: add support for split meta tag opening and closing?
-        current_tag: _MultimodalTag | None = None
+        current_tag: _TagOpening | None = None
         current_tag_content: list[MultimodalContentElement] = []
         for part in MultimodalContent.of(content).parts:
             match part:
                 case TextContent() as text_content:
-                    text_iterator: _ParserIterator[str] = _ParserIterator(text_content.text)
+                    text_iterator = _CharactersIterator(text_content.text)
                     text_accumulator: str = ""  # accumulator for any parts that are not tags
                     while text_iterator:  # keep working until end of text part
                         if current_tag is None:  # find the tag opening first
@@ -55,13 +54,27 @@ class MultimodalTagElement(DataModel):
                                 meta=text_content.meta,
                             ):
                                 match element:
-                                    case _MultimodalTag() as opening:
-                                        # begin new tag
-                                        current_tag = opening
-                                        # clear content and accumulator
-                                        current_tag_content = []
-                                        text_accumulator = ""
-                                        break  # break the loop and find tag closing
+                                    case _TagOpening() as opening:
+                                        # check if tag is already closed
+                                        if opening.closed:
+                                            # check if it is the tag we are looking for
+                                            if not tag or opening.name == tag:
+                                                yield cls(
+                                                    name=opening.name,
+                                                    attributes=opening.attributes,
+                                                    content=MultimodalContent.of(),
+                                                )
+
+                                            # cleanup regardless of matching
+                                            current_tag = None
+                                            continue  # continue the loop
+
+                                        else:
+                                            # begin new tag
+                                            current_tag = opening
+                                            # cleanup content and accumulator
+                                            current_tag_content = []
+                                            break  # break the loop and find tag closing
 
                                     case _:
                                         pass  # skip other elements - we are out of any tag
@@ -73,33 +86,33 @@ class MultimodalTagElement(DataModel):
                                 meta=text_content.meta,
                             ):
                                 match element:
-                                    case _MultimodalTag():
+                                    case _TagClosing():
+                                        if text_accumulator:
+                                            # append accumulated content if needed
+                                            current_tag_content.append(
+                                                TextContent(
+                                                    text=text_accumulator,
+                                                    meta=text_content.meta,
+                                                )
+                                            )
+                                            text_accumulator = ""  # cleanup
+
                                         # check if it is the tag we are looking for
                                         if not tag or current_tag.name == tag:
-                                            if text_accumulator:
-                                                current_tag_content.append(
-                                                    TextContent(
-                                                        text=text_accumulator,
-                                                        meta=text_content.meta,
-                                                    )
-                                                )
-
                                             yield cls(
                                                 name=current_tag.name,
                                                 attributes=current_tag.attributes,
                                                 content=MultimodalContent.of(*current_tag_content),
                                             )
-
-                                        # skip unwanted tags and clear out
+                                        # we have closed current tag - cleanup
                                         current_tag = None
                                         current_tag_content = []
-                                        text_accumulator = ""
                                         break  # and break the loop - we have closing
 
                                     case text:
                                         text_accumulator += text
 
-                        # continue until end of part text
+                        continue  # continue until the end of text part
 
                     # add text reminder to tag content at the end of the element
                     if current_tag is not None and text_accumulator:
@@ -126,16 +139,34 @@ class MultimodalTagElement(DataModel):
         replace_all: bool = False,
     ) -> MultimodalContent:
         # TODO: add support for tag id attribute or custom matching?
-        # TODO: add support for split meta tag opening and closing?
         replacement_content = MultimodalContent.of(replacement).parts
         result_content: list[MultimodalContentElement] = []
-        current_tag: _MultimodalTag | None = None
+        current_tag: _TagOpening | None = None
         current_tag_content: list[MultimodalContentElement] = []
         replaced: bool = False
         for part in MultimodalContent.of(content).parts:
+            # check if we need to replace anything more
+            if replaced and not replace_all:
+                if current_tag is not None:
+                    # include leftovers
+                    result_content.extend(
+                        (
+                            TextContent(
+                                text=current_tag.raw,
+                                meta=current_tag.meta,
+                            ),
+                            MultimodalContent.of(*current_tag_content),
+                        ),
+                    )
+                    current_tag = None
+                    current_tag_content = []
+
+                result_content.append(part)
+                continue  # skip parsing
+
             match part:
                 case TextContent() as text_content:
-                    text_iterator: _ParserIterator[str] = _ParserIterator(text_content.text)
+                    text_iterator = _CharactersIterator(text_content.text)
                     text_accumulator: str = ""  # accumulator for any parts that are not tags
                     while text_iterator:  # keep working until end of text part
                         if current_tag is None:  # find the tag opening first
@@ -144,7 +175,7 @@ class MultimodalTagElement(DataModel):
                                 meta=text_content.meta,
                             ):
                                 match element:
-                                    case _MultimodalTag() as opening:
+                                    case _TagOpening() as opening:
                                         # include all content up to this point
                                         if text_accumulator:
                                             result_content.append(
@@ -153,13 +184,57 @@ class MultimodalTagElement(DataModel):
                                                     meta=text_content.meta,
                                                 )
                                             )
+                                            text_accumulator = ""  # cleanup
 
-                                        # begin new tag
-                                        current_tag = opening
-                                        # clear content and accumulator
-                                        current_tag_content = []
-                                        text_accumulator = ""
-                                        break  # break the loop and find tag closing
+                                        # check if tag is already closed
+                                        if opening.closed:
+                                            # check if it is the tag we are looking for
+                                            if (not tag or opening.name == tag) and (
+                                                replace_all or not replaced
+                                            ):
+                                                replaced = True
+
+                                                if strip_tags:
+                                                    result_content.extend(replacement_content)
+
+                                                else:
+                                                    result_content.extend(
+                                                        (  # expand tag
+                                                            TextContent(
+                                                                text=opening.raw.removesuffix("/>")
+                                                                + ">",
+                                                                meta=opening.meta,
+                                                            )
+                                                            if opening.closed
+                                                            else TextContent(
+                                                                text=opening.raw,
+                                                                meta=opening.meta,
+                                                            ),
+                                                            *replacement_content,
+                                                            TextContent(
+                                                                text=f"</{opening.name}>",
+                                                                meta=opening.meta,
+                                                            ),
+                                                        ),
+                                                    )
+                                            else:
+                                                result_content.append(
+                                                    TextContent(
+                                                        text=opening.raw,
+                                                        meta=opening.meta,
+                                                    ),
+                                                )
+
+                                            # cleanup regardless of matching
+                                            current_tag = None
+                                            continue  # continue the loop
+
+                                        else:
+                                            # begin new tag
+                                            current_tag = opening
+                                            # cleanup content
+                                            current_tag_content = []
+                                            break  # break the loop and find tag closing
 
                                     case other:
                                         text_accumulator += other
@@ -171,8 +246,8 @@ class MultimodalTagElement(DataModel):
                                 meta=text_content.meta,
                             ):
                                 match element:
-                                    case _MultimodalTag() as closing:
-                                        # check if it is the tag we are looking for
+                                    case _TagClosing() as closing:
+                                        # check if we should replace
                                         if (not tag or current_tag.name == tag) and (
                                             replace_all or not replaced
                                         ):
@@ -183,27 +258,47 @@ class MultimodalTagElement(DataModel):
 
                                             else:
                                                 result_content.extend(
-                                                    (
-                                                        current_tag.raw,
+                                                    (  # expand tag
+                                                        TextContent(
+                                                            text=current_tag.raw.removesuffix("/>")
+                                                            + ">",
+                                                            meta=current_tag.meta,
+                                                        )
+                                                        if current_tag.closed
+                                                        else TextContent(
+                                                            text=current_tag.raw,
+                                                            meta=current_tag.meta,
+                                                        ),
                                                         *replacement_content,
-                                                        closing.raw,
+                                                        TextContent(
+                                                            text=closing.raw,
+                                                            meta=closing.meta,
+                                                        ),
                                                     ),
                                                 )
 
                                         else:
-                                            if text_accumulator:
-                                                current_tag_content.append(
+                                            result_content.extend(
+                                                (  # expand tag
                                                     TextContent(
+                                                        text=current_tag.raw.removesuffix("/>")
+                                                        + ">",
+                                                        meta=current_tag.meta,
+                                                    )
+                                                    if current_tag.closed
+                                                    else TextContent(
+                                                        text=current_tag.raw,
+                                                        meta=current_tag.meta,
+                                                    ),
+                                                    *current_tag_content,
+                                                    TextContent(  # include accumulator leftover
                                                         text=text_accumulator,
                                                         meta=text_content.meta,
-                                                    )
-                                                )
-
-                                            result_content.extend(
-                                                (
-                                                    current_tag.raw,
-                                                    *current_tag_content,
-                                                    closing.raw,
+                                                    ),
+                                                    TextContent(
+                                                        text=closing.raw,
+                                                        meta=closing.meta,
+                                                    ),
                                                 ),
                                             )
 
@@ -216,7 +311,7 @@ class MultimodalTagElement(DataModel):
                                     case text:
                                         text_accumulator += text
 
-                        # continue until end of part text
+                        continue  # continue until end of part text
 
                     # add text reminder to tag or result content at the end of the element
                     if text_accumulator:
@@ -244,81 +339,255 @@ class MultimodalTagElement(DataModel):
             # include leftovers
             result_content.extend(
                 (
-                    current_tag.raw,
+                    TextContent(
+                        text=current_tag.raw,
+                        meta=current_tag.meta,
+                    ),
                     MultimodalContent.of(*current_tag_content),
                 ),
             )
         return MultimodalContent.of(*result_content)
 
 
-class _MultimodalTag(State):
+class _TagOpening(State):
     name: str
     attributes: Mapping[str, str] | None
-    raw: TextContent
+    raw: str
+    meta: Mapping[str, str | float | int | bool | None] | None
     closed: bool
 
 
 # look for tag opening and pass through everything else
-def _parse_tag_opening(
+def _parse_tag_opening(  # noqa: C901, PLR0912
     source: Iterator[str],
     /,
     meta: Mapping[str, str | float | int | bool | None] | None,
-) -> Generator[_MultimodalTag | str]:
+) -> Generator[_TagOpening | str]:
     accumulator: str | None = None  # None is out of tag, empty is a started tag
+    attributes: list[tuple[str, str]] = []
+    closed: bool = False
     while character := next(source, None):
         if accumulator is None:  # check if we started a tag
             match character:
-                case "<":  # potential tag opening
-                    accumulator = ""  # prepare accumulator
+                case "<":  # potential opening
+                    # prepare accumulators for new tag
+                    accumulator = ""
+                    attributes = []
+                    closed = False
 
                 case char:  # skip anything else
                     yield char
 
         else:
             match character:
-                case ">":  # tag closing
-                    # TODO: add closed tag support
-                    yield _MultimodalTag(
+                case ">" if accumulator:  # closing
+                    yield _TagOpening(
                         name=accumulator,
-                        attributes=None,  # TODO: add attributes parsing support
-                        raw=TextContent(
-                            text="<" + accumulator + ">",
-                            meta=meta,
+                        attributes=dict(attributes) if attributes else None,
+                        raw=(
+                            "<"
+                            + accumulator
+                            + _escaped_attributes(attributes)
+                            + ("/>" if closed else ">")
                         ),
-                        closed=False,
+                        meta=meta,
+                        closed=closed,
                     )
                     return  # end of parsing
 
                 case char if str.isalnum(char):  # part of the tag name
                     accumulator += char
 
-                case "<":  # potential new tag opening
-                    # clear accumulator and start fresh
-                    yield "<" + accumulator  # add opening char
-                    accumulator = ""
+                case "/" if accumulator and not closed:  # possible closed tag
+                    closed = True
 
-                case char:  # anything else
+                case _ if str.isspace(
+                    char
+                ) and not closed and accumulator:  # possible attribute start
+                    for element in _parse_tag_attribute(source):
+                        match element:
+                            case tuple() as attribute:
+                                attributes.append(attribute)
+
+                            case ">":  # closing
+                                yield _TagOpening(
+                                    name=accumulator,
+                                    attributes=dict(attributes) if attributes else None,
+                                    raw=(
+                                        "<"
+                                        + accumulator
+                                        + _escaped_attributes(attributes)
+                                        + ("/>" if closed else ">")
+                                    ),
+                                    meta=meta,
+                                    closed=closed,
+                                )
+                                return  # end of parsing
+
+                            case _ if str.isspace(element):
+                                # TODO: we are not preserving spaces correctly
+                                continue  # possible next attribute
+
+                            case "/" if not closed:  # possible closed tag
+                                closed = True
+                                break  # FIXME: the only valid successor is closing??
+
+                            case other:
+                                # we are no longer in tag processing, clear out
+                                yield (
+                                    "<"
+                                    + accumulator
+                                    + _escaped_attributes(attributes)
+                                    + " "
+                                    + other
+                                )
+                                accumulator = None
+                                attributes = []
+                                closed = False
+                                break  # we are no longer looking for attributes
+
+                case "<":  # potential new tag opening
+                    # clear accumulators and start fresh
+                    yield (
+                        "<"
+                        + accumulator
+                        + _escaped_attributes(attributes)
+                        + ("/" if closed else "")
+                    )
+                    accumulator = ""
+                    attributes = []
+                    closed = False
+
+                case other:  # anything else
                     # we are no longer in tag processing, clear out
-                    yield "<" + accumulator + char  # add opening char
+                    yield (
+                        "<"
+                        + accumulator
+                        + _escaped_attributes(attributes)
+                        + ("/" if closed else "")
+                        + other
+                    )
                     accumulator = None
+                    attributes = []
+                    closed = False
 
     if accumulator is not None:
-        yield "<" + accumulator  # add opening char
+        yield ("<" + accumulator + _escaped_attributes(attributes) + ("/" if closed else ""))
 
 
-# look for tag closing and pass through everything else
+def _parse_tag_attribute(
+    source: Iterator[str],
+    /,
+) -> Generator[tuple[str, str] | str]:
+    while source:
+        match _parse_tag_attribute_name(source):
+            case (attribute,):
+                match _parse_tag_attribute_value(source):
+                    case (value,):
+                        yield (attribute, value)
+
+                    case other:
+                        yield attribute + "=" + other
+
+            case other:
+                yield other
+
+    raise StopIteration()
+
+
+def _parse_tag_attribute_name(
+    source: Iterator[str],
+    /,
+) -> tuple[str] | str:
+    accumulator: list[str] = []
+    while char := next(source, None):
+        match char:
+            case char if str.isalpha(char) or (
+                accumulator and (str.isnumeric(char) or char in "_-")
+            ):
+                accumulator.append(char)
+
+            case "=" if accumulator:
+                return ("".join(accumulator),)
+
+            case other:
+                return "".join(accumulator) + other
+
+    return "".join(accumulator)
+
+
+def _parse_tag_attribute_value(  # noqa: C901, PLR0912
+    source: Iterator[str],
+    /,
+) -> tuple[str] | str:
+    # Check first character
+    match next(source, ""):
+        case '"':
+            pass  # continue
+
+        case other:
+            return other
+
+    accumulator: list[str] = []
+    while char := next(source, None):
+        match char:
+            case '"':
+                return ("".join(accumulator),)
+
+            case "\\":
+                # Handle escape sequences
+                if (next_char := next(source, None)) is not None:
+                    match next_char:
+                        case "n":
+                            accumulator.append("\n")
+
+                        case "t":
+                            accumulator.append("\t")
+
+                        case "r":
+                            accumulator.append("\r")
+
+                        case '"' | "\\":
+                            accumulator.append(next_char)
+
+                        case _:
+                            if next_char == "\n":
+                                return '"' + "".join(accumulator) + "\\" + next_char
+
+                            else:
+                                accumulator.append("\\" + next_char)
+
+                continue
+
+            case _ if char != "\n":
+                accumulator.append(char)
+
+            case _:
+                return '"' + "".join(accumulator) + char
+
+    return "".join(accumulator)
+
+
+class _TagClosing(State):
+    name: str
+    raw: str
+    meta: Mapping[str, str | float | int | bool | None] | None
+
+
+# look for tag closing and pass through everything else]
+# note that we are not allowing spaces before/after tag name
 def _parse_tag_closing(  # noqa: C901, PLR0912
     source: Iterator[str],
     /,
-    tag: _MultimodalTag,
+    tag: _TagOpening,
     meta: Mapping[str, str | float | int | bool | None] | None,
-) -> Generator[_MultimodalTag | str]:
+) -> Generator[_TagClosing | str]:
     accumulator: str | None = None  # None is out of tag, empty is a started tag
     closing: bool = False
     while character := next(source, None):
         if accumulator is None:  # check if we started a tag
             match character:
-                case "<":  # potential tag opening
+                case "<":  # potential opening
                     accumulator = ""  # prepare accumulator
                     closing = False
 
@@ -327,16 +596,12 @@ def _parse_tag_closing(  # noqa: C901, PLR0912
 
         elif closing:
             match character:
-                case ">":  # tag closing
+                case ">" if accumulator:  # closing
                     if accumulator == tag.name:  # check if it is what we were looking for
-                        yield _MultimodalTag(
+                        yield _TagClosing(
                             name=accumulator,
-                            attributes=tag.attributes,
-                            raw=TextContent(
-                                text="</" + accumulator + ">",
-                                meta=meta,
-                            ),
-                            closed=True,
+                            raw="</" + accumulator + ">",
+                            meta=meta,
                         )
                         return  # end of parsing
 
@@ -350,12 +615,12 @@ def _parse_tag_closing(  # noqa: C901, PLR0912
 
                 case "<":  # potential new tag opening
                     # clear accumulator and start fresh
-                    yield "</" + accumulator  # add opening char
+                    yield "</" + accumulator  # add opening
                     accumulator = ""
 
                 case char:  # anything else
                     # we are no longer in tag processing, clear out
-                    yield "</" + accumulator + char  # add opening char
+                    yield "</" + accumulator + char  # add opening
                     accumulator = None
 
         else:
@@ -364,7 +629,7 @@ def _parse_tag_closing(  # noqa: C901, PLR0912
                     closing = True
 
                 case char:  # anything else
-                    # we are no longer in tag processing, clear out
+                    # we are no longer in processing, clear out
                     yield "<" + accumulator + char  # add opening char
                     accumulator = None
 
@@ -376,34 +641,70 @@ def _parse_tag_closing(  # noqa: C901, PLR0912
             yield "<" + accumulator  # add opening char
 
 
-_SENTINEL: Final[object] = object()
+def _escaped_attributes(
+    attributes: list[tuple[str, str]],
+    /,
+) -> str:
+    return (
+        (
+            " "
+            + " ".join(f'{key}="{_escape_tag_attribute_value(value)}"' for key, value in attributes)
+        )
+        if attributes
+        else ""
+    )
 
 
-class _ParserIterator[T]:
+def _escape_tag_attribute_value(
+    value: str,
+    /,
+) -> str:
+    accumulator: list[str] = []
+    for char in value:
+        match char:
+            case "\n":
+                accumulator.append("\\n")
+
+            case "\t":
+                accumulator.append("\\t")
+
+            case "\r":
+                accumulator.append("\\r")
+
+            case '"':
+                accumulator.append('\\"')
+
+            case "\\":
+                accumulator.append("\\\\")
+
+            case other:
+                accumulator.append(other)
+
+    return "".join(accumulator)
+
+
+class _CharactersIterator:
     def __init__(
         self,
-        iterable: Iterable[T],
+        text: str,
+        /,
     ) -> None:
-        self._iterator: Iterator[T] = iter(iterable)
-        self._peek: T | object = _SENTINEL
+        self._text: str = text
+        self._index: int = 0
+        self._size: int = len(text)
 
     def __iter__(self) -> Self:
         return self
 
-    def __next__(self) -> T:
-        if self._peek is _SENTINEL:
-            return next(self._iterator)
+    def __next__(self) -> str:
+        if self._index >= self._size:
+            raise StopIteration()
 
-        peek: T = cast(T, self._peek)
-        self._peek = _SENTINEL
-        return peek
+        try:
+            return self._text[self._index]
+
+        finally:
+            self._index += 1
 
     def __bool__(self) -> bool:
-        if self._peek is _SENTINEL:
-            try:
-                self._peek = next(self._iterator)
-
-            except StopIteration:
-                return False
-
-        return True
+        return self._index < self._size
