@@ -203,7 +203,7 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.37.0"
+version = "0.37.2"
 source = { editable = "." }
 dependencies = [
     { name = "haiway" },
@@ -274,7 +274,7 @@ requires-dist = [
     { name = "draive", extras = ["sentencepiece"], marker = "extra == 'gemini'" },
     { name = "draive", extras = ["sentencepiece"], marker = "extra == 'mistral'" },
     { name = "fastembed", marker = "extra == 'fastembed'", specifier = "~=0.3" },
-    { name = "haiway", specifier = "~=0.8.3" },
+    { name = "haiway", specifier = "~=0.8.4" },
     { name = "httpx", marker = "extra == 'gemini'", specifier = "~=0.28.0" },
     { name = "httpx", marker = "extra == 'mistral'", specifier = "~=0.28.0" },
     { name = "httpx", marker = "extra == 'ollama'", specifier = "~=0.28.0" },
@@ -378,11 +378,11 @@ wheels = [
 
 [[package]]
 name = "haiway"
-version = "0.8.3"
+version = "0.8.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/cf/02/924a688f12ea4082ddb9fc8a8abbd1a3a545abd62ab866d1e08710fbdc3b/haiway-0.8.3.tar.gz", hash = "sha256:3141701f3eda20ab7f34fffe048817730edd90f8b139db285b52f7728b314294", size = 38470 }
+sdist = { url = "https://files.pythonhosted.org/packages/73/a8/c7ce0b651a45480a5fc49e12d22c14caddb46d0915c8bae806e4a10bdc7e/haiway-0.8.4.tar.gz", hash = "sha256:d338b32751b2d0ba99bc6f9a20a7b3bc871e3679c80916ec51d11f9623f38726", size = 38515 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/83/7ffce9b10498f1e37eb2f55ad566fdea719fe92d4bb760a7ce96244d4bc3/haiway-0.8.3-py3-none-any.whl", hash = "sha256:3581d08f35587dcbd128482a2e0ccfb41a0c49eeb8aee82a7778872899ee3080", size = 44789 },
+    { url = "https://files.pythonhosted.org/packages/60/0c/1df1fa3499098b696fdee5ca381ff2e46b2e8bfa637a541ecdb43287f1ee/haiway-0.8.4-py3-none-any.whl", hash = "sha256:91e2ae8d996d34f35f986129569fc8df913f110de0e903e0834cec27f9a75338", size = 44760 },
 ]
 
 [[package]]

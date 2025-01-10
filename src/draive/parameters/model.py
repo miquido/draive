@@ -650,7 +650,13 @@ class DataModel(metaclass=DataModelMeta):
         return len(vars(self))
 
     def __copy__(self) -> Self:
-        return self.__class__(**vars(self))
+        return self  # DataModel is immutable, no need to provide an actual copy
+
+    def __deepcopy__(
+        self,
+        memo: dict[int, Any] | None,
+    ) -> Self:
+        return self  # DataModel is immutable, no need to provide an actual copy
 
     @classmethod
     @cache(limit=2)

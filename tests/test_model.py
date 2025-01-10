@@ -1,5 +1,6 @@
 import json
 from collections.abc import Mapping, Sequence
+from copy import copy, deepcopy
 from datetime import UTC, datetime
 from typing import Any, Literal, NotRequired, Required, TypedDict
 from uuid import UUID
@@ -415,3 +416,16 @@ def test_generic_subtypes_validation() -> None:
 
     # not raises
     _ = Container(generic=Generic(nested=NestedGeneric(value="ok")))
+
+
+def test_copying_leaves_same_object() -> None:
+    class Nested(DataModel):
+        string: str
+
+    class Copied(DataModel):
+        string: str
+        nested: Nested
+
+    origin = Copied(string="42", nested=Nested(string="answer"))
+    assert copy(origin) is origin
+    assert deepcopy(origin) is origin
