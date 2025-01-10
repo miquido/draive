@@ -401,9 +401,9 @@ def _parse_tag_opening(  # noqa: C901, PLR0912
                 case "/" if accumulator and not closed:  # possible closed tag
                     closed = True
 
-                case _ if str.isspace(
-                    char
-                ) and not closed and accumulator:  # possible attribute start
+                case _ if (
+                    str.isspace(char) and not closed and accumulator
+                ):  # possible attribute start
                     for element in _parse_tag_attribute(source):
                         match element:
                             case tuple() as attribute:
