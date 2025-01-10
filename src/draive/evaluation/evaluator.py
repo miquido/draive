@@ -75,7 +75,7 @@ class EvaluatorResult(DataModel):
             else "N/A"
         )
         return (
-            f"{self.evaluator} {'passed' if self.passed else 'failed' }"
+            f"{self.evaluator} {'passed' if self.passed else 'failed'}"
             f" with score {self.score.value},"
             f" required {self.threshold},"
             f" comment: {f"'{self.score.comment}'" or 'N/A'}"
