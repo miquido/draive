@@ -10,7 +10,7 @@ from draive.lmm.types import (
     LMMToolSpecification,
 )
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalContentConvertible
-from draive.parameters import ParameterSpecification, ParametrizedFunction
+from draive.parameters import ParameterSpecification, ParametersSpecification, ParametrizedFunction
 
 __all__ = [
     "AnyTool",
@@ -33,28 +33,33 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         *,
         function: Callable[Args, Coroutine[Any, Any, Result]],
         description: str | None = None,
+        specification: ParametersSpecification | None = None,
         availability_check: ToolAvailabilityCheck | None = None,
         format_result: Callable[[Result], Multimodal],
         format_failure: Callable[[Exception], Multimodal],
         direct_result: bool = False,
     ) -> None:
         super().__init__(function)
-        aliased_required: list[str] = []
-        parameters: dict[str, ParameterSpecification] = {}
-        for parameter in self._parameters.values():
-            parameters[parameter.alias or parameter.name] = parameter.specification
 
-            if parameter.required:
-                aliased_required.append(parameter.alias or parameter.name)
+        if specification is None:
+            aliased_required: list[str] = []
+            parameters: dict[str, ParameterSpecification] = {}
+            for parameter in self._parameters.values():
+                parameters[parameter.alias or parameter.name] = parameter.specification
+
+                if parameter.required:
+                    aliased_required.append(parameter.alias or parameter.name)
+
+            specification = {
+                "type": "object",
+                "properties": parameters,
+                "required": aliased_required,
+            }
 
         self.specification: LMMToolSpecification = LMMToolFunctionSpecification(
             name=name,
             description=description,
-            parameters={
-                "type": "object",
-                "properties": parameters,
-                "required": aliased_required,
-            },
+            parameters=specification,
         )
 
         self.name: str = name
@@ -88,22 +93,30 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
     ) -> MultimodalContent:
         with ctx.scope(self.name):
             ctx.record(ArgumentsTrace.of(**arguments))
-
             try:
-                if not self.available:
-                    raise LMMToolException(f"{self.name} is not available!")
+                try:
+                    if not self.available:
+                        raise LMMToolException(f"{self.name} is not available!")
 
-                result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
-                ctx.record(ResultTrace.of(result))
+                    result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
+                    ctx.record(ResultTrace.of(result))
 
-                return MultimodalContent.of(self.format_result(result))
+                    return MultimodalContent.of(self.format_result(result))
 
-            except Exception as exc:
-                # return an error with formatted content
-                raise LMMToolError(
-                    f"Tool {self.name}[{call_id}] failed",
-                    content=MultimodalContent.of(self.format_failure(exc)),
-                ) from exc
+                except Exception as exc:
+                    # return an error with formatted content
+                    raise LMMToolError(
+                        f"Tool {self.name}[{call_id}] failed",
+                        content=MultimodalContent.of(self.format_failure(exc)),
+                    ) from exc
+
+            except BaseException as exc:
+                ctx.record(ResultTrace.of(exc))
+                ctx.log_error(
+                    "Tool call error",
+                    exception=exc,
+                )
+                raise exc
 
     # regular call when using as a function
     async def __call__(
@@ -113,14 +126,22 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
     ) -> Result:
         with ctx.scope(self.name):
             ctx.record(ArgumentsTrace.of(*args, **kwargs))
-            result: Result = await super().__call__(
-                *args,
-                **kwargs,
-            )
+            try:
+                result: Result = await super().__call__(
+                    *args,
+                    **kwargs,
+                )
+                ctx.record(ResultTrace.of(result))
 
-            ctx.record(ResultTrace.of(result))
+                return result
 
-            return result
+            except BaseException as exc:
+                ctx.record(ResultTrace.of(exc))
+                ctx.log_error(
+                    "Tool call error",
+                    exception=exc,
+                )
+                raise exc
 
 
 AnyTool = Tool[Any, Any]
@@ -313,8 +334,4 @@ def _default_result_format(result: Any) -> MultimodalContent:
 
 
 def _default_failure_result(exception: Exception) -> MultimodalContent:
-    ctx.log_error(
-        "Tool call failure",
-        exception=exception,
-    )
     return MultimodalContent.of("ERROR")

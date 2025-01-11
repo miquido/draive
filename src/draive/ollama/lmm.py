@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from typing import Any
 
 from haiway import ArgumentsTrace, ResultTrace, ctx
@@ -6,6 +6,7 @@ from haiway import ArgumentsTrace, ResultTrace, ctx
 from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
+    LMMContext,
     LMMContextElement,
     LMMInput,
     LMMInvocation,
@@ -35,7 +36,7 @@ def ollama_lmm(
     async def lmm_invocation(
         *,
         instruction: Instruction | str | None,
-        context: Sequence[LMMContextElement],
+        context: LMMContext,
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,

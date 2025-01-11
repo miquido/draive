@@ -6,14 +6,12 @@ from haiway import ctx
 from draive.generation.model.types import ModelGeneratorDecoder
 from draive.instructions import Instruction
 from draive.lmm import (
-    AnyTool,
     LMMCompletion,
     LMMContextElement,
     LMMInput,
     LMMToolRequests,
     LMMToolResponse,
     LMMToolResponses,
-    Toolbox,
     lmm_invoke,
 )
 from draive.multimodal import (
@@ -21,6 +19,8 @@ from draive.multimodal import (
     MultimodalContent,
 )
 from draive.parameters import DataModel
+from draive.prompts import Prompt
+from draive.tools import AnyTool, Toolbox
 
 __all__ = [
     "default_generate_model",
@@ -32,7 +32,7 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
     /,
     *,
     instruction: Instruction | str,
-    input: Multimodal,  # noqa: A002
+    input: Prompt | Multimodal,  # noqa: A002
     schema_injection: Literal["auto", "full", "simplified", "skip"],
     tools: Toolbox | Iterable[AnyTool] | None,
     examples: Iterable[tuple[Multimodal, Generated]] | None,
@@ -84,8 +84,14 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
                     LMMCompletion.of(example[1].as_json(indent=2)),
                 ]
             ],
-            LMMInput.of(input),
         ]
+
+        match input:
+            case Prompt() as prompt:
+                context.extend(prompt.content)
+
+            case value:
+                context.append(LMMInput.of(value))
 
         recursion_level: int = 0
         while recursion_level <= toolbox.repeated_calls_limit:

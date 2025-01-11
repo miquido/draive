@@ -1,13 +1,18 @@
 from collections.abc import Mapping
 from typing import Any, Protocol, Self, final, overload, runtime_checkable
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from haiway import State
 
 __all__ = [
     "Instruction",
     "InstructionFetching",
+    "MissingInstruction",
 ]
+
+
+class MissingInstruction(Exception):
+    pass
 
 
 @final
@@ -26,7 +31,7 @@ class Instruction(State):
         cls,
         instruction: Self | str,
         /,
-        **variables: object,
+        **variables: str,
     ) -> str: ...
 
     @overload
@@ -35,7 +40,7 @@ class Instruction(State):
         cls,
         instruction: Self | str | None,
         /,
-        **variables: object,
+        **variables: str,
     ) -> str | None: ...
 
     @classmethod
@@ -43,7 +48,7 @@ class Instruction(State):
         cls,
         instruction: Self | str | None,
         /,
-        **variables: object,
+        **variables: str,
     ) -> str | None:
         match instruction:
             case None:
@@ -64,30 +69,33 @@ class Instruction(State):
         cls,
         instruction: Self | str,
         /,
-        identifier: UUID | None = None,
-        **variables: object,
+        identifier: str | None = None,
+        description: str | None = None,
+        **variables: str,
     ) -> Self:
         match instruction:
             case str() as content:
                 return cls(
-                    instruction=content,
-                    identifier=identifier or uuid4(),
+                    identifier=identifier or uuid4().hex,
+                    description=description,
+                    content=content,
                     variables=variables,
                 )
 
             case instruction:
                 return instruction.updated(**variables)
 
-    instruction: str
-    identifier: UUID
-    variables: Mapping[str, Any]
+    identifier: str
+    description: str | None
+    content: str
+    variables: Mapping[str, str]
 
     def format(
         self,
-        **variables: Any,
+        **variables: str,
     ) -> str:
         if variables:
-            return self.instruction.format_map(
+            return self.content.format_map(
                 {
                     **self.variables,
                     **variables,
@@ -95,22 +103,24 @@ class Instruction(State):
             )
 
         elif self.variables:
-            return self.instruction.format_map(self.variables)
+            return self.content.format_map(self.variables)
 
         else:
-            return self.instruction
+            return self.content
 
     def extended(
         self,
         instruction: str,
         /,
+        description: str | None = None,
         joiner: str | None = None,
-        **variables: object,
+        **variables: str,
     ) -> Self:
         if variables:
             return self.__class__(
-                instruction=(joiner or " ").join((self.instruction, instruction)),
                 identifier=self.identifier,
+                description=description,
+                content=(joiner or " ").join((self.content, instruction)),
                 variables={
                     **self.variables,
                     **variables,
@@ -119,19 +129,21 @@ class Instruction(State):
 
         else:
             return self.__class__(
-                instruction=(joiner or " ").join((self.instruction, instruction)),
                 identifier=self.identifier,
+                description=description,
+                content=(joiner or " ").join((self.content, instruction)),
                 variables=self.variables,
             )
 
     def updated(
         self,
-        **variables: Any,
+        **variables: str,
     ) -> Self:
         if variables:
             return self.__class__(
-                instruction=self.instruction,
                 identifier=self.identifier,
+                description=self.description,
+                content=self.content,
                 variables={
                     **self.variables,
                     **variables,
@@ -146,12 +158,16 @@ class Instruction(State):
             return self.format()
 
         except KeyError:
-            return self.instruction
+            return self.content
 
 
 @runtime_checkable
 class InstructionFetching(Protocol):
     async def __call__(
         self,
-        key: str,
-    ) -> Instruction: ...
+        identifier: str,
+        /,
+        *,
+        variables: Mapping[str, str] | None = None,
+        **extra: Any,
+    ) -> Instruction | None: ...

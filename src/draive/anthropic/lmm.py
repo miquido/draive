@@ -1,5 +1,5 @@
 from base64 import b64encode
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from typing import Any, cast
 
 from anthropic.types import (
@@ -19,6 +19,7 @@ from draive.anthropic.types import AnthropicException
 from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
+    LMMContext,
     LMMContextElement,
     LMMInput,
     LMMInvocation,
@@ -48,7 +49,7 @@ def anthropic_lmm(
     async def lmm_invocation(  # noqa: PLR0913
         *,
         instruction: Instruction | str | None,
-        context: Sequence[LMMContextElement],
+        context: LMMContext,
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,

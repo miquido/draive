@@ -5,8 +5,8 @@ from uuid import uuid4
 from haiway import State
 
 from draive.instructions import Instruction
-from draive.lmm import Toolbox
 from draive.multimodal import Multimodal, MultimodalContent
+from draive.tools import Toolbox
 
 __all__ = [
     "ChoiceCompletion",

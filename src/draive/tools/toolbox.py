@@ -1,10 +1,9 @@
 from asyncio import gather
 from collections.abc import Iterable, Mapping
-from typing import Any, Literal, Self, final
+from typing import Any, Literal, Protocol, Self, cast, final, runtime_checkable
 
 from haiway import State, ctx
 
-from draive.lmm.tool import AnyTool
 from draive.lmm.types import (
     LMMToolError,
     LMMToolException,
@@ -14,9 +13,12 @@ from draive.lmm.types import (
     LMMToolSpecification,
 )
 from draive.multimodal import MultimodalContent
+from draive.tools.tool import AnyTool
 
 __all__ = [
+    "ExternalToolbox",
     "Toolbox",
+    "ToolboxFetching",
 ]
 
 
@@ -74,6 +76,23 @@ class Toolbox(State):
                     suggest_tool=False,
                     repeated_calls_limit=1,
                 )
+
+    @classmethod
+    async def external(
+        cls,
+        suggest: Literal[True] | None = None,
+        repeated_calls_limit: int | None = None,
+    ) -> Self:
+        return cast(
+            Self,
+            await ctx.state(ExternalToolbox).fetch(
+                extending=cls(
+                    tools={},
+                    suggest_tool=suggest or False,
+                    repeated_calls_limit=repeated_calls_limit or 1,
+                )
+            ),
+        )
 
     tools: Mapping[str, AnyTool]
     suggest_tool: AnyTool | bool
@@ -173,3 +192,16 @@ class Toolbox(State):
                 direct=False,
                 error=True,
             )
+
+
+@runtime_checkable
+class ToolboxFetching(Protocol):
+    async def __call__(
+        self,
+        *,
+        extending: Toolbox | Iterable[AnyTool] | None,
+    ) -> Toolbox: ...
+
+
+class ExternalToolbox(State):
+    fetch: ToolboxFetching

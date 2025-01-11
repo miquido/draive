@@ -16,6 +16,7 @@ from draive.parameters import DataModel, Field, ParametersSpecification
 
 __all__ = [
     "LMMCompletion",
+    "LMMContext",
     "LMMContextElement",
     "LMMInput",
     "LMMInvocating",
@@ -115,6 +116,7 @@ class LMMToolRequests(DataModel):
 
 
 LMMContextElement = LMMInput | LMMCompletion | LMMToolRequests | LMMToolResponses
+LMMContext = Sequence[LMMContextElement]
 LMMOutput = LMMCompletion | LMMToolRequests
 
 
@@ -148,7 +150,7 @@ class LMMInvocating(Protocol):
         self,
         *,
         instruction: Instruction | str | None,
-        context: Sequence[LMMContextElement],
+        context: LMMContext,
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
@@ -168,6 +170,6 @@ class LMMStreaming(Protocol):
         *,
         properties: AsyncIterator[LMMStreamProperties],
         input: AsyncIterator[LMMStreamInput],  # noqa: A002
-        context: Sequence[LMMContextElement] | None,
+        context: LMMContext | None,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput]: ...

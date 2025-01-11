@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from typing import Any, Literal, cast
 
 from haiway import ArgumentsTrace, ResultTrace, ctx
@@ -10,6 +10,7 @@ from draive.bedrock.types import BedrockException
 from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
+    LMMContext,
     LMMContextElement,
     LMMInput,
     LMMInvocation,
@@ -44,7 +45,7 @@ def bedrock_lmm(
     async def lmm_invocation(
         *,
         instruction: Instruction | str | None,
-        context: Sequence[LMMContextElement],
+        context: LMMContext,
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
@@ -80,7 +81,11 @@ def bedrock_lmm(
                 case _:
                     raise NotImplementedError("model output is not supported by bedrock")
 
-            messages: list[ChatMessage] = [_convert_context_element(element) for element in context]
+
+
+            messages: list[ChatMessage] = [
+                _convert_context_element(element) for element in context
+            ]
 
             tools_list: list[ChatTool] = [_convert_tool(tool) for tool in tools or []]
             require_tool: bool

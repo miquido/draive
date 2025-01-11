@@ -6,8 +6,8 @@ from haiway import ctx
 from draive.choice.state import Choice
 from draive.choice.types import ChoiceOption
 from draive.instructions import Instruction
-from draive.lmm import AnyTool, Toolbox
 from draive.multimodal import Multimodal
+from draive.tools import AnyTool, Toolbox
 
 __all__ = [
     "choice_completion",

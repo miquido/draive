@@ -5,20 +5,17 @@ from haiway import ctx
 
 from draive.instructions import Instruction
 from draive.lmm import (
-    AnyTool,
     LMMCompletion,
     LMMContextElement,
     LMMInput,
     LMMToolRequests,
     LMMToolResponse,
     LMMToolResponses,
-    Toolbox,
     lmm_invoke,
 )
-from draive.multimodal import (
-    Multimodal,
-    MultimodalContent,
-)
+from draive.multimodal import Multimodal, MultimodalContent
+from draive.prompts import Prompt
+from draive.tools import AnyTool, Toolbox
 
 __all__ = [
     "default_generate_text",
@@ -28,7 +25,7 @@ __all__ = [
 async def default_generate_text(
     *,
     instruction: Instruction | str | None,
-    input: Multimodal,  # noqa: A002
+    input: Prompt | Multimodal,  # noqa: A002
     tools: Toolbox | Iterable[AnyTool] | None,
     examples: Iterable[tuple[Multimodal, str]] | None,
     **extra: Any,
@@ -45,8 +42,14 @@ async def default_generate_text(
                     LMMCompletion.of(example[1]),
                 ]
             ],
-            LMMInput.of(input),
         ]
+
+        match input:
+            case Prompt() as prompt:
+                context.extend(prompt.content)
+
+            case value:
+                context.append(LMMInput.of(value))
 
         recursion_level: int = 0
         while recursion_level <= toolbox.repeated_calls_limit:

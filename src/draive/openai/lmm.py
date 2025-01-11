@@ -17,6 +17,7 @@ from openai.types.chat.chat_completion_chunk import Choice, ChoiceDeltaToolCall
 from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
+    LMMContext,
     LMMContextElement,
     LMMInput,
     LMMInvocation,
@@ -60,7 +61,7 @@ def openai_lmm(
     async def lmm_invocation(
         *,
         instruction: Instruction | str | None,
-        context: Sequence[LMMContextElement],
+        context: LMMContext,
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
@@ -120,11 +121,19 @@ def openai_streaming_lmm(
         *,
         properties: AsyncIterator[LMMStreamProperties],
         input: AsyncIterator[LMMStreamInput],  # noqa: A002
-        context: Sequence[LMMContextElement] | None,
+        context: LMMContext | None,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput]:
         config: OpenAIChatConfig = ctx.state(OpenAIChatConfig).updated(**extra)
         ctx.record(config)
+
+        context_elements: Sequence[LMMContextElement]
+        match context:
+            case None:
+                context_elements = ()
+
+            case [*elements]:
+                context_elements = elements
 
         return _chat_stream(
             client=client,
@@ -135,12 +144,10 @@ def openai_streaming_lmm(
                 chain.from_iterable(
                     [
                         _convert_context_element(config=config, element=element)
-                        for element in context
+                        for element in context_elements
                     ]
                 )
-            )
-            if context
-            else [],
+            ),
         )
 
     return LMMStream(prepare=lmm_stream)

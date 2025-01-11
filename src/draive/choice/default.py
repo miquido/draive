@@ -13,10 +13,10 @@ from draive.lmm import (
     LMMToolRequests,
     LMMToolResponse,
     LMMToolResponses,
-    Toolbox,
     lmm_invoke,
 )
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
+from draive.tools import Toolbox
 
 __all__ = [
     "default_choice_completion",

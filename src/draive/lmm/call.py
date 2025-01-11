@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Iterable, Sequence
+from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
 from haiway import ctx
@@ -6,7 +6,7 @@ from haiway import ctx
 from draive.instructions import Instruction
 from draive.lmm.state import LMMInvocation, LMMStream
 from draive.lmm.types import (
-    LMMContextElement,
+    LMMContext,
     LMMOutput,
     LMMOutputSelection,
     LMMStreamInput,
@@ -26,7 +26,7 @@ __all__ = [
 async def lmm_invoke(
     *,
     instruction: Instruction | str | None = None,
-    context: Sequence[LMMContextElement],
+    context: LMMContext,
     tool_selection: LMMToolSelection = "auto",
     tools: Iterable[LMMToolSpecification] | None = None,
     output: LMMOutputSelection = "auto",
@@ -46,7 +46,7 @@ async def lmm_stream(
     *,
     properties: AsyncIterator[LMMStreamProperties] | LMMStreamProperties,
     input: AsyncIterator[LMMStreamInput],  # noqa: A002
-    context: Sequence[LMMContextElement] | None = None,
+    context: LMMContext | None = None,
     **extra: Any,
 ) -> AsyncIterator[LMMStreamOutput]:
     properties_stream: AsyncIterator[LMMStreamProperties]
