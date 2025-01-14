@@ -71,6 +71,8 @@ from draive.choice import (
 )
 from draive.conversation import (
     Conversation,
+    ConversationElement,
+    ConversationMemory,
     ConversationMessage,
     conversation_completion,
     default_conversation_completion,
@@ -113,6 +115,7 @@ from draive.instructions import (
 )
 from draive.lmm import (
     LMMCompletion,
+    LMMContext,
     LMMContextElement,
     LMMInput,
     LMMInvocating,
@@ -127,15 +130,13 @@ from draive.lmm import (
     LMMToolRequest,
     LMMToolResponse,
     LMMToolResponses,
-    Tool,
-    ToolAvailabilityCheck,
-    Toolbox,
     lmm_invoke,
     lmm_stream,
-    tool,
 )
 from draive.metrics import TokenUsage
 from draive.multimodal import (
+    MEDIA_KINDS,
+    MEDIA_TYPES,
     MediaContent,
     MediaKind,
     MediaType,
@@ -145,6 +146,8 @@ from draive.multimodal import (
     MultimodalContentElement,
     MultimodalTagElement,
     TextContent,
+    validated_media_kind,
+    validated_media_type,
 )
 from draive.parameters import (
     Argument,
@@ -174,6 +177,14 @@ from draive.steps import (
     steps_completion,
 )
 from draive.tokenization import TextTokenizing, Tokenization, count_text_tokens, tokenize_text
+from draive.tools import (
+    ExternalToolbox,
+    Tool,
+    ToolAvailabilityCheck,
+    Toolbox,
+    ToolboxFetching,
+    tool,
+)
 from draive.utils import (
     AsyncStream,
     ConstantStream,
@@ -184,6 +195,8 @@ from draive.utils import (
 )
 
 __all__ = [
+    "MEDIA_KINDS",
+    "MEDIA_TYPES",
     "MISSING",
     "Agent",
     "AgentError",
@@ -208,11 +221,14 @@ __all__ = [
     "ConstantStream",
     "ContentGuardrails",
     "Conversation",
+    "ConversationElement",
+    "ConversationMemory",
     "ConversationMessage",
     "DataModel",
     "Disposable",
     "Disposables",
     "Embedded",
+    "ExternalToolbox",
     "Field",
     "FixedStream",
     "GuardrailsException",
@@ -224,6 +240,7 @@ __all__ = [
     "InstructionFetching",
     "InstructionsRepository",
     "LMMCompletion",
+    "LMMContext",
     "LMMContextElement",
     "LMMInput",
     "LMMInvocating",
@@ -283,6 +300,7 @@ __all__ = [
     "Tool",
     "ToolAvailabilityCheck",
     "Toolbox",
+    "ToolboxFetching",
     "ValueEmbedder",
     "VectorIndex",
     "VectorIndexing",
@@ -336,6 +354,8 @@ __all__ = [
     "tokenize_text",
     "tool",
     "traced",
+    "validated_media_kind",
+    "validated_media_type",
     "vector_similarity_score",
     "vector_similarity_search",
     "when_missing",

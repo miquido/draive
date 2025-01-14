@@ -1,17 +1,15 @@
 from collections.abc import AsyncIterator, Iterable, Sequence
-from datetime import UTC, datetime
-from typing import Any, Final, Literal, overload
+from typing import Any, Literal, overload
 
 from haiway import ctx
 
 from draive.conversation.state import Conversation
-from draive.conversation.types import ConversationMessage
+from draive.conversation.types import ConversationElement, ConversationMemory, ConversationMessage
 from draive.instructions import Instruction
-from draive.lmm import AnyTool, LMMStreamChunk, Toolbox
-from draive.multimodal import (
-    Multimodal,
-    MultimodalContent,
-)
+from draive.lmm import LMMStreamChunk
+from draive.multimodal import Multimodal
+from draive.prompts import Prompt
+from draive.tools import AnyTool, Toolbox
 from draive.utils import Memory
 
 __all__ = [
@@ -23,10 +21,8 @@ __all__ = [
 async def conversation_completion(
     *,
     instruction: Instruction | str | None = None,
-    input: ConversationMessage | Multimodal,
-    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
-    | Sequence[ConversationMessage]
-    | None = None,
+    input: ConversationMessage | Prompt | Multimodal,
+    memory: ConversationMemory | Iterable[ConversationElement] | None = None,
     tools: Toolbox | Iterable[AnyTool] | None = None,
     stream: Literal[True],
     **extra: Any,
@@ -37,10 +33,8 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: Instruction | str | None = None,
-    input: ConversationMessage | Multimodal,
-    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
-    | Sequence[ConversationMessage]
-    | None = None,
+    input: ConversationMessage | Prompt | Multimodal,
+    memory: ConversationMemory | Iterable[ConversationElement] | None = None,
     tools: Toolbox | Iterable[AnyTool] | None = None,
     stream: Literal[False] = False,
     **extra: Any,
@@ -50,48 +44,22 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: Instruction | str | None = None,
-    input: ConversationMessage | Multimodal,  # noqa: A002
-    memory: Memory[Sequence[ConversationMessage], ConversationMessage]
-    | Sequence[ConversationMessage]
-    | None = None,
+    input: ConversationMessage | Prompt | Multimodal,  # noqa: A002
+    memory: ConversationMemory | Iterable[ConversationElement] | None = None,
     tools: Toolbox | Iterable[AnyTool] | None = None,
     stream: bool = False,
     **extra: Any,
 ) -> AsyncIterator[LMMStreamChunk] | ConversationMessage:
     conversation: Conversation = ctx.state(Conversation)
 
-    # prepare message
-    message: ConversationMessage
-    match input:
-        case ConversationMessage() as conversation_message:
-            if guardrails := conversation.guardrails:
-                message = conversation_message.updated(
-                    content=await guardrails(conversation_message.content),
-                )
-
-            else:
-                message = conversation_message
-
-        case content:
-            if guardrails := conversation.guardrails:
-                message = ConversationMessage(
-                    role="user",
-                    created=datetime.now(UTC),
-                    content=await guardrails(MultimodalContent.of(content)),
-                )
-
-            else:
-                message = ConversationMessage(
-                    role="user",
-                    created=datetime.now(UTC),
-                    content=MultimodalContent.of(content),
-                )
-
     # prepare memory
     conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage]
     match memory or conversation.memory:
         case None:
-            conversation_memory = _EMPTY_MEMORY
+            conversation_memory = Memory[
+                Sequence[ConversationMessage],
+                ConversationMessage,
+            ].constant(recalled=())
 
         case Memory() as memory:
             conversation_memory = memory
@@ -100,24 +68,13 @@ async def conversation_completion(
             conversation_memory = Memory[
                 Sequence[ConversationMessage],
                 ConversationMessage,
-            ].constant(recalled=memory_messages)
+            ].constant(recalled=tuple(memory_messages))
 
     # request completion
     return await conversation.completion(
         instruction=instruction,
-        message=message,
+        input=input,
         memory=conversation_memory,
         toolbox=Toolbox.out_of(tools),
         stream=stream,
     )
-
-
-_EMPTY_MEMORY: Final[
-    Memory[
-        Sequence[ConversationMessage],
-        ConversationMessage,
-    ]
-] = Memory[
-    Sequence[ConversationMessage],
-    ConversationMessage,
-].constant(recalled=())

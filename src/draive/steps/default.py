@@ -6,15 +6,15 @@ from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
-    LMMInput,
     LMMToolRequests,
     LMMToolResponse,
     LMMToolResponses,
-    Toolbox,
     lmm_invoke,
 )
 from draive.multimodal import Multimodal, MultimodalContent
+from draive.prompts import Prompt
 from draive.steps.types import Step
+from draive.tools import Toolbox
 
 __all__ = [
     "default_steps_completion",
@@ -22,7 +22,7 @@ __all__ = [
 
 
 async def default_steps_completion(
-    *steps: Step | Multimodal,
+    *steps: Step | Prompt | Multimodal,
     instruction: Instruction | str | None = None,
     **extra: Any,
 ) -> MultimodalContent:
@@ -88,7 +88,12 @@ async def _process_step(
     context: list[LMMContextElement],
     **extra: Any,
 ) -> MultimodalContent:
-    context.append(LMMInput.of(step.input))
+    match step.input:
+        case Prompt() as prompt:
+            context.extend(prompt.content)
+
+        case input:
+            context.append(input)
 
     if step.completion is not None:
         context.append(step.completion)

@@ -1,4 +1,4 @@
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, MutableMapping
 from typing import Any, Self, cast, final
 
 from haiway import MISSING, Missing
@@ -121,6 +121,33 @@ class Parameter[Type]:
                 self.name,
                 MISSING,
             )
+
+    def pick(
+        self,
+        mapping: MutableMapping[str, Any],
+        /,
+    ) -> Any:
+        if self.alias:
+            if self.alias in mapping:
+                picked: Any = mapping[self.alias]
+                del mapping[self.alias]
+                return picked
+
+            elif self.name in mapping:
+                picked: Any = mapping[self.name]
+                del mapping[self.name]
+                return picked
+
+            else:
+                return MISSING
+
+        elif self.name in mapping:
+            picked: Any = mapping[self.name]
+            del mapping[self.name]
+            return picked
+
+        else:
+            return MISSING
 
     def validated(
         self,

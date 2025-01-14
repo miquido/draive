@@ -9,17 +9,20 @@ from draive.lmm import (
     LMMContextElement,
     LMMInput,
     LMMStreamChunk,
-    Toolbox,
 )
 from draive.multimodal import (
     Multimodal,
     MultimodalContent,
 )
 from draive.parameters import DataModel, Field
+from draive.prompts import Prompt
+from draive.tools import Toolbox
 from draive.utils import Memory
 
 __all__ = [
     "ConversationCompletion",
+    "ConversationElement",
+    "ConversationMemory",
     "ConversationMessage",
 ]
 
@@ -80,6 +83,10 @@ class ConversationMessage(DataModel):
         return bool(self.content)
 
 
+ConversationElement = ConversationMessage  # TODO: allow events/tool statuses
+ConversationMemory = Memory[Sequence[ConversationElement], ConversationElement]
+
+
 @runtime_checkable
 class ConversationCompletion(Protocol):
     @overload
@@ -87,7 +94,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: Instruction | str | None,
-        message: ConversationMessage,
+        input: ConversationMessage | Prompt | Multimodal,
         memory: Memory[Sequence[ConversationMessage], ConversationMessage],
         toolbox: Toolbox,
         stream: Literal[True],
@@ -99,7 +106,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: Instruction | str | None,
-        message: ConversationMessage,
+        input: ConversationMessage | Prompt | Multimodal,
         memory: Memory[Sequence[ConversationMessage], ConversationMessage],
         toolbox: Toolbox,
         stream: Literal[False] = False,
@@ -111,7 +118,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: Instruction | str | None,
-        message: ConversationMessage,
+        input: ConversationMessage | Prompt | Multimodal,
         memory: Memory[Sequence[ConversationMessage], ConversationMessage],
         toolbox: Toolbox,
         stream: bool,
@@ -122,7 +129,7 @@ class ConversationCompletion(Protocol):
         self,
         *,
         instruction: Instruction | str | None,
-        message: ConversationMessage,
+        input: ConversationMessage | Prompt | Multimodal,  # noqa: A002
         memory: Memory[Sequence[ConversationMessage], ConversationMessage],
         toolbox: Toolbox,
         stream: bool = False,

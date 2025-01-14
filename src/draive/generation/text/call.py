@@ -5,8 +5,9 @@ from haiway import ctx
 
 from draive.generation.text.state import TextGeneration
 from draive.instructions import Instruction
-from draive.lmm import AnyTool, Toolbox
 from draive.multimodal import Multimodal
+from draive.prompts import Prompt
+from draive.tools import AnyTool, Toolbox
 
 __all__ = [
     "generate_text",
@@ -16,7 +17,7 @@ __all__ = [
 async def generate_text(
     *,
     instruction: Instruction | str | None = None,
-    input: Multimodal,  # noqa: A002
+    input: Prompt | Multimodal,  # noqa: A002
     tools: Toolbox | Iterable[AnyTool] | None = None,
     examples: Iterable[tuple[Multimodal, str]] | None = None,
     **extra: Any,

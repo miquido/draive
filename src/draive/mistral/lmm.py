@@ -1,5 +1,5 @@
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from itertools import chain
 from typing import Any
 
@@ -8,6 +8,7 @@ from haiway import ArgumentsTrace, ResultTrace, ctx
 from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
+    LMMContext,
     LMMContextElement,
     LMMInput,
     LMMInvocation,
@@ -40,7 +41,7 @@ def mistral_lmm(
     async def lmm_invocation(  # noqa: PLR0913
         *,
         instruction: Instruction | str | None,
-        context: Sequence[LMMContextElement],
+        context: LMMContext,
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
@@ -85,6 +86,7 @@ def mistral_lmm(
 
                     else:
                         response_format = {"type": "json_object"}
+
 
             if prefill:
                 context = [*context, LMMCompletion.of(prefill)]

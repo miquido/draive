@@ -1,9 +1,9 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from inspect import Parameter as InspectParameter
 from inspect import _empty as INSPECT_EMPTY  # pyright: ignore[reportPrivateUsage]
 from inspect import signature
 from types import EllipsisType
-from typing import Any, ClassVar, cast, final, overload
+from typing import Any, ClassVar, cast, final, get_type_hints, overload
 
 from haiway import MISSING, Missing, mimic_function
 from haiway.state import AttributeAnnotation
@@ -137,13 +137,28 @@ class ParametrizedFunction[**Args, Result]:
 
         self._call: Callable[Args, Result] = function
         self._name: str = function.__name__
-        self._parameters: dict[str, Parameter[Any]] = {
-            parameter.name: _resolve_argument(
-                parameter,
-                module=function.__module__,
-            )
-            for parameter in signature(function).parameters.values()
-        }
+        self._parameters: dict[str, Parameter[Any]] = {}
+        self._variadic_keyword_parameters: Parameter[Any] | None = None
+        type_hints: Mapping[str, Any] = get_type_hints(function)
+        for parameter in signature(function).parameters.values():
+            match parameter.kind:
+                case InspectParameter.POSITIONAL_ONLY | InspectParameter.VAR_POSITIONAL:
+                    raise NotImplementedError("Positional only arguments are not supported yet.")
+
+                case InspectParameter.VAR_KEYWORD:
+                    assert self._variadic_keyword_parameters is None  # nosec: B101
+                    self._variadic_keyword_parameters = _resolve_argument(
+                        parameter,
+                        module=function.__module__,
+                        type_hint=type_hints.get(parameter.name),
+                    )
+
+                case _:
+                    self._parameters[parameter.name] = _resolve_argument(
+                        parameter,
+                        module=function.__module__,
+                        type_hint=type_hints.get(parameter.name),
+                    )
 
         mimic_function(function, within=self)
 
@@ -154,11 +169,25 @@ class ParametrizedFunction[**Args, Result]:
         # TODO: add support for positional arguments
         with ParameterValidationContext().scope(self.__class__.__qualname__) as context:
             validated: dict[str, Any] = {}
-            for parameter in self._parameters.values():
-                validated[parameter.name] = parameter.validated(
-                    parameter.find(kwargs),
-                    context=context,
-                )
+            if self._variadic_keyword_parameters is None:
+                for parameter in self._parameters.values():
+                    validated[parameter.name] = parameter.validated(
+                        parameter.find(kwargs),
+                        context=context,
+                    )
+
+            else:
+                for parameter in self._parameters.values():
+                    validated[parameter.name] = parameter.validated(
+                        parameter.pick(kwargs),
+                        context=context,
+                    )
+
+                for key, value in kwargs.items():
+                    validated[key] = self._variadic_keyword_parameters.validated(
+                        value,
+                        context=context,
+                    )
 
             return validated
 
@@ -176,15 +205,16 @@ def _resolve_argument(
     /,
     *,
     module: str,
+    type_hint: Any,
 ) -> Parameter[Any]:
-    if parameter.annotation is INSPECT_EMPTY:
+    if parameter.annotation is INSPECT_EMPTY or type_hint is None:
         raise TypeError(
             "Untyped argument %s",
             parameter.name,
         )
 
     attribute: AttributeAnnotation = resolve_attribute_annotation(
-        parameter.annotation,
+        type_hint,
         module=module,
         type_parameters={},
         self_annotation=None,
@@ -208,6 +238,7 @@ def _resolve_argument(
                 and argument.default is MISSING
                 and argument.default_factory is MISSING,
             )
+
         case default:
             return Parameter[Any].of(
                 attribute,

@@ -4,8 +4,10 @@ from typing import Any, Protocol, Self, overload, runtime_checkable
 from haiway import State
 
 from draive.instructions import Instruction
-from draive.lmm import AnyTool, LMMCompletion, LMMOutputSelection, Toolbox
+from draive.lmm import LMMCompletion, LMMInput, LMMOutputSelection
 from draive.multimodal import Multimodal, MultimodalContent
+from draive.prompts import Prompt
+from draive.tools import AnyTool, Toolbox
 
 __all__ = [
     "Step",
@@ -26,7 +28,7 @@ class Step(State):
     @classmethod
     def of(
         cls,
-        input: Multimodal,
+        input: Prompt | Multimodal,
         /,
         *,
         completion: Multimodal,
@@ -40,7 +42,7 @@ class Step(State):
     @classmethod
     def of(
         cls,
-        input: Multimodal,
+        input: Prompt | Multimodal,
         /,
         *,
         instruction: Instruction | str | None = None,
@@ -56,7 +58,7 @@ class Step(State):
     @classmethod
     def of(  # noqa: PLR0913
         cls,
-        input: Multimodal,  # noqa: A002
+        input: Prompt | Multimodal,  # noqa: A002
         /,
         *,
         instruction: Instruction | str | None = None,
@@ -79,9 +81,17 @@ class Step(State):
             completion is None or result_processing is None
         ), "Can't specify result processing with predefined result"
 
+        step_input: Prompt | LMMInput
+        match input:
+            case Prompt() as prompt:
+                step_input = prompt
+
+            case other:
+                step_input = LMMInput.of(other)
+
         return cls(
             instruction=Instruction.of(instruction) if instruction else None,
-            input=MultimodalContent.of(input),
+            input=step_input,
             toolbox=Toolbox.out_of(tools),
             output=output,
             completion=None if completion is None else LMMCompletion.of(completion),
@@ -93,7 +103,7 @@ class Step(State):
         )
 
     instruction: Instruction | None
-    input: MultimodalContent
+    input: Prompt | LMMInput
     toolbox: Toolbox
     output: LMMOutputSelection
     completion: LMMCompletion | None
@@ -108,7 +118,7 @@ class Step(State):
 class StepsCompleting(Protocol):
     async def __call__(
         self,
-        *steps: Step | Multimodal,
+        *steps: Step | Prompt | Multimodal,
         instruction: Instruction | str | None = None,
         **extra: Any,
     ) -> MultimodalContent: ...

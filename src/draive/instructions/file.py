@@ -1,12 +1,11 @@
+import json
 from collections.abc import Mapping
 from pathlib import Path
-from uuid import UUID
+from typing import Any
 
 from haiway import asynchronous
 
-from draive.instructions.errors import MissingInstruction
-from draive.instructions.types import Instruction, InstructionFetching
-from draive.parameters import DataModel
+from draive.instructions.types import Instruction, InstructionFetching, MissingInstruction
 
 __all__ = [
     "instructions_file",
@@ -16,23 +15,22 @@ __all__ = [
 def instructions_file(
     path: Path | str,
 ) -> InstructionFetching:
-    repository: _InstructionsFileStorage = _InstructionsFileStorage(path=path)
+    storage: _InstructionsFileStorage = _InstructionsFileStorage(path=path)
 
     async def fetch(
-        key: str,
+        identifier: str,
+        /,
+        *,
+        variables: Mapping[str, str] | None = None,
+        **extra: Any,
     ) -> Instruction:
-        return await repository.instruction(key)
+        return await storage.instruction(
+            identifier,
+            variables=variables,
+            **extra,
+        )
 
     return fetch
-
-
-class _Instruction(DataModel):
-    identifier: UUID
-    content: str
-
-
-class _Storage(DataModel):
-    instructions: Mapping[str, _Instruction]
 
 
 class _InstructionsFileStorage:
@@ -48,46 +46,46 @@ class _InstructionsFileStorage:
             case path:
                 self._path = path
 
-        self._storage: _Storage | None = None
+        self._storage: Mapping[str, str] | None = None
 
     async def instruction(
         self,
-        key: str,
+        identifier: str,
+        *,
+        variables: Mapping[str, str] | None = None,
+        **extra: Any,
     ) -> Instruction:
-        if instruction := (await self.storage).instructions.get(key):
+        if self._storage is None:
+            self._storage = await self._file_load()
+
+        if instruction := self._storage.get(identifier):
             return Instruction.of(
-                instruction.content,
-                identifier=instruction.identifier,
+                instruction,
+                identifier=identifier,
+                **(variables if variables is not None else {}),
             )
+
         else:
             raise MissingInstruction(
-                "%s does not contain instruction for key %s",
+                "%s does not contain instruction for identifier %s",
                 self._path,
-                key,
+                identifier,
             )
-
-    @property
-    async def storage(self) -> _Storage:
-        if cache := self._storage:
-            return cache
-
-        else:
-            loaded: _Storage = await self.load()
-            self._storage = loaded
-            return loaded
-
-    async def load(
-        self,
-    ) -> _Storage:
-        return await self._file_load()
 
     @asynchronous
     def _file_load(
         self,
-    ) -> _Storage:
+    ) -> Mapping[str, str]:
         if self._path.exists():
             with open(self._path, mode="rb") as file:
-                return _Storage.from_json(file.read())
+                match json.loads(file.read()):
+                    case {**elements}:
+                        return {
+                            key: value for key, value in elements.items() if isinstance(value, str)
+                        }
+
+                    case _:
+                        return {}
 
         else:
-            return _Storage(instructions={})
+            return {}

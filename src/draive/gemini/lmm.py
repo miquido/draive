@@ -25,6 +25,7 @@ from draive.gemini.types import GeminiException
 from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
+    LMMContext,
     LMMContextElement,
     LMMInput,
     LMMInvocation,
@@ -55,7 +56,7 @@ def gemini_lmm(
     async def lmm_invocation(
         *,
         instruction: Instruction | str | None,
-        context: Sequence[LMMContextElement],
+        context: LMMContext,
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,

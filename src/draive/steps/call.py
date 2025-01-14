@@ -4,6 +4,7 @@ from haiway import ctx
 
 from draive.instructions import Instruction
 from draive.multimodal import Multimodal, MultimodalContent
+from draive.prompts import Prompt
 from draive.steps.state import Steps
 from draive.steps.types import Step
 
@@ -13,7 +14,7 @@ __all__ = [
 
 
 async def steps_completion(
-    *steps: Step | Multimodal,
+    *steps: Step | Prompt | Multimodal,
     instruction: Instruction | str | None = None,
     **extra: Any,
 ) -> MultimodalContent:

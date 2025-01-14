@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.37.2"
+version = "0.38.0"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
@@ -46,18 +46,21 @@ anthropic = [
   "tokenizers~=0.21",
 ]
 mistral = [
-  "httpx~=0.28.0",
+  "httpx~=0.28",
   "draive[sentencepiece]",
 ]
 gemini = [
-  "httpx~=0.28.0",
+  "httpx~=0.28",
   "draive[sentencepiece]",
 ]
 ollama = [
-  "httpx~=0.28.0",
+  "httpx~=0.28",
 ]
 bedrock = [
   "boto3~=1.35",
+]
+mcp = [
+  "mcp~=1.2",
 ]
 
 dev = [
@@ -69,7 +72,8 @@ dev = [
   "draive[ollama]",
   "draive[gemini]",
   "draive[bedrock]",
-  "ruff~=0.8",
+  "draive[mcp]",
+  "ruff~=0.9",
   "pyright~=1.1",
   "bandit~=1.7",
   "pytest~=7.4",
