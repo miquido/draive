@@ -1,6 +1,8 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol, Self, runtime_checkable
 
+from haiway import State
+
 from draive.lmm import LMMContext, LMMContextElement
 from draive.parameters import DataModel, Field
 from draive.parameters.specification import ParameterSpecification
@@ -36,7 +38,7 @@ class PromptDeclaration(DataModel):
     arguments: Sequence[PromptDeclarationArgument]
 
 
-class Prompt(DataModel):
+class Prompt(State):
     @classmethod
     def of(
         cls,

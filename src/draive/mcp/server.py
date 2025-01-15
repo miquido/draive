@@ -10,18 +10,85 @@ from mcp.types import ImageContent as MCPImageContent
 from mcp.types import Prompt as MCPPrompt
 from mcp.types import PromptArgument as MCPPromptArgument
 from mcp.types import PromptMessage as MCPPromptMessage
+from mcp.types import Resource as MCPResource
 from mcp.types import TextContent as MCPTextContent
 from mcp.types import Tool as MCPTool
+from pydantic import AnyUrl
 
 from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
 from draive.multimodal import MediaContent, MultimodalContent, TextContent
 from draive.prompts import Prompt, PromptTemplate
+from draive.resources import Resource, ResourceContent, ResourceTemplate
 from draive.tools import AnyTool, Toolbox
 
 __all__ = [
     "expose_prompts",
+    "expose_resources",
     "expose_tools",
 ]
+
+
+def expose_resources(  # noqa: C901
+    resources: Iterable[ResourceTemplate[Any, Any] | Resource],
+    /,
+    server: Server,
+) -> None:
+    resource_declarations: list[MCPResource] = []
+    available_resources: dict[str, ResourceTemplate[Any, Any] | Resource] = {}
+    for resource in resources:
+        match resource:
+            case Resource():
+                available_resources[resource.uri] = resource
+                match resource.content:
+                    case ResourceContent() as content:
+                        resource_declarations.append(
+                            MCPResource(
+                                uri=AnyUrl(resource.uri),
+                                mimeType=content.mime_type,
+                                name=resource.name,
+                                description=resource.description,
+                            )
+                        )
+
+                    case _:
+                        raise NotImplementedError("Multi-content resources are not supported yet")
+
+            case ResourceTemplate():
+                resource_declarations.append(
+                    MCPResource(
+                        uri=AnyUrl(resource.uri),
+                        mimeType=resource.declaration.mime_type,
+                        name=resource.declaration.name,
+                        description=resource.declaration.description,
+                    )
+                )
+                available_resources[resource.uri] = resource
+
+    @server.list_resources()
+    async def list_resources() -> list[MCPResource]:  # pyright: ignore[reportUnusedFunction]
+        return resource_declarations
+
+    @server.read_resource()
+    async def read_resource(uri: AnyUrl) -> str | bytes:  # pyright: ignore[reportUnusedFunction]
+        resource: Resource
+        match available_resources.get(uri.unicode_string()):
+            case None:
+                raise ValueError(f"Resource '{uri}' is not defined")
+
+            case Resource() as available_resource:
+                resource = available_resource
+
+            case ResourceTemplate() as resource_template:
+                # TODO: we can support only resource templates without actual arguments?
+                # perhaps we could extract uri arguments
+                resource = await resource_template.resolve()
+
+        match resource.content:
+            case ResourceContent() as content:
+                return content.blob
+
+            case _:
+                raise NotImplementedError("Multi-content resources are not supported yet")
 
 
 def expose_prompts(

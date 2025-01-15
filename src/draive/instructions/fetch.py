@@ -4,7 +4,7 @@ from typing import Any, Literal, overload
 from haiway import ctx
 
 from draive.instructions.state import InstructionsRepository
-from draive.instructions.types import Instruction, MissingInstruction
+from draive.instructions.types import Instruction, InstructionDeclaration, MissingInstruction
 
 __all__ = [
     "fetch_instruction",
@@ -13,7 +13,7 @@ __all__ = [
 
 @overload
 async def fetch_instruction(
-    name: str,
+    reference: InstructionDeclaration | str,
     /,
     *,
     default: Instruction | str | None = None,
@@ -24,18 +24,29 @@ async def fetch_instruction(
 
 @overload
 async def fetch_instruction(
-    name: str,
+    reference: InstructionDeclaration | str,
+    /,
+    *,
+    default: Instruction | str,
+    arguments: Mapping[str, str] | None = None,
+    **extra: Any,
+) -> Instruction: ...
+
+
+@overload
+async def fetch_instruction(
+    reference: InstructionDeclaration | str,
     /,
     *,
     default: Instruction | str | None = None,
     arguments: Mapping[str, str] | None = None,
     required: Literal[True],
     **extra: Any,
-) -> Instruction | None: ...
+) -> Instruction: ...
 
 
 async def fetch_instruction(
-    name: str,
+    reference: InstructionDeclaration | str,
     /,
     *,
     default: Instruction | str | None = None,
@@ -43,6 +54,8 @@ async def fetch_instruction(
     required: bool = True,
     **extra: Any,
 ) -> Instruction | None:
+    name: str = reference if isinstance(reference, str) else reference.name
+
     match await ctx.state(InstructionsRepository).fetch(
         name,
         arguments=arguments,
@@ -64,6 +77,9 @@ async def fetch_instruction(
                     return Instruction.of(
                         text,
                         name=name,
+                        description=reference.description
+                        if isinstance(reference, InstructionDeclaration)
+                        else None,
                         **(arguments if arguments is not None else {}),
                     )
 
