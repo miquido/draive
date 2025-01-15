@@ -1,10 +1,12 @@
 from collections.abc import Mapping, Sequence
-from typing import Protocol, Self, runtime_checkable
+from typing import Any, Protocol, Self, runtime_checkable
 
 from draive.lmm import LMMContext, LMMContextElement
-from draive.parameters import DataModel
+from draive.parameters import DataModel, Field
+from draive.parameters.specification import ParameterSpecification
 
 __all__ = [
+    "MissingPrompt",
     "Prompt",
     "PromptDeclaration",
     "PromptDeclarationArgument",
@@ -13,9 +15,18 @@ __all__ = [
 ]
 
 
+class MissingPrompt(Exception):
+    pass
+
+
 class PromptDeclarationArgument(DataModel):
     name: str
-    description: str | None = None
+    specification: ParameterSpecification = Field(
+        specification={
+            "type": "object",
+            "additionalProperties": True,
+        }
+    )
     required: bool = True
 
 
@@ -29,9 +40,8 @@ class Prompt(DataModel):
     @classmethod
     def of(
         cls,
-        name: str,
-        /,
         *content: LMMContextElement,
+        name: str,
         description: str | None = None,
     ) -> Self:
         return cls(
@@ -49,6 +59,7 @@ class Prompt(DataModel):
 class PromptListing(Protocol):
     async def __call__(
         self,
+        **extra: Any,
     ) -> Sequence[PromptDeclaration]: ...
 
 
@@ -59,4 +70,5 @@ class PromptFetching(Protocol):
         name: str,
         *,
         arguments: Mapping[str, str] | None,
-    ) -> Prompt: ...
+        **extra: Any,
+    ) -> Prompt | None: ...

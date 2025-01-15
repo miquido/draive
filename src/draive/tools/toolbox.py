@@ -1,5 +1,5 @@
 from asyncio import gather
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Literal, Protocol, Self, cast, final, runtime_checkable
 
 from haiway import State, ctx
@@ -28,11 +28,11 @@ class Toolbox(State):
     def of(
         cls,
         *tools: AnyTool,
-        suggest: AnyTool | Literal[True] | None = None,
+        suggest: AnyTool | bool | None = None,
         repeated_calls_limit: int | None = None,
     ) -> Self:
         match suggest:
-            case None:
+            case None | False:
                 return cls(
                     tools={tool.name: tool for tool in tools},
                     suggest_tool=False,
@@ -80,19 +80,27 @@ class Toolbox(State):
     @classmethod
     async def external(
         cls,
-        suggest: Literal[True] | None = None,
+        suggest: bool | None = None,
         repeated_calls_limit: int | None = None,
+        other_tools: Iterable[AnyTool] | None = None,
+        **extra: Any,
     ) -> Self:
-        return cast(
+        external_toolbox: Self = cast(
             Self,
             await ctx.state(ExternalToolbox).fetch(
-                extending=cls(
-                    tools={},
-                    suggest_tool=suggest or False,
-                    repeated_calls_limit=repeated_calls_limit or 1,
-                )
+                suggest_tool=suggest,
+                repeated_calls_limit=repeated_calls_limit,
+                **extra,
             ),
         )
+
+        if other_tools:
+            return external_toolbox.updated(
+                tools={**external_toolbox.tools, **{tool.name: tool for tool in other_tools}}
+            )
+
+        else:
+            return external_toolbox
 
     tools: Mapping[str, AnyTool]
     suggest_tool: AnyTool | bool
@@ -121,7 +129,7 @@ class Toolbox(State):
         else:
             return "auto"
 
-    def available_tools(self) -> list[LMMToolSpecification]:
+    def available_tools(self) -> Sequence[LMMToolSpecification]:
         return [tool.specification for tool in self.tools.values() if tool.available]
 
     async def call_tool(
@@ -129,7 +137,7 @@ class Toolbox(State):
         name: str,
         /,
         call_id: str,
-        arguments: dict[str, Any],
+        arguments: Mapping[str, Any],
     ) -> MultimodalContent:
         if tool := self.tools.get(name):
             return await tool._toolbox_call(  # pyright: ignore[reportPrivateUsage]
@@ -144,7 +152,7 @@ class Toolbox(State):
         self,
         requests: LMMToolRequests,
         /,
-    ) -> list[LMMToolResponse]:
+    ) -> Sequence[LMMToolResponse]:
         return await gather(
             *[self.respond(request) for request in requests.requests],
             return_exceptions=False,  # toolbox calls handle errors if able
@@ -199,7 +207,9 @@ class ToolboxFetching(Protocol):
     async def __call__(
         self,
         *,
-        extending: Toolbox | Iterable[AnyTool] | None,
+        suggest: bool | None = None,
+        repeated_calls_limit: int | None = None,
+        **extra: Any,
     ) -> Toolbox: ...
 
 

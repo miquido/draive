@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any, Literal
 
 from haiway import ctx
@@ -112,7 +112,7 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
 
                 case LMMToolRequests() as tool_requests:
                     context.append(tool_requests)
-                    responses: list[LMMToolResponse] = await toolbox.respond_all(tool_requests)
+                    responses: Sequence[LMMToolResponse] = await toolbox.respond_all(tool_requests)
 
                     if direct_responses := [response for response in responses if response.direct]:
                         for response in direct_responses:

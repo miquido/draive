@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 from haiway import ctx
@@ -67,7 +67,7 @@ async def default_generate_text(
 
                 case LMMToolRequests() as tool_requests:
                     ctx.log_debug("Received text generation tool calls")
-                    responses: list[LMMToolResponse] = await toolbox.respond_all(tool_requests)
+                    responses: Sequence[LMMToolResponse] = await toolbox.respond_all(tool_requests)
 
                     if direct_responses := [response for response in responses if response.direct]:
                         return MultimodalContent.of(

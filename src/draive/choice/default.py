@@ -98,7 +98,7 @@ async def default_choice_completion(  # noqa: C901
 
                 case LMMToolRequests() as tool_requests:
                     ctx.log_debug("Received choice tool calls")
-                    responses: list[LMMToolResponse] = await toolbox.respond_all(tool_requests)
+                    responses: Sequence[LMMToolResponse] = await toolbox.respond_all(tool_requests)
 
                     if direct_content := [
                         response.content for response in responses if response.direct

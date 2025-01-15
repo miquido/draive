@@ -7,60 +7,65 @@ from draive.instructions.state import InstructionsRepository
 from draive.instructions.types import Instruction, MissingInstruction
 
 __all__ = [
-    "instruction",
+    "fetch_instruction",
 ]
 
 
 @overload
-async def instruction(
-    key: str,
+async def fetch_instruction(
+    name: str,
     /,
     *,
     default: Instruction | str | None = None,
-    variables: Mapping[str, str] | None = None,
+    arguments: Mapping[str, str] | None = None,
     **extra: Any,
 ) -> Instruction | None: ...
 
 
 @overload
-async def instruction(
-    key: str,
+async def fetch_instruction(
+    name: str,
     /,
     *,
     default: Instruction | str | None = None,
-    variables: Mapping[str, str] | None = None,
+    arguments: Mapping[str, str] | None = None,
     required: Literal[True],
     **extra: Any,
 ) -> Instruction | None: ...
 
 
-async def instruction(
-    key: str,
+async def fetch_instruction(
+    name: str,
     /,
     *,
     default: Instruction | str | None = None,
-    variables: Mapping[str, str] | None = None,
+    arguments: Mapping[str, str] | None = None,
     required: bool = True,
     **extra: Any,
 ) -> Instruction | None:
     match await ctx.state(InstructionsRepository).fetch(
-        key,
-        variables=variables,
+        name,
+        arguments=arguments,
         **extra,
     ):
         case None:
-            if default is not None:
-                return Instruction.of(
-                    default,
-                    identifier=None,
-                    **(variables if variables is not None else {}),
-                )
+            match default:
+                case None:
+                    if required:
+                        raise MissingInstruction(f"Missing instruction: '{name}'")
 
-            elif required:
-                raise MissingInstruction(f"Missing instruction: '{key}'")
+                    else:
+                        return None
 
-            else:
-                return None
+                case Instruction() as instruction:
+                    return instruction
+
+                case str() as text:
+                    return Instruction.of(
+                        text,
+                        name=name,
+                        **(arguments if arguments is not None else {}),
+                    )
 
         case instruction:
             return instruction

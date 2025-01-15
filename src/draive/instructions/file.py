@@ -21,12 +21,12 @@ def instructions_file(
         identifier: str,
         /,
         *,
-        variables: Mapping[str, str] | None = None,
+        arguments: Mapping[str, str] | None = None,
         **extra: Any,
     ) -> Instruction:
         return await storage.instruction(
             identifier,
-            variables=variables,
+            arguments=arguments,
             **extra,
         )
 
@@ -50,26 +50,26 @@ class _InstructionsFileStorage:
 
     async def instruction(
         self,
-        identifier: str,
+        name: str,
         *,
-        variables: Mapping[str, str] | None = None,
+        arguments: Mapping[str, str] | None = None,
         **extra: Any,
     ) -> Instruction:
         if self._storage is None:
             self._storage = await self._file_load()
 
-        if instruction := self._storage.get(identifier):
+        if instruction := self._storage.get(name):
             return Instruction.of(
                 instruction,
-                identifier=identifier,
-                **(variables if variables is not None else {}),
+                name=name,
+                **(arguments if arguments is not None else {}),
             )
 
         else:
             raise MissingInstruction(
                 "%s does not contain instruction for identifier %s",
                 self._path,
-                identifier,
+                name,
             )
 
     @asynchronous

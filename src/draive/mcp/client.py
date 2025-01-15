@@ -1,12 +1,13 @@
 from asyncio import gather
-from collections.abc import Callable, Coroutine, Iterable, Mapping, Sequence
-from contextlib import AbstractAsyncContextManager
+from collections.abc import AsyncGenerator, Callable, Coroutine, Mapping, Sequence
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from types import TracebackType
-from typing import Any, cast, final
+from typing import Any, Self, cast, final
 
-from haiway import as_dict
-from mcp import ClientSession, GetPromptResult, ListToolsResult
+from haiway import as_dict, as_list
+from mcp import ClientSession, GetPromptResult, ListToolsResult, StdioServerParameters, stdio_client
 from mcp import Tool as MCPTool
+from mcp.client.sse import sse_client
 from mcp.types import CallToolResult, EmbeddedResource, ImageContent, TextContent
 
 from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
@@ -23,6 +24,50 @@ __all__ = [
 
 @final
 class MCPClient:
+    @classmethod
+    def stdio(
+        cls,
+        *,
+        command: str,
+        args: Sequence[str] | None = None,
+        env: dict[str, str] | None = None,
+    ) -> Self:
+        @asynccontextmanager
+        async def mcp_stdio_session() -> AsyncGenerator[ClientSession]:
+            async with stdio_client(
+                StdioServerParameters(
+                    command=command,
+                    args=as_list(args) if args else [],
+                    env=env,
+                )
+            ) as (read, write):
+                async with ClientSession(read, write) as session:
+                    yield session
+
+        return cls(mcp_stdio_session())
+
+    @classmethod
+    def sse(
+        cls,
+        *,
+        url: str,
+        headers: dict[str, Any] | None = None,
+        timeout: float = 5,
+        sse_read_timeout: float = 60 * 5,
+    ) -> Self:
+        @asynccontextmanager
+        async def mcp_sse_session() -> AsyncGenerator[ClientSession]:
+            async with sse_client(
+                url=url,
+                headers=headers,
+                timeout=timeout,
+                sse_read_timeout=sse_read_timeout,
+            ) as (read, write):
+                async with ClientSession(read, write) as session:
+                    yield session
+
+        return cls(mcp_sse_session())
+
     def __init__(
         self,
         session_manager: AbstractAsyncContextManager[ClientSession],
@@ -33,6 +78,7 @@ class MCPClient:
 
     async def prompts_list(
         self,
+        **extra: Any,
     ) -> Sequence[PromptDeclaration]:
         assert hasattr(  # nosec: B101
             self,
@@ -46,7 +92,14 @@ class MCPClient:
                 arguments=tuple(
                     PromptDeclarationArgument(
                         name=argument.name,
-                        description=argument.description,
+                        specification={
+                            "type": "string",
+                        }
+                        if argument.description is None
+                        else {
+                            "type": "string",
+                            "description": argument.description,
+                        },
                         required=argument.required if argument.required is not None else True,
                     )
                     for argument in prompt.arguments
@@ -64,6 +117,7 @@ class MCPClient:
         name: str,
         *,
         arguments: Mapping[str, str] | None,
+        **extra: Any,
     ) -> Prompt:
         assert hasattr(  # nosec: B101
             self, "_session"
@@ -92,12 +146,17 @@ class MCPClient:
     async def toolbox_fetch(
         self,
         *,
-        extending: Toolbox | Iterable[AnyTool] | None,
+        suggest: bool | None = None,
+        repeated_calls_limit: int | None = None,
+        **extra: Any,
     ) -> Toolbox:
         tools: ListToolsResult = await self._session.list_tools()
 
-        # TODO: FIXME: linter
-        return Toolbox.out_of([_convert_tool(tool, self.tool_call) for tool in tools.tools])  # pyright: ignore
+        return Toolbox.of(
+            *[_convert_tool(tool, self.tool_call) for tool in tools.tools],
+            suggest=suggest,
+            repeated_calls_limit=repeated_calls_limit,
+        )
 
     async def tool_call(
         self,
