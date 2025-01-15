@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any
 
 from haiway import ctx
@@ -127,7 +128,7 @@ async def _process_step(
                     return processed_content
 
             case LMMToolRequests() as tool_requests:
-                responses: list[LMMToolResponse] = await toolbox.respond_all(tool_requests)
+                responses: Sequence[LMMToolResponse] = await toolbox.respond_all(tool_requests)
 
                 if direct_results := [
                     response.content for response in responses if response.direct

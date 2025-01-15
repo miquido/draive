@@ -54,6 +54,7 @@ class Parameter[Type]:
 
         return cls(
             name=name,
+            description=None if description is MISSING else cast(str, description),
             alias=alias,
             default=default,
             validator=ParameterValidator.of(
@@ -79,6 +80,7 @@ class Parameter[Type]:
         self,
         *,
         name: str,
+        description: str | None,
         alias: str | None,
         default: ParameterDefaultFactory[Type] | Missing,
         validator: ParameterValidation[Type],
@@ -87,6 +89,7 @@ class Parameter[Type]:
         required: bool,
     ) -> None:
         self.name: str = name
+        self.description: str | None = description
         self.alias: str | None = alias
         self.default: Callable[[], Type | Missing]
         if default is MISSING:

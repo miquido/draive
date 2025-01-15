@@ -25,13 +25,13 @@ class ToolAvailabilityCheck(Protocol):
 
 
 @final
-class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result]]):
+class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Result]]):
     def __init__(  # noqa: PLR0913
         self,
         /,
         name: str,
         *,
-        function: Callable[Args, Coroutine[Any, Any, Result]],
+        function: Callable[Args, Coroutine[None, None, Result]],
         description: str | None = None,
         specification: ParametersSpecification | None = None,
         availability_check: ToolAvailabilityCheck | None = None,
@@ -63,6 +63,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[Any, Any, Result
         )
 
         self.name: str = name
+        self.description: str | None = description
         self._direct_result: bool = direct_result
         self._check_availability: ToolAvailabilityCheck = availability_check or (
             lambda: True  # available by default
@@ -150,20 +151,20 @@ AnyTool = Tool[Any, Any]
 class ToolWrapper(Protocol):
     def __call__[**Args, Result](
         self,
-        function: Callable[Args, Coroutine[Any, Any, Result]],
+        function: Callable[Args, Coroutine[None, None, Result]],
     ) -> Tool[Args, Result]: ...
 
 
 class PartialToolWrapper[Result](Protocol):
     def __call__[**Args](
         self,
-        function: Callable[Args, Coroutine[Any, Any, Result]],
+        function: Callable[Args, Coroutine[None, None, Result]],
     ) -> Tool[Args, Result]: ...
 
 
 @overload
 def tool[**Args, Result](
-    function: Callable[Args, Coroutine[Any, Any, Result]],
+    function: Callable[Args, Coroutine[None, None, Result]],
     /,
 ) -> Tool[Args, Result]:
     """
@@ -284,7 +285,7 @@ def tool(
 
 
 def tool[**Args, Result](  # noqa: PLR0913
-    function: Callable[Args, Coroutine[Any, Any, Result]] | None = None,
+    function: Callable[Args, Coroutine[None, None, Result]] | None = None,
     *,
     name: str | None = None,
     description: str | None = None,
@@ -294,7 +295,7 @@ def tool[**Args, Result](  # noqa: PLR0913
     direct_result: bool = False,
 ) -> PartialToolWrapper[Result] | ToolWrapper | Tool[Args, Result]:
     def wrap(
-        function: Callable[Args, Coroutine[Any, Any, Result]],
+        function: Callable[Args, Coroutine[None, None, Result]],
     ) -> Tool[Args, Result]:
         return Tool(
             name=name or function.__name__,

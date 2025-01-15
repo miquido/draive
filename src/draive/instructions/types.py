@@ -1,11 +1,15 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any, Protocol, Self, final, overload, runtime_checkable
 from uuid import uuid4
 
 from haiway import State
 
+from draive.parameters import DataModel, Field, ParameterSpecification
+
 __all__ = [
     "Instruction",
+    "InstructionDeclaration",
+    "InstructionDeclarationArgument",
     "InstructionFetching",
     "MissingInstruction",
 ]
@@ -13,6 +17,23 @@ __all__ = [
 
 class MissingInstruction(Exception):
     pass
+
+
+class InstructionDeclarationArgument(DataModel):
+    name: str
+    specification: ParameterSpecification = Field(
+        specification={
+            "type": "object",
+            "additionalProperties": True,
+        }
+    )
+    required: bool = True
+
+
+class InstructionDeclaration(DataModel):
+    name: str
+    description: str | None = None
+    arguments: Sequence[InstructionDeclarationArgument]
 
 
 @final
@@ -69,14 +90,15 @@ class Instruction(State):
         cls,
         instruction: Self | str,
         /,
-        identifier: str | None = None,
+        *,
+        name: str | None = None,
         description: str | None = None,
         **variables: str,
     ) -> Self:
         match instruction:
             case str() as content:
                 return cls(
-                    identifier=identifier or uuid4().hex,
+                    name=name or uuid4().hex,
                     description=description,
                     content=content,
                     variables=variables,
@@ -85,7 +107,7 @@ class Instruction(State):
             case instruction:
                 return instruction.updated(**variables)
 
-    identifier: str
+    name: str
     description: str | None
     content: str
     variables: Mapping[str, str]
@@ -118,9 +140,9 @@ class Instruction(State):
     ) -> Self:
         if variables:
             return self.__class__(
-                identifier=self.identifier,
+                name=self.name,
                 description=description,
-                content=(joiner or " ").join((self.content, instruction)),
+                content=(joiner if joiner is not None else "").join((self.content, instruction)),
                 variables={
                     **self.variables,
                     **variables,
@@ -129,9 +151,9 @@ class Instruction(State):
 
         else:
             return self.__class__(
-                identifier=self.identifier,
+                name=self.name,
                 description=description,
-                content=(joiner or " ").join((self.content, instruction)),
+                content=(joiner if joiner is not None else "").join((self.content, instruction)),
                 variables=self.variables,
             )
 
@@ -141,7 +163,7 @@ class Instruction(State):
     ) -> Self:
         if variables:
             return self.__class__(
-                identifier=self.identifier,
+                name=self.name,
                 description=self.description,
                 content=self.content,
                 variables={
@@ -165,9 +187,9 @@ class Instruction(State):
 class InstructionFetching(Protocol):
     async def __call__(
         self,
-        identifier: str,
+        name: str,
         /,
         *,
-        variables: Mapping[str, str] | None = None,
+        arguments: Mapping[str, str] | None = None,
         **extra: Any,
     ) -> Instruction | None: ...

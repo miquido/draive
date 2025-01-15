@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.38.0"
+version = "0.38.1"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
