@@ -28,7 +28,7 @@ Use the explained RATING scale and the requested FORMAT to provide the result.
 Evaluated metric is similarity - the degree of semantic similarity between the REFERENCE\
  and the EVALUATED content.
 </EVALUATION_CRITERIA>
-
+{guidelines}
 <RATING>
 Assign a similarity score using exact name of one of the following values:
 - "poor" is very low similarity, the content is completely unrelated in meaning.
@@ -51,6 +51,7 @@ async def similarity_evaluator(
     /,
     *,
     reference: Multimodal,
+    guidelines: str | None = None,
 ) -> EvaluationScore:
     if not evaluated:
         return EvaluationScore(
@@ -72,7 +73,11 @@ async def similarity_evaluator(
             evaluated,
             "</EVALUATED>",
         ),
-        instruction=INSTRUCTION,
+        instruction=INSTRUCTION.format(
+            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
+            if guidelines is not None
+            else ""
+        ),
     )
 
     if result := MultimodalTagElement.parse_first(

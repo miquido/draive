@@ -28,7 +28,7 @@ Evaluated metric is truthfulness (factual accuracy) - this metric evaluates the 
  it must still be correct and represent the truth of the matter. Truthfulness is about the correctness of the\
  facts themselves, not just their alignment with a specific source.
 </EVALUATION_CRITERIA>
-
+{guidelines}
 <RATING>
 Assign a truthfulness (factual accuracy) score using exact name of one of the following values:
 - "poor" is very low truthfulness, the content contains many factual inaccuracies or distortions.
@@ -52,6 +52,7 @@ async def truthfulness_evaluator(
     /,
     *,
     reference: Multimodal,
+    guidelines: str | None = None,
 ) -> EvaluationScore:
     if not evaluated:
         return EvaluationScore(
@@ -73,7 +74,11 @@ async def truthfulness_evaluator(
             evaluated,
             "</EVALUATED>",
         ),
-        instruction=INSTRUCTION,
+        instruction=INSTRUCTION.format(
+            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
+            if guidelines is not None
+            else ""
+        ),
     )
 
     if result := MultimodalTagElement.parse_first(

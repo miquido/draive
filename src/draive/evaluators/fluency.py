@@ -23,7 +23,7 @@ Use the explained RATING scale and the requested FORMAT to provide the result.
 Evaluated metric is fluency - the quality of the content in terms of grammar, spelling,\
  punctuation, content choice, and overall structure.
 </EVALUATION_CRITERIA>
-
+{guidelines}
 <RATING>
 Assign a fluency score using exact name of one of the following values:
 - "poor" is very low fluency, the content has many errors that make it hard to understand or\
@@ -45,6 +45,7 @@ The final result containing only the numerical score value HAVE to be put inside
 async def fluency_evaluator(
     content: Multimodal,
     /,
+    guidelines: str | None = None,
 ) -> EvaluationScore:
     if not content:
         return EvaluationScore(
@@ -58,7 +59,11 @@ async def fluency_evaluator(
             content,
             "</CONTENT>",
         ),
-        instruction=INSTRUCTION,
+        instruction=INSTRUCTION.format(
+            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
+            if guidelines is not None
+            else ""
+        ),
     )
 
     if result := MultimodalTagElement.parse_first(

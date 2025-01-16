@@ -18,7 +18,7 @@ Compare the REFERENCE and the EVALUATED content by carefully examining them, the
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
-
+{guidelines}
 <EVALUATION_CRITERIA>
 Evaluated metric is relevance - selection of important parts from the REFERENCE content.
 The EVALUATED content should include only important information from the REFERENCE avoiding\
@@ -52,6 +52,7 @@ async def relevance_evaluator(
     /,
     *,
     reference: Multimodal,
+    guidelines: str | None = None,
 ) -> EvaluationScore:
     if not evaluated:
         return EvaluationScore(
@@ -73,7 +74,11 @@ async def relevance_evaluator(
             evaluated,
             "</EVALUATED>",
         ),
-        instruction=INSTRUCTION,
+        instruction=INSTRUCTION.format(
+            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
+            if guidelines is not None
+            else ""
+        ),
     )
 
     if result := MultimodalTagElement.parse_first(

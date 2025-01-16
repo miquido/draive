@@ -24,7 +24,7 @@ Evaluated metric is readability - the ease with which a reader can understand th
 A readable content uses clear and concise language, is well-structured,
 and avoids complex or convoluted elements.
 </EVALUATION_CRITERIA>
-
+{guidelines}
 <RATING>
 Assign a readability score using exact name of one of the following values:
 - "poor" is very low readability, the content is extremely difficult to understand,\
@@ -50,6 +50,7 @@ The final result containing only the numerical score value HAVE to be put inside
 async def readability_evaluator(
     content: Multimodal,
     /,
+    guidelines: str | None = None,
 ) -> EvaluationScore:
     if not content:
         return EvaluationScore(
@@ -63,7 +64,11 @@ async def readability_evaluator(
             content,
             "</CONTENT>",
         ),
-        instruction=INSTRUCTION,
+        instruction=INSTRUCTION.format(
+            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
+            if guidelines is not None
+            else ""
+        ),
     )
 
     if result := MultimodalTagElement.parse_first(

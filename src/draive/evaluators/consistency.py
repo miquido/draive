@@ -23,7 +23,7 @@ Use the explained RATING scale and the requested FORMAT to provide the result.
 Evaluated metric is consistency - a factual alignment between the REFERENCE and the EVALUATED content.
 A factually consistent content contains only elements that are entailed by the REFERENCE content.
 </EVALUATION_CRITERIA>
-
+{guidelines}
 <RATING>
 Assign a consistency score using exact name of one of the following values:
 - "poor" is very low consistency, the content contains multiple hallucinated facts\
@@ -51,6 +51,7 @@ async def consistency_evaluator(
     /,
     *,
     reference: Multimodal,
+    guidelines: str | None = None,
 ) -> EvaluationScore:
     if not evaluated:
         return EvaluationScore(
@@ -72,7 +73,11 @@ async def consistency_evaluator(
             evaluated,
             "</EVALUATED>",
         ),
-        instruction=INSTRUCTION,
+        instruction=INSTRUCTION.format(
+            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
+            if guidelines is not None
+            else ""
+        ),
     )
 
     if result := MultimodalTagElement.parse_first(
