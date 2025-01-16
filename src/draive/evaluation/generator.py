@@ -14,11 +14,11 @@ You are preparing automated evaluation test scenarios.
 <INSTRUCTION>
 Familiarize yourself with the SCHEMA describing desired data structure.
 Prepare diversified and high quality test scenarios according to the provided SCHEMA.
-Result should cover various possible valid outcomes to cover multiple possible scenarios.
+Results should cover various possible valid outcomes to cover multiple possible scenarios.
 </INSTRUCTION>
 {guidelines}
 <SCHEMA>
-{schema}
+{{schema}}
 </SCHEMA>
 
 <FORMAT>
