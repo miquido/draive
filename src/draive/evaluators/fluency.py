@@ -76,4 +76,4 @@ async def fluency_evaluator(
         )
 
     else:
-        raise ValueError("Invalid evaluator result")
+        raise ValueError("Invalid evaluator result:\n%s", completion)
