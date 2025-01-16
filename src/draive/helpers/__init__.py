@@ -1,3 +1,4 @@
+from draive.helpers.instruction_refinement import refine_instruction
 from draive.helpers.usage_cost import (
     ModelTokenPrice,
     TokenPrice,
@@ -15,5 +16,6 @@ __all__ = [
     "VectorIndex",
     "VectorIndexing",
     "VectorSearching",
+    "refine_instruction",
     "usage_cost",
 ]
