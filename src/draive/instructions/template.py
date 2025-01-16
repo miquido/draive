@@ -38,10 +38,10 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
             InstructionDeclaration(
                 name=name,
                 description=description,
-                arguments=[
+                arguments=[  # should we verify if all are strings?
                     InstructionDeclarationArgument(
                         name=parameter.alias or parameter.name,
-                        specification=parameter.specification,
+                        description=parameter.description,
                         required=parameter.required,
                     )
                     for parameter in self._parameters.values()

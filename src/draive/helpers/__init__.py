@@ -2,6 +2,7 @@ from draive.helpers.instruction_preparation import (
     InstructionPreparationAmbiguity,
     prepare_instruction,
 )
+from draive.helpers.instruction_refinement import refine_instruction
 from draive.helpers.volatile_configuration import VolatileConfiguration
 from draive.helpers.volatile_memory import (
     AccumulativeVolatileMemory,
@@ -18,4 +19,5 @@ __all__ = (
     "VolatileMemory",
     "VolatileVectorIndex",
     "prepare_instruction",
+    "refine_instruction",
 )

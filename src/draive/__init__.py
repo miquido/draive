@@ -106,6 +106,7 @@ from draive.helpers import (
     VolatileMemory,
     VolatileVectorIndex,
     prepare_instruction,
+    refine_instruction,
 )
 from draive.instructions import (
     Instruction,
@@ -382,6 +383,7 @@ __all__ = (
     "not_missing",
     "prepare_instruction",
     "prompt",
+    "refine_instruction",
     "resource",
     "retry",
     "setup_logging",
