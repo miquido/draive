@@ -5,9 +5,9 @@ from haiway import State, ctx
 
 from draive.lmm import LMMContext
 from draive.multimodal import Multimodal, MultimodalContent
-from draive.parameters.model import DataModel
+from draive.parameters import DataModel
 from draive.prompts import Prompt
-from draive.utils.processing import Processing
+from draive.utils import Processing
 from draive.workflow.stage import Stage
 
 __all__ = [

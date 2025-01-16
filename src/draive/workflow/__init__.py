@@ -6,6 +6,7 @@ from draive.workflow.types import (
     StageMerging,
     StageProcessing,
     StageResultProcessing,
+    StageStateProcessing,
 )
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "StageMerging",
     "StageProcessing",
     "StageResultProcessing",
+    "StageStateProcessing",
     "workflow_completion",
 ]

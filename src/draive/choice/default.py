@@ -87,8 +87,8 @@ async def default_choice_completion(  # noqa: C901
                 case LMMCompletion() as completion:
                     ctx.log_debug("Received choice results")
                     if selection := MultimodalTagElement.parse_first(
-                        completion.content,
-                        tag="CHOICE",
+                        "CHOICE",
+                        content=completion.content,
                     ):
                         if option := options_map.get(selection.content.as_string()):
                             return option
@@ -103,8 +103,8 @@ async def default_choice_completion(  # noqa: C901
                         response.content for response in tool_responses.responses if response.direct
                     ]:
                         if selection := MultimodalTagElement.parse_first(
-                            MultimodalContent.of(*direct_content),
-                            tag="CHOICE",
+                            "CHOICE",
+                            content=MultimodalContent.of(*direct_content),
                         ):
                             if option := options_map.get(selection.content.as_string()):
                                 return option

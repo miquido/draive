@@ -54,7 +54,7 @@ class Instruction(State):
         cls,
         instruction: Self | str,
         /,
-        **variables: str,
+        **arguments: str,
     ) -> str: ...
 
     @overload
@@ -63,7 +63,7 @@ class Instruction(State):
         cls,
         instruction: Self | str | None,
         /,
-        **variables: str,
+        **arguments: str,
     ) -> str | None: ...
 
     @classmethod
@@ -71,21 +71,21 @@ class Instruction(State):
         cls,
         instruction: Self | str | None,
         /,
-        **variables: str,
+        **arguments: str,
     ) -> str | None:
         match instruction:
             case None:
                 return None
 
             case str() as string:
-                if variables:
-                    return string.format_map(variables)
+                if arguments:
+                    return string.format_map(arguments)
 
                 else:
                     return string
 
             case instruction:
-                return instruction.format(**variables)
+                return instruction.format(**arguments)
 
     @classmethod
     def of(
@@ -96,7 +96,7 @@ class Instruction(State):
         name: str | None = None,
         description: str | None = None,
         meta: Meta | None = None,
-        **variables: str,
+        **arguments: str,
     ) -> Self:
         match instruction:
             case str() as content:
@@ -104,33 +104,33 @@ class Instruction(State):
                     name=name or uuid4().hex,
                     description=description,
                     content=content,
-                    variables=variables,
+                    arguments=arguments,
                     meta=meta,
                 )
 
             case instruction:
-                return instruction.updated(**variables)
+                return instruction.updated(**arguments)
 
     name: str
     description: str | None
     content: str
-    variables: Mapping[str, str]
+    arguments: Mapping[str, str]
     meta: Meta | None
 
     def format(
         self,
-        **variables: str,
+        **arguments: str,
     ) -> str:
-        if variables:
+        if arguments:
             return self.content.format_map(
                 {
-                    **self.variables,
-                    **variables,
+                    **self.arguments,
+                    **arguments,
                 },
             )
 
-        elif self.variables:
-            return self.content.format_map(self.variables)
+        elif self.arguments:
+            return self.content.format_map(self.arguments)
 
         else:
             return self.content
@@ -141,16 +141,16 @@ class Instruction(State):
         /,
         description: str | None = None,
         joiner: str | None = None,
-        **variables: str,
+        **arguments: str,
     ) -> Self:
-        if variables:
+        if arguments:
             return self.__class__(
                 name=self.name,
                 description=description,
                 content=(joiner if joiner is not None else "").join((self.content, instruction)),
-                variables={
-                    **self.variables,
-                    **variables,
+                arguments={
+                    **self.arguments,
+                    **arguments,
                 },
                 meta=self.meta,
             )
@@ -160,22 +160,22 @@ class Instruction(State):
                 name=self.name,
                 description=description,
                 content=(joiner if joiner is not None else "").join((self.content, instruction)),
-                variables=self.variables,
+                arguments=self.arguments,
                 meta=self.meta,
             )
 
-    def updated(
+    def with_arguments(
         self,
-        **variables: str,
+        **arguments: str,
     ) -> Self:
-        if variables:
+        if arguments:
             return self.__class__(
                 name=self.name,
                 description=self.description,
                 content=self.content,
-                variables={
-                    **self.variables,
-                    **variables,
+                arguments={
+                    **self.arguments,
+                    **arguments,
                 },
                 meta=self.meta,
             )

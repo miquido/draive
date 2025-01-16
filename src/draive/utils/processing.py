@@ -1,6 +1,6 @@
-from typing import Protocol, overload, runtime_checkable
+from typing import Literal, Protocol, overload, runtime_checkable
 
-from haiway import State, ctx
+from haiway import MissingState, State, ctx
 
 from draive.commons import Meta
 from draive.multimodal import MultimodalContent
@@ -92,6 +92,16 @@ class Processing(State):
         state: type[StateType],
         /,
         *,
+        required: Literal[True],
+    ) -> StateType: ...
+
+    @overload
+    @classmethod
+    async def read[StateType: DataModel | State](
+        cls,
+        state: type[StateType],
+        /,
+        *,
         default: StateType,
     ) -> StateType: ...
 
@@ -102,13 +112,20 @@ class Processing(State):
         /,
         *,
         default: StateType | None = None,
+        required: bool = False,
     ) -> StateType | None:
         current: StateType | None = await ctx.state(cls).state_reading(state)
-        if current is None:
+        if current is not None:
+            return current
+
+        elif default is not None:
             return default
 
+        elif required:
+            raise MissingState(f"{state.__qualname__} is not available within current processing")
+
         else:
-            return current
+            return None
 
     @classmethod
     async def write(
