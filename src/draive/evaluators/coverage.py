@@ -25,7 +25,7 @@ Evaluated metric is coverage - the extent to which the EVALUATED content include
 EVALUATED content with good coverage includes all the important information from\
  the REFERENCE content without omitting critical points.
 </EVALUATION_CRITERIA>
-
+{guidelines}
 <RATING>
 Assign a coverage score using exact name of one of the following values:
 - "poor" is very low coverage - the content misses most key points from the reference content.
@@ -49,6 +49,7 @@ async def coverage_evaluator(
     /,
     *,
     reference: Multimodal,
+    guidelines: str | None = None,
 ) -> EvaluationScore:
     if not evaluated:
         return EvaluationScore(
@@ -70,7 +71,11 @@ async def coverage_evaluator(
             evaluated,
             "</EVALUATED>",
         ),
-        instruction=INSTRUCTION,
+        instruction=INSTRUCTION.format(
+            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
+            if guidelines is not None
+            else ""
+        ),
     )
 
     if result := MultimodalTagElement.parse_first(

@@ -25,7 +25,7 @@ Evaluated metric is conciseness - a extent to which the EVALUATED content is bri
 A concise content avoids unnecessary details and repetition, also avoiding being overly verbose\
  or include irrelevant information.
 </EVALUATION_CRITERIA>
-
+{guidelines}
 <RATING>
 Assign a conciseness score using exact name of one of the following values:
 - "poor" is very low conciseness, the content is excessively verbose with much irrelevant\
@@ -53,6 +53,7 @@ async def conciseness_evaluator(
     /,
     *,
     reference: Multimodal,
+    guidelines: str | None = None,
 ) -> EvaluationScore:
     if not evaluated:
         return EvaluationScore(
@@ -74,7 +75,11 @@ async def conciseness_evaluator(
             evaluated,
             "</EVALUATED>",
         ),
-        instruction=INSTRUCTION,
+        instruction=INSTRUCTION.format(
+            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
+            if guidelines is not None
+            else ""
+        ),
     )
 
     if result := MultimodalTagElement.parse_first(

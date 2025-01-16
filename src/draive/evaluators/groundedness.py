@@ -28,7 +28,7 @@ Evaluated metric is groundedness - this metric assesses the extent to which the 
  or interpretations that stray from the source. Groundedness is about maintaining fidelity to the original\
  data, ensuring that every detail and conclusion is rooted in the provided information.
 </EVALUATION_CRITERIA>
-
+{guidelines}
 <RATING>
 Assign a groundedness score using exact name of one of the following values:
 - "poor" is very low groundedness, the content is mostly ungrounded with many unsupported claims.
@@ -52,6 +52,7 @@ async def groundedness_evaluator(
     /,
     *,
     reference: Multimodal,
+    guidelines: str | None = None,
 ) -> EvaluationScore:
     if not evaluated:
         return EvaluationScore(
@@ -73,7 +74,11 @@ async def groundedness_evaluator(
             evaluated,
             "</EVALUATED>",
         ),
-        instruction=INSTRUCTION,
+        instruction=INSTRUCTION.format(
+            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
+            if guidelines is not None
+            else ""
+        ),
     )
 
     if result := MultimodalTagElement.parse_first(

@@ -26,7 +26,7 @@ We align this dimension with the DUC (Document Understanding Conference) quality
 EVALUATED content should not just be a heap of related information, but should build from part
 to part into a coherent body of information about the topic.
 </EVALUATION_CRITERIA>
-
+{guidelines}
 <RATING>
 Assign a coherence score using exact name of one of the following values:
 - "poor" is very low coherence, the content is chaotic, lacking logical connections between parts.
@@ -51,6 +51,7 @@ async def coherence_evaluator(
     /,
     *,
     reference: Multimodal,
+    guidelines: str | None = None,
 ) -> EvaluationScore:
     if not evaluated:
         return EvaluationScore(
@@ -72,7 +73,11 @@ async def coherence_evaluator(
             evaluated,
             "</EVALUATED>",
         ),
-        instruction=INSTRUCTION,
+        instruction=INSTRUCTION.format(
+            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
+            if guidelines is not None
+            else ""
+        ),
     )
 
     if result := MultimodalTagElement.parse_first(
