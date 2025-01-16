@@ -1,5 +1,5 @@
-from collections.abc import Callable, Coroutine, Mapping
-from typing import Any, final, overload
+from collections.abc import Callable, Coroutine
+from typing import final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
 
@@ -45,15 +45,16 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
 
     async def resolve(
         self,
-        arguments: Mapping[str, Any],
+        *args: Args.args,
+        **kwargs: Args.kwargs,
     ) -> Instruction:
-        with ctx.scope(self.declaration.name):
-            ctx.record(ArgumentsTrace.of(**arguments))
+        with ctx.scope(f"instruction:{self.declaration.name}"):
+            ctx.record(ArgumentsTrace.of(*args, **kwargs))
             try:
                 result = Instruction(
                     name=self.declaration.name,
                     description=self.declaration.description,
-                    content=await super().__call__(**arguments),  # pyright: ignore[reportCallIssue]
+                    content=await super().__call__(*args, **kwargs),  # pyright: ignore[reportCallIssue]
                 )
                 ctx.record(ResultTrace.of(result))
 

@@ -1,5 +1,5 @@
-from collections.abc import Callable, Coroutine, Mapping
-from typing import Any, Protocol, final, overload
+from collections.abc import Callable, Coroutine
+from typing import Protocol, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
 
@@ -59,15 +59,16 @@ class PromptTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, LM
 
     async def resolve(
         self,
-        arguments: Mapping[str, Any],
+        *args: Args.args,
+        **kwargs: Args.kwargs,
     ) -> Prompt:
-        with ctx.scope(self.declaration.name):
-            ctx.record(ArgumentsTrace.of(**arguments))
+        with ctx.scope(f"prompt:{self.declaration.name}"):
+            ctx.record(ArgumentsTrace.of(*args, **kwargs))
             try:
                 result = Prompt(
                     name=self.declaration.name,
                     description=self.declaration.description,
-                    content=await super().__call__(**arguments),  # pyright: ignore[reportCallIssue]
+                    content=await super().__call__(*args, **kwargs),  # pyright: ignore[reportCallIssue]
                 )
                 ctx.record(ResultTrace.of(result))
 

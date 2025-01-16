@@ -22,29 +22,40 @@ async def fetch_prompt_list(
 
 @overload
 async def fetch_prompt(
-    name: str,
+    reference: PromptDeclaration | str,
     /,
     *,
     default: Prompt | str | None = None,
-    variables: Mapping[str, str] | None = None,
+    arguments: Mapping[str, str] | None = None,
     **extra: Any,
 ) -> Prompt | None: ...
 
 
 @overload
 async def fetch_prompt(
-    name: str,
+    reference: PromptDeclaration | str,
+    /,
+    *,
+    default: Prompt | str,
+    arguments: Mapping[str, str] | None = None,
+    **extra: Any,
+) -> Prompt: ...
+
+
+@overload
+async def fetch_prompt(
+    reference: PromptDeclaration | str,
     /,
     *,
     default: Prompt | str | None = None,
-    variables: Mapping[str, str] | None = None,
+    arguments: Mapping[str, str] | None = None,
     required: Literal[True],
     **extra: Any,
-) -> Prompt | None: ...
+) -> Prompt: ...
 
 
 async def fetch_prompt(
-    name: str,
+    reference: PromptDeclaration | str,
     /,
     *,
     default: Prompt | str | None = None,
@@ -52,6 +63,8 @@ async def fetch_prompt(
     required: bool = True,
     **extra: Any,
 ) -> Prompt | None:
+    name: str = reference if isinstance(reference, str) else reference.name
+
     match await ctx.state(PromptRepository).fetch(
         name,
         arguments=arguments,
@@ -77,6 +90,9 @@ async def fetch_prompt(
                             )
                         ),
                         name=name,
+                        description=reference.description
+                        if isinstance(reference, Prompt)
+                        else None,
                     )
 
         case prompt:
