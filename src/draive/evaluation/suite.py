@@ -305,6 +305,7 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
         *,
         persist: bool = False,
         count: int,
+        guidelines: str | None = None,
         examples: Iterable[CaseParameters] | None = None,
     ) -> None:
         async with self._lock:
@@ -318,6 +319,7 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
                             self._parameters,
                             count=count,
                             examples=examples or [case.parameters for case in data.cases],
+                            guidelines=guidelines,
                         )
                     ],
                 )
