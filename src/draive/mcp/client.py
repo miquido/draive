@@ -61,7 +61,8 @@ class MCPClient:
                     env=env,
                 )
             ) as (read, write):
-                async with ClientSession(read, write) as session:
+                # verify typing here
+                async with ClientSession(read, write) as session:  # pyright: ignore[reportArgumentType]
                     yield session
 
         return cls(identifier, session_manager=mcp_stdio_session())

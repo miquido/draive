@@ -89,7 +89,7 @@ class VLLMLMMStreaming(VLLMAPI):
         # before each call check for updated properties - this supposed to be an infinite loop
         async for current_properties in properties:
             # for each call accumulate input first
-            input_buffer: MultimodalContent = MultimodalContent.of()
+            input_buffer: MultimodalContent = MultimodalContent.empty
             async for chunk in input:
                 match chunk:
                     # gether input content chunks until marked as end
@@ -146,7 +146,7 @@ class VLLMLMMStreaming(VLLMAPI):
                 tool_selection=current_properties.tool_selection,
             )
 
-            accumulated_result: MultimodalContent = MultimodalContent.of()
+            accumulated_result: MultimodalContent = MultimodalContent.empty
             accumulated_tool_calls: list[ChoiceDeltaToolCall] = []
             async for part in await self._client.chat.completions.create(
                 messages=request_messages,
@@ -271,7 +271,7 @@ class VLLMLMMStreaming(VLLMAPI):
                             )
                             # send completion chunk
                             yield LMMStreamChunk.of(
-                                MultimodalContent.of(),
+                                MultimodalContent.empty,
                                 eod=True,
                             )
 

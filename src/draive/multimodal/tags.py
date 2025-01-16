@@ -87,7 +87,7 @@ class MultimodalTagElement(DataModel):
                                                 yield cls(
                                                     name=opening.name,
                                                     attributes=opening.attributes,
-                                                    content=MultimodalContent.of(),
+                                                    content=MultimodalContent.empty,
                                                 )
 
                                             # cleanup regardless of matching

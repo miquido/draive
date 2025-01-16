@@ -203,6 +203,15 @@ from draive.similarity import (
     vector_similarity_search,
 )
 from draive.splitters import split_text
+from draive.stages import (
+    Stage,
+    StageCondition,
+    StageContextTransforming,
+    StageMerging,
+    StageProcessing,
+    StageResultTransforming,
+    StageStateAccessing,
+)
 from draive.steps import (
     Step,
     Steps,
@@ -231,16 +240,6 @@ from draive.utils import (
     ProcessingStateWriting,
     RateLimitError,
     split_sequence,
-)
-from draive.workflow import (
-    Stage,
-    StageCondition,
-    StageContextProcessing,
-    StageMerging,
-    StageProcessing,
-    StageResultProcessing,
-    StageStateProcessing,
-    workflow_completion,
 )
 
 __all__ = [
@@ -364,11 +363,11 @@ __all__ = [
     "SelectionException",
     "Stage",
     "StageCondition",
-    "StageContextProcessing",
+    "StageContextTransforming",
     "StageMerging",
     "StageProcessing",
-    "StageResultProcessing",
-    "StageStateProcessing",
+    "StageResultTransforming",
+    "StageStateAccessing",
     "State",
     "Step",
     "Steps",
@@ -451,6 +450,5 @@ __all__ = [
     "vector_similarity_search",
     "when_missing",
     "workflow",
-    "workflow_completion",
     "wrap_async",
 ]

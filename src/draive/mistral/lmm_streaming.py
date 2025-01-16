@@ -76,7 +76,7 @@ class MistralLMMStreaming(MistralAPI):
         # before each call check for updated properties - this supposed to be an infinite loop
         async for current_properties in properties:
             # start from accumulating input first
-            input_buffer: MultimodalContent = MultimodalContent.of()
+            input_buffer: MultimodalContent = MultimodalContent.empty
             async for chunk in input:
                 match chunk:
                     # gether input content chunks until marked as end
@@ -133,7 +133,7 @@ class MistralLMMStreaming(MistralAPI):
                 tool_selection=current_properties.tool_selection,
             )
 
-            accumulated_result: MultimodalContent = MultimodalContent.of()
+            accumulated_result: MultimodalContent = MultimodalContent.empty
             accumulated_tool_calls: list[ToolCall] = []
             async with await self._client.chat.stream_async(
                 model=chat_config.model,
@@ -160,7 +160,7 @@ class MistralLMMStreaming(MistralAPI):
                         )
                         # send completion chunk - openAI sends it without an actual content
                         yield LMMStreamChunk.of(
-                            MultimodalContent.of(),
+                            MultimodalContent.empty,
                             eod=True,
                         )
 
@@ -253,7 +253,7 @@ class MistralLMMStreaming(MistralAPI):
 
                             # send completion chunk if needed
                             yield LMMStreamChunk.of(
-                                MultimodalContent.of(),
+                                MultimodalContent.empty,
                                 eod=True,
                             )
                             break  # and break the loop

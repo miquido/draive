@@ -176,7 +176,7 @@ def _spawn_lmm_handler(
 
     async def consume_lmm_output() -> MultimodalContent:
         try:
-            accumulated_content: MultimodalContent = MultimodalContent.of()
+            accumulated_content: MultimodalContent = MultimodalContent.empty
             async for element in await lmm_stream(
                 properties=properties_generator(),
                 input=input_queue,

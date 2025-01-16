@@ -15,7 +15,7 @@ input_multimodal: MultimodalContent = MultimodalContent.of(
 
 
 def test_empty_is_falsy():
-    assert not MultimodalContent.of()
+    assert not MultimodalContent.empty
 
 
 def test_as_string_is_equal_input_text():

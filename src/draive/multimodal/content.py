@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from itertools import chain
-from typing import Self, final, overload
+from typing import ClassVar, Self, final, overload
 
 from draive.commons import Meta
 from draive.multimodal.media import MediaContent, MediaKind
@@ -22,6 +22,8 @@ MultimodalContentConvertible = str | MultimodalContentElement
 
 @final
 class MultimodalContent(DataModel):
+    empty: ClassVar[Self]  # defined after the class
+
     @classmethod
     def of(
         cls,
@@ -167,6 +169,7 @@ class MultimodalContent(DataModel):
         return self.as_string()
 
 
+MultimodalContent.empty = MultimodalContent(parts=())
 Multimodal = MultimodalContent | MultimodalContentConvertible
 
 
