@@ -68,19 +68,67 @@ class EvaluatorResult(DataModel):
     def passed(self) -> bool:
         return self.score.value >= self.threshold
 
-    def report(self) -> str:
-        meta_values: str = (
-            f"\n{'\n'.join(f'{key}: {value}' for key, value in self.meta.items())}"
-            if self.meta
-            else "N/A"
-        )
-        return (
-            f"{self.evaluator} {'passed' if self.passed else 'failed'}"
-            f" with score {self.score.value},"
-            f" required {self.threshold},"
-            f" comment: {f"'{self.score.comment}'" or 'N/A'}"
-            f" meta:\n{meta_values}"
-        )
+    def report(
+        self,
+        include_details: bool = True,
+    ) -> str:
+        if include_details:
+            meta_values: str = (
+                f"\n{'\n'.join(f'{key}: {value}' for key, value in self.meta.items())}"
+                if self.meta
+                else "N/A"
+            )
+
+            return (
+                f"{self.evaluator} {'passed' if self.passed else 'failed'}"
+                f" with score {self.score.value},"
+                f" required {self.threshold},"
+                f" comment: {f"'{self.score.comment}'" or 'N/A'}"
+                f" meta:\n{meta_values}"
+            )
+
+        else:
+            return (
+                f"{self.evaluator} {'passed' if self.passed else 'failed'}"
+                f" with score {self.score.value},"
+                f" required {self.threshold},"
+                f" comment: {f"'{self.score.comment}'" or 'N/A'}"
+            )
+
+    def __gt__(self, other: Self) -> bool:
+        assert isinstance(other, self.__class__)  # nosec: B101
+        if self.evaluator != other.evaluator or self.threshold != other.threshold:
+            raise ValueError("Can't compare different evaluator results")
+
+        return self.score > other.score
+
+    def __ge__(self, other: Self) -> bool:
+        assert isinstance(other, self.__class__)  # nosec: B101
+        if self.evaluator != other.evaluator or self.threshold != other.threshold:
+            raise ValueError("Can't compare different evaluator results")
+
+        return self.score >= other.score
+
+    def __lt__(self, other: Self) -> bool:
+        assert isinstance(other, self.__class__)  # nosec: B101
+        if self.evaluator != other.evaluator or self.threshold != other.threshold:
+            raise ValueError("Can't compare different evaluator results")
+
+        return self.score < other.score
+
+    def __le__(self, other: Self) -> bool:
+        assert isinstance(other, self.__class__)  # nosec: B101
+        if self.evaluator != other.evaluator or self.threshold != other.threshold:
+            raise ValueError("Can't compare different evaluator results")
+
+        return self.score <= other.score
+
+    def __eq__(self, other: Self) -> bool:
+        assert isinstance(other, self.__class__)  # nosec: B101
+        if self.evaluator != other.evaluator or self.threshold != other.threshold:
+            raise ValueError("Can't compare different evaluator results")
+
+        return self.score == other.score
 
 
 class EvaluationResult(DataModel):

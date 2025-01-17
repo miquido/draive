@@ -7,6 +7,7 @@ from draive.evaluation.evaluator import (
     evaluator_highest,
     evaluator_lowest,
 )
+from draive.evaluation.generator import generate_case_parameters
 from draive.evaluation.scenario import (
     EvaluationScenarioResult,
     PreparedScenarioEvaluator,
@@ -52,4 +53,5 @@ __all__ = [
     "evaluator",
     "evaluator_highest",
     "evaluator_lowest",
+    "generate_case_parameters",
 ]
