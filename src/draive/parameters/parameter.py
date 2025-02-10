@@ -1,13 +1,12 @@
-from collections.abc import Callable, Mapping, MutableMapping
+from collections.abc import Mapping, MutableMapping
 from typing import Any, Self, cast, final
 
-from haiway import MISSING, Missing
+from haiway import MISSING, DefaultValue, Missing
 from haiway.state import AttributeAnnotation
 
 from draive.parameters.specification import ParameterSpecification, parameter_specification
 from draive.parameters.types import (
     ParameterConversion,
-    ParameterDefaultFactory,
     ParameterValidation,
     ParameterValidationContext,
     ParameterVerification,
@@ -17,10 +16,6 @@ from draive.parameters.validation import ParameterValidator
 __all__ = [
     "Parameter",
 ]
-
-
-def _missing_default() -> Missing:
-    return MISSING
 
 
 @final
@@ -34,8 +29,7 @@ class Parameter[Type]:
         name: str,
         alias: str | None,
         description: str | Missing,
-        default_value: ParameterDefaultFactory[Type] | Missing,
-        default_factory: ParameterDefaultFactory[Type] | Missing,
+        default: DefaultValue[Type],
         validator: ParameterValidation[Type] | Missing,
         verifier: ParameterVerification[Type] | Missing,
         converter: ParameterConversion[Type] | Missing,
@@ -44,13 +38,6 @@ class Parameter[Type]:
     ) -> Self:
         assert validator is MISSING or verifier is MISSING  # nosec: B101
         assert description is MISSING or specification is MISSING  # nosec: B101
-        assert default_value is MISSING or default_factory is MISSING  # nosec: B101
-        default: ParameterDefaultFactory[Type] | Missing
-        if default_value is MISSING:
-            default = default_factory
-
-        else:
-            default = lambda: cast(Type, default_value)  # noqa: E731
 
         return cls(
             name=name,
@@ -82,7 +69,7 @@ class Parameter[Type]:
         name: str,
         description: str | None,
         alias: str | None,
-        default: ParameterDefaultFactory[Type] | Missing,
+        default: DefaultValue[Type],
         validator: ParameterValidation[Type],
         converter: ParameterConversion[Type] | Missing,
         specification: ParameterSpecification,
@@ -91,13 +78,7 @@ class Parameter[Type]:
         self.name: str = name
         self.description: str | None = description
         self.alias: str | None = alias
-        self.default: Callable[[], Type | Missing]
-        if default is MISSING:
-            self.default = _missing_default
-
-        else:
-            self.default = cast(Callable[[], Type | Missing], default)
-
+        self.default: DefaultValue[Type] = default
         self.validator: ParameterValidation[Any] = validator
         self.converter: ParameterConversion[Type] | None = (
             None if converter is MISSING else cast(ParameterConversion[Type], converter)

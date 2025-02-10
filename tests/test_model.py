@@ -3,8 +3,9 @@ from collections.abc import Mapping, Sequence
 from copy import copy, deepcopy
 from datetime import UTC, datetime
 from typing import Any, Literal, NotRequired, Required, TypedDict
-from uuid import UUID
+from uuid import UUID, uuid4
 
+from haiway import Default
 from pytest import raises
 
 from draive import (
@@ -41,6 +42,7 @@ class ExampleModel(DataModel):
         description="complex",
         default="",
     )
+    default: UUID = Default(factory=uuid4)
 
 
 # TODO: prepare extensive tests
@@ -53,12 +55,17 @@ def test_validated_passes_with_valid_values() -> None:
         "invalid": "valid",
         "answer": {"string": "value", "more": None},
         "all": True,
+        "default": "12345678123456781234567812345678",
     }
     assert json.loads(ExampleModel(**values_dict).as_json()) == values_dict
 
 
 def test_validated_passes_with_default_values() -> None:
     ExampleModel()
+
+
+def test_default_factory_produces_values() -> None:
+    assert ExampleModel().default != ExampleModel().default
 
 
 class DatetimeModel(DataModel):
