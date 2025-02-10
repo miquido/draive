@@ -3,8 +3,6 @@ from datetime import date, datetime, time
 from enum import IntEnum, StrEnum
 from types import EllipsisType, NoneType, UnionType
 from typing import Any, Literal, NotRequired, Required, TypedDict, Union, cast, final, is_typeddict
-from typing import Mapping as MappingType  # noqa: UP035
-from typing import Sequence as SequenceType  # noqa: UP035
 from uuid import UUID
 
 from haiway import Missing
@@ -596,9 +594,7 @@ SPECIFICATIONS: Mapping[
     tuple: _prepare_specification_of_tuple,
     Literal: _prepare_specification_of_literal,
     Sequence: _prepare_specification_of_sequence,
-    SequenceType: _prepare_specification_of_sequence,
     Mapping: _prepare_specification_of_mapping,
-    MappingType: _prepare_specification_of_mapping,
     UUID: _prepare_specification_of_uuid,
     date: _prepare_specification_of_date,
     datetime: _prepare_specification_of_datetime,
