@@ -6,7 +6,6 @@ from typing import Any, Protocol
 __all__ = [
     "BasicValue",
     "ParameterConversion",
-    "ParameterDefaultFactory",
     "ParameterValidation",
     "ParameterValidationContext",
     "ParameterValidationError",
@@ -19,7 +18,6 @@ type BasicValue = (
 
 type ParameterConversion[Type] = Callable[[Type], BasicValue]
 type ParameterVerification[Type] = Callable[[Type], None]
-type ParameterDefaultFactory[Type] = Callable[[], Type]
 
 
 class ParameterValidationContext:

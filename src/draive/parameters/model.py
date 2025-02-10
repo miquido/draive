@@ -20,7 +20,7 @@ from typing import (
 from uuid import UUID
 from weakref import WeakValueDictionary
 
-from haiway import MISSING, AttributePath, Missing, cache, not_missing
+from haiway import MISSING, AttributePath, DefaultValue, Missing, cache, not_missing
 from haiway.state import AttributeAnnotation, attribute_annotations
 
 from draive.parameters.parameter import Parameter
@@ -31,7 +31,6 @@ from draive.parameters.specification import (
 )
 from draive.parameters.types import (
     ParameterConversion,
-    ParameterDefaultFactory,
     ParameterValidation,
     ParameterValidationContext,
     ParameterVerification,
@@ -60,7 +59,7 @@ def Field[Value](
     *,
     aliased: str | None = None,
     description: str | Missing = MISSING,
-    default_factory: ParameterDefaultFactory[Value] | Missing = MISSING,
+    default_factory: Callable[[], Value] | Missing = MISSING,
     validator: ParameterValidation[Value] | Missing = MISSING,
     converter: ParameterConversion[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
@@ -84,7 +83,7 @@ def Field[Value](
     *,
     aliased: str | None = None,
     description: str | Missing = MISSING,
-    default_factory: ParameterDefaultFactory[Value] | Missing = MISSING,
+    default_factory: Callable[[], Value] | Missing = MISSING,
     verifier: ParameterVerification[Value] | Missing = MISSING,
     converter: ParameterConversion[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
@@ -96,7 +95,7 @@ def Field[Value](  # noqa: PLR0913
     aliased: str | None = None,
     description: str | Missing = MISSING,
     default: Value | Missing = MISSING,
-    default_factory: ParameterDefaultFactory[Value] | Missing = MISSING,
+    default_factory: Callable[[], Value] | Missing = MISSING,
     validator: ParameterValidation[Value] | Missing = MISSING,
     verifier: ParameterVerification[Value] | Missing = MISSING,
     converter: ParameterConversion[Value] | Missing = MISSING,
@@ -117,7 +116,7 @@ def Field[Value](  # noqa: PLR0913
         DataField(
             aliased=aliased,
             description=description,
-            default=default,
+            default_value=default,
             default_factory=default_factory,
             validator=validator,
             verifier=verifier,
@@ -133,8 +132,8 @@ class DataField:
         self,
         aliased: str | None,
         description: str | Missing,
-        default: Any | Missing,
-        default_factory: ParameterDefaultFactory[Any] | Missing,
+        default_value: Any | Missing,
+        default_factory: Callable[[], Any] | Missing,
         validator: ParameterValidation[Any] | Missing,
         verifier: ParameterVerification[Any] | Missing,
         converter: ParameterConversion[Any] | Missing,
@@ -142,7 +141,7 @@ class DataField:
     ) -> None:
         self.aliased: str | None = aliased
         self.description: str | Missing = description
-        self.default: Any | Missing = default
+        self.default_value: Any | Missing = default_value
         self.default_factory: Callable[[], Any] | Missing = default_factory
         self.validator: ParameterValidation[Any] | Missing = validator
         self.verifier: ParameterVerification[Any] | Missing = verifier
@@ -164,25 +163,40 @@ def _resolve_field(
                 name=name,
                 alias=data_field.aliased,
                 description=data_field.description,
-                default_value=data_field.default,
-                default_factory=data_field.default_factory,
+                default=DefaultValue(
+                    data_field.default_value,
+                    factory=data_field.default_factory,
+                ),
                 validator=data_field.validator,
                 verifier=data_field.verifier,
                 converter=data_field.converter,
                 specification=data_field.specification,
                 required=attribute.required
-                and data_field.default is MISSING
+                and data_field.default_value is MISSING
                 and data_field.default_factory is MISSING,
             )
 
-        case default:
+        case DefaultValue() as default:  # pyright: ignore[reportUnknownVariableType]
             return Parameter[Any].of(
                 attribute,
                 name=name,
                 alias=None,
                 description=MISSING,
-                default_value=default,
-                default_factory=MISSING,
+                default=default,  # pyright: ignore[reportUnknownArgumentType]
+                validator=MISSING,
+                verifier=MISSING,
+                converter=MISSING,
+                specification=MISSING,
+                required=False,
+            )
+
+        case value:
+            return Parameter[Any].of(
+                attribute,
+                name=name,
+                alias=None,
+                description=MISSING,
+                default=DefaultValue(value),
                 validator=MISSING,
                 verifier=MISSING,
                 converter=MISSING,
@@ -354,7 +368,7 @@ def _check_required(default: Any) -> bool:
         return True
 
     elif isinstance(default, DataField):
-        return default.default is MISSING and default.default_factory is MISSING
+        return default.default_value is MISSING and default.default_factory is MISSING
 
     else:
         return False

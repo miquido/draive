@@ -16,7 +16,6 @@ async def fetch_instruction(
     reference: InstructionDeclaration | str,
     /,
     *,
-    default: Instruction | str | None = None,
     arguments: Mapping[str, str] | None = None,
     **extra: Any,
 ) -> Instruction | None: ...

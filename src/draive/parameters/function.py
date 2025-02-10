@@ -5,17 +5,13 @@ from inspect import signature
 from types import EllipsisType
 from typing import Any, ClassVar, cast, final, get_type_hints, overload
 
-from haiway import MISSING, Missing, mimic_function
+from haiway import MISSING, DefaultValue, Missing, mimic_function
 from haiway.state import AttributeAnnotation
 from haiway.state.attributes import resolve_attribute_annotation
 
 from draive.parameters.parameter import Parameter
 from draive.parameters.specification import ParameterSpecification
-from draive.parameters.types import (
-    ParameterDefaultFactory,
-    ParameterValidation,
-    ParameterVerification,
-)
+from draive.parameters.types import ParameterValidation, ParameterVerification
 from draive.parameters.validation import ParameterValidationContext
 
 __all__ = [
@@ -40,7 +36,7 @@ def Argument[Value](
     *,
     aliased: str | None = None,
     description: str | Missing = MISSING,
-    default_factory: ParameterDefaultFactory[Value] | Missing = MISSING,
+    default_factory: Callable[[], Value] | Missing = MISSING,
     validator: ParameterValidation[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
@@ -62,7 +58,7 @@ def Argument[Value](
     *,
     aliased: str | None = None,
     description: str | Missing = MISSING,
-    default_factory: ParameterDefaultFactory[Value] | Missing = MISSING,
+    default_factory: Callable[[], Value] | Missing = MISSING,
     verifier: ParameterVerification[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
@@ -73,7 +69,7 @@ def Argument[Value](  # noqa: PLR0913
     aliased: str | None = None,
     description: str | Missing = MISSING,
     default: Value | Missing = MISSING,
-    default_factory: ParameterDefaultFactory[Value] | Missing = MISSING,
+    default_factory: Callable[[], Value] | Missing = MISSING,
     validator: ParameterValidation[Value] | Missing = MISSING,
     verifier: ParameterVerification[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
@@ -109,7 +105,7 @@ class FunctionArgument:
         aliased: str | None,
         description: str | Missing,
         default: Any | Missing,
-        default_factory: ParameterDefaultFactory[Any] | Missing,
+        default_factory: Callable[[], Any] | Missing,
         validator: ParameterValidation[Any] | Missing,
         verifier: ParameterVerification[Any] | Missing,
         specification: ParameterSpecification | Missing,
@@ -228,8 +224,10 @@ def _resolve_argument(
                 name=parameter.name,
                 alias=argument.aliased,
                 description=argument.description,
-                default_value=argument.default,
-                default_factory=argument.default_factory,
+                default=DefaultValue(
+                    argument.default,
+                    factory=argument.default_factory,
+                ),
                 validator=argument.validator,
                 verifier=argument.verifier,
                 converter=MISSING,
@@ -239,17 +237,30 @@ def _resolve_argument(
                 and argument.default_factory is MISSING,
             )
 
-        case default:
+        case DefaultValue() as default:  # pyright: ignore[reportUnknownVariableType]
             return Parameter[Any].of(
                 attribute,
                 name=parameter.name,
                 alias=None,
                 description=MISSING,
-                default_value=MISSING if default is INSPECT_EMPTY else default,
-                default_factory=MISSING,
+                default=default,  # pyright: ignore[reportUnknownArgumentType]
                 validator=MISSING,
                 verifier=MISSING,
                 converter=MISSING,
                 specification=MISSING,
-                required=attribute.required and default is INSPECT_EMPTY,
+                required=False,
+            )
+
+        case value:
+            return Parameter[Any].of(
+                attribute,
+                name=parameter.name,
+                alias=None,
+                description=MISSING,
+                default=DefaultValue(MISSING if value is INSPECT_EMPTY else value),
+                validator=MISSING,
+                verifier=MISSING,
+                converter=MISSING,
+                specification=MISSING,
+                required=attribute.required and value is INSPECT_EMPTY,
             )
