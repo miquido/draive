@@ -144,7 +144,7 @@ def _simplified_schema_property(  # noqa: C901, PLR0912, PLR0911
             return "|".join(alternative_elements)
 
         case {"type": "array", "items": items, "description": str() as description}:
-            return [_simplified_schema_property(specification=items), f"({description})"]
+            return [_simplified_schema_property(specification=items)]  # TODO: add description?
 
         case {"type": "array", "items": items}:
             return [
@@ -159,7 +159,7 @@ def _simplified_schema_property(  # noqa: C901, PLR0912, PLR0911
                     specification=item,
                 )
                 for item in items
-            ] + [f"({description})"]
+            ]  # TODO: add description?
 
         case {"type": "array", "prefixItems": items}:
             return [
@@ -170,7 +170,7 @@ def _simplified_schema_property(  # noqa: C901, PLR0912, PLR0911
             ]
 
         case {"type": "array", "description": str() as description}:
-            return [f"({description})"]
+            return []  # TODO: add description?
 
         case {"type": "array"}:
             return []
@@ -181,7 +181,7 @@ def _simplified_schema_property(  # noqa: C901, PLR0912, PLR0911
                     specification=specification,
                 )
                 for key, specification in properties.items()
-            }
+            }  # TODO: add description?
 
         case {"type": "object", "properties": {**properties}}:
             return {

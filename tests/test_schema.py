@@ -52,7 +52,7 @@ json_schema: str = """\
       ],
       "description": "alternative"
     },
-    "nested": {
+    "nested_value": {
       "type": "object",
       "properties": {
         "value": {
@@ -82,7 +82,7 @@ json_schema: str = """\
     "bool_value",
     "list_value",
     "optional_value",
-    "nested"
+    "nested_value"
   ]
 }\
 """
@@ -102,7 +102,7 @@ simplified_schema: str = """\
     "string"
   ],
   "optional_value": "string|null(alternative)",
-  "nested": {
+  "nested_value": {
     "value": "'A'|'B'|'C'(selection)",
     "other_value": "null"
   }

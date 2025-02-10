@@ -228,11 +228,14 @@ class DataModelMeta(type):
                 name=key,
                 default=default,
             )
-            parameters_specification[key] = parameter.specification
+            # we are using aliased name for specification
+            aliased_name: str = parameter.alias or parameter.name
+            parameters_specification[aliased_name] = parameter.specification
 
             if parameter.required:
-                parameters_specification_required.append(key)
+                parameters_specification_required.append(aliased_name)
 
+            # we are using actual key/name for object itself
             parameters[key] = parameter
 
         if bases:
