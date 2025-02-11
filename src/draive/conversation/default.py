@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from datetime import UTC, datetime
 from typing import Any, Literal, overload
 
-from haiway import AsyncQueue, ctx
+from haiway import ArgumentsTrace, AsyncQueue, ResultTrace, ctx
 
 from draive.conversation.types import ConversationMemory, ConversationMessage
 from draive.instructions import Instruction
@@ -157,6 +157,12 @@ async def _conversation_completion(
     toolbox: Toolbox,
     **extra: Any,
 ) -> ConversationMessage:
+    ctx.record(
+        ArgumentsTrace.of(
+            instruction=instruction,
+            context=context,
+        )
+    )
     recursion_level: int = 0
     while recursion_level <= toolbox.repeated_calls_limit:
         match await lmm_invoke(
@@ -174,7 +180,11 @@ async def _conversation_completion(
                     created=datetime.now(UTC),
                     content=completion.content,
                 )
+
                 await memory.remember(response_message)
+
+                ctx.record(ResultTrace.of(response_message))
+
                 return response_message
 
             case LMMToolRequests() as tool_requests:
@@ -191,6 +201,9 @@ async def _conversation_completion(
                         content=MultimodalContent.of(*direct_content),
                     )
                     await memory.remember(response_message)
+
+                    ctx.record(ResultTrace.of(response_message))
+
                     return response_message
 
                 else:
@@ -208,19 +221,28 @@ async def _conversation_completion(
 
 async def _conversation_stream(
     instruction: Instruction | str | None,
-    message: ConversationMessage,
     memory: Memory[Sequence[ConversationMessage], ConversationMessage],
     context: list[LMMContextElement],
     toolbox: Toolbox,
     **extra: Any,
 ) -> AsyncGenerator[LMMStreamChunk]:
+    ctx.record(
+        ArgumentsTrace.of(
+            instruction=instruction,
+            context=context,
+        )
+    )
+    if not isinstance(context[-1], LMMInput):
+        raise ValueError(f"Streaming input has to end with LMMInput, received {type(context[-1])}")
+
     input_stream = AsyncQueue[LMMStreamInput]()
     input_stream.enqueue(
         LMMStreamChunk.of(
-            message.content,
-            eod=True,  # we provide single input chunk here
+            context[-1].content,
+            eod=True,  # we provide single input chunk through this interface
         )
     )
+    del context[-1]  # we are using last element as stream input, we have to remove it from context
     accumulated_content: MultimodalContent = MultimodalContent.of()
     async for element in await lmm_stream(
         properties=LMMStreamProperties(
@@ -234,7 +256,7 @@ async def _conversation_stream(
         match element:
             case LMMStreamChunk() as chunk:
                 accumulated_content = accumulated_content.appending(
-                    chunk.content,
+                    *chunk.content.parts,
                     merge_text=True,
                 )
 
@@ -248,10 +270,9 @@ async def _conversation_stream(
                         created=datetime.now(UTC),
                         content=accumulated_content,
                     )
-                    await memory.remember(
-                        message,
-                        response_message,
-                    )
+                    await memory.remember(response_message)
+
+                    ctx.record(ResultTrace.of(response_message))
 
                     return  # end of streaming for conversation completion
 
