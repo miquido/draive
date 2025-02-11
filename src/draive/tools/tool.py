@@ -4,8 +4,8 @@ from typing import Any, Protocol, cast, final, overload
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
 
 from draive.lmm.types import (
+    LMMException,
     LMMToolError,
-    LMMToolException,
     LMMToolFunctionSpecification,
     LMMToolSpecification,
 )
@@ -97,7 +97,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
             try:
                 try:
                     if not self.available:
-                        raise LMMToolException(f"{self.name} is not available!")
+                        raise LMMException(f"Tool {self.name} is not available!")
 
                     result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
                     ctx.record(ResultTrace.of(result))
