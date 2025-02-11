@@ -18,6 +18,7 @@ __all__ = [
     "LMMCompletion",
     "LMMContext",
     "LMMContextElement",
+    "LMMException",
     "LMMInput",
     "LMMInvocating",
     "LMMOutput",
@@ -27,7 +28,6 @@ __all__ = [
     "LMMStreamProperties",
     "LMMStreaming",
     "LMMToolError",
-    "LMMToolException",
     "LMMToolFunctionSpecification",
     "LMMToolRequest",
     "LMMToolRequests",
@@ -49,11 +49,11 @@ type LMMOutputSelection = Literal["auto", "text", "image", "audio", "video"] | t
 type LMMToolSelection = Literal["auto", "required", "none"] | LMMToolSpecification
 
 
-class LMMToolException(Exception):
+class LMMException(Exception):
     pass
 
 
-class LMMToolError(LMMToolException):
+class LMMToolError(LMMException):
     def __init__(
         self,
         *args: object,

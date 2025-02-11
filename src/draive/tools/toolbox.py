@@ -5,8 +5,8 @@ from typing import Any, Literal, Protocol, Self, cast, final, runtime_checkable
 from haiway import State, ctx
 
 from draive.lmm.types import (
+    LMMException,
     LMMToolError,
-    LMMToolException,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
@@ -146,7 +146,7 @@ class Toolbox(State):
             )
 
         else:
-            raise LMMToolException("Requested tool (%s) is not defined", name)
+            raise LMMException(f"Requested tool ({name}) is not defined")
 
     async def respond_all(
         self,
