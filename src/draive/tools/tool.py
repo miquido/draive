@@ -294,10 +294,10 @@ def tool[**Args, Result](  # noqa: PLR0913
     format_failure: Callable[[Exception], Multimodal] | None = None,
     direct_result: bool = False,
 ) -> PartialToolWrapper[Result] | ToolWrapper | Tool[Args, Result]:
-    def wrap(
-        function: Callable[Args, Coroutine[None, None, Result]],
-    ) -> Tool[Args, Result]:
-        return Tool(
+    def wrap[**Arg](
+        function: Callable[Arg, Coroutine[None, None, Result]],
+    ) -> Tool[Arg, Result]:
+        return Tool[Arg, Result](
             name=name or function.__name__,
             description=description,
             function=function,

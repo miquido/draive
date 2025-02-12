@@ -1,5 +1,5 @@
 from collections.abc import Callable, Coroutine
-from typing import final, overload
+from typing import Protocol, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
 
@@ -55,6 +55,7 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
                     name=self.declaration.name,
                     description=self.declaration.description,
                     content=await super().__call__(*args, **kwargs),  # pyright: ignore[reportCallIssue]
+                    variables={},
                 )
                 ctx.record(ResultTrace.of(result))
 
@@ -69,19 +70,26 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
                 raise exc
 
 
+class InstructionTemplateWrapper(Protocol):
+    def __call__[**Args](
+        self,
+        function: Callable[Args, Coroutine[None, None, str]],
+    ) -> InstructionTemplate[Args]: ...
+
+
 @overload
 def instruction[**Args](
     function: Callable[Args, Coroutine[None, None, str]],
     /,
-) -> Callable[[Callable[Args, Coroutine[None, None, str]]], InstructionTemplate[Args]]: ...
+) -> InstructionTemplate[Args]: ...
 
 
 @overload
-def instruction[**Args](
+def instruction(
     *,
     name: str | None = None,
     description: str | None = None,
-) -> InstructionTemplate[Args]: ...
+) -> InstructionTemplateWrapper: ...
 
 
 def instruction[**Args](
@@ -89,14 +97,11 @@ def instruction[**Args](
     *,
     name: str | None = None,
     description: str | None = None,
-) -> (
-    Callable[[Callable[Args, Coroutine[None, None, str]]], InstructionTemplate[Args]]
-    | InstructionTemplate[Args]
-):
-    def wrap(
-        function: Callable[Args, Coroutine[None, None, str]],
-    ) -> InstructionTemplate[Args]:
-        return InstructionTemplate[Args](
+) -> InstructionTemplateWrapper | InstructionTemplate[Args]:
+    def wrap[**Arg](
+        function: Callable[Arg, Coroutine[None, None, str]],
+    ) -> InstructionTemplate[Arg]:
+        return InstructionTemplate[Arg](
             name=name or function.__name__,
             description=description,
             function=function,
