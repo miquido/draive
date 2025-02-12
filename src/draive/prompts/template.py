@@ -83,11 +83,18 @@ class PromptTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, LM
                 raise exc
 
 
+class PromptTemplateWrapper(Protocol):
+    def __call__[**Args](
+        self,
+        function: Callable[Args, Coroutine[None, None, LMMContext]],
+    ) -> PromptTemplate[Args]: ...
+
+
 @overload
 def prompt[**Args](
     function: Callable[Args, Coroutine[None, None, LMMContext]],
     /,
-) -> Callable[[Callable[Args, Coroutine[None, None, LMMContext]]], PromptTemplate[Args]]: ...
+) -> PromptTemplate[Args]: ...
 
 
 @overload
@@ -96,7 +103,7 @@ def prompt[**Args](
     name: str | None = None,
     description: str | None = None,
     availability_check: PromptAvailabilityCheck | None = None,
-) -> PromptTemplate[Args]: ...
+) -> PromptTemplateWrapper: ...
 
 
 def prompt[**Args](
@@ -105,14 +112,11 @@ def prompt[**Args](
     name: str | None = None,
     description: str | None = None,
     availability_check: PromptAvailabilityCheck | None = None,
-) -> (
-    Callable[[Callable[Args, Coroutine[None, None, LMMContext]]], PromptTemplate[Args]]
-    | PromptTemplate[Args]
-):
-    def wrap(
-        function: Callable[Args, Coroutine[None, None, LMMContext]],
-    ) -> PromptTemplate[Args]:
-        return PromptTemplate[Args](
+) -> PromptTemplateWrapper | PromptTemplate[Args]:
+    def wrap[**Arg](
+        function: Callable[Arg, Coroutine[None, None, LMMContext]],
+    ) -> PromptTemplate[Arg]:
+        return PromptTemplate[Arg](
             name=name or function.__name__,
             description=description,
             availability_check=availability_check,
