@@ -137,18 +137,18 @@ ReferenceParameterSpecification = TypedDict(
 
 
 type ParameterSpecification = (
-    ParameterNoneSpecification
-    | ParameterBoolSpecification
-    | ParameterIntegerSpecification
-    | ParameterNumberSpecification
-    | ParameterStringSpecification
+    ParameterObjectSpecification
+    | ParameterAnyObjectSpecification
+    | ParameterDictSpecification
+    | ParameterTupleSpecification
+    | ParameterArraySpecification
     | ParameterEnumSpecification
     | ParameterUnionSpecification
-    | ParameterArraySpecification
-    | ParameterTupleSpecification
-    | ParameterDictSpecification
-    | ParameterObjectSpecification
-    | ParameterAnyObjectSpecification
+    | ParameterStringSpecification
+    | ParameterNumberSpecification
+    | ParameterIntegerSpecification
+    | ParameterBoolSpecification
+    | ParameterNoneSpecification
     | ReferenceParameterSpecification
 )
 
