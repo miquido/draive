@@ -319,7 +319,7 @@ class DataModelMeta(type):
         )
         if checked_parameters is None:
             # if we are not parametrized allow any subclass
-            return self in subclass.__bases__
+            return self in subclass.__bases__  # pyright: ignore[reportUnnecessaryContains]
 
         # verify if we have common base next - our generic subtypes have the same base
         if self.__bases__ == subclass.__bases__:

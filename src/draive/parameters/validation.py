@@ -1,4 +1,4 @@
-from collections.abc import Callable, Mapping, MutableMapping, Sequence
+from collections.abc import Callable, Mapping, MutableMapping, Sequence, Set
 from datetime import UTC, date, datetime, time
 from enum import Enum, IntEnum, StrEnum
 from types import EllipsisType, NoneType, UnionType
@@ -944,15 +944,16 @@ def _prepare_validator_of_typed_dict(  # noqa: C901
             case _:
                 raise TypeError(f"'{value}' is not matching expected type of 'str'")
 
-    validators: dict[str, ParameterValidation[Any]] = {
+    formatted_type: str = str(annotation)
+    values_validators: dict[str, ParameterValidation[Any]] = {
         key: ParameterValidator.of(
             element,
             verifier=None,
             recursion_guard=recursion_guard,
         )
-        for key, element in annotation.extra.items()
+        for key, element in annotation.extra["attributes"].items()
     }
-    formatted_type: str = str(annotation)
+    required_values: Set[str] = annotation.extra["required"]
 
     if verifier := verifier:
 
@@ -964,15 +965,17 @@ def _prepare_validator_of_typed_dict(  # noqa: C901
             match value:
                 case {**elements}:
                     validated: MutableMapping[Any, Any] = {}
-                    for key, validate in validators.items():
+                    for key, validate in values_validators.items():
                         validated_key: str = key_validator(key)
                         with context.scope(f"[{validated_key}]"):
                             element: Any = elements.get(validated_key, MISSING)
-                            if element is not MISSING:
-                                validated[validated_key] = validate(
-                                    element,
-                                    context=context,
-                                )
+                            if element is MISSING and key not in required_values:
+                                continue  # skip missing and not required
+
+                            validated[validated_key] = validate(
+                                element,
+                                context=context,
+                            )
 
                     # TODO: FIXME: make sure dict is not mutable?
                     # validated = MappingProxyType(validated)
@@ -993,15 +996,17 @@ def _prepare_validator_of_typed_dict(  # noqa: C901
             match value:
                 case {**elements}:
                     validated: MutableMapping[Any, Any] = {}
-                    for key, validate in validators.items():
+                    for key, validate in values_validators.items():
                         validated_key: str = key_validator(key)
                         with context.scope(f"[{validated_key}]"):
                             element: Any = elements.get(validated_key, MISSING)
-                            if element is not MISSING:
-                                validated[validated_key] = validate(
-                                    element,
-                                    context=context,
-                                )
+                            if element is MISSING and key not in required_values:
+                                continue  # skip missing and not required
+
+                            validated[validated_key] = validate(
+                                element,
+                                context=context,
+                            )
 
                     # TODO: FIXME: make sure dict is not mutable?
                     # return MappingProxyType(validated)
