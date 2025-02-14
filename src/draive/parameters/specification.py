@@ -56,30 +56,23 @@ class ParameterStringSpecification(TypedDict, total=False):
 
 @final
 class ParameterStringEnumSpecification(TypedDict, total=False):
-    type: NotRequired[Literal["string"]]
+    type: Required[Literal["string"]]
     enum: Required[Sequence[str]]
     description: NotRequired[str]
 
 
 @final
 class ParameterIntegerEnumSpecification(TypedDict, total=False):
-    type: NotRequired[Literal["integer"]]
+    type: Required[Literal["integer"]]
     enum: Required[Sequence[int]]
     description: NotRequired[str]
 
 
 @final
 class ParameterNumberEnumSpecification(TypedDict, total=False):
-    type: NotRequired[Literal["number"]]
+    type: Required[Literal["number"]]
     enum: Required[Sequence[float]]
     description: NotRequired[str]
-
-
-ParameterEnumSpecification = (
-    ParameterStringEnumSpecification
-    | ParameterIntegerEnumSpecification
-    | ParameterNumberEnumSpecification
-)
 
 
 @final
@@ -105,7 +98,7 @@ class ParameterTupleSpecification(TypedDict, total=False):
 @final
 class ParameterDictSpecification(TypedDict, total=False):
     type: Required[Literal["object"]]
-    additionalProperties: Required["ParameterSpecification | bool"]
+    additionalProperties: Required["ParameterSpecification"]
     description: NotRequired[str]
     required: NotRequired[Sequence[str]]
 
@@ -137,18 +130,20 @@ ReferenceParameterSpecification = TypedDict(
 
 
 type ParameterSpecification = (
-    ParameterObjectSpecification
-    | ParameterAnyObjectSpecification
-    | ParameterDictSpecification
+    ParameterUnionSpecification
+    | ParameterNoneSpecification
+    | ParameterStringEnumSpecification
+    | ParameterStringSpecification
+    | ParameterIntegerEnumSpecification
+    | ParameterIntegerSpecification
+    | ParameterNumberEnumSpecification
+    | ParameterNumberSpecification
+    | ParameterBoolSpecification
     | ParameterTupleSpecification
     | ParameterArraySpecification
-    | ParameterEnumSpecification
-    | ParameterUnionSpecification
-    | ParameterStringSpecification
-    | ParameterNumberSpecification
-    | ParameterIntegerSpecification
-    | ParameterBoolSpecification
-    | ParameterNoneSpecification
+    | ParameterObjectSpecification
+    | ParameterDictSpecification
+    | ParameterAnyObjectSpecification
     | ReferenceParameterSpecification
 )
 
@@ -556,7 +551,7 @@ def _prepare_specification_of_typed_dict(
     required: list[str] = []
     properties: dict[str, ParameterSpecification] = {}
 
-    for key, element in annotation.extra.items():
+    for key, element in annotation.extra["attributes"].items():
         properties[key] = parameter_specification(
             element,
             description=None,
