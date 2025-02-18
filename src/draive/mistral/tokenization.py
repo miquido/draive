@@ -1,22 +1,32 @@
 from pathlib import Path
 
+from haiway import cache
+
+from draive.mistral.api import MistralAPI
 from draive.sentencepiece import sentencepiece_processor, sentencepiece_tokenizer
 from draive.tokenization import Tokenization
 
 __all__ = [
-    "mistral_text_tokenizer",
+    "MistralTokenization",
 ]
 
 
-async def mistral_text_tokenizer(
-    model_name: str,
-    /,
-) -> Tokenization:
-    return Tokenization(
-        tokenize_text=sentencepiece_tokenizer(
-            await sentencepiece_processor(model_path=_model_path(model_name))
+class MistralTokenization(MistralAPI):
+    @cache(limit=2)
+    async def tokenizer(
+        self,
+        model_name: str,
+        /,
+    ) -> Tokenization:
+        """
+        Prepare tokenizer for selected Mistral model.
+        """
+
+        return Tokenization(
+            tokenize_text=sentencepiece_tokenizer(
+                await sentencepiece_processor(model_path=_model_path(model_name))
+            )
         )
-    )
 
 
 def _model_path(

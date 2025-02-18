@@ -45,7 +45,9 @@ class LMMToolFunctionSpecification(TypedDict):
 
 
 type LMMToolSpecification = LMMToolFunctionSpecification
-type LMMOutputSelection = Literal["auto", "text", "image", "audio", "video"] | type[DataModel]
+type LMMOutputSelection = (
+    Literal["auto", "text", "json", "image", "audio", "video"] | type[DataModel]
+)
 type LMMToolSelection = Literal["auto", "required", "none"] | LMMToolSpecification
 
 
@@ -112,6 +114,7 @@ class LMMToolRequest(DataModel):
 
 
 class LMMToolRequests(DataModel):
+    completion: LMMCompletion | None = None
     requests: Sequence[LMMToolRequest]
 
 
@@ -161,6 +164,7 @@ class LMMInvocating(Protocol):
 class LMMStreamProperties(State):
     instruction: Instruction | str | None = None
     tools: Sequence[LMMToolSpecification] | None
+    tool_selection: LMMToolSelection = "auto"
 
 
 @runtime_checkable

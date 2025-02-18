@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any, Protocol, runtime_checkable
 
 __all__ = [
@@ -10,5 +11,6 @@ class TextTokenizing(Protocol):
     def __call__(
         self,
         text: str,
+        /,
         **extra: Any,
-    ) -> list[int]: ...
+    ) -> Sequence[int]: ...
