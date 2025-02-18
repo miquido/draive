@@ -112,7 +112,7 @@ class OpenAIClient:
         *,
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
-        response_format: Literal["auto", "text", "image", "audio", "video"]
+        response_format: Literal["auto", "text", "json", "image", "audio", "video"]
         | type[DataModel] = "auto",
         tools: list[ChatCompletionToolParam] | None = None,
         tool_choice: ChatCompletionToolChoiceOptionParam | NotGiven = NOT_GIVEN,
@@ -123,7 +123,7 @@ class OpenAIClient:
         *,
         config: OpenAIChatConfig,
         messages: list[ChatCompletionMessageParam],
-        response_format: Literal["auto", "text", "image", "audio", "video"]
+        response_format: Literal["auto", "text", "json", "image", "audio", "video"]
         | type[DataModel] = "auto",
         tools: list[ChatCompletionToolParam] | None = None,
         tool_choice: ChatCompletionToolChoiceOptionParam | NotGiven = NOT_GIVEN,

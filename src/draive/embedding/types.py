@@ -21,5 +21,6 @@ class ValueEmbedder[Value: DataModel | State | str | bytes](Protocol):
     async def __call__(
         self,
         values: Sequence[Value],
+        /,
         **extra: Any,
     ) -> Sequence[Embedded[Value]]: ...

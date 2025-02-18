@@ -1,44 +1,60 @@
+from asyncio import gather
 from collections.abc import Sequence
+from itertools import chain
 from typing import Any
 
-from haiway import ctx
+from haiway import as_list, ctx
+from mistralai import EmbeddingResponse
 
 from draive.embedding import Embedded, TextEmbedding
-from draive.mistral.client import MistralClient
+from draive.mistral.api import MistralAPI
 from draive.mistral.config import MistralEmbeddingConfig
 
 __all__ = [
-    "mistral_text_embedding",
+    "MistralEmbedding",
 ]
 
 
-def mistral_text_embedding(
-    client: MistralClient | None = None,
-    /,
-) -> TextEmbedding:
-    client = client or MistralClient.shared()
+class MistralEmbedding(MistralAPI):
+    def text_embedding(self) -> TextEmbedding:
+        """
+        Prepare TextEmbedding implementation using Mistral service.
+        """
+        return TextEmbedding(embed=self.create_text_embeddings)
 
-    async def mistral_embed_text(
+    async def create_text_embeddings(
+        self,
         values: Sequence[str],
+        /,
         **extra: Any,
     ) -> Sequence[Embedded[str]]:
+        """
+        Create texts embedding with Mistral embedding service.
+        """
         config: MistralEmbeddingConfig = ctx.state(MistralEmbeddingConfig).updated(**extra)
-        with ctx.scope("mistral_embed_text", config):
-            results: list[Sequence[float]] = await client.embedding(  # pyright: ignore[reportDeprecated]
-                config=config,
-                inputs=values,
+        with ctx.scope("mistral_text_embedding", config):
+            texts: list[str] = as_list(values)
+            responses: list[EmbeddingResponse] = await gather(
+                *[
+                    self._client.embeddings.create_async(
+                        model=config.model,
+                        inputs=texts[index : index + config.batch_size],
+                        encoding_format="float",
+                    )
+                    for index in range(0, len(texts), config.batch_size)
+                ]
             )
 
             return [
                 Embedded(
                     value=embedded[0],
-                    vector=embedded[1],
+                    vector=embedded[1].embedding,
                 )
                 for embedded in zip(
-                    values,
-                    results,
+                    texts,
+                    chain.from_iterable([response.data for response in responses]),
                     strict=True,
                 )
+                # filter out missing embeddings, although all should be available
+                if embedded[1].embedding
             ]
-
-    return TextEmbedding(embed=mistral_embed_text)

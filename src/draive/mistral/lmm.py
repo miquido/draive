@@ -1,149 +1,75 @@
 import json
+from base64 import b64encode
 from collections.abc import Iterable
-from itertools import chain
-from typing import Any
+from typing import Any, cast
 
-from haiway import ArgumentsTrace, ResultTrace, ctx
+from mistralai.models import (
+    ChatCompletionRequestToolChoiceTypedDict,
+    ContentChunk,
+    ContentChunkTypedDict,
+    ImageURLChunk,
+    MessagesTypedDict,
+    ResponseFormatTypedDict,
+    TextChunk,
+    ToolTypedDict,
+)
 
-from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
-    LMMContext,
     LMMContextElement,
     LMMInput,
-    LMMInvocation,
-    LMMOutput,
     LMMOutputSelection,
-    LMMToolRequest,
     LMMToolRequests,
     LMMToolResponses,
     LMMToolSelection,
     LMMToolSpecification,
 )
-from draive.metrics import TokenUsage
-from draive.mistral.client import MistralClient
-from draive.mistral.config import MistralChatConfig
-from draive.mistral.models import ChatCompletionResponse, ChatMessage, ChatMessageResponse
 from draive.mistral.types import MistralException
-from draive.multimodal import MultimodalContent
+from draive.multimodal import MediaContent, MultimodalContentElement, TextContent
+from draive.parameters import DataModel
 
 __all__ = [
-    "mistral_lmm",
+    "content_chunk_as_content_element",
+    "content_element_as_content_chunk",
+    "context_element_as_messages",
+    "output_as_response_format",
+    "tool_specification_as_tool",
+    "tools_as_tool_config",
 ]
 
 
-def mistral_lmm(
-    client: MistralClient | None = None,
-    /,
-) -> LMMInvocation:
-    client = client or MistralClient.shared()
-
-    async def lmm_invocation(  # noqa: PLR0913
-        *,
-        instruction: Instruction | str | None,
-        context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
-        output: LMMOutputSelection,
-        prefill: MultimodalContent | None = None,
-        **extra: Any,
-    ) -> LMMOutput:
-        with ctx.scope("mistral_lmm_invocation"):
-            ctx.record(
-                ArgumentsTrace.of(
-                    instruction=instruction,
-                    context=context,
-                    tools=tools,
-                    tool_selection=tool_selection,
-                    output=output,
-                    **extra,
-                )
-            )
-            config: MistralChatConfig = ctx.state(MistralChatConfig).updated(**extra)
-            ctx.record(config)
-
-            response_format: dict[str, str]
-            match output:
-                case "auto" | "text":
-                    response_format = {"type": "text"}
-
-                case "image":
-                    raise NotImplementedError("image output is not supported by mistral")
-
-                case "audio":
-                    raise NotImplementedError("audio output is not supported by mistral")
-
-                case "video":
-                    raise NotImplementedError("video output is not supported by mistral")
-
-                case _:
-                    if tools:
-                        ctx.log_warning(
-                            "Attempting to use Mistral in JSON mode with tools which is not"
-                            " supported. Using text mode instead..."
-                        )
-                        response_format = {"type": "text"}
-
-                    else:
-                        response_format = {"type": "json_object"}
-
-
-            if prefill:
-                context = [*context, LMMCompletion.of(prefill)]
-
-            messages: list[ChatMessage] = list(
-                chain.from_iterable(
-                    [_convert_context_element(element=element) for element in context]
-                )
-            )
-
-            if instruction:
-                messages = [
-                    ChatMessage(
-                        role="system",
-                        content=Instruction.formatted(instruction),
-                    ),
-                    *messages,
-                ]
-
-            return await _chat_completion(
-                client=client,
-                config=config,
-                messages=messages,
-                response_format=response_format,
-                tools=tools,
-                tool_selection=tool_selection,
-            )
-
-    return LMMInvocation(invoke=lmm_invocation)
-
-
-def _convert_context_element(
+def context_element_as_messages(
     element: LMMContextElement,
-) -> Iterable[ChatMessage]:
+    /,
+) -> Iterable[MessagesTypedDict]:
     match element:
         case LMMInput() as input:
             return (
-                ChatMessage(
-                    role="user",
-                    content=input.content.as_string(),
-                ),
+                {
+                    "role": "user",
+                    "content": [
+                        content_element_as_content_chunk(element) for element in input.content.parts
+                    ],
+                },
             )
 
         case LMMCompletion() as completion:
             return (
-                ChatMessage(
-                    role="assistant",
-                    content=completion.content.as_string(),
-                ),
+                {
+                    "role": "assistant",
+                    "content": [
+                        content_element_as_content_chunk(element)
+                        for element in completion.content.parts
+                    ],
+                },
             )
 
         case LMMToolRequests() as tool_requests:
             return (
-                ChatMessage(
-                    role="assistant",
-                    content="",
-                    tool_calls=[
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
                         {
                             "id": request.identifier,
                             "function": {
@@ -153,142 +79,161 @@ def _convert_context_element(
                         }
                         for request in tool_requests.requests
                     ],
-                ),
+                },
             )
 
         case LMMToolResponses() as tool_responses:
             return (
-                ChatMessage(
-                    role="tool",
-                    tool_call_id=response.identifier,
-                    name=response.tool,
-                    content=response.content.as_string(),
-                )
+                {
+                    "role": "tool",
+                    "tool_call_id": response.identifier,
+                    "name": response.tool,
+                    "content": [
+                        content_element_as_content_chunk(element)
+                        for element in response.content.parts
+                    ],
+                }
                 for response in tool_responses.responses
             )
 
 
-async def _chat_completion(  # noqa: PLR0913
-    *,
-    client: MistralClient,
-    config: MistralChatConfig,
-    messages: list[ChatMessage],
-    response_format: dict[str, str],
+def content_element_as_content_chunk(
+    element: MultimodalContentElement,
+    /,
+) -> ContentChunkTypedDict:
+    match element:
+        case TextContent() as text:
+            return {
+                "type": "text",
+                "text": text.text,
+            }
+
+        case MediaContent() as media:
+            if media.kind != "image":
+                raise ValueError("Unsupported content", media)
+
+            url: str
+            match media.source:
+                case str() as string:
+                    url = string
+
+                case bytes() as data:
+                    url = f"data:{media.media};base64,{b64encode(data).decode()}"
+
+            return {
+                "type": "image_url",
+                "image_url": {"url": url},
+                # TODO: there is optional "detail" argument, however undocumented
+            }
+
+        case DataModel() as data:
+            return {
+                "type": "text",
+                "text": data.as_json(),
+            }
+
+
+def content_chunk_as_content_element(
+    element: ContentChunk,
+    /,
+) -> MultimodalContentElement:
+    match element:
+        case TextChunk() as chunk:
+            return TextContent(text=chunk.text)
+
+        case ImageURLChunk() as image:
+            match image.image_url:
+                case str() as url:
+                    return MediaContent.url(
+                        url,
+                        media="image",
+                    )
+
+                case image_url:
+                    return MediaContent.url(
+                        image_url.url,
+                        media="image",
+                    )
+
+        case other:
+            raise MistralException("Unsupported Mistral message content chunk", other)
+
+
+def tool_specification_as_tool(
+    tool: LMMToolSpecification,
+    /,
+) -> ToolTypedDict:
+    return {
+        "type": "function",
+        "function": {
+            "name": tool["name"],
+            "description": tool["description"] or "",
+            "parameters": cast(dict[str, Any], tool["parameters"]),
+        },
+    }
+
+
+def output_as_response_format(
+    output: LMMOutputSelection,
+) -> ResponseFormatTypedDict:
+    match output:
+        case "auto" | "text":
+            return {"type": "text"}
+
+        case "json":
+            return {"type": "json_object"}
+
+        case "image":
+            raise NotImplementedError("image output is not supported by Mistral")
+
+        case "audio":
+            raise NotImplementedError("audio output is not supported by Mistral")
+
+        case "video":
+            raise NotImplementedError("video output is not supported by Mistral")
+
+        case model:
+            return {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": model.__name__,
+                    "schema_definition": cast(
+                        dict[str, Any],
+                        model.__PARAMETERS_SPECIFICATION__,
+                    ),
+                    "description": None,
+                    "strict": True,
+                },
+            }
+
+
+def tools_as_tool_config(
     tools: Iterable[LMMToolSpecification] | None,
+    /,
+    *,
     tool_selection: LMMToolSelection,
-) -> LMMOutput:
-    completion: ChatCompletionResponse
-    match tool_selection:
-        case "auto":
-            completion = await client.chat_completion(
-                config=config,
-                messages=messages,
-                response_format=response_format,
-                tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": tool["name"],
-                            "description": tool["description"] or "",
-                            "parameters": tool["parameters"],
-                        },
-                    }
-                    for tool in tools
-                ]
-                if tools
-                else None,
-                tool_choice="auto",
-            )
+) -> tuple[ChatCompletionRequestToolChoiceTypedDict, list[ToolTypedDict]]:
+    tools_list: list[ToolTypedDict] = [tool_specification_as_tool(tool) for tool in (tools or [])]
+    tool_choice: ChatCompletionRequestToolChoiceTypedDict
+    if tools_list:
+        match tool_selection:
+            case "auto":
+                tool_choice = "auto"
 
-        case "none":
-            completion = await client.chat_completion(
-                config=config,
-                messages=messages,
-                response_format=response_format,
-                tools=[],
-                tool_choice="none",
-            )
+            case "none":
+                tool_choice = "none"
 
-        case "required":
-            completion = await client.chat_completion(
-                config=config,
-                messages=messages,
-                response_format=response_format,
-                tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": tool["name"],
-                            "description": tool["description"] or "",
-                            "parameters": tool["parameters"],
-                        },
-                    }
-                    for tool in tools
-                ]
-                if tools
-                else None,
-                tool_choice="any",
-            )
+            case "required":
+                tool_choice = "any"
 
-        case tool:
-            assert tool in (tools or []), "Can't suggest a tool without using it"  # nosec: B101
-            completion = await client.chat_completion(
-                config=config,
-                messages=messages,
-                response_format=response_format,
-                tools=[  # mistral can't be suggested with concrete tool
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": tool["name"],
-                            "description": tool["description"] or "",
-                            "parameters": tool["parameters"],
-                        },
-                    }
-                ],
-                tool_choice="any",
-            )
-
-    if usage := completion.usage:
-        ctx.record(
-            TokenUsage.for_model(
-                config.model,
-                input_tokens=usage.prompt_tokens,
-                output_tokens=usage.completion_tokens,
-            ),
-        )
-
-    if not completion.choices:
-        raise MistralException("Invalid Mistral completion - missing messages!", completion)
-
-    completion_message: ChatMessageResponse = completion.choices[0].message
-
-    if (tool_calls := completion_message.tool_calls) and (tools := tools):
-        ctx.record(ResultTrace.of(tool_calls))
-
-        return LMMToolRequests(
-            requests=[
-                LMMToolRequest(
-                    identifier=call.id,
-                    tool=call.function.name,
-                    arguments=json.loads(call.function.arguments)
-                    if isinstance(call.function.arguments, str)
-                    else call.function.arguments,
-                )
-                for call in tool_calls
-            ]
-        )
-
-    elif message := completion_message.content:
-        ctx.record(ResultTrace.of(message))
-        match message:
-            case str(content):
-                return LMMCompletion.of(content)
-
-            # API docs say that it can be only a string in response
-            # however library model allows list as well
-            case other:
-                return LMMCompletion.of(*other)
+            case tool:
+                assert tool in (tools or []), "Can't suggest a tool without using it"  # nosec: B101
+                tool_choice = {
+                    "type": "function",
+                    "function": {"name": tool["name"]},
+                }
 
     else:
-        raise MistralException("Invalid Mistral completion", completion)
+        tool_choice = "none"
+
+    return (tool_choice, tools_list)

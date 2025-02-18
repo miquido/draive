@@ -62,7 +62,7 @@ class ParameterValidationContextScope:
                 ) from exc_val
 
         finally:
-            self.context._path.pop()  # pyright: ignore # FIXME
+            self.context._path.pop()
 
 
 class ParameterValidation[Type](Protocol):
