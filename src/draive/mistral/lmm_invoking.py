@@ -36,7 +36,7 @@ from draive.mistral.lmm import (
     tools_as_tool_config,
 )
 from draive.mistral.types import MistralException
-from draive.multimodal import MultimodalContent
+from draive.multimodal import Multimodal, MultimodalContent
 
 __all__ = [
     "MistralLMMInvoking",
@@ -55,7 +55,7 @@ class MistralLMMInvoking(MistralAPI):
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
-        prefill: MultimodalContent | None = None,
+        prefill: Multimodal | None = None,
         **extra: Any,
     ) -> LMMOutput:
         with ctx.scope("mistral_lmm_invocation"):
@@ -81,7 +81,8 @@ class MistralLMMInvoking(MistralAPI):
                     {
                         "role": "assistant",
                         "content": [
-                            content_element_as_content_chunk(element) for element in prefill.parts
+                            content_element_as_content_chunk(element)
+                            for element in MultimodalContent.of(prefill).parts
                         ],
                         "prefix": True,
                     }

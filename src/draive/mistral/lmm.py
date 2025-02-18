@@ -202,7 +202,7 @@ def output_as_response_format(
                         model.__PARAMETERS_SPECIFICATION__,
                     ),
                     "description": None,
-                    "strict": True,
+                    "strict": False,
                 },
             }
 
