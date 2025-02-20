@@ -1,28 +1,24 @@
-name: CI
+name: publish
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
+    tags:
       - "*"
 
 jobs:
-  test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.12"]
-
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv and set the python version
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.12
 
       - name: Install
         run: uv sync --all-groups --all-extras --frozen --no-python-downloads
@@ -32,3 +28,6 @@ jobs:
 
       - name: Test
         run: uv run pytest --rootdir= ./tests --doctest-modules --junitxml=junit/test-results.xml
+
+      - name: Publish
+        run: uv publish
