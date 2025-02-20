@@ -3,7 +3,7 @@ from base64 import b64decode
 from collections.abc import AsyncGenerator, Callable, Coroutine, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from types import TracebackType
-from typing import Any, Self, cast, final
+from typing import Any, Self, final
 
 from haiway import as_dict, as_list
 from mcp import ClientSession, GetPromptResult, ListToolsResult, StdioServerParameters, stdio_client
@@ -23,9 +23,10 @@ from pydantic import AnyUrl
 
 from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
 from draive.lmm.types import LMMToolError
-from draive.multimodal import MediaContent, MultimodalContent, TextContent, validated_media_type
+from draive.multimodal import MediaContent, MultimodalContent, TextContent
 from draive.parameters import BasicValue, ParametersSpecification
 from draive.parameters.model import DataModel
+from draive.parameters.specification import validated_specification
 from draive.prompts import Prompt, PromptDeclaration, PromptDeclarationArgument, PromptRepository
 from draive.resources import Resource, ResourceContent, ResourceDeclaration, ResourceRepository
 from draive.tools import AnyTool, ExternalToolbox, Tool, Toolbox
@@ -311,7 +312,7 @@ async def _convert_content(
             return MultimodalContent.of(
                 MediaContent.base64(
                     image.data,
-                    media=validated_media_type(image.mimeType),
+                    media=image.mimeType,
                 )
             )
 
@@ -342,9 +343,20 @@ async def _convert_content(
                             return MultimodalContent.of(
                                 MediaContent.data(
                                     b64decode(blob.blob),
-                                    media=validated_media_type(other),
+                                    media=other,
                                 )
                             )
+
+
+def _validated_parameters(
+    schema: dict[str, Any],
+    /,
+) -> ParametersSpecification:
+    return {
+        "type": "object",
+        "properties": {},
+        "required": [],
+    }
 
 
 def _convert_tool(
@@ -362,7 +374,7 @@ def _convert_tool(
     return Tool(
         name=name,
         description=mcp_tool.description,
-        specification=cast(ParametersSpecification, mcp_tool.inputSchema),
+        specification=validated_specification(mcp_tool.inputSchema),
         function=remote_call,
         availability_check=None,
         format_result=_format_tool_result,

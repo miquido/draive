@@ -1,35 +1,25 @@
-from base64 import b64encode
-from collections.abc import Iterable, Sequence
-from copy import copy
-from typing import Any, cast, get_args
+from collections.abc import Callable, Iterable
+from typing import Literal, cast
 from uuid import uuid4
 
-from haiway import ArgumentsTrace, ResultTrace, ctx
-
-from draive.gemini.client import GeminiClient
-from draive.gemini.config import GeminiConfig
-from draive.gemini.models import (
-    GeminiChoice,
-    GeminiDataMessageContent,
-    GeminiDataReferenceMessageContent,
-    GeminiFunctionCallMessageContent,
-    GeminiFunctionsTool,
-    GeminiFunctionToolSpecification,
-    GeminiGenerationResult,
-    GeminiMessage,
-    GeminiMessageContent,
-    GeminiRequestMessage,
-    GeminiTextMessageContent,
+from google.genai.types import (
+    ContentDict,
+    FunctionCallingConfigMode,
+    FunctionDeclarationDict,
+    HarmBlockThreshold,
+    HarmCategory,
+    MediaResolution,
+    Part,
+    PartDict,
+    SafetySettingDict,
+    SchemaDict,
 )
-from draive.gemini.types import GeminiException
-from draive.instructions import Instruction
+from haiway import Missing, as_dict
+
 from draive.lmm import (
     LMMCompletion,
-    LMMContext,
     LMMContextElement,
     LMMInput,
-    LMMInvocation,
-    LMMOutput,
     LMMOutputSelection,
     LMMToolRequest,
     LMMToolRequests,
@@ -37,349 +27,353 @@ from draive.lmm import (
     LMMToolSelection,
     LMMToolSpecification,
 )
-from draive.metrics import TokenUsage
-from draive.multimodal import MediaContent, MultimodalContent, MultimodalContentElement, TextContent
-from draive.multimodal.media import MediaType
+from draive.multimodal import (
+    MediaContent,
+    Multimodal,
+    MultimodalContent,
+    MultimodalContentElement,
+    TextContent,
+)
 from draive.parameters import DataModel
 
 __all__ = [
-    "gemini_lmm",
+    "DISABLED_SAFETY_SETTINGS",
+    "content_element_as_part",
+    "context_element_as_content",
+    "output_as_response_declaration",
+    "resoluton_as_media_resulution",
+    "result_part_as_content_or_call",
+    "tools_as_tools_config",
 ]
 
 
-def gemini_lmm(
-    client: GeminiClient | None = None,
+def context_element_as_content(
+    element: LMMContextElement,
     /,
-) -> LMMInvocation:
-    client = client or GeminiClient.shared()
-
-    async def lmm_invocation(
-        *,
-        instruction: Instruction | str | None,
-        context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
-        output: LMMOutputSelection,
-        **extra: Any,
-    ) -> LMMOutput:
-        with ctx.scope("gemini_lmm_invocation"):
-            ctx.record(
-                ArgumentsTrace.of(
-                    instruction=instruction,
-                    context=context,
-                    tool_selection=tool_selection,
-                    tools=tools,
-                    output=output,
-                    **extra,
-                ),
+) -> Iterable[ContentDict]:
+    match element:
+        case LMMInput() as input:
+            return (
+                {
+                    "role": "user",
+                    "parts": [content_element_as_part(element) for element in input.content.parts],
+                },
             )
 
-            config: GeminiConfig = ctx.state(GeminiConfig).updated(**extra)
-            ctx.record(config)
-
-            match output:
-                case "auto" | "text":
-                    config = config.updated(response_format="text/plain")
-
-                case "image":
-                    raise NotImplementedError("image output is not supported by gemini")
-
-                case "audio":
-                    raise NotImplementedError("audio output is not supported by gemini")
-
-                case "video":
-                    raise NotImplementedError("video output is not supported by gemini")
-
-                case _:  # TODO: utilize json schema within API
-                    if tools:
-                        ctx.log_warning(
-                            "Attempting to use Gemini in JSON mode with tools which is"
-                            " not supported. Using text mode instead..."
-                        )
-                        config = config.updated(response_format="text/plain")
-
-                    else:
-                        config = config.updated(response_format="application/json")
-
-            return await _generate(
-                client=client,
-                config=config,
-                instruction=Instruction.formatted(instruction) or "",
-                messages=[_convert_context_element(element=element) for element in context],
-                tool_selection=tool_selection,
-                tools=tools,
+        case LMMCompletion() as completion:
+            return (
+                {
+                    "role": "model",
+                    "parts": [
+                        content_element_as_part(element) for element in completion.content.parts
+                    ],
+                },
             )
 
-    return LMMInvocation(invoke=lmm_invocation)
+        case LMMToolRequests() as tool_requests:
+            return (
+                {
+                    "role": "model",
+                    "parts": [
+                        {
+                            "function_call": {
+                                "id": request.identifier,
+                                "name": request.tool,
+                                "args": as_dict(request.arguments),
+                            }
+                        }
+                        for request in tool_requests.requests
+                    ],
+                },
+            )
+
+        case LMMToolResponses() as tool_responses:
+            return (
+                {
+                    "role": "model",
+                    "parts": [
+                        {
+                            "function_response": {
+                                "id": response.identifier,
+                                "name": response.tool,
+                                "response": {
+                                    "error": [
+                                        content_element_as_part(element)
+                                        for element in response.content.parts
+                                    ],
+                                }
+                                if response.error
+                                else {
+                                    "output": [
+                                        content_element_as_part(element)
+                                        for element in response.content.parts
+                                    ],
+                                },
+                            }
+                        }
+                        for response in tool_responses.responses
+                    ],
+                },
+            )
 
 
-def _convert_content_element(
+def content_element_as_part(
     element: MultimodalContentElement,
-) -> dict[str, Any]:
+    /,
+) -> PartDict:
     match element:
         case TextContent() as text:
-            return {"text": text.text}
+            return {
+                "text": text.text,
+            }
 
         case MediaContent() as media:
             match media.source:
-                case str() as reference:
+                case str() as uri:
                     return {
-                        "fileData": {
-                            "mimeType": media.media,
-                            "fileUri": reference,
+                        "file_data": {
+                            "file_uri": uri,
+                            "mime_type": media.media,
                         }
                     }
 
                 case bytes() as data:
                     return {
-                        "inlineData": {
-                            "mimeType": media.media,
-                            "data": b64encode(data).decode(),
-                        }
+                        "inline_data": {
+                            "data": data,
+                            "mime_type": media.media,
+                        },
                     }
 
         case DataModel() as data:
-            return {"text": data.as_json()}
-
-
-def _convert_context_element(
-    element: LMMContextElement,
-) -> GeminiRequestMessage:
-    match element:
-        case LMMInput() as input:
             return {
-                "role": "user",
-                "parts": [
-                    _convert_content_element(element=element) for element in input.content.parts
-                ],
-            }
-
-        case LMMCompletion() as completion:
-            return {
-                "role": "model",
-                "parts": [
-                    _convert_content_element(element=element)
-                    for element in completion.content.parts
-                ],
-            }
-
-        case LMMToolRequests() as tool_requests:
-            return {
-                "role": "model",
-                "parts": [
-                    {
-                        "functionCall": {
-                            "name": request.tool,
-                            "args": request.arguments,
-                        },
-                    }
-                    for request in tool_requests.requests
-                ],
-            }
-
-        case LMMToolResponses() as tool_responses:
-            return {
-                "role": "model",
-                "parts": [
-                    {
-                        "functionResponse": {
-                            "name": response.tool,
-                            "response": response.content.as_dict(),
-                        },
-                    }
-                    for response in tool_responses.responses
-                ],
+                "text": data.as_json(),
             }
 
 
-def _convert_content_part(
-    part: GeminiMessageContent,
-) -> MultimodalContentElement:
-    match part:
-        case GeminiTextMessageContent() as text:
-            return TextContent(text=text.text)
-
-        case GeminiDataMessageContent() as data:
-            mime_type: str = data.data.mime_type
-            if mime_type in get_args(MediaType):
-                return MediaContent.base64(
-                    data.data.data,
-                    media=cast(MediaType, mime_type),
-                )
-
-            else:
-                raise GeminiException("Unsupported result content data %s", data)
-
-        case GeminiDataReferenceMessageContent() as reference:
-            mime_type: str = reference.reference.mime_type
-            if mime_type in get_args(MediaType):
-                return MediaContent.url(
-                    reference.reference.uri,
-                    media=cast(MediaType, mime_type),
-                )
-
-            else:
-                raise GeminiException("Unsupported result content reference %s", reference)
-
-        case other:
-            raise GeminiException("Unsupported result content %s", other)
-
-
-async def _generate(  # noqa: PLR0913, C901, PLR0912, PLR0915
-    *,
-    client: GeminiClient,
-    config: GeminiConfig,
-    instruction: str,
-    messages: list[GeminiRequestMessage],
-    tool_selection: LMMToolSelection,
-    tools: Iterable[LMMToolSpecification] | None,
-) -> LMMOutput:
-    result: GeminiGenerationResult
-    converted_tools: Sequence[GeminiFunctionToolSpecification] = []
-    for tool in tools or []:
-        tool_function: GeminiFunctionToolSpecification = {
-            "name": tool["name"],
-            "description": tool["description"] or "",
-            "parameters": cast(dict[str, Any], tool["parameters"]),
-        }
-        # AIStudio api requires to delete properties if those are empty...
-        if "parameters" in tool_function and not tool_function["parameters"]["properties"]:
-            tool_function = copy(tool_function)
-            del tool_function["parameters"]
-
-        converted_tools.append(tool_function)
-
-    match tool_selection:
+def output_as_response_declaration(  # noqa: PLR0911
+    output: LMMOutputSelection,
+    /,
+) -> tuple[SchemaDict | None, str | None, Callable[[MultimodalContent], Multimodal]]:
+    match output:
         case "auto":
-            result = await client.generate(
-                config=config,
-                instruction=instruction,
-                messages=messages,
-                tools=[GeminiFunctionsTool(functionDeclarations=converted_tools)],
-                tool_calling_mode="AUTO",
+            return (None, None, _auto_output_conversion)
+
+        case "text":
+            return (None, "text/plain", _text_output_conversion)
+
+        case "json":
+            return (
+                None,
+                "application/json",
+                _json_output_conversion,
             )
 
-        case "none":
-            result = await client.generate(
-                config=config,
-                instruction=instruction,
-                messages=messages,
-                tools=[],
-                tool_calling_mode="NONE",
+        case "image":
+            return (
+                None,
+                "image/png",
+                _image_output_conversion,
+            )  # TODO: verify with actual capabilities
+
+        case "audio":
+            return (
+                None,
+                "audio/wav",
+                _audio_output_conversion,
+            )  # TODO: verify with actual capabilities
+
+        case "video":
+            return (
+                None,
+                "video/mpeg",
+                _video_output_conversion,
+            )  # TODO: verify with actual capabilities
+
+        case model:
+            return (
+                cast(SchemaDict, model.__PARAMETERS_SPECIFICATION__),
+                "application/json",
+                _prepare_model_output_conversion(model),
             )
 
-        case "required":
-            result = await client.generate(
-                config=config,
-                instruction=instruction,
-                messages=messages,
-                tools=[GeminiFunctionsTool(functionDeclarations=converted_tools)],
-                tool_calling_mode="ANY",
+
+def _auto_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> Multimodal:
+    return output
+
+
+def _text_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> Multimodal:
+    return output.as_string()
+
+
+def _image_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> Multimodal:
+    return MultimodalContent.of(*output.media("image"))
+
+
+def _audio_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> Multimodal:
+    return MultimodalContent.of(*output.media("audio"))
+
+
+def _video_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> Multimodal:
+    return MultimodalContent.of(*output.media("video"))
+
+
+def _json_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> Multimodal:
+    return MultimodalContent.of(DataModel.from_json(output.as_string()))
+
+
+def _prepare_model_output_conversion(
+    model: type[DataModel],
+    /,
+) -> Callable[[MultimodalContent], Multimodal]:
+    def _model_output_conversion(
+        output: MultimodalContent,
+        /,
+    ) -> Multimodal:
+        return MultimodalContent.of(DataModel.from_json(output.as_string()))
+
+    return _model_output_conversion
+
+
+def result_part_as_content_or_call(
+    part: Part,
+    /,
+) -> Iterable[MultimodalContentElement | LMMToolRequest]:
+    result: list[MultimodalContentElement | LMMToolRequest] = []
+    if part.text:
+        result.append(TextContent(text=part.text))
+
+    if part.function_call and part.function_call.name:  # can't call without a name
+        result.append(
+            LMMToolRequest(
+                identifier=part.function_call.id or uuid4().hex,
+                tool=part.function_call.name,
+                arguments=part.function_call.args or {},
             )
+        )
 
-        case tool:
-            assert tool in (tools or []), "Can't suggest a tool without using it"  # nosec: B101
-            tool_function: GeminiFunctionToolSpecification = {
-                "name": tool["name"],
-                "description": tool["description"] or "",
-                "parameters": cast(dict[str, Any], tool["parameters"]),
-            }
-
-            # AIStudio api requires to delete properties if those are empty...
-            if "parameters" in tool_function and not tool_function["parameters"]["properties"]:
-                tool_function = copy(tool_function)
-                del tool_function["parameters"]
-
-            result = await client.generate(
-                config=config,
-                instruction=instruction,
-                messages=messages,
-                tools=[GeminiFunctionsTool(functionDeclarations=[tool_function])],
-                tool_calling_mode="ANY",
-            )
-
-    if usage := result.usage:
-        ctx.record(
-            TokenUsage.for_model(
-                config.model,
-                input_tokens=usage.prompt_tokens,
-                output_tokens=usage.generated_tokens,
+    if part.inline_data and part.inline_data.data:  # there is no content without content...
+        result.append(
+            MediaContent.data(
+                part.inline_data.data,
+                media=part.inline_data.mime_type or "unknown",
             ),
         )
 
-    if not result.choices:
-        raise GeminiException("Invalid Gemini completion - missing messages!", result)
-
-    result_choice: GeminiChoice = result.choices[0]
-    result_message: GeminiMessage
-    match result_choice.finish_reason:
-        case "STOP":
-            if message := result_choice.content:
-                result_message = message
-
-            else:
-                raise GeminiException(
-                    "Invalid Gemini response - missing message content: %s", result
-                )
-
-        case "MAX_TOKENS":
-            raise GeminiException("Gemini response finish caused by token limit: %s", result)
-
-        case "SAFETY":
-            raise GeminiException("Gemini response finish caused by safety reason: %s", result)
-
-        case "RECITATION":
-            raise GeminiException("Gemini response finish caused by recitation reason: %s", result)
-
-        case "OTHER":
-            raise GeminiException("Gemini response finish caused by unknown reason: %s", result)
-
-    message_parts: list[
-        GeminiTextMessageContent | GeminiDataReferenceMessageContent | GeminiDataMessageContent
-    ] = []
-
-    tool_calls: list[GeminiFunctionCallMessageContent] = []
-    for part in result_message.content:
-        match part:
-            case GeminiTextMessageContent() as text:
-                message_parts.append(text)
-
-            case GeminiFunctionCallMessageContent() as call:
-                tool_calls.append(call)
-
-            case GeminiDataReferenceMessageContent() as reference:
-                message_parts.append(reference)
-
-            case GeminiDataMessageContent() as data:
-                message_parts.append(data)
-
-            case other:
-                raise GeminiException("Invalid Gemini completion part", other)
-
-    if tool_calls and (tools := tools):
-        if __debug__ and message_parts:
-            ctx.log_debug("Gemini has generated a message and tool calls, ignoring the message...")
-
-        ctx.record(ResultTrace.of(tool_calls))
-
-        return LMMToolRequests(
-            requests=[
-                LMMToolRequest(
-                    identifier=uuid4().hex,
-                    tool=call.function_call.name,
-                    arguments=call.function_call.arguments,
-                )
-                for call in tool_calls
-            ]
+    if part.file_data and part.file_data.file_uri:  # there is no content without content...
+        result.append(
+            MediaContent.url(
+                part.file_data.file_uri,
+                media=part.file_data.mime_type or "unknown",
+            ),
         )
 
-    elif message_parts:
-        ctx.record(ResultTrace.of(message_parts))
-        return LMMCompletion.of(
-            MultimodalContent.of(
-                *[_convert_content_part(part) for part in message_parts],
+    # TODO: we could also extract thoughts
+    return result
+
+
+def resoluton_as_media_resulution(
+    resolution: Literal["low", "medium", "high"] | Missing,
+    /,
+) -> MediaResolution | None:
+    match resolution:
+        case "low":
+            return MediaResolution.MEDIA_RESOLUTION_LOW
+
+        case "modeium":
+            return MediaResolution.MEDIA_RESOLUTION_MEDIUM
+
+        case "high":
+            return MediaResolution.MEDIA_RESOLUTION_HIGH
+
+        case _:
+            return None
+
+
+def tools_as_tools_config(
+    tools: Iterable[LMMToolSpecification] | None,
+    /,
+    tool_selection: LMMToolSelection,
+) -> tuple[list[FunctionDeclarationDict] | None, FunctionCallingConfigMode | None]:
+    functions: list[FunctionDeclarationDict] = []
+    for tool in tools or []:
+        declaration: FunctionDeclarationDict = FunctionDeclarationDict(
+            name=tool["name"],
+            description=tool["description"],
+            parameters=cast(SchemaDict, tool["parameters"]),
+        )
+
+        functions.append(declaration)
+
+    if not functions:
+        return (
+            None,
+            FunctionCallingConfigMode.NONE,
+        )
+
+    match tool_selection:
+        case "auto":
+            return (
+                functions,
+                FunctionCallingConfigMode.AUTO,
             )
-        )
 
-    else:
-        raise GeminiException("Invalid Gemini completion", result)
+        case "required":
+            return (
+                functions,
+                FunctionCallingConfigMode.ANY,
+            )
+
+        case "none":
+            return (
+                None,  # no need to pass functions if none can be used
+                FunctionCallingConfigMode.NONE,
+            )
+
+        case _:  # TODO: FIXME: specific tool selection?
+            return (
+                functions,
+                FunctionCallingConfigMode.AUTO,
+            )
+
+
+DISABLED_SAFETY_SETTINGS: list[SafetySettingDict] = [
+    SafetySettingDict(
+        category=HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+        threshold=HarmBlockThreshold.OFF,
+    ),
+    SafetySettingDict(
+        category=HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+        threshold=HarmBlockThreshold.OFF,
+    ),
+    SafetySettingDict(
+        category=HarmCategory.HARM_CATEGORY_HARASSMENT,
+        threshold=HarmBlockThreshold.OFF,
+    ),
+    SafetySettingDict(
+        category=HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        threshold=HarmBlockThreshold.OFF,
+    ),
+    SafetySettingDict(
+        category=HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
+        threshold=HarmBlockThreshold.OFF,
+    ),
+]

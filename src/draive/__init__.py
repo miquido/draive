@@ -143,7 +143,6 @@ from draive.lmm import (
 from draive.metrics import TokenUsage
 from draive.multimodal import (
     MEDIA_KINDS,
-    MEDIA_TYPES,
     MediaContent,
     MediaKind,
     MediaType,
@@ -154,7 +153,6 @@ from draive.multimodal import (
     MultimodalTagElement,
     TextContent,
     validated_media_kind,
-    validated_media_type,
 )
 from draive.parameters import (
     Argument,
@@ -230,7 +228,6 @@ from draive.utils import (
 
 __all__ = [
     "MEDIA_KINDS",
-    "MEDIA_TYPES",
     "MISSING",
     "Agent",
     "AgentError",
@@ -417,7 +414,6 @@ __all__ = [
     "traced",
     "usage_cost",
     "validated_media_kind",
-    "validated_media_type",
     "vector_similarity_score",
     "vector_similarity_search",
     "when_missing",

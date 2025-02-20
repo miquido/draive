@@ -120,6 +120,7 @@ class MistralLMMInvoking(MistralAPI):
                     TokenUsage.for_model(
                         completion.model,
                         input_tokens=usage.prompt_tokens,
+                        cached_tokens=None,
                         output_tokens=usage.completion_tokens,
                     ),
                 )
@@ -155,7 +156,9 @@ class MistralLMMInvoking(MistralAPI):
 
                     case chunks:
                         lmm_completion = LMMCompletion.of(
-                            *[content_chunk_as_content_element(chunk) for chunk in chunks]
+                            MultimodalContent.of(
+                                *[content_chunk_as_content_element(chunk) for chunk in chunks]
+                            ),
                         )
 
             else:

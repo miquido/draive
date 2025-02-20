@@ -6,7 +6,10 @@ from typing import Any, Literal, Self, Union, is_typeddict
 from uuid import UUID
 
 from haiway import MISSING, Missing
-from haiway.state.attributes import AttributeAnnotation
+from haiway.state.attributes import (
+    AttributeAnnotation,
+    _resolve_type_typeddict,
+)
 
 from draive.parameters.types import (
     ParameterValidation,
@@ -20,6 +23,27 @@ __all__ = [
 
 
 class ParameterValidator[Type]:
+    @classmethod
+    def of_typed_dict[Dict](
+        cls,
+        typed_dict: type[Dict],
+        /,
+    ) -> ParameterValidation[Dict]:
+        if not is_typeddict(typed_dict):
+            raise ValueError("Type has to be a TypedDict")
+
+        return cls.of(
+            _resolve_type_typeddict(
+                typed_dict,
+                module=typed_dict.__module__,
+                type_parameters={},  # TODO: type parameters?
+                self_annotation=None,
+                recursion_guard={},
+            ),
+            verifier=None,
+            recursion_guard={},
+        )
+
     @classmethod
     def of(
         cls,

@@ -7,42 +7,32 @@ from draive.parameters import DataModel
 
 __all__ = [
     "MEDIA_KINDS",
-    "MEDIA_TYPES",
     "MediaContent",
     "MediaKind",
     "MediaType",
     "validated_media_kind",
-    "validated_media_type",
 ]
 
-MediaType = Literal[
-    "image/jpeg",
-    "image/png",
-    "image/bmp",
-    "image/gif",
-    "audio/aac",
-    "audio/mpeg",
-    "audio/ogg",
-    "audio/wav",
-    "video/mp4",
-    "video/mpeg",
-    "video/ogg",
-]
-MEDIA_TYPES: Final[Sequence[str]] = get_args(MediaType)
-
-
-def validated_media_type(
-    mime: str,
-    /,
-) -> MediaType:
-    if mime in MEDIA_TYPES:
-        return cast(MediaType, mime)
-
-    else:
-        raise ValueError(f"Unsupported media type: {mime}")
+MediaType = (
+    Literal[
+        "image/jpeg",
+        "image/png",
+        "image/bmp",
+        "image/gif",
+        "audio/aac",
+        "audio/mpeg",
+        "audio/ogg",
+        "audio/wav",
+        "video/mp4",
+        "video/mpeg",
+        "video/ogg",
+    ]
+    | str
+)
 
 
 MediaKind = Literal[
+    "unknown",
     "image",
     "audio",
     "video",
@@ -110,7 +100,7 @@ class MediaContent(DataModel):
     meta: Mapping[str, str | float | int | bool | None] | None = None
 
     @property
-    def kind(self) -> MediaKind:
+    def kind(self) -> MediaKind:  # noqa: PLR0911
         match self.media:
             case "image" | "image/jpeg" | "image/png" | "image/bmp" | "image/gif":
                 return "image"
@@ -120,6 +110,18 @@ class MediaContent(DataModel):
 
             case "video" | "video/mp4" | "video/mpeg" | "video/ogg":
                 return "video"
+
+            case other_image if other_image.startswith("image"):
+                return "image"
+
+            case other_audio if other_audio.startswith("audio"):
+                return "audio"
+
+            case other_video if other_video.startswith("video"):
+                return "video"
+
+            case _:
+                return "unknown"
 
     def as_string(
         self,

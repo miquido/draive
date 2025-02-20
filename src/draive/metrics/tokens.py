@@ -11,6 +11,7 @@ __all__ = [
 
 class ModelTokenUsage(State):
     input_tokens: int
+    cached_tokens: int
     output_tokens: int
 
     def __add__(
@@ -19,6 +20,7 @@ class ModelTokenUsage(State):
     ) -> Self:
         return self.__class__(
             input_tokens=self.input_tokens + other.input_tokens,
+            cached_tokens=self.cached_tokens + other.cached_tokens,
             output_tokens=self.output_tokens + other.output_tokens,
         )
 
@@ -49,6 +51,17 @@ class TokenUsage(State):
         name: str,
         *,
         input_tokens: int | None,
+        cached_tokens: int | None,
+    ) -> Self: ...
+
+    @overload
+    @classmethod
+    def for_model(
+        cls,
+        name: str,
+        *,
+        input_tokens: int | None,
+        cached_tokens: int | None,
         output_tokens: int | None,
     ) -> Self: ...
 
@@ -58,12 +71,14 @@ class TokenUsage(State):
         name: str,
         *,
         input_tokens: int | None = None,
+        cached_tokens: int | None = None,
         output_tokens: int | None = None,
     ) -> Self:
         return cls(
             usage={
                 name: ModelTokenUsage(
                     input_tokens=input_tokens or 0,
+                    cached_tokens=cached_tokens or 0,
                     output_tokens=output_tokens or 0,
                 ),
             },

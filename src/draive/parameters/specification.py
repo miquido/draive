@@ -2,16 +2,31 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import date, datetime, time
 from enum import IntEnum, StrEnum
 from types import EllipsisType, NoneType, UnionType
-from typing import Any, Literal, NotRequired, Required, TypedDict, Union, cast, final, is_typeddict
+from typing import (
+    Any,
+    Final,
+    Literal,
+    NotRequired,
+    Required,
+    TypedDict,
+    Union,
+    cast,
+    final,
+    is_typeddict,
+)
 from uuid import UUID
 
 from haiway import Missing
 from haiway.state import AttributeAnnotation
 
+from draive.parameters.types import ParameterValidation, ParameterValidationContext
+from draive.parameters.validation import ParameterValidator
+
 __all__ = [
     "ParameterSpecification",
     "ParametersSpecification",
     "parameter_specification",
+    "validated_specification",
 ]
 
 
@@ -147,7 +162,23 @@ type ParameterSpecification = (
     | ReferenceParameterSpecification
 )
 
-type ParametersSpecification = ParameterObjectSpecification | ParameterAnyObjectSpecification
+type ParametersSpecification = ParameterObjectSpecification  #  | ParameterAnyObjectSpecification
+
+
+def validated_specification(
+    specification: dict[str, Any],
+    /,
+) -> ParameterObjectSpecification:
+    with ParameterValidationContext().scope("specification") as validation_context:
+        return _specification_validation(
+            specification,
+            context=validation_context,
+        )
+
+
+_specification_validation: Final[ParameterValidation[ParameterObjectSpecification]] = (
+    ParameterValidator.of_typed_dict(ParameterObjectSpecification)
+)
 
 
 def parameter_specification(  # noqa: PLR0911
