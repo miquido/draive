@@ -1,11 +1,11 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.41.1"
+dynamic = ["version"]
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
@@ -80,6 +80,9 @@ dev = [
   "pytest-cov~=4.1",
   "pytest-asyncio~=0.23.0",
 ]
+
+[tool.hatch.metadata.hooks.custom]
+path = "hatch_version.py"
 
 [tool.ruff]
 target-version = "py312"

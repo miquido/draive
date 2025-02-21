@@ -84,5 +84,6 @@ test:
 
 release: lint test
 	@echo '# Preparing release...'
-	@python -m build && python -m twine upload --skip-existing dist/*
+	@uv build
+	@uv publish
 	@echo '...finished!'
