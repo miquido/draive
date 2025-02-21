@@ -1,11 +1,9 @@
 name: publish
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - "*"
+  release:
+    types:
+      - released
 
 jobs:
   publish:
@@ -14,6 +12,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Install uv and set the python version
         uses: astral-sh/setup-uv@v5
@@ -30,4 +30,6 @@ jobs:
         run: uv run pytest --rootdir= ./tests --doctest-modules --junitxml=junit/test-results.xml
 
       - name: Publish
-        run: uv publish
+        env:
+          PROJECT_VERSION: ${{ github.event.release.tag_name }}
+        run: uv build && uv publish
