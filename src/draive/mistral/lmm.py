@@ -1,6 +1,6 @@
 import json
 from base64 import b64encode
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any, cast
 
 from mistralai.models import (
@@ -25,14 +25,20 @@ from draive.lmm import (
     LMMToolSpecification,
 )
 from draive.mistral.types import MistralException
-from draive.multimodal import MediaContent, MultimodalContentElement, TextContent
+from draive.multimodal import (
+    MediaContent,
+    Multimodal,
+    MultimodalContent,
+    MultimodalContentElement,
+    TextContent,
+)
 from draive.parameters import DataModel
 
 __all__ = [
     "content_chunk_as_content_element",
     "content_element_as_content_chunk",
     "context_element_as_messages",
-    "output_as_response_format",
+    "output_as_response_declaration",
     "tool_specification_as_tool",
     "tools_as_tool_config",
 ]
@@ -173,15 +179,18 @@ def tool_specification_as_tool(
     }
 
 
-def output_as_response_format(
+def output_as_response_declaration(
     output: LMMOutputSelection,
-) -> ResponseFormatTypedDict:
+) -> tuple[ResponseFormatTypedDict, Callable[[MultimodalContent], Multimodal]]:
     match output:
-        case "auto" | "text":
-            return {"type": "text"}
+        case "auto":
+            return ({"type": "text"}, _auto_output_conversion)
+
+        case "text":
+            return ({"type": "text"}, _text_output_conversion)
 
         case "json":
-            return {"type": "json_object"}
+            return ({"type": "json_object"}, _json_output_conversion)
 
         case "image":
             raise NotImplementedError("image output is not supported by Mistral")
@@ -193,18 +202,55 @@ def output_as_response_format(
             raise NotImplementedError("video output is not supported by Mistral")
 
         case model:
-            return {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": model.__name__,
-                    "schema_definition": cast(
-                        dict[str, Any],
-                        model.__PARAMETERS_SPECIFICATION__,
-                    ),
-                    "description": None,
-                    "strict": False,
+            return (
+                {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": model.__name__,
+                        "schema_definition": cast(
+                            dict[str, Any],
+                            model.__PARAMETERS_SPECIFICATION__,
+                        ),
+                        "description": None,
+                        "strict": False,
+                    },
                 },
-            }
+                _prepare_model_output_conversion(model),
+            )
+
+
+def _auto_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> Multimodal:
+    return output
+
+
+def _text_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> Multimodal:
+    return output.as_string()
+
+
+def _json_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> Multimodal:
+    return MultimodalContent.of(DataModel.from_json(output.as_string()))
+
+
+def _prepare_model_output_conversion(
+    model: type[DataModel],
+    /,
+) -> Callable[[MultimodalContent], Multimodal]:
+    def _model_output_conversion(
+        output: MultimodalContent,
+        /,
+    ) -> Multimodal:
+        return MultimodalContent.of(DataModel.from_json(output.as_string()))
+
+    return _model_output_conversion
 
 
 def tools_as_tool_config(
