@@ -37,6 +37,7 @@ class MistralEmbedding(MistralAPI):
             MistralEmbeddingConfig
         ).updated(**extra)
         with ctx.scope("mistral_text_embedding", embedding_config):
+            ctx.record(embedding_config)
             texts: list[str] = as_list(values)
             responses: list[EmbeddingResponse] = await gather(
                 *[
