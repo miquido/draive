@@ -1,159 +1,48 @@
 import json
 from base64 import b64encode
-from collections.abc import AsyncGenerator, AsyncIterator, Iterable, Sequence
-from itertools import chain
+from collections.abc import Callable, Iterable
 from typing import Any, Literal, cast
-from uuid import uuid4
 
-from haiway import ArgumentsTrace, ResultTrace, as_dict, ctx, not_missing
+from haiway import not_missing
+from openai import NOT_GIVEN, NotGiven
 from openai.types.chat import (
-    ChatCompletion,
     ChatCompletionContentPartParam,
-    ChatCompletionMessage,
     ChatCompletionMessageParam,
+    ChatCompletionModality,
+    ChatCompletionToolChoiceOptionParam,
+    ChatCompletionToolParam,
 )
-from openai.types.chat.chat_completion_chunk import Choice, ChoiceDeltaToolCall
+from openai.types.chat.completion_create_params import ResponseFormat
+from openai.types.shared_params.response_format_json_schema import ResponseFormatJSONSchema
 
-from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
-    LMMContext,
     LMMContextElement,
     LMMInput,
-    LMMInvocation,
-    LMMOutput,
     LMMOutputSelection,
-    LMMStream,
-    LMMStreamChunk,
-    LMMStreamInput,
-    LMMStreamOutput,
-    LMMStreamProperties,
-    LMMToolRequest,
     LMMToolRequests,
+    LMMToolResponses,
     LMMToolSelection,
     LMMToolSpecification,
 )
-from draive.lmm.types import LMMToolResponses
-from draive.metrics import TokenUsage
 from draive.multimodal import (
     MediaContent,
+    Multimodal,
     MultimodalContent,
     MultimodalContentElement,
     TextContent,
 )
-from draive.openai.client import OpenAIClient
-from draive.openai.config import OpenAIChatConfig, OpenAISystemFingerprint
-from draive.openai.types import OpenAIException
+from draive.openai.config import OpenAIChatConfig
 from draive.parameters import DataModel
 
 __all__ = [
-    "openai_lmm",
-    "openai_streaming_lmm",
+    "content_element_as_content_part",
+    "context_element_as_messages",
+    "tools_as_tool_config",
 ]
 
 
-def openai_lmm(
-    client: OpenAIClient | None = None,
-    /,
-) -> LMMInvocation:
-    client = client or OpenAIClient.shared()
-
-    async def lmm_invocation(
-        *,
-        instruction: Instruction | str | None,
-        context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
-        output: LMMOutputSelection,
-        **extra: Any,
-    ) -> LMMOutput:
-        with ctx.scope("openai_lmm_invocation"):
-            ctx.record(
-                ArgumentsTrace.of(
-                    instruction=instruction,
-                    context=context,
-                    tool_selection=tool_selection,
-                    tools=tools,
-                    output=output,
-                    **extra,
-                ),
-            )
-            config: OpenAIChatConfig = ctx.state(OpenAIChatConfig).updated(**extra)
-            ctx.record(config)
-
-            messages: list[ChatCompletionMessageParam] = list(
-                chain.from_iterable(
-                    [
-                        _convert_context_element(config=config, element=element)
-                        for element in context
-                    ]
-                )
-            )
-
-            if instruction:
-                messages = [
-                    {
-                        "role": "system",
-                        "content": Instruction.of(instruction).format(),
-                    },
-                    *messages,
-                ]
-
-            return await _chat_completion(
-                client=client,
-                config=config,
-                output=output,
-                messages=messages,
-                tools=tools,
-                tool_selection=tool_selection,
-            )
-
-    return LMMInvocation(invoke=lmm_invocation)
-
-
-def openai_streaming_lmm(
-    client: OpenAIClient | None = None,
-    /,
-) -> LMMStream:
-    client = client or OpenAIClient.shared()
-
-    async def lmm_stream(
-        *,
-        properties: AsyncIterator[LMMStreamProperties],
-        input: AsyncIterator[LMMStreamInput],  # noqa: A002
-        context: LMMContext | None,
-        **extra: Any,
-    ) -> AsyncIterator[LMMStreamOutput]:
-        config: OpenAIChatConfig = ctx.state(OpenAIChatConfig).updated(**extra)
-        ctx.record(config)
-
-        context_elements: Sequence[LMMContextElement]
-        match context:
-            case None:
-                context_elements = ()
-
-            case [*elements]:
-                context_elements = elements
-
-        return _chat_stream(
-            client=client,
-            config=config,
-            properties=properties,
-            input=input,
-            context=list(
-                chain.from_iterable(
-                    [
-                        _convert_context_element(config=config, element=element)
-                        for element in context_elements
-                    ]
-                )
-            ),
-        )
-
-    return LMMStream(prepare=lmm_stream)
-
-
-def _convert_content_element(
+def content_element_as_content_part(
     element: MultimodalContentElement,
     config: OpenAIChatConfig,
 ) -> ChatCompletionContentPartParam:
@@ -193,8 +82,9 @@ def _convert_content_element(
             }
 
 
-def _convert_context_element(
+def context_element_as_messages(
     element: LMMContextElement,
+    /,
     config: OpenAIChatConfig,
 ) -> Iterable[ChatCompletionMessageParam]:
     match element:
@@ -203,7 +93,7 @@ def _convert_context_element(
                 {
                     "role": "user",
                     "content": [
-                        _convert_content_element(
+                        content_element_as_content_part(
                             element=element,
                             config=config,
                         )
@@ -213,10 +103,10 @@ def _convert_context_element(
             )
 
         case LMMCompletion() as completion:
-            # TODO: OpenAI models generating media?
             return (
                 {
                     "role": "assistant",
+                    # TODO: OpenAI models generating media?
                     "content": completion.content.as_string(),
                 },
             )
@@ -250,367 +140,149 @@ def _convert_context_element(
             )
 
 
-async def _chat_completion(  # noqa: C901, PLR0912, PLR0913
-    *,
-    client: OpenAIClient,
-    config: OpenAIChatConfig,
+def output_as_response_declaration(
     output: LMMOutputSelection,
-    messages: list[ChatCompletionMessageParam],
+) -> tuple[
+    ResponseFormat | ResponseFormatJSONSchema | NotGiven,
+    list[ChatCompletionModality] | NotGiven,
+    Callable[[MultimodalContent], Multimodal],
+]:
+    match output:
+        case "auto":
+            return (
+                NOT_GIVEN,
+                NOT_GIVEN,
+                _auto_output_conversion,
+            )
+
+        case "text":
+            return (
+                {"type": "text"},
+                ["text"],
+                _auto_output_conversion,
+            )
+
+        case "json":
+            return (
+                {"type": "json_object"},
+                ["text"],
+                _auto_output_conversion,
+            )
+            return ({"type": "json_object"}, _json_output_conversion)
+
+        case "image":
+            raise NotImplementedError("image output is not supported by OpenAI")
+
+        case "audio":
+            return (NOT_GIVEN, ["audio"], _text_output_conversion)
+
+        case "video":
+            raise NotImplementedError("video output is not supported by OpenAI")
+
+        case model:
+            return (
+                {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": model.__name__,
+                        "schema": cast(
+                            dict[str, Any],
+                            model.__PARAMETERS_SPECIFICATION__,
+                        ),
+                        "strict": False,
+                    },
+                },
+                ["text"],
+                _prepare_model_output_conversion(model),
+            )
+
+
+def _auto_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> Multimodal:
+    return output
+
+
+def _text_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> Multimodal:
+    return output.as_string()
+
+
+def _audio_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> Multimodal:
+    return MultimodalContent.of(*output.media("audio"))
+
+
+def _json_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> Multimodal:
+    return MultimodalContent.of(DataModel.from_json(output.as_string()))
+
+
+def _prepare_model_output_conversion(
+    model: type[DataModel],
+    /,
+) -> Callable[[MultimodalContent], Multimodal]:
+    def _model_output_conversion(
+        output: MultimodalContent,
+        /,
+    ) -> Multimodal:
+        return MultimodalContent.of(DataModel.from_json(output.as_string()))
+
+    return _model_output_conversion
+
+
+def tool_specification_as_tool(
+    tool: LMMToolSpecification,
+    /,
+) -> ChatCompletionToolParam:
+    return {
+        "type": "function",
+        "function": {
+            "name": tool["name"],
+            "description": tool["description"] or "",
+            "parameters": cast(dict[str, Any], tool["parameters"]),
+        },
+    }
+
+
+def tools_as_tool_config(
     tools: Iterable[LMMToolSpecification] | None,
+    /,
+    *,
     tool_selection: LMMToolSelection,
-) -> LMMOutput:
-    completion: ChatCompletion
+) -> tuple[
+    ChatCompletionToolChoiceOptionParam | NotGiven, list[ChatCompletionToolParam] | NotGiven
+]:
+    tools_list: list[ChatCompletionToolParam] = [
+        tool_specification_as_tool(tool) for tool in (tools or [])
+    ]
+    if not tools_list:
+        return (NOT_GIVEN, NOT_GIVEN)
+
     match tool_selection:
         case "auto":
-            completion = await client.chat_completion(
-                config=config,
-                messages=messages,
-                response_format=output,
-                tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": tool["name"],
-                            "description": tool["description"] or "",
-                            "parameters": as_dict(tool["parameters"]) or {},
-                        },
-                    }
-                    for tool in tools
-                ]
-                if tools
-                else None,
-                tool_choice="auto",
-            )
+            return ("auto", tools_list)
 
         case "none":
-            completion = await client.chat_completion(
-                config=config,
-                messages=messages,
-                response_format=output,
-                tools=None,
-                tool_choice="none",
-            )
+            return (NOT_GIVEN, NOT_GIVEN)
 
         case "required":
-            completion = await client.chat_completion(
-                config=config,
-                messages=messages,
-                response_format=output,
-                tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": tool["name"],
-                            "description": tool["description"] or "",
-                            "parameters": as_dict(tool["parameters"]) or {},
-                        },
-                    }
-                    for tool in tools
-                ]
-                if tools
-                else None,
-                tool_choice="required",
-            )
+            return ("required", tools_list)
 
         case tool:
-            completion = await client.chat_completion(
-                config=config,
-                messages=messages,
-                response_format=output,
-                tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": tool["name"],
-                            "description": tool["description"] or "",
-                            "parameters": as_dict(tool["parameters"]) or {},
-                        },
-                    }
-                    for tool in tools
-                ]
-                if tools
-                else None,
-                tool_choice={
+            assert tool in (tools or []), "Can't suggest a tool without using it"  # nosec: B101
+
+            return (
+                {
                     "type": "function",
-                    "function": {
-                        "name": tool["name"],
-                    },
+                    "function": {"name": tool["name"]},
                 },
+                tools_list,
             )
-
-    if usage := completion.usage:
-        ctx.record(
-            TokenUsage.for_model(
-                config.model,
-                input_tokens=usage.prompt_tokens,
-                cached_tokens=None,
-                output_tokens=usage.completion_tokens,
-            ),
-        )
-
-    if not completion.choices:
-        raise OpenAIException("Invalid OpenAI completion - missing messages!", completion)
-
-    if fingerprint := completion.system_fingerprint:
-        ctx.record(OpenAISystemFingerprint(system_fingerprint=fingerprint))
-
-    completion_message: ChatCompletionMessage = completion.choices[0].message
-    match completion.choices[0].finish_reason:
-        case "tool_calls":
-            if (tool_calls := completion_message.tool_calls) and (tools := tools):
-                ctx.record(ResultTrace.of(tool_calls))
-                return LMMToolRequests(
-                    requests=[
-                        LMMToolRequest(
-                            identifier=call.id,
-                            tool=call.function.name,
-                            arguments=json.loads(call.function.arguments),
-                        )
-                        for call in tool_calls
-                    ]
-                )
-
-            else:
-                raise OpenAIException("Invalid OpenAI completion", completion)
-
-        case "stop":
-            if (tool_calls := completion_message.tool_calls) and (tools := tools):
-                ctx.record(ResultTrace.of(tool_calls))
-                return LMMToolRequests(
-                    requests=[
-                        LMMToolRequest(
-                            identifier=call.id,
-                            tool=call.function.name,
-                            arguments=json.loads(call.function.arguments),
-                        )
-                        for call in tool_calls
-                    ]
-                )
-
-            elif content := completion_message.content:
-                ctx.record(ResultTrace.of(content))
-                return LMMCompletion.of(content)
-
-            else:
-                raise OpenAIException("Invalid OpenAI completion", completion)
-
-        case other:
-            raise OpenAIException(f"Unexpected finish reason: {other}")
-
-
-async def _chat_stream(  # noqa: C901, PLR0912, PLR0915
-    *,
-    client: OpenAIClient,
-    config: OpenAIChatConfig,
-    properties: AsyncIterator[LMMStreamProperties],
-    input: AsyncIterator[LMMStreamInput],  # noqa: A002
-    context: list[ChatCompletionMessageParam],
-) -> AsyncGenerator[LMMStreamOutput, None]:
-    # track requested tool calls out of the loop
-    pending_tool_calls: set[str] = set()
-    # before each call check for updated properties - this supposed to be an infinite loop
-    async for current_properties in properties:
-        # for each call accumulate input first
-        input_buffer: MultimodalContent = MultimodalContent.of()
-        async for chunk in input:
-            match chunk:
-                # gether input content chunks until marked as end
-                case LMMStreamChunk() as content_chunk:
-                    input_buffer = input_buffer.appending(content_chunk.content)
-                    if content_chunk.eod:
-                        context.append(
-                            {
-                                "role": "user",
-                                "content": [
-                                    _convert_content_element(
-                                        element=element,
-                                        config=config,
-                                    )
-                                    for element in input_buffer.parts
-                                ],
-                            }
-                        )
-                        break  # we are supporting only completed input messages with this api
-
-                # accumulate tool results directly in context
-                case tool_result:
-                    pending_tool_calls.remove(tool_result.identifier)
-                    context.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": tool_result.identifier,
-                            "content": tool_result.content.as_string(),
-                        }
-                    )
-                    # when there is no pending input and we got all requested tool results
-                    if not input_buffer and not pending_tool_calls:
-                        break  # then we can request completion again
-
-        else:  # finalize streaming if input is finished
-            return
-
-        # prepare context for the next request by extending with instructions if any
-        request_context: list[ChatCompletionMessageParam]
-        if instruction := current_properties.instruction:
-            request_context = [
-                {
-                    "role": "system",
-                    "content": Instruction.of(instruction).format(),
-                },
-                *context,
-            ]
-
-        else:
-            request_context = context
-
-        accumulated_result: MultimodalContent = MultimodalContent.of()
-        accumulated_tool_calls: list[ChoiceDeltaToolCall] = []
-        async for part in await client.chat_completion(
-            config=config,
-            messages=request_context,
-            tools=[
-                {
-                    "type": "function",
-                    "function": {
-                        "name": tool["name"],
-                        "description": tool["description"] or "",
-                        "parameters": as_dict(tool["parameters"]) or {},
-                    },
-                }
-                for tool in current_properties.tools
-            ]
-            if current_properties.tools
-            else None,
-            tool_choice="auto" if current_properties.tools else "none",
-            stream=True,
-        ):
-            if part.choices:  # usage part does not contain choices
-                # we are always requesting single result - no need to take care of indices
-                element: Choice = part.choices[0]
-                # get the tool calls parts first
-                if tool_calls := element.delta.tool_calls:
-                    # tool calls come in parts, we have to merge them manually
-                    for call in tool_calls:
-                        try:
-                            tool_call: ChoiceDeltaToolCall = next(
-                                tool_call
-                                for tool_call in accumulated_tool_calls
-                                if tool_call.index == call.index
-                            )
-
-                            if call.id:
-                                if tool_call.id is not None:
-                                    tool_call.id += call.id
-                                else:
-                                    tool_call.id = call.id
-                            else:
-                                pass
-
-                            if call.function is None:
-                                continue
-
-                            if tool_call.function is None:
-                                tool_call.function = call.function
-                                continue
-
-                            if call.function.name:
-                                if tool_call.function.name is not None:
-                                    tool_call.function.name += call.function.name
-                                else:
-                                    tool_call.function.name = call.function.name
-                            else:
-                                pass
-
-                            if call.function.arguments:
-                                if tool_call.function.arguments is not None:
-                                    tool_call.function.arguments += call.function.arguments
-                                else:
-                                    tool_call.function.arguments = call.function.arguments
-                            else:
-                                pass
-
-                        except (StopIteration, StopAsyncIteration):
-                            accumulated_tool_calls.append(call)
-
-                # then process content
-                if element.delta.content is not None:
-                    content_chunk: LMMStreamChunk = LMMStreamChunk.of(element.delta.content)
-                    accumulated_result = accumulated_result.appending(
-                        content_chunk.content,
-                        merge_text=True,
-                    )
-                    yield content_chunk
-
-                if finish_reason := element.finish_reason:
-                    match finish_reason:
-                        case "stop":
-                            # send completion chunk - openAI sends it without an actual content
-                            yield LMMStreamChunk.of(
-                                MultimodalContent.of(),
-                                eod=True,
-                            )
-
-                        case "tool_calls":
-                            if accumulated_tool_calls:
-                                context.append(
-                                    {
-                                        "role": "assistant",
-                                        "tool_calls": [
-                                            {
-                                                "id": request.id,
-                                                "type": "function",
-                                                "function": {
-                                                    "name": request.function.name,
-                                                    "arguments": request.function.arguments or "{}",
-                                                },
-                                            }
-                                            for request in accumulated_tool_calls
-                                            if request.id
-                                            and request.function
-                                            and request.function.name
-                                        ],
-                                    }
-                                )
-                            if accumulated_result:
-                                context.append(
-                                    {
-                                        "role": "assistant",
-                                        "content": accumulated_result.as_string(),
-                                    }
-                                )
-
-                            for call in accumulated_tool_calls:
-                                if not call.function:
-                                    continue  # skip partial calls
-                                if not call.function.name:
-                                    continue  # skip calls with missing names
-
-                                call_identifier: str = call.id or uuid4().hex
-                                pending_tool_calls.add(call_identifier)
-                                # send tool requests when ensured that all were completed
-                                yield LMMToolRequest(
-                                    identifier=call_identifier,
-                                    tool=call.function.name,
-                                    arguments=json.loads(call.function.arguments)
-                                    if call.function.arguments
-                                    else {},
-                                )
-
-                        case other:
-                            raise OpenAIException(f"Unexpected finish reason: {other}")
-
-            elif usage := part.usage:  # record usage if able (expected in the last part)
-                ctx.record(
-                    TokenUsage.for_model(
-                        config.model,
-                        input_tokens=usage.prompt_tokens,
-                        cached_tokens=None,
-                        output_tokens=usage.completion_tokens,
-                    ),
-                )
-
-                if fingerprint := part.system_fingerprint:
-                    ctx.record(OpenAISystemFingerprint(system_fingerprint=fingerprint))
-
-            else:
-                ctx.log_warning("Unexpected OpenAI streaming part: %s", part)

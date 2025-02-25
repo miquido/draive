@@ -26,32 +26,36 @@ class GeminiEmbedding(GeminiAPI):
         self,
         values: Sequence[str],
         /,
+        *,
+        config: GeminiEmbeddingConfig | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[str]]:
         """
         Create texts embedding with Gemini embedding service.
         """
-        config: GeminiEmbeddingConfig = ctx.state(GeminiEmbeddingConfig).updated(**extra)
-        embedding_config: EmbedContentConfigDict | None
-        if not_missing(config.dimensions):
-            embedding_config = {"output_dimensionality": config.dimensions}
+        embedding_config: GeminiEmbeddingConfig = config or ctx.state(
+            GeminiEmbeddingConfig
+        ).updated(**extra)
+        config_dict: EmbedContentConfigDict | None
+        if not_missing(embedding_config.dimensions):
+            config_dict = {"output_dimensionality": embedding_config.dimensions}
 
         else:
-            embedding_config = None
+            config_dict = None
 
-        with ctx.scope("gemini_text_embedding", config):
+        with ctx.scope("gemini_text_embedding", embedding_config):
             texts: list[str] = as_list(values)
             responses: list[EmbedContentResponse] = await gather(
                 *[
                     self._client.aio.models.embed_content(
-                        model=config.model,
-                        config=embedding_config,
+                        model=embedding_config.model,
+                        config=config_dict,
                         contents=cast(
                             list[ContentUnion],  # it is actually list[str]
-                            texts[index : index + config.batch_size],
+                            texts[index : index + embedding_config.batch_size],
                         ),
                     )
-                    for index in range(0, len(texts), config.batch_size)
+                    for index in range(0, len(texts), embedding_config.batch_size)
                 ]
             )
 

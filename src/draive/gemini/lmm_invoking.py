@@ -25,6 +25,7 @@ from draive.gemini.lmm import (
     tools_as_tools_config,
 )
 from draive.gemini.types import GeminiException
+from draive.gemini.utils import unwrap_missing
 from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
@@ -49,7 +50,7 @@ class GeminiLMMInvoking(GeminiAPI):
     def lmm_invoking(self) -> LMMInvocation:
         return LMMInvocation(invoke=self.lmm_invocation)
 
-    async def lmm_invocation(  # noqa: PLR0912
+    async def lmm_invocation(  # noqa: PLR0912, PLR0913
         self,
         *,
         instruction: Instruction | str | None,
@@ -57,6 +58,7 @@ class GeminiLMMInvoking(GeminiAPI):
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
+        config: GeminiGenerationConfig | None = None,
         **extra: Any,
     ) -> LMMOutput:
         with ctx.scope("gemini_lmm_invocation"):
@@ -70,8 +72,10 @@ class GeminiLMMInvoking(GeminiAPI):
                     **extra,
                 )
             )
-            config: GeminiGenerationConfig = ctx.state(GeminiGenerationConfig).updated(**extra)
-            ctx.record(config)
+            generation_config: GeminiGenerationConfig = config or ctx.state(
+                GeminiGenerationConfig
+            ).updated(**extra)
+            ctx.record(generation_config)
 
             content: ContentListUnionDict = list(
                 chain.from_iterable([context_element_as_content(element) for element in context])
@@ -91,17 +95,15 @@ class GeminiLMMInvoking(GeminiAPI):
             )
 
             completion: GenerateContentResponse = await self._client.aio.models.generate_content(
-                model=config.model,
+                model=generation_config.model,
                 config={
-                    "temperature": config.temperature,
-                    "top_p": config.top_p,
-                    "top_k": config.top_k,
-                    "max_output_tokens": config.max_tokens,
+                    "temperature": unwrap_missing(generation_config.temperature),
+                    "top_p": unwrap_missing(generation_config.top_p),
+                    "top_k": unwrap_missing(generation_config.top_k),
+                    "max_output_tokens": unwrap_missing(generation_config.max_tokens),
                     "candidate_count": 1,
-                    "seed": config.seed,
-                    "stop_sequences": as_list(config.stop_sequences)
-                    if config.stop_sequences
-                    else None,
+                    "seed": unwrap_missing(generation_config.seed),
+                    "stop_sequences": as_list(unwrap_missing(generation_config.stop_sequences)),
                     # gemini safety is really bad and often triggers false positive
                     "safety_settings": DISABLED_SAFETY_SETTINGS,
                     "system_instruction": Instruction.formatted(instruction)
@@ -115,7 +117,9 @@ class GeminiLMMInvoking(GeminiAPI):
                     else None,
                     # prevent google from automatically resolving function calls
                     "automatic_function_calling": {"disable": True, "maximum_remote_calls": None},
-                    "media_resolution": resoluton_as_media_resulution(config.media_resolution),
+                    "media_resolution": resoluton_as_media_resulution(
+                        generation_config.media_resolution
+                    ),
                     "response_schema": response_schema,
                     "response_mime_type": response_mime_type,
                 },
@@ -125,7 +129,7 @@ class GeminiLMMInvoking(GeminiAPI):
             if usage := completion.usage_metadata:
                 ctx.record(
                     TokenUsage.for_model(
-                        config.model,
+                        generation_config.model,
                         input_tokens=usage.prompt_token_count,
                         cached_tokens=usage.cached_content_token_count,
                         output_tokens=usage.candidates_token_count,

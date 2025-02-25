@@ -12,12 +12,12 @@ __all__ = [
 class GeminiGenerationConfig(State):
     model: str
     temperature: float = 1.0
-    top_p: float | None = None
-    top_k: int | None = None
-    max_tokens: int | None = None
-    seed: int | None = None
-    timeout: float | None = None
-    stop_sequences: Sequence[str] | None = None
+    top_p: float | Missing = MISSING
+    top_k: int | Missing = MISSING
+    max_tokens: int | Missing = MISSING
+    seed: int | Missing = MISSING
+    timeout: float | Missing = MISSING
+    stop_sequences: Sequence[str] | Missing = MISSING
     media_resolution: Literal["low", "medium", "high"] | Missing = MISSING
 
 

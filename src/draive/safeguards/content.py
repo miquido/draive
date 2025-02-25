@@ -7,6 +7,7 @@ __all__ = [
 ]
 
 
+# TODO: refine guardrails
 @runtime_checkable
 class ContentGuardrails(Protocol):
     async def __call__(

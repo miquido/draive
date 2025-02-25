@@ -4,14 +4,13 @@ from itertools import chain
 from typing import Any
 from uuid import uuid4
 
-from haiway import ArgumentsTrace, ResultTrace, as_list, ctx, not_missing
+from haiway import ArgumentsTrace, ResultTrace, as_list, ctx
 from mistralai.models import (
     AssistantMessage,
     ChatCompletionChoice,
     ChatCompletionResponse,
     MessagesTypedDict,
 )
-from mistralai.types import UNSET
 
 from draive.instructions import Instruction
 from draive.lmm import (
@@ -36,6 +35,7 @@ from draive.mistral.lmm import (
     tools_as_tool_config,
 )
 from draive.mistral.types import MistralException
+from draive.mistral.utils import unwrap_missing_to_none, unwrap_missing_to_unset
 from draive.multimodal import Multimodal, MultimodalContent
 
 __all__ = [
@@ -56,6 +56,7 @@ class MistralLMMInvoking(MistralAPI):
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
         prefill: Multimodal | None = None,
+        config: MistralChatConfig | None = None,
         **extra: Any,
     ) -> LMMOutput:
         with ctx.scope("mistral_lmm_invocation"):
@@ -69,8 +70,8 @@ class MistralLMMInvoking(MistralAPI):
                     **extra,
                 )
             )
-            config: MistralChatConfig = ctx.state(MistralChatConfig).updated(**extra)
-            ctx.record(config)
+            chat_config: MistralChatConfig = config or ctx.state(MistralChatConfig).updated(**extra)
+            ctx.record(chat_config)
 
             messages: list[MessagesTypedDict] = list(
                 chain.from_iterable([context_element_as_messages(element) for element in context])
@@ -105,18 +106,19 @@ class MistralLMMInvoking(MistralAPI):
             )
 
             completion: ChatCompletionResponse = await self._client.chat.complete_async(
-                model=config.model,
+                model=chat_config.model,
                 messages=messages,
-                temperature=config.temperature,
-                top_p=config.top_p if not_missing(config.top_p) else None,
-                max_tokens=config.max_tokens if not_missing(config.max_tokens) else UNSET,
+                temperature=chat_config.temperature,
+                top_p=unwrap_missing_to_none(chat_config.top_p),
+                max_tokens=unwrap_missing_to_unset(chat_config.max_tokens),
                 stream=False,
-                stop=as_list(config.stop_sequences) if not_missing(config.stop_sequences) else None,
-                random_seed=config.seed if not_missing(config.seed) else UNSET,
+                stop=as_list(unwrap_missing_to_none(chat_config.stop_sequences)),
+                random_seed=unwrap_missing_to_unset(chat_config.seed),
                 response_format=response_format,
                 tools=tools_list,
                 tool_choice=tool_choice,
             )
+
             if usage := completion.usage:
                 ctx.record(
                     TokenUsage.for_model(

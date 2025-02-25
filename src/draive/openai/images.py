@@ -2,6 +2,7 @@ from typing import Any
 
 from haiway import ctx
 from openai.types.image import Image
+from openai.types.images_response import ImagesResponse
 
 from draive.generation import ImageGeneration
 from draive.instructions import Instruction
@@ -9,35 +10,45 @@ from draive.multimodal import (
     MediaContent,
     Multimodal,
 )
-from draive.openai.client import OpenAIClient
+from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIImageGenerationConfig
 from draive.openai.types import OpenAIException
+from draive.openai.utils import unwrap_missing
 
 __all__ = [
-    "openai_image_generator",
+    "OpenAIImageGeneration",
 ]
 
 
-def openai_image_generator(
-    client: OpenAIClient | None = None,
-    /,
-) -> ImageGeneration:
-    client = client or OpenAIClient.shared()
+class OpenAIImageGeneration(OpenAIAPI):
+    def image_generator(self) -> ImageGeneration:
+        return ImageGeneration(generate=self.generate_image)
 
-    async def openai_generate_image(
+    async def generate_image(
+        self,
         *,
         instruction: Instruction | str,
         input: Multimodal | None,  # noqa: A002
+        config: OpenAIImageGenerationConfig | None = None,
         **extra: Any,
     ) -> MediaContent:
         with ctx.scope("generate_image"):
-            config: OpenAIImageGenerationConfig = ctx.state(OpenAIImageGenerationConfig).updated(
-                **extra
+            generation_config: OpenAIImageGenerationConfig = config or ctx.state(
+                OpenAIImageGenerationConfig
+            ).updated(**extra)
+
+            response: ImagesResponse = await self._client.images.generate(
+                model=generation_config.model,
+                n=1,
+                prompt=Instruction.formatted(instruction),
+                quality=generation_config.quality,
+                size=generation_config.size,
+                style=generation_config.style,
+                timeout=unwrap_missing(generation_config.timeout),
+                response_format=generation_config.result,
             )
-            image: Image = await client.generate_image(
-                config=config,
-                instruction=Instruction.formatted(instruction),
-            )
+
+            image: Image = response.data[0]
             if url := image.url:
                 return MediaContent.url(
                     url,
@@ -52,5 +63,3 @@ def openai_image_generator(
 
             else:
                 raise OpenAIException("Invalid OpenAI response - missing image content")
-
-    return ImageGeneration(generate=openai_generate_image)
