@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from haiway import ctx
 
@@ -106,6 +106,11 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
                 case LMMCompletion() as completion:
                     if decoder := decoder:
                         return generated.from_dict(decoder(completion.content))
+
+                    elif (artifacts := completion.content.artifacts()) and isinstance(
+                        artifacts[0], generated
+                    ):
+                        return cast(Generated, artifacts[0])
 
                     else:
                         return generated.from_json(completion.content.as_string())

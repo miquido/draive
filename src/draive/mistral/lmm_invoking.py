@@ -32,7 +32,7 @@ from draive.mistral.lmm import (
     content_chunk_as_content_element,
     content_element_as_content_chunk,
     context_element_as_messages,
-    output_as_response_format,
+    output_as_response_declaration,
     tools_as_tool_config,
 )
 from draive.mistral.types import MistralException
@@ -97,6 +97,8 @@ class MistralLMMInvoking(MistralAPI):
                     *messages,
                 ]
 
+            response_format, output_decoder = output_as_response_declaration(output)
+
             tool_choice, tools_list = tools_as_tool_config(
                 tools,
                 tool_selection=tool_selection,
@@ -111,7 +113,7 @@ class MistralLMMInvoking(MistralAPI):
                 stream=False,
                 stop=as_list(config.stop_sequences) if not_missing(config.stop_sequences) else None,
                 random_seed=config.seed if not_missing(config.seed) else UNSET,
-                response_format=output_as_response_format(output),
+                response_format=response_format,
                 tools=tools_list,
                 tool_choice=tool_choice,
             )
@@ -152,12 +154,16 @@ class MistralLMMInvoking(MistralAPI):
             if content := completion_message.content:
                 match content:
                     case str() as string:
-                        lmm_completion = LMMCompletion.of(string)
+                        lmm_completion = LMMCompletion.of(
+                            output_decoder(MultimodalContent.of(string))
+                        )
 
                     case chunks:
                         lmm_completion = LMMCompletion.of(
-                            MultimodalContent.of(
-                                *[content_chunk_as_content_element(chunk) for chunk in chunks]
+                            output_decoder(
+                                MultimodalContent.of(
+                                    *[content_chunk_as_content_element(chunk) for chunk in chunks]
+                                )
                             ),
                         )
 
