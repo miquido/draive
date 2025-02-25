@@ -81,3 +81,6 @@ pip-selfcheck.json
 .vscode/
 .idea/
 local_cache/
+
+## Custom
+src/draive/__main__.py

@@ -44,6 +44,7 @@ class GeminiEmbedding(GeminiAPI):
             config_dict = None
 
         with ctx.scope("gemini_text_embedding", embedding_config):
+            ctx.record(embedding_config)
             texts: list[str] = as_list(values)
             responses: list[EmbedContentResponse] = await gather(
                 *[

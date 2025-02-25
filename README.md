@@ -14,7 +14,7 @@ Great, but how it looks like?
 
 ```python
 from draive import ctx, generate_text, tool
-from draive.openai import OpenAIClient, openai_lmm_invocation
+from draive.openai import OpenAI, OpenAIChatConfig
 
 
 @tool # simply annotate a function as a tool
@@ -23,9 +23,10 @@ async def current_time(location: str) -> str:
 
 async with  ctx.scope( # create execution context
     "example", # give it a name
-    openai_lmm_invocation(), # define llm provider for this scope
+    OpenAI().lmm_invoking(),, # define services provider
+    OpenAIChatConfig(model="gpt-4o-mini") # and its configuration
 ):
-    result: str = await generate_text( # choose the right abstraction, i.e. `generate_text`
+    result: str = await generate_text( # choose the right abstraction
         instruction="You are a helpful assistant", # provide clear instructions
         input="What is the time in Kraków?", # give it some input (including multimodal)
         tools=[current_time], # and select any tools you like
@@ -117,28 +118,20 @@ Use Mistral services client. Allows to use Azure services as well.
 pip install draive[mistral]
 ```
 
+- Cohere:
+
+Use Cohere services client.
+
+```bash
+pip install draive[cohere]
+```
+
 - Ollama:
 
 Use Ollama services client.
 
 ```bash
 pip install draive[ollama]
-```
-
-- Fastembed:
-
-User Fastembed services client.
-
-```bash
-pip install draive[fastembed]
-```
-
-- SentencePiece:
-
-User SentencePiece model runner. It is used by Gemini and Mistral.
-
-```bash
-pip install draive[sentencepiece]
 ```
 
 ## 👷 Contributing

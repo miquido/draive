@@ -37,6 +37,9 @@ sentencepiece = [
 fastembed = [
   "fastembed~=0.4",
 ]
+cohere = [
+  "cohere~=5.13"
+]
 openai = [
   "openai~=1.57",
   "tiktoken~=0.8",
@@ -66,6 +69,7 @@ mcp = [
 dev = [
   "draive[sentencepiece]",
   "draive[fastembed]",
+  "draive[cohere]",
   "draive[openai]",
   "draive[anthropic]",
   "draive[mistral]",
@@ -90,6 +94,7 @@ line-length = 100
 extend-exclude = [".venv", ".git", ".cache"]
 lint.select = ["E", "F", "A", "I", "B", "PL", "W", "C", "RUF", "UP"]
 lint.ignore = ["A005"]
+exclude = ["./src/draive/__main__.py"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "E402"]
@@ -104,7 +109,7 @@ venvPath = "."
 venv = ".venv"
 include = ["./src"]
 exclude = ["**/node_modules", "**/__pycache__"]
-ignore = []
+ignore = ["./src/draive/__main__.py"]
 stubPath = "./stubs"
 reportMissingImports = true
 reportMissingTypeStubs = false

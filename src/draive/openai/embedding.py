@@ -38,6 +38,7 @@ class OpenAIEmbedding(OpenAIAPI):
             OpenAIEmbeddingConfig
         ).updated(**extra)
         with ctx.scope("openai_text_embedding", embedding_config):
+            ctx.record(embedding_config)
             texts: list[str] = as_list(values)
             responses: list[CreateEmbeddingResponse] = await gather(
                 *[
