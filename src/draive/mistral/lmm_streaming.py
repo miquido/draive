@@ -158,6 +158,7 @@ class MistralLMMStreaming(MistralAPI):
                             TokenUsage.for_model(
                                 completion_chunk.data.model,
                                 input_tokens=usage.prompt_tokens,
+                                cached_tokens=None,
                                 output_tokens=usage.completion_tokens,
                             ),
                         )

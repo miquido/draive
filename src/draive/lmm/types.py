@@ -41,7 +41,7 @@ __all__ = [
 class LMMToolFunctionSpecification(TypedDict):
     name: str
     description: str | None
-    parameters: ParametersSpecification
+    parameters: ParametersSpecification | None
 
 
 type LMMToolSpecification = LMMToolFunctionSpecification
@@ -71,10 +71,15 @@ class LMMInput(DataModel):
         cls,
         content: Multimodal,
         /,
+        meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> Self:
-        return cls(content=MultimodalContent.of(content))
+        return cls(
+            content=MultimodalContent.of(content),
+            meta=meta,
+        )
 
     content: MultimodalContent
+    meta: Mapping[str, str | float | int | bool | None] | None = None
 
     def __bool__(self) -> bool:
         return bool(self.content)
@@ -86,10 +91,15 @@ class LMMCompletion(DataModel):
         cls,
         content: Multimodal,
         /,
+        meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> Self:
-        return cls(content=MultimodalContent.of(content))
+        return cls(
+            content=MultimodalContent.of(content),
+            meta=meta,
+        )
 
     content: MultimodalContent
+    meta: Mapping[str, str | float | int | bool | None] | None = None
 
     def __bool__(self) -> bool:
         return bool(self.content)

@@ -139,6 +139,7 @@ async def _chat_completion(
         TokenUsage.for_model(
             config.model,
             input_tokens=completion.prompt_eval_count,
+            cached_tokens=None,
             output_tokens=completion.eval_count,
         ),
     )

@@ -5,7 +5,7 @@ from itertools import chain
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from haiway import ArgumentsTrace, ResultTrace, ctx, not_missing
+from haiway import ArgumentsTrace, ResultTrace, as_dict, ctx, not_missing
 from openai.types.chat import (
     ChatCompletion,
     ChatCompletionContentPartParam,
@@ -272,7 +272,7 @@ async def _chat_completion(  # noqa: C901, PLR0912, PLR0913
                         "function": {
                             "name": tool["name"],
                             "description": tool["description"] or "",
-                            "parameters": dict[str, object](tool["parameters"]),
+                            "parameters": as_dict(tool["parameters"]) or {},
                         },
                     }
                     for tool in tools
@@ -302,7 +302,7 @@ async def _chat_completion(  # noqa: C901, PLR0912, PLR0913
                         "function": {
                             "name": tool["name"],
                             "description": tool["description"] or "",
-                            "parameters": dict[str, object](tool["parameters"]),
+                            "parameters": as_dict(tool["parameters"]) or {},
                         },
                     }
                     for tool in tools
@@ -323,7 +323,7 @@ async def _chat_completion(  # noqa: C901, PLR0912, PLR0913
                         "function": {
                             "name": tool["name"],
                             "description": tool["description"] or "",
-                            "parameters": dict[str, object](tool["parameters"]),
+                            "parameters": as_dict(tool["parameters"]) or {},
                         },
                     }
                     for tool in tools
@@ -343,6 +343,7 @@ async def _chat_completion(  # noqa: C901, PLR0912, PLR0913
             TokenUsage.for_model(
                 config.model,
                 input_tokens=usage.prompt_tokens,
+                cached_tokens=None,
                 output_tokens=usage.completion_tokens,
             ),
         )
@@ -473,7 +474,7 @@ async def _chat_stream(  # noqa: C901, PLR0912, PLR0915
                     "function": {
                         "name": tool["name"],
                         "description": tool["description"] or "",
-                        "parameters": dict[str, object](tool["parameters"]),
+                        "parameters": as_dict(tool["parameters"]) or {},
                     },
                 }
                 for tool in current_properties.tools
@@ -603,6 +604,7 @@ async def _chat_stream(  # noqa: C901, PLR0912, PLR0915
                     TokenUsage.for_model(
                         config.model,
                         input_tokens=usage.prompt_tokens,
+                        cached_tokens=None,
                         output_tokens=usage.completion_tokens,
                     ),
                 )

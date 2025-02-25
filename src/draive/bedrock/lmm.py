@@ -81,11 +81,7 @@ def bedrock_lmm(
                 case _:
                     raise NotImplementedError("model output is not supported by bedrock")
 
-
-
-            messages: list[ChatMessage] = [
-                _convert_context_element(element) for element in context
-            ]
+            messages: list[ChatMessage] = [_convert_context_element(element) for element in context]
 
             tools_list: list[ChatTool] = [_convert_tool(tool) for tool in tools or []]
             require_tool: bool
@@ -223,6 +219,7 @@ async def _chat_completion(  # noqa: PLR0913
         TokenUsage.for_model(
             config.model,
             input_tokens=completion["usage"]["inputTokens"],
+            cached_tokens=None,
             output_tokens=completion["usage"]["outputTokens"],
         ),
     )

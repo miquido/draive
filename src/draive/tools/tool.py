@@ -56,6 +56,9 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
                 "required": aliased_required,
             }
 
+        if not specification["properties"]:
+            specification = None  # use no parameters without arguments
+
         self.specification: LMMToolSpecification = LMMToolFunctionSpecification(
             name=name,
             description=description,

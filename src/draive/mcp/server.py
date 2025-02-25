@@ -220,7 +220,7 @@ def expose_tools(
             MCPTool(
                 name=tool["name"],
                 description=tool["description"],
-                inputSchema=as_dict(tool["parameters"]),
+                inputSchema=as_dict(tool["parameters"]) or {},
             )
             for tool in toolbox.available_tools()
         ]

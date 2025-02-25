@@ -114,8 +114,8 @@ def content_element_as_content_chunk(
 
             url: str
             match media.source:
-                case str() as string:
-                    url = string
+                case str() as uri:
+                    url = uri
 
                 case bytes() as data:
                     url = f"data:{media.media};base64,{b64encode(data).decode()}"
@@ -214,26 +214,26 @@ def tools_as_tool_config(
     tool_selection: LMMToolSelection,
 ) -> tuple[ChatCompletionRequestToolChoiceTypedDict, list[ToolTypedDict]]:
     tools_list: list[ToolTypedDict] = [tool_specification_as_tool(tool) for tool in (tools or [])]
-    tool_choice: ChatCompletionRequestToolChoiceTypedDict
-    if tools_list:
-        match tool_selection:
-            case "auto":
-                tool_choice = "auto"
+    if not tools_list:
+        return ("none", tools_list)
 
-            case "none":
-                tool_choice = "none"
+    match tool_selection:
+        case "auto":
+            return ("auto", tools_list)
 
-            case "required":
-                tool_choice = "any"
+        case "none":
+            return ("none", [])
 
-            case tool:
-                assert tool in (tools or []), "Can't suggest a tool without using it"  # nosec: B101
-                tool_choice = {
+        case "required":
+            return ("any", tools_list)
+
+        case tool:
+            assert tool in (tools or []), "Can't suggest a tool without using it"  # nosec: B101
+
+            return (
+                {
                     "type": "function",
                     "function": {"name": tool["name"]},
-                }
-
-    else:
-        tool_choice = "none"
-
-    return (tool_choice, tools_list)
+                },
+                tools_list,
+            )

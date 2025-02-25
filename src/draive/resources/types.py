@@ -7,7 +7,7 @@ from draive.multimodal import (
     MediaContent,
     MultimodalContentElement,
     TextContent,
-    validated_media_type,
+    # validated_media_type,
 )
 from draive.parameters import DataModel
 
@@ -49,10 +49,10 @@ class ResourceContent(State):
                 return DataModel.from_json(self.blob.decode())
 
             case other:
-                # try to match supported media or raise an exception
+                # try to match supported media
                 return MediaContent.data(
                     self.blob,
-                    media=validated_media_type(other),
+                    media=other,
                 )
 
 

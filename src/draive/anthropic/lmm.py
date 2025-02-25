@@ -277,6 +277,7 @@ async def _completion(  # noqa: PLR0913, PLR0912, C901
         TokenUsage.for_model(
             config.model,
             input_tokens=completion.usage.input_tokens or 0,
+            cached_tokens=None,
             output_tokens=completion.usage.output_tokens or 0,
         ),
     )

@@ -46,12 +46,12 @@ anthropic = [
   "tokenizers~=0.21",
 ]
 mistral = [
-  "mistralai~=1.5",
   "draive[sentencepiece]",
+  "mistralai~=1.5",
 ]
 gemini = [
-  "httpx~=0.28",
   "draive[sentencepiece]",
+  "google-genai~=1.2",
 ]
 ollama = [
   "httpx~=0.28",
