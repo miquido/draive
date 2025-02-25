@@ -26,22 +26,26 @@ class MistralEmbedding(MistralAPI):
         self,
         values: Sequence[str],
         /,
+        *,
+        config: MistralEmbeddingConfig | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[str]]:
         """
         Create texts embedding with Mistral embedding service.
         """
-        config: MistralEmbeddingConfig = ctx.state(MistralEmbeddingConfig).updated(**extra)
-        with ctx.scope("mistral_text_embedding", config):
+        embedding_config: MistralEmbeddingConfig = config or ctx.state(
+            MistralEmbeddingConfig
+        ).updated(**extra)
+        with ctx.scope("mistral_text_embedding", embedding_config):
             texts: list[str] = as_list(values)
             responses: list[EmbeddingResponse] = await gather(
                 *[
                     self._client.embeddings.create_async(
-                        model=config.model,
-                        inputs=texts[index : index + config.batch_size],
+                        model=embedding_config.model,
+                        inputs=texts[index : index + embedding_config.batch_size],
                         encoding_format="float",
                     )
-                    for index in range(0, len(texts), config.batch_size)
+                    for index in range(0, len(texts), embedding_config.batch_size)
                 ]
             )
 

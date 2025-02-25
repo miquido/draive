@@ -3,26 +3,33 @@ from typing import Any
 from haiway import cache
 from tiktoken import Encoding, encoding_for_model
 
+from draive.openai.api import OpenAIAPI
 from draive.tokenization import Tokenization
 
 __all__ = [
-    "openai_tokenizer",
+    "OpenAITokenization",
 ]
 
 
-def openai_tokenizer(
-    model_name: str,
-    /,
-) -> Tokenization:
-    encoding: Encoding = _encoding(model_name=model_name)
+class OpenAITokenization(OpenAIAPI):
+    @cache(limit=2)
+    async def tokenizer(
+        self,
+        model_name: str,
+        /,
+    ) -> Tokenization:
+        """
+        Prepare tokenizer for selected OpenAI model.
+        """
+        encoding: Encoding = _encoding(model_name=model_name)
 
-    def openai_tokenize_text(
-        text: str,
-        **extra: Any,
-    ) -> list[int]:
-        return encoding.encode(text=text)
+        def openai_tokenize_text(
+            text: str,
+            **extra: Any,
+        ) -> list[int]:
+            return encoding.encode(text=text)
 
-    return Tokenization(tokenize_text=openai_tokenize_text)
+        return Tokenization(tokenize_text=openai_tokenize_text)
 
 
 @cache(limit=4)

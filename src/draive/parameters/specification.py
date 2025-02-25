@@ -162,7 +162,7 @@ type ParameterSpecification = (
     | ReferenceParameterSpecification
 )
 
-type ParametersSpecification = ParameterObjectSpecification  #  | ParameterAnyObjectSpecification
+type ParametersSpecification = ParameterObjectSpecification
 
 
 def validated_specification(

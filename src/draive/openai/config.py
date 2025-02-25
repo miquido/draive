@@ -23,7 +23,7 @@ class OpenAIChatConfig(State):
     top_p: float | Missing = MISSING
     frequency_penalty: float | Missing = MISSING
     max_tokens: int | Missing = MISSING
-    seed: int | None | Missing = MISSING
+    seed: int | Missing = MISSING
     audio_response_format: AudioResponseFormat | Missing = MISSING
     vision_details: Literal["auto", "low", "high"] | Missing = MISSING
     parallel_tool_calls: bool | Missing = MISSING
@@ -35,17 +35,16 @@ class OpenAIEmbeddingConfig(State):
     model: str
     dimensions: int | Missing = MISSING
     batch_size: int = 128
-    encoding_format: Literal["float", "base64"] | Missing = MISSING
     timeout: float | Missing = MISSING
 
 
 class OpenAIImageGenerationConfig(State):
     model: str
+    result: Literal["url", "b64_json"]
     quality: Literal["standard", "hd"] = "standard"
     size: Literal["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"] = "1024x1024"
     style: Literal["vivid", "natural"] = "vivid"
     timeout: float | Missing = MISSING
-    response_format: Literal["url", "b64_json"] = "b64_json"
 
 
 class OpenAISystemFingerprint(State):
@@ -53,6 +52,8 @@ class OpenAISystemFingerprint(State):
 
 
 class OpenAIModerationConfig(State):
+    model: str
+    timeout: float | Missing = MISSING
     harassment_threshold: float | Missing = MISSING
     harassment_threatening_threshold: float | Missing = MISSING
     hate_threshold: float | Missing = MISSING

@@ -1,44 +1,65 @@
+from asyncio import gather
 from collections.abc import Sequence
+from itertools import chain
 from typing import Any
 
-from haiway import ctx
+from haiway import as_list, ctx
+from openai.types.create_embedding_response import CreateEmbeddingResponse
 
 from draive.embedding import Embedded, TextEmbedding
-from draive.openai.client import OpenAIClient
+from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIEmbeddingConfig
+from draive.openai.utils import unwrap_missing
 
 __all__ = [
-    "openai_text_embedding",
+    "OpenAIEmbedding",
 ]
 
 
-def openai_text_embedding(
-    client: OpenAIClient | None = None,
-    /,
-) -> TextEmbedding:
-    client = client or OpenAIClient.shared()
+class OpenAIEmbedding(OpenAIAPI):
+    def text_embedding(self) -> TextEmbedding:
+        """
+        Prepare TextEmbedding implementation using OpenAI service.
+        """
+        return TextEmbedding(embed=self.create_text_embeddings)
 
-    async def openai_embed_text(
+    async def create_text_embeddings(
+        self,
         values: Sequence[str],
+        /,
+        *,
+        config: OpenAIEmbeddingConfig | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[str]]:
-        with ctx.scope("embed_text"):
-            config: OpenAIEmbeddingConfig = ctx.state(OpenAIEmbeddingConfig).updated(**extra)
-            results: list[list[float]] = await client.embedding(  # pyright: ignore[reportDeprecated]
-                config=config,
-                inputs=values,
+        """
+        Create texts embedding with OpenAI embedding service.
+        """
+        embedding_config: OpenAIEmbeddingConfig = config or ctx.state(
+            OpenAIEmbeddingConfig
+        ).updated(**extra)
+        with ctx.scope("openai_text_embedding", embedding_config):
+            texts: list[str] = as_list(values)
+            responses: list[CreateEmbeddingResponse] = await gather(
+                *[
+                    self._client.embeddings.create(
+                        input=texts[index : index + embedding_config.batch_size],
+                        model=embedding_config.model,
+                        dimensions=unwrap_missing(embedding_config.dimensions),
+                        encoding_format="float",
+                        timeout=unwrap_missing(embedding_config.timeout),
+                    )
+                    for index in range(0, len(texts), embedding_config.batch_size)
+                ]
             )
 
             return [
                 Embedded(
                     value=embedded[0],
-                    vector=embedded[1],
+                    vector=embedded[1].embedding,
                 )
                 for embedded in zip(
-                    values,
-                    results,
+                    texts,
+                    chain.from_iterable([response.data for response in responses]),
                     strict=True,
                 )
             ]
-
-    return TextEmbedding(embed=openai_embed_text)
