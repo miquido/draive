@@ -233,7 +233,7 @@ def _prepare_model_output_conversion(
         output: MultimodalContent,
         /,
     ) -> Multimodal:
-        return MultimodalContent.of(DataModel.from_json(output.as_string()))
+        return MultimodalContent.of(model.from_json(output.as_string()))
 
     return _model_output_conversion
 
