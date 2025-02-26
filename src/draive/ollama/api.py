@@ -18,7 +18,7 @@ class OllamaAPI:
         return AsyncClient(host=self._server_url)
 
     async def _initialize_client(self) -> None:
-        self._client._client.aclose()
+        await self._client._client.aclose()
         self._client = self._prepare_client()
         await self._client._client.__aenter__()
 
