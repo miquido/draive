@@ -3,6 +3,7 @@ from base64 import b64encode
 from collections.abc import Callable, Iterable
 from typing import Any, cast
 
+from haiway import as_dict
 from mistralai.models import (
     ChatCompletionRequestToolChoiceTypedDict,
     ContentChunk,
@@ -80,7 +81,7 @@ def context_element_as_messages(
                             "id": request.identifier,
                             "function": {
                                 "name": request.tool,
-                                "arguments": json.dumps(dict(request.arguments)),
+                                "arguments": json.dumps(as_dict(request.arguments)),
                             },
                         }
                         for request in tool_requests.requests
