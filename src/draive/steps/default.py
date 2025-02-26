@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from copy import copy
 from typing import Any
 
 from haiway import ctx
@@ -107,7 +108,7 @@ async def _process_step(
     while recursion_level <= toolbox.repeated_calls_limit:
         match await lmm_invoke(
             instruction=step.instruction or instruction,
-            context=context,
+            context=copy(context),
             output=step.output,
             tools=toolbox.available_tools(),
             tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
