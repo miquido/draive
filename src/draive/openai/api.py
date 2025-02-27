@@ -55,8 +55,7 @@ class OpenAIAPI:
 
     async def _initialize_client(self) -> None:
         await self._client.close()
-        self._client: AsyncOpenAI = self._prepare_client()
-
+        self._client = self._prepare_client()
         await self._client.__aenter__()
 
     async def _deinitialize_client(self) -> None:
