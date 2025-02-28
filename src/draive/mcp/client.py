@@ -2,10 +2,14 @@ from asyncio import gather
 from base64 import b64decode
 from collections.abc import AsyncGenerator, Callable, Coroutine, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from itertools import chain
 from types import TracebackType
 from typing import Any, Self, final
+from urllib.parse import ParseResult, urlparse, urlunparse
+from uuid import uuid4
 
-from haiway import as_dict, as_list
+from haiway import as_dict, as_list, ctx
+from haiway.utils.freezing import freeze
 from mcp import ClientSession, GetPromptResult, ListToolsResult, StdioServerParameters, stdio_client
 from mcp import Tool as MCPTool
 from mcp.client.sse import sse_client
@@ -24,7 +28,7 @@ from pydantic import AnyUrl
 from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
 from draive.lmm.types import LMMToolError
 from draive.multimodal import MediaContent, MultimodalContent, TextContent
-from draive.parameters import BasicValue, ParametersSpecification
+from draive.parameters import BasicValue
 from draive.parameters.model import DataModel
 from draive.parameters.specification import validated_specification
 from draive.prompts import Prompt, PromptDeclaration, PromptDeclarationArgument, PromptRepository
@@ -33,6 +37,7 @@ from draive.tools import AnyTool, ExternalToolbox, Tool, Toolbox
 
 __all__ = [
     "MCPClient",
+    "MCPClientAggregate",
 ]
 
 
@@ -41,6 +46,7 @@ class MCPClient:
     @classmethod
     def stdio(
         cls,
+        identifier: str | None = None,
         *,
         command: str,
         args: Sequence[str] | None = None,
@@ -58,11 +64,12 @@ class MCPClient:
                 async with ClientSession(read, write) as session:
                     yield session
 
-        return cls(mcp_stdio_session())
+        return cls(identifier, session_manager=mcp_stdio_session())
 
     @classmethod
     def sse(
         cls,
+        identifier: str | None = None,
         *,
         url: str,
         headers: dict[str, Any] | None = None,
@@ -80,13 +87,15 @@ class MCPClient:
                 async with ClientSession(read, write) as session:
                     yield session
 
-        return cls(mcp_sse_session())
+        return cls(identifier, session_manager=mcp_sse_session())
 
     def __init__(
         self,
+        identifier: str | None,
+        *,
         session_manager: AbstractAsyncContextManager[ClientSession],
-        /,
     ) -> None:
+        self.identifier: str = identifier or uuid4().hex
         self._session_manager: AbstractAsyncContextManager[ClientSession] = session_manager
         self._session: ClientSession
 
@@ -97,17 +106,19 @@ class MCPClient:
         assert hasattr(  # nosec: B101
             self,
             "_session",
-        ), "MCPClient has to be initialized throug async context entering"
+        ), "MCPClient has to be initialized through async context entering"
 
-        result: ListResourcesResult = await self._session.list_resources()
         # TODO: in theory there are some extra elements like pagination
         # we are not supporting it as for now (how to pass cursor anyways?)
+        result: ListResourcesResult = await self._session.list_resources()
+
         return [
             ResourceDeclaration(
-                uri=resource.uri.unicode_string(),
+                uri=self._with_uri_identifier(resource.uri.unicode_string()),
                 name=resource.name,
                 description=resource.description,
                 mime_type=resource.mimeType,
+                meta={"source": self.identifier},
             )
             for resource in result.resources
         ]
@@ -120,10 +131,12 @@ class MCPClient:
         assert hasattr(  # nosec: B101
             self,
             "_session",
-        ), "MCPClient has to be initialized throug async context entering"
-        result: ReadResourceResult = await self._session.read_resource(uri=AnyUrl(uri))
+        ), "MCPClient has to be initialized through async context entering"
+        result: ReadResourceResult = await self._session.read_resource(
+            uri=AnyUrl(self._without_uri_identifier(uri))
+        )
 
-        match [_convert_resource_content(element) for element in result.contents]:
+        match [self._convert_resource_content(element) for element in result.contents]:
             case [resource]:
                 # if there is only a single element return it directly
                 return resource
@@ -131,9 +144,10 @@ class MCPClient:
             case resources:
                 return Resource(
                     uri=uri,
-                    name="",  # TODO: resource name?
+                    name="resource",  # TODO: resource name?
                     description=None,
                     content=resources,
+                    meta={"source": self.identifier},
                 )
 
     async def prompts_list(
@@ -143,13 +157,13 @@ class MCPClient:
         assert hasattr(  # nosec: B101
             self,
             "_session",
-        ), "MCPClient has to be initialized throug async context entering"
+        ), "MCPClient has to be initialized through async context entering"
 
         # TODO: in theory there are some extra elements like pagination
         # we are not supporting it as for now (how to pass cursor anyways?)
         return tuple(
             PromptDeclaration(
-                name=prompt.name,
+                name=self._with_prompt_name_identifier(prompt.name),
                 description=prompt.description,
                 arguments=tuple(
                     PromptDeclarationArgument(
@@ -168,6 +182,7 @@ class MCPClient:
                 )
                 if prompt.arguments
                 else (),
+                meta={"source": self.identifier},
             )
             for prompt in (await self._session.list_prompts()).prompts
         )
@@ -181,10 +196,10 @@ class MCPClient:
     ) -> Prompt:
         assert hasattr(  # nosec: B101
             self, "_session"
-        ), "MCPClient has to be initialized throug async context entering"
+        ), "MCPClient has to be initialized through async context entering"
 
         fetched_prompt: GetPromptResult = await self._session.get_prompt(
-            name=name,
+            name=self._without_prompt_name_identifier(name),
             arguments=as_dict(arguments) if arguments is not None else None,
         )
 
@@ -201,6 +216,22 @@ class MCPClient:
             name=name,
             description=fetched_prompt.description,
             content=prompt_context,
+            meta={"source": self.identifier},
+        )
+
+    async def tools_fetch(
+        self,
+        **extra: Any,
+    ) -> Sequence[AnyTool]:
+        tools: ListToolsResult = await self._session.list_tools()
+
+        return tuple(
+            _convert_tool(
+                tool,
+                tool_call=self._tool_call,
+                source=self.identifier,
+            )
+            for tool in tools.tools
         )
 
     async def toolbox_fetch(
@@ -208,23 +239,21 @@ class MCPClient:
         *,
         suggest: bool | None = None,
         repeated_calls_limit: int | None = None,
+        other_tools: Sequence[AnyTool] | None = None,
         **extra: Any,
     ) -> Toolbox:
-        tools: ListToolsResult = await self._session.list_tools()
-
         return Toolbox.of(
-            *[_convert_tool(tool, self.tool_call) for tool in tools.tools],
+            *[*(other_tools or []), *await self.tools_fetch(**extra)],
             suggest=suggest,
             repeated_calls_limit=repeated_calls_limit,
         )
 
-    async def tool_call(
+    async def _tool_call(
         self,
         name: str,
         arguments: Mapping[str, BasicValue],
     ) -> MultimodalContent:
-        # TODO: FIXME: linter
-        result: CallToolResult = await self._session.call_tool(  # pyright: ignore
+        result: CallToolResult = await self._session.call_tool(
             name=name,
             arguments=as_dict(arguments),
         )
@@ -239,6 +268,140 @@ class MCPClient:
             )
 
         return content
+
+    def _with_prompt_name_identifier(
+        self,
+        name: str,
+        /,
+    ) -> str:
+        """Add server identifier to prompt name."""
+
+        return f"{self.identifier}|{name}"
+
+    def _without_prompt_name_identifier(
+        self,
+        name: str,
+        /,
+    ) -> str:
+        """Remove server identifier from prompt name."""
+
+        match name.split("|", 1):
+            case [identifier, reminder] if identifier == self.identifier:
+                return reminder
+
+            case _:
+                return name
+
+    def _with_uri_identifier(
+        self,
+        uri: str,
+        /,
+    ) -> str:
+        """Add server identifier to URI."""
+        if not uri:
+            return uri
+
+        parsed: ParseResult = urlparse(uri)
+        if parsed.netloc:
+            return urlunparse(
+                (
+                    parsed.scheme,
+                    f"{self.identifier}.{parsed.netloc}",
+                    parsed.path,
+                    parsed.params,
+                    parsed.query,
+                    parsed.fragment,
+                )
+            )
+        else:
+            # Ensure path starts with /
+            path: str = parsed.path
+            if not path.startswith("/"):
+                path = "/" + path
+
+            return urlunparse(
+                (
+                    # default to mcp scheme if empty
+                    parsed.scheme or "mcpclient",
+                    # use identifier as domain/netloc
+                    self.identifier,
+                    path,
+                    parsed.params,
+                    parsed.query,
+                    parsed.fragment,
+                )
+            )
+
+    def _without_uri_identifier(
+        self,
+        uri: str,
+        /,
+    ) -> str:
+        """Remove server identifier from URI."""
+        if not uri:
+            return uri
+
+        parsed: ParseResult = urlparse(uri)
+        if not parsed.netloc:
+            return uri
+
+        if parsed.netloc == self.identifier:
+            return urlunparse(
+                (
+                    parsed.scheme if parsed.scheme != "mcpclient" else "",
+                    "",
+                    parsed.path,
+                    parsed.params,
+                    parsed.query,
+                    parsed.fragment,
+                )
+            )
+
+        match parsed.netloc.split(".", 1):
+            case [identifier, netloc] if identifier == self.identifier:
+                return urlunparse(
+                    (
+                        parsed.scheme,
+                        netloc,
+                        parsed.path,
+                        parsed.params,
+                        parsed.query,
+                        parsed.fragment,
+                    )
+                )
+
+            case _:
+                return uri
+
+    def _convert_resource_content(
+        self,
+        resource: TextResourceContents | BlobResourceContents,
+        /,
+    ) -> Resource:
+        match resource:
+            case TextResourceContents():
+                return Resource(
+                    uri=self._with_uri_identifier(resource.uri.unicode_string()),
+                    name="resource",  # TODO: resource name?
+                    description=None,
+                    content=ResourceContent(
+                        blob=resource.text.encode(),
+                        mime_type=resource.mimeType or "text/plain",
+                    ),
+                    meta={"source": self.identifier},
+                )
+
+            case BlobResourceContents():
+                return Resource(
+                    uri=self._with_uri_identifier(resource.uri.unicode_string()),
+                    name="resource",  # TODO: resource name?
+                    description=None,
+                    content=ResourceContent(
+                        blob=b64decode(resource.blob),
+                        mime_type=resource.mimeType or "text/plain",
+                    ),
+                    meta={"source": self.identifier},
+                )
 
     async def __aenter__(self) -> tuple[ResourceRepository, PromptRepository, ExternalToolbox]:
         self._session = await self._session_manager.__aenter__()
@@ -270,34 +433,6 @@ class MCPClient:
             exc_tb,
         )
         del self._session
-
-
-def _convert_resource_content(
-    resource: TextResourceContents | BlobResourceContents,
-    /,
-) -> Resource:
-    match resource:
-        case TextResourceContents():
-            return Resource(
-                uri=resource.uri.unicode_string(),
-                name="",  # TODO: resource name?
-                description=None,
-                content=ResourceContent(
-                    blob=resource.text.encode(),
-                    mime_type=resource.mimeType or "text/plain",
-                ),
-            )
-
-        case BlobResourceContents():
-            return Resource(
-                uri=resource.uri.unicode_string(),
-                name="",  # TODO: resource name?
-                description=None,
-                content=ResourceContent(
-                    blob=b64decode(resource.blob),
-                    mime_type=resource.mimeType or "text/plain",
-                ),
-            )
 
 
 async def _convert_content(
@@ -348,20 +483,12 @@ async def _convert_content(
                             )
 
 
-def _validated_parameters(
-    schema: dict[str, Any],
-    /,
-) -> ParametersSpecification:
-    return {
-        "type": "object",
-        "properties": {},
-        "required": [],
-    }
-
-
 def _convert_tool(
     mcp_tool: MCPTool,
+    /,
+    *,
     tool_call: Callable[[str, Mapping[str, BasicValue]], Coroutine[None, None, MultimodalContent]],
+    source: str,
 ) -> AnyTool:
     name: str = mcp_tool.name
 
@@ -380,6 +507,7 @@ def _convert_tool(
         format_result=_format_tool_result,
         format_failure=_format_tool_failure,
         direct_result=False,
+        meta={"source": source},
     )
 
 
@@ -397,3 +525,161 @@ def _format_tool_failure(
         return exception.content
 
     return MultimodalContent.of("ERROR")
+
+
+@final
+class MCPClientAggregate:
+    def __init__(
+        self,
+        client: MCPClient,
+        *clients: MCPClient,
+    ) -> None:
+        self._clients: Mapping[str, MCPClient] = {c.identifier: c for c in [client, *clients]}
+
+        freeze(self)
+
+    async def resources_list(
+        self,
+        **extra: Any,
+    ) -> Sequence[ResourceDeclaration]:
+        return tuple(
+            chain.from_iterable(
+                await gather(*[client.resources_list(**extra) for client in self._clients.values()])
+            )
+        )
+
+    async def resource_fetch(
+        self,
+        uri: str,
+        **extra: Any,
+    ) -> Resource | None:
+        if client := self._client_for_uri(uri):
+            return await client.resource_fetch(uri)
+
+        else:
+            ctx.log_warning(f"Requested resource ({uri}) from unknown source")
+            return None
+
+    def _client_for_uri(
+        self,
+        uri: str,
+        /,
+    ) -> MCPClient | None:
+        """Find server associated with URI."""
+        if not uri:
+            return None
+
+        parsed: ParseResult = urlparse(uri)
+        if not parsed.netloc:
+            return None
+
+        if parsed.netloc in self._clients.keys():
+            return self._clients.get(parsed.netloc)
+
+        match parsed.netloc.split(".", 1):
+            case [identifier, _]:
+                return self._clients.get(identifier)
+
+            case _:
+                return None
+
+    async def prompts_list(
+        self,
+        **extra: Any,
+    ) -> Sequence[PromptDeclaration]:
+        return tuple(
+            chain.from_iterable(
+                await gather(*[client.prompts_list(**extra) for client in self._clients.values()])
+            )
+        )
+
+    async def prompt_fetch(
+        self,
+        name: str,
+        *,
+        arguments: Mapping[str, str] | None,
+        **extra: Any,
+    ) -> Prompt | None:
+        if client := self._client_for_prompt_name(name):
+            return await client.prompt_fetch(
+                name,
+                arguments=arguments,
+            )
+
+        else:
+            ctx.log_warning(f"Requested prompt ({name}) from unknown source")
+            return None
+
+    def _client_for_prompt_name(
+        self,
+        name: str,
+        /,
+    ) -> MCPClient | None:
+        """Find server associated with prompt name."""
+        if not name:
+            return None
+
+        match name.split("|", 1):
+            case [identifier, _]:
+                return self._clients.get(identifier)
+
+            case _:
+                return None
+
+    async def tools_fetch(
+        self,
+        **extra: Any,
+    ) -> Sequence[AnyTool]:
+        return tuple(
+            chain.from_iterable(
+                await gather(*[client.tools_fetch(**extra) for client in self._clients.values()])
+            )
+        )
+
+    async def toolbox_fetch(
+        self,
+        *,
+        suggest: bool | None = None,
+        repeated_calls_limit: int | None = None,
+        other_tools: Sequence[AnyTool] | None = None,
+        **extra: Any,
+    ) -> Toolbox:
+        return Toolbox.of(
+            *[*(other_tools or []), *await self.tools_fetch(**extra)],
+            suggest=suggest,
+            repeated_calls_limit=repeated_calls_limit,
+        )
+
+    async def __aenter__(self) -> tuple[ResourceRepository, PromptRepository, ExternalToolbox]:
+        await gather(*[client.__aenter__() for client in self._clients.values()])
+
+        return (
+            ResourceRepository(
+                list=self.resources_list,
+                fetch=self.resource_fetch,
+            ),
+            PromptRepository(
+                list=self.prompts_list,
+                fetch=self.prompt_fetch,
+            ),
+            ExternalToolbox(
+                fetch=self.toolbox_fetch,
+            ),
+        )
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        await gather(
+            *[
+                client.__aexit__(
+                    exc_type,
+                    exc_val,
+                    exc_tb,
+                )
+                for client in self._clients.values()
+            ]
+        )

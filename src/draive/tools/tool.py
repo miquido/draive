@@ -32,12 +32,13 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
         name: str,
         *,
         function: Callable[Args, Coroutine[None, None, Result]],
-        description: str | None = None,
-        specification: ParametersSpecification | None = None,
-        availability_check: ToolAvailabilityCheck | None = None,
+        description: str | None,
+        specification: ParametersSpecification | None,
+        availability_check: ToolAvailabilityCheck | None,
         format_result: Callable[[Result], Multimodal],
         format_failure: Callable[[Exception], Multimodal],
         direct_result: bool = False,
+        meta: Mapping[str, str | float | int | bool | None] | None,
     ) -> None:
         super().__init__(function)
 
@@ -73,6 +74,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
         )
         self.format_result: Callable[[Result], Multimodal] = format_result
         self.format_failure: Callable[[Exception], Multimodal] = format_failure
+        self.meta: Mapping[str, str | float | int | bool | None] | None = meta
 
         freeze(self)
 
@@ -197,6 +199,7 @@ def tool[Result](
     format_result: Callable[[Result], Multimodal],
     format_failure: Callable[[Exception], Multimodal] | None = None,
     direct_result: bool = False,
+    meta: Mapping[str, str | float | int | bool | None] | None = None,
 ) -> PartialToolWrapper[Result]:
     """
     Convert a function to a tool using provided parameters.
@@ -230,6 +233,8 @@ def tool[Result](
         Note that during concurrent execution of multiple tools the call/result order defines
         direct result and exact behavior is not defined.
         Default is False.
+    meta: Mapping[str, str | float | int | bool | None] | None
+        custom metadata allowing to access tool metadata like its source in case of remote tools.
 
     Returns
     -------
@@ -246,6 +251,7 @@ def tool(
     availability_check: ToolAvailabilityCheck | None = None,
     format_failure: Callable[[Exception], Multimodal] | None = None,
     direct_result: bool = False,
+    meta: Mapping[str, str | float | int | bool | None] | None = None,
 ) -> ToolWrapper:
     """
     Convert a function to a tool using provided parameters.
@@ -279,6 +285,8 @@ def tool(
         Note that during concurrent execution of multiple tools the call/result order defines
         direct result and exact behavior is not defined.
         Default is False.
+    meta: Mapping[str, str | float | int | bool | None] | None
+        custom metadata allowing to access tool metadata like its source in case of remote tools.
 
     Returns
     -------
@@ -296,6 +304,7 @@ def tool[**Args, Result](  # noqa: PLR0913
     format_result: Callable[[Result], Multimodal] | None = None,
     format_failure: Callable[[Exception], Multimodal] | None = None,
     direct_result: bool = False,
+    meta: Mapping[str, str | float | int | bool | None] | None = None,
 ) -> PartialToolWrapper[Result] | ToolWrapper | Tool[Args, Result]:
     def wrap[**Arg](
         function: Callable[Arg, Coroutine[None, None, Result]],
@@ -303,11 +312,13 @@ def tool[**Args, Result](  # noqa: PLR0913
         return Tool[Arg, Result](
             name=name or function.__name__,
             description=description,
+            specification=None,
             function=function,
             availability_check=availability_check,
             format_result=format_result or _default_result_format,
             format_failure=format_failure or _default_failure_result,
             direct_result=direct_result,
+            meta=meta,
         )
 
     if function := function:

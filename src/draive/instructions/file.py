@@ -62,6 +62,7 @@ class _InstructionsFileStorage:
             return Instruction.of(
                 instruction,
                 name=name,
+                meta={"file": str(self._path)},
                 **(arguments if arguments is not None else {}),
             )
 

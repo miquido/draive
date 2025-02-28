@@ -1,4 +1,4 @@
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Mapping
 from typing import Protocol, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
@@ -26,7 +26,8 @@ class PromptTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, LM
         name: str,
         *,
         description: str | None = None,
-        availability_check: PromptAvailabilityCheck | None = None,
+        availability_check: PromptAvailabilityCheck | None,
+        meta: Mapping[str, str | float | int | bool | None] | None,
         function: Callable[Args, Coroutine[None, None, LMMContext]],
     ) -> None:
         super().__init__(function)
@@ -42,6 +43,7 @@ class PromptTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, LM
                 )
                 for parameter in self._parameters.values()
             ],
+            meta=meta,
         )
         self._check_availability: PromptAvailabilityCheck = availability_check or (
             lambda: True  # available by default
@@ -103,6 +105,7 @@ def prompt[**Args](
     name: str | None = None,
     description: str | None = None,
     availability_check: PromptAvailabilityCheck | None = None,
+    meta: Mapping[str, str | float | int | bool | None] | None = None,
 ) -> PromptTemplateWrapper: ...
 
 
@@ -112,6 +115,7 @@ def prompt[**Args](
     name: str | None = None,
     description: str | None = None,
     availability_check: PromptAvailabilityCheck | None = None,
+    meta: Mapping[str, str | float | int | bool | None] | None = None,
 ) -> PromptTemplateWrapper | PromptTemplate[Args]:
     def wrap[**Arg](
         function: Callable[Arg, Coroutine[None, None, LMMContext]],
@@ -120,6 +124,7 @@ def prompt[**Args](
             name=name or function.__name__,
             description=description,
             availability_check=availability_check,
+            meta=meta,
             function=function,
         )
 

@@ -98,6 +98,7 @@ line-length = 100
 extend-exclude = [".venv", ".git", ".cache"]
 lint.select = ["E", "F", "A", "I", "B", "PL", "W", "C", "RUF", "UP"]
 lint.ignore = ["A005"]
+lint.pydocstyle.convention = "numpy"
 exclude = ["./src/draive/__main__.py"]
 
 [tool.ruff.lint.per-file-ignores]
