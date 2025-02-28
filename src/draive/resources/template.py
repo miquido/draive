@@ -1,4 +1,4 @@
-from collections.abc import Callable, Coroutine, Sequence
+from collections.abc import Callable, Coroutine, Mapping, Sequence
 from typing import Protocol, final
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
@@ -31,7 +31,8 @@ class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
         mime_type: str | None,
         name: str,
         description: str | None,
-        availability_check: ResourceAvailabilityCheck | None = None,
+        availability_check: ResourceAvailabilityCheck | None,
+        meta: Mapping[str, str | float | int | bool | None] | None,
         function: Callable[Args, Coroutine[None, None, Result]],
     ) -> None:
         super().__init__(function)
@@ -42,6 +43,7 @@ class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
             mime_type=mime_type,
             name=name,
             description=description,
+            meta=meta,
         )
         self._check_availability: ResourceAvailabilityCheck = availability_check or (
             lambda: True  # available by default
@@ -82,13 +84,14 @@ class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
                 raise exc
 
 
-def resource[**Args, Result: Sequence[Resource] | ResourceContent](
+def resource[**Args, Result: Sequence[Resource] | ResourceContent](  # noqa: PLR0913
     *,
     uri: str,
     mime_type: str | None = None,
     name: str | None = None,
     description: str | None = None,
     availability_check: ResourceAvailabilityCheck | None = None,
+    meta: Mapping[str, str | float | int | bool | None] | None = None,
 ) -> Callable[
     [Callable[Args, Coroutine[None, None, Result]]],
     ResourceTemplate[Args, Result],
@@ -103,6 +106,7 @@ def resource[**Args, Result: Sequence[Resource] | ResourceContent](
             description=description,
             availability_check=availability_check,
             function=function,
+            meta=meta,
         )
 
     return wrap

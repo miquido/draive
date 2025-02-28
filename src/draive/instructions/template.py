@@ -1,4 +1,4 @@
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Mapping
 from typing import Protocol, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
@@ -23,7 +23,8 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
         /,
         name: str,
         *,
-        description: str | None = None,
+        description: str | None,
+        meta: Mapping[str, str | float | int | bool | None] | None,
         function: Callable[Args, Coroutine[None, None, str]],
     ) -> None:
         super().__init__(function)
@@ -39,6 +40,7 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
                 )
                 for parameter in self._parameters.values()
             ],
+            meta=meta,
         )
 
         freeze(self)
@@ -89,6 +91,7 @@ def instruction(
     *,
     name: str | None = None,
     description: str | None = None,
+    meta: Mapping[str, str | float | int | bool | None] | None = None,
 ) -> InstructionTemplateWrapper: ...
 
 
@@ -97,6 +100,7 @@ def instruction[**Args](
     *,
     name: str | None = None,
     description: str | None = None,
+    meta: Mapping[str, str | float | int | bool | None] | None = None,
 ) -> InstructionTemplateWrapper | InstructionTemplate[Args]:
     def wrap[**Arg](
         function: Callable[Arg, Coroutine[None, None, str]],
@@ -104,6 +108,7 @@ def instruction[**Args](
         return InstructionTemplate[Arg](
             name=name or function.__name__,
             description=description,
+            meta=meta,
             function=function,
         )
 

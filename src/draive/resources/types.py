@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, Protocol, Self, runtime_checkable
 
 from haiway import State
@@ -30,6 +30,7 @@ class ResourceDeclaration(DataModel):
     mime_type: str | None
     name: str
     description: str | None = None
+    meta: Mapping[str, str | float | int | bool | None] | None
 
 
 # TODO: add ResourceTemplateDeclaration for ResourceTemplates support
@@ -61,6 +62,7 @@ class Resource(State):
     name: str
     description: str | None
     content: Sequence[Self] | ResourceContent
+    meta: Mapping[str, str | float | int | bool | None] | None
 
 
 @runtime_checkable

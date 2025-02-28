@@ -36,6 +36,7 @@ class PromptDeclaration(DataModel):
     name: str
     description: str | None = None
     arguments: Sequence[PromptDeclarationArgument]
+    meta: Mapping[str, str | float | int | bool | None] | None
 
 
 class Prompt(State):
@@ -45,16 +46,19 @@ class Prompt(State):
         *content: LMMContextElement,
         name: str,
         description: str | None = None,
+        meta: Mapping[str, str | float | int | bool | None] | None = None,
     ) -> Self:
         return cls(
             name=name,
             description=description,
             content=content,
+            meta=meta,
         )
 
     name: str
     description: str | None = None
     content: LMMContext
+    meta: Mapping[str, str | float | int | bool | None] | None
 
 
 @runtime_checkable

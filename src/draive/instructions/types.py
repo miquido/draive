@@ -34,6 +34,7 @@ class InstructionDeclaration(DataModel):
     name: str
     description: str | None = None
     arguments: Sequence[InstructionDeclarationArgument]
+    meta: Mapping[str, str | float | int | bool | None] | None
 
 
 @final
@@ -93,6 +94,7 @@ class Instruction(State):
         *,
         name: str | None = None,
         description: str | None = None,
+        meta: Mapping[str, str | float | int | bool | None] | None = None,
         **variables: str,
     ) -> Self:
         match instruction:
@@ -102,6 +104,7 @@ class Instruction(State):
                     description=description,
                     content=content,
                     variables=variables,
+                    meta=meta,
                 )
 
             case instruction:
@@ -111,6 +114,7 @@ class Instruction(State):
     description: str | None
     content: str
     variables: Mapping[str, str]
+    meta: Mapping[str, str | float | int | bool | None] | None
 
     def format(
         self,
@@ -147,6 +151,7 @@ class Instruction(State):
                     **self.variables,
                     **variables,
                 },
+                meta=self.meta,
             )
 
         else:
@@ -155,6 +160,7 @@ class Instruction(State):
                 description=description,
                 content=(joiner if joiner is not None else "").join((self.content, instruction)),
                 variables=self.variables,
+                meta=self.meta,
             )
 
     def updated(
@@ -170,6 +176,7 @@ class Instruction(State):
                     **self.variables,
                     **variables,
                 },
+                meta=self.meta,
             )
 
         else:

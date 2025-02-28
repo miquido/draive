@@ -79,6 +79,7 @@ async def fetch_instruction(
                         description=reference.description
                         if isinstance(reference, InstructionDeclaration)
                         else None,
+                        meta=None,
                         **(arguments if arguments is not None else {}),
                     )
 
