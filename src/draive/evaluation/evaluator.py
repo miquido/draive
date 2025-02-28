@@ -3,6 +3,7 @@ from collections.abc import Callable, Mapping
 from typing import Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import AttributePath, ctx, freeze
+from haiway.context.access import ScopeContext
 
 from draive.evaluation.score import EvaluationScore
 from draive.evaluation.value import EvaluationScoreValue, evaluation_score_value
@@ -14,8 +15,6 @@ __all__ = [
     "EvaluatorResult",
     "PreparedEvaluator",
     "evaluator",
-    "evaluator_highest",
-    "evaluator_lowest",
 ]
 
 
@@ -78,7 +77,7 @@ class EvaluatorResult(DataModel):
             f"{self.evaluator} {'passed' if self.passed else 'failed'}"
             f" with score {self.score.value},"
             f" required {self.threshold},"
-            f" comment: {f"'{self.score.comment}'" or 'N/A'}"
+            f" comment: {f"'\n{self.score.comment}'\n" or 'N/A'}"
             f" meta:\n{meta_values}"
         )
 
@@ -141,23 +140,94 @@ class PreparedEvaluator[Value](Protocol):
 
 @final
 class Evaluator[Value, **Args]:
+    @staticmethod
+    def lowest(
+        evaluators: PreparedEvaluator[Value],
+        /,
+        *_evaluators: PreparedEvaluator[Value],
+    ) -> PreparedEvaluator[Value]:
+        async def evaluate(
+            value: Value,
+        ) -> EvaluatorResult:
+            # Placeholder for the lowest result
+            lowest: EvaluatorResult = EvaluatorResult(
+                evaluator="lowest",
+                score=EvaluationScore(value=1),
+                threshold=0,
+                meta=None,
+            )
+
+            for result in await gather(
+                evaluators(value),
+                *[evaluator(value) for evaluator in _evaluators],
+            ):
+                if result.score <= lowest.score:
+                    lowest = result
+
+            return lowest
+
+        return evaluate
+
+    @staticmethod
+    def highest(
+        evaluators: PreparedEvaluator[Value],
+        /,
+        *_evaluators: PreparedEvaluator[Value],
+    ) -> PreparedEvaluator[Value]:
+        async def evaluate(
+            value: Value,
+        ) -> EvaluatorResult:
+            # Placeholder for the highest result
+            highest: EvaluatorResult = EvaluatorResult(
+                evaluator="highest",
+                score=EvaluationScore(value=0),
+                threshold=1,
+                meta=None,
+            )
+
+            for result in await gather(
+                evaluators(value),
+                *[evaluator(value) for evaluator in _evaluators],
+            ):
+                if result.score >= highest.score:
+                    highest = result
+
+            return highest
+
+        return evaluate
+
     def __init__(
         self,
         name: str,
         definition: EvaluatorDefinition[Value, Args],
         threshold: float | None,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        execution_context: ScopeContext | None,
+        meta: Mapping[str, str | float | int | bool | None] | None,
     ) -> None:
         assert (  # nosec: B101
             threshold is None or 0 <= threshold <= 1
         ), "Evaluation threshold has to be between 0 and 1"
 
         self._definition: EvaluatorDefinition[Value, Args] = definition
+        self._execution_context: ScopeContext | None = execution_context
         self.name: str = name
         self.threshold: float = 1 if threshold is None else threshold
         self.meta: Mapping[str, str | float | int | bool | None] | None = meta
 
         freeze(self)
+
+    def with_execution_context(
+        self,
+        context: ScopeContext,
+        /,
+    ) -> Self:
+        return self.__class__(
+            name=self.name,
+            definition=self._definition,
+            threshold=self.threshold,
+            execution_context=context,
+            meta=self.meta,
+        )
 
     def with_threshold(
         self,
@@ -168,6 +238,7 @@ class Evaluator[Value, **Args]:
             name=self.name,
             definition=self._definition,
             threshold=evaluation_score_value(value),
+            execution_context=self._execution_context,
             meta=self.meta,
         )
 
@@ -180,6 +251,7 @@ class Evaluator[Value, **Args]:
             name=self.name,
             definition=self._definition,
             threshold=self.threshold,
+            execution_context=self._execution_context,
             meta={**self.meta, **meta} if self.meta else meta,
         )
 
@@ -231,9 +303,33 @@ class Evaluator[Value, **Args]:
             name=self.name,
             definition=evaluation,
             threshold=self.threshold,
+            execution_context=self._execution_context,
+            meta=self.meta,
         )
 
     async def __call__(
+        self,
+        value: Value,
+        /,
+        *args: Args.args,
+        **kwargs: Args.kwargs,
+    ) -> EvaluatorResult:
+        if context := self._execution_context:
+            async with context:
+                return await self._evaluate(
+                    value,
+                    *args,
+                    **kwargs,
+                )
+
+        else:
+            return await self._evaluate(
+                value,
+                *args,
+                **kwargs,
+            )
+
+    async def _evaluate(
         self,
         value: Value,
         /,
@@ -309,18 +405,22 @@ def evaluator[Value, **Args](
     *,
     name: str | None = None,
     threshold: EvaluationScoreValue | None = None,
+    execution_context: ScopeContext | None = None,
+    meta: Mapping[str, str | float | int | bool | None] | None = None,
 ) -> Callable[
     [EvaluatorDefinition[Value, Args]],
     Evaluator[Value, Args],
 ]: ...
 
 
-def evaluator[Value, **Args](  # pyright: ignore[reportInconsistentOverload] - this seems to be pyright false positive/error
+def evaluator[Value, **Args](
     evaluation: EvaluatorDefinition[Value, Args] | None = None,
     /,
     *,
     name: str | None = None,
     threshold: EvaluationScoreValue | None = None,
+    execution_context: ScopeContext | None = None,
+    meta: Mapping[str, str | float | int | bool | None] | None = None,
 ) -> (
     Callable[
         [EvaluatorDefinition[Value, Args]],
@@ -335,6 +435,8 @@ def evaluator[Value, **Args](  # pyright: ignore[reportInconsistentOverload] - t
             name=name or definition.__name__,
             definition=definition,
             threshold=evaluation_score_value(threshold) if threshold is not None else None,
+            execution_context=execution_context,
+            meta=meta,
         )
 
     if evaluation:
@@ -342,59 +444,3 @@ def evaluator[Value, **Args](  # pyright: ignore[reportInconsistentOverload] - t
 
     else:
         return wrap
-
-
-def evaluator_lowest[Value](
-    evaluators: PreparedEvaluator[Value],
-    /,
-    *_evaluators: PreparedEvaluator[Value],
-) -> PreparedEvaluator[Value]:
-    async def evaluate(
-        value: Value,
-    ) -> EvaluatorResult:
-        # Placeholder for the lowest result
-        lowest: EvaluatorResult = EvaluatorResult(
-            evaluator="lowest",
-            score=EvaluationScore(value=1),
-            threshold=0,
-            meta=None,
-        )
-
-        for result in await gather(
-            evaluators(value),
-            *[evaluator(value) for evaluator in _evaluators],
-        ):
-            if result.score <= lowest.score:
-                lowest = result
-
-        return lowest
-
-    return evaluate
-
-
-def evaluator_highest[Value](
-    evaluators: PreparedEvaluator[Value],
-    /,
-    *_evaluators: PreparedEvaluator[Value],
-) -> PreparedEvaluator[Value]:
-    async def evaluate(
-        value: Value,
-    ) -> EvaluatorResult:
-        # Placeholder for the highest result
-        highest: EvaluatorResult = EvaluatorResult(
-            evaluator="highest",
-            score=EvaluationScore(value=0),
-            threshold=1,
-            meta=None,
-        )
-
-        for result in await gather(
-            evaluators(value),
-            *[evaluator(value) for evaluator in _evaluators],
-        ):
-            if result.score >= highest.score:
-                highest = result
-
-        return highest
-
-    return evaluate

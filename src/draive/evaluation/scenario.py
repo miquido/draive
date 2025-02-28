@@ -3,6 +3,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Protocol, Self, cast, overload, runtime_checkable
 
 from haiway import AttributePath, ctx, freeze
+from haiway.context.access import ScopeContext
 
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.parameters import DataModel, Field
@@ -110,10 +111,12 @@ class ScenarioEvaluator[Value, **Args]:
         self,
         name: str,
         definition: ScenarioEvaluatorDefinition[Value, Args],
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        execution_context: ScopeContext | None,
+        meta: Mapping[str, str | float | int | bool | None] | None,
     ) -> None:
         self.name: str = name
         self._definition: ScenarioEvaluatorDefinition[Value, Args] = definition
+        self._execution_context: ScopeContext | None = execution_context
         self.meta: Mapping[str, str | float | int | bool | None] | None = meta
 
         freeze(self)
@@ -134,6 +137,18 @@ class ScenarioEvaluator[Value, **Args]:
 
         return evaluate
 
+    def with_execution_context(
+        self,
+        context: ScopeContext,
+        /,
+    ) -> Self:
+        return self.__class__(
+            name=self.name,
+            definition=self._definition,
+            execution_context=context,
+            meta=self.meta,
+        )
+
     def with_meta(
         self,
         meta: Mapping[str, str | float | int | bool | None],
@@ -142,6 +157,7 @@ class ScenarioEvaluator[Value, **Args]:
         return self.__class__(
             name=self.name,
             definition=self._definition,
+            execution_context=self._execution_context,
             meta={**self.meta, **meta} if self.meta else meta,
         )
 
@@ -176,9 +192,33 @@ class ScenarioEvaluator[Value, **Args]:
         return ScenarioEvaluator[Mapped, Args](
             name=self.name,
             definition=evaluation,
+            execution_context=self._execution_context,
+            meta=self.meta,
         )
 
     async def __call__(
+        self,
+        value: Value,
+        /,
+        *args: Args.args,
+        **kwargs: Args.kwargs,
+    ) -> ScenarioEvaluatorResult:
+        if context := self._execution_context:
+            async with context:
+                return await self._evaluate(
+                    value,
+                    *args,
+                    **kwargs,
+                )
+
+        else:
+            return await self._evaluate(
+                value,
+                *args,
+                **kwargs,
+            )
+
+    async def _evaluate(
         self,
         value: Value,
         /,
@@ -242,7 +282,9 @@ def evaluation_scenario[Value, **Args](
 @overload
 def evaluation_scenario[Value, **Args](
     *,
-    name: str,
+    name: str | None = None,
+    execution_context: ScopeContext | None = None,
+    meta: Mapping[str, str | float | int | bool | None] | None = None,
 ) -> Callable[
     [ScenarioEvaluatorDefinition[Value, Args]],
     ScenarioEvaluator[Value, Args],
@@ -254,6 +296,8 @@ def evaluation_scenario[Value, **Args](  # pyright: ignore[reportInconsistentOve
     /,
     *,
     name: str | None = None,
+    execution_context: ScopeContext | None = None,
+    meta: Mapping[str, str | float | int | bool | None] | None = None,
 ) -> (
     Callable[
         [ScenarioEvaluatorDefinition[Value, Args]],
@@ -267,6 +311,8 @@ def evaluation_scenario[Value, **Args](  # pyright: ignore[reportInconsistentOve
         return ScenarioEvaluator(
             name=name or definition.__name__,
             definition=definition,
+            execution_context=execution_context,
+            meta=meta,
         )
 
     if definition:

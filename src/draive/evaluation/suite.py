@@ -5,6 +5,7 @@ from typing import Protocol, Self, overload, runtime_checkable
 from uuid import UUID, uuid4
 
 from haiway import asynchronous, ctx
+from haiway.context.access import ScopeContext
 
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.evaluation.generator import generate_case_parameters
@@ -179,14 +180,16 @@ class EvaluationSuiteStorage[CaseParameters: DataModel](Protocol):
 class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
     def __init__(
         self,
+        parameters: type[CaseParameters],
         definition: EvaluationSuiteDefinition[CaseParameters, Value],
         storage: EvaluationSuiteStorage[CaseParameters],
-        parameters: type[CaseParameters],
+        execution_context: ScopeContext | None,
     ) -> None:
+        self._parameters: type[CaseParameters] = parameters
         self._definition: EvaluationSuiteDefinition[CaseParameters, Value] = definition
         self._storage: EvaluationSuiteStorage[CaseParameters] = storage
+        self._execution_context: ScopeContext | None = execution_context
         self._data_cache: EvaluationSuiteData[CaseParameters] | None = None
-        self._parameters: type[CaseParameters] = parameters
         self._lock: Lock = Lock()
 
     @overload
@@ -216,13 +219,36 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
         SuiteEvaluatorResult[CaseParameters, Value]
         | SuiteEvaluatorCaseResult[CaseParameters, Value]
     ):
+        if context := self._execution_context:
+            async with context:
+                return await self._evaluate(
+                    parameters,
+                    reload=reload,
+                )
+
+        else:
+            return await self._evaluate(
+                parameters,
+                reload=reload,
+            )
+
+    async def _evaluate(
+        self,
+        parameters: CaseParameters | UUID | None = None,
+        /,
+        *,
+        reload: bool = False,
+    ) -> (
+        SuiteEvaluatorResult[CaseParameters, Value]
+        | SuiteEvaluatorCaseResult[CaseParameters, Value]
+    ):
         async with self._lock:
             match parameters:
                 case None:
                     return SuiteEvaluatorResult(
                         cases=await gather(
                             *[
-                                self._evaluate(case=case)
+                                self._evaluate_case(case=case)
                                 for case in (await self._data(reload=reload)).cases
                             ],
                             return_exceptions=False,
@@ -238,19 +264,19 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
                         iter([case for case in available_cases if case.identifier == identifier]),
                         None,
                     ):
-                        return await self._evaluate(case=evaluation_case)
+                        return await self._evaluate_case(case=evaluation_case)
 
                     else:
                         raise ValueError(f"Evaluation case with ID {identifier} does not exists.")
 
                 case case_parameters:
-                    return await self._evaluate(
+                    return await self._evaluate_case(
                         case=EvaluationSuiteCase[CaseParameters](
                             parameters=case_parameters,
                         )
                     )
 
-    async def _evaluate(
+    async def _evaluate_case(
         self,
         *,
         case: EvaluationSuiteCase[CaseParameters],
@@ -273,6 +299,47 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
 
         else:
             return self._data_cache
+
+    def with_execution_context(
+        self,
+        context: ScopeContext,
+        /,
+    ) -> Self:
+        return self.__class__(
+            parameters=self._parameters,
+            definition=self._definition,
+            storage=self._storage,
+            execution_context=context,
+        )
+
+    def with_storage(
+        self,
+        storage: EvaluationSuiteStorage[CaseParameters] | Path | str,
+        /,
+    ) -> Self:
+        suite_storage: EvaluationSuiteStorage[CaseParameters]
+        match storage:
+            case str() as path_str:
+                suite_storage = _EvaluationSuiteFileStorage[CaseParameters](
+                    path=path_str,
+                    data_type=EvaluationSuiteData[self._parameters],
+                )
+
+            case Path() as path:
+                suite_storage = _EvaluationSuiteFileStorage[CaseParameters](
+                    path=path,
+                    data_type=EvaluationSuiteData[self._parameters],
+                )
+
+            case storage:
+                suite_storage = storage
+
+        return self.__class__(
+            parameters=self._parameters,
+            definition=self._definition,
+            storage=suite_storage,
+            execution_context=self._execution_context,
+        )
 
     async def cases(
         self,
@@ -303,8 +370,8 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
     async def generate_cases(
         self,
         *,
-        persist: bool = False,
         count: int,
+        persist: bool = False,
         guidelines: str | None = None,
         examples: Iterable[CaseParameters] | None = None,
     ) -> None:
@@ -345,6 +412,7 @@ def evaluation_suite[CaseParameters: DataModel, Value: DataModel | str](
     case: type[CaseParameters],
     /,
     storage: EvaluationSuiteStorage[CaseParameters] | Path | str | None = None,
+    execution_context: ScopeContext | None = None,
 ) -> Callable[
     [EvaluationSuiteDefinition[CaseParameters, Value]],
     EvaluationSuite[CaseParameters, Value],
@@ -375,9 +443,10 @@ def evaluation_suite[CaseParameters: DataModel, Value: DataModel | str](
         definition: EvaluationSuiteDefinition[CaseParameters, Value],
     ) -> EvaluationSuite[CaseParameters, Value]:
         return EvaluationSuite[CaseParameters, Value](
+            parameters=case,
             definition=definition,
             storage=suite_storage,
-            parameters=case,
+            execution_context=execution_context,
         )
 
     return wrap
