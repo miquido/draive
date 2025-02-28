@@ -4,8 +4,6 @@ from draive.evaluation.evaluator import (
     EvaluatorResult,
     PreparedEvaluator,
     evaluator,
-    evaluator_highest,
-    evaluator_lowest,
 )
 from draive.evaluation.scenario import (
     EvaluationScenarioResult,
@@ -50,6 +48,4 @@ __all__ = [
     "evaluation_scenario",
     "evaluation_suite",
     "evaluator",
-    "evaluator_highest",
-    "evaluator_lowest",
 ]
