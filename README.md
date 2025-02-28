@@ -134,6 +134,14 @@ Use Ollama services client.
 pip install draive[ollama]
 ```
 
+- VLLM:
+
+Use VLLM services through OpenAI client.
+
+```bash
+pip install draive[vllm]
+```
+
 ## 👷 Contributing
 
 As an open-source project in a rapidly evolving field, we welcome all contributions. Whether you can add a new feature, enhance our infrastructure, or improve our documentation, your input is valuable to us.
