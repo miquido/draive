@@ -46,7 +46,7 @@ class ParameterValidationContextScope:
         self.component: str = component
 
     def __enter__(self) -> ParameterValidationContext:
-        self.context._path.append(self.component)  # pyright: ignore # FIXME
+        self.context._path.append(self.component)
         return self.context
 
     def __exit__(
