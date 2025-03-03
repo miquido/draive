@@ -247,7 +247,8 @@ def tool_specification_as_tool(
         "function": {
             "name": tool["name"],
             "description": tool["description"] or "",
-            "parameters": cast(dict[str, Any], tool["parameters"]),
+            "parameters": cast(dict[str, Any], tool["parameters"])
+            or {"type": "object", "properties": {}},
         },
     }
 
