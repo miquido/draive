@@ -58,6 +58,7 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
                     description=self.declaration.description,
                     content=await super().__call__(*args, **kwargs),  # pyright: ignore[reportCallIssue]
                     variables={},
+                    meta=self.declaration.meta,
                 )
                 ctx.record(ResultTrace.of(result))
 
