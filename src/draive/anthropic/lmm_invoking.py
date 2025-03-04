@@ -2,11 +2,8 @@ from collections.abc import Iterable, Sequence
 from typing import Any, cast
 
 from anthropic import NOT_GIVEN
-from anthropic.types import (
-    Message,
-    TextBlock,
-    ToolUseBlock,
-)
+from anthropic import RateLimitError as AnthropicRateLimitError
+from anthropic.types import Message, TextBlock, ToolUseBlock
 from haiway import MISSING, ArgumentsTrace, ResultTrace, as_list, ctx
 
 from draive.anthropic.api import AnthropicAPI
@@ -38,6 +35,7 @@ from draive.multimodal import (
     Multimodal,
     MultimodalContent,
 )
+from draive.utils import RateLimitError
 
 __all__ = [
     "AnthropicLMMInvoking",
@@ -48,7 +46,7 @@ class AnthropicLMMInvoking(AnthropicAPI):
     def lmm_invoking(self) -> LMMInvocation:
         return LMMInvocation(invoke=self.lmm_invocation)
 
-    async def lmm_invocation(  # noqa: C901, PLR0912, PLR0913
+    async def lmm_invocation(  # noqa: C901, PLR0912, PLR0913, PLR0915
         self,
         *,
         instruction: Instruction | str | None,
@@ -98,21 +96,34 @@ class AnthropicLMMInvoking(AnthropicAPI):
                 tool_selection=tool_selection,
             )
 
-            completion: Message = await self._client.messages.create(
-                model=completion_config.model,
-                system=Instruction.formatted(instruction) if instruction else NOT_GIVEN,
-                messages=messages,
-                temperature=completion_config.temperature,
-                top_p=unwrap_missing(completion_config.top_p),
-                max_tokens=completion_config.max_tokens,
-                thinking=thinking_budget_as_config(completion_config.thinking_tokens_budget),
-                tools=tools_list,
-                tool_choice=tool_choice,
-                stop_sequences=as_list(cast(Sequence[str], completion_config.stop_sequences))
-                if completion_config.stop_sequences is not MISSING
-                else NOT_GIVEN,
-                stream=False,
-            )
+            completion: Message
+            try:
+                completion = await self._client.messages.create(
+                    model=completion_config.model,
+                    system=Instruction.formatted(instruction) if instruction else NOT_GIVEN,
+                    messages=messages,
+                    temperature=completion_config.temperature,
+                    top_p=unwrap_missing(completion_config.top_p),
+                    max_tokens=completion_config.max_tokens,
+                    thinking=thinking_budget_as_config(completion_config.thinking_tokens_budget),
+                    tools=tools_list,
+                    tool_choice=tool_choice,
+                    stop_sequences=as_list(cast(Sequence[str], completion_config.stop_sequences))
+                    if completion_config.stop_sequences is not MISSING
+                    else NOT_GIVEN,
+                    stream=False,
+                )
+
+            except AnthropicRateLimitError as exc:  # retry on rate limit after delay
+                if delay := exc.response.headers.get("Retry-After"):
+                    try:
+                        raise RateLimitError(retry_after=float(delay)) from exc
+
+                    except ValueError:
+                        raise exc from None
+
+                else:
+                    raise exc
 
             ctx.record(
                 TokenUsage.for_model(
