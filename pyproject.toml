@@ -23,7 +23,7 @@ classifiers = [
 license = { file = "LICENSE" }
 dependencies = [
   "numpy~=1.26",
-  "haiway~=0.10.0",
+  "haiway~=0.10.13",
 ]
 
 [project.urls]
@@ -90,7 +90,31 @@ dev = [
 ]
 
 [tool.hatch.metadata.hooks.custom]
-path = "hatch_version.py"
+path = "./hatch_version.py"
+
+[tool.hatch.build.targets.sdist]
+packages = ["./src/draive", "./hatch_version.py"]
+exclude = [
+  "./hatch_version.py",
+  "./cookbooks",
+  "./guides",
+  "./config",
+  "Makefile",
+  "uv.lock",
+  "./.github",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["./src/draive"]
+exclude = [
+  "./hatch_version.py",
+  "./cookbooks",
+  "./guides",
+  "./config",
+  "Makefile",
+  "uv.lock",
+  "./.github",
+]
 
 [tool.ruff]
 target-version = "py312"
@@ -124,12 +148,3 @@ useLibraryCodeForTypes = true
 [tool.pyright.analysis]
 diagnosticMode = "workspace"
 typeCheckingMode = "strict"
-
-[tool.setuptools]
-include-package-data = true
-
-[tool.setuptools.package-data]
-"*" = ["*.model", "*.json"]
-
-[tool.setuptools.packages.find]
-where = ["src"]

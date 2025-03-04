@@ -33,3 +33,6 @@ jobs:
 
       - name: Test
         run: uv run pytest --rootdir= ./tests --doctest-modules --junitxml=junit/test-results.xml
+
+      - name: Build
+        run: uv build
