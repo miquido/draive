@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-dynamic = ["version"]
+version = "0.45.3"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
@@ -23,7 +23,7 @@ classifiers = [
 license = { file = "LICENSE" }
 dependencies = [
   "numpy~=1.26",
-  "haiway~=0.10.13",
+  "haiway~=0.10.16",
 ]
 
 [project.urls]
@@ -87,33 +87,6 @@ dev = [
   "pytest~=7.4",
   "pytest-cov~=4.1",
   "pytest-asyncio~=0.23.0",
-]
-
-[tool.hatch.metadata.hooks.custom]
-path = "./hatch_version.py"
-
-[tool.hatch.build.targets.sdist]
-packages = ["./src/draive", "./hatch_version.py"]
-exclude = [
-  "./hatch_version.py",
-  "./cookbooks",
-  "./guides",
-  "./config",
-  "Makefile",
-  "uv.lock",
-  "./.github",
-]
-
-[tool.hatch.build.targets.wheel]
-packages = ["./src/draive"]
-exclude = [
-  "./hatch_version.py",
-  "./cookbooks",
-  "./guides",
-  "./config",
-  "Makefile",
-  "uv.lock",
-  "./.github",
 ]
 
 [tool.ruff]
