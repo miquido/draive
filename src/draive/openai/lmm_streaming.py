@@ -227,14 +227,7 @@ class OpenAILMMStreaming(OpenAIAPI):
 
                     if finish_reason := element.finish_reason:
                         match finish_reason:
-                            case "stop":
-                                # send completion chunk - openAI sends it without an actual content
-                                yield LMMStreamChunk.of(
-                                    MultimodalContent.of(),
-                                    eod=True,
-                                )
-
-                            case "tool_calls":
+                            case "stop" | "tool_calls":
                                 if accumulated_tool_calls:
                                     messages_context.append(
                                         {
@@ -256,6 +249,7 @@ class OpenAILMMStreaming(OpenAIAPI):
                                             ],
                                         }
                                     )
+
                                 if accumulated_result:
                                     messages_context.append(
                                         {
@@ -280,6 +274,12 @@ class OpenAILMMStreaming(OpenAIAPI):
                                         if call.function.arguments
                                         else {},
                                     )
+
+                                # send completion chunk - openAI sends it without an actual content
+                                yield LMMStreamChunk.of(
+                                    MultimodalContent.of(),
+                                    eod=True,
+                                )
 
                             case other:
                                 raise OpenAIException(f"Unexpected finish reason: {other}")

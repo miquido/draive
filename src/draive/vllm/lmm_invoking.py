@@ -11,7 +11,6 @@ from openai.types.chat import (
     ChatCompletionMessage,
     ChatCompletionMessageParam,
 )
-from openai.types.chat.chat_completion_audio_param import ChatCompletionAudioParam
 
 from draive.instructions import Instruction
 from draive.lmm import (
@@ -29,7 +28,7 @@ from draive.metrics import TokenUsage
 from draive.multimodal.content import MultimodalContent
 from draive.utils import RateLimitError
 from draive.vllm.api import VLLMAPI
-from draive.vllm.config import AudioResponseFormat, VLLMChatConfig
+from draive.vllm.config import VLLMChatConfig
 from draive.vllm.lmm import (
     context_element_as_messages,
     output_as_response_declaration,
@@ -104,12 +103,6 @@ class VLLMLMMInvoking(VLLMAPI):
                 completion = await self._client.chat.completions.create(
                     messages=messages,
                     model=chat_config.model,
-                    modalities=response_modalities,
-                    audio=ChatCompletionAudioParam(
-                        **cast(AudioResponseFormat, chat_config.audio_response_format)
-                    )
-                    if chat_config.audio_response_format is not MISSING
-                    else NOT_GIVEN,
                     frequency_penalty=unwrap_missing(chat_config.frequency_penalty),
                     max_tokens=unwrap_missing(chat_config.max_tokens),
                     n=1,

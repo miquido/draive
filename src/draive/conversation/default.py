@@ -242,12 +242,25 @@ async def _conversation_stream(
         )
     )
     del context[-1]  # we are using last element as stream input, we have to remove it from context
+
+    async def properties_generator() -> AsyncGenerator[LMMStreamProperties, None]:
+        # within conversation completion we are not allowing multi turn within one call
+        # we might need to refine tool avaliablility passing and recursion/round updates
+        recursion_level: int = 0
+        while recursion_level < toolbox.repeated_calls_limit:
+            yield LMMStreamProperties(
+                instruction=instruction,
+                tools=toolbox.available_tools(),
+                tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
+            )
+
+            recursion_level += 1
+
+        raise RuntimeError("LMM exceeded limit of recursive calls")
+
     accumulated_content: MultimodalContent = MultimodalContent.of()
     async for element in await lmm_stream(
-        properties=LMMStreamProperties(
-            instruction=instruction,
-            tools=toolbox.available_tools(),
-        ),
+        properties=properties_generator(),
         input=input_stream,
         context=context,
         **extra,

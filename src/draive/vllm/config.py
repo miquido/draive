@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Literal, TypedDict
+from typing import Literal
 
 from haiway import MISSING, Missing, State
 
@@ -9,11 +9,6 @@ __all__ = [
 ]
 
 
-class AudioResponseFormat(TypedDict):
-    format: Literal["wav", "mp3"]
-    voice: Literal["ash", "ballad", "coral", "sage", "verse"]
-
-
 class VLLMChatConfig(State):
     model: str
     temperature: float = 1.0
@@ -21,7 +16,6 @@ class VLLMChatConfig(State):
     frequency_penalty: float | Missing = MISSING
     max_tokens: int | Missing = MISSING
     seed: int | Missing = MISSING
-    audio_response_format: AudioResponseFormat | Missing = MISSING
     vision_details: Literal["auto", "low", "high"] | Missing = MISSING
     parallel_tool_calls: bool | Missing = MISSING
     timeout: float | Missing = MISSING
