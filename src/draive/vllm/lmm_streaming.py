@@ -151,12 +151,9 @@ class VLLMLMMStreaming(VLLMAPI):
             async for part in await self._client.chat.completions.create(
                 messages=request_messages,
                 model=chat_config.model,
-                modalities=["text"],
-                audio=NOT_GIVEN,  # TODO: add audio support?
                 frequency_penalty=unwrap_missing(chat_config.frequency_penalty),
                 max_tokens=unwrap_missing(chat_config.max_tokens),
                 n=1,
-                response_format={"type": "text"},
                 seed=unwrap_missing(chat_config.seed),
                 stream=True,
                 temperature=chat_config.temperature,
@@ -227,13 +224,7 @@ class VLLMLMMStreaming(VLLMAPI):
 
                     if finish_reason := element.finish_reason:
                         match finish_reason:
-                            case "stop":
-                                yield LMMStreamChunk.of(
-                                    MultimodalContent.of(),
-                                    eod=True,
-                                )
-
-                            case "tool_calls":
+                            case "stop" | "tool_calls":
                                 if accumulated_tool_calls:
                                     messages_context.append(
                                         {
@@ -255,6 +246,7 @@ class VLLMLMMStreaming(VLLMAPI):
                                             ],
                                         }
                                     )
+
                                 if accumulated_result:
                                     messages_context.append(
                                         {
@@ -279,6 +271,11 @@ class VLLMLMMStreaming(VLLMAPI):
                                         if call.function.arguments
                                         else {},
                                     )
+
+                                yield LMMStreamChunk.of(
+                                    MultimodalContent.of(),
+                                    eod=True,
+                                )
 
                             case other:
                                 raise VLLMException(f"Unexpected finish reason: {other}")
