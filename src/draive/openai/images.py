@@ -21,7 +21,7 @@ __all__ = [
 
 
 class OpenAIImageGeneration(OpenAIAPI):
-    def image_generator(self) -> ImageGeneration:
+    def image_generation(self) -> ImageGeneration:
         return ImageGeneration(generate=self.generate_image)
 
     async def generate_image(

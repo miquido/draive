@@ -222,10 +222,7 @@ class VLLMLMMStreaming(VLLMAPI):
                     # then process content
                     if element.delta.content is not None:
                         content_chunk: LMMStreamChunk = LMMStreamChunk.of(element.delta.content)
-                        accumulated_result = accumulated_result.appending(
-                            content_chunk.content,
-                            merge_text=True,
-                        )
+                        accumulated_result = accumulated_result.appending(content_chunk.content)
                         yield content_chunk
 
                     if finish_reason := element.finish_reason:

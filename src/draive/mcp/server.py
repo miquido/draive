@@ -212,7 +212,13 @@ def expose_tools(
     /,
     server: Server,
 ) -> None:
-    toolbox: Toolbox = Toolbox.out_of(tools)
+    toolbox: Toolbox
+    match tools:
+        case Toolbox() as tools:
+            toolbox = tools
+
+        case tools:
+            toolbox = Toolbox.of(*tools)
 
     @server.list_tools()
     async def list_tools() -> list[MCPTool]:  # pyright: ignore[reportUnusedFunction]

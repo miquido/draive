@@ -1,12 +1,12 @@
 from draive.tools.tool import AnyTool, Tool, ToolAvailabilityCheck, tool
-from draive.tools.toolbox import ExternalToolbox, Toolbox, ToolboxFetching
+from draive.tools.toolbox import ExternalTools, Toolbox, ToolsFetching
 
 __all__ = [
     "AnyTool",
-    "ExternalToolbox",
+    "ExternalTools",
     "Tool",
     "ToolAvailabilityCheck",
     "Toolbox",
-    "ToolboxFetching",
+    "ToolsFetching",
     "tool",
 ]

@@ -1,6 +1,7 @@
 from typing import Any
 
 from haiway import ctx
+from typing_extensions import deprecated
 
 from draive.instructions import Instruction
 from draive.multimodal import Multimodal, MultimodalContent
@@ -13,6 +14,7 @@ __all__ = [
 ]
 
 
+@deprecated("`steps_completion` has been replaced with `workflow_completion`")
 async def steps_completion(
     *steps: Step | Prompt | Multimodal,
     instruction: Instruction | str | None = None,

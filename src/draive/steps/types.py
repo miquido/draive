@@ -2,6 +2,7 @@ from collections.abc import Callable, Iterable, Mapping
 from typing import Any, Protocol, Self, overload, runtime_checkable
 
 from haiway import State
+from typing_extensions import deprecated
 
 from draive.instructions import Instruction
 from draive.lmm import LMMCompletion, LMMInput, LMMOutputSelection
@@ -23,6 +24,7 @@ class StepResultProcessing(Protocol):
     ) -> MultimodalContent: ...
 
 
+@deprecated("`Step` has been replaced with `Stage`")
 class Step(State):
     @overload
     @classmethod
@@ -92,7 +94,7 @@ class Step(State):
         return cls(
             instruction=Instruction.of(instruction) if instruction else None,
             input=step_input,
-            toolbox=Toolbox.out_of(tools),
+            toolbox=Toolbox.of(tools),
             output=output,
             completion=None if completion is None else LMMCompletion.of(completion),
             volatile=volatile,

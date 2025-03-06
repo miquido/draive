@@ -15,7 +15,6 @@ from draive.lmm import (
     LMMStreamProperties,
     LMMToolRequest,
     LMMToolRequests,
-    LMMToolResponse,
     LMMToolResponses,
     lmm_invoke,
     lmm_stream,
@@ -190,10 +189,10 @@ async def _conversation_completion(
             case LMMToolRequests() as tool_requests:
                 ctx.log_debug("Received conversation tool calls")
 
-                responses: Sequence[LMMToolResponse] = await toolbox.respond_all(tool_requests)
+                tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
                 if direct_content := [
-                    response.content for response in responses if response.direct
+                    response.content for response in tool_responses.responses if response.direct
                 ]:
                     response_message: ConversationMessage = ConversationMessage(
                         role="model",
@@ -210,7 +209,7 @@ async def _conversation_completion(
                     context.extend(
                         [
                             tool_requests,
-                            LMMToolResponses(responses=responses),
+                            tool_responses,
                         ]
                     )
 
@@ -255,10 +254,7 @@ async def _conversation_stream(
     ):
         match element:
             case LMMStreamChunk() as chunk:
-                accumulated_content = accumulated_content.appending(
-                    *chunk.content.parts,
-                    merge_text=True,
-                )
+                accumulated_content = accumulated_content.appending(*chunk.content.parts)
 
                 yield chunk
 
