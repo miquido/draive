@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from typing import Any
 
 from haiway import ctx
@@ -9,7 +9,6 @@ from draive.lmm import (
     LMMContextElement,
     LMMInput,
     LMMToolRequests,
-    LMMToolResponse,
     LMMToolResponses,
     lmm_invoke,
 )
@@ -31,7 +30,7 @@ async def default_generate_text(
     **extra: Any,
 ) -> str:
     with ctx.scope("generate_text"):
-        toolbox: Toolbox = Toolbox.out_of(tools)
+        toolbox: Toolbox = Toolbox.of(tools)
 
         context: list[LMMContextElement] = [
             *[
@@ -67,9 +66,11 @@ async def default_generate_text(
 
                 case LMMToolRequests() as tool_requests:
                     ctx.log_debug("Received text generation tool calls")
-                    responses: Sequence[LMMToolResponse] = await toolbox.respond_all(tool_requests)
+                    tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
-                    if direct_responses := [response for response in responses if response.direct]:
+                    if direct_responses := [
+                        response for response in tool_responses.responses if response.direct
+                    ]:
                         return MultimodalContent.of(
                             *[response.content for response in direct_responses]
                         ).as_string()
@@ -78,7 +79,7 @@ async def default_generate_text(
                         context.extend(
                             [
                                 tool_requests,
-                                LMMToolResponses(responses=responses),
+                                tool_responses,
                             ]
                         )
 

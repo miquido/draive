@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from typing import Any, Literal, cast
 
 from haiway import ctx
@@ -10,7 +10,6 @@ from draive.lmm import (
     LMMContextElement,
     LMMInput,
     LMMToolRequests,
-    LMMToolResponse,
     LMMToolResponses,
     lmm_invoke,
 )
@@ -40,7 +39,7 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
     **extra: Any,
 ) -> Generated:
     with ctx.scope("generate_model"):
-        toolbox: Toolbox = Toolbox.out_of(tools)
+        toolbox: Toolbox = Toolbox.of(tools)
 
         generation_instruction: Instruction
         match instruction:
@@ -117,9 +116,11 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
 
                 case LMMToolRequests() as tool_requests:
                     context.append(tool_requests)
-                    responses: Sequence[LMMToolResponse] = await toolbox.respond_all(tool_requests)
+                    tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
-                    if direct_responses := [response for response in responses if response.direct]:
+                    if direct_responses := [
+                        response for response in tool_responses.responses if response.direct
+                    ]:
                         for response in direct_responses:
                             if isinstance(response, generated):
                                 # return first response matching requested model
@@ -141,7 +142,7 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
                             return generated.from_json(direct_responses_content.as_string())
 
                     else:
-                        context.append(LMMToolResponses(responses=responses))
+                        context.append(tool_responses)
 
             recursion_level += 1  # continue with next recursion level
 

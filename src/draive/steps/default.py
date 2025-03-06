@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from copy import copy
 from typing import Any
 
@@ -9,7 +8,6 @@ from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
     LMMToolRequests,
-    LMMToolResponse,
     LMMToolResponses,
     lmm_invoke,
 )
@@ -129,10 +127,10 @@ async def _process_step(
                     return processed_content
 
             case LMMToolRequests() as tool_requests:
-                responses: Sequence[LMMToolResponse] = await toolbox.respond_all(tool_requests)
+                tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
                 if direct_results := [
-                    response.content for response in responses if response.direct
+                    response.content for response in tool_responses.responses if response.direct
                 ]:
                     del context[context_end_index:]  # remove tool calls from context
                     direct_content: MultimodalContent = MultimodalContent.of(*direct_results)
@@ -151,7 +149,7 @@ async def _process_step(
                     context.extend(
                         [
                             tool_requests,
-                            LMMToolResponses(responses=responses),
+                            tool_responses,
                         ]
                     )
 

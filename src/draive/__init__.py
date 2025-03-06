@@ -210,11 +210,11 @@ from draive.steps import (
 )
 from draive.tokenization import TextTokenizing, Tokenization, count_text_tokens, tokenize_text
 from draive.tools import (
-    ExternalToolbox,
+    ExternalTools,
     Tool,
     ToolAvailabilityCheck,
     Toolbox,
-    ToolboxFetching,
+    ToolsFetching,
     tool,
 )
 from draive.utils import (
@@ -224,6 +224,14 @@ from draive.utils import (
     Memory,
     RateLimitError,
     split_sequence,
+)
+from draive.workflow import (
+    Stage,
+    StageCondition,
+    StageContextProcessing,
+    StageProcessing,
+    StageResultProcessing,
+    workflow_completion,
 )
 
 __all__ = [
@@ -261,7 +269,7 @@ __all__ = [
     "Disposable",
     "Disposables",
     "Embedded",
-    "ExternalToolbox",
+    "ExternalTools",
     "Field",
     "FixedStream",
     "GuardrailsException",
@@ -336,6 +344,11 @@ __all__ = [
     "ResultTrace",
     "ScopeIdentifier",
     "SelectionException",
+    "Stage",
+    "StageCondition",
+    "StageContextProcessing",
+    "StageProcessing",
+    "StageResultProcessing",
     "State",
     "Step",
     "Steps",
@@ -351,7 +364,7 @@ __all__ = [
     "Tool",
     "ToolAvailabilityCheck",
     "Toolbox",
-    "ToolboxFetching",
+    "ToolsFetching",
     "ValueEmbedder",
     "VectorIndex",
     "VectorIndexing",
@@ -418,5 +431,6 @@ __all__ = [
     "vector_similarity_search",
     "when_missing",
     "workflow",
+    "workflow_completion",
     "wrap_async",
 ]

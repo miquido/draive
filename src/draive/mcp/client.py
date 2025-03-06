@@ -33,7 +33,7 @@ from draive.parameters.model import DataModel
 from draive.parameters.specification import validated_specification
 from draive.prompts import Prompt, PromptDeclaration, PromptDeclarationArgument, PromptRepository
 from draive.resources import Resource, ResourceContent, ResourceDeclaration, ResourceRepository
-from draive.tools import AnyTool, ExternalToolbox, Tool, Toolbox
+from draive.tools import AnyTool, ExternalTools, Tool
 
 __all__ = [
     "MCPClient",
@@ -234,20 +234,6 @@ class MCPClient:
             for tool in tools.tools
         )
 
-    async def toolbox_fetch(
-        self,
-        *,
-        suggest: bool | None = None,
-        repeated_calls_limit: int | None = None,
-        other_tools: Sequence[AnyTool] | None = None,
-        **extra: Any,
-    ) -> Toolbox:
-        return Toolbox.of(
-            *[*(other_tools or []), *await self.tools_fetch(**extra)],
-            suggest=suggest,
-            repeated_calls_limit=repeated_calls_limit,
-        )
-
     async def _tool_call(
         self,
         name: str,
@@ -403,7 +389,7 @@ class MCPClient:
                     meta={"source": self.identifier},
                 )
 
-    async def __aenter__(self) -> tuple[ResourceRepository, PromptRepository, ExternalToolbox]:
+    async def __aenter__(self) -> tuple[ResourceRepository, PromptRepository, ExternalTools]:
         self._session = await self._session_manager.__aenter__()
         await self._session.initialize()
 
@@ -416,8 +402,8 @@ class MCPClient:
                 list=self.prompts_list,
                 fetch=self.prompt_fetch,
             ),
-            ExternalToolbox(
-                fetch=self.toolbox_fetch,
+            ExternalTools(
+                fetch=self.tools_fetch,
             ),
         )
 
@@ -636,21 +622,7 @@ class MCPClientAggregate:
             )
         )
 
-    async def toolbox_fetch(
-        self,
-        *,
-        suggest: bool | None = None,
-        repeated_calls_limit: int | None = None,
-        other_tools: Sequence[AnyTool] | None = None,
-        **extra: Any,
-    ) -> Toolbox:
-        return Toolbox.of(
-            *[*(other_tools or []), *await self.tools_fetch(**extra)],
-            suggest=suggest,
-            repeated_calls_limit=repeated_calls_limit,
-        )
-
-    async def __aenter__(self) -> tuple[ResourceRepository, PromptRepository, ExternalToolbox]:
+    async def __aenter__(self) -> tuple[ResourceRepository, PromptRepository, ExternalTools]:
         await gather(*[client.__aenter__() for client in self._clients.values()])
 
         return (
@@ -662,8 +634,8 @@ class MCPClientAggregate:
                 list=self.prompts_list,
                 fetch=self.prompt_fetch,
             ),
-            ExternalToolbox(
-                fetch=self.toolbox_fetch,
+            ExternalTools(
+                fetch=self.tools_fetch,
             ),
         )
 

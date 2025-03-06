@@ -118,57 +118,37 @@ class MultimodalContent(DataModel):
     def appending(
         self,
         *parts: MultimodalContentConvertible,
-        merge_text: bool = False,
     ) -> Self:
         if not self.parts:
-            if merge_text:
-                return self.__class__(
-                    parts=tuple(_merge_texts(*(_as_content(element) for element in parts))),
-                )
-
-            else:
-                return self.__class__(
-                    parts=tuple(_as_content(element) for element in parts),
-                )
-
-        if merge_text:
-            # check the last part
-            match self.parts[-1]:
-                case TextContent() as text:
-                    # if it is a text append merge starting with it
-                    return self.__class__(
-                        parts=(
-                            *self.parts[:-1],
-                            *_merge_texts(text, *(_as_content(element) for element in parts)),
-                        )
-                    )
-
-                case _:
-                    # otherwise just append merged items
-                    return self.__class__(
-                        parts=(
-                            *self.parts,
-                            *_merge_texts(*(_as_content(element) for element in parts)),
-                        )
-                    )
-
-        else:
             return self.__class__(
-                parts=(
-                    *self.parts,
-                    *(_as_content(element) for element in parts),
-                )
+                parts=tuple(_merge_texts(*(_as_content(element) for element in parts))),
             )
+
+        # check the last part
+        match self.parts[-1]:
+            case TextContent() as text:
+                # if it is a text append merge starting with it
+                return self.__class__(
+                    parts=(
+                        *self.parts[:-1],
+                        *_merge_texts(text, *(_as_content(element) for element in parts)),
+                    )
+                )
+
+            case _:
+                # otherwise just append merged items
+                return self.__class__(
+                    parts=(
+                        *self.parts,
+                        *_merge_texts(*(_as_content(element) for element in parts)),
+                    )
+                )
 
     def extending(
         self,
         *other: Self,
-        merge_text: bool = False,
     ) -> Self:
-        return self.appending(
-            *chain.from_iterable(content.parts for content in other),
-            merge_text=merge_text,
-        )
+        return self.appending(*chain.from_iterable(content.parts for content in other))
 
     def __bool__(self) -> bool:
         return bool(self.parts) and any(self.parts)

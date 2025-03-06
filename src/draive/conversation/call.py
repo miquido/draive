@@ -75,6 +75,6 @@ async def conversation_completion(
         instruction=instruction,
         input=input,
         memory=conversation_memory,
-        toolbox=Toolbox.out_of(tools),
+        toolbox=Toolbox.of(tools),
         stream=stream,
     )

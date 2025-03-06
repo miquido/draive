@@ -11,7 +11,6 @@ from draive.lmm import (
     LMMContextElement,
     LMMInput,
     LMMToolRequests,
-    LMMToolResponse,
     LMMToolResponses,
     lmm_invoke,
 )
@@ -98,10 +97,10 @@ async def default_choice_completion(  # noqa: C901
 
                 case LMMToolRequests() as tool_requests:
                     ctx.log_debug("Received choice tool calls")
-                    responses: Sequence[LMMToolResponse] = await toolbox.respond_all(tool_requests)
+                    tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
                     if direct_content := [
-                        response.content for response in responses if response.direct
+                        response.content for response in tool_responses.responses if response.direct
                     ]:
                         if selection := MultimodalTagElement.parse_first(
                             MultimodalContent.of(*direct_content),
@@ -116,7 +115,7 @@ async def default_choice_completion(  # noqa: C901
                         context.extend(
                             [
                                 tool_requests,
-                                LMMToolResponses(responses=responses),
+                                tool_responses,
                             ]
                         )
 
