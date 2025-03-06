@@ -139,7 +139,7 @@ class MistralLMMStreaming(MistralAPI):
 
                 accumulated_result: MultimodalContent = MultimodalContent.of()
                 accumulated_tool_calls: list[ToolCall] = []
-                async for completion_chunk in await self._client.chat.stream_async(
+                async with await self._client.chat.stream_async(
                     model=chat_config.model,
                     messages=request_context,
                     temperature=chat_config.temperature,
@@ -151,185 +151,197 @@ class MistralLMMStreaming(MistralAPI):
                     response_format={"type": "text"},
                     tools=tools_list,
                     tool_choice=tool_choice,
-                ):
-                    if usage := completion_chunk.data.usage:
-                        ctx.record(
-                            TokenUsage.for_model(
-                                completion_chunk.data.model,
-                                input_tokens=usage.prompt_tokens,
-                                cached_tokens=None,
-                                output_tokens=usage.completion_tokens,
-                            ),
-                        )
-
-                    if not completion_chunk.data.choices:
-                        raise MistralException(
-                            "Invalid Mistral completion - missing choices!", completion_chunk.data
-                        )
-
-                    completion_choice: CompletionResponseStreamChoice = (
-                        completion_chunk.data.choices[0]
-                    )
-
-                    completion_delta: DeltaMessage = completion_choice.delta
-                    if content := completion_delta.content:
-                        match content:
-                            case str() as string:
-                                yield LMMStreamChunk.of(string)
-
-                            case chunks:
-                                yield LMMStreamChunk.of(
-                                    MultimodalContent.of(
-                                        *[
-                                            content_chunk_as_content_element(chunk)
-                                            for chunk in chunks
-                                        ]
-                                    )
-                                )
-
-                    if tool_calls := completion_delta.tool_calls:
-                        assert tools_list, "Requesting tool call without tools"  # nosec: B101
-                        if not accumulated_tool_calls:
-                            accumulated_tool_calls = sorted(
-                                tool_calls,
-                                key=lambda call: call.index or 0,
+                ) as response_stream:
+                    async for completion_chunk in response_stream:
+                        if usage := completion_chunk.data.usage:
+                            ctx.record(
+                                TokenUsage.for_model(
+                                    completion_chunk.data.model,
+                                    input_tokens=usage.prompt_tokens,
+                                    cached_tokens=None,
+                                    output_tokens=usage.completion_tokens,
+                                ),
                             )
 
-                        else:
-                            for tool_call in tool_calls:
-                                assert tool_call.index, "Can't identify function call without index"  # nosec: B101
-
-                                # "null" is a dafault value...
-                                if tool_call.id and tool_call.id != "null":
-                                    accumulated_tool_calls[tool_call.index].id = tool_call.id
-
-                                if tool_call.function.name:
-                                    accumulated_tool_calls[
-                                        tool_call.index
-                                    ].function.name += tool_call.function.name
-
-                                if isinstance(tool_call.function.arguments, str):
-                                    assert isinstance(  # nosec: B101
-                                        accumulated_tool_calls[tool_call.index].function.arguments,
-                                        str,
-                                    )
-                                    accumulated_tool_calls[  # pyright: ignore[reportOperatorIssue]
-                                        tool_call.index
-                                    ].function.arguments += tool_call.function.arguments
-
-                                else:
-                                    assert isinstance(  # nosec: B101
-                                        accumulated_tool_calls[tool_call.index].function.arguments,
-                                        dict,
-                                    )
-                                    accumulated_tool_calls[tool_call.index].function.arguments = {
-                                        **cast(
-                                            dict,
-                                            accumulated_tool_calls[
-                                                tool_call.index
-                                            ].function.arguments,
-                                        ),
-                                        **tool_call.function.arguments,
-                                    }
-
-                    match completion_choice.finish_reason:
-                        case None:
-                            pass  # continue streaming
-
-                        case "stop":
-                            if accumulated_result:
-                                messages.append(
-                                    {
-                                        "role": "assistant",
-                                        "content": [
-                                            content_element_as_content_chunk(element)
-                                            for element in accumulated_result.parts
-                                        ],
-                                    }
-                                )
-
-                            # send completion chunk if needed
-                            yield LMMStreamChunk.of(
-                                MultimodalContent.of(),
-                                eod=True,
+                        if not completion_chunk.data.choices:
+                            raise MistralException(
+                                "Invalid Mistral completion - missing choices!",
+                                completion_chunk.data,
                             )
-                            break  # and break the loop
 
-                        case "tool_calls":
-                            for call in accumulated_tool_calls:
-                                if not call.function:
-                                    continue  # skip partial calls
-                                if not call.function.name:
-                                    continue  # skip calls with missing names
+                        completion_choice: CompletionResponseStreamChoice = (
+                            completion_chunk.data.choices[0]
+                        )
 
-                                call_identifier: str = call.id or uuid4().hex
-                                pending_tool_calls.add(call_identifier)
-                                # send tool requests when ensured that all were completed
-                                yield LMMToolRequest(
-                                    identifier=call_identifier,
-                                    tool=call.function.name,
-                                    arguments=json.loads(call.function.arguments)
-                                    if isinstance(call.function.arguments, str)
-                                    else call.function.arguments,
-                                )
+                        completion_delta: DeltaMessage = completion_choice.delta
+                        if content := completion_delta.content:
+                            match content:
+                                case str() as string:
+                                    yield LMMStreamChunk.of(string)
 
-                            # include accumulated result if needed
-                            if accumulated_result:
-                                messages.append(
-                                    {
-                                        "role": "assistant",
-                                        "content": [
-                                            content_element_as_content_chunk(element)
-                                            for element in accumulated_result.parts
-                                        ],
-                                        "tool_calls": [
-                                            {
-                                                "id": request.id,
-                                                "type": "function",
-                                                "function": {
-                                                    "name": request.function.name,
-                                                    "arguments": request.function.arguments or "{}",
-                                                },
-                                            }
-                                            for request in accumulated_tool_calls
-                                            if request.id
-                                            and request.function
-                                            and request.function.name
-                                        ],
-                                    }
+                                case chunks:
+                                    yield LMMStreamChunk.of(
+                                        MultimodalContent.of(
+                                            *[
+                                                content_chunk_as_content_element(chunk)
+                                                for chunk in chunks
+                                            ]
+                                        )
+                                    )
+
+                        if tool_calls := completion_delta.tool_calls:
+                            assert tools_list, "Requesting tool call without tools"  # nosec: B101
+                            if not accumulated_tool_calls:
+                                accumulated_tool_calls = sorted(
+                                    tool_calls,
+                                    key=lambda call: call.index or 0,
                                 )
 
                             else:
-                                messages.append(
-                                    {
-                                        "role": "assistant",
-                                        "tool_calls": [
-                                            {
-                                                "id": request.id,
-                                                "type": "function",
-                                                "function": {
-                                                    "name": request.function.name,
-                                                    "arguments": request.function.arguments or "{}",
-                                                },
-                                            }
-                                            for request in accumulated_tool_calls
-                                            if request.id
-                                            and request.function
-                                            and request.function.name
-                                        ],
-                                    }
+                                for tool_call in tool_calls:
+                                    assert (
+                                        tool_call.index
+                                    ), "Can't identify function call without index"  # nosec: B101
+
+                                    # "null" is a dafault value...
+                                    if tool_call.id and tool_call.id != "null":
+                                        accumulated_tool_calls[tool_call.index].id = tool_call.id
+
+                                    if tool_call.function.name:
+                                        accumulated_tool_calls[
+                                            tool_call.index
+                                        ].function.name += tool_call.function.name
+
+                                    if isinstance(tool_call.function.arguments, str):
+                                        assert isinstance(  # nosec: B101
+                                            accumulated_tool_calls[
+                                                tool_call.index
+                                            ].function.arguments,
+                                            str,
+                                        )
+                                        accumulated_tool_calls[  # pyright: ignore[reportOperatorIssue]
+                                            tool_call.index
+                                        ].function.arguments += tool_call.function.arguments
+
+                                    else:
+                                        assert isinstance(  # nosec: B101
+                                            accumulated_tool_calls[
+                                                tool_call.index
+                                            ].function.arguments,
+                                            dict,
+                                        )
+                                        accumulated_tool_calls[
+                                            tool_call.index
+                                        ].function.arguments = {
+                                            **cast(
+                                                dict,
+                                                accumulated_tool_calls[
+                                                    tool_call.index
+                                                ].function.arguments,
+                                            ),
+                                            **tool_call.function.arguments,
+                                        }
+
+                        match completion_choice.finish_reason:
+                            case None:
+                                pass  # continue streaming
+
+                            case "stop":
+                                if accumulated_result:
+                                    messages.append(
+                                        {
+                                            "role": "assistant",
+                                            "content": [
+                                                content_element_as_content_chunk(element)
+                                                for element in accumulated_result.parts
+                                            ],
+                                        }
+                                    )
+
+                                # send completion chunk if needed
+                                yield LMMStreamChunk.of(
+                                    MultimodalContent.of(),
+                                    eod=True,
+                                )
+                                break  # and break the loop
+
+                            case "tool_calls":
+                                for call in accumulated_tool_calls:
+                                    if not call.function:
+                                        continue  # skip partial calls
+                                    if not call.function.name:
+                                        continue  # skip calls with missing names
+
+                                    call_identifier: str = call.id or uuid4().hex
+                                    pending_tool_calls.add(call_identifier)
+                                    # send tool requests when ensured that all were completed
+                                    yield LMMToolRequest(
+                                        identifier=call_identifier,
+                                        tool=call.function.name,
+                                        arguments=json.loads(call.function.arguments)
+                                        if isinstance(call.function.arguments, str)
+                                        else call.function.arguments,
+                                    )
+
+                                # include accumulated result if needed
+                                if accumulated_result:
+                                    messages.append(
+                                        {
+                                            "role": "assistant",
+                                            "content": [
+                                                content_element_as_content_chunk(element)
+                                                for element in accumulated_result.parts
+                                            ],
+                                            "tool_calls": [
+                                                {
+                                                    "id": request.id,
+                                                    "type": "function",
+                                                    "function": {
+                                                        "name": request.function.name,
+                                                        "arguments": request.function.arguments
+                                                        or "{}",
+                                                    },
+                                                }
+                                                for request in accumulated_tool_calls
+                                                if request.id
+                                                and request.function
+                                                and request.function.name
+                                            ],
+                                        }
+                                    )
+
+                                else:
+                                    messages.append(
+                                        {
+                                            "role": "assistant",
+                                            "tool_calls": [
+                                                {
+                                                    "id": request.id,
+                                                    "type": "function",
+                                                    "function": {
+                                                        "name": request.function.name,
+                                                        "arguments": request.function.arguments
+                                                        or "{}",
+                                                    },
+                                                }
+                                                for request in accumulated_tool_calls
+                                                if request.id
+                                                and request.function
+                                                and request.function.name
+                                            ],
+                                        }
+                                    )
+
+                                break  # and break the loop
+
+                            case "length":
+                                raise MistralException(
+                                    "Invalid Mistral completion - exceeded maximum length!",
+                                    completion_chunk.data,
                                 )
 
-                            break  # and break the loop
-
-                        case "length":
-                            raise MistralException(
-                                "Invalid Mistral completion - exceeded maximum length!",
-                                completion_chunk.data,
-                            )
-
-                        case "error":
-                            raise MistralException(
-                                "Mistral completion generation failed!",
-                                completion_chunk.data,
-                            )
+                            case "error":
+                                raise MistralException(
+                                    "Mistral completion generation failed!",
+                                    completion_chunk.data,
+                                )
