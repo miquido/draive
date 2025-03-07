@@ -1,28 +1,26 @@
-from collections.abc import Iterable, Mapping, MutableSequence, Sequence
+from asyncio import gather
+from collections.abc import Iterable, Sequence
 from typing import Any, Self, final, overload
-from uuid import uuid4
 
-from haiway import as_list
 from haiway.context.access import ScopeContext
 
 from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
     LMMContext,
-    LMMContextElement,
     LMMInput,
     LMMOutputSelection,
-    LMMToolRequest,
     LMMToolRequests,
     LMMToolResponses,
 )
 from draive.lmm.call import lmm_invoke
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.prompts import Prompt
-from draive.tools import AnyTool, Tool, Toolbox
+from draive.tools import AnyTool, Toolbox
 from draive.workflow.types import (
     StageCondition,
     StageContextProcessing,
+    StageMerging,
     StageProcessing,
     StageResultProcessing,
 )
@@ -59,12 +57,10 @@ class Stage:
 
         async def stage(
             *,
-            context: MutableSequence[LMMContextElement],
+            context: LMMContext,
             result: MultimodalContent,
-        ) -> MultimodalContent:
-            context.extend(context_extension)
-
-            return completion_result
+        ) -> tuple[LMMContext, MultimodalContent]:
+            return ((*context, *context_extension), completion_result)
 
         return cls(stage)
 
@@ -90,16 +86,16 @@ class Stage:
 
         async def stage(
             *,
-            context: MutableSequence[LMMContextElement],
+            context: LMMContext,
             result: MultimodalContent,
-        ) -> MultimodalContent:
-            context.extend(context_extension)
+        ) -> tuple[LMMContext, MultimodalContent]:
+            current_context: LMMContext = (*context, *context_extension)
             recursion_level: int = 0
             context_end_index: int = len(context)
             while recursion_level <= toolbox.repeated_calls_limit:
                 match await lmm_invoke(
                     instruction=instruction,
-                    context=context,
+                    context=current_context,
                     output=output,
                     tools=toolbox.available_tools(),
                     tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
@@ -107,10 +103,12 @@ class Stage:
                 ):
                     case LMMCompletion() as completion:
                         if toolbox.hide_calls:
-                            del context[context_end_index:]  # remove tool calls from context
+                            current_context = (*context[:context_end_index], completion)
 
-                        context.append(completion)
-                        return completion.content
+                        else:
+                            current_context = (*current_context, completion)
+
+                        return (current_context, completion.content)
 
                     case LMMToolRequests() as tool_requests:
                         tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
@@ -120,20 +118,28 @@ class Stage:
                             for response in tool_responses.responses
                             if response.direct
                         ]:
-                            if toolbox.hide_calls:
-                                del context[context_end_index:]  # remove tool calls from context
                             direct_content: MultimodalContent = MultimodalContent.of(
                                 *direct_results
                             )
-                            context.append(LMMCompletion.of(direct_content))
-                            return direct_content
+                            if toolbox.hide_calls:
+                                current_context = (
+                                    *context[:context_end_index],
+                                    LMMCompletion.of(direct_content),
+                                )
+
+                            else:
+                                current_context = (
+                                    *current_context,
+                                    LMMCompletion.of(direct_content),
+                                )
+
+                            return (current_context, direct_content)
 
                         else:
-                            context.extend(
-                                [
-                                    tool_requests,
-                                    tool_responses,
-                                ]
+                            current_context = (
+                                *current_context,
+                                tool_requests,
+                                tool_responses,
                             )
 
                 recursion_level += 1  # continue with next recursion level
@@ -150,10 +156,10 @@ class Stage:
     ) -> Self:
         async def stage(
             *,
-            context: MutableSequence[LMMContextElement],
+            context: LMMContext,
             result: MultimodalContent,
-        ) -> MultimodalContent:
-            return await processing(result)
+        ) -> tuple[LMMContext, MultimodalContent]:
+            return (context, await processing(result))
 
         return cls(stage)
 
@@ -165,12 +171,10 @@ class Stage:
     ) -> Self:
         async def stage(
             *,
-            context: MutableSequence[LMMContextElement],
+            context: LMMContext,
             result: MultimodalContent,
-        ) -> MultimodalContent:
-            await processing(context)
-
-            return result
+        ) -> tuple[LMMContext, MultimodalContent]:
+            return (await processing(context), result)
 
         return cls(stage)
 
@@ -203,76 +207,28 @@ class Stage:
 
             async def stage(
                 *,
-                context: MutableSequence[LMMContextElement],
+                context: LMMContext,
                 result: MultimodalContent,
-            ) -> MultimodalContent:
-                context[:limit]
-
-                return result
+            ) -> tuple[LMMContext, MultimodalContent]:
+                return (context[:limit], result)
 
         elif slice_limit:
 
             async def stage(
                 *,
-                context: MutableSequence[LMMContextElement],
+                context: LMMContext,
                 result: MultimodalContent,
-            ) -> MultimodalContent:
-                context[slice_limit]
-
-                return result
+            ) -> tuple[LMMContext, MultimodalContent]:
+                return (context[slice_limit], result)
 
         else:
 
             async def stage(
                 *,
-                context: MutableSequence[LMMContextElement],
+                context: LMMContext,
                 result: MultimodalContent,
-            ) -> MultimodalContent:
-                return result
-
-        return cls(stage)
-
-    @classmethod
-    def tool_call[**Args, Result](
-        cls,
-        tool: Tool[Args, Result],
-        /,
-        *args: Args.args,
-        **kwargs: Args.kwargs,
-    ) -> Self:
-        assert not args  # nosec: B101
-        toolbox: Toolbox = Toolbox.of(tool)
-        arguments: Mapping[str, Any] = kwargs
-
-        async def stage(
-            *,
-            context: MutableSequence[LMMContextElement],
-            result: MultimodalContent,
-        ) -> MultimodalContent:
-            tool_requests = LMMToolRequests(
-                requests=[
-                    LMMToolRequest(
-                        identifier=uuid4().hex,
-                        tool=tool.name,
-                        arguments=arguments,
-                    )
-                ],
-            )
-            tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
-            context.extend(
-                (
-                    tool_requests,
-                    tool_responses,
-                )
-            )
-
-            if direct_responses := [
-                response for response in tool_responses.responses if response.direct
-            ]:
-                return MultimodalContent.of(*[response.content for response in direct_responses])
-
-            else:
-                return result
+            ) -> tuple[LMMContext, MultimodalContent]:
+                return (context, result)
 
         return cls(stage)
 
@@ -290,23 +246,84 @@ class Stage:
 
         async def stage_loop(
             *,
-            context: MutableSequence[LMMContextElement],
+            context: LMMContext,
             result: MultimodalContent,
-        ) -> MultimodalContent:
+        ) -> tuple[LMMContext, MultimodalContent]:
+            current_context: LMMContext = context
             current_result: MultimodalContent = result
             while await condition(
-                context=context,
-                result=result,
+                context=current_context,
+                result=current_result,
             ):
                 for processings in stage_processings:
-                    current_result = await processings(
-                        context=context,
-                        result=result,
+                    current_context, current_result = await processings(
+                        context=current_context,
+                        result=current_result,
                     )
 
-            return current_result
+            return (current_context, current_result)
 
         return cls(stage_loop)
+
+    @classmethod
+    def sequence(
+        cls,
+        stage: Self,
+        /,
+        *stages: Self,
+    ) -> Self:
+        stage_processings: Sequence[StageProcessing] = tuple(
+            stage._processing for stage in (stage, *stages)
+        )
+
+        async def stage_sequence(
+            *,
+            context: LMMContext,
+            result: MultimodalContent,
+        ) -> tuple[LMMContext, MultimodalContent]:
+            current_context: LMMContext = context
+            current_result: MultimodalContent = result
+            for processings in stage_processings:
+                current_context, current_result = await processings(
+                    context=current_context,
+                    result=current_result,
+                )
+
+            return (current_context, current_result)
+
+        return cls(stage_sequence)
+
+    @classmethod
+    def concurrent(
+        cls,
+        stage: Self,
+        /,
+        *stages: Self,
+        merge: StageMerging,
+    ) -> Self:
+        stage_processings: Sequence[StageProcessing] = tuple(
+            stage._processing for stage in (stage, *stages)
+        )
+
+        async def concurrent_stage(
+            *,
+            context: LMMContext,
+            result: MultimodalContent,
+        ) -> tuple[LMMContext, MultimodalContent]:
+            return await merge(
+                branches=await gather(
+                    *[
+                        processing(
+                            context=context,
+                            result=result,
+                        )
+                        for processing in stage_processings
+                    ],
+                    return_exceptions=True,
+                )
+            )
+
+        return cls(concurrent_stage)
 
     def __init__(
         self,
@@ -331,9 +348,9 @@ class Stage:
 
         async def stage(
             *,
-            context: MutableSequence[LMMContextElement],
+            context: LMMContext,
             result: MultimodalContent,
-        ) -> MultimodalContent:
+        ) -> tuple[LMMContext, MultimodalContent]:
             async with execution_context:
                 return await processing(
                     context=context,
@@ -356,9 +373,9 @@ class Stage:
 
         async def stage(
             *,
-            context: MutableSequence[LMMContextElement],
+            context: LMMContext,
             result: MultimodalContent,
-        ) -> MultimodalContent:
+        ) -> tuple[LMMContext, MultimodalContent]:
             if await condition(context=context, result=result):
                 return await processing(
                     context=context,
@@ -372,7 +389,7 @@ class Stage:
                 )
 
             else:
-                return result
+                return (context, result)
 
         return self.__class__(stage)
 
@@ -381,15 +398,15 @@ class Stage:
 
         async def stage(
             *,
-            context: MutableSequence[LMMContextElement],
+            context: LMMContext,
             result: MultimodalContent,
-        ) -> MultimodalContent:
-            await processing(
+        ) -> tuple[LMMContext, MultimodalContent]:
+            processed_context, _ = await processing(
                 context=context,
                 result=result,
             )
 
-            return result
+            return (processed_context, result)
 
         return self.__class__(stage)
 
@@ -398,15 +415,14 @@ class Stage:
 
         async def stage(
             *,
-            context: MutableSequence[LMMContextElement],
+            context: LMMContext,
             result: MultimodalContent,
-        ) -> MultimodalContent:
-            return result.appending(
-                await processing(
-                    context=context,
-                    result=result,
-                )
+        ) -> tuple[LMMContext, MultimodalContent]:
+            processed_context, processed_result = await processing(
+                context=context,
+                result=result,
             )
+            return (processed_context, result.appending(processed_result))
 
         return self.__class__(stage)
 
@@ -427,20 +443,20 @@ class Stage:
         self,
         *,
         context: Prompt | LMMContext | None,
-        result: MultimodalContent,
     ) -> MultimodalContent:
-        mutable_context: MutableSequence[LMMContextElement]
+        current_context: LMMContext
         match context:
             case None:
-                mutable_context = []
+                current_context = ()
 
             case Prompt() as prompt:
-                mutable_context = as_list(prompt.content)
+                current_context = prompt.content
 
             case context:
-                mutable_context = as_list(context)
+                current_context = context
 
-        return await self._processing(
-            context=mutable_context,
-            result=result,
+        _, result = await self._processing(
+            context=current_context,
+            result=MultimodalContent.of(),
         )
+        return result

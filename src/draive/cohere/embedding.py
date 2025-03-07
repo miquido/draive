@@ -53,7 +53,6 @@ class CohereEmbedding(CohereAPI):
                 ]
             )
 
-            print(responses)
             return [
                 Embedded(
                     value=embedded[0],
