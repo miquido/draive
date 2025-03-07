@@ -1,7 +1,6 @@
-from collections.abc import MutableSequence
 from typing import Any
 
-from draive.lmm.types import LMMContextElement
+from draive.lmm import LMMContext
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.prompts import Prompt
 from draive.workflow.stage import Stage
@@ -17,7 +16,7 @@ async def workflow_completion(
     *stages: Stage | Prompt | Multimodal,
     **extra: Any,
 ) -> MultimodalContent:
-    context: MutableSequence[LMMContextElement] = []
+    current_context: LMMContext = []
     current_result = MultimodalContent.of()
     for current in (stage, *stages):
         current_stage: Stage
@@ -31,8 +30,8 @@ async def workflow_completion(
             case multimodal:
                 current_stage = Stage.completion(multimodal)
 
-        current_result = await current_stage._processing(
-            context=context,
+        current_context, current_result = await current_stage._processing(
+            context=current_context,
             result=current_result,
         )
 
