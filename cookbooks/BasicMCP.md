@@ -1,6 +1,6 @@
 # Basic MCP
 
-ModelContextProtocol (MCP) allows to easily extend application and LLM capabilities using standardized feature implementation. Draive library comes with support for MCP both as a server and client allowing to build LLM based application even faster with more code reuse. Lets have a small example:
+ModelContextProtocol (MCP) allows to easily extend application and LLM capabilities using standardized feature implementation. Draive library comes with support for MCP both as a server and client allowing to build LLM based application even faster with more code reuse.
 
 For this example we've created a directory in our home folder and its structure looks like this:
 ```

@@ -352,10 +352,6 @@ requirement: AttributeRequirement[PathModel] = AttributeRequirement[PathModel].e
 # requirement can be executed to check value on any instance
 requirement.check(path_model_instance)
 ```
-
-
-
-
     True
 
 
@@ -377,14 +373,9 @@ combined_requirement: AttributeRequirement[PathModel] = requirement & AttributeR
 
 combined_requirement.check(path_model_instance)
 ```
-
     lhs: nested.values[0]
     operator: equal
     rhs: 42
-
-
-
-
 
     True
 

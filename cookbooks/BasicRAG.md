@@ -11,8 +11,7 @@ load_env() # load .env variables
 
 ## Data preparation
 
-We are going to use a local file with plain text as out input. After loading the file content we will prepare it for embedding by splitting the original text to smaller chunks. This allows to fit the data into limited context windows and to additionally filter out unnecessary information. We are going to use a basic splitter looking for paragraphs structure defined by multiple subsequent newlines in the text. Chunks will be put into a structured envelope which allows to store additional information such as a full text of the document or additional metadata.
-The `document` variable is the same short text about John Doe as appears in [Basic Data Extraction](./BasicDataExtraction.md).
+We are going to use a the same text about John Doe as we did in [Basic Data Extraction](./BasicDataExtraction.md) as our input. After assigning it to a variable we will prepare it for embedding by splitting the original text to smaller chunks. This allows to fit the data into limited context windows and to additionally filter out unnecessary information. We are going to use a basic splitter looking for paragraphs structure defined by multiple subsequent newlines in the text. Chunks will be put into a structured envelope which allows to store additional information such as a full text of the document or additional metadata.
 
 ```python
 from draive import DataModel, count_text_tokens, ctx, split_text
