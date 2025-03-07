@@ -12,12 +12,16 @@ load_env() # load .env variables
 ## Data preparation
 
 We are going to use a local file with plain text as out input. After loading the file content we will prepare it for embedding by splitting the original text to smaller chunks. This allows to fit the data into limited context windows and to additionally filter out unnecessary information. We are going to use a basic splitter looking for paragraphs structure defined by multiple subsequent newlines in the text. Chunks will be put into a structured envelope which allows to store additional information such as a full text of the document or additional metadata.
-
+The `document` variable is the same short text about John Doe as appears in [Basic Data Extraction](./BasicDataExtraction.md).
 
 ```python
 from draive import DataModel, count_text_tokens, ctx, split_text
 from draive.openai import OpenAI
 
+# document is a short text about John Doe
+document: str = """
+...
+"""
 
 # define chunk data structure
 class DocumentChunk(DataModel):
@@ -31,24 +35,20 @@ async with ctx.scope(
     # define tokenizer for this context
     await OpenAI().tokenizer("gpt-3.5-turbo"),
 ):
-    # load the document contents
-    with open("data/personal_document.txt") as file:
-        document = file.read()
-
-        document_chunks = [
-            DocumentChunk(
-                full_document=document,
-                content=chunk,
-            )
-            # split document text into smaller parts
-            for chunk in split_text(
-                text=document,
-                separators=("\n\n", " "),
-                part_size=64,
-                part_overlap_size=16,
-                count_size=count_text_tokens,
-            )
-        ]
+    document_chunks = [
+        DocumentChunk(
+            full_document=document,
+            content=chunk,
+        )
+        # split document text into smaller parts
+        for chunk in split_text(
+            text=document,
+            separators=("\n\n", " "),
+            part_size=64,
+            part_overlap_size=16,
+            count_size=count_text_tokens,
+        )
+    ]
 
 print(f"Prepared {len(document_chunks)} chunks:\n---")
 print("\n---\n".join(chunk.content for chunk in document_chunks))
