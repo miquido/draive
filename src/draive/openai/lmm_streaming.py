@@ -226,65 +226,59 @@ class OpenAILMMStreaming(OpenAIAPI):
                         yield content_chunk
 
                     if finish_reason := element.finish_reason:
-                        match finish_reason:
-                            case "stop" | "tool_calls":
-                                if accumulated_tool_calls:
-                                    messages_context.append(
+                        if finish_reason in ("length", "content_filter"):
+                            raise OpenAIException(f"Unexpected finish reason: {finish_reason}")
+
+                        if accumulated_tool_calls:
+                            messages_context.append(
+                                {
+                                    "role": "assistant",
+                                    "tool_calls": [
                                         {
-                                            "role": "assistant",
-                                            "tool_calls": [
-                                                {
-                                                    "id": request.id,
-                                                    "type": "function",
-                                                    "function": {
-                                                        "name": request.function.name,
-                                                        "arguments": request.function.arguments
-                                                        or "{}",
-                                                    },
-                                                }
-                                                for request in accumulated_tool_calls
-                                                if request.id
-                                                and request.function
-                                                and request.function.name
-                                            ],
+                                            "id": request.id,
+                                            "type": "function",
+                                            "function": {
+                                                "name": request.function.name,
+                                                "arguments": request.function.arguments or "{}",
+                                            },
                                         }
-                                    )
+                                        for request in accumulated_tool_calls
+                                        if request.id and request.function and request.function.name
+                                    ],
+                                }
+                            )
+                            # send tool calls - openAI always sends it without other elements
+                            for call in accumulated_tool_calls:
+                                if not call.function:
+                                    continue  # skip partial calls
+                                if not call.function.name:
+                                    continue  # skip calls with missing names
 
-                                if accumulated_result:
-                                    messages_context.append(
-                                        {
-                                            "role": "assistant",
-                                            "content": accumulated_result.as_string(),
-                                        }
-                                    )
-
-                                for call in accumulated_tool_calls:
-                                    if not call.function:
-                                        continue  # skip partial calls
-                                    if not call.function.name:
-                                        continue  # skip calls with missing names
-
-                                    call_identifier: str = call.id or uuid4().hex
-                                    pending_tool_calls.add(call_identifier)
-                                    # send tool requests when ensured that all were completed
-                                    yield LMMToolRequest(
-                                        identifier=call_identifier,
-                                        tool=call.function.name,
-                                        arguments=json.loads(call.function.arguments)
-                                        if call.function.arguments
-                                        else {},
-                                    )
-
-                                # send completion chunk - openAI sends it without an actual content
-                                yield LMMStreamChunk.of(
-                                    MultimodalContent.of(),
-                                    eod=True,
+                                call_identifier: str = call.id or uuid4().hex
+                                pending_tool_calls.add(call_identifier)
+                                # send tool requests when ensured that all were completed
+                                yield LMMToolRequest(
+                                    identifier=call_identifier,
+                                    tool=call.function.name,
+                                    arguments=json.loads(call.function.arguments)
+                                    if call.function.arguments
+                                    else {},
                                 )
 
-                            case other:
-                                raise OpenAIException(f"Unexpected finish reason: {other}")
+                        else:
+                            messages_context.append(
+                                {
+                                    "role": "assistant",
+                                    "content": accumulated_result.as_string(),
+                                }
+                            )
+                            # send completion chunk - openAI sends it without an actual content
+                            yield LMMStreamChunk.of(
+                                MultimodalContent.of(),
+                                eod=True,
+                            )
 
-                elif usage := part.usage:  # record usage if able (expected in the last part)
+                if usage := part.usage:  # record usage if able (expected in the last part)
                     ctx.record(
                         TokenUsage.for_model(
                             part.model,
@@ -296,6 +290,3 @@ class OpenAILMMStreaming(OpenAIAPI):
 
                     if fingerprint := part.system_fingerprint:
                         ctx.record(OpenAISystemFingerprint(system_fingerprint=fingerprint))
-
-                else:
-                    ctx.log_warning("Unexpected OpenAI streaming part: %s", part)
