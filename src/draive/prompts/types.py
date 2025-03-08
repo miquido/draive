@@ -3,6 +3,7 @@ from typing import Any, Protocol, Self, runtime_checkable
 
 from haiway import State
 
+from draive.commons import Meta
 from draive.lmm import LMMContext, LMMContextElement
 from draive.parameters import DataModel, Field
 from draive.parameters.specification import ParameterSpecification
@@ -36,7 +37,7 @@ class PromptDeclaration(DataModel):
     name: str
     description: str | None = None
     arguments: Sequence[PromptDeclarationArgument]
-    meta: Mapping[str, str | float | int | bool | None] | None
+    meta: Meta | None
 
 
 class Prompt(State):
@@ -46,7 +47,7 @@ class Prompt(State):
         *content: LMMContextElement,
         name: str,
         description: str | None = None,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         return cls(
             name=name,
@@ -58,7 +59,7 @@ class Prompt(State):
     name: str
     description: str | None = None
     content: LMMContext
-    meta: Mapping[str, str | float | int | bool | None] | None
+    meta: Meta | None
 
 
 @runtime_checkable

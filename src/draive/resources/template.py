@@ -1,8 +1,9 @@
-from collections.abc import Callable, Coroutine, Mapping, Sequence
+from collections.abc import Callable, Coroutine, Sequence
 from typing import Protocol, final
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
 
+from draive.commons import Meta
 from draive.parameters import ParametrizedFunction
 from draive.resources.types import Resource, ResourceContent, ResourceDeclaration
 
@@ -32,7 +33,7 @@ class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
         name: str,
         description: str | None,
         availability_check: ResourceAvailabilityCheck | None,
-        meta: Mapping[str, str | float | int | bool | None] | None,
+        meta: Meta | None,
         function: Callable[Args, Coroutine[None, None, Result]],
     ) -> None:
         super().__init__(function)
@@ -91,7 +92,7 @@ def resource[**Args, Result: Sequence[Resource] | ResourceContent](  # noqa: PLR
     name: str | None = None,
     description: str | None = None,
     availability_check: ResourceAvailabilityCheck | None = None,
-    meta: Mapping[str, str | float | int | bool | None] | None = None,
+    meta: Meta | None = None,
 ) -> Callable[
     [Callable[Args, Coroutine[None, None, Result]]],
     ResourceTemplate[Args, Result],

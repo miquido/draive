@@ -1,7 +1,8 @@
 from base64 import b64decode, b64encode
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Final, Literal, Self, cast, get_args
 
+from draive.commons import Meta
 from draive.multimodal.data_field import b64_or_url_field
 from draive.parameters import DataModel
 
@@ -58,7 +59,7 @@ class MediaContent(DataModel):
         url: str,
         /,
         media: MediaType | MediaKind,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         return cls(
             media=media,
@@ -72,7 +73,7 @@ class MediaContent(DataModel):
         data: str,
         /,
         media: MediaType,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         return cls(
             media=media,
@@ -86,7 +87,7 @@ class MediaContent(DataModel):
         data: bytes,
         /,
         media: MediaType,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         return cls(
             media=media,
@@ -97,7 +98,7 @@ class MediaContent(DataModel):
     media: MediaType | MediaKind
     # special field - url string or base64 content auto converted to bytes
     source: str | bytes = b64_or_url_field()
-    meta: Mapping[str, str | float | int | bool | None] | None = None
+    meta: Meta | None = None
 
     @property
     def kind(self) -> MediaKind:  # noqa: PLR0911

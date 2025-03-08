@@ -6,12 +6,16 @@ from anthropic import NOT_GIVEN, NotGiven
 from anthropic.types import (
     ImageBlockParam,
     MessageParam,
+    RedactedThinkingBlock,
     TextBlock,
     TextBlockParam,
+    ThinkingBlock,
     ThinkingConfigParam,
     ToolChoiceParam,
     ToolParam,
 )
+from anthropic.types.redacted_thinking_block_param import RedactedThinkingBlockParam
+from anthropic.types.thinking_block_param import ThinkingBlockParam
 from haiway import Missing
 
 from draive.lmm import (
@@ -26,6 +30,7 @@ from draive.lmm import (
 )
 from draive.multimodal import (
     MediaContent,
+    MetaContent,
     Multimodal,
     MultimodalContent,
     MultimodalContentElement,
@@ -63,18 +68,39 @@ def context_element_as_message(
             }
 
         case LMMToolRequests() as tool_requests:
-            return {
-                "role": "assistant",
-                "content": [
-                    {
-                        "id": request.identifier,
-                        "type": "tool_use",
-                        "name": request.tool,
-                        "input": request.arguments,
-                    }
-                    for request in tool_requests.requests
-                ],
-            }
+            if tool_requests.content:
+                return {
+                    "role": "assistant",
+                    "content": [
+                        *[
+                            convert_content_element(element=element)
+                            for element in tool_requests.content.parts
+                        ],
+                        *[
+                            {
+                                "id": request.identifier,
+                                "type": "tool_use",
+                                "name": request.tool,
+                                "input": request.arguments,
+                            }
+                            for request in tool_requests.requests
+                        ],
+                    ],
+                }
+
+            else:
+                return {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "id": request.identifier,
+                            "type": "tool_use",
+                            "name": request.tool,
+                            "input": request.arguments,
+                        }
+                        for request in tool_requests.requests
+                    ],
+                }
 
         case LMMToolResponses() as tool_responses:
             return {
@@ -85,7 +111,11 @@ def context_element_as_message(
                         "type": "tool_result",
                         "is_error": response.error,
                         "content": [
-                            convert_content_element(element=part) for part in response.content.parts
+                            cast(  # there will be no thinking within tool results
+                                TextBlockParam | ImageBlockParam,
+                                convert_content_element(element=part),
+                            )
+                            for part in response.content.parts
                         ],
                     }
                     for response in tool_responses.responses
@@ -93,9 +123,9 @@ def context_element_as_message(
             }
 
 
-def convert_content_element(
+def convert_content_element(  # noqa: C901, PLR0911, PLR0912
     element: MultimodalContentElement,
-) -> TextBlockParam | ImageBlockParam:
+) -> TextBlockParam | ImageBlockParam | ThinkingBlockParam | RedactedThinkingBlockParam:
     match element:
         case TextContent() as text:
             return {
@@ -127,6 +157,49 @@ def convert_content_element(
                         },
                     }
 
+        case MetaContent() as meta if meta.category == "thinking":
+            match meta.content:
+                case TextContent() as text:
+                    return {
+                        "type": "thinking",
+                        "thinking": text.text,
+                        "signature": str(meta.meta.get("signature", "")),
+                    }
+
+                case MediaContent() as media:
+                    return {
+                        "type": "thinking",
+                        "thinking": media.as_string(include_data=False),
+                        "signature": str(meta.meta.get("signature", "")),
+                    }
+
+                case DataModel() as model:
+                    return {
+                        "type": "thinking",
+                        "thinking": model.as_json(),
+                        "signature": str(meta.meta.get("signature", "")),
+                    }
+
+        case MetaContent() as meta if meta.category == "redacted_thinking":
+            match meta.content:
+                case TextContent() as text:
+                    return {
+                        "type": "redacted_thinking",
+                        "data": text.text,
+                    }
+
+                case MediaContent() as media:
+                    return {
+                        "type": "redacted_thinking",
+                        "data": media.as_string(include_data=False),
+                    }
+
+                case DataModel() as model:
+                    return {
+                        "type": "redacted_thinking",
+                        "data": model.as_json(),
+                    }
+
         case DataModel() as data:
             return {
                 "type": "text",
@@ -135,12 +208,35 @@ def convert_content_element(
 
 
 def content_block_as_content_element(
-    block: TextBlock,
+    block: TextBlock | ThinkingBlock | RedactedThinkingBlock,
     /,
 ) -> MultimodalContentElement:
     match block:
         case TextBlock() as text:
-            return TextContent(text=text.text)
+            return TextContent(
+                text=text.text,
+                # TODO: add citations meta
+            )
+
+        case ThinkingBlock() as thinking:
+            return MetaContent(
+                category="thinking",
+                content=TextContent(
+                    text=thinking.thinking,
+                ),
+                meta={
+                    "signature": thinking.signature,
+                },
+            )
+
+        case RedactedThinkingBlock() as redacted_thinking:
+            return MetaContent(
+                category="redacted_thinking",
+                content=TextContent(
+                    text=redacted_thinking.data,
+                ),
+                meta={},
+            )
 
 
 def thinking_budget_as_config(budget: int | Missing) -> ThinkingConfigParam:

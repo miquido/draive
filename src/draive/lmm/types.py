@@ -10,6 +10,7 @@ from typing import (
 
 from haiway import State
 
+from draive.commons import Meta
 from draive.instructions import Instruction
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel, Field, ParametersSpecification
@@ -71,7 +72,7 @@ class LMMInput(DataModel):
         cls,
         content: Multimodal,
         /,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         return cls(
             content=MultimodalContent.of(content),
@@ -79,7 +80,7 @@ class LMMInput(DataModel):
         )
 
     content: MultimodalContent
-    meta: Mapping[str, str | float | int | bool | None] | None = None
+    meta: Meta | None = None
 
     def __bool__(self) -> bool:
         return bool(self.content)
@@ -91,7 +92,7 @@ class LMMCompletion(DataModel):
         cls,
         content: Multimodal,
         /,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         return cls(
             content=MultimodalContent.of(content),
@@ -99,7 +100,7 @@ class LMMCompletion(DataModel):
         )
 
     content: MultimodalContent
-    meta: Mapping[str, str | float | int | bool | None] | None = None
+    meta: Meta | None = None
 
     def __bool__(self) -> bool:
         return bool(self.content)
@@ -115,6 +116,7 @@ class LMMToolResponse(DataModel):
 
 class LMMToolResponses(DataModel):
     responses: Sequence[LMMToolResponse]
+    meta: Meta | None = None
 
 
 class LMMToolRequest(DataModel):
@@ -124,8 +126,9 @@ class LMMToolRequest(DataModel):
 
 
 class LMMToolRequests(DataModel):
-    completion: LMMCompletion | None = None
+    content: MultimodalContent | None = None
     requests: Sequence[LMMToolRequest]
+    meta: Meta | None = None
 
 
 LMMContextElement = LMMInput | LMMCompletion | LMMToolRequests | LMMToolResponses
@@ -140,14 +143,17 @@ class LMMStreamChunk(DataModel):
         content: Multimodal,
         /,
         eod: bool = False,
+        meta: Meta | None = None,
     ) -> Self:
         return cls(
             content=MultimodalContent.of(content),
             eod=eod,
+            meta=meta,
         )
 
     content: MultimodalContent
     eod: bool
+    meta: Meta | None = None
 
     def __bool__(self) -> bool:
         return bool(self.content)

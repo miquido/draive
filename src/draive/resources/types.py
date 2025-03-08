@@ -1,8 +1,9 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any, Protocol, Self, runtime_checkable
 
 from haiway import State
 
+from draive.commons import Meta
 from draive.multimodal import (
     MediaContent,
     MultimodalContentElement,
@@ -30,7 +31,7 @@ class ResourceDeclaration(DataModel):
     mime_type: str | None
     name: str
     description: str | None = None
-    meta: Mapping[str, str | float | int | bool | None] | None
+    meta: Meta | None
 
 
 # TODO: add ResourceTemplateDeclaration for ResourceTemplates support
@@ -62,7 +63,7 @@ class Resource(State):
     name: str
     description: str | None
     content: Sequence[Self] | ResourceContent
-    meta: Mapping[str, str | float | int | bool | None] | None
+    meta: Meta | None
 
 
 @runtime_checkable

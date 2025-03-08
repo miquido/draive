@@ -1,9 +1,10 @@
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from typing import Any, Protocol, Self, runtime_checkable
 from uuid import uuid4
 
 from haiway import State
 
+from draive.commons import Meta, MetaValue
 from draive.instructions import Instruction
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.tools import Toolbox
@@ -22,7 +23,7 @@ class ChoiceOption(State):
         content: Multimodal,
         /,
         identifier: str | None = None,
-        **meta: Any,
+        **meta: MetaValue,
     ) -> Self:
         assert identifier is None or len(identifier) > 0, "Identifier can't be empty"  # nosec: B101
 
@@ -34,7 +35,7 @@ class ChoiceOption(State):
 
     identifier: str
     content: MultimodalContent
-    meta: Mapping[str, Any]
+    meta: Meta
 
 
 @runtime_checkable

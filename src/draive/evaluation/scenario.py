@@ -1,10 +1,11 @@
 from asyncio import gather
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from typing import Protocol, Self, cast, overload, runtime_checkable
 
 from haiway import AttributePath, ctx, freeze
 from haiway.context.access import ScopeContext
 
+from draive.commons import Meta
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.parameters import DataModel, Field
 
@@ -24,7 +25,7 @@ class ScenarioEvaluatorResult(DataModel):
     evaluations: Sequence[EvaluatorResult] = Field(
         description="Scenario evaluation results",
     )
-    meta: Mapping[str, str | float | int | bool | None] | None = Field(
+    meta: Meta | None = Field(
         description="Additional evaluation metadata",
         default=None,
     )
@@ -62,7 +63,7 @@ class EvaluationScenarioResult(DataModel):
         /,
         evaluators: PreparedEvaluator[Value],
         *_evaluators: PreparedEvaluator[Value],
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         return cls(
             evaluations=tuple(
@@ -77,7 +78,7 @@ class EvaluationScenarioResult(DataModel):
     evaluations: Sequence[EvaluatorResult] = Field(
         description="Scenario evaluation results",
     )
-    meta: Mapping[str, str | float | int | bool | None] | None = Field(
+    meta: Meta | None = Field(
         description="Additional evaluation metadata",
         default=None,
     )
@@ -112,12 +113,12 @@ class ScenarioEvaluator[Value, **Args]:
         name: str,
         definition: ScenarioEvaluatorDefinition[Value, Args],
         execution_context: ScopeContext | None,
-        meta: Mapping[str, str | float | int | bool | None] | None,
+        meta: Meta | None,
     ) -> None:
         self.name: str = name
         self._definition: ScenarioEvaluatorDefinition[Value, Args] = definition
         self._execution_context: ScopeContext | None = execution_context
-        self.meta: Mapping[str, str | float | int | bool | None] | None = meta
+        self.meta: Meta | None = meta
 
         freeze(self)
 
@@ -151,7 +152,7 @@ class ScenarioEvaluator[Value, **Args]:
 
     def with_meta(
         self,
-        meta: Mapping[str, str | float | int | bool | None],
+        meta: Meta,
         /,
     ) -> Self:
         return self.__class__(
@@ -232,7 +233,7 @@ class ScenarioEvaluator[Value, **Args]:
                 **kwargs,
             ):
                 case EvaluationScenarioResult() as result:
-                    meta: Mapping[str, str | float | int | bool | None] | None
+                    meta: Meta | None
                     if self.meta:
                         if result.meta:
                             meta = {**self.meta, **result.meta}
@@ -284,7 +285,7 @@ def evaluation_scenario[Value, **Args](
     *,
     name: str | None = None,
     execution_context: ScopeContext | None = None,
-    meta: Mapping[str, str | float | int | bool | None] | None = None,
+    meta: Meta | None = None,
 ) -> Callable[
     [ScenarioEvaluatorDefinition[Value, Args]],
     ScenarioEvaluator[Value, Args],
@@ -297,7 +298,7 @@ def evaluation_scenario[Value, **Args](  # pyright: ignore[reportInconsistentOve
     *,
     name: str | None = None,
     execution_context: ScopeContext | None = None,
-    meta: Mapping[str, str | float | int | bool | None] | None = None,
+    meta: Meta | None = None,
 ) -> (
     Callable[
         [ScenarioEvaluatorDefinition[Value, Args]],

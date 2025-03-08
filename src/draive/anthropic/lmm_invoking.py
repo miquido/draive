@@ -3,7 +3,14 @@ from typing import Any, cast
 
 from anthropic import NOT_GIVEN
 from anthropic import RateLimitError as AnthropicRateLimitError
-from anthropic.types import Message, TextBlock, ToolUseBlock
+from anthropic.types import (
+    Message,
+    MessageParam,
+    RedactedThinkingBlock,
+    TextBlock,
+    ThinkingBlock,
+    ToolUseBlock,
+)
 from haiway import MISSING, ArgumentsTrace, ResultTrace, as_list, ctx
 
 from draive.anthropic.api import AnthropicAPI
@@ -74,7 +81,9 @@ class AnthropicLMMInvoking(AnthropicAPI):
             )
             ctx.record(completion_config)
 
-            messages: list = [context_element_as_message(element) for element in context]
+            messages: list[MessageParam] = [
+                context_element_as_message(element) for element in context
+            ]
 
             response_prefill, output_decoder = output_as_response_declaration(
                 output=output,
@@ -151,7 +160,7 @@ class AnthropicLMMInvoking(AnthropicAPI):
                         completion,
                     )
 
-            message_parts: list[TextBlock] = []
+            message_parts: list[TextBlock | ThinkingBlock | RedactedThinkingBlock] = []
             tool_calls: list[ToolUseBlock] = []
             for part in completion.content:
                 match part:
@@ -161,9 +170,14 @@ class AnthropicLMMInvoking(AnthropicAPI):
                     case ToolUseBlock() as call:
                         tool_calls.append(call)
 
+                    case ThinkingBlock() as thinking:
+                        message_parts.append(thinking)
+
+                    case RedactedThinkingBlock() as redacted_thinking:
+                        message_parts.append(redacted_thinking)
+
                     case _:
-                        # TODO: add thinking support
-                        pass  # skip other elements
+                        pass  # skip unknown elements
 
             lmm_completion: LMMCompletion | None
             if message_parts:
@@ -192,7 +206,7 @@ class AnthropicLMMInvoking(AnthropicAPI):
             if tool_calls:
                 assert tools, "Requesting tool call without tools"  # nosec: B101
                 completion_tool_calls = LMMToolRequests(
-                    completion=lmm_completion,
+                    content=lmm_completion.content if lmm_completion else None,
                     requests=[
                         LMMToolRequest(
                             identifier=call.id,

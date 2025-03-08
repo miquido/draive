@@ -185,7 +185,7 @@ class GeminiLMMInvoking(GeminiAPI):
             if tool_requests:
                 assert tools, "Requesting tool call without tools"  # nosec: B101
                 completion_tool_calls = LMMToolRequests(
-                    completion=lmm_completion,
+                    content=lmm_completion.content if lmm_completion else None,
                     requests=tool_requests,
                 )
                 ctx.record(ResultTrace.of(completion_tool_calls))

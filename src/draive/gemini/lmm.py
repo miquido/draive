@@ -34,6 +34,7 @@ from draive.multimodal import (
     MultimodalContentElement,
     TextContent,
 )
+from draive.multimodal.meta import MetaContent
 from draive.parameters import DataModel
 
 __all__ = [
@@ -117,7 +118,7 @@ def context_element_as_content(
             )
 
 
-def content_element_as_part(
+def content_element_as_part(  # noqa: PLR0911
     element: MultimodalContentElement,
     /,
 ) -> PartDict:
@@ -143,6 +144,26 @@ def content_element_as_part(
                             "data": data,
                             "mime_type": media.media,
                         },
+                    }
+
+        case MetaContent() as meta:
+            match meta.content:
+                case TextContent() as text:
+                    return {
+                        "text": text.text,
+                        "thought": True,
+                    }
+
+                case MediaContent() as media:
+                    return {
+                        "text": media.as_string(include_data=False),
+                        "thought": True,
+                    }
+
+                case DataModel() as model:
+                    return {
+                        "text": model.as_json(),
+                        "thought": True,
                     }
 
         case DataModel() as data:
@@ -259,7 +280,18 @@ def result_part_as_content_or_call(
 ) -> Iterable[MultimodalContentElement | LMMToolRequest]:
     result: list[MultimodalContentElement | LMMToolRequest] = []
     if part.text:
-        result.append(TextContent(text=part.text))
+        # assuming only text thinking is possible
+        if part.thought:
+            result.append(
+                MetaContent(
+                    category="thought",
+                    content=TextContent(text=part.text),
+                    meta={},
+                ),
+            )
+
+        else:
+            result.append(TextContent(text=part.text))
 
     if part.function_call and part.function_call.name:  # can't call without a name
         result.append(
@@ -286,7 +318,6 @@ def result_part_as_content_or_call(
             ),
         )
 
-    # TODO: we could also extract thoughts
     return result
 
 

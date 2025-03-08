@@ -19,6 +19,7 @@ from uuid import UUID
 from haiway import Missing
 from haiway.state import AttributeAnnotation
 
+from draive.commons import Meta
 from draive.parameters.types import ParameterValidation, ParameterValidationContext
 from draive.parameters.validation import ParameterValidator
 
@@ -345,6 +346,23 @@ def _prepare_specification_of_mapping(
     /,
     description: str | None,
 ) -> ParameterSpecification:
+    # special handlig for meta as it is recursive type
+    # which is an equivalent of json object
+    # asuming type aliases are put within extra in haiway
+    if annotation.extra.get("TYPE_ALIAS") == Meta.__name__:
+        if description := description:
+            return {
+                "type": "object",
+                "additionalProperties": True,
+                "description": description,
+            }
+
+        else:
+            return {
+                "type": "object",
+                "additionalProperties": True,
+            }
+
     if description := description:
         return {
             "type": "object",

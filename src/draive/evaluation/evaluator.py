@@ -1,10 +1,11 @@
 from asyncio import gather
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from typing import Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import AttributePath, ctx, freeze
 from haiway.context.access import ScopeContext
 
+from draive.commons import Meta
 from draive.evaluation.score import EvaluationScore
 from draive.evaluation.value import EvaluationScoreValue, evaluation_score_value
 from draive.parameters import DataModel, Field
@@ -35,7 +36,7 @@ class EvaluatorResult(DataModel):
         score: EvaluationScoreValue,
         score_comment: str | None = None,
         threshold: EvaluationScoreValue,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         return cls(
             evaluator=evaluator,
@@ -58,7 +59,7 @@ class EvaluatorResult(DataModel):
         "a value between 0 (min) and 1 (max)",
         verifier=_verifier,
     )
-    meta: Mapping[str, str | float | int | bool | None] | None = Field(
+    meta: Meta | None = Field(
         description="Additional evaluation metadata",
         default=None,
     )
@@ -88,7 +89,7 @@ class EvaluationResult(DataModel):
         cls,
         score: EvaluationScore | float | bool,
         /,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         evaluation_score: EvaluationScore
         match score:
@@ -109,7 +110,7 @@ class EvaluationResult(DataModel):
     score: EvaluationScore = Field(
         description="Evaluation score",
     )
-    meta: Mapping[str, str | float | int | bool | None] | None = Field(
+    meta: Meta | None = Field(
         description="Additional evaluation metadata",
         default=None,
     )
@@ -202,7 +203,7 @@ class Evaluator[Value, **Args]:
         definition: EvaluatorDefinition[Value, Args],
         threshold: float | None,
         execution_context: ScopeContext | None,
-        meta: Mapping[str, str | float | int | bool | None] | None,
+        meta: Meta | None,
     ) -> None:
         assert (  # nosec: B101
             threshold is None or 0 <= threshold <= 1
@@ -212,7 +213,7 @@ class Evaluator[Value, **Args]:
         self._execution_context: ScopeContext | None = execution_context
         self.name: str = name
         self.threshold: float = 1 if threshold is None else threshold
-        self.meta: Mapping[str, str | float | int | bool | None] | None = meta
+        self.meta: Meta | None = meta
 
         freeze(self)
 
@@ -244,7 +245,7 @@ class Evaluator[Value, **Args]:
 
     def with_meta(
         self,
-        meta: Mapping[str, str | float | int | bool | None],
+        meta: Meta,
         /,
     ) -> Self:
         return self.__class__(
@@ -337,7 +338,7 @@ class Evaluator[Value, **Args]:
         **kwargs: Args.kwargs,
     ) -> EvaluatorResult:
         evaluation_score: EvaluationScore
-        evaluation_meta: Mapping[str, str | float | int | bool | None] | None
+        evaluation_meta: Meta | None
         try:
             match await self._definition(
                 value,
@@ -371,7 +372,7 @@ class Evaluator[Value, **Args]:
             )
             evaluation_meta = {"exception": str(exc)}
 
-        result_meta: Mapping[str, str | float | int | bool | None] | None
+        result_meta: Meta | None
         if self.meta:
             if evaluation_meta:
                 result_meta = {**self.meta, **evaluation_meta}
@@ -406,7 +407,7 @@ def evaluator[Value, **Args](
     name: str | None = None,
     threshold: EvaluationScoreValue | None = None,
     execution_context: ScopeContext | None = None,
-    meta: Mapping[str, str | float | int | bool | None] | None = None,
+    meta: Meta | None = None,
 ) -> Callable[
     [EvaluatorDefinition[Value, Args]],
     Evaluator[Value, Args],
@@ -420,7 +421,7 @@ def evaluator[Value, **Args](
     name: str | None = None,
     threshold: EvaluationScoreValue | None = None,
     execution_context: ScopeContext | None = None,
-    meta: Mapping[str, str | float | int | bool | None] | None = None,
+    meta: Meta | None = None,
 ) -> (
     Callable[
         [EvaluatorDefinition[Value, Args]],

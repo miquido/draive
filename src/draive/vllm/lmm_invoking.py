@@ -176,7 +176,7 @@ class VLLMLMMInvoking(VLLMAPI):
             if tool_calls := completion_message.tool_calls:
                 assert tools, "Requesting tool call without tools"  # nosec: B101
                 completion_tool_calls = LMMToolRequests(
-                    completion=lmm_completion,
+                    content=lmm_completion.content if lmm_completion else None,
                     requests=[
                         LMMToolRequest(
                             identifier=call.id,

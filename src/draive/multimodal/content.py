@@ -1,8 +1,10 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from itertools import chain
 from typing import Self, final, overload
 
+from draive.commons import Meta
 from draive.multimodal.media import MediaContent, MediaKind
+from draive.multimodal.meta import MetaContent
 from draive.multimodal.text import TextContent
 from draive.parameters import DataModel
 
@@ -14,7 +16,7 @@ __all__ = [
 ]
 
 
-MultimodalContentElement = TextContent | MediaContent | DataModel
+MultimodalContentElement = TextContent | MediaContent | MetaContent | DataModel
 MultimodalContentConvertible = str | MultimodalContentElement
 
 
@@ -24,7 +26,7 @@ class MultimodalContent(DataModel):
     def of(
         cls,
         *elements: Self | MultimodalContentConvertible,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         match elements:
             case [MultimodalContent() as content]:
@@ -52,10 +54,6 @@ class MultimodalContent(DataModel):
     def has_media(self) -> bool:
         return any(_is_media(part) for part in self.parts)
 
-    @property
-    def has_artifacts(self) -> bool:
-        return any(_is_artifact(part) for part in self.parts)
-
     def media(
         self,
         media: MediaKind | None = None,
@@ -72,6 +70,10 @@ class MultimodalContent(DataModel):
         return self.__class__(
             parts=tuple(part for part in self.parts if not isinstance(part, MediaContent)),
         )
+
+    @property
+    def has_artifacts(self) -> bool:
+        return any(_is_artifact(part) for part in self.parts)
 
     @overload
     def artifacts(
@@ -100,6 +102,14 @@ class MultimodalContent(DataModel):
     def without_artifacts(self) -> Self:
         return self.__class__(
             parts=tuple(part for part in self.parts if not _is_artifact(part)),
+        )
+
+    def meta(self) -> Sequence[MetaContent]:
+        return tuple(part for part in self.parts if isinstance(part, MetaContent))
+
+    def without_meta(self) -> Self:
+        return self.__class__(
+            parts=tuple(part for part in self.parts if not isinstance(part, MetaContent)),
         )
 
     def as_string(
@@ -163,7 +173,7 @@ Multimodal = MultimodalContent | MultimodalContentConvertible
 def _extract_parts(  # noqa: PLR0911
     element: Multimodal,
     /,
-    meta: Mapping[str, str | float | int | bool | None] | None = None,
+    meta: Meta | None = None,
 ) -> Sequence[MultimodalContentElement]:
     match element:
         case MultimodalContent() as content:
@@ -236,7 +246,7 @@ def _is_artifact(
 ) -> bool:
     return not isinstance(
         element,
-        TextContent | MediaContent,
+        TextContent | MediaContent | MetaContent,
     )
 
 
@@ -252,6 +262,13 @@ def _as_string(
 
         case MediaContent() as media:
             return media.as_string(include_data=include_data)
+
+        case MetaContent() as meta:
+            return (
+                f"<{meta.category}>"
+                f"{_as_string(meta.content, include_data=include_data)}"
+                f"</{meta.category}>"
+            )
 
         case DataModel() as model:
             return str(model)
@@ -297,12 +314,12 @@ def _merge_texts(
 
 
 def _update_meta(
-    meta: Mapping[str, str | float | int | bool | None],
+    meta: Meta,
     /,
     element: MultimodalContentElement,
 ) -> MultimodalContentElement:
     match element:
-        case (TextContent() | MediaContent()) as content:
+        case (TextContent() | MediaContent() | MetaContent()) as content:
             if current_meta := content.meta:
                 return content.updated(meta={**current_meta, **meta})
 

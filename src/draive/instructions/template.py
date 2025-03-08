@@ -1,8 +1,9 @@
-from collections.abc import Callable, Coroutine, Mapping
+from collections.abc import Callable, Coroutine
 from typing import Protocol, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
 
+from draive.commons import Meta
 from draive.instructions.types import (
     Instruction,
     InstructionDeclaration,
@@ -24,7 +25,7 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
         name: str,
         *,
         description: str | None,
-        meta: Mapping[str, str | float | int | bool | None] | None,
+        meta: Meta | None,
         function: Callable[Args, Coroutine[None, None, str]],
     ) -> None:
         super().__init__(function)
@@ -92,7 +93,7 @@ def instruction(
     *,
     name: str | None = None,
     description: str | None = None,
-    meta: Mapping[str, str | float | int | bool | None] | None = None,
+    meta: Meta | None = None,
 ) -> InstructionTemplateWrapper: ...
 
 
@@ -101,7 +102,7 @@ def instruction[**Args](
     *,
     name: str | None = None,
     description: str | None = None,
-    meta: Mapping[str, str | float | int | bool | None] | None = None,
+    meta: Meta | None = None,
 ) -> InstructionTemplateWrapper | InstructionTemplate[Args]:
     def wrap[**Arg](
         function: Callable[Arg, Coroutine[None, None, str]],
