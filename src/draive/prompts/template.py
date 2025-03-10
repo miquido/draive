@@ -1,8 +1,9 @@
-from collections.abc import Callable, Coroutine, Mapping
+from collections.abc import Callable, Coroutine
 from typing import Protocol, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
 
+from draive.commons import Meta
 from draive.lmm import LMMContext
 from draive.parameters import ParametrizedFunction
 from draive.prompts.types import Prompt, PromptDeclaration, PromptDeclarationArgument
@@ -27,7 +28,7 @@ class PromptTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, LM
         *,
         description: str | None = None,
         availability_check: PromptAvailabilityCheck | None,
-        meta: Mapping[str, str | float | int | bool | None] | None,
+        meta: Meta | None,
         function: Callable[Args, Coroutine[None, None, LMMContext]],
     ) -> None:
         super().__init__(function)
@@ -105,7 +106,7 @@ def prompt[**Args](
     name: str | None = None,
     description: str | None = None,
     availability_check: PromptAvailabilityCheck | None = None,
-    meta: Mapping[str, str | float | int | bool | None] | None = None,
+    meta: Meta | None = None,
 ) -> PromptTemplateWrapper: ...
 
 
@@ -115,7 +116,7 @@ def prompt[**Args](
     name: str | None = None,
     description: str | None = None,
     availability_check: PromptAvailabilityCheck | None = None,
-    meta: Mapping[str, str | float | int | bool | None] | None = None,
+    meta: Meta | None = None,
 ) -> PromptTemplateWrapper | PromptTemplate[Args]:
     def wrap[**Arg](
         function: Callable[Arg, Coroutine[None, None, LMMContext]],

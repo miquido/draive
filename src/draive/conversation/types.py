@@ -1,8 +1,9 @@
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Sequence
 from datetime import datetime
 from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
 from uuid import uuid4
 
+from draive.commons import Meta
 from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
@@ -35,7 +36,7 @@ class ConversationMessage(DataModel):
         identifier: str | None = None,
         author: str | None = None,
         created: datetime | None = None,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         return cls(
             identifier=identifier or uuid4().hex,
@@ -53,7 +54,7 @@ class ConversationMessage(DataModel):
         identifier: str | None = None,
         author: str | None = None,
         created: datetime | None = None,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         return cls(
             identifier=identifier or uuid4().hex,
@@ -69,7 +70,7 @@ class ConversationMessage(DataModel):
     author: str | None = None
     created: datetime | None = None
     content: MultimodalContent
-    meta: Mapping[str, str | float | int | bool | None] | None = None
+    meta: Meta | None = None
 
     def as_lmm_context_element(self) -> LMMContextElement:
         match self.role:

@@ -44,7 +44,6 @@ class MistralEmbedding(MistralAPI):
                     self._client.embeddings.create_async(
                         model=embedding_config.model,
                         inputs=texts[index : index + embedding_config.batch_size],
-                        encoding_format="float",
                     )
                     for index in range(0, len(texts), embedding_config.batch_size)
                 ]

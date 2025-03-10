@@ -3,6 +3,7 @@ from typing import Self
 
 from haiway import State
 
+from draive.commons import Meta
 from draive.multimodal.content import Multimodal, MultimodalContent, MultimodalContentElement
 from draive.multimodal.text import TextContent
 from draive.parameters import DataModel
@@ -353,7 +354,7 @@ class _TagOpening(State):
     name: str
     attributes: Mapping[str, str] | None
     raw: str
-    meta: Mapping[str, str | float | int | bool | None] | None
+    meta: Meta | None
     closed: bool
 
 
@@ -361,7 +362,7 @@ class _TagOpening(State):
 def _parse_tag_opening(  # noqa: C901, PLR0912
     source: Iterator[str],
     /,
-    meta: Mapping[str, str | float | int | bool | None] | None,
+    meta: Meta | None,
 ) -> Generator[_TagOpening | str]:
     accumulator: str | None = None  # None is out of tag, empty is a started tag
     attributes: list[tuple[str, str]] = []
@@ -571,7 +572,7 @@ def _parse_tag_attribute_value(  # noqa: C901, PLR0912
 class _TagClosing(State):
     name: str
     raw: str
-    meta: Mapping[str, str | float | int | bool | None] | None
+    meta: Meta | None
 
 
 # look for tag closing and pass through everything else]
@@ -580,7 +581,7 @@ def _parse_tag_closing(  # noqa: C901, PLR0912
     source: Iterator[str],
     /,
     tag: _TagOpening,
-    meta: Mapping[str, str | float | int | bool | None] | None,
+    meta: Meta | None,
 ) -> Generator[_TagClosing | str]:
     accumulator: str | None = None  # None is out of tag, empty is a started tag
     closing: bool = False

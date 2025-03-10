@@ -1,5 +1,5 @@
 from asyncio import Lock, gather
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 from typing import Protocol, Self, overload, runtime_checkable
 from uuid import UUID, uuid4
@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 from haiway import asynchronous, ctx
 from haiway.context.access import ScopeContext
 
+from draive.commons import Meta
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.evaluation.generator import generate_case_parameters
 from draive.evaluation.scenario import PreparedScenarioEvaluator, ScenarioEvaluatorResult
@@ -39,7 +40,7 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
     results: Sequence[ScenarioEvaluatorResult] = Field(
         description="Evaluation results",
     )
-    meta: Mapping[str, str | float | int | bool | None] | None = Field(
+    meta: Meta | None = Field(
         description="Additional evaluation metadata",
         default=None,
     )
@@ -97,7 +98,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
         results: ScenarioEvaluatorResult | EvaluatorResult,
         *_results: ScenarioEvaluatorResult | EvaluatorResult,
         value: Value,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         free_results: list[EvaluatorResult] = []
         scenario_results: list[ScenarioEvaluatorResult] = []
@@ -130,7 +131,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
         /,
         evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
         *_evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
     ) -> Self:
         return cls.of(
             *await gather(
@@ -147,7 +148,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
     results: Sequence[ScenarioEvaluatorResult] = Field(
         description="Evaluation results",
     )
-    meta: Mapping[str, str | float | int | bool | None] | None = Field(
+    meta: Meta | None = Field(
         description="Additional evaluation metadata",
         default=None,
     )

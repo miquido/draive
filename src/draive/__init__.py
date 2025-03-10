@@ -72,6 +72,7 @@ from draive.choice import (
     choice_completion,
     default_choice_completion,
 )
+from draive.commons import Meta, MetaPath, MetaValue
 from draive.conversation import (
     Conversation,
     ConversationElement,
@@ -146,6 +147,7 @@ from draive.multimodal import (
     MediaContent,
     MediaKind,
     MediaType,
+    MetaContent,
     Multimodal,
     MultimodalContent,
     MultimodalContentConvertible,
@@ -301,6 +303,10 @@ __all__ = [
     "MediaKind",
     "MediaType",
     "Memory",
+    "Meta",
+    "MetaContent",
+    "MetaPath",
+    "MetaValue",
     "MetricsContext",
     "MetricsHandler",
     "MetricsLogger",

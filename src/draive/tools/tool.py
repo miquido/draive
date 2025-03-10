@@ -3,6 +3,7 @@ from typing import Any, Protocol, cast, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
 
+from draive.commons import Meta
 from draive.lmm.types import (
     LMMException,
     LMMToolError,
@@ -38,7 +39,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
         format_result: Callable[[Result], Multimodal],
         format_failure: Callable[[Exception], Multimodal],
         direct_result: bool = False,
-        meta: Mapping[str, str | float | int | bool | None] | None,
+        meta: Meta | None,
     ) -> None:
         super().__init__(function)
 
@@ -74,7 +75,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
         )
         self.format_result: Callable[[Result], Multimodal] = format_result
         self.format_failure: Callable[[Exception], Multimodal] = format_failure
-        self.meta: Mapping[str, str | float | int | bool | None] | None = meta
+        self.meta: Meta | None = meta
 
         freeze(self)
 
@@ -199,7 +200,7 @@ def tool[Result](
     format_result: Callable[[Result], Multimodal],
     format_failure: Callable[[Exception], Multimodal] | None = None,
     direct_result: bool = False,
-    meta: Mapping[str, str | float | int | bool | None] | None = None,
+    meta: Meta | None = None,
 ) -> PartialToolWrapper[Result]:
     """
     Convert a function to a tool using provided parameters.
@@ -251,7 +252,7 @@ def tool(
     availability_check: ToolAvailabilityCheck | None = None,
     format_failure: Callable[[Exception], Multimodal] | None = None,
     direct_result: bool = False,
-    meta: Mapping[str, str | float | int | bool | None] | None = None,
+    meta: Meta | None = None,
 ) -> ToolWrapper:
     """
     Convert a function to a tool using provided parameters.
@@ -285,7 +286,7 @@ def tool(
         Note that during concurrent execution of multiple tools the call/result order defines
         direct result and exact behavior is not defined.
         Default is False.
-    meta: Mapping[str, str | float | int | bool | None] | None
+    meta: Meta | None
         custom metadata allowing to access tool metadata like its source in case of remote tools.
 
     Returns
@@ -304,7 +305,7 @@ def tool[**Args, Result](  # noqa: PLR0913
     format_result: Callable[[Result], Multimodal] | None = None,
     format_failure: Callable[[Exception], Multimodal] | None = None,
     direct_result: bool = False,
-    meta: Mapping[str, str | float | int | bool | None] | None = None,
+    meta: Meta | None = None,
 ) -> PartialToolWrapper[Result] | ToolWrapper | Tool[Args, Result]:
     def wrap[**Arg](
         function: Callable[Arg, Coroutine[None, None, Result]],

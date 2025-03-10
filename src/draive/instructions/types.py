@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from haiway import State
 
+from draive.commons import Meta
 from draive.parameters import DataModel, Field, ParameterSpecification
 
 __all__ = [
@@ -34,7 +35,7 @@ class InstructionDeclaration(DataModel):
     name: str
     description: str | None = None
     arguments: Sequence[InstructionDeclarationArgument]
-    meta: Mapping[str, str | float | int | bool | None] | None
+    meta: Meta | None
 
 
 @final
@@ -94,7 +95,7 @@ class Instruction(State):
         *,
         name: str | None = None,
         description: str | None = None,
-        meta: Mapping[str, str | float | int | bool | None] | None = None,
+        meta: Meta | None = None,
         **variables: str,
     ) -> Self:
         match instruction:
@@ -114,7 +115,7 @@ class Instruction(State):
     description: str | None
     content: str
     variables: Mapping[str, str]
-    meta: Mapping[str, str | float | int | bool | None] | None
+    meta: Meta | None
 
     def format(
         self,
