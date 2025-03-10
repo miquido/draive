@@ -88,7 +88,7 @@ class Memory[Recalled, Remembered](State):
         initial: Sequence[Item] | None = None,
         limit: int | None = None,
     ) -> "Memory[Sequence[Item], Item]":
-        storage: list[Item] = list(initial) if initial else []
+        storage: Sequence[Item] = tuple(initial) if initial else ()
         limit = limit or 0
 
         async def recall(
@@ -105,10 +105,10 @@ class Memory[Recalled, Remembered](State):
             if not items:
                 return  # nothing to do
 
-            storage.extend(items)
+            storage = (*storage, *items)
 
             if limit > 0:
-                storage = storage[-limit:]
+                storage = tuple(storage[-limit:])
 
         return Memory[Sequence[Item], Item](
             recall=recall,

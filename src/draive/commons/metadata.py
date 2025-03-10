@@ -12,5 +12,4 @@ type MetaValue = Mapping[str, MetaValue] | Sequence[MetaValue] | str | float | i
 
 type Meta = Mapping[str, MetaValue]
 
-
 MetaPath: Meta = AttributePath(Meta, attribute=Meta)  # pyright: ignore[reportArgumentType, reportAssignmentType, reportCallIssue]
