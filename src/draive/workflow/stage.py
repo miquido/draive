@@ -91,7 +91,6 @@ class Stage:
         ) -> tuple[LMMContext, MultimodalContent]:
             current_context: LMMContext = (*context, *context_extension)
             recursion_level: int = 0
-            context_end_index: int = len(context)
             while recursion_level <= toolbox.repeated_calls_limit:
                 match await lmm_invoke(
                     instruction=instruction,
@@ -102,11 +101,7 @@ class Stage:
                     **extra,
                 ):
                     case LMMCompletion() as completion:
-                        if toolbox.hide_calls:
-                            current_context = (*context[:context_end_index], completion)
-
-                        else:
-                            current_context = (*current_context, completion)
+                        current_context = (*current_context, completion)
 
                         return (current_context, completion.content)
 
@@ -121,17 +116,11 @@ class Stage:
                             direct_content: MultimodalContent = MultimodalContent.of(
                                 *direct_results
                             )
-                            if toolbox.hide_calls:
-                                current_context = (
-                                    *context[:context_end_index],
-                                    LMMCompletion.of(direct_content),
-                                )
 
-                            else:
-                                current_context = (
-                                    *current_context,
-                                    LMMCompletion.of(direct_content),
-                                )
+                            current_context = (
+                                *current_context,
+                                LMMCompletion.of(direct_content),
+                            )
 
                             return (current_context, direct_content)
 
@@ -237,12 +226,9 @@ class Stage:
         cls,
         stage: Self,
         /,
-        *stages: Self,
         condition: StageCondition,
     ) -> Self:
-        stage_processings: Sequence[StageProcessing] = tuple(
-            stage._processing for stage in (stage, *stages)
-        )
+        stage_processing: StageProcessing = stage._processing
 
         async def stage_loop(
             *,
@@ -255,11 +241,10 @@ class Stage:
                 context=current_context,
                 result=current_result,
             ):
-                for processings in stage_processings:
-                    current_context, current_result = await processings(
-                        context=current_context,
-                        result=current_result,
-                    )
+                current_context, current_result = await stage_processing(
+                    context=current_context,
+                    result=current_result,
+                )
 
             return (current_context, current_result)
 

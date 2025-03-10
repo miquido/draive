@@ -33,7 +33,6 @@ class Toolbox(State):
         *tools: AnyTool,
         suggest: AnyTool | bool | None = None,
         repeated_calls_limit: int | None = None,
-        hide_calls: bool | None = None,
     ) -> Self:
         match tool_or_toolbox:
             case None:
@@ -42,7 +41,6 @@ class Toolbox(State):
                     tools={},
                     suggest_call=False,
                     repeated_calls_limit=repeated_calls_limit or 3,
-                    hide_calls=hide_calls if hide_calls is not None else True,
                 )
 
             case Toolbox() as toolbox:
@@ -54,7 +52,6 @@ class Toolbox(State):
                     },
                     suggest_call=suggest or toolbox.suggest_call,
                     repeated_calls_limit=repeated_calls_limit or toolbox.repeated_calls_limit,
-                    hide_calls=hide_calls if hide_calls is not None else toolbox.hide_calls,
                 )
 
             case Tool() as tool:
@@ -64,7 +61,6 @@ class Toolbox(State):
                     tools={tool.name: tool for tool in merged_tools},
                     suggest_call=suggest or False,
                     repeated_calls_limit=repeated_calls_limit or 3,
-                    hide_calls=hide_calls if hide_calls is not None else True,
                 )
 
             case iterable_tools:
@@ -74,14 +70,12 @@ class Toolbox(State):
                     tools={tool.name: tool for tool in merged_tools},
                     suggest_call=suggest or False,
                     repeated_calls_limit=repeated_calls_limit or 3,
-                    hide_calls=hide_calls if hide_calls is not None else True,
                 )
 
     @classmethod
     async def external(
         cls,
         repeated_calls_limit: int | None = None,
-        hide_calls: bool = True,
         suggest_call: AnyTool | bool = False,
         other_tools: Iterable[AnyTool] | None = None,
         **extra: Any,
@@ -91,13 +85,11 @@ class Toolbox(State):
             *(*external_tools, *(other_tools or ())),
             suggest=suggest_call or False,
             repeated_calls_limit=repeated_calls_limit or 3,
-            hide_calls=hide_calls,
         )
 
     tools: Mapping[str, AnyTool]
     suggest_call: AnyTool | bool
     repeated_calls_limit: int
-    hide_calls: bool
 
     def tool_selection(
         self,
