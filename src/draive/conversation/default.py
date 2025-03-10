@@ -1,4 +1,5 @@
-from collections.abc import AsyncGenerator, AsyncIterator, Sequence
+from asyncio import CancelledError, Task
+from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Sequence
 from datetime import UTC, datetime
 from typing import Any, Literal, overload
 
@@ -22,7 +23,7 @@ from draive.lmm import (
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.prompts import Prompt
 from draive.tools import Toolbox
-from draive.utils import Memory
+from draive.utils import Memory, Processing, ProcessingEvent
 
 __all__ = [
     "default_conversation_completion",
@@ -38,7 +39,7 @@ async def default_conversation_completion(
     toolbox: Toolbox,
     stream: Literal[True],
     **extra: Any,
-) -> AsyncIterator[LMMStreamChunk]: ...
+) -> AsyncIterator[LMMStreamChunk | ProcessingEvent]: ...
 
 
 @overload
@@ -62,7 +63,7 @@ async def default_conversation_completion(
     toolbox: Toolbox,
     stream: bool,
     **extra: Any,
-) -> AsyncIterator[LMMStreamChunk] | ConversationMessage: ...
+) -> AsyncIterator[LMMStreamChunk | ProcessingEvent] | ConversationMessage: ...
 
 
 async def default_conversation_completion(
@@ -73,7 +74,7 @@ async def default_conversation_completion(
     toolbox: Toolbox,
     stream: bool = False,
     **extra: Any,
-) -> AsyncIterator[LMMStreamChunk] | ConversationMessage:
+) -> AsyncIterator[LMMStreamChunk | ProcessingEvent] | ConversationMessage:
     with ctx.scope("conversation_completion"):
         recalled_messages: Sequence[ConversationMessage] = await memory.recall()
         context: list[LMMContextElement]
@@ -224,7 +225,7 @@ async def _conversation_stream(
     context: list[LMMContextElement],
     toolbox: Toolbox,
     **extra: Any,
-) -> AsyncGenerator[LMMStreamChunk]:
+) -> AsyncGenerator[LMMStreamChunk | ProcessingEvent]:
     ctx.record(
         ArgumentsTrace.of(
             instruction=instruction,
@@ -243,6 +244,83 @@ async def _conversation_stream(
     )
     del context[-1]  # we are using last element as stream input, we have to remove it from context
 
+    output_queue = AsyncQueue[LMMStreamChunk | ProcessingEvent]()
+    with Processing.context() as processing_events:
+        processing_handler_task: Task[None] = _spawn_processing_handler(
+            output_queue=output_queue,
+            processing_events=processing_events,
+        )
+
+        try:
+            _spawn_lmm_handler(
+                processing_handler_task=processing_handler_task,
+                input_stream=input_stream,
+                output_queue=output_queue,
+                toolbox=toolbox,
+                instruction=instruction,
+                context=context,
+                **extra,
+            )
+            accumulated_content: MultimodalContent = MultimodalContent.of()
+
+            async for output in output_queue:
+                if isinstance(output, LMMStreamChunk):
+                    accumulated_content = accumulated_content.appending(*output.content.parts)
+                yield output
+
+            response_message = ConversationMessage(
+                role="model",
+                created=datetime.now(UTC),
+                content=accumulated_content,
+            )
+            await memory.remember(response_message)
+            ctx.record(ResultTrace.of(response_message))
+
+        finally:
+            processing_handler_task.cancel()
+
+
+async def _handle_tool_call(
+    request: LMMToolRequest,
+    /,
+    *,
+    toolbox: Toolbox,
+    output: AsyncQueue[LMMStreamInput],
+) -> None:
+    output.enqueue(await toolbox.respond(request))
+
+
+def _spawn_processing_handler(
+    output_queue: AsyncQueue[LMMStreamChunk | ProcessingEvent],
+    processing_events: AsyncIterable[ProcessingEvent],
+) -> Task[None]:
+    async def consume_processing_output() -> None:
+        try:
+            async for event in processing_events:
+                output_queue.enqueue(event)
+
+        except CancelledError:
+            pass  # just cancelled
+
+        except BaseException as exc:
+            ctx.log_error(
+                "Processing events stream failed!",
+                exception=exc,
+            )
+            # catching exceptions to avoid breaking main task of output streaming
+
+    return ctx.spawn(consume_processing_output)
+
+
+def _spawn_lmm_handler(  # noqa: PLR0913
+    processing_handler_task: Task[None],
+    input_stream: AsyncQueue[LMMStreamInput],
+    output_queue: AsyncQueue[LMMStreamChunk | ProcessingEvent],
+    toolbox: Toolbox,
+    instruction: Instruction | str | None,
+    context: list[LMMContextElement],
+    **extra: Any,
+) -> Task[None]:
     async def properties_generator() -> AsyncGenerator[LMMStreamProperties, None]:
         # within conversation completion we are not allowing multi turn within one call
         # we might need to refine tool avaliablility passing and recursion/round updates
@@ -258,47 +336,38 @@ async def _conversation_stream(
 
         raise RuntimeError("LMM exceeded limit of recursive calls")
 
-    accumulated_content: MultimodalContent = MultimodalContent.of()
-    async for element in await lmm_stream(
-        properties=properties_generator(),
-        input=input_stream,
-        context=context,
-        **extra,
-    ):
-        match element:
-            case LMMStreamChunk() as chunk:
-                accumulated_content = accumulated_content.appending(*chunk.content.parts)
+    async def consume_lmm_output() -> None:
+        try:
+            async for element in await lmm_stream(
+                properties=properties_generator(),
+                input=input_stream,
+                context=context,
+                **extra,
+            ):
+                match element:
+                    case LMMStreamChunk() as chunk:
+                        output_queue.enqueue(chunk)
 
-                yield chunk
+                        # on turn end finalize the stream
+                        # - we are streaming only a single response here
+                        if chunk.eod:
+                            return  # end of streaming for conversation completion
 
-                # on turn end finalize the stream - we are streaming only a single response here
-                if chunk.eod:
-                    input_stream.finish()
-                    response_message: ConversationMessage = ConversationMessage(
-                        role="model",
-                        created=datetime.now(UTC),
-                        content=accumulated_content,
-                    )
-                    await memory.remember(response_message)
+                    case LMMToolRequest() as tool_request:
+                        ctx.spawn(
+                            _handle_tool_call,
+                            tool_request,
+                            toolbox=toolbox,
+                            output=input_stream,
+                        )
 
-                    ctx.record(ResultTrace.of(response_message))
+        except BaseException as exc:
+            output_queue.finish(exception=exc)
+            raise exc
 
-                    return  # end of streaming for conversation completion
+        finally:
+            processing_handler_task.cancel()
+            input_stream.finish()
+            output_queue.finish()
 
-            case LMMToolRequest() as tool_request:
-                ctx.spawn(
-                    handle_tool_call,
-                    tool_request,
-                    toolbox=toolbox,
-                    output=input_stream,
-                )
-
-
-async def handle_tool_call(
-    request: LMMToolRequest,
-    /,
-    *,
-    toolbox: Toolbox,
-    output: AsyncQueue[LMMStreamInput],
-) -> None:
-    output.enqueue(await toolbox.respond(request))
+    return ctx.spawn(consume_lmm_output)

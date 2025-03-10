@@ -10,7 +10,7 @@ from draive.lmm import LMMStreamChunk
 from draive.multimodal import Multimodal
 from draive.prompts import Prompt
 from draive.tools import AnyTool, Toolbox
-from draive.utils import Memory
+from draive.utils import Memory, ProcessingEvent
 
 __all__ = [
     "conversation_completion",
@@ -26,7 +26,7 @@ async def conversation_completion(
     tools: Toolbox | Iterable[AnyTool] | None = None,
     stream: Literal[True],
     **extra: Any,
-) -> AsyncIterator[LMMStreamChunk]: ...
+) -> AsyncIterator[LMMStreamChunk | ProcessingEvent]: ...
 
 
 @overload
@@ -49,7 +49,7 @@ async def conversation_completion(
     tools: Toolbox | Iterable[AnyTool] | None = None,
     stream: bool = False,
     **extra: Any,
-) -> AsyncIterator[LMMStreamChunk] | ConversationMessage:
+) -> AsyncIterator[LMMStreamChunk | ProcessingEvent] | ConversationMessage:
     conversation: Conversation = ctx.state(Conversation)
 
     # prepare memory
