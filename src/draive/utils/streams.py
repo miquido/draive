@@ -1,4 +1,9 @@
-from asyncio import AbstractEventLoop, CancelledError, Future, get_running_loop
+from asyncio import (
+    AbstractEventLoop,
+    CancelledError,
+    Future,
+    get_running_loop,
+)
 from collections import deque
 from collections.abc import AsyncIterator
 
@@ -46,9 +51,6 @@ class AsyncStream[Element](AsyncIterator[Element]):
         self._waiting: Future[Element] | None = None
         self._finish_reason: BaseException | None = None
 
-    def __del__(self) -> None:
-        self.finish()
-
     @property
     def finished(self) -> bool:
         return self._finish_reason is not None
@@ -86,10 +88,24 @@ class AsyncStream[Element](AsyncIterator[Element]):
         self._finish_reason = exception or StopAsyncIteration()
 
         if not self._ready.done():
-            self._ready.set_result(None)
+            if get_running_loop() is not self._loop:
+                self._loop.call_soon_threadsafe(
+                    self._ready.set_result,
+                    None,
+                )
+
+            else:
+                self._ready.set_result(None)
 
         if self._waiting is not None and not self._waiting.done():
-            self._waiting.set_exception(self._finish_reason)
+            if get_running_loop() is not self._loop:
+                self._loop.call_soon_threadsafe(
+                    self._waiting.set_exception,
+                    self._finish_reason,
+                )
+
+            else:
+                self._waiting.set_exception(self._finish_reason)
 
     def cancel(self) -> None:
         self.finish(exception=CancelledError())

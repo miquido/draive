@@ -158,7 +158,6 @@ class OpenAILMMStreaming(OpenAIAPI):
                 n=1,
                 response_format={"type": "text"},
                 seed=unwrap_missing(chat_config.seed),
-                stream=True,
                 temperature=chat_config.temperature,
                 tools=tools_list,
                 tool_choice=tool_choice,
@@ -170,6 +169,7 @@ class OpenAILMMStreaming(OpenAIAPI):
                 stop=as_list(cast(Sequence[str], chat_config.stop_sequences))
                 if chat_config.stop_sequences is not MISSING
                 else NOT_GIVEN,
+                stream=True,
             ):
                 if part.choices:  # usage part does not contain choices
                     # we are always requesting single result - no need to take care of indices

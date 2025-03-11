@@ -18,7 +18,7 @@ from draive.multimodal import (
 from draive.parameters import DataModel, Field
 from draive.prompts import Prompt
 from draive.tools import Toolbox
-from draive.utils import Memory
+from draive.utils import Memory, ProcessingEvent
 
 __all__ = [
     "ConversationCompletion",
@@ -100,7 +100,7 @@ class ConversationCompletion(Protocol):
         toolbox: Toolbox,
         stream: Literal[True],
         **extra: Any,
-    ) -> AsyncIterator[LMMStreamChunk]: ...
+    ) -> AsyncIterator[LMMStreamChunk | ProcessingEvent]: ...
 
     @overload
     async def __call__(
@@ -124,7 +124,7 @@ class ConversationCompletion(Protocol):
         toolbox: Toolbox,
         stream: bool,
         **extra: Any,
-    ) -> AsyncIterator[LMMStreamChunk] | ConversationMessage: ...
+    ) -> AsyncIterator[LMMStreamChunk | ProcessingEvent] | ConversationMessage: ...
 
     async def __call__(
         self,
@@ -135,4 +135,4 @@ class ConversationCompletion(Protocol):
         toolbox: Toolbox,
         stream: bool = False,
         **extra: Any,
-    ) -> AsyncIterator[LMMStreamChunk] | ConversationMessage: ...
+    ) -> AsyncIterator[LMMStreamChunk | ProcessingEvent] | ConversationMessage: ...

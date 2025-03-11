@@ -1,9 +1,10 @@
-from collections.abc import AsyncGenerator, AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime
 from typing import Any, Literal, overload
 
-from haiway import ArgumentsTrace, AsyncQueue, ResultTrace, ctx
+from haiway import ArgumentsTrace, ResultTrace, ctx
 
+from draive.conversation.stream import conversation_stream
 from draive.conversation.types import ConversationMemory, ConversationMessage
 from draive.instructions import Instruction
 from draive.lmm import (
@@ -11,18 +12,14 @@ from draive.lmm import (
     LMMContextElement,
     LMMInput,
     LMMStreamChunk,
-    LMMStreamInput,
-    LMMStreamProperties,
-    LMMToolRequest,
     LMMToolRequests,
     LMMToolResponses,
     lmm_invoke,
-    lmm_stream,
 )
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.prompts import Prompt
 from draive.tools import Toolbox
-from draive.utils import Memory
+from draive.utils import Memory, ProcessingEvent
 
 __all__ = [
     "default_conversation_completion",
@@ -38,7 +35,7 @@ async def default_conversation_completion(
     toolbox: Toolbox,
     stream: Literal[True],
     **extra: Any,
-) -> AsyncIterator[LMMStreamChunk]: ...
+) -> AsyncIterator[LMMStreamChunk | ProcessingEvent]: ...
 
 
 @overload
@@ -62,7 +59,7 @@ async def default_conversation_completion(
     toolbox: Toolbox,
     stream: bool,
     **extra: Any,
-) -> AsyncIterator[LMMStreamChunk] | ConversationMessage: ...
+) -> AsyncIterator[LMMStreamChunk | ProcessingEvent] | ConversationMessage: ...
 
 
 async def default_conversation_completion(
@@ -73,7 +70,17 @@ async def default_conversation_completion(
     toolbox: Toolbox,
     stream: bool = False,
     **extra: Any,
-) -> AsyncIterator[LMMStreamChunk] | ConversationMessage:
+) -> AsyncIterator[LMMStreamChunk | ProcessingEvent] | ConversationMessage:
+    if stream:
+        return ctx.stream(
+            conversation_stream,
+            instruction=instruction,
+            input=input,
+            memory=memory,
+            toolbox=toolbox,
+            **extra,
+        )
+
     with ctx.scope("conversation_completion"):
         recalled_messages: Sequence[ConversationMessage] = await memory.recall()
         context: list[LMMContextElement]
@@ -129,24 +136,13 @@ async def default_conversation_completion(
                     message.as_lmm_context_element(),
                 ]
 
-        if stream:
-            return ctx.stream(
-                _conversation_stream,
-                instruction=instruction,
-                memory=memory,
-                context=context,
-                toolbox=toolbox,
-                **extra,
-            )
-
-        else:
-            return await _conversation_completion(
-                instruction=instruction,
-                memory=memory,
-                context=context,
-                toolbox=toolbox,
-                **extra,
-            )
+        return await _conversation_completion(
+            instruction=instruction,
+            memory=memory,
+            context=context,
+            toolbox=toolbox,
+            **extra,
+        )
 
 
 async def _conversation_completion(
@@ -216,89 +212,3 @@ async def _conversation_completion(
         recursion_level += 1  # continue with next recursion level
 
     raise RuntimeError("LMM exceeded limit of recursive calls")
-
-
-async def _conversation_stream(
-    instruction: Instruction | str | None,
-    memory: Memory[Sequence[ConversationMessage], ConversationMessage],
-    context: list[LMMContextElement],
-    toolbox: Toolbox,
-    **extra: Any,
-) -> AsyncGenerator[LMMStreamChunk]:
-    ctx.record(
-        ArgumentsTrace.of(
-            instruction=instruction,
-            context=context,
-        )
-    )
-    if not isinstance(context[-1], LMMInput):
-        raise ValueError(f"Streaming input has to end with LMMInput, received {type(context[-1])}")
-
-    input_stream = AsyncQueue[LMMStreamInput]()
-    input_stream.enqueue(
-        LMMStreamChunk.of(
-            context[-1].content,
-            eod=True,  # we provide single input chunk through this interface
-        )
-    )
-    del context[-1]  # we are using last element as stream input, we have to remove it from context
-
-    async def properties_generator() -> AsyncGenerator[LMMStreamProperties, None]:
-        # within conversation completion we are not allowing multi turn within one call
-        # we might need to refine tool avaliablility passing and recursion/round updates
-        recursion_level: int = 0
-        while recursion_level < toolbox.repeated_calls_limit:
-            yield LMMStreamProperties(
-                instruction=instruction,
-                tools=toolbox.available_tools(),
-                tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
-            )
-
-            recursion_level += 1
-
-        raise RuntimeError("LMM exceeded limit of recursive calls")
-
-    accumulated_content: MultimodalContent = MultimodalContent.of()
-    async for element in await lmm_stream(
-        properties=properties_generator(),
-        input=input_stream,
-        context=context,
-        **extra,
-    ):
-        match element:
-            case LMMStreamChunk() as chunk:
-                accumulated_content = accumulated_content.appending(*chunk.content.parts)
-
-                yield chunk
-
-                # on turn end finalize the stream - we are streaming only a single response here
-                if chunk.eod:
-                    input_stream.finish()
-                    response_message: ConversationMessage = ConversationMessage(
-                        role="model",
-                        created=datetime.now(UTC),
-                        content=accumulated_content,
-                    )
-                    await memory.remember(response_message)
-
-                    ctx.record(ResultTrace.of(response_message))
-
-                    return  # end of streaming for conversation completion
-
-            case LMMToolRequest() as tool_request:
-                ctx.spawn(
-                    handle_tool_call,
-                    tool_request,
-                    toolbox=toolbox,
-                    output=input_stream,
-                )
-
-
-async def handle_tool_call(
-    request: LMMToolRequest,
-    /,
-    *,
-    toolbox: Toolbox,
-    output: AsyncQueue[LMMStreamInput],
-) -> None:
-    output.enqueue(await toolbox.respond(request))
