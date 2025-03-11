@@ -227,6 +227,8 @@ from draive.utils import (
     Processing,
     ProcessingEvent,
     ProcessingEventReporting,
+    ProcessingStateReading,
+    ProcessingStateWriting,
     RateLimitError,
     split_sequence,
 )
@@ -338,6 +340,8 @@ __all__ = [
     "Processing",
     "ProcessingEvent",
     "ProcessingEventReporting",
+    "ProcessingStateReading",
+    "ProcessingStateWriting",
     "Prompt",
     "PromptAvailabilityCheck",
     "PromptDeclaration",
