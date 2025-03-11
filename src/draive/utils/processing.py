@@ -1,4 +1,4 @@
-from typing import Protocol, Self, overload, runtime_checkable
+from typing import Protocol, overload, runtime_checkable
 
 from haiway import State, ctx
 
@@ -11,6 +11,8 @@ __all__ = [
     "Processing",
     "ProcessingEvent",
     "ProcessingEventReporting",
+    "ProcessingStateReading",
+    "ProcessingStateWriting",
 ]
 
 
@@ -30,10 +32,91 @@ class ProcessingEventReporting(Protocol):
     ) -> None: ...
 
 
+@runtime_checkable
+class ProcessingStateReading(Protocol):
+    async def __call__[StateType: DataModel | State](
+        self,
+        state: type[StateType],
+        /,
+    ) -> StateType | None: ...
+
+
+@runtime_checkable
+class ProcessingStateWriting(Protocol):
+    async def __call__(
+        self,
+        value: DataModel | State,
+        /,
+    ) -> None: ...
+
+
+async def _log_event_reporting(
+    event: ProcessingEvent,
+    /,
+) -> None:
+    ctx.log_info(f"ProcessingEvent:\n{event}")
+
+
+async def _context_state_reading[StateType: DataModel | State](
+    state: type[StateType],
+    /,
+    default: StateType | None = None,
+) -> StateType | None:
+    if issubclass(state, State):
+        return ctx.state(state, default=default)
+
+    else:
+        return None
+
+
+async def _ignored_state_writing(
+    state: DataModel | State,
+    /,
+) -> None:
+    ctx.log_warning(f"Ignoring processing state writing of {type(state)}")
+
+
 class Processing(State):
+    @overload
     @classmethod
-    def current(cls) -> Self:
-        return ctx.state(cls)
+    async def read[StateType: DataModel | State](
+        cls,
+        state: type[StateType],
+        /,
+    ) -> StateType | None: ...
+
+    @overload
+    @classmethod
+    async def read[StateType: DataModel | State](
+        cls,
+        state: type[StateType],
+        /,
+        *,
+        default: StateType,
+    ) -> StateType: ...
+
+    @classmethod
+    async def read[StateType: DataModel | State](
+        cls,
+        state: type[StateType],
+        /,
+        *,
+        default: StateType | None = None,
+    ) -> StateType | None:
+        current: StateType | None = await ctx.state(cls).state_reading(state)
+        if current is None:
+            return default
+
+        else:
+            return current
+
+    @classmethod
+    async def write(
+        cls,
+        state: DataModel | State,
+        /,
+    ) -> None:
+        await ctx.state(cls).state_writing(state)
 
     @overload
     @classmethod
@@ -80,4 +163,6 @@ class Processing(State):
             )
         )
 
-    event_reporting: ProcessingEventReporting
+    event_reporting: ProcessingEventReporting = _log_event_reporting
+    state_reading: ProcessingStateReading = _context_state_reading
+    state_writing: ProcessingStateWriting = _ignored_state_writing

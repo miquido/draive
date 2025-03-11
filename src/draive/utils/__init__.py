@@ -3,6 +3,8 @@ from draive.utils.processing import (
     Processing,
     ProcessingEvent,
     ProcessingEventReporting,
+    ProcessingStateReading,
+    ProcessingStateWriting,
 )
 from draive.utils.rate_limit import RateLimitError
 from draive.utils.splitting import split_sequence
@@ -16,6 +18,8 @@ __all__ = [
     "Processing",
     "ProcessingEvent",
     "ProcessingEventReporting",
+    "ProcessingStateReading",
+    "ProcessingStateWriting",
     "RateLimitError",
     "split_sequence",
 ]
