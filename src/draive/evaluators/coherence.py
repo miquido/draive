@@ -81,8 +81,8 @@ async def coherence_evaluator(
     )
 
     if result := MultimodalTagElement.parse_first(
-        completion,
-        tag="RESULT",
+        "RESULT",
+        content=completion,
     ):
         return EvaluationScore.of(
             cast(EvaluationScoreValue, result.content.as_string()),
@@ -90,4 +90,4 @@ async def coherence_evaluator(
         )
 
     else:
-        raise ValueError("Invalid evaluator result")
+        raise ValueError("Invalid evaluator result:\n%s", completion)

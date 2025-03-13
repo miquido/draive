@@ -10,6 +10,7 @@ __all__ = [
     "StageMerging",
     "StageProcessing",
     "StageResultProcessing",
+    "StageStateProcessing",
 ]
 
 
@@ -47,6 +48,15 @@ class StageResultProcessing(Protocol):
         self,
         content: MultimodalContent,
     ) -> MultimodalContent: ...
+
+
+@runtime_checkable
+class StageStateProcessing(Protocol):
+    async def __call__(
+        self,
+        context: LMMContext,
+        result: MultimodalContent,
+    ) -> None: ...
 
 
 @runtime_checkable

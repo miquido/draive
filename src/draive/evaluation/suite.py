@@ -1,11 +1,10 @@
 from asyncio import Lock, gather
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
-from typing import Protocol, Self, overload, runtime_checkable
+from typing import Literal, Protocol, Self, overload, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import asynchronous, ctx
-from haiway.context.access import ScopeContext
+from haiway import ScopeContext, asynchronous, ctx
 
 from draive.commons import Meta
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
@@ -50,23 +49,51 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
         # empty results is equivalent of failure
         return len(self.results) > 0 and all(result.passed for result in self.results)
 
-    def report(self) -> str:
+    def report(
+        self,
+        *,
+        include_passed: bool = True,
+        include_details: bool = True,
+    ) -> str:
         report: str = "\n---\n".join(
-            [result.report() for result in self.results if not result.passed]
+            [
+                result.report(
+                    include_passed=include_passed,
+                    include_details=include_details,
+                )
+                for result in self.results
+                if include_passed or not result.passed
+            ]
         )
 
-        if report:  # nonempty report contains failing reports
-            return (
-                f"Evaluation case {self.case.identifier}:"
-                f"\nvalue: {self.value}"
-                f"\n{self.case.parameters}\n---\n{report}"
-            )
+        if report:  # nonempty report
+            if include_details:
+                return (
+                    f"Evaluation case {self.case.identifier}:"
+                    f"\nvalue: {self.value}"
+                    f"\n{self.case.parameters}\n---\n{report}"
+                )
+
+            else:
+                return f"Evaluation case {self.case.identifier}:\n---\n{report}"
 
         elif not self.results:
             return f"Evaluation case {self.case.identifier} empty!"
 
         else:
             return f"Evaluation case {self.case.identifier} passed!"
+
+    @property
+    def relative_score(self) -> float:
+        if not self.results:
+            return 0
+
+        passed: int = 0
+        for evaluation in self.results:
+            if evaluation.passed:
+                passed += 1
+
+        return passed / len(self.results)
 
 
 class SuiteEvaluatorResult[CaseParameters: DataModel, Value: DataModel | str](DataModel):
@@ -76,9 +103,21 @@ class SuiteEvaluatorResult[CaseParameters: DataModel, Value: DataModel | str](Da
     def passed(self) -> bool:
         return all(case.passed for case in self.cases)
 
-    def report(self) -> str:
+    def report(
+        self,
+        *,
+        include_passed: bool = True,
+        include_details: bool = True,
+    ) -> str:
         report: str = "\n---\n".join(
-            [result.report() for result in self.cases if not result.passed]
+            [
+                result.report(
+                    include_passed=include_passed,
+                    include_details=include_details,
+                )
+                for result in self.cases
+                if include_passed or not result.passed
+            ]
         )
 
         if report:  # nonempty report contains failing reports
@@ -89,6 +128,18 @@ class SuiteEvaluatorResult[CaseParameters: DataModel, Value: DataModel | str](Da
 
         else:
             return "Evaluation suite passed!"
+
+    @property
+    def relative_score(self) -> float:
+        if not self.cases:
+            return 0
+
+        passed: int = 0
+        for case in self.cases:
+            if case.passed:
+                passed += 1
+
+        return passed / len(self.cases)
 
 
 class EvaluationCaseResult[Value: DataModel | str](DataModel):
@@ -196,10 +247,21 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
     @overload
     async def __call__(
         self,
-        parameters: CaseParameters | UUID | None,
+        parameters: CaseParameters,
+        /,
+        *,
+        reload: Literal[False] = False,
+        store: Literal[True],
+    ) -> SuiteEvaluatorCaseResult[CaseParameters, Value]: ...
+
+    @overload
+    async def __call__(
+        self,
+        parameters: CaseParameters | UUID,
         /,
         *,
         reload: bool = False,
+        store: Literal[False] = False,
     ) -> SuiteEvaluatorCaseResult[CaseParameters, Value]: ...
 
     @overload
@@ -208,6 +270,7 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
         /,
         *,
         reload: bool = False,
+        store: Literal[False] = False,
     ) -> SuiteEvaluatorResult[CaseParameters, Value]: ...
 
     async def __call__(
@@ -216,6 +279,7 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
         /,
         *,
         reload: bool = False,
+        store: bool = False,
     ) -> (
         SuiteEvaluatorResult[CaseParameters, Value]
         | SuiteEvaluatorCaseResult[CaseParameters, Value]
@@ -375,26 +439,26 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
         persist: bool = False,
         guidelines: str | None = None,
         examples: Iterable[CaseParameters] | None = None,
-    ) -> None:
+    ) -> Sequence[EvaluationSuiteCase[CaseParameters]]:
         async with self._lock:
-            data: EvaluationSuiteData[CaseParameters] = await self._data(reload=True)
-            self._data_cache = data.updated(
-                cases=(
-                    *data.cases,
-                    *[
-                        EvaluationSuiteCase(parameters=parameters)
-                        for parameters in await generate_case_parameters(
-                            self._parameters,
-                            count=count,
-                            examples=examples or [case.parameters for case in data.cases],
-                            guidelines=guidelines,
-                        )
-                    ],
+            current: EvaluationSuiteData[CaseParameters] = await self._data(reload=True)
+
+            generated: Sequence[EvaluationSuiteCase[CaseParameters]] = [
+                EvaluationSuiteCase(parameters=parameters)
+                for parameters in await generate_case_parameters(
+                    self._parameters,
+                    count=count,
+                    examples=examples or [case.parameters for case in current.cases],
+                    guidelines=guidelines,
                 )
-            )
+            ]
+
+            self._data_cache = current.updated(cases=(*current.cases, *generated))
 
             if persist:
                 await self._storage.save(self._data_cache)
+
+            return generated
 
     async def remove_case(
         self,

@@ -1,5 +1,5 @@
 from collections.abc import Generator, Iterator, Mapping
-from typing import Self
+from typing import Self, overload
 
 from haiway import State
 
@@ -19,27 +19,51 @@ class MultimodalTagElement(DataModel):
     content: MultimodalContent
     attributes: Mapping[str, str] | None = None
 
+    @overload
     @classmethod
     def parse_first(
         cls,
-        content: Multimodal,
-        /,
         tag: str | None = None,
+        /,
+        *,
+        content: Multimodal,
+    ) -> Self | None: ...
+
+    @overload
+    @classmethod
+    def parse_first(
+        cls,
+        tag: str | None = None,
+        /,
+        *,
+        content: Multimodal,
+        default: Self,
+    ) -> Self: ...
+
+    @classmethod
+    def parse_first(
+        cls,
+        tag: str | None = None,
+        /,
+        *,
+        content: Multimodal,
+        default: Self | None = None,
     ) -> Self | None:
         return next(
             cls.parse(
-                content,
-                tag=tag,
+                tag,
+                content=content,
             ),
-            None,
+            default,
         )
 
     @classmethod
     def parse(  # noqa: C901, PLR0912
         cls,
-        content: Multimodal,
-        /,
         tag: str | None = None,
+        /,
+        *,
+        content: Multimodal,
     ) -> Generator[Self]:
         current_tag: _TagOpening | None = None
         current_tag_content: list[MultimodalContentElement] = []
@@ -132,9 +156,10 @@ class MultimodalTagElement(DataModel):
     @classmethod
     def replace(  # noqa: C901, PLR0912, PLR0915
         cls,
-        content: Multimodal,
-        /,
         tag: str,
+        /,
+        *,
+        content: Multimodal,
         replacement: Multimodal,
         strip_tags: bool = False,
         replace_all: bool = False,

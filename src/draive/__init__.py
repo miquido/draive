@@ -239,6 +239,7 @@ from draive.workflow import (
     StageMerging,
     StageProcessing,
     StageResultProcessing,
+    StageStateProcessing,
     workflow_completion,
 )
 
@@ -367,6 +368,7 @@ __all__ = [
     "StageMerging",
     "StageProcessing",
     "StageResultProcessing",
+    "StageStateProcessing",
     "State",
     "Step",
     "Steps",

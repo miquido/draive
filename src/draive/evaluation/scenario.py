@@ -2,8 +2,7 @@ from asyncio import gather
 from collections.abc import Callable, Sequence
 from typing import Protocol, Self, cast, overload, runtime_checkable
 
-from haiway import AttributePath, ctx, freeze
-from haiway.context.access import ScopeContext
+from haiway import AttributePath, ScopeContext, ctx, freeze
 
 from draive.commons import Meta
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
@@ -35,24 +34,47 @@ class ScenarioEvaluatorResult(DataModel):
         # empty evaluations is equivalent of failure
         return len(self.evaluations) > 0 and all(case.passed for case in self.evaluations)
 
-    def report(self) -> str:
+    def report(
+        self,
+        *,
+        include_passed: bool = True,
+        include_details: bool = True,
+    ) -> str:
         report: str = "\n- ".join(
-            result.report() for result in self.evaluations if not result.passed
+            result.report(include_details=include_details)
+            for result in self.evaluations
+            if include_passed or not result.passed
         )
 
-        if report:  # nonempty report contains failing reports
-            meta_values: str = (
-                f"\n{'\n'.join(f'{key}: {value}' for key, value in self.meta.items())}"
-                if self.meta
-                else "N/A"
-            )
-            return f"Scenario {self.name}, meta: {meta_values}\n---\n{report}"
+        if report:  # nonempty report
+            if include_details:
+                meta_values: str = (
+                    f"\n{'\n'.join(f'{key}: {value}' for key, value in self.meta.items())}"
+                    if self.meta
+                    else "N/A"
+                )
+                return f"Scenario {self.name}, meta: {meta_values}\n---\n{report}"
+
+            else:
+                return f"Scenario {self.name}:\n{report}"
 
         elif not self.evaluations:
             return f"Scenario {self.name} empty!"
 
         else:
             return f"Scenario {self.name} passed!"
+
+    @property
+    def relative_score(self) -> float:
+        if not self.evaluations:
+            return 0
+
+        passed: int = 0
+        for evaluation in self.evaluations:
+            if evaluation.passed:
+                passed += 1
+
+        return passed / len(self.evaluations)
 
 
 class EvaluationScenarioResult(DataModel):
