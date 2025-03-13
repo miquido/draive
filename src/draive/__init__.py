@@ -109,6 +109,7 @@ from draive.helpers import (
     VectorIndex,
     VectorIndexing,
     VectorSearching,
+    refine_instruction,
     usage_cost,
 )
 from draive.instructions import (
@@ -434,6 +435,7 @@ __all__ = [
     "noop",
     "not_missing",
     "prompt",
+    "refine_instruction",
     "resource",
     "retry",
     "setup_logging",
