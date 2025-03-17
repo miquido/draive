@@ -14,7 +14,7 @@ __all__ = [
 ]
 
 
-@deprecated("`steps_completion` has been replaced with `workflow_completion`")
+@deprecated("`steps_completion` has been replaced with `Stage`")
 async def steps_completion(
     *steps: Step | Prompt | Multimodal,
     instruction: Instruction | str | None = None,

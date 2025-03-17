@@ -6,11 +6,11 @@ from draive.multimodal import MultimodalContent
 
 __all__ = [
     "StageCondition",
-    "StageContextProcessing",
+    "StageContextTransforming",
     "StageMerging",
     "StageProcessing",
-    "StageResultProcessing",
-    "StageStateProcessing",
+    "StageResultTransforming",
+    "StageStateAccessing",
 ]
 
 
@@ -43,7 +43,7 @@ class StageCondition(Protocol):
 
 
 @runtime_checkable
-class StageResultProcessing(Protocol):
+class StageResultTransforming(Protocol):
     async def __call__(
         self,
         content: MultimodalContent,
@@ -51,7 +51,7 @@ class StageResultProcessing(Protocol):
 
 
 @runtime_checkable
-class StageStateProcessing(Protocol):
+class StageStateAccessing(Protocol):
     async def __call__(
         self,
         context: LMMContext,
@@ -60,7 +60,7 @@ class StageStateProcessing(Protocol):
 
 
 @runtime_checkable
-class StageContextProcessing(Protocol):
+class StageContextTransforming(Protocol):
     async def __call__(
         self,
         context: LMMContext,

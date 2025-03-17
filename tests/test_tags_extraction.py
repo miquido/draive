@@ -5,7 +5,7 @@ def test_returns_none_with_empty():
     assert (
         MultimodalTagElement.parse_first(
             "test",
-            content=MultimodalContent.of(),
+            content=MultimodalContent.empty,
         )
         is None
     )
@@ -83,7 +83,7 @@ def test_returns_empty_with_closed_tag():
         content=MultimodalContent.of("Lorem ipsum<test/>"),
     ) == MultimodalTagElement(
         name="test",
-        content=MultimodalContent.of(),
+        content=MultimodalContent.empty,
     )
 
     assert MultimodalTagElement.parse_first(
@@ -95,7 +95,7 @@ def test_returns_empty_with_closed_tag():
         ),
     ) == MultimodalTagElement(
         name="test",
-        content=MultimodalContent.of(),
+        content=MultimodalContent.empty,
     )
 
 
@@ -611,7 +611,7 @@ def test_handles_empty_tag_content():
         content=MultimodalContent.of("<test></test>"),
     ) == MultimodalTagElement(
         name="test",
-        content=MultimodalContent.of(),
+        content=MultimodalContent.empty,
     )
 
 
@@ -656,15 +656,15 @@ def test_handles_multiple_consecutive_tags():
     ) == [
         MultimodalTagElement(
             name="test",
-            content=MultimodalContent.of(),
+            content=MultimodalContent.empty,
         ),
         MultimodalTagElement(
             name="test",
-            content=MultimodalContent.of(),
+            content=MultimodalContent.empty,
         ),
         MultimodalTagElement(
             name="test",
-            content=MultimodalContent.of(),
+            content=MultimodalContent.empty,
         ),
     ]
 
@@ -678,7 +678,7 @@ def test_handles_mixed_self_closing_and_normal_tags():
     ) == [
         MultimodalTagElement(
             name="test",
-            content=MultimodalContent.of(),
+            content=MultimodalContent.empty,
         ),
         MultimodalTagElement(
             name="test",
@@ -686,7 +686,7 @@ def test_handles_mixed_self_closing_and_normal_tags():
         ),
         MultimodalTagElement(
             name="test",
-            content=MultimodalContent.of(),
+            content=MultimodalContent.empty,
         ),
     ]
 
@@ -775,15 +775,15 @@ def test_handles_mixed_media_and_empty_tags():
     ) == [
         MultimodalTagElement(
             name="test",
-            content=MultimodalContent.of(),
+            content=MultimodalContent.empty,
         ),
         MultimodalTagElement(
             name="test",
-            content=MultimodalContent.of(),
+            content=MultimodalContent.empty,
         ),
         MultimodalTagElement(
             name="test",
-            content=MultimodalContent.of(),
+            content=MultimodalContent.empty,
         ),
     ]
 

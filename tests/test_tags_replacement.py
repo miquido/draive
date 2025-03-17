@@ -5,20 +5,20 @@ def test_returns_unchanged_with_empty():
     assert (
         MultimodalTagElement.replace(
             "test",
-            content=MultimodalContent.of(),
+            content=MultimodalContent.empty,
             replacement="replaced",
         )
-        == MultimodalContent.of()
+        == MultimodalContent.empty
     )
 
     assert (
         MultimodalTagElement.replace(
             "test",
-            content=MultimodalContent.of(),
+            content=MultimodalContent.empty,
             replacement="replaced",
             strip_tags=True,
         )
-        == MultimodalContent.of()
+        == MultimodalContent.empty
     )
 
 
