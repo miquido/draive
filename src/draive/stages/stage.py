@@ -1,6 +1,6 @@
 from asyncio import gather
-from collections.abc import Iterable, Sequence
-from typing import Any, ClassVar, Self, final, overload
+from collections.abc import Callable, Coroutine, Iterable, Sequence
+from typing import Any, ClassVar, Literal, Self, final, overload
 
 from haiway import ScopeContext, State, StateContext, ctx, traced
 
@@ -28,6 +28,7 @@ from draive.stages.types import (
     StageStateAccessing,
 )
 from draive.tools import AnyTool, Toolbox
+from draive.utils.memory import Memory
 from draive.utils.processing import Processing
 
 __all__ = [
@@ -150,6 +151,90 @@ class Stage:
         return cls(stage)
 
     @classmethod
+    def memory_recall(
+        cls,
+        memory: Memory[LMMContext, Any],
+        /,
+        *,
+        handling: Literal["replace", "extend"] = "replace",
+    ) -> Self:
+        """
+        Creates a Stage that recalls context from memory.
+
+        This Stage retrieves context from the provided memory and either replaces
+        the current context or extends it, depending on the specified mode.
+
+        Parameters
+        ----------
+        memory : Memory[LMMContext, Any]
+            The memory instance from which to recall the LMM context.
+        handling : Literal["replace", "extend"]
+            Determines how the recalled context is used:
+            - "replace": Completely replaces the current context with the recalled one.
+            - "extend": Appends the recalled context to the current one.
+            Default is "replace".
+
+        Returns
+        -------
+        Self
+            A new Stage instance that recalls context from memory.
+        """
+
+        match handling:
+            case "replace":
+
+                async def stage(
+                    *,
+                    context: LMMContext,
+                    result: MultimodalContent,
+                ) -> tuple[LMMContext, MultimodalContent]:
+                    return (await memory.recall(), result)
+
+            case "extend":
+
+                async def stage(
+                    *,
+                    context: LMMContext,
+                    result: MultimodalContent,
+                ) -> tuple[LMMContext, MultimodalContent]:
+                    return ((*context, *await memory.recall()), result)
+
+        return cls(stage)
+
+    @classmethod
+    def memory_remember(
+        cls,
+        memory: Memory[Any, LMMContext],
+        /,
+    ) -> Self:
+        """
+        Creates a Stage that stores the current context in memory.
+
+        This Stage saves the current LMM context to the provided memory instance
+        without modifying the context or result.
+
+        Parameters
+        ----------
+        memory : Memory[Any, LMMContext]
+            The memory instance in which to store the current LMM context.
+
+        Returns
+        -------
+        Self
+            A new Stage instance that remembers context in memory.
+        """
+
+        async def stage(
+            *,
+            context: LMMContext,
+            result: MultimodalContent,
+        ) -> tuple[LMMContext, MultimodalContent]:
+            await memory.remember(context)
+            return (context, result)
+
+        return cls(stage)
+
+    @classmethod
     def completion(
         cls,
         input: Prompt | Multimodal,  # noqa: A002
@@ -216,57 +301,95 @@ class Stage:
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            current_context: LMMContext = (*context, *context_extension)
-            recursion_level: int = 0
-            while recursion_level <= toolbox.repeated_calls_limit:
-                match await lmm_invoke(
-                    instruction=instruction,
-                    context=current_context,
-                    output=output,
-                    tools=toolbox.available_tools(),
-                    tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
-                    **extra,
-                ):
-                    case LMMCompletion() as completion:
-                        current_context = (*current_context, completion)
+            return await _lmm_completion(
+                instruction=instruction,
+                context=(*context, *context_extension),
+                toolbox=toolbox,
+                output=output,
+                **extra,
+            )
 
-                        return (current_context, completion.content)
+        return cls(stage)
 
-                    case LMMToolRequests() as tool_requests:
-                        tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
+    @classmethod
+    def prompting_completion(
+        cls,
+        input: Callable[[], Coroutine[None, None, Multimodal]],  # noqa: A002
+        /,
+        *,
+        instruction: Instruction | str | None = None,
+        tools: Toolbox | Iterable[AnyTool] | None = None,
+        output: LMMOutputSelection = "auto",
+        **extra: Any,
+    ) -> Self:
+        """
+        Creates a Stage that generates a completion using an LMM after prompting for input.
 
-                        if direct_results := [
-                            response.content
-                            for response in tool_responses.responses
-                            if response.direct
-                        ]:
-                            direct_content: MultimodalContent = MultimodalContent.of(
-                                *direct_results
-                            )
+        This Stage awaits the result of an asynchronous function to obtain input content,
+        then uses this input along with the current LMM context to generate a completion.
+        The obtained input and the generated completion are added to the context, and
+        the completion becomes the new result value.
 
-                            current_context = (
-                                *current_context,
-                                LMMCompletion.of(direct_content),
-                            )
+        Similar to the `completion` method, this Stage can utilize tools that may be
+        invoked by the LMM during completion generation, with tool calls and their
+        results managed automatically.
 
-                            return (current_context, direct_content)
+        Parameters
+        ----------
+        input : Callable[[], Coroutine[None, None, Multimodal]]
+            An async function that returns the input content to provide to the LMM.
+            This function will be awaited during stage execution.
+        instruction : Instruction | str | None, optional
+            Optional instruction or guidance for the LMM.
+        tools : Toolbox | Iterable[AnyTool] | None, optional
+            Optional tools that the LMM can use during completion generation.
+        output : LMMOutputSelection, optional
+            Controls the modality/type of the generated completion, default is "auto".
+        **extra : Any
+            Additional parameters to pass to the LMM invocation.
 
-                        else:
-                            current_context = (
-                                *current_context,
-                                tool_requests,
-                                tool_responses,
-                            )
+        Returns
+        -------
+        Self
+            A new Stage instance that generates a completion after prompting for input.
 
-                recursion_level += 1  # continue with next recursion level
+        Raises
+        ------
+        RuntimeError
+            If the LMM exceeds the limit of recursive tool calls.
 
-            raise RuntimeError("LMM exceeded limit of recursive calls")
+        Examples
+        --------
+        >>> async def get_user_input():
+        ...     # Implementation that gets input from user
+        ...     return "What is the capital of Poland?"
+        ...
+        >>> stage = Stage.prompting_completion(
+        ...     get_user_input,
+        ...     tools=[geography_tool]
+        ... )
+        """
+        toolbox: Toolbox = Toolbox.of(tools)
+
+        async def stage(
+            *,
+            context: LMMContext,
+            result: MultimodalContent,
+        ) -> tuple[LMMContext, MultimodalContent]:
+            return await _lmm_completion(
+                instruction=instruction,
+                context=(*context, LMMInput.of(MultimodalContent.of(await input()))),
+                toolbox=toolbox,
+                output=output,
+                **extra,
+            )
 
         return cls(stage)
 
     @classmethod
     def loopback_completion(
         cls,
+        *,
         instruction: Instruction | str | None = None,
         tools: Toolbox | Iterable[AnyTool] | None = None,
         output: LMMOutputSelection = "auto",
@@ -311,52 +434,14 @@ class Stage:
                 ctx.log_warning("loopback_completion has been skipped due to invalid context")
                 return (context, result)
 
-            # skipping meta as it is no longer applicable to input converted from output
-            current_context: LMMContext = (*context[:-2], LMMInput.of(context[-1].content))
-            recursion_level: int = 0
-            while recursion_level <= toolbox.repeated_calls_limit:
-                match await lmm_invoke(
-                    instruction=instruction,
-                    context=current_context,
-                    output=output,
-                    tools=toolbox.available_tools(),
-                    tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
-                    **extra,
-                ):
-                    case LMMCompletion() as completion:
-                        current_context = (*current_context, completion)
-
-                        return (current_context, completion.content)
-
-                    case LMMToolRequests() as tool_requests:
-                        tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
-
-                        if direct_results := [
-                            response.content
-                            for response in tool_responses.responses
-                            if response.direct
-                        ]:
-                            direct_content: MultimodalContent = MultimodalContent.of(
-                                *direct_results
-                            )
-
-                            current_context = (
-                                *current_context,
-                                LMMCompletion.of(direct_content),
-                            )
-
-                            return (current_context, direct_content)
-
-                        else:
-                            current_context = (
-                                *current_context,
-                                tool_requests,
-                                tool_responses,
-                            )
-
-                recursion_level += 1  # continue with next recursion level
-
-            raise RuntimeError("LMM exceeded limit of recursive calls")
+            return await _lmm_completion(
+                instruction=instruction,
+                # skipping meta as it is no longer applicable to input converted from output
+                context=(*context[:-2], LMMInput.of(context[-1].content)),
+                toolbox=toolbox,
+                output=output,
+                **extra,
+            )
 
         return cls(stage)
 
@@ -525,6 +610,7 @@ class Stage:
         cls,
         stage: Self,
         /,
+        *,
         condition: StageCondition,
     ) -> Self:
         """
@@ -1016,6 +1102,57 @@ class Stage:
                     )
 
         return processed
+
+
+async def _lmm_completion(
+    *,
+    instruction: Instruction | str | None,
+    context: LMMContext,
+    toolbox: Toolbox,
+    output: LMMOutputSelection,
+    **extra: Any,
+) -> tuple[LMMContext, MultimodalContent]:
+    current_context: LMMContext = context
+    recursion_level: int = 0
+    while recursion_level <= toolbox.repeated_calls_limit:
+        match await lmm_invoke(
+            instruction=instruction,
+            context=current_context,
+            output=output,
+            tools=toolbox.available_tools(),
+            tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
+            **extra,
+        ):
+            case LMMCompletion() as completion:
+                current_context = (*current_context, completion)
+
+                return (current_context, completion.content)
+
+            case LMMToolRequests() as tool_requests:
+                tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
+
+                if direct_results := [
+                    response.content for response in tool_responses.responses if response.direct
+                ]:
+                    direct_content: MultimodalContent = MultimodalContent.of(*direct_results)
+
+                    current_context = (
+                        *current_context,
+                        LMMCompletion.of(direct_content),
+                    )
+
+                    return (current_context, direct_content)
+
+                else:
+                    current_context = (
+                        *current_context,
+                        tool_requests,
+                        tool_responses,
+                    )
+
+        recursion_level += 1  # continue with next recursion level
+
+    raise RuntimeError("LMM exceeded limit of recursive calls")
 
 
 @Stage
