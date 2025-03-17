@@ -47,7 +47,9 @@ class LMMToolFunctionSpecification(TypedDict):
 
 type LMMToolSpecification = LMMToolFunctionSpecification
 type LMMOutputSelection = (
-    Literal["auto", "text", "json", "image", "audio", "video"] | type[DataModel]
+    Sequence[Literal["text", "image", "audio", "video"]]
+    | Literal["auto", "text", "json", "image", "audio", "video"]
+    | type[DataModel]
 )
 type LMMToolSelection = Literal["auto", "required", "none"] | LMMToolSpecification
 

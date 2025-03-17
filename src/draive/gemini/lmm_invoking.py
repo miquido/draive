@@ -83,8 +83,9 @@ class GeminiLMMInvoking(GeminiAPI):
 
             response_schema: SchemaDict | None
             response_mime_type: str | None
-            response_schema, response_mime_type, output_decoder = output_as_response_declaration(
-                output
+            response_modalities: list[str] | None
+            response_schema, response_modalities, response_mime_type, output_decoder = (
+                output_as_response_declaration(output)
             )
 
             functions: list[FunctionDeclarationDict] | None
@@ -121,6 +122,7 @@ class GeminiLMMInvoking(GeminiAPI):
                         generation_config.media_resolution
                     ),
                     "response_schema": response_schema,
+                    "response_modalities": response_modalities,
                     "response_mime_type": response_mime_type,
                 },
                 contents=content,

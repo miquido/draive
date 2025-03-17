@@ -185,7 +185,7 @@ def _spawn_lmm_handler(
             ):
                 match element:
                     case LMMStreamChunk() as chunk:
-                        accumulated_content = accumulated_content.appending(*chunk.content.parts)
+                        accumulated_content = accumulated_content.extending(chunk.content)
                         output_queue.enqueue(chunk)
 
                         if chunk.eod:

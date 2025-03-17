@@ -140,7 +140,7 @@ def context_element_as_messages(
             )
 
 
-def output_as_response_declaration(
+def output_as_response_declaration(  # noqa: PLR0911
     output: LMMOutputSelection,
 ) -> tuple[
     ResponseFormat | ResponseFormatJSONSchema | NotGiven,
@@ -155,7 +155,7 @@ def output_as_response_declaration(
                 _auto_output_conversion,
             )
 
-        case "text":
+        case ["text"] | "text":
             return (
                 {"type": "text"},
                 ["text"],
@@ -173,11 +173,17 @@ def output_as_response_declaration(
         case "image":
             raise NotImplementedError("image output is not supported by OpenAI")
 
-        case "audio":
-            return (NOT_GIVEN, ["audio"], _text_output_conversion)
+        case ["audio"] | "audio":
+            return (NOT_GIVEN, ["audio"], _audio_output_conversion)
 
         case "video":
             raise NotImplementedError("video output is not supported by OpenAI")
+
+        case ["text", "audio"] | ["audio", "text"]:  # refine multimodal matching?
+            return (NOT_GIVEN, ["text", "audio"], _auto_output_conversion)
+
+        case [*_]:
+            raise NotImplementedError("multimodal output is not supported by OpenAI")
 
         case model:
             return (

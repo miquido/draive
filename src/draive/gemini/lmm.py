@@ -172,20 +172,28 @@ def content_element_as_part(  # noqa: PLR0911
             }
 
 
-def output_as_response_declaration(  # noqa: PLR0911
+def output_as_response_declaration(
     output: LMMOutputSelection,
     /,
-) -> tuple[SchemaDict | None, str | None, Callable[[MultimodalContent], Multimodal]]:
+) -> tuple[
+    SchemaDict | None, list[str] | None, str | None, Callable[[MultimodalContent], Multimodal]
+]:
     match output:
         case "auto":
-            return (None, None, _auto_output_conversion)
+            return (None, None, None, _auto_output_conversion)
 
         case "text":
-            return (None, "text/plain", _text_output_conversion)
+            return (
+                None,
+                ["Text"],
+                "text/plain",
+                _text_output_conversion,
+            )
 
         case "json":
             return (
                 None,
+                ["Text"],
                 "application/json",
                 _json_output_conversion,
             )
@@ -193,27 +201,27 @@ def output_as_response_declaration(  # noqa: PLR0911
         case "image":
             return (
                 None,
-                "image/png",
-                _image_output_conversion,
-            )  # TODO: verify with actual capabilities
+                ["Text", "Image"],  # google api does not allow to specify only image
+                None,
+                _image_output_conversion,  # we will ignore text anyways
+            )
 
         case "audio":
-            return (
-                None,
-                "audio/wav",
-                _audio_output_conversion,
-            )  # TODO: verify with actual capabilities
+            raise NotImplementedError("audio output is not supported by Gemini")
 
         case "video":
-            return (
-                None,
-                "video/mpeg",
-                _video_output_conversion,
-            )  # TODO: verify with actual capabilities
+            raise NotImplementedError("video output is not supported by Gemini")
+
+        case ["text", "image"] | ["image", "text"]:  # refine multimodal matching?
+            return (None, ["Text", "Image"], None, _auto_output_conversion)
+
+        case [*_]:
+            raise NotImplementedError("multimodal output is not supported by Gemini")
 
         case model:
             return (
                 cast(SchemaDict, model.__PARAMETERS_SPECIFICATION__),
+                ["Text"],
                 "application/json",
                 _prepare_model_output_conversion(model),
             )

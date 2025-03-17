@@ -81,7 +81,7 @@ class MistralLMMStreaming(MistralAPI):
                 match chunk:
                     # gether input content chunks until marked as end
                     case LMMStreamChunk() as content_chunk:
-                        input_buffer = input_buffer.appending(content_chunk.content)
+                        input_buffer = input_buffer.extending(content_chunk.content)
                         if content_chunk.eod:
                             messages.append(
                                 {
