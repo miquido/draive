@@ -187,7 +187,7 @@ def output_as_response_declaration(
         case "auto":
             return ({"type": "text"}, _auto_output_conversion)
 
-        case "text":
+        case ["text"] | "text":
             return ({"type": "text"}, _text_output_conversion)
 
         case "json":
@@ -201,6 +201,9 @@ def output_as_response_declaration(
 
         case "video":
             raise NotImplementedError("video output is not supported by Mistral")
+
+        case [*_]:
+            raise NotImplementedError("multimodal output is not supported by Mistral")
 
         case model:
             return (

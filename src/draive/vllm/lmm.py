@@ -155,7 +155,7 @@ def output_as_response_declaration(
                 _auto_output_conversion,
             )
 
-        case "text":
+        case ["text"] | "text":
             return (
                 {"type": "text"},
                 ["text"],
@@ -171,13 +171,16 @@ def output_as_response_declaration(
             return ({"type": "json_object"}, _json_output_conversion)
 
         case "image":
-            raise NotImplementedError("image output is not supported by OpenAI client")
+            raise NotImplementedError("image output is not supported by VLLM client")
 
         case "audio":
             return (NOT_GIVEN, ["audio"], _text_output_conversion)
 
         case "video":
-            raise NotImplementedError("video output is not supported by OpenAI client")
+            raise NotImplementedError("video output is not supported by VLLM client")
+
+        case [*_]:
+            raise NotImplementedError("multimodal output is not supported by VLLM client")
 
         case model:
             return (

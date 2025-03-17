@@ -131,7 +131,8 @@ class MultimodalContent(DataModel):
         self,
         *parts: MultimodalContentConvertible,
     ) -> Self:
-        if not self.parts:
+        assert not any(isinstance(part, MultimodalContent) for part in parts)  # nosec: B101
+        if len(self.parts) == 0:
             return self.__class__(
                 parts=tuple(_merge_texts(*(_as_content(element) for element in parts))),
             )

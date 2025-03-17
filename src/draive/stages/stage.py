@@ -1034,7 +1034,7 @@ class Stage:
                 context=context,
                 result=result,
             )
-            return (processed_context, result.appending(processed_result))
+            return (processed_context, result.extending(processed_result))
 
         return self.__class__(stage)
 

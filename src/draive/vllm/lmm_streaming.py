@@ -94,7 +94,7 @@ class VLLMLMMStreaming(VLLMAPI):
                 match chunk:
                     # gether input content chunks until marked as end
                     case LMMStreamChunk() as content_chunk:
-                        input_buffer = input_buffer.appending(content_chunk.content)
+                        input_buffer = input_buffer.extending(content_chunk.content)
                         if content_chunk.eod:
                             messages_context.append(
                                 {
@@ -219,7 +219,7 @@ class VLLMLMMStreaming(VLLMAPI):
                     # then process content
                     if element.delta.content is not None:
                         content_chunk: LMMStreamChunk = LMMStreamChunk.of(element.delta.content)
-                        accumulated_result = accumulated_result.appending(content_chunk.content)
+                        accumulated_result = accumulated_result.extending(content_chunk.content)
                         yield content_chunk
 
                     if finish_reason := element.finish_reason:

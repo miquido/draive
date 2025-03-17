@@ -103,7 +103,7 @@ def output_as_response_declaration(
         case "auto":
             return (None, _auto_output_conversion)
 
-        case "text":
+        case ["text"] | "text":
             return (None, _text_output_conversion)
 
         case "json":
@@ -117,6 +117,9 @@ def output_as_response_declaration(
 
         case "video":
             raise NotImplementedError("video output is not supported by Ollama")
+
+        case [*_]:
+            raise NotImplementedError("multimodal output is not supported by Ollama")
 
         case model:
             return (
