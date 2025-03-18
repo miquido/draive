@@ -16,6 +16,7 @@ from google.genai.types import (
 )
 from haiway import Missing, as_dict
 
+from draive.commons import META_EMPTY
 from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
@@ -294,7 +295,7 @@ def result_part_as_content_or_call(
                 MetaContent(
                     category="thought",
                     content=TextContent(text=part.text),
-                    meta={},
+                    meta=META_EMPTY,
                 ),
             )
 

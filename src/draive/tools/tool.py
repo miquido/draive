@@ -3,7 +3,7 @@ from typing import Any, Protocol, cast, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
 
-from draive.commons import Meta
+from draive.commons import META_EMPTY, Meta
 from draive.lmm.types import (
     LMMException,
     LMMToolError,
@@ -39,7 +39,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
         format_result: Callable[[Result], Multimodal],
         format_failure: Callable[[Exception], Multimodal],
         direct_result: bool = False,
-        meta: Meta | None,
+        meta: Meta,
     ) -> None:
         super().__init__(function)
 
@@ -75,7 +75,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
         )
         self.format_result: Callable[[Result], Multimodal] = format_result
         self.format_failure: Callable[[Exception], Multimodal] = format_failure
-        self.meta: Meta | None = meta
+        self.meta: Meta = meta
 
         freeze(self)
 
@@ -319,7 +319,7 @@ def tool[**Args, Result](  # noqa: PLR0913
             format_result=format_result or _default_result_format,
             format_failure=format_failure or _default_failure_result,
             direct_result=direct_result,
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
     if function := function:

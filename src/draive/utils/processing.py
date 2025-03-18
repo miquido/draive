@@ -1,8 +1,9 @@
-from typing import Literal, Protocol, overload, runtime_checkable
+from typing import Literal, Protocol, Self, overload, runtime_checkable
+from uuid import uuid4
 
-from haiway import MissingState, State, ctx
+from haiway import Default, MissingState, State, ctx
 
-from draive.commons import Meta
+from draive.commons import META_EMPTY, Meta
 from draive.multimodal import MultimodalContent
 from draive.multimodal.content import Multimodal
 from draive.parameters import DataModel
@@ -17,10 +18,27 @@ __all__ = [
 
 
 class ProcessingEvent(DataModel):
+    @classmethod
+    def of(
+        cls,
+        identifier: str | None = None,
+        /,
+        *,
+        name: str,
+        content: Multimodal | None = None,
+        meta: Meta | None = None,
+    ) -> Self:
+        return cls(
+            identifier=identifier if identifier is not None else uuid4().hex,
+            name=name,
+            content=MultimodalContent.of(content) if content is not None else None,
+            meta=meta if meta is not None else META_EMPTY,
+        )
+
     identifier: str
     name: str
     content: MultimodalContent | None = None
-    meta: Meta | None = None
+    meta: Meta = Default(META_EMPTY)
 
 
 @runtime_checkable
@@ -176,7 +194,7 @@ class Processing(State):
                 identifier=identifier,
                 name=name,
                 content=MultimodalContent.of(content) if content is not None else None,
-                meta=meta,
+                meta=meta if meta is not None else META_EMPTY,
             )
         )
 

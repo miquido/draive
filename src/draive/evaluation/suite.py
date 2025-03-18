@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 
 from haiway import ScopeContext, asynchronous, ctx
 
-from draive.commons import Meta
+from draive.commons import META_EMPTY, Meta
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.evaluation.generator import generate_case_parameters
 from draive.evaluation.scenario import PreparedScenarioEvaluator, ScenarioEvaluatorResult
@@ -39,9 +39,9 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
     results: Sequence[ScenarioEvaluatorResult] = Field(
         description="Evaluation results",
     )
-    meta: Meta | None = Field(
+    meta: Meta = Field(
         description="Additional evaluation metadata",
-        default=None,
+        default=META_EMPTY,
     )
 
     @property
@@ -172,7 +172,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
         return cls(
             value=value,
             results=tuple(scenario_results),
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
     @classmethod
@@ -199,9 +199,9 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
     results: Sequence[ScenarioEvaluatorResult] = Field(
         description="Evaluation results",
     )
-    meta: Meta | None = Field(
+    meta: Meta = Field(
         description="Additional evaluation metadata",
-        default=None,
+        default=META_EMPTY,
     )
 
 

@@ -273,7 +273,7 @@ async def _chat_completion(  # noqa: PLR0913
 
     match completion["stopReason"]:
         case "end_turn" | "stop_sequence":
-            message_completion = LMMCompletion(content=MultimodalContent.of(*message_parts))
+            message_completion = LMMCompletion.of(MultimodalContent.of(*message_parts))
             ctx.record(ResultTrace.of(message_completion))
             return message_completion
 

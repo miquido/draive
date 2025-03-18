@@ -72,7 +72,7 @@ from draive.choice import (
     choice_completion,
     default_choice_completion,
 )
-from draive.commons import Meta, MetaPath, MetaValue
+from draive.commons import META_EMPTY, Meta, MetaPath, MetaValue
 from draive.conversation import (
     Conversation,
     ConversationElement,
@@ -242,6 +242,7 @@ from draive.utils import (
 
 __all__ = [
     "MEDIA_KINDS",
+    "META_EMPTY",
     "MISSING",
     "Agent",
     "AgentError",
