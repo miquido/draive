@@ -9,7 +9,7 @@ __all__ = [
 
 
 @runtime_checkable
-class MemoryRecall[Recalled](Protocol):
+class MemoryRecalling[Recalled](Protocol):
     async def __call__(
         self,
         **extra: Any,
@@ -17,7 +17,7 @@ class MemoryRecall[Recalled](Protocol):
 
 
 @runtime_checkable
-class MemoryRemember[Remembered](Protocol):
+class MemoryRemembering[Remembered](Protocol):
     async def __call__(
         self,
         *items: Remembered,
@@ -115,5 +115,5 @@ class Memory[Recalled, Remembered](State):
             remember=remember,
         )
 
-    recall: MemoryRecall[Recalled]
-    remember: MemoryRemember[Remembered]
+    recall: MemoryRecalling[Recalled]
+    remember: MemoryRemembering[Remembered]

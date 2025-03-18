@@ -14,13 +14,12 @@ __all__ = [
 def vector_similarity_search(
     query_vector: NDArray[Any] | Sequence[float],
     values_vectors: Sequence[NDArray[Any]] | Sequence[Sequence[float]],
-    limit: int,
+    limit: int | None = None,
     score_threshold: float | None = None,
     similarity: Callable[
         [list[NDArray[Any]] | NDArray[Any], list[NDArray[Any]] | NDArray[Any]], NDArray[Any]
     ] = cosine_similarity,
 ) -> Sequence[int]:
-    assert limit > 0  # nosec: B101
     if not values_vectors:
         return []
 
@@ -30,16 +29,18 @@ def vector_similarity_search(
     values: NDArray[Any] = np.array(values_vectors)
     matching_scores: NDArray[Any] = similarity(values, query)
     sorted_indices: list[int] = list(reversed(np.argsort(matching_scores)))
+    if limit is not None:
+        sorted_indices = sorted_indices[:limit]
 
     if score_threshold:
         return [
             int(idx)
             for idx in sorted_indices  # pyright: ignore[reportUnknownVariableType]
             if matching_scores[idx] > score_threshold  # pyright: ignore[reportUnknownArgumentType]
-        ][:limit]
+        ]
 
     else:
         return [
             int(idx)
             for idx in sorted_indices  # pyright: ignore[reportUnknownVariableType]
-        ][:limit]
+        ]
