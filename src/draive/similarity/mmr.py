@@ -14,15 +14,21 @@ __all__ = [
 def mmr_vector_similarity_search(
     query_vector: NDArray[Any] | Sequence[float],
     values_vectors: Sequence[NDArray[Any]] | Sequence[Sequence[float]],
-    limit: int,
+    limit: int | None = None,
     lambda_multiplier: float = 0.5,
     similarity: Callable[
         [list[NDArray[Any]] | NDArray[Any], list[NDArray[Any]] | NDArray[Any]], NDArray[Any]
     ] = cosine_similarity,
 ) -> Sequence[int]:
-    assert limit > 0  # nosec: B101
     if not values_vectors:
         return []
+
+    results_limit: int
+    if limit is not None:
+        results_limit = min(limit, len(values_vectors))
+
+    else:
+        results_limit = len(values_vectors)
 
     query: NDArray[Any] = np.array(query_vector)
     if query.ndim == 1:
@@ -36,8 +42,8 @@ def mmr_vector_similarity_search(
     selected_indices: list[int] = [most_similar]
     selected: NDArray[Any] = np.array([values[most_similar]])
 
-    # then look one by one next best matches until the limit or end of alternatives
-    while len(selected_indices) < limit and len(selected_indices) < len(values_vectors):
+    # then look one by one next best matches until the limit
+    while len(selected_indices) < results_limit:
         best_score: float = -np.inf
         best_index: int = -1
         # count similarity to already selected results

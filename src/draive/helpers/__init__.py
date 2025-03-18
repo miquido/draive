@@ -3,17 +3,11 @@ from draive.helpers.usage_cost import (
     TokenPrice,
     usage_cost,
 )
-from draive.helpers.vector_index import (
-    VectorIndex,
-    VectorIndexing,
-    VectorSearching,
-)
+from draive.helpers.volatile_vector_index import VolatileVectorIndex
 
 __all__ = [
     "ModelTokenPrice",
     "TokenPrice",
-    "VectorIndex",
-    "VectorIndexing",
-    "VectorSearching",
+    "VolatileVectorIndex",
     "usage_cost",
 ]

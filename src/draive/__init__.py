@@ -106,9 +106,6 @@ from draive.generation import (
 from draive.helpers import (
     ModelTokenPrice,
     TokenPrice,
-    VectorIndex,
-    VectorIndexing,
-    VectorSearching,
     usage_cost,
 )
 from draive.instructions import (
@@ -239,6 +236,7 @@ from draive.utils import (
     ProcessingStateReading,
     ProcessingStateWriting,
     RateLimitError,
+    VectorIndex,
     split_sequence,
 )
 
@@ -386,8 +384,6 @@ __all__ = [
     "ToolsFetching",
     "ValueEmbedder",
     "VectorIndex",
-    "VectorIndexing",
-    "VectorSearching",
     "agent",
     "always",
     "as_dict",
