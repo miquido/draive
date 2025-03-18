@@ -2,9 +2,7 @@ from draive.utils.memory import Memory
 from draive.utils.processing import (
     Processing,
     ProcessingEvent,
-    ProcessingEventReporting,
-    ProcessingStateReading,
-    ProcessingStateWriting,
+    ProcessingState,
 )
 from draive.utils.rate_limit import RateLimitError
 from draive.utils.splitting import split_sequence
@@ -18,9 +16,7 @@ __all__ = [
     "Memory",
     "Processing",
     "ProcessingEvent",
-    "ProcessingEventReporting",
-    "ProcessingStateReading",
-    "ProcessingStateWriting",
+    "ProcessingState",
     "RateLimitError",
     "VectorIndex",
     "split_sequence",
