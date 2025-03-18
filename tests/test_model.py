@@ -274,11 +274,11 @@ basic_conversation_message_json: str = """\
         "parts": [
             {
                 "text": "string",
-                "meta": null
+                "meta": {}
             }
         ]
     },
-    "meta": null
+    "meta": {}
 }\
 """
 
@@ -298,11 +298,11 @@ media_url_conversation_message_json: str = """\
             {
                 "media": "image/png",
                 "source": "https://miquido.com/image",
-                "meta": null
+                "meta": {}
             }
         ]
     },
-    "meta": null
+    "meta": {}
 }\
 """
 
@@ -322,11 +322,11 @@ media_data_conversation_message_json: str = """\
             {
                 "media": "image/png",
                 "source": "aW1hZ2VfZGF0YQ==",
-                "meta": null
+                "meta": {}
             }
         ]
     },
-    "meta": null
+    "meta": {}
 }\
 """
 

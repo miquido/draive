@@ -3,7 +3,9 @@ from datetime import datetime
 from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
 from uuid import uuid4
 
-from draive.commons import Meta
+from haiway import Default
+
+from draive.commons import META_EMPTY, Meta
 from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
@@ -15,7 +17,7 @@ from draive.multimodal import (
     Multimodal,
     MultimodalContent,
 )
-from draive.parameters import DataModel, Field
+from draive.parameters import DataModel
 from draive.prompts import Prompt
 from draive.tools import Toolbox
 from draive.utils import Memory, ProcessingEvent
@@ -44,7 +46,7 @@ class ConversationMessage(DataModel):
             author=author,
             created=created,
             content=MultimodalContent.of(content),
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
     @classmethod
@@ -62,15 +64,15 @@ class ConversationMessage(DataModel):
             author=author,
             created=created,
             content=MultimodalContent.of(content),
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
-    identifier: str = Field(default_factory=lambda: uuid4().hex)
+    identifier: str = Default(factory=lambda: uuid4().hex)
     role: Literal["user", "model"]
     author: str | None = None
     created: datetime | None = None
     content: MultimodalContent
-    meta: Meta | None = None
+    meta: Meta = Default(META_EMPTY)
 
     def as_lmm_context_element(self) -> LMMContextElement:
         match self.role:

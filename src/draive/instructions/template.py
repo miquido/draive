@@ -3,7 +3,7 @@ from typing import Protocol, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
 
-from draive.commons import Meta
+from draive.commons import META_EMPTY, Meta
 from draive.instructions.types import (
     Instruction,
     InstructionDeclaration,
@@ -41,7 +41,7 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
                 )
                 for parameter in self._parameters.values()
             ],
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
         freeze(self)

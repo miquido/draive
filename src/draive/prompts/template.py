@@ -3,7 +3,7 @@ from typing import Protocol, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
 
-from draive.commons import Meta
+from draive.commons import META_EMPTY, Meta
 from draive.lmm import LMMContext
 from draive.parameters import ParametrizedFunction
 from draive.prompts.types import Prompt, PromptDeclaration, PromptDeclarationArgument
@@ -44,7 +44,7 @@ class PromptTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, LM
                 )
                 for parameter in self._parameters.values()
             ],
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
         self._check_availability: PromptAvailabilityCheck = availability_check or (
             lambda: True  # available by default

@@ -25,6 +25,7 @@ from draive.anthropic.lmm import (
 )
 from draive.anthropic.types import AnthropicException
 from draive.anthropic.utils import unwrap_missing
+from draive.commons import META_EMPTY
 from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
@@ -95,7 +96,11 @@ class AnthropicLMMInvoking(AnthropicAPI):
                     {
                         "role": "assistant",
                         "content": [
-                            convert_content_element(element) for element in response_prefill.parts
+                            convert_content_element(
+                                element,
+                                cache=False,
+                            )
+                            for element in response_prefill.parts
                         ],
                     }
                 )
@@ -137,8 +142,10 @@ class AnthropicLMMInvoking(AnthropicAPI):
             ctx.record(
                 TokenUsage.for_model(
                     completion.model,
-                    input_tokens=completion.usage.input_tokens,
-                    # TODO: should we count cache_creation_input_tokens as well?
+                    # NOTE: cache input tokens are charged extra
+                    # we are not handling it that specific though
+                    input_tokens=completion.usage.input_tokens
+                    + (completion.usage.cache_creation_input_tokens or 0),
                     cached_tokens=completion.usage.cache_read_input_tokens,
                     output_tokens=completion.usage.output_tokens,
                 ),
@@ -215,6 +222,7 @@ class AnthropicLMMInvoking(AnthropicAPI):
                         )
                         for call in tool_calls
                     ],
+                    meta=META_EMPTY,
                 )
                 ctx.record(ResultTrace.of(completion_tool_calls))
                 return completion_tool_calls

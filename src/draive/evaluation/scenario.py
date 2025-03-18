@@ -4,7 +4,7 @@ from typing import Protocol, Self, cast, overload, runtime_checkable
 
 from haiway import AttributePath, ScopeContext, ctx, freeze
 
-from draive.commons import Meta
+from draive.commons import META_EMPTY, Meta
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.parameters import DataModel, Field
 
@@ -24,9 +24,9 @@ class ScenarioEvaluatorResult(DataModel):
     evaluations: Sequence[EvaluatorResult] = Field(
         description="Scenario evaluation results",
     )
-    meta: Meta | None = Field(
+    meta: Meta = Field(
         description="Additional evaluation metadata",
-        default=None,
+        default=META_EMPTY,
     )
 
     @property
@@ -94,15 +94,15 @@ class EvaluationScenarioResult(DataModel):
                     return_exceptions=False,
                 ),
             ),
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
     evaluations: Sequence[EvaluatorResult] = Field(
         description="Scenario evaluation results",
     )
-    meta: Meta | None = Field(
+    meta: Meta = Field(
         description="Additional evaluation metadata",
-        default=None,
+        default=META_EMPTY,
     )
 
 
@@ -140,7 +140,7 @@ class ScenarioEvaluator[Value, **Args]:
         self.name: str = name
         self._definition: ScenarioEvaluatorDefinition[Value, Args] = definition
         self._execution_context: ScopeContext | None = execution_context
-        self.meta: Meta | None = meta
+        self.meta: Meta = meta if meta is not None else META_EMPTY
 
         freeze(self)
 
@@ -255,7 +255,7 @@ class ScenarioEvaluator[Value, **Args]:
                 **kwargs,
             ):
                 case EvaluationScenarioResult() as result:
-                    meta: Meta | None
+                    meta: Meta
                     if self.meta:
                         if result.meta:
                             meta = {**self.meta, **result.meta}
@@ -263,11 +263,8 @@ class ScenarioEvaluator[Value, **Args]:
                         else:
                             meta = self.meta
 
-                    elif result.meta:
-                        meta = result.meta
-
                     else:
-                        meta = None
+                        meta = result.meta
 
                     return ScenarioEvaluatorResult(
                         name=self.name,

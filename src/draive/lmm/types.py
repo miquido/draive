@@ -8,12 +8,12 @@ from typing import (
     runtime_checkable,
 )
 
-from haiway import State
+from haiway import Default, State
 
-from draive.commons import Meta
+from draive.commons import META_EMPTY, Meta
 from draive.instructions import Instruction
 from draive.multimodal import Multimodal, MultimodalContent
-from draive.parameters import DataModel, Field, ParametersSpecification
+from draive.parameters import DataModel, ParametersSpecification
 
 __all__ = [
     "LMMCompletion",
@@ -78,11 +78,11 @@ class LMMInput(DataModel):
     ) -> Self:
         return cls(
             content=MultimodalContent.of(content),
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
     content: MultimodalContent
-    meta: Meta | None = None
+    meta: Meta = Default(META_EMPTY)
 
     def __bool__(self) -> bool:
         return bool(self.content)
@@ -98,11 +98,11 @@ class LMMCompletion(DataModel):
     ) -> Self:
         return cls(
             content=MultimodalContent.of(content),
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
     content: MultimodalContent
-    meta: Meta | None = None
+    meta: Meta = Default(META_EMPTY)
 
     def __bool__(self) -> bool:
         return bool(self.content)
@@ -117,20 +117,63 @@ class LMMToolResponse(DataModel):
 
 
 class LMMToolResponses(DataModel):
+    @classmethod
+    def of(
+        cls,
+        responses: Sequence[LMMToolResponse],
+        /,
+        meta: Meta | None = None,
+    ) -> Self:
+        return cls(
+            responses=responses,
+            meta=meta if meta is not None else META_EMPTY,
+        )
+
     responses: Sequence[LMMToolResponse]
-    meta: Meta | None = None
+    meta: Meta = Default(META_EMPTY)
 
 
 class LMMToolRequest(DataModel):
+    @classmethod
+    def of(
+        cls,
+        identifier: str,
+        /,
+        tool: str,
+        arguments: Mapping[str, Any] | None = None,
+        meta: Meta | None = None,
+    ) -> Self:
+        return cls(
+            identifier=identifier,
+            tool=tool,
+            arguments=arguments if arguments is not None else {},
+            meta=meta if meta is not None else META_EMPTY,
+        )
+
     identifier: str
     tool: str
-    arguments: Mapping[str, Any] = Field(default_factory=dict)
+    arguments: Mapping[str, Any] = Default(factory=dict)
+    meta: Meta = Default(META_EMPTY)
 
 
 class LMMToolRequests(DataModel):
-    content: MultimodalContent | None = None
+    @classmethod
+    def of(
+        cls,
+        requests: Sequence[LMMToolRequest],
+        /,
+        content: MultimodalContent | None = None,
+        meta: Meta | None = None,
+    ) -> Self:
+        return cls(
+            requests=requests,
+            content=content,
+            meta=meta if meta is not None else META_EMPTY,
+        )
+
     requests: Sequence[LMMToolRequest]
-    meta: Meta | None = None
+    content: MultimodalContent | None = None
+    meta: Meta = Default(META_EMPTY)
 
 
 LMMContextElement = LMMInput | LMMCompletion | LMMToolRequests | LMMToolResponses
@@ -150,12 +193,12 @@ class LMMStreamChunk(DataModel):
         return cls(
             content=MultimodalContent.of(content),
             eod=eod,
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
     content: MultimodalContent
     eod: bool
-    meta: Meta | None = None
+    meta: Meta = Default(META_EMPTY)
 
     def __bool__(self) -> bool:
         return bool(self.content)

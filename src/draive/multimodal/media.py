@@ -2,7 +2,9 @@ from base64 import b64decode, b64encode
 from collections.abc import Sequence
 from typing import Final, Literal, Self, cast, get_args
 
-from draive.commons import Meta
+from haiway import Default
+
+from draive.commons import META_EMPTY, Meta
 from draive.multimodal.data_field import b64_or_url_field
 from draive.parameters import DataModel
 
@@ -64,7 +66,7 @@ class MediaContent(DataModel):
         return cls(
             media=media,
             source=url,
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
     @classmethod
@@ -78,7 +80,7 @@ class MediaContent(DataModel):
         return cls(
             media=media,
             source=b64decode(data),
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
     @classmethod
@@ -92,13 +94,13 @@ class MediaContent(DataModel):
         return cls(
             media=media,
             source=data,
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
     media: MediaType | MediaKind
     # special field - url string or base64 content auto converted to bytes
     source: str | bytes = b64_or_url_field()
-    meta: Meta | None = None
+    meta: Meta = Default(META_EMPTY)
 
     @property
     def kind(self) -> MediaKind:  # noqa: PLR0911

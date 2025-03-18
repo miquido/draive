@@ -3,7 +3,7 @@ from typing import Protocol, final
 
 from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
 
-from draive.commons import Meta
+from draive.commons import META_EMPTY, Meta
 from draive.parameters import ParametrizedFunction
 from draive.resources.types import Resource, ResourceContent, ResourceDeclaration
 
@@ -33,7 +33,7 @@ class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
         name: str,
         description: str | None,
         availability_check: ResourceAvailabilityCheck | None,
-        meta: Meta | None,
+        meta: Meta,
         function: Callable[Args, Coroutine[None, None, Result]],
     ) -> None:
         super().__init__(function)
@@ -107,7 +107,7 @@ def resource[**Args, Result: Sequence[Resource] | ResourceContent](  # noqa: PLR
             description=description,
             availability_check=availability_check,
             function=function,
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
     return wrap

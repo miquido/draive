@@ -2,9 +2,9 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Protocol, Self, final, overload, runtime_checkable
 from uuid import uuid4
 
-from haiway import State
+from haiway import Default, State
 
-from draive.commons import Meta
+from draive.commons import META_EMPTY, Meta
 from draive.parameters import DataModel, Field, ParameterSpecification
 
 __all__ = [
@@ -35,7 +35,7 @@ class InstructionDeclaration(DataModel):
     name: str
     description: str | None = None
     arguments: Sequence[InstructionDeclarationArgument]
-    meta: Meta | None
+    meta: Meta = Default(META_EMPTY)
 
 
 @final
@@ -105,17 +105,17 @@ class Instruction(State):
                     description=description,
                     content=content,
                     arguments=arguments,
-                    meta=meta,
+                    meta=meta if meta is not None else META_EMPTY,
                 )
 
             case instruction:
                 return instruction.updated(**arguments)
 
     name: str
-    description: str | None
+    description: str | None = None
     content: str
-    arguments: Mapping[str, str]
-    meta: Meta | None
+    arguments: Mapping[str, str] = Default(factory=dict)
+    meta: Meta = Default(META_EMPTY)
 
     def format(
         self,

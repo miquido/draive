@@ -18,6 +18,7 @@ from anthropic.types.redacted_thinking_block_param import RedactedThinkingBlockP
 from anthropic.types.thinking_block_param import ThinkingBlockParam
 from haiway import Missing
 
+from draive.commons import META_EMPTY
 from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
@@ -55,7 +56,11 @@ def context_element_as_message(
             return {
                 "role": "user",
                 "content": [
-                    convert_content_element(element=element) for element in input.content.parts
+                    convert_content_element(
+                        element=element,
+                        cache=input.meta.get("cache") == "ephemeral",
+                    )
+                    for element in input.content.parts
                 ],
             }
 
@@ -63,7 +68,11 @@ def context_element_as_message(
             return {
                 "role": "assistant",
                 "content": [
-                    convert_content_element(element=element) for element in completion.content.parts
+                    convert_content_element(
+                        element=element,
+                        cache=completion.meta.get("cache") == "ephemeral",
+                    )
+                    for element in completion.content.parts
                 ],
             }
 
@@ -73,7 +82,10 @@ def context_element_as_message(
                     "role": "assistant",
                     "content": [
                         *[
-                            convert_content_element(element=element)
+                            convert_content_element(
+                                element=element,
+                                cache=False,
+                            )
                             for element in tool_requests.content.parts
                         ],
                         *[
@@ -113,7 +125,10 @@ def context_element_as_message(
                         "content": [
                             cast(  # there will be no thinking within tool results
                                 TextBlockParam | ImageBlockParam,
-                                convert_content_element(element=part),
+                                convert_content_element(
+                                    element=part,
+                                    cache=False,
+                                ),
                             )
                             for part in response.content.parts
                         ],
@@ -125,12 +140,18 @@ def context_element_as_message(
 
 def convert_content_element(  # noqa: C901, PLR0911, PLR0912
     element: MultimodalContentElement,
+    cache: bool = False,
 ) -> TextBlockParam | ImageBlockParam | ThinkingBlockParam | RedactedThinkingBlockParam:
     match element:
         case TextContent() as text:
             return {
                 "type": "text",
                 "text": text.text,
+                "cache_control": {
+                    "type": "ephemeral",
+                }
+                if cache
+                else None,
             }
 
         case MediaContent() as media:
@@ -145,6 +166,11 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
                             "type": "url",
                             "url": url,
                         },
+                        "cache_control": {
+                            "type": "ephemeral",
+                        }
+                        if cache
+                        else None,
                     }
 
                 case bytes() as data:
@@ -155,6 +181,11 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
                             "media_type": cast(Any, media.media),
                             "data": b64encode(data).decode(),
                         },
+                        "cache_control": {
+                            "type": "ephemeral",
+                        }
+                        if cache
+                        else None,
                     }
 
         case MetaContent() as meta if meta.category == "thinking":
@@ -204,6 +235,11 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
             return {
                 "type": "text",
                 "text": data.as_json(),
+                "cache_control": {
+                    "type": "ephemeral",
+                }
+                if cache
+                else None,
             }
 
 
@@ -235,7 +271,7 @@ def content_block_as_content_element(
                 content=TextContent(
                     text=redacted_thinking.data,
                 ),
-                meta={},
+                meta=META_EMPTY,
             )
 
 

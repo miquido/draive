@@ -4,7 +4,7 @@ from typing import Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import AttributePath, ScopeContext, ctx, freeze
 
-from draive.commons import Meta
+from draive.commons import META_EMPTY, Meta
 from draive.evaluation.score import EvaluationScore
 from draive.evaluation.value import EvaluationScoreValue, evaluation_score_value
 from draive.parameters import DataModel, Field
@@ -44,7 +44,7 @@ class EvaluatorResult(DataModel):
                 comment=score_comment,
             ),
             threshold=evaluation_score_value(threshold),
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
     evaluator: str = Field(
@@ -58,9 +58,9 @@ class EvaluatorResult(DataModel):
         "a value between 0 (min) and 1 (max)",
         verifier=_verifier,
     )
-    meta: Meta | None = Field(
+    meta: Meta = Field(
         description="Additional evaluation metadata",
-        default=None,
+        default=META_EMPTY,
     )
 
     @property
@@ -149,15 +149,15 @@ class EvaluationResult(DataModel):
 
         return cls(
             score=evaluation_score,
-            meta=meta,
+            meta=meta if meta is not None else META_EMPTY,
         )
 
     score: EvaluationScore = Field(
         description="Evaluation score",
     )
-    meta: Meta | None = Field(
+    meta: Meta = Field(
         description="Additional evaluation metadata",
-        default=None,
+        default=META_EMPTY,
     )
 
 
@@ -200,7 +200,7 @@ class Evaluator[Value, **Args]:
                 evaluator="lowest",
                 score=EvaluationScore(value=1),
                 threshold=0,
-                meta=None,
+                meta=META_EMPTY,
             )
 
             for result in await gather(
@@ -228,7 +228,7 @@ class Evaluator[Value, **Args]:
                 evaluator="highest",
                 score=EvaluationScore(value=0),
                 threshold=1,
-                meta=None,
+                meta=META_EMPTY,
             )
 
             for result in await gather(
@@ -258,7 +258,7 @@ class Evaluator[Value, **Args]:
         self._execution_context: ScopeContext | None = execution_context
         self.name: str = name
         self.threshold: float = 1 if threshold is None else threshold
-        self.meta: Meta | None = meta
+        self.meta: Meta = meta if meta is not None else META_EMPTY
 
         freeze(self)
 
@@ -383,7 +383,7 @@ class Evaluator[Value, **Args]:
         **kwargs: Args.kwargs,
     ) -> EvaluatorResult:
         evaluation_score: EvaluationScore
-        evaluation_meta: Meta | None
+        evaluation_meta: Meta
         try:
             match await self._definition(
                 value,
@@ -396,15 +396,15 @@ class Evaluator[Value, **Args]:
 
                 case EvaluationScore() as score:
                     evaluation_score = score
-                    evaluation_meta = None
+                    evaluation_meta = META_EMPTY
 
                 case float() as score_value:
                     evaluation_score = EvaluationScore(value=score_value)
-                    evaluation_meta = None
+                    evaluation_meta = META_EMPTY
 
                 case passed:
                     evaluation_score = EvaluationScore(value=1 if passed else 0)
-                    evaluation_meta = None
+                    evaluation_meta = META_EMPTY
 
         except Exception as exc:
             ctx.log_error(
@@ -417,7 +417,7 @@ class Evaluator[Value, **Args]:
             )
             evaluation_meta = {"exception": str(exc)}
 
-        result_meta: Meta | None
+        result_meta: Meta
         if self.meta:
             if evaluation_meta:
                 result_meta = {**self.meta, **evaluation_meta}
@@ -425,11 +425,8 @@ class Evaluator[Value, **Args]:
             else:
                 result_meta = self.meta
 
-        elif evaluation_meta:
-            result_meta = evaluation_meta
-
         else:
-            result_meta = None
+            result_meta = evaluation_meta
 
         return EvaluatorResult(
             evaluator=self.name,
