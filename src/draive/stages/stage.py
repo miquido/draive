@@ -2,7 +2,7 @@ from asyncio import gather
 from collections.abc import Callable, Coroutine, Iterable, Sequence
 from typing import Any, ClassVar, Literal, Self, final, overload
 
-from haiway import ScopeContext, State, StateContext, ctx, traced
+from haiway import ScopeContext, State, StateContext, ctx, retry, traced
 
 from draive.instructions import Instruction
 from draive.lmm import (
@@ -854,6 +854,56 @@ class Stage:
         processing: StageProcessing = self.processing
 
         @traced(label=label)
+        async def stage(
+            *,
+            context: LMMContext,
+            result: MultimodalContent,
+        ) -> tuple[LMMContext, MultimodalContent]:
+            return await processing(
+                context=context,
+                result=result,
+            )
+
+        return self.__class__(stage)
+
+    def retry(
+        self,
+        *,
+        limit: int = 1,
+        delay: Callable[[int, Exception], float] | float | None = None,
+        catching: set[type[Exception]] | tuple[type[Exception], ...] | type[Exception] = Exception,
+    ) -> Self:
+        """
+        Creates a copy of this Stage with retry behavior added.
+
+        The returned Stage will re-execute its processing function if it raises
+        any of the exceptions specified in `catching`, up to `limit` times.
+        Retries can be delayed using a fixed `delay` in seconds or a dynamic
+        `delay` function that calculates the delay based on the retry attempt and exception.
+
+        Parameters
+        ----------
+        limit : int, optional
+            Maximum number of retry attempts. Defaults to 1.
+        delay : Callable[[int, Exception], float] | float | None, optional
+            Delay between retries in seconds. Can be a fixed float, a function
+            that accepts the retry attempt number (starting from 0) and the raised
+            exception and returns the delay, or None for no delay. Defaults to None.
+        catching : set[type[Exception]] | tuple[type[Exception], ...] | type[Exception], optional
+            Exception types to catch and retry on. Defaults to catching all Exceptions.
+
+        Returns
+        -------
+        Self
+            A new Stage instance with retry behavior.
+        """
+        processing: StageProcessing = self.processing
+
+        @retry(
+            limit=limit,
+            delay=delay,
+            catching=catching,
+        )
         async def stage(
             *,
             context: LMMContext,
