@@ -119,7 +119,7 @@ def context_element_as_content(
             )
 
 
-def content_element_as_part(  # noqa: PLR0911
+def content_element_as_part(  # noqa: C901, PLR0911
     element: MultimodalContentElement,
     /,
 ) -> PartDict:
@@ -147,8 +147,14 @@ def content_element_as_part(  # noqa: PLR0911
                         },
                     }
 
-        case MetaContent() as meta:
+        case MetaContent() as meta if meta.category == "thought":
             match meta.content:
+                case None:
+                    return {
+                        "text": "",
+                        "thought": True,
+                    }
+
                 case TextContent() as text:
                     return {
                         "text": text.text,
@@ -292,8 +298,8 @@ def result_part_as_content_or_call(
         # assuming only text thinking is possible
         if part.thought:
             result.append(
-                MetaContent(
-                    category="thought",
+                MetaContent.of(
+                    "thought",
                     content=TextContent(text=part.text),
                     meta=META_EMPTY,
                 ),

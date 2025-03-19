@@ -4,6 +4,7 @@ from collections.abc import Callable, Iterable
 from typing import Any, cast
 
 from haiway import as_dict
+from mistralai import DocumentURLChunk, ReferenceChunk
 from mistralai.models import (
     ChatCompletionRequestToolChoiceTypedDict,
     ContentChunk,
@@ -33,6 +34,7 @@ from draive.multimodal import (
     MultimodalContentElement,
     TextContent,
 )
+from draive.multimodal.meta import MetaContent
 from draive.parameters import DataModel
 
 __all__ = [
@@ -161,6 +163,25 @@ def content_chunk_as_content_element(
                         image_url.url,
                         media="image",
                     )
+
+        case ReferenceChunk() as reference:
+            return MetaContent.of(
+                "reference",
+                meta={
+                    "reference_ids": reference.reference_ids,
+                },
+            )
+
+        case DocumentURLChunk() as document:
+            return MediaContent.url(
+                document.document_url,
+                media="document",
+                meta={
+                    "document_name": document.document_name,
+                }
+                if document.document_name
+                else None,
+            )
 
         case other:
             raise MistralException("Unsupported Mistral message content chunk", other)
