@@ -268,10 +268,14 @@ def _as_string(
             return media.as_string(include_data=include_data)
 
         case MetaContent() as meta:
-            return (
-                f"<{meta.category}>"
-                f"{_as_string(meta.content, include_data=include_data)}"
-                f"</{meta.category}>"
+            return (  # perhaps, we could use meta values within xml tag?
+                (
+                    f"<{meta.category}>"
+                    f"{_as_string(meta.content, include_data=include_data)}"
+                    f"</{meta.category}>"
+                )
+                if meta.content is not None
+                else f"</{meta.category}>"
             )
 
         case DataModel() as model:

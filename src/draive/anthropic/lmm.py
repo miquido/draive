@@ -190,6 +190,13 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
 
         case MetaContent() as meta if meta.category == "thinking":
             match meta.content:
+                case None:
+                    return {
+                        "type": "thinking",
+                        "thinking": "",
+                        "signature": str(meta.meta.get("signature", "")),
+                    }
+
                 case TextContent() as text:
                     return {
                         "type": "thinking",
@@ -213,6 +220,12 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
 
         case MetaContent() as meta if meta.category == "redacted_thinking":
             match meta.content:
+                case None:
+                    return {
+                        "type": "redacted_thinking",
+                        "data": "",
+                    }
+
                 case TextContent() as text:
                     return {
                         "type": "redacted_thinking",
@@ -255,8 +268,8 @@ def content_block_as_content_element(
             )
 
         case ThinkingBlock() as thinking:
-            return MetaContent(
-                category="thinking",
+            return MetaContent.of(
+                "thinking",
                 content=TextContent(
                     text=thinking.thinking,
                 ),
@@ -266,8 +279,8 @@ def content_block_as_content_element(
             )
 
         case RedactedThinkingBlock() as redacted_thinking:
-            return MetaContent(
-                category="redacted_thinking",
+            return MetaContent.of(
+                "redacted_thinking",
                 content=TextContent(
                     text=redacted_thinking.data,
                 ),
