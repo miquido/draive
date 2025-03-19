@@ -21,6 +21,7 @@ from draive.prompts import Prompt
 from draive.stages.types import (
     StageCondition,
     StageContextTransforming,
+    StageException,
     StageMerging,
     StageProcessing,
     StageResultTransforming,
@@ -88,7 +89,7 @@ class Stage:
         Creates a Stage that inserts predefined elements into the context.
 
         This Stage adds the specified elements to the LMM context and
-        updates the result to the last provided completion value. It's useful for
+        sets the result to the last provided completion value. It's useful for
         injecting static content into a processing pipeline.
         Note that context must always end with LMMCompletion as the result.
 
@@ -571,6 +572,33 @@ class Stage:
         return cls(stage)
 
     @classmethod
+    def strip_context_tools(cls) -> Self:
+        """
+        Creates a Stage that trims the current context by removing tool calls.
+
+        Returns
+        -------
+        Self
+            A new Stage instance that removes tool-related elements from the context.
+        """
+
+        async def stage(
+            *,
+            context: LMMContext,
+            result: MultimodalContent,
+        ) -> tuple[LMMContext, MultimodalContent]:
+            return (
+                tuple(
+                    element
+                    for element in context
+                    if not isinstance(element, LMMToolRequests | LMMToolResponses)
+                ),
+                result,
+            )
+
+        return cls(stage)
+
+    @classmethod
     def access_state(
         cls,
         access: StageStateAccessing,
@@ -866,7 +894,7 @@ class Stage:
 
         return self.__class__(stage)
 
-    def retry(
+    def with_retry(
         self,
         *,
         limit: int = 1,
@@ -940,6 +968,54 @@ class Stage:
                 result=result,
             )
             return (context, processed_result)
+
+        return self.__class__(stage)
+
+    def with_volatile_tools_context(self) -> Self:
+        """
+        Creates a copy of this Stage that discards tool calls added by this stage.
+
+        The returned Stage will execute normally, but upon completion, it will
+        remove any LMMToolRequests and LMMToolResponses elements that were added
+        to the context during the execution of this specific stage. When produced
+        and a previous contexts share a common prefix with tools usage it won't be
+        removed from the result context.
+
+        Returns
+        -------
+        Stage
+            A new Stage instance that makes tool-related context elements volatile.
+        """
+        processing: StageProcessing = self.processing
+
+        async def stage(
+            *,
+            context: LMMContext,
+            result: MultimodalContent,
+        ) -> tuple[LMMContext, MultimodalContent]:
+            processed_context, processed_result = await processing(
+                context=context,
+                result=result,
+            )
+
+            common_prefix: LMMContext = tuple(
+                current
+                for previous, current in zip(
+                    context,
+                    processed_context,
+                    strict=True,
+                )
+                if current == previous
+            )
+            striped_suffix: LMMContext = tuple(
+                element
+                for element in processed_context[len(common_prefix) :]
+                if not isinstance(element, LMMToolRequests | LMMToolResponses)
+            )
+
+            merged_context: LMMContext = (*common_prefix, *striped_suffix)
+            assert not merged_context or isinstance(merged_context[-1], LMMCompletion)  # nosec: B101
+            return (merged_context, processed_result)
 
         return self.__class__(stage)
 
@@ -1137,19 +1213,27 @@ class Stage:
                 state_writing=stage_state.write,
             )
         ):
+            initial_context: LMMContext
             match context:
                 case None:
-                    _, processed = await self.processing(
-                        context=(),
-                        result=result if result is not None else MultimodalContent.empty,
-                    )
+                    initial_context = ()
 
                 case context:
                     assert not context or isinstance(context[-1], LMMCompletion)  # nosec: B101
-                    _, processed = await self.processing(
-                        context=context,
-                        result=result if result is not None else MultimodalContent.empty,
-                    )
+                    initial_context = context
+
+            try:
+                _, processed = await self.processing(
+                    context=initial_context,
+                    result=result if result is not None else MultimodalContent.empty,
+                )
+
+            except StageException as exc:
+                if exc.execution_result is not None:
+                    return exc.execution_result
+
+                else:
+                    raise exc
 
         return processed
 

@@ -7,6 +7,7 @@ from draive.multimodal import MultimodalContent
 __all__ = [
     "StageCondition",
     "StageContextTransforming",
+    "StageException",
     "StageMerging",
     "StageProcessing",
     "StageResultTransforming",
@@ -65,3 +66,13 @@ class StageContextTransforming(Protocol):
         self,
         context: LMMContext,
     ) -> LMMContext: ...
+
+
+class StageException(Exception):
+    def __init__(
+        self,
+        *args: object,
+        execution_result: MultimodalContent | None = None,
+    ) -> None:
+        super().__init__(*args)
+        self.execution_result: MultimodalContent | None = execution_result

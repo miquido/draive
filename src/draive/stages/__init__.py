@@ -2,6 +2,7 @@ from draive.stages.stage import Stage
 from draive.stages.types import (
     StageCondition,
     StageContextTransforming,
+    StageException,
     StageMerging,
     StageProcessing,
     StageResultTransforming,
@@ -12,6 +13,7 @@ __all__ = [
     "Stage",
     "StageCondition",
     "StageContextTransforming",
+    "StageException",
     "StageMerging",
     "StageProcessing",
     "StageResultTransforming",
