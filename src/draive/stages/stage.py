@@ -18,7 +18,6 @@ from draive.lmm.types import LMMContextElement
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters.model import DataModel
 from draive.prompts import Prompt
-from draive.stages.state import StageState
 from draive.stages.types import (
     StageCondition,
     StageContextTransforming,
@@ -28,6 +27,7 @@ from draive.stages.types import (
     StageStateAccessing,
 )
 from draive.tools import AnyTool, Toolbox
+from draive.utils import ProcessingState
 from draive.utils.memory import Memory
 from draive.utils.processing import Processing
 
@@ -1128,7 +1128,7 @@ class Stage:
         MultimodalContent
             The result produced by executing the Stage.
         """
-        stage_state = StageState(state)
+        stage_state = ProcessingState(state)
         with ctx.updated(
             ctx.state(Processing).updated(
                 # keep current processing unchanged
