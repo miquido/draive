@@ -35,7 +35,8 @@ sentencepiece = [
   "sentencepiece~=0.2",
 ]
 fastembed = [
-  "fastembed~=0.4",
+  "fastembed~=0.4; python_version < '3.13'",
+  "fastembed~=0.6; python_version >= '3.13'",
 ]
 cohere = [
   "cohere~=5.13"
