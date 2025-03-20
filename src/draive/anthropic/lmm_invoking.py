@@ -96,11 +96,7 @@ class AnthropicLMMInvoking(AnthropicAPI):
                     {
                         "role": "assistant",
                         "content": [
-                            convert_content_element(
-                                element,
-                                cache=False,
-                            )
-                            for element in response_prefill.parts
+                            convert_content_element(element) for element in response_prefill.parts
                         ],
                     }
                 )
