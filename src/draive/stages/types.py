@@ -8,15 +8,15 @@ __all__ = [
     "StageCondition",
     "StageContextTransforming",
     "StageException",
+    "StageExecution",
     "StageMerging",
-    "StageProcessing",
     "StageResultTransforming",
     "StageStateAccessing",
 ]
 
 
 @runtime_checkable
-class StageProcessing(Protocol):
+class StageExecution(Protocol):
     async def __call__(
         self,
         *,

@@ -3,8 +3,8 @@ from draive.stages.types import (
     StageCondition,
     StageContextTransforming,
     StageException,
+    StageExecution,
     StageMerging,
-    StageProcessing,
     StageResultTransforming,
     StageStateAccessing,
 )
@@ -14,8 +14,8 @@ __all__ = [
     "StageCondition",
     "StageContextTransforming",
     "StageException",
+    "StageExecution",
     "StageMerging",
-    "StageProcessing",
     "StageResultTransforming",
     "StageStateAccessing",
 ]

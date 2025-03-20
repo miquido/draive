@@ -2,7 +2,7 @@ from asyncio import gather
 from collections.abc import Callable, Coroutine, Iterable, Sequence
 from typing import Any, ClassVar, Literal, Self, final, overload
 
-from haiway import ScopeContext, State, StateContext, ctx, retry, traced
+from haiway import State, StateContext, ctx, retry, traced
 
 from draive.instructions import Instruction
 from draive.lmm import (
@@ -22,8 +22,8 @@ from draive.stages.types import (
     StageCondition,
     StageContextTransforming,
     StageException,
+    StageExecution,
     StageMerging,
-    StageProcessing,
     StageResultTransforming,
     StageStateAccessing,
 )
@@ -661,7 +661,7 @@ class Stage:
         Stage
             A new Stage instance that implements the looping behavior.
         """
-        stage_processing: StageProcessing = stage.processing
+        stage_execution: StageExecution = stage.execution
 
         async def stage_loop(
             *,
@@ -674,7 +674,7 @@ class Stage:
                 context=current_context,
                 result=current_result,
             ):
-                current_context, current_result = await stage_processing(
+                current_context, current_result = await stage_execution(
                     context=current_context,
                     result=current_result,
                 )
@@ -709,8 +709,8 @@ class Stage:
         Stage
             A new Stage instance that executes the provided Stages sequentially.
         """
-        stage_processings: Sequence[StageProcessing] = tuple(
-            stage.processing for stage in (stage, *stages)
+        stage_executions: Sequence[StageExecution] = tuple(
+            stage.execution for stage in (stage, *stages)
         )
 
         async def stage_sequence(
@@ -720,8 +720,8 @@ class Stage:
         ) -> tuple[LMMContext, MultimodalContent]:
             current_context: LMMContext = context
             current_result: MultimodalContent = result
-            for processings in stage_processings:
-                current_context, current_result = await processings(
+            for execution in stage_executions:
+                current_context, current_result = await execution(
                     context=current_context,
                     result=current_result,
                 )
@@ -762,8 +762,8 @@ class Stage:
         Stage
             A new Stage instance that executes Stages concurrently and merges results.
         """
-        stage_processings: Sequence[StageProcessing] = tuple(
-            stage.processing for stage in (stage, *stages)
+        stage_executions: Sequence[StageExecution] = tuple(
+            stage.execution for stage in (stage, *stages)
         )
 
         async def concurrent_stage(
@@ -776,11 +776,11 @@ class Stage:
             merged_context, merged_result = await merge(
                 branches=await gather(
                     *[
-                        processing(
+                        execution(
                             context=context,
                             result=result,
                         )
-                        for processing in stage_processings
+                        for execution in stage_executions
                     ],
                     return_exceptions=True,
                 )
@@ -790,36 +790,38 @@ class Stage:
 
         return cls(concurrent_stage)
 
-    __slots__ = ("processing",)
+    __slots__ = ("execution",)
 
     def __init__(
         self,
-        processing: StageProcessing,
+        execution: StageExecution,
         /,
     ) -> None:
-        assert not isinstance(processing, Stage)  # nosec: B101
-        assert isinstance(processing, StageProcessing)  # nosec: B101
-        self.processing: StageProcessing
+        assert not isinstance(execution, Stage)  # nosec: B101
+        assert isinstance(execution, StageExecution)  # nosec: B101
+        self.execution: StageExecution
         object.__setattr__(
             self,
-            "processing",
-            processing,
+            "execution",
+            execution,
         )
 
-    def with_execution_context(
+    def with_state_context(
         self,
-        execution_context: ScopeContext | StateContext,
+        state_context: StateContext,
         /,
     ) -> Self:
         """
-        Creates a copy of this Stage with the specified execution context applied.
+        Creates a copy of this Stage with the specified state context applied.
 
-        The returned Stage will execute within the provided execution context,
-        which affects how contextual state is accessed and modified.
+        The returned Stage will execute within the provided state context,
+        which affects what contextual state is available.
+
+        Note that Processing state will be replaced with contextual state.
 
         Parameters
         ----------
-        execution_context : ScopeContext | StateContext
+        state_context : StateContext
             The execution context to apply to the Stage.
 
         Returns
@@ -827,34 +829,19 @@ class Stage:
         Stage
             A new Stage instance that executes within the specified context.
         """
-        processing: StageProcessing = self.processing
+        execution: StageExecution = self.execution
 
-        match execution_context:
-            case StateContext() as state_context:
-
-                async def stage(
-                    *,
-                    context: LMMContext,
-                    result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
-                    with state_context:
-                        return await processing(
-                            context=context,
-                            result=result,
-                        )
-
-            case ScopeContext() as scope_context:
-
-                async def stage(
-                    *,
-                    context: LMMContext,
-                    result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
-                    async with scope_context:
-                        return await processing(
-                            context=context,
-                            result=result,
-                        )
+        async def stage(
+            *,
+            context: LMMContext,
+            result: MultimodalContent,
+        ) -> tuple[LMMContext, MultimodalContent]:
+            # preserve current Processing state by replacing it
+            with state_context.updated((ctx.state(Processing),)):
+                return await execution(
+                    context=context,
+                    result=result,
+                )
 
         return self.__class__(stage)
 
@@ -879,7 +866,7 @@ class Stage:
         Stage
             A new Stage instance with tracing enabled.
         """
-        processing: StageProcessing = self.processing
+        execution: StageExecution = self.execution
 
         @traced(label=label)
         async def stage(
@@ -887,7 +874,7 @@ class Stage:
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            return await processing(
+            return await execution(
                 context=context,
                 result=result,
             )
@@ -925,7 +912,7 @@ class Stage:
         Self
             A new Stage instance with retry behavior.
         """
-        processing: StageProcessing = self.processing
+        execution: StageExecution = self.execution
 
         @retry(
             limit=limit,
@@ -937,7 +924,7 @@ class Stage:
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            return await processing(
+            return await execution(
                 context=context,
                 result=result,
             )
@@ -956,14 +943,14 @@ class Stage:
         Stage
             A new Stage instance that discards context changes.
         """
-        processing: StageProcessing = self.processing
+        execution: StageExecution = self.execution
 
         async def stage(
             *,
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            _, processed_result = await processing(
+            _, processed_result = await execution(
                 context=context,
                 result=result,
             )
@@ -986,14 +973,14 @@ class Stage:
         Stage
             A new Stage instance that makes tool-related context elements volatile.
         """
-        processing: StageProcessing = self.processing
+        execution: StageExecution = self.execution
 
         async def stage(
             *,
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            processed_context, processed_result = await processing(
+            processed_context, processed_result = await execution(
                 context=context,
                 result=result,
             )
@@ -1057,9 +1044,9 @@ class Stage:
         >>> # Use a boolean condition with an alternative
         >>> primary_stage.when(is_premium_user, alternative=basic_stage)
         """
-        processing: StageProcessing = self.processing
-        alternative_processing: StageProcessing | None = (
-            alternative.processing if alternative else None
+        execution: StageExecution = self.execution
+        alternative_execution: StageExecution | None = (
+            alternative.execution if alternative else None
         )
 
         match condition:
@@ -1071,13 +1058,13 @@ class Stage:
                     result: MultimodalContent,
                 ) -> tuple[LMMContext, MultimodalContent]:
                     if value:
-                        return await processing(
+                        return await execution(
                             context=context,
                             result=result,
                         )
 
-                    elif alternative_processing:
-                        return await alternative_processing(
+                    elif alternative_execution:
+                        return await alternative_execution(
                             context=context,
                             result=result,
                         )
@@ -1093,13 +1080,13 @@ class Stage:
                     result: MultimodalContent,
                 ) -> tuple[LMMContext, MultimodalContent]:
                     if await function(context=context, result=result):
-                        return await processing(
+                        return await execution(
                             context=context,
                             result=result,
                         )
 
-                    elif alternative_processing:
-                        return await alternative_processing(
+                    elif alternative_execution:
+                        return await alternative_execution(
                             context=context,
                             result=result,
                         )
@@ -1121,14 +1108,14 @@ class Stage:
         Stage
             A new Stage instance that ignores its produced result.
         """
-        processing: StageProcessing = self.processing
+        execution: StageExecution = self.execution
 
         async def stage(
             *,
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            processed_context, _ = await processing(
+            processed_context, _ = await execution(
                 context=context,
                 result=result,
             )
@@ -1149,14 +1136,14 @@ class Stage:
         Stage
             A new Stage instance that extends rather than replaces the result.
         """
-        processing: StageProcessing = self.processing
+        execution: StageExecution = self.execution
 
         async def stage(
             *,
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            processed_context, processed_result = await processing(
+            processed_context, processed_result = await execution(
                 context=context,
                 result=result,
             )
@@ -1223,7 +1210,7 @@ class Stage:
                     initial_context = context
 
             try:
-                _, processed = await self.processing(
+                _, processed = await self.execution(
                     context=initial_context,
                     result=result if result is not None else MultimodalContent.empty,
                 )
