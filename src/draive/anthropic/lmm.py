@@ -48,32 +48,43 @@ __all__ = [
 ]
 
 
-def context_element_as_message(
+def context_element_as_message(  # noqa: C901
     element: LMMContextElement,
 ) -> MessageParam:
     match element:
         case LMMInput() as input:
+            message_content = [
+                convert_content_element(element=element) for element in input.content.parts
+            ]
+
+            if input.meta.get("cache") == "ephemeral":
+                for message in reversed(message_content):
+                    if message["type"] in ("text", "image"):
+                        message["cache_control"] = {  # pyright: ignore[reportGeneralTypeIssues]
+                            "type": "ephemeral",
+                        }
+                        break
+
             return {
                 "role": "user",
-                "content": [
-                    convert_content_element(
-                        element=element,
-                        cache=input.meta.get("cache") == "ephemeral",
-                    )
-                    for element in input.content.parts
-                ],
+                "content": message_content,
             }
 
         case LMMCompletion() as completion:
+            message_content = [
+                convert_content_element(element=element) for element in completion.content.parts
+            ]
+            if completion.meta.get("cache") == "ephemeral":
+                for message in reversed(message_content):
+                    if message["type"] in ("text", "image"):
+                        message["cache_control"] = {  # pyright: ignore[reportGeneralTypeIssues]
+                            "type": "ephemeral",
+                        }
+                        break
+
             return {
                 "role": "assistant",
-                "content": [
-                    convert_content_element(
-                        element=element,
-                        cache=completion.meta.get("cache") == "ephemeral",
-                    )
-                    for element in completion.content.parts
-                ],
+                "content": message_content,
             }
 
         case LMMToolRequests() as tool_requests:
@@ -82,10 +93,7 @@ def context_element_as_message(
                     "role": "assistant",
                     "content": [
                         *[
-                            convert_content_element(
-                                element=element,
-                                cache=False,
-                            )
+                            convert_content_element(element=element)
                             for element in tool_requests.content.parts
                         ],
                         *[
@@ -125,10 +133,7 @@ def context_element_as_message(
                         "content": [
                             cast(  # there will be no thinking within tool results
                                 TextBlockParam | ImageBlockParam,
-                                convert_content_element(
-                                    element=part,
-                                    cache=False,
-                                ),
+                                convert_content_element(element=part),
                             )
                             for part in response.content.parts
                         ],
@@ -140,18 +145,12 @@ def context_element_as_message(
 
 def convert_content_element(  # noqa: C901, PLR0911, PLR0912
     element: MultimodalContentElement,
-    cache: bool = False,
 ) -> TextBlockParam | ImageBlockParam | ThinkingBlockParam | RedactedThinkingBlockParam:
     match element:
         case TextContent() as text:
             return {
                 "type": "text",
                 "text": text.text,
-                "cache_control": {
-                    "type": "ephemeral",
-                }
-                if cache
-                else None,
             }
 
         case MediaContent() as media:
@@ -166,11 +165,6 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
                             "type": "url",
                             "url": url,
                         },
-                        "cache_control": {
-                            "type": "ephemeral",
-                        }
-                        if cache
-                        else None,
                     }
 
                 case bytes() as data:
@@ -181,11 +175,6 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
                             "media_type": cast(Any, media.media),
                             "data": b64encode(data).decode(),
                         },
-                        "cache_control": {
-                            "type": "ephemeral",
-                        }
-                        if cache
-                        else None,
                     }
 
         case MetaContent() as meta if meta.category == "thinking":
@@ -248,11 +237,6 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
             return {
                 "type": "text",
                 "text": data.as_json(),
-                "cache_control": {
-                    "type": "ephemeral",
-                }
-                if cache
-                else None,
             }
 
 
