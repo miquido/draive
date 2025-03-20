@@ -2,7 +2,7 @@ from asyncio import gather
 from collections.abc import Callable, Coroutine, Iterable, Sequence
 from typing import Any, ClassVar, Literal, Self, final, overload
 
-from haiway import State, StateContext, ctx, retry, traced
+from haiway import Disposable, Disposables, State, StateContext, ctx, retry, traced
 
 from draive.instructions import Instruction
 from draive.lmm import (
@@ -806,10 +806,35 @@ class Stage:
             execution,
         )
 
-    def with_state_context(
+    @overload
+    def with_context_state(
         self,
         state_context: StateContext,
         /,
+    ) -> Self: ...
+
+    @overload
+    def with_context_state(
+        self,
+        /,
+        *,
+        disposables: Disposables | Iterable[Disposable],
+    ) -> Self: ...
+
+    @overload
+    def with_context_state(
+        self,
+        state_context: State,
+        /,
+        *state: State,
+    ) -> Self: ...
+
+    def with_context_state(  # noqa: C901
+        self,
+        state: StateContext | State | None = None,
+        /,
+        *states: State,
+        disposables: Disposables | Iterable[Disposable] | None = None,
     ) -> Self:
         """
         Creates a copy of this Stage with the specified state context applied.
@@ -817,12 +842,20 @@ class Stage:
         The returned Stage will execute within the provided state context,
         which affects what contextual state is available.
 
-        Note that Processing state will be replaced with contextual state.
+        Note that Processing state will be replaced with contextual.
 
         Parameters
         ----------
-        state_context : StateContext
+        state_context : StateContext | State | None
             The execution context to apply to the Stage.
+            Can be either a whole `StateContext` or a just a `State` to update.
+        *state : State
+            Optional additional `State` objects to include in the state context.
+            Only applicable when `state_context` is a `State`.
+
+        disposables: Disposables | Iterable[Disposable] | None
+            Optional Disposables which will be used for execution of this stage.
+            State produced by disposables will be used within the context state.
 
         Returns
         -------
@@ -831,17 +864,113 @@ class Stage:
         """
         execution: StageExecution = self.execution
 
-        async def stage(
-            *,
-            context: LMMContext,
-            result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
-            # preserve current Processing state by replacing it
-            with state_context.updated((ctx.state(Processing),)):
-                return await execution(
-                    context=context,
-                    result=result,
-                )
+        resolved_disposables: Disposables | None
+        match disposables:
+            case None:
+                resolved_disposables = None
+
+            case Disposables() as disposables:
+                resolved_disposables = disposables
+
+            case iterable:
+                resolved_disposables = Disposables(*iterable)
+
+        match (state, resolved_disposables):
+            case (None, None):
+                assert not states  # nosec: B101
+                return self  # nothing to change...
+
+            case (None, disposables):
+                assert not states  # nosec: B101
+
+                async def stage(
+                    *,
+                    context: LMMContext,
+                    result: MultimodalContent,
+                ) -> tuple[LMMContext, MultimodalContent]:
+                    async with disposables as disposable_state:
+                        # preserve current Processing state by replacing it
+                        with ctx.updated(*disposable_state, ctx.state(Processing)):
+                            return await execution(
+                                context=context,
+                                result=result,
+                            )
+
+            case (StateContext() as state_context, None):
+                assert not states  # nosec: B101
+
+                async def stage(
+                    *,
+                    context: LMMContext,
+                    result: MultimodalContent,
+                ) -> tuple[LMMContext, MultimodalContent]:
+                    # it is kind of temporary solution until we figure out a better
+                    # solution for updating state on StateContext directly
+                    # preserve current Processing state by replacing it
+                    with StateContext(state=state_context._state.updated((ctx.state(Processing),))):
+                        return await execution(
+                            context=context,
+                            result=result,
+                        )
+
+            case (StateContext() as state_context, disposables):
+                assert not states  # nosec: B101
+
+                async def stage(
+                    *,
+                    context: LMMContext,
+                    result: MultimodalContent,
+                ) -> tuple[LMMContext, MultimodalContent]:
+                    async with disposables as disposable_state:
+                        # it is kind of temporary solution until we figure out a better
+                        # solution for updating state on StateContext directly
+                        with StateContext(
+                            state=state_context._state.updated(
+                                (
+                                    *disposable_state,
+                                    # preserve current Processing state by replacing it
+                                    ctx.state(Processing),
+                                )
+                            )
+                        ):
+                            return await execution(
+                                context=context,
+                                result=result,
+                            )
+
+            case (state, None):
+
+                async def stage(
+                    *,
+                    context: LMMContext,
+                    result: MultimodalContent,
+                ) -> tuple[LMMContext, MultimodalContent]:
+                    # preserve current Processing state by replacing it
+                    with ctx.updated(state, *states, ctx.state(Processing)):
+                        return await execution(
+                            context=context,
+                            result=result,
+                        )
+
+            case (state, disposables):
+
+                async def stage(
+                    *,
+                    context: LMMContext,
+                    result: MultimodalContent,
+                ) -> tuple[LMMContext, MultimodalContent]:
+                    async with disposables as disposable_state:
+                        with ctx.updated(
+                            state,
+                            *states,
+                            *disposable_state,
+                            # preserve current Processing state by replacing it
+                            ctx.state(Processing),
+                        ):
+                            return await execution(
+                                context=context,
+                                result=result,
+                            )
 
         return self.__class__(stage)
 
