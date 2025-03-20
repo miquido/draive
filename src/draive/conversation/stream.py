@@ -116,7 +116,7 @@ async def conversation_stream(
     ) -> None:
         output_queue.enqueue(event)
 
-    with ctx.updated(Processing(event_reporting=report_event)):
+    with ctx.updated(ctx.state(Processing).updated(event_reporting=report_event)):
         lmm_task = _spawn_lmm_handler(
             input_queue=input_queue,
             output_queue=output_queue,
