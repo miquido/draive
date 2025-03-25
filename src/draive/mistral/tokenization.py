@@ -1,7 +1,5 @@
 from pathlib import Path
 
-from haiway import cache
-
 from draive.mistral.api import MistralAPI
 from draive.sentencepiece import sentencepiece_processor, sentencepiece_tokenizer
 from draive.tokenization import Tokenization
@@ -12,7 +10,6 @@ __all__ = [
 
 
 class MistralTokenization(MistralAPI):
-    @cache(limit=2)
     async def tokenizer(
         self,
         model_name: str,

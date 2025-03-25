@@ -12,7 +12,6 @@ __all__ = [
 
 
 class OpenAITokenization(OpenAIAPI):
-    @cache(limit=2)
     async def tokenizer(
         self,
         model_name: str,
@@ -32,6 +31,6 @@ class OpenAITokenization(OpenAIAPI):
         return Tokenization(tokenize_text=openai_tokenize_text)
 
 
-@cache(limit=4)
+@cache(limit=1)
 def _encoding(model_name: str) -> Encoding:
     return encoding_for_model(model_name=model_name)

@@ -1,6 +1,6 @@
 from typing import Any, cast
 
-from haiway import asynchronous
+from haiway import asynchronous, cache
 from sentencepiece import SentencePieceProcessor  # pyright: ignore[reportMissingTypeStubs]
 
 from draive.tokenization import TextTokenizing
@@ -28,6 +28,7 @@ def sentencepiece_tokenizer(
 
 
 @asynchronous
+@cache(limit=1)
 def sentencepiece_processor(
     *,
     model_path: str,
