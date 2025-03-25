@@ -29,7 +29,8 @@ class MistralAPI:
         )
 
     async def _initialize_client(self) -> None:
-        await self._client.sdk_configuration.async_client.aclose()
+        if self._client.sdk_configuration.async_client is not None:
+            await self._client.sdk_configuration.async_client.aclose()
         self._client = self._prepare_client()
         await self._client.__aenter__()
 

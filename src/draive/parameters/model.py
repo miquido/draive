@@ -20,7 +20,7 @@ from typing import (
 from uuid import UUID
 from weakref import WeakValueDictionary
 
-from haiway import MISSING, AttributePath, DefaultValue, Missing, cache, not_missing
+from haiway import MISSING, AttributePath, DefaultValue, Missing, not_missing
 from haiway.state import AttributeAnnotation, attribute_annotations
 
 from draive.parameters.parameter import Parameter
@@ -676,7 +676,6 @@ class DataModel(metaclass=DataModelMeta):
         return self  # DataModel is immutable, no need to provide an actual copy
 
     @classmethod
-    @cache(limit=2)
     def json_schema(
         cls,
         indent: int | None = None,
@@ -687,7 +686,6 @@ class DataModel(metaclass=DataModelMeta):
         )
 
     @classmethod
-    @cache(limit=2)
     def simplified_schema(
         cls,
         indent: int | None = None,

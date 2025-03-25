@@ -1,8 +1,8 @@
 from asyncio import gather
-from collections.abc import Callable, Coroutine, Iterable, Sequence
-from typing import Any, ClassVar, Literal, Self, final, overload
+from collections.abc import Callable, Coroutine, Hashable, Iterable, Sequence
+from typing import Any, ClassVar, Literal, Protocol, Self, cast, final, overload
 
-from haiway import Disposable, Disposables, State, StateContext, ctx, retry, traced
+from haiway import Disposable, Disposables, State, StateContext, cache, ctx, retry, traced
 
 from draive.instructions import Instruction
 from draive.lmm import (
@@ -35,6 +35,30 @@ from draive.utils.processing import Processing
 __all__ = [
     "Stage",
 ]
+
+
+class MakeCacheKey[Key](Protocol):
+    def __call__(
+        self,
+        *,
+        context: LMMContext,
+        result: MultimodalContent,
+    ) -> Key: ...
+
+
+class ReadCache[Key](Protocol):
+    async def __call__(
+        self,
+        key: Key,
+    ) -> tuple[LMMContext, MultimodalContent] | None: ...
+
+
+class WriteCache[Key](Protocol):
+    async def __call__(
+        self,
+        key: Key,
+        value: tuple[LMMContext, MultimodalContent],
+    ) -> None: ...
 
 
 @final
@@ -261,11 +285,11 @@ class Stage:
         ----------
         input : Prompt | Multimodal
             The input content to provide to the LMM, either as a Prompt or Multimodal.
-        instruction : Instruction | str | None, optional
+        instruction : Instruction | str | None
             Optional instruction or guidance for the LMM.
-        tools : Toolbox | Iterable[AnyTool] | None, optional
+        tools : Toolbox | Iterable[AnyTool] | None
             Optional tools that the LMM can use during completion generation.
-        output : LMMOutputSelection, optional
+        output : LMMOutputSelection
             Controls the modality/type of the generated completion, default is "auto".
         **extra : Any
             Additional parameters to pass to the LMM invocation.
@@ -340,11 +364,11 @@ class Stage:
         input : Callable[[], Coroutine[None, None, Multimodal]]
             An async function that returns the input content to provide to the LMM.
             This function will be awaited during stage execution.
-        instruction : Instruction | str | None, optional
+        instruction : Instruction | str | None
             Optional instruction or guidance for the LMM.
-        tools : Toolbox | Iterable[AnyTool] | None, optional
+        tools : Toolbox | Iterable[AnyTool] | None
             Optional tools that the LMM can use during completion generation.
-        output : LMMOutputSelection, optional
+        output : LMMOutputSelection
             Controls the modality/type of the generated completion, default is "auto".
         **extra : Any
             Additional parameters to pass to the LMM invocation.
@@ -405,11 +429,11 @@ class Stage:
 
         Parameters
         ----------
-        instruction : Instruction | str | None, optional
+        instruction : Instruction | str | None
             Optional instruction or guidance for the LMM.
-        tools : Toolbox | Iterable[AnyTool] | None, optional
+        tools : Toolbox | Iterable[AnyTool] | None
             Optional tools that the LMM can use during completion generation.
-        output : LMMOutputSelection, optional
+        output : LMMOutputSelection
             Controls the modality/type of the generated completion, default is "auto".
         **extra : Any
             Additional parameters to pass to the LMM invocation.
@@ -526,7 +550,7 @@ class Stage:
 
         Parameters
         ----------
-        limit : slice | int | None, optional
+        limit : slice | int | None
             Specifies how to trim the context:
             - None: Clear the context completely
             - int: Keep only the first N elements
@@ -995,20 +1019,91 @@ class Stage:
         Stage
             A new Stage instance with tracing enabled.
         """
-        execution: StageExecution = self.execution
 
-        @traced(label=label)
-        async def stage(
-            *,
-            context: LMMContext,
-            result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
-            return await execution(
-                context=context,
-                result=result,
+        return self.__class__(traced(label=label)(self.execution))
+
+    @overload
+    def cached[Key: Hashable](
+        self,
+        *,
+        limit: int | None = None,
+        expiration: float | None = None,
+        make_key: MakeCacheKey[Key] | None = None,
+    ) -> Self: ...
+
+    @overload
+    def cached[Key](
+        self,
+        *,
+        make_key: MakeCacheKey[Key],
+        read: ReadCache[Key],
+        write: WriteCache[Key],
+    ) -> Self: ...
+
+    def cached[Key](
+        self,
+        *,
+        limit: int | None = None,
+        expiration: float | None = None,
+        make_key: MakeCacheKey[Key] | None = None,
+        read: ReadCache[Key] | None = None,
+        write: WriteCache[Key] | None = None,
+    ) -> Self:
+        """
+        Creates a copy of this Stage with caching enabled.
+
+        The returned Stage will provide the same context and result as the last execution
+        if cache keys match.
+        Note that the result will be the exact same context and result each time regarless
+        of cached stage actual execution assuming no side effects or processing state changes
+        are produced within cached stage.
+
+        Parameters
+        ----------
+        limit : int | None
+            Maximum number of entries to store in the cache. If None, cache size is
+            one. Ignored when using custom read and write.
+        expiration : float | None
+            Time in seconds after which cache entries expire. If None, entries never
+            expire. Ignored when using custom read and write.
+        make_key : MakeCacheKey[Key] | None
+            Custom function to generate cache keys from execution inputs. The function
+            should accept context and result parameters and return a hashable value
+            uniquely identifying the inputs.
+        read : ReadCache[Key] | None
+            Custom function to retrieve cached values. Must be provided together with
+            `write` and `make_key`.
+        write : WriteCache[Key] | None
+            Custom function to store values in cache. Must be provided together with
+            `read` and `make_key`.
+
+        Returns
+        -------
+        Self
+            A new Stage instance with caching enabled.
+        """
+
+        if read is not None and write is not None and make_key is not None:
+            return self.__class__(
+                cast(
+                    StageExecution,
+                    cache(
+                        make_key=make_key,
+                        read=read,
+                        write=write,
+                    )(self.execution),
+                )
             )
 
-        return self.__class__(stage)
+        else:
+            assert read is None and write is None and make_key is None  # nosec: B101
+            return self.__class__(
+                cache(
+                    limit=limit,
+                    expiration=expiration,
+                    make_key=make_key,
+                )(self.execution)
+            )
 
     def with_retry(
         self,
@@ -1027,13 +1122,13 @@ class Stage:
 
         Parameters
         ----------
-        limit : int, optional
+        limit : int
             Maximum number of retry attempts. Defaults to 1.
-        delay : Callable[[int, Exception], float] | float | None, optional
+        delay : Callable[[int, Exception], float] | float | None
             Delay between retries in seconds. Can be a fixed float, a function
             that accepts the retry attempt number (starting from 0) and the raised
             exception and returns the delay, or None for no delay. Defaults to None.
-        catching : set[type[Exception]] | tuple[type[Exception], ...] | type[Exception], optional
+        catching : set[type[Exception]] | tuple[type[Exception], ...] | type[Exception]
             Exception types to catch and retry on. Defaults to catching all Exceptions.
 
         Returns
@@ -1041,24 +1136,14 @@ class Stage:
         Self
             A new Stage instance with retry behavior.
         """
-        execution: StageExecution = self.execution
 
-        @retry(
-            limit=limit,
-            delay=delay,
-            catching=catching,
+        return self.__class__(
+            retry(
+                limit=limit,
+                delay=delay,
+                catching=catching,
+            )(self.execution)
         )
-        async def stage(
-            *,
-            context: LMMContext,
-            result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
-            return await execution(
-                context=context,
-                result=result,
-            )
-
-        return self.__class__(stage)
 
     def with_volatile_context(self) -> Self:
         """
@@ -1154,7 +1239,7 @@ class Stage:
         condition : StageCondition | bool
             A boolean value or function that determines whether this Stage executes.
             If a function is provided, it will be called with the current context and result.
-        alternative : Stage | None, optional
+        alternative : Stage | None
             Optional Stage to execute when the condition is not met.
 
         Returns
@@ -1308,11 +1393,11 @@ class Stage:
 
         Parameters
         ----------
-        context : Prompt | LMMContext | None, optional
+        context : Prompt | LMMContext | None
             The initial LMM context to use, or None to use an empty context.
-        result : MultimodalContent | None, optional
+        result : MultimodalContent | None
             The initial result value to use, or None to use an empty result.
-        state : Iterable[DataModel | State] | None, optional
+        state : Iterable[DataModel | State] | None
             The initial state models to use, or None to use an empty state.
 
         Returns
