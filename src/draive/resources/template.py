@@ -69,8 +69,11 @@ class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
             ctx.record(ArgumentsTrace.of(*args, **kwargs))
             try:
                 result = Resource(
+                    name=self.declaration.name,
+                    description=self.declaration.description,
                     uri=self.uri,
                     content=await super().__call__(*args, **kwargs),  # pyright: ignore[reportCallIssue],
+                    meta=self.declaration.meta,
                 )
                 ctx.record(ResultTrace.of(result))
 

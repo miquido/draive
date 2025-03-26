@@ -115,7 +115,9 @@ class AnthropicLMMInvoking(AnthropicAPI):
                     temperature=completion_config.temperature,
                     top_p=unwrap_missing(completion_config.top_p),
                     max_tokens=completion_config.max_tokens,
-                    thinking=thinking_budget_as_config(completion_config.thinking_tokens_budget),
+                    thinking=thinking_budget_as_config(completion_config.thinking_tokens_budget)
+                    if self._provider == "anthropic"
+                    else NOT_GIVEN,  # bedrock does not support thinking yet
                     tools=tools_list,
                     tool_choice=tool_choice,
                     stop_sequences=as_list(cast(Sequence[str], completion_config.stop_sequences))
