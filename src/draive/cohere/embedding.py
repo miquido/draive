@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from itertools import chain
 from typing import Any, cast
 
-from cohere import EmbedResponse
+from cohere import EmbedByTypeResponse
 from haiway import as_list, ctx
 
 from draive.cohere.api import CohereAPI
@@ -40,14 +40,13 @@ class CohereEmbedding(CohereAPI):
         with ctx.scope("cohere_text_embedding", embedding_config):
             ctx.record(embedding_config)
             texts: list[str] = as_list(values)
-            responses: list[EmbedResponse] = await gather(
+            responses: list[EmbedByTypeResponse] = await gather(
                 *[
                     self._client.embed(
                         model=embedding_config.model,
                         texts=texts[index : index + embedding_config.batch_size],
                         embedding_types=["float"],
                         input_type=embedding_config.purpose,
-                        batching=False,
                     )
                     for index in range(0, len(texts), embedding_config.batch_size)
                 ]
@@ -62,9 +61,7 @@ class CohereEmbedding(CohereAPI):
                     texts,
                     chain.from_iterable(
                         [
-                            cast(list[list[float]], response.embeddings)
-                            if response.response_type == "embeddings_floats"
-                            else cast(list[list[float]], response.embeddings.float_)
+                            cast(list[list[float]], response.embeddings.float_)
                             for response in responses
                         ]
                     ),
@@ -95,7 +92,7 @@ class CohereEmbedding(CohereAPI):
         with ctx.scope("cohere_image_embedding", embedding_config):
             ctx.record(embedding_config)
             images: list[bytes] = as_list(values)
-            responses: list[EmbedResponse] = await gather(
+            responses: list[EmbedByTypeResponse] = await gather(
                 *[
                     self._client.embed(
                         model=embedding_config.model,
@@ -105,7 +102,6 @@ class CohereEmbedding(CohereAPI):
                         ],
                         embedding_types=["float"],
                         input_type="image",
-                        batching=False,
                     )
                     for index in range(0, len(images), embedding_config.batch_size)
                 ]
@@ -120,9 +116,7 @@ class CohereEmbedding(CohereAPI):
                     images,
                     chain.from_iterable(
                         [
-                            cast(list[list[float]], response.embeddings)
-                            if response.response_type == "embeddings_floats"
-                            else cast(list[list[float]], response.embeddings.float_)
+                            cast(list[list[float]], response.embeddings.float_)
                             for response in responses
                         ]
                     ),
