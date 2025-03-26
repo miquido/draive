@@ -459,10 +459,21 @@ class Stage:
                 ctx.log_warning("loopback_completion has been skipped due to invalid context")
                 return (context, result)
 
+            # Find the index of the last LMMInput in the context
+            last_input_idx = -1
+            for idx, element in enumerate(reversed(context)):
+                if isinstance(element, LMMInput):
+                    last_input_idx = len(context) - idx - 1
+                    break
+
+            else:
+                ctx.log_warning("loopback_completion could not find an LMMInput in the context")
+                return (context, result)
+
             return await _lmm_completion(
                 instruction=instruction,
                 # skipping meta as it is no longer applicable to input converted from output
-                context=(*context[:-2], LMMInput.of(context[-1].content)),
+                context=(*context[:last_input_idx], LMMInput.of(context[-1].content)),
                 toolbox=toolbox,
                 output=output,
                 **extra,
@@ -664,6 +675,10 @@ class Stage:
         /,
         *,
         condition: StageCondition,
+        mode: Literal[
+            "pre_check",
+            "post_check",
+        ] = "post_check",
     ) -> Self:
         """
         Creates a Stage that executes another Stage in a loop while a condition is met.
@@ -679,6 +694,10 @@ class Stage:
             A function that determines whether to continue looping. It should be
             an async function that accepts the current context and result and returns
             a boolean.
+        mode: Literal["while", "do-while"]
+            A loop mode determining the first condition check behavior.
+            "pre_check" will check the condition before executing stage
+            "post_check" will check the condition affter executing stage
 
         Returns
         -------
@@ -687,24 +706,53 @@ class Stage:
         """
         stage_execution: StageExecution = stage.execution
 
-        async def stage_loop(
-            *,
-            context: LMMContext,
-            result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
-            current_context: LMMContext = context
-            current_result: MultimodalContent = result
-            while await condition(
-                context=current_context,
-                result=current_result,
-            ):
-                current_context, current_result = await stage_execution(
-                    context=current_context,
-                    result=current_result,
-                )
-                assert not current_context or isinstance(current_context[-1], LMMCompletion)  # nosec: B101
+        match mode:
+            case "pre_check":
 
-            return (current_context, current_result)
+                async def stage_loop(
+                    *,
+                    context: LMMContext,
+                    result: MultimodalContent,
+                ) -> tuple[LMMContext, MultimodalContent]:
+                    current_context: LMMContext = context
+                    current_result: MultimodalContent = result
+
+                    while await condition(
+                        context=current_context,
+                        result=current_result,
+                    ):
+                        current_context, current_result = await stage_execution(
+                            context=current_context,
+                            result=current_result,
+                        )
+                        assert not current_context or isinstance(current_context[-1], LMMCompletion)  # nosec: B101
+
+                    return (current_context, current_result)
+
+            case "post_check":
+
+                async def stage_loop(
+                    *,
+                    context: LMMContext,
+                    result: MultimodalContent,
+                ) -> tuple[LMMContext, MultimodalContent]:
+                    current_context: LMMContext = context
+                    current_result: MultimodalContent = result
+
+                    while True:
+                        current_context, current_result = await stage_execution(
+                            context=current_context,
+                            result=current_result,
+                        )
+                        assert not current_context or isinstance(current_context[-1], LMMCompletion)  # nosec: B101
+
+                        if not await condition(
+                            context=current_context,
+                            result=current_result,
+                        ):
+                            break
+
+                    return (current_context, current_result)
 
         return cls(stage_loop)
 
@@ -1204,7 +1252,7 @@ class Stage:
                 for previous, current in zip(
                     context,
                     processed_context,
-                    strict=True,
+                    strict=False,
                 )
                 if current == previous
             )

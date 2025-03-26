@@ -188,6 +188,18 @@ class Toolbox(State):
                 error=True,
             )
 
+    def with_tools(
+        self,
+        tool: AnyTool,
+        /,
+        *tools: AnyTool,
+    ) -> Self:
+        return self.__class__.of(
+            *(tool, *tools, *self.tools.values()),
+            suggest=self.suggest_call,
+            repeated_calls_limit=self.repeated_calls_limit,
+        )
+
 
 @runtime_checkable
 class ToolsFetching(Protocol):
