@@ -32,7 +32,7 @@ from draive.parameters import BasicValue
 from draive.parameters.model import DataModel
 from draive.parameters.specification import validated_specification
 from draive.prompts import Prompt, PromptDeclaration, PromptDeclarationArgument, PromptRepository
-from draive.resources import Resource, ResourceContent, ResourceDeclaration, ResourceRepository
+from draive.resources import Resource, ResourceContent, ResourceDeclaration, Resources
 from draive.tools import AnyTool, ExternalTools, Tool
 
 __all__ = [
@@ -142,7 +142,7 @@ class MCPClient:
                 # if there is only a single element return it directly
                 return resource
 
-            case resources:
+            case [*resources]:
                 return Resource(
                     uri=uri,
                     name="resource",  # TODO: resource name?
@@ -366,38 +366,39 @@ class MCPClient:
         /,
     ) -> Resource:
         match resource:
-            case TextResourceContents():
+            case TextResourceContents() as text_resource:
                 return Resource(
                     uri=self._with_uri_identifier(resource.uri.unicode_string()),
                     name="resource",  # TODO: resource name?
                     description=None,
                     content=ResourceContent(
-                        blob=resource.text.encode(),
-                        mime_type=resource.mimeType or "text/plain",
+                        blob=text_resource.text.encode(),
+                        mime_type=text_resource.mimeType or "text/plain",
                     ),
                     meta={"source": self.identifier},
                 )
 
-            case BlobResourceContents():
+            case BlobResourceContents() as blob_resource:
                 return Resource(
                     uri=self._with_uri_identifier(resource.uri.unicode_string()),
                     name="resource",  # TODO: resource name?
                     description=None,
                     content=ResourceContent(
-                        blob=b64decode(resource.blob),
-                        mime_type=resource.mimeType or "text/plain",
+                        # TODO: to verify, it seems strange but did not worked otherwise when tested
+                        blob=b64decode(b64decode(blob_resource.blob)),
+                        mime_type=blob_resource.mimeType or "application/octet-stream",
                     ),
                     meta={"source": self.identifier},
                 )
 
-    async def __aenter__(self) -> tuple[ResourceRepository, PromptRepository, ExternalTools]:
+    async def __aenter__(self) -> tuple[Resources, PromptRepository, ExternalTools]:
         self._session = await self._session_manager.__aenter__()
         await self._session.initialize()
 
         return (
-            ResourceRepository(
-                list=self.resources_list,
-                fetch=self.resource_fetch,
+            Resources(
+                list_fetching=self.resources_list,
+                fetching=self.resource_fetch,
             ),
             PromptRepository(
                 list=self.prompts_list,
@@ -623,13 +624,13 @@ class MCPClientAggregate:
             )
         )
 
-    async def __aenter__(self) -> tuple[ResourceRepository, PromptRepository, ExternalTools]:
+    async def __aenter__(self) -> tuple[Resources, PromptRepository, ExternalTools]:
         await gather(*[client.__aenter__() for client in self._clients.values()])
 
         return (
-            ResourceRepository(
-                list=self.resources_list,
-                fetch=self.resource_fetch,
+            Resources(
+                list_fetching=self.resources_list,
+                fetching=self.resource_fetch,
             ),
             PromptRepository(
                 list=self.prompts_list,

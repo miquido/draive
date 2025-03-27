@@ -1,25 +1,24 @@
-from draive.resources.fetch import fetch_resource, fetch_resource_list
-from draive.resources.state import ResourceRepository
+from draive.resources.state import Resources
 from draive.resources.template import ResourceTemplate, resource
 from draive.resources.types import (
-    MissingResource,
     Resource,
     ResourceContent,
     ResourceDeclaration,
+    ResourceException,
     ResourceFetching,
-    ResourceListing,
+    ResourceListFetching,
+    ResourceMissing,
 )
 
 __all__ = [
-    "MissingResource",
     "Resource",
     "ResourceContent",
     "ResourceDeclaration",
+    "ResourceException",
     "ResourceFetching",
-    "ResourceListing",
-    "ResourceRepository",
+    "ResourceListFetching",
+    "ResourceMissing",
     "ResourceTemplate",
-    "fetch_resource",
-    "fetch_resource_list",
+    "Resources",
     "resource",
 ]

@@ -54,6 +54,7 @@ def validated_media_kind(
         raise ValueError(f"Unsupported media kind: {kind}")
 
 
+# TODO: split to MediaContent and MediaReferenceContent
 class MediaContent(DataModel):
     @classmethod
     def url(

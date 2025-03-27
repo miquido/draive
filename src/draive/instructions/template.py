@@ -6,7 +6,7 @@ from draive.instructions.types import (
     Instruction,
     InstructionDeclaration,
     InstructionDeclarationArgument,
-    InstructionResolutionFailed,
+    InstructionException,
 )
 from draive.parameters import ParametrizedFunction
 
@@ -59,8 +59,8 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
                 meta=self.declaration.meta,
             )
 
-        except BaseException as exc:
-            raise InstructionResolutionFailed(
+        except Exception as exc:
+            raise InstructionException(
                 f"Resolving instruction '{self.declaration.name}' failed"
             ) from exc
 

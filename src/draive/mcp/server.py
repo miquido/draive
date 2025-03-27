@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from haiway import as_dict
 from mcp.server import Server
+from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.types import EmbeddedResource, GetPromptResult
 from mcp.types import ImageContent as MCPImageContent
 from mcp.types import Prompt as MCPPrompt
@@ -69,7 +70,7 @@ def expose_resources(  # noqa: C901
         return resource_declarations
 
     @server.read_resource()
-    async def read_resource(uri: AnyUrl) -> str | bytes:  # pyright: ignore[reportUnusedFunction]
+    async def read_resource(uri: AnyUrl) -> Iterable[ReadResourceContents]:  # pyright: ignore[reportUnusedFunction]
         resource: Resource
         match available_resources.get(uri.unicode_string()):
             case None:
@@ -83,12 +84,29 @@ def expose_resources(  # noqa: C901
                 # perhaps we could extract uri arguments
                 resource = await resource_template.resolve()
 
+        return _resource_content(resource)
+
+    def _resource_content(
+        resource: Resource,
+    ) -> Iterable[ReadResourceContents]:
         match resource.content:
             case ResourceContent() as content:
-                return content.blob
+                match content.mime_type:
+                    case "text/plain" | "application/json":
+                        yield ReadResourceContents(
+                            content=content.blob.decode(),
+                            mime_type=content.mime_type,
+                        )
 
-            case _:
-                raise NotImplementedError("Multi-content resources are not supported yet")
+                    case _:
+                        yield ReadResourceContents(
+                            content=content.blob,
+                            mime_type=content.mime_type,
+                        )
+
+            case [*contents]:  # is it intended use of nested resource contents?
+                for content in contents:
+                    yield from _resource_content(content)
 
 
 def expose_prompts(

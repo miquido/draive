@@ -1,11 +1,14 @@
 from collections.abc import Callable, Coroutine, Sequence
 from typing import Protocol, final
 
-from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
-
 from draive.commons import META_EMPTY, Meta
 from draive.parameters import ParametrizedFunction
-from draive.resources.types import Resource, ResourceContent, ResourceDeclaration
+from draive.resources.types import (
+    Resource,
+    ResourceContent,
+    ResourceDeclaration,
+    ResourceException,
+)
 
 __all__ = [
     "ResourceAvailabilityCheck",
@@ -24,6 +27,12 @@ class ResourceAvailabilityCheck(Protocol):
 class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
     ParametrizedFunction[Args, Coroutine[None, None, Result]]
 ):
+    __slots__ = (
+        "_check_availability",
+        "declaration",
+        "uri",
+    )
+
     def __init__(  # noqa: PLR0913
         self,
         /,
@@ -50,8 +59,6 @@ class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
             lambda: True  # available by default
         )
 
-        freeze(self)
-
     @property
     def available(self) -> bool:
         try:
@@ -65,27 +72,17 @@ class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Resource:
-        with ctx.scope(f"resource:{self.uri}"):
-            ctx.record(ArgumentsTrace.of(*args, **kwargs))
-            try:
-                result = Resource(
-                    name=self.declaration.name,
-                    description=self.declaration.description,
-                    uri=self.uri,
-                    content=await super().__call__(*args, **kwargs),  # pyright: ignore[reportCallIssue],
-                    meta=self.declaration.meta,
-                )
-                ctx.record(ResultTrace.of(result))
+        try:
+            return Resource(
+                name=self.declaration.name,
+                description=self.declaration.description,
+                uri=self.uri,
+                content=await super().__call__(*args, **kwargs),  # pyright: ignore[reportCallIssue],
+                meta=self.declaration.meta,
+            )
 
-                return result
-
-            except BaseException as exc:
-                ctx.record(ResultTrace.of(exc))
-                ctx.log_error(
-                    "Resource resolving error",
-                    exception=exc,
-                )
-                raise exc
+        except Exception as exc:
+            raise ResourceException(f"Resolving resource '{self.declaration.uri}' failed") from exc
 
 
 def resource[**Args, Result: Sequence[Resource] | ResourceContent](  # noqa: PLR0913
