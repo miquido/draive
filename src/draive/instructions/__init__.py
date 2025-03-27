@@ -6,7 +6,6 @@ from draive.instructions.types import (
     InstructionFetching,
     InstructionListFetching,
     InstructionMissing,
-    InstructionResolutionFailed,
 )
 
 __all__ = [
@@ -15,7 +14,6 @@ __all__ = [
     "InstructionFetching",
     "InstructionListFetching",
     "InstructionMissing",
-    "InstructionResolutionFailed",
     "InstructionTemplate",
     "Instructions",
     "instruction",

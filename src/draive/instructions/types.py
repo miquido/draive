@@ -15,7 +15,6 @@ __all__ = [
     "InstructionFetching",
     "InstructionListFetching",
     "InstructionMissing",
-    "InstructionResolutionFailed",
 ]
 
 
@@ -24,10 +23,6 @@ class InstructionException(Exception):
 
 
 class InstructionMissing(InstructionException):
-    pass
-
-
-class InstructionResolutionFailed(InstructionException):
     pass
 
 

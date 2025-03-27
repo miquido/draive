@@ -10,7 +10,7 @@ from draive.instructions.types import (
     InstructionDeclaration,
     InstructionFetching,
     InstructionListFetching,
-    InstructionResolutionFailed,
+    InstructionMissing,
 )
 
 __all__ = [
@@ -103,6 +103,7 @@ class Instructions(State):
         **extra: Any,
     ) -> Instruction | None:
         name: str = instruction if isinstance(instruction, str) else instruction.name
+
         if fetched := await ctx.state(Instructions).fetching(
             name,
             arguments=arguments,
@@ -111,7 +112,7 @@ class Instructions(State):
             return fetched
 
         elif required and default is None:
-            raise InstructionResolutionFailed(f"Failed to fetch instruction: '{name}'")
+            raise InstructionMissing(f"Missing instruction: '{name}'")
 
         elif isinstance(default, str):
             return Instruction.of(
