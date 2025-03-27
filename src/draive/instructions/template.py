@@ -1,13 +1,12 @@
 from collections.abc import Callable, Coroutine
 from typing import Protocol, final, overload
 
-from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
-
 from draive.commons import META_EMPTY, Meta
 from draive.instructions.types import (
     Instruction,
     InstructionDeclaration,
     InstructionDeclarationArgument,
+    InstructionResolutionFailed,
 )
 from draive.parameters import ParametrizedFunction
 
@@ -19,6 +18,8 @@ __all__ = [
 
 @final
 class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, str]]):
+    __slots__ = ("declaration",)
+
     def __init__(
         self,
         /,
@@ -44,34 +45,24 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
             meta=meta if meta is not None else META_EMPTY,
         )
 
-        freeze(self)
-
     async def resolve(
         self,
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Instruction:
-        with ctx.scope(f"instruction:{self.declaration.name}"):
-            ctx.record(ArgumentsTrace.of(*args, **kwargs))
-            try:
-                result = Instruction(
-                    name=self.declaration.name,
-                    description=self.declaration.description,
-                    content=await super().__call__(*args, **kwargs),  # pyright: ignore[reportCallIssue]
-                    arguments={},
-                    meta=self.declaration.meta,
-                )
-                ctx.record(ResultTrace.of(result))
+        try:
+            return Instruction(
+                name=self.declaration.name,
+                description=self.declaration.description,
+                content=await super().__call__(*args, **kwargs),  # pyright: ignore[reportCallIssue]
+                arguments={},
+                meta=self.declaration.meta,
+            )
 
-                return result
-
-            except BaseException as exc:
-                ctx.record(ResultTrace.of(exc))
-                ctx.log_error(
-                    "Instruction resolving error",
-                    exception=exc,
-                )
-                raise exc
+        except BaseException as exc:
+            raise InstructionResolutionFailed(
+                f"Resolving instruction '{self.declaration.name}' failed"
+            ) from exc
 
 
 class InstructionTemplateWrapper(Protocol):

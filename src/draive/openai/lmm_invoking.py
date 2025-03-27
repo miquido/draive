@@ -88,7 +88,7 @@ class OpenAILMMInvoking(OpenAIAPI):
                 messages = [
                     {
                         "role": "system",
-                        "content": Instruction.of(instruction).format(),
+                        "content": Instruction.formatted(instruction),
                     },
                     *messages,
                 ]

@@ -11,15 +11,27 @@ __all__ = [
     "Instruction",
     "InstructionDeclaration",
     "InstructionDeclarationArgument",
+    "InstructionException",
     "InstructionFetching",
-    "MissingInstruction",
+    "InstructionListFetching",
+    "InstructionMissing",
+    "InstructionResolutionFailed",
 ]
 
 
-class MissingInstruction(Exception):
+class InstructionException(Exception):
     pass
 
 
+class InstructionMissing(InstructionException):
+    pass
+
+
+class InstructionResolutionFailed(InstructionException):
+    pass
+
+
+@final
 class InstructionDeclarationArgument(DataModel):
     name: str
     specification: ParameterSpecification = Field(
@@ -31,6 +43,7 @@ class InstructionDeclarationArgument(DataModel):
     required: bool = True
 
 
+@final
 class InstructionDeclaration(DataModel):
     name: str
     description: str | None = None
@@ -44,17 +57,9 @@ class Instruction(State):
     @classmethod
     def formatted(
         cls,
-        instruction: None,
-        /,
-    ) -> None: ...
-
-    @overload
-    @classmethod
-    def formatted(
-        cls,
         instruction: Self | str,
         /,
-        **arguments: str,
+        **arguments: str | float | int,
     ) -> str: ...
 
     @overload
@@ -63,7 +68,7 @@ class Instruction(State):
         cls,
         instruction: Self | str | None,
         /,
-        **arguments: str,
+        **arguments: str | float | int,
     ) -> str | None: ...
 
     @classmethod
@@ -71,7 +76,7 @@ class Instruction(State):
         cls,
         instruction: Self | str | None,
         /,
-        **arguments: str,
+        **arguments: str | float | int,
     ) -> str | None:
         match instruction:
             case None:
@@ -96,7 +101,7 @@ class Instruction(State):
         name: str | None = None,
         description: str | None = None,
         meta: Meta | None = None,
-        **arguments: str,
+        arguments: Mapping[str, str | float | int] | None = None,
     ) -> Self:
         match instruction:
             case str() as content:
@@ -104,22 +109,33 @@ class Instruction(State):
                     name=name or uuid4().hex,
                     description=description,
                     content=content,
-                    arguments=arguments,
+                    arguments=arguments if arguments is not None else {},
                     meta=meta if meta is not None else META_EMPTY,
                 )
 
             case instruction:
-                return instruction.updated(**arguments)
+                if name is None and description is None and meta is None and arguments is None:
+                    return instruction  # nothing to update
+
+                return instruction.updated(
+                    name=name or instruction.name,
+                    description=description or instruction.description,
+                    content=instruction.content,
+                    arguments={**instruction.arguments, **arguments}
+                    if arguments is not None
+                    else instruction.arguments,
+                    meta={**instruction.meta, **meta} if meta is not None else instruction.meta,
+                )
 
     name: str
     description: str | None = None
     content: str
-    arguments: Mapping[str, str] = Default(factory=dict)
+    arguments: Mapping[str, str | float | int] = Default(factory=dict)
     meta: Meta = Default(META_EMPTY)
 
     def format(
         self,
-        **arguments: str,
+        **arguments: str | float | int,
     ) -> str:
         if arguments:
             return self.content.format_map(
@@ -139,40 +155,16 @@ class Instruction(State):
         self,
         instruction: str,
         /,
-        description: str | None = None,
         joiner: str | None = None,
-        **arguments: str,
-    ) -> Self:
-        if arguments:
-            return self.__class__(
-                name=self.name,
-                description=description,
-                content=(joiner if joiner is not None else "").join((self.content, instruction)),
-                arguments={
-                    **self.arguments,
-                    **arguments,
-                },
-                meta=self.meta,
-            )
-
-        else:
-            return self.__class__(
-                name=self.name,
-                description=description,
-                content=(joiner if joiner is not None else "").join((self.content, instruction)),
-                arguments=self.arguments,
-                meta=self.meta,
-            )
-
-    def with_arguments(
-        self,
-        **arguments: str,
+        **arguments: str | float | int,
     ) -> Self:
         if arguments:
             return self.__class__(
                 name=self.name,
                 description=self.description,
-                content=self.content,
+                content=(joiner if joiner is not None else "").join((self.content, instruction))
+                if instruction
+                else self.content,
                 arguments={
                     **self.arguments,
                     **arguments,
@@ -180,15 +172,17 @@ class Instruction(State):
                 meta=self.meta,
             )
 
-        else:
+        elif instruction:
+            return self.__class__(
+                name=self.name,
+                description=self.description,
+                content=(joiner if joiner is not None else "").join((self.content, instruction)),
+                arguments=self.arguments,
+                meta=self.meta,
+            )
+
+        else:  # nothing to update
             return self
-
-    def __str__(self) -> str:
-        try:
-            return self.format()
-
-        except KeyError:
-            return self.content
 
 
 @runtime_checkable
@@ -198,6 +192,14 @@ class InstructionFetching(Protocol):
         name: str,
         /,
         *,
-        arguments: Mapping[str, str] | None = None,
+        arguments: Mapping[str, str | float | int] | None = None,
         **extra: Any,
     ) -> Instruction | None: ...
+
+
+@runtime_checkable
+class InstructionListFetching(Protocol):
+    async def __call__(
+        self,
+        **extra: Any,
+    ) -> Sequence[InstructionDeclaration]: ...

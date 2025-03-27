@@ -21,6 +21,8 @@ class PromptAvailabilityCheck(Protocol):
 
 @final
 class PromptTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, LMMContext]]):
+    __slots__ = ("_check_availability", "declaration")
+
     def __init__(
         self,
         /,

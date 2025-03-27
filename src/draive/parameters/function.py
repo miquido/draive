@@ -122,6 +122,21 @@ class FunctionArgument:
 class ParametrizedFunction[**Args, Result]:
     __IMMUTABLE__: ClassVar[EllipsisType] = ...
 
+    __slots__ = (
+        "__defaults__",
+        "__doc__",
+        "__globals__",
+        "__kwdefaults__",
+        "__name__",
+        "__qualname__",
+        "__wrapped__",
+        "_call",
+        "_name",
+        "_parameters",
+        "_variadic_keyword_parameters",
+        "_write",
+    )
+
     def __init__(
         self,
         function: Callable[Args, Result],

@@ -133,7 +133,7 @@ class VLLMLMMStreaming(VLLMAPI):
                 request_messages = [
                     {
                         "role": "system",
-                        "content": Instruction.of(instruction).format(),
+                        "content": Instruction.formatted(instruction),
                     },
                     *messages_context,
                 ]

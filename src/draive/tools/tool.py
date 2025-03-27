@@ -1,7 +1,7 @@
 from collections.abc import Callable, Coroutine, Mapping
 from typing import Any, Protocol, cast, final, overload
 
-from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
+from haiway import ArgumentsTrace, ResultTrace, ctx
 
 from draive.commons import META_EMPTY, Meta
 from draive.lmm.types import (
@@ -27,6 +27,17 @@ class ToolAvailabilityCheck(Protocol):
 
 @final
 class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Result]]):
+    __slots__ = (
+        "_check_availability",
+        "_direct_result",
+        "description",
+        "format_failure",
+        "format_result",
+        "meta",
+        "name",
+        "specification",
+    )
+
     def __init__(  # noqa: PLR0913
         self,
         /,
@@ -76,8 +87,6 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
         self.format_result: Callable[[Result], Multimodal] = format_result
         self.format_failure: Callable[[Exception], Multimodal] = format_failure
         self.meta: Meta = meta
-
-        freeze(self)
 
     @property
     def available(self) -> bool:
