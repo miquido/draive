@@ -1,39 +1,25 @@
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from string import Formatter
+from typing import Any, final
 
 from haiway import asynchronous
 
-from draive.instructions.types import Instruction, InstructionFetching, MissingInstruction
+from draive.instructions.types import (
+    Instruction,
+    InstructionDeclaration,
+    InstructionDeclarationArgument,
+    InstructionMissing,
+)
 
 __all__ = [
-    "instructions_file",
+    "InstructionsFileStorage",
 ]
 
 
-def instructions_file(
-    path: Path | str,
-) -> InstructionFetching:
-    storage: _InstructionsFileStorage = _InstructionsFileStorage(path=path)
-
-    async def fetch(
-        identifier: str,
-        /,
-        *,
-        arguments: Mapping[str, str] | None = None,
-        **extra: Any,
-    ) -> Instruction:
-        return await storage.instruction(
-            identifier,
-            arguments=arguments,
-            **extra,
-        )
-
-    return fetch
-
-
-class _InstructionsFileStorage:
+@final
+class InstructionsFileStorage:
     def __init__(
         self,
         path: Path | str,
@@ -47,12 +33,48 @@ class _InstructionsFileStorage:
                 self._path = path
 
         self._storage: Mapping[str, str] | None = None
+        self._listing: Sequence[InstructionDeclaration] | None = None
+
+    async def listing(
+        self,
+        name: str,
+        *,
+        arguments: Mapping[str, str | float | int] | None = None,
+        **extra: Any,
+    ) -> Sequence[InstructionDeclaration]:
+        if self._listing is not None:
+            return self._listing
+
+        if self._storage is None:
+            self._storage = await self._file_load()
+
+        formatter = Formatter()
+        self._listing = tuple(
+            InstructionDeclaration(
+                name=name,
+                arguments=tuple(
+                    InstructionDeclarationArgument(
+                        name=arg_name,
+                        specification={
+                            # assuming all will be strings
+                            "type": "string",
+                        },
+                    )
+                    for _, arg_name, _, _ in formatter.parse(content)
+                    if arg_name  # we could also check for positional arguments
+                ),
+                meta={"file": str(self._path)},
+            )
+            for name, content in self._storage.items()
+        )
+
+        return self._listing
 
     async def instruction(
         self,
         name: str,
         *,
-        arguments: Mapping[str, str] | None = None,
+        arguments: Mapping[str, str | float | int] | None = None,
         **extra: Any,
     ) -> Instruction:
         if self._storage is None:
@@ -63,15 +85,11 @@ class _InstructionsFileStorage:
                 instruction,
                 name=name,
                 meta={"file": str(self._path)},
-                **(arguments if arguments is not None else {}),
+                arguments=arguments,
             )
 
         else:
-            raise MissingInstruction(
-                "%s does not contain instruction for identifier %s",
-                self._path,
-                name,
-            )
+            raise InstructionMissing(f"{self._path} does not contain instruction '{name}'")
 
     @asynchronous
     def _file_load(

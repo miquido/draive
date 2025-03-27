@@ -1,16 +1,22 @@
-from draive.instructions.fetch import fetch_instruction
-from draive.instructions.file import instructions_file
-from draive.instructions.state import InstructionsRepository
+from draive.instructions.state import Instructions
 from draive.instructions.template import InstructionTemplate, instruction
-from draive.instructions.types import Instruction, InstructionFetching, MissingInstruction
+from draive.instructions.types import (
+    Instruction,
+    InstructionException,
+    InstructionFetching,
+    InstructionListFetching,
+    InstructionMissing,
+    InstructionResolutionFailed,
+)
 
 __all__ = [
     "Instruction",
+    "InstructionException",
     "InstructionFetching",
+    "InstructionListFetching",
+    "InstructionMissing",
+    "InstructionResolutionFailed",
     "InstructionTemplate",
-    "InstructionsRepository",
-    "MissingInstruction",
-    "fetch_instruction",
+    "Instructions",
     "instruction",
-    "instructions_file",
 ]
