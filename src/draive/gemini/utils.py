@@ -1,4 +1,5 @@
-from typing import cast
+from collections.abc import Callable
+from typing import cast, overload
 
 from haiway import MISSING, Missing
 
@@ -7,11 +8,54 @@ __all__ = [
 ]
 
 
+@overload
 def unwrap_missing[Value, Default](
     value: Value | Missing,
     /,
-) -> Value | None:
+    default: Value,
+) -> Value: ...
+
+
+@overload
+def unwrap_missing[Value, Default](
+    value: Value | Missing,
+    /,
+    default: Value | None = None,
+) -> Value | None: ...
+
+
+@overload
+def unwrap_missing[Value, Default, Result](
+    value: Value | Missing,
+    /,
+    default: Value,
+    *,
+    transform: Callable[[Value], Result],
+) -> Result: ...
+
+
+@overload
+def unwrap_missing[Value, Default, Result](
+    value: Value | Missing,
+    /,
+    default: Value | None = None,
+    *,
+    transform: Callable[[Value], Result],
+) -> Result | None: ...
+
+
+def unwrap_missing[Value, Default, Result](
+    value: Value | Missing,
+    /,
+    default: Result | Value | None = None,
+    *,
+    transform: Callable[[Value], Result] | None = None,
+) -> Result | Value | None:
     if value is MISSING:
-        return None
+        return default
+
+    elif transform is not None:
+        return transform(cast(Value, value))
+
     else:
-        return cast(Value, value)
+        return cast(Result, value)

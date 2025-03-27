@@ -1,9 +1,9 @@
 from asyncio import gather
 from collections.abc import Sequence
 from itertools import chain
-from typing import Any, cast
+from typing import Any
 
-from google.genai.types import ContentUnion, EmbedContentConfigDict, EmbedContentResponse
+from google.genai.types import EmbedContentConfigDict, EmbedContentResponse
 from haiway import as_list, ctx, not_missing
 
 from draive.embedding import Embedded, TextEmbedding
@@ -33,9 +33,8 @@ class GeminiEmbedding(GeminiAPI):
         """
         Create texts embedding with Gemini embedding service.
         """
-        embedding_config: GeminiEmbeddingConfig = config or ctx.state(
-            GeminiEmbeddingConfig
-        ).updated(**extra)
+
+        embedding_config: GeminiEmbeddingConfig = config or ctx.state(GeminiEmbeddingConfig)
         config_dict: EmbedContentConfigDict | None
         if not_missing(embedding_config.dimensions):
             config_dict = {"output_dimensionality": embedding_config.dimensions}
@@ -45,18 +44,16 @@ class GeminiEmbedding(GeminiAPI):
 
         with ctx.scope("gemini_text_embedding", embedding_config):
             ctx.record(embedding_config)
-            texts: list[str] = as_list(values)
             responses: list[EmbedContentResponse] = await gather(
                 *[
                     self._client.aio.models.embed_content(
                         model=embedding_config.model,
                         config=config_dict,
-                        contents=cast(
-                            list[ContentUnion],  # it is actually list[str]
-                            texts[index : index + embedding_config.batch_size],
+                        contents=as_list(
+                            values[index : index + embedding_config.batch_size],
                         ),
                     )
-                    for index in range(0, len(texts), embedding_config.batch_size)
+                    for index in range(0, len(values), embedding_config.batch_size)
                 ]
             )
 
@@ -66,7 +63,7 @@ class GeminiEmbedding(GeminiAPI):
                     vector=embedded[1].values,
                 )
                 for embedded in zip(
-                    texts,
+                    values,
                     chain.from_iterable(
                         # filter out missing embeddings, although all should be available
                         [response.embeddings for response in responses if response.embeddings]
