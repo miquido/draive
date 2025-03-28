@@ -11,6 +11,7 @@ from google.genai.types import (
     FunctionDeclarationDict,
     GenerateContentResponse,
     SchemaDict,
+    SpeechConfigDict,
 )
 from haiway import ArgumentsTrace, ResultTrace, as_list, ctx
 
@@ -62,8 +63,10 @@ class GeminiLMMInvoking(GeminiAPI):
         **extra: Any,
     ) -> LMMOutput:
         with ctx.scope("gemini_lmm_invocation"):
+            generation_config: GeminiGenerationConfig = config or ctx.state(GeminiGenerationConfig)
             ctx.record(
                 ArgumentsTrace.of(
+                    config=generation_config,
                     instruction=instruction,
                     context=context,
                     tools=tools,
@@ -72,10 +75,6 @@ class GeminiLMMInvoking(GeminiAPI):
                     **extra,
                 )
             )
-            generation_config: GeminiGenerationConfig = config or ctx.state(
-                GeminiGenerationConfig
-            ).updated(**extra)
-            ctx.record(generation_config)
 
             content: ContentListUnionDict = list(
                 chain.from_iterable([context_element_as_content(element) for element in context])
@@ -104,16 +103,15 @@ class GeminiLMMInvoking(GeminiAPI):
                     "max_output_tokens": unwrap_missing(generation_config.max_tokens),
                     "candidate_count": 1,
                     "seed": unwrap_missing(generation_config.seed),
-                    "stop_sequences": as_list(unwrap_missing(generation_config.stop_sequences)),
+                    "stop_sequences": unwrap_missing(
+                        generation_config.stop_sequences,
+                        transform=as_list,
+                    ),
                     # gemini safety is really bad and often triggers false positive
                     "safety_settings": DISABLED_SAFETY_SETTINGS,
-                    "system_instruction": Instruction.formatted(instruction)
-                    if instruction
-                    else None,
+                    "system_instruction": Instruction.formatted(instruction),
                     "tools": [{"function_declarations": functions}] if functions else None,
-                    "tool_config": {
-                        "function_calling_config": {"mode": function_calling_mode},
-                    }
+                    "tool_config": {"function_calling_config": {"mode": function_calling_mode}}
                     if function_calling_mode
                     else None,
                     # prevent google from automatically resolving function calls
@@ -121,9 +119,14 @@ class GeminiLMMInvoking(GeminiAPI):
                     "media_resolution": resoluton_as_media_resulution(
                         generation_config.media_resolution
                     ),
-                    "response_schema": response_schema,
                     "response_modalities": response_modalities,
                     "response_mime_type": response_mime_type,
+                    "response_schema": response_schema,
+                    "thinking_config": {"include_thoughts": True},
+                    "speech_config": unwrap_missing(
+                        generation_config.speech_voice_name,
+                        transform=_speech_config,
+                    ),
                 },
                 contents=content,
             )
@@ -199,3 +202,11 @@ class GeminiLMMInvoking(GeminiAPI):
 
             else:
                 raise GeminiException("Invalid Gemini completion, missing content!", completion)
+
+
+def _speech_config(voice_name: str) -> SpeechConfigDict:
+    return {
+        "voice_config": {
+            "prebuilt_voice_config": {"voice_name": voice_name},
+        }
+    }

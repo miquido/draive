@@ -18,6 +18,7 @@ class GeminiGenerationConfig(State):
     seed: int | Missing = MISSING
     timeout: float | Missing = MISSING
     stop_sequences: Sequence[str] | Missing = MISSING
+    speech_voice_name: str | Missing = MISSING
     media_resolution: Literal["low", "medium", "high"] | Missing = MISSING
 
 

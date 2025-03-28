@@ -179,7 +179,7 @@ def content_element_as_part(  # noqa: C901, PLR0911
             }
 
 
-def output_as_response_declaration(
+def output_as_response_declaration(  # noqa: PLR0911
     output: LMMOutputSelection,
     /,
 ) -> tuple[
@@ -187,7 +187,13 @@ def output_as_response_declaration(
 ]:
     match output:
         case "auto":
-            return (None, None, None, _auto_output_conversion)
+            # not specified at all - use defaults
+            return (
+                None,
+                None,
+                None,
+                _auto_output_conversion,
+            )
 
         case "text":
             return (
@@ -209,18 +215,33 @@ def output_as_response_declaration(
             return (
                 None,
                 ["Text", "Image"],  # google api does not allow to specify only image
-                None,
+                None,  # define mime type?
                 _image_output_conversion,  # we will ignore text anyways
             )
 
         case "audio":
-            raise NotImplementedError("audio output is not supported by Gemini")
+            return (
+                None,
+                ["Audio"],
+                None,  # define mime type?
+                _audio_output_conversion,  # we will ignore text anyways
+            )
 
         case "video":
-            raise NotImplementedError("video output is not supported by Gemini")
+            return (
+                None,
+                ["Video"],
+                None,  # define mime type?
+                _video_output_conversion,  # we will ignore text anyways
+            )
 
         case ["text", "image"] | ["image", "text"]:  # refine multimodal matching?
-            return (None, ["Text", "Image"], None, _auto_output_conversion)
+            return (
+                None,
+                ["Text", "Image"],
+                None,
+                _auto_output_conversion,
+            )
 
         case [*_]:
             raise NotImplementedError("multimodal output is not supported by Gemini")
@@ -321,7 +342,7 @@ def result_part_as_content_or_call(
         result.append(
             MediaContent.data(
                 part.inline_data.data,
-                media=part.inline_data.mime_type or "unknown",
+                media=part.inline_data.mime_type or "application/octet-stream",
             ),
         )
 
@@ -329,7 +350,7 @@ def result_part_as_content_or_call(
         result.append(
             MediaContent.url(
                 part.file_data.file_uri,
-                media=part.file_data.mime_type or "unknown",
+                media=part.file_data.mime_type or "application/octet-stream",
             ),
         )
 
