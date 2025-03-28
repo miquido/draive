@@ -26,6 +26,7 @@ __all__ = [
     "LMMStreamChunk",
     "LMMStreamInput",
     "LMMStreamOutput",
+    "LMMStreamOutputSelection",
     "LMMStreamProperties",
     "LMMStreaming",
     "LMMToolError",
@@ -222,8 +223,14 @@ class LMMInvocating(Protocol):
     ) -> LMMOutput: ...
 
 
+type LMMStreamOutputSelection = (
+    Sequence[Literal["text", "audio"]] | Literal["auto", "text", "audio"]
+)
+
+
 class LMMStreamProperties(State):
     instruction: Instruction | str | None = None
+    output: LMMStreamOutputSelection = "auto"
     tools: Sequence[LMMToolSpecification] | None
     tool_selection: LMMToolSelection = "auto"
 

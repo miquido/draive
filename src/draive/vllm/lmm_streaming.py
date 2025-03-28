@@ -27,6 +27,7 @@ from draive.vllm.config import VLLMChatConfig
 from draive.vllm.lmm import (
     content_element_as_content_part,
     context_element_as_messages,
+    output_as_response_declaration,
     tools_as_tool_config,
 )
 from draive.vllm.types import VLLMException
@@ -146,6 +147,10 @@ class VLLMLMMStreaming(VLLMAPI):
                 tool_selection=current_properties.tool_selection,
             )
 
+            response_format, output_decoder = output_as_response_declaration(
+                current_properties.output
+            )
+
             accumulated_result: MultimodalContent = MultimodalContent.empty
             accumulated_tool_calls: list[ChoiceDeltaToolCall] = []
             async for part in await self._client.chat.completions.create(
@@ -154,6 +159,7 @@ class VLLMLMMStreaming(VLLMAPI):
                 frequency_penalty=unwrap_missing(chat_config.frequency_penalty),
                 max_tokens=unwrap_missing(chat_config.max_tokens),
                 n=1,
+                response_format=response_format,
                 seed=unwrap_missing(chat_config.seed),
                 temperature=chat_config.temperature,
                 tools=tools_list,
@@ -218,7 +224,9 @@ class VLLMLMMStreaming(VLLMAPI):
 
                     # then process content
                     if element.delta.content is not None:
-                        content_chunk: LMMStreamChunk = LMMStreamChunk.of(element.delta.content)
+                        content_chunk: LMMStreamChunk = LMMStreamChunk.of(
+                            output_decoder(MultimodalContent.of(element.delta.content))
+                        )
                         accumulated_result = accumulated_result.extending(content_chunk.content)
                         yield content_chunk
 

@@ -4,6 +4,7 @@ from typing import final
 from draive.gemini.api import GeminiAPI
 from draive.gemini.embedding import GeminiEmbedding
 from draive.gemini.lmm_invoking import GeminiLMMInvoking
+from draive.gemini.lmm_streaming import GeminiLMMStreaming
 from draive.gemini.tokenization import GeminiTokenization
 
 __all__ = [
@@ -14,6 +15,7 @@ __all__ = [
 @final
 class Gemini(
     GeminiLMMInvoking,
+    GeminiLMMStreaming,
     GeminiEmbedding,
     GeminiTokenization,
     GeminiAPI,
