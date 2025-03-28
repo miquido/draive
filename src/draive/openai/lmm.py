@@ -27,7 +27,6 @@ from draive.lmm import (
 )
 from draive.multimodal import (
     MediaContent,
-    Multimodal,
     MultimodalContent,
     MultimodalContentElement,
     TextContent,
@@ -145,7 +144,7 @@ def output_as_response_declaration(  # noqa: PLR0911
 ) -> tuple[
     ResponseFormat | ResponseFormatJSONSchema | NotGiven,
     list[ChatCompletionModality] | NotGiven,
-    Callable[[MultimodalContent], Multimodal],
+    Callable[[MultimodalContent], MultimodalContent],
 ]:
     match output:
         case "auto":
@@ -206,39 +205,39 @@ def output_as_response_declaration(  # noqa: PLR0911
 def _auto_output_conversion(
     output: MultimodalContent,
     /,
-) -> Multimodal:
+) -> MultimodalContent:
     return output
 
 
 def _text_output_conversion(
     output: MultimodalContent,
     /,
-) -> Multimodal:
-    return output.as_string()
+) -> MultimodalContent:
+    return MultimodalContent.of(output.as_string())
 
 
 def _audio_output_conversion(
     output: MultimodalContent,
     /,
-) -> Multimodal:
+) -> MultimodalContent:
     return MultimodalContent.of(*output.media("audio"))
 
 
 def _json_output_conversion(
     output: MultimodalContent,
     /,
-) -> Multimodal:
+) -> MultimodalContent:
     return MultimodalContent.of(DataModel.from_json(output.as_string()))
 
 
 def _prepare_model_output_conversion(
     model: type[DataModel],
     /,
-) -> Callable[[MultimodalContent], Multimodal]:
+) -> Callable[[MultimodalContent], MultimodalContent]:
     def _model_output_conversion(
         output: MultimodalContent,
         /,
-    ) -> Multimodal:
+    ) -> MultimodalContent:
         return MultimodalContent.of(model.from_json(output.as_string()))
 
     return _model_output_conversion
