@@ -92,9 +92,7 @@ class VLLMLMMInvoking(VLLMAPI):
                     *messages,
                 ]
 
-            response_format, response_modalities, output_decoder = output_as_response_declaration(
-                output
-            )
+            response_format, output_decoder = output_as_response_declaration(output)
 
             tool_choice, tools_list = tools_as_tool_config(tools, tool_selection=tool_selection)
 

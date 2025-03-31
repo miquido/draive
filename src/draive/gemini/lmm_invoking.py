@@ -122,7 +122,6 @@ class GeminiLMMInvoking(GeminiAPI):
                     "response_modalities": response_modalities,
                     "response_mime_type": response_mime_type,
                     "response_schema": response_schema,
-                    "thinking_config": {"include_thoughts": True},
                     "speech_config": unwrap_missing(
                         generation_config.speech_voice_name,
                         transform=_speech_config,

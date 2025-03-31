@@ -384,8 +384,7 @@ class MCPClient:
                     name="resource",  # TODO: resource name?
                     description=None,
                     content=ResourceContent(
-                        # TODO: to verify, it seems strange but did not worked otherwise when tested
-                        blob=b64decode(b64decode(blob_resource.blob)),
+                        blob=b64decode(blob_resource.blob),
                         mime_type=blob_resource.mimeType or "application/octet-stream",
                     ),
                     meta={"source": self.identifier},
