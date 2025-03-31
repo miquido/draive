@@ -299,7 +299,7 @@ def output_as_response_declaration(
     *,
     output: LMMOutputSelection,
     prefill: Multimodal | None,
-) -> tuple[MultimodalContent | None, Callable[[MultimodalContent], Multimodal]]:
+) -> tuple[MultimodalContent | None, Callable[[MultimodalContent], MultimodalContent]]:
     match output:
         case "auto":
             return (None, _auto_output_conversion)
@@ -337,32 +337,32 @@ def output_as_response_declaration(
 def _auto_output_conversion(
     output: MultimodalContent,
     /,
-) -> Multimodal:
+) -> MultimodalContent:
     return output
 
 
 def _text_output_conversion(
     output: MultimodalContent,
     /,
-) -> Multimodal:
-    return output.as_string()
+) -> MultimodalContent:
+    return MultimodalContent.of(output.as_string())
 
 
 def _json_output_conversion(
     output: MultimodalContent,
     /,
-) -> Multimodal:
+) -> MultimodalContent:
     return MultimodalContent.of(DataModel.from_json(output.as_string()))
 
 
 def _prepare_model_output_conversion(
     model: type[DataModel],
     /,
-) -> Callable[[MultimodalContent], Multimodal]:
+) -> Callable[[MultimodalContent], MultimodalContent]:
     def _model_output_conversion(
         output: MultimodalContent,
         /,
-    ) -> Multimodal:
+    ) -> MultimodalContent:
         return MultimodalContent.of(model.from_json(output.as_string()))
 
     return _model_output_conversion

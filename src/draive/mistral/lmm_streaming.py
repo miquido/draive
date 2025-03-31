@@ -26,6 +26,7 @@ from draive.mistral.lmm import (
     content_chunk_as_content_element,
     content_element_as_content_chunk,
     context_element_as_messages,
+    output_as_response_declaration,
     tools_as_tool_config,
 )
 from draive.mistral.types import MistralException
@@ -133,6 +134,10 @@ class MistralLMMStreaming(MistralAPI):
                 tool_selection=current_properties.tool_selection,
             )
 
+            response_format, output_decoder = output_as_response_declaration(
+                current_properties.output
+            )
+
             accumulated_result: MultimodalContent = MultimodalContent.empty
             accumulated_tool_calls: list[ToolCall] = []
             async with await self._client.chat.stream_async(
@@ -143,7 +148,7 @@ class MistralLMMStreaming(MistralAPI):
                 max_tokens=unwrap_missing_to_unset(chat_config.max_tokens),
                 stop=as_list(unwrap_missing_to_none(chat_config.stop_sequences)),
                 random_seed=unwrap_missing_to_unset(chat_config.seed),
-                response_format={"type": "text"},
+                response_format=response_format,
                 tools=tools_list,
                 tool_choice=tool_choice,
                 stream=True,
@@ -178,15 +183,19 @@ class MistralLMMStreaming(MistralAPI):
                     if content := completion_delta.content:
                         match content:
                             case str() as string:
-                                yield LMMStreamChunk.of(string)
+                                yield LMMStreamChunk.of(
+                                    output_decoder(MultimodalContent.of(string))
+                                )
 
                             case chunks:
                                 yield LMMStreamChunk.of(
-                                    MultimodalContent.of(
-                                        *[
-                                            content_chunk_as_content_element(chunk)
-                                            for chunk in chunks
-                                        ]
+                                    output_decoder(
+                                        MultimodalContent.of(
+                                            *[
+                                                content_chunk_as_content_element(chunk)
+                                                for chunk in chunks
+                                            ]
+                                        )
                                     )
                                 )
 

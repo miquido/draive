@@ -8,7 +8,6 @@ from openai import NOT_GIVEN, NotGiven
 from openai.types.chat import (
     ChatCompletionContentPartParam,
     ChatCompletionMessageParam,
-    ChatCompletionModality,
     ChatCompletionToolChoiceOptionParam,
     ChatCompletionToolParam,
 )
@@ -27,7 +26,6 @@ from draive.lmm import (
 )
 from draive.multimodal import (
     MediaContent,
-    Multimodal,
     MultimodalContent,
     MultimodalContentElement,
     TextContent,
@@ -144,13 +142,11 @@ def output_as_response_declaration(
     output: LMMOutputSelection,
 ) -> tuple[
     ResponseFormat | ResponseFormatJSONSchema | NotGiven,
-    list[ChatCompletionModality] | NotGiven,
-    Callable[[MultimodalContent], Multimodal],
+    Callable[[MultimodalContent], MultimodalContent],
 ]:
     match output:
         case "auto":
             return (
-                NOT_GIVEN,
                 NOT_GIVEN,
                 _auto_output_conversion,
             )
@@ -158,14 +154,12 @@ def output_as_response_declaration(
         case ["text"] | "text":
             return (
                 {"type": "text"},
-                ["text"],
                 _auto_output_conversion,
             )
 
         case "json":
             return (
                 {"type": "json_object"},
-                ["text"],
                 _auto_output_conversion,
             )
             return ({"type": "json_object"}, _json_output_conversion)
@@ -174,7 +168,7 @@ def output_as_response_declaration(
             raise NotImplementedError("image output is not supported by VLLM client")
 
         case "audio":
-            return (NOT_GIVEN, ["audio"], _text_output_conversion)
+            raise NotImplementedError("audio output is not supported by VLLM client")
 
         case "video":
             raise NotImplementedError("video output is not supported by VLLM client")
@@ -195,7 +189,6 @@ def output_as_response_declaration(
                         "strict": False,
                     },
                 },
-                ["text"],
                 _prepare_model_output_conversion(model),
             )
 
@@ -203,39 +196,39 @@ def output_as_response_declaration(
 def _auto_output_conversion(
     output: MultimodalContent,
     /,
-) -> Multimodal:
+) -> MultimodalContent:
     return output
 
 
 def _text_output_conversion(
     output: MultimodalContent,
     /,
-) -> Multimodal:
-    return output.as_string()
+) -> MultimodalContent:
+    return MultimodalContent.of(output.as_string())
 
 
 def _audio_output_conversion(
     output: MultimodalContent,
     /,
-) -> Multimodal:
+) -> MultimodalContent:
     return MultimodalContent.of(*output.media("audio"))
 
 
 def _json_output_conversion(
     output: MultimodalContent,
     /,
-) -> Multimodal:
+) -> MultimodalContent:
     return MultimodalContent.of(DataModel.from_json(output.as_string()))
 
 
 def _prepare_model_output_conversion(
     model: type[DataModel],
     /,
-) -> Callable[[MultimodalContent], Multimodal]:
+) -> Callable[[MultimodalContent], MultimodalContent]:
     def _model_output_conversion(
         output: MultimodalContent,
         /,
-    ) -> Multimodal:
+    ) -> MultimodalContent:
         return MultimodalContent.of(model.from_json(output.as_string()))
 
     return _model_output_conversion
