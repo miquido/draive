@@ -87,6 +87,7 @@ class Instruction(State):
             case instruction:
                 return instruction.format(**arguments)
 
+    @overload
     @classmethod
     def of(
         cls,
@@ -97,8 +98,36 @@ class Instruction(State):
         description: str | None = None,
         meta: Meta | None = None,
         arguments: Mapping[str, str | float | int] | None = None,
-    ) -> Self:
+    ) -> Self: ...
+
+    @overload
+    @classmethod
+    def of(
+        cls,
+        instruction: Self | str | None,
+        /,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        meta: Meta | None = None,
+        arguments: Mapping[str, str | float | int] | None = None,
+    ) -> Self | None: ...
+
+    @classmethod
+    def of(
+        cls,
+        instruction: Self | str | None,
+        /,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        meta: Meta | None = None,
+        arguments: Mapping[str, str | float | int] | None = None,
+    ) -> Self | None:
         match instruction:
+            case None:
+                return None
+
             case str() as content:
                 return cls(
                     name=name or uuid4().hex,

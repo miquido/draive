@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.55.2"
+version = "0.56.0"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
@@ -23,7 +23,7 @@ classifiers = [
 license = { file = "LICENSE" }
 dependencies = [
   "numpy~=1.26",
-  "haiway~=0.13.1",
+  "haiway~=0.15.0",
 ]
 
 [project.urls]
@@ -106,8 +106,8 @@ lint.pydocstyle.convention = "numpy"
 "__init__.py" = ["F401", "E402"]
 "./tests/*.py" = ["PLR2004"]
 
-[tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["Argument", "draive.Argument"]
+[tool.ruff.lint.pylint]
+max-args = 12
 
 [tool.pyright]
 pythonVersion = "3.12"
@@ -124,3 +124,6 @@ useLibraryCodeForTypes = true
 [tool.pyright.analysis]
 diagnosticMode = "workspace"
 typeCheckingMode = "strict"
+
+[tool.hatch.metadata]
+allow-direct-references = true

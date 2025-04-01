@@ -1,4 +1,4 @@
-from typing import Literal, overload
+from typing import Literal
 
 from cohere import AsyncClientV2
 from haiway import getenv_str
@@ -9,26 +9,6 @@ __all__ = [
 
 
 class CohereAPI:
-    @overload
-    def __init__(
-        self,
-        provider: Literal["bedrock"],
-        /,
-        *,
-        timeout: float = 60.0,
-    ) -> None: ...
-
-    @overload
-    def __init__(
-        self,
-        provider: Literal["cohere"] = "cohere",
-        /,
-        *,
-        base_url: str | None = None,
-        api_key: str | None = None,
-        timeout: float = 60.0,
-    ) -> None: ...
-
     def __init__(
         self,
         provider: Literal["cohere", "bedrock"] = "cohere",

@@ -1,5 +1,5 @@
-from collections.abc import Iterable, Sequence
-from typing import Any, cast
+from collections.abc import AsyncIterator, Iterable, Sequence
+from typing import Any, Literal, cast, overload
 
 from anthropic import NOT_GIVEN
 from anthropic import RateLimitError as AnthropicRateLimitError
@@ -30,45 +30,81 @@ from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
     LMMContext,
-    LMMInvocation,
     LMMOutput,
     LMMOutputSelection,
+    LMMStreamOutput,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolSelection,
     LMMToolSpecification,
 )
+from draive.lmm.state import LMM
 from draive.metrics import TokenUsage
-from draive.multimodal import (
-    Multimodal,
-    MultimodalContent,
-)
+from draive.multimodal import Multimodal, MultimodalContent
 from draive.utils import RateLimitError
 
 __all__ = [
-    "AnthropicLMMInvoking",
+    "AnthropicLMMGeneration",
 ]
 
 
-class AnthropicLMMInvoking(AnthropicAPI):
-    def lmm_invoking(self) -> LMMInvocation:
-        return LMMInvocation(invoke=self.lmm_invocation)
+class AnthropicLMMGeneration(AnthropicAPI):
+    def lmm(self) -> LMM:
+        return LMM(completing=self.lmm_completion)
 
-    async def lmm_invocation(  # noqa: C901, PLR0912, PLR0913, PLR0915
+    @overload
+    async def lmm_completion(
         self,
         *,
-        instruction: Instruction | str | None,
+        instruction: Instruction | None,
+        context: LMMContext,
+        tool_selection: LMMToolSelection,
+        tools: Iterable[LMMToolSpecification] | None,
+        prefill: Multimodal | None = None,
+        config: AnthropicConfig | None = None,
+        output: LMMOutputSelection,
+        stream: Literal[False] = False,
+        **extra: Any,
+    ) -> LMMOutput: ...
+
+    @overload
+    async def lmm_completion(
+        self,
+        *,
+        instruction: Instruction | None,
         context: LMMContext,
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
         prefill: Multimodal | None = None,
         config: AnthropicConfig | None = None,
+        stream: Literal[True],
         **extra: Any,
-    ) -> LMMOutput:
-        with ctx.scope("anthropic_lmm_invocation"):
+    ) -> AsyncIterator[LMMStreamOutput]: ...
+
+    async def lmm_completion(  # noqa: C901, PLR0912, PLR0915
+        self,
+        *,
+        instruction: Instruction | None,
+        context: LMMContext,
+        tool_selection: LMMToolSelection,
+        tools: Iterable[LMMToolSpecification] | None,
+        output: LMMOutputSelection,
+        prefill: Multimodal | None = None,
+        config: AnthropicConfig | None = None,
+        stream: bool = False,
+        **extra: Any,
+    ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
+        if stream:
+            raise NotImplementedError("Anthropic streaming is not implemented yet")
+
+        with ctx.scope("anthropic_lmm_completion"):
+            completion_config: AnthropicConfig = config or ctx.state(AnthropicConfig).updated(
+                **extra
+            )
             ctx.record(
                 ArgumentsTrace.of(
+                    config=completion_config,
                     instruction=instruction,
                     context=context,
                     tools=tools,
@@ -77,10 +113,6 @@ class AnthropicLMMInvoking(AnthropicAPI):
                     **extra,
                 )
             )
-            completion_config: AnthropicConfig = config or ctx.state(AnthropicConfig).updated(
-                **extra
-            )
-            ctx.record(completion_config)
 
             messages: list[MessageParam] = [
                 context_element_as_message(element) for element in context
@@ -154,16 +186,10 @@ class AnthropicLMMInvoking(AnthropicAPI):
                     pass  # process results
 
                 case "max_tokens":
-                    raise AnthropicException(
-                        "Invalid Anthropic completion - exceeded maximum length!",
-                        completion,
-                    )
+                    raise AnthropicException("Invalid Anthropic completion - tokens limit!")
 
-                case _:
-                    raise AnthropicException(
-                        "Anthropic completion generation failed!",
-                        completion,
-                    )
+                case reason:
+                    raise AnthropicException(f"Anthropic completion generation failed - {reason}!")
 
             message_parts: list[TextBlock | ThinkingBlock | RedactedThinkingBlock] = []
             tool_calls: list[ToolUseBlock] = []

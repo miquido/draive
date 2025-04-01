@@ -1,7 +1,7 @@
 import json
-from collections.abc import Iterable
+from collections.abc import AsyncIterator, Iterable
 from itertools import chain
-from typing import Any
+from typing import Any, Literal, overload
 from uuid import uuid4
 
 from haiway import ArgumentsTrace, ResultTrace, ctx
@@ -9,9 +9,9 @@ from ollama import ChatResponse, Message, Options
 
 from draive.instructions import Instruction
 from draive.lmm import (
+    LMM,
     LMMCompletion,
     LMMContext,
-    LMMInvocation,
     LMMOutput,
     LMMOutputSelection,
     LMMToolRequest,
@@ -19,6 +19,7 @@ from draive.lmm import (
     LMMToolSelection,
     LMMToolSpecification,
 )
+from draive.lmm.types import LMMStreamOutput
 from draive.multimodal import MultimodalContent
 from draive.ollama.api import OllamaAPI
 from draive.ollama.config import OllamaChatConfig
@@ -31,26 +32,58 @@ from draive.ollama.types import OllamaException
 from draive.ollama.utils import unwrap_missing
 
 __all__ = [
-    "OllamaLMMInvoking",
+    "OllamaLMMGeneration",
 ]
 
 
-class OllamaLMMInvoking(OllamaAPI):
-    def lmm_invoking(self) -> LMMInvocation:
-        return LMMInvocation(invoke=self.lmm_invocation)
+class OllamaLMMGeneration(OllamaAPI):
+    def lmm(self) -> LMM:
+        return LMM(completing=self.lmm_completion)
 
-    async def lmm_invocation(  # noqa: PLR0913
+    @overload
+    async def lmm_completion(
         self,
         *,
-        instruction: Instruction | str | None,
+        instruction: Instruction | None,
+        context: LMMContext,
+        tool_selection: LMMToolSelection,
+        tools: Iterable[LMMToolSpecification] | None,
+        config: OllamaChatConfig | None = None,
+        output: LMMOutputSelection,
+        stream: Literal[False] = False,
+        **extra: Any,
+    ) -> LMMOutput: ...
+
+    @overload
+    async def lmm_completion(
+        self,
+        *,
+        instruction: Instruction | None,
         context: LMMContext,
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
         config: OllamaChatConfig | None = None,
+        stream: Literal[True],
         **extra: Any,
-    ) -> LMMOutput:
-        with ctx.scope("ollama_lmm_invocation"):
+    ) -> AsyncIterator[LMMStreamOutput]: ...
+
+    async def lmm_completion(
+        self,
+        *,
+        instruction: Instruction | None,
+        context: LMMContext,
+        tool_selection: LMMToolSelection,
+        tools: Iterable[LMMToolSpecification] | None,
+        output: LMMOutputSelection,
+        config: OllamaChatConfig | None = None,
+        stream: bool = False,
+        **extra: Any,
+    ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
+        if stream:
+            raise NotImplementedError("ollama streaming is not implemented yet")
+
+        with ctx.scope("ollama_lmm_completion"):
             ctx.record(
                 ArgumentsTrace.of(
                     instruction=instruction,

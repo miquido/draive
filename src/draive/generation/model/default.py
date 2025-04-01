@@ -6,12 +6,12 @@ from haiway import ctx
 from draive.generation.model.types import ModelGeneratorDecoder
 from draive.instructions import Instruction
 from draive.lmm import (
+    LMM,
     LMMCompletion,
     LMMContextElement,
     LMMInput,
     LMMToolRequests,
     LMMToolResponses,
-    lmm_invoke,
 )
 from draive.multimodal import (
     Multimodal,
@@ -26,7 +26,7 @@ __all__ = [
 ]
 
 
-async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, PLR0912
+async def default_generate_model[Generated: DataModel](  # noqa: C901, PLR0912
     generated: type[Generated],
     /,
     *,
@@ -94,7 +94,7 @@ async def default_generate_model[Generated: DataModel](  # noqa: PLR0913, C901, 
 
         recursion_level: int = 0
         while recursion_level <= toolbox.repeated_calls_limit:
-            match await lmm_invoke(
+            match await LMM.completion(
                 instruction=extended_instruction,
                 context=context,
                 tool_selection=toolbox.tool_selection(repetition_level=recursion_level),

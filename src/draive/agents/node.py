@@ -104,7 +104,7 @@ class AgentNode:
 
 @final
 class AgentMessage:
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         identifier: UUID,
         sender: AgentNode | Missing,

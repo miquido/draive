@@ -1,6 +1,6 @@
-from collections.abc import Iterable
+from collections.abc import AsyncIterator, Iterable
 from itertools import chain
-from typing import Any
+from typing import Any, Literal, overload
 
 from google.genai.types import (
     Candidate,
@@ -29,11 +29,12 @@ from draive.gemini.types import GeminiException
 from draive.gemini.utils import unwrap_missing
 from draive.instructions import Instruction
 from draive.lmm import (
+    LMM,
     LMMCompletion,
     LMMContext,
-    LMMInvocation,
     LMMOutput,
     LMMOutputSelection,
+    LMMStreamOutput,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolSelection,
@@ -43,26 +44,58 @@ from draive.metrics import TokenUsage
 from draive.multimodal.content import MultimodalContent, MultimodalContentElement
 
 __all__ = [
-    "GeminiLMMInvoking",
+    "GeminiLMMGeneration",
 ]
 
 
-class GeminiLMMInvoking(GeminiAPI):
-    def lmm_invoking(self) -> LMMInvocation:
-        return LMMInvocation(invoke=self.lmm_invocation)
+class GeminiLMMGeneration(GeminiAPI):
+    def lmm(self) -> LMM:
+        return LMM(completing=self.lmm_completion)
 
-    async def lmm_invocation(  # noqa: PLR0912, PLR0913
+    @overload
+    async def lmm_completion(
         self,
         *,
-        instruction: Instruction | str | None,
+        instruction: Instruction | None,
+        context: LMMContext,
+        tool_selection: LMMToolSelection,
+        tools: Iterable[LMMToolSpecification] | None,
+        config: GeminiGenerationConfig | None = None,
+        output: LMMOutputSelection,
+        stream: Literal[False] = False,
+        **extra: Any,
+    ) -> LMMOutput: ...
+
+    @overload
+    async def lmm_completion(
+        self,
+        *,
+        instruction: Instruction | None,
         context: LMMContext,
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
         config: GeminiGenerationConfig | None = None,
+        stream: Literal[True],
         **extra: Any,
-    ) -> LMMOutput:
-        with ctx.scope("gemini_lmm_invocation"):
+    ) -> AsyncIterator[LMMStreamOutput]: ...
+
+    async def lmm_completion(  # noqa: C901, PLR0912
+        self,
+        *,
+        instruction: Instruction | None,
+        context: LMMContext,
+        tool_selection: LMMToolSelection,
+        tools: Iterable[LMMToolSpecification] | None,
+        output: LMMOutputSelection,
+        config: GeminiGenerationConfig | None = None,
+        stream: bool = False,
+        **extra: Any,
+    ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
+        if stream:
+            raise NotImplementedError("gemini streaming is not implemented yet")
+
+        with ctx.scope("gemini_lmm_completion"):
             generation_config: GeminiGenerationConfig = config or ctx.state(GeminiGenerationConfig)
             ctx.record(
                 ArgumentsTrace.of(

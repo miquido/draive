@@ -1,4 +1,4 @@
-from base64 import b64encode
+from base64 import urlsafe_b64encode
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 from uuid import uuid4
@@ -290,7 +290,7 @@ def _convert_multimodal_content(
                 converted.append(
                     MCPImageContent(
                         type="image",
-                        data=b64encode(media.source).decode(),
+                        data=urlsafe_b64encode(media.source).decode(),
                         mimeType=media.media,
                     )
                 )

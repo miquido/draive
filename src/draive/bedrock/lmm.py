@@ -1,5 +1,5 @@
-from collections.abc import Iterable
-from typing import Any, Literal, cast
+from collections.abc import AsyncIterator, Iterable
+from typing import Any, Literal, cast, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx
 
@@ -9,11 +9,11 @@ from draive.bedrock.models import ChatCompletionResponse, ChatMessage, ChatMessa
 from draive.bedrock.types import BedrockException
 from draive.instructions import Instruction
 from draive.lmm import (
+    LMM,
     LMMCompletion,
     LMMContext,
     LMMContextElement,
     LMMInput,
-    LMMInvocation,
     LMMOutput,
     LMMOutputSelection,
     LMMToolRequest,
@@ -22,9 +22,11 @@ from draive.lmm import (
     LMMToolSelection,
     LMMToolSpecification,
 )
+from draive.lmm.types import LMMStreamOutput
 from draive.metrics.tokens import TokenUsage
 from draive.multimodal import (
     MediaContent,
+    Multimodal,
     MultimodalContent,
     MultimodalContentElement,
     TextContent,
@@ -39,21 +41,60 @@ __all__ = [
 def bedrock_lmm(
     client: BedrockClient | None = None,
     /,
-) -> LMMInvocation:
+) -> LMM:
     client = client or BedrockClient.shared()
 
-    async def lmm_invocation(
+    @overload
+    async def lmm_completion(
+        self,
         *,
-        instruction: Instruction | str | None,
+        instruction: Instruction | None,
+        context: LMMContext,
+        tool_selection: LMMToolSelection,
+        tools: Iterable[LMMToolSpecification] | None,
+        prefill: Multimodal | None = None,
+        config: BedrockChatConfig | None = None,
+        output: LMMOutputSelection,
+        stream: Literal[False] = False,
+        **extra: Any,
+    ) -> LMMOutput: ...
+
+    @overload
+    async def lmm_completion(
+        self,
+        *,
+        instruction: Instruction | None,
         context: LMMContext,
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
+        prefill: Multimodal | None = None,
+        config: BedrockChatConfig | None = None,
+        stream: Literal[True],
         **extra: Any,
-    ) -> LMMOutput:
-        with ctx.scope("bedrock_lmm_invocation"):
+    ) -> AsyncIterator[LMMStreamOutput]: ...
+
+    async def lmm_completion(
+        self,
+        *,
+        instruction: Instruction | None,
+        context: LMMContext,
+        tool_selection: LMMToolSelection,
+        tools: Iterable[LMMToolSpecification] | None,
+        output: LMMOutputSelection,
+        prefill: Multimodal | None = None,
+        config: BedrockChatConfig | None = None,
+        stream: bool = False,
+        **extra: Any,
+    ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
+        if stream:
+            raise NotImplementedError("bedrock streaming is not implemented yet")
+
+        with ctx.scope("bedrock_lmm_completion"):
+            completion_config: BedrockChatConfig = ctx.state(BedrockChatConfig).updated(**extra)
             ctx.record(
                 ArgumentsTrace.of(
+                    config=completion_config,
                     instruction=instruction,
                     context=context,
                     tools=tools,
@@ -62,8 +103,6 @@ def bedrock_lmm(
                     **extra,
                 ),
             )
-            config: BedrockChatConfig = ctx.state(BedrockChatConfig).updated(**extra)
-            ctx.record(config)
 
             match output:
                 case "auto" | "text":
@@ -94,14 +133,14 @@ def bedrock_lmm(
 
             return await _chat_completion(
                 client=client,
-                config=config,
+                config=completion_config,
                 instruction=Instruction.formatted(instruction),
                 messages=messages,
                 tools_list=tools_list,
                 require_tool=require_tool,
             )
 
-    return LMMInvocation(invoke=lmm_invocation)
+    return LMM(completing=lmm_completion)
 
 
 def _convert_content_element(
@@ -198,7 +237,7 @@ def _convert_tool(tool: LMMToolSpecification) -> ChatTool:
     }
 
 
-async def _chat_completion(  # noqa: PLR0913
+async def _chat_completion(
     *,
     client: BedrockClient,
     config: BedrockChatConfig,

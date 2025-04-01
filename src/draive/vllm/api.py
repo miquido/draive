@@ -10,12 +10,21 @@ __all__ = [
 
 
 class VLLMAPI:
+    __slots__ = (
+        "_base_url",
+        "_client",
+        "_default_headers",
+        "_extra",
+    )
+
     def __init__(
         self,
         base_url: str | None = None,
+        default_headers: Mapping[str, str] | None = None,
         **extra: Any,
     ) -> None:
         self._base_url: str | None = base_url or getenv_str("VLLM_BASE_URL")
+        self._default_headers: Mapping[str, str] | None = default_headers
         self._extra: Mapping[str, Any] = extra
         self._client: AsyncOpenAI = self._prepare_client()
 
@@ -25,6 +34,7 @@ class VLLMAPI:
             organization="vllm",
             project="vllm",
             base_url=self._base_url,
+            default_headers=self._default_headers,
             **self._extra,
         )
 

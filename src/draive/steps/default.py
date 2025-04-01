@@ -5,11 +5,11 @@ from haiway import ctx
 
 from draive.instructions import Instruction
 from draive.lmm import (
+    LMM,
     LMMCompletion,
     LMMContextElement,
     LMMToolRequests,
     LMMToolResponses,
-    lmm_invoke,
 )
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.prompts import Prompt
@@ -104,7 +104,7 @@ async def _process_step(
     recursion_level: int = 0
     context_end_index: int = len(context)
     while recursion_level <= toolbox.repeated_calls_limit:
-        match await lmm_invoke(
+        match await LMM.completion(
             instruction=step.instruction or instruction,
             context=copy(context),
             output=step.output,

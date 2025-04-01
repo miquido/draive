@@ -6,15 +6,15 @@ from haiway import Disposable, Disposables, State, StateContext, cache, ctx, ret
 
 from draive.instructions import Instruction
 from draive.lmm import (
+    LMM,
     LMMCompletion,
     LMMContext,
+    LMMContextElement,
     LMMInput,
     LMMOutputSelection,
     LMMToolRequests,
     LMMToolResponses,
-    lmm_invoke,
 )
-from draive.lmm.types import LMMContextElement
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters.model import DataModel
 from draive.prompts import Prompt
@@ -1498,7 +1498,7 @@ async def _lmm_completion(
     current_context: LMMContext = context
     recursion_level: int = 0
     while recursion_level <= toolbox.repeated_calls_limit:
-        match await lmm_invoke(
+        match await LMM.completion(
             instruction=instruction,
             context=current_context,
             output=output,

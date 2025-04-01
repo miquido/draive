@@ -23,7 +23,7 @@ from draive.tools import Toolbox
 from draive.utils import Memory, ProcessingEvent
 
 __all__ = [
-    "ConversationCompletion",
+    "ConversationCompleting",
     "ConversationElement",
     "ConversationMemory",
     "ConversationMessage",
@@ -91,26 +91,14 @@ ConversationMemory = Memory[Sequence[ConversationElement], ConversationElement]
 
 
 @runtime_checkable
-class ConversationCompletion(Protocol):
+class ConversationCompleting(Protocol):
     @overload
     async def __call__(
         self,
         *,
-        instruction: Instruction | str | None,
+        instruction: Instruction | None,
         input: ConversationMessage | Prompt | Multimodal,
-        memory: Memory[Sequence[ConversationMessage], ConversationMessage],
-        toolbox: Toolbox,
-        stream: Literal[True],
-        **extra: Any,
-    ) -> AsyncIterator[LMMStreamChunk | ProcessingEvent]: ...
-
-    @overload
-    async def __call__(
-        self,
-        *,
-        instruction: Instruction | str | None,
-        input: ConversationMessage | Prompt | Multimodal,
-        memory: Memory[Sequence[ConversationMessage], ConversationMessage],
+        memory: ConversationMemory,
         toolbox: Toolbox,
         stream: Literal[False] = False,
         **extra: Any,
@@ -120,20 +108,20 @@ class ConversationCompletion(Protocol):
     async def __call__(
         self,
         *,
-        instruction: Instruction | str | None,
+        instruction: Instruction | None,
         input: ConversationMessage | Prompt | Multimodal,
-        memory: Memory[Sequence[ConversationMessage], ConversationMessage],
+        memory: ConversationMemory,
         toolbox: Toolbox,
-        stream: bool,
+        stream: Literal[True],
         **extra: Any,
-    ) -> AsyncIterator[LMMStreamChunk | ProcessingEvent] | ConversationMessage: ...
+    ) -> AsyncIterator[LMMStreamChunk | ProcessingEvent]: ...
 
     async def __call__(
         self,
         *,
-        instruction: Instruction | str | None,
+        instruction: Instruction | None,
         input: ConversationMessage | Prompt | Multimodal,  # noqa: A002
-        memory: Memory[Sequence[ConversationMessage], ConversationMessage],
+        memory: ConversationMemory,
         toolbox: Toolbox,
         stream: bool = False,
         **extra: Any,

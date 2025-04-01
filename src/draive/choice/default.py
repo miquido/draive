@@ -7,12 +7,12 @@ from haiway import ctx
 from draive.choice.types import ChoiceOption, SelectionException
 from draive.instructions import Instruction
 from draive.lmm import (
+    LMM,
     LMMCompletion,
     LMMContextElement,
     LMMInput,
     LMMToolRequests,
     LMMToolResponses,
-    lmm_invoke,
 )
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
 from draive.tools import Toolbox
@@ -76,7 +76,7 @@ async def default_choice_completion(  # noqa: C901
 
         recursion_level: int = 0
         while recursion_level <= toolbox.repeated_calls_limit:
-            match await lmm_invoke(
+            match await LMM.completion(
                 instruction=extended_instruction,
                 context=context,
                 tool_selection=toolbox.tool_selection(repetition_level=recursion_level),

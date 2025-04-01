@@ -72,7 +72,7 @@ class BedrockClient:
         )
 
     @asynchronous
-    def _create_chat_completion(  # noqa: PLR0913
+    def _create_chat_completion(
         self,
         model: str,
         temperature: float,

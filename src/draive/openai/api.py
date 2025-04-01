@@ -7,7 +7,17 @@ __all__ = [
 
 
 class OpenAIAPI:
-    def __init__(  # noqa: PLR0913
+    __slots__ = (
+        "_api_key",
+        "_azure_api_endpoint",
+        "_azure_api_version",
+        "_azure_deployment",
+        "_base_url",
+        "_client",
+        "_organization",
+    )
+
+    def __init__(
         self,
         base_url: str | None = None,
         api_key: str | None = None,

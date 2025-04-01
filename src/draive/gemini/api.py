@@ -1,4 +1,3 @@
-from collections.abc import Mapping
 from typing import Any
 
 from google.genai import Client
@@ -10,14 +9,14 @@ __all__ = [
 
 
 class GeminiAPI:
+    __slots__ = ("_client",)
+
     def __init__(
         self,
         api_key: str | None = None,
         **extra: Any,
     ) -> None:
-        self._api_key: str | None = api_key or getenv_str("GEMINI_API_KEY")
-        self._extra: Mapping[str, Any] = extra
         self._client = Client(
-            api_key=self._api_key,
-            **self._extra,
+            api_key=api_key or getenv_str("GEMINI_API_KEY"),
+            **extra,
         )

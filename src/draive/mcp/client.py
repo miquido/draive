@@ -1,5 +1,5 @@
 from asyncio import gather
-from base64 import b64decode
+from base64 import urlsafe_b64decode
 from collections.abc import AsyncGenerator, Callable, Coroutine, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from itertools import chain
@@ -384,7 +384,7 @@ class MCPClient:
                     name="resource",  # TODO: resource name?
                     description=None,
                     content=ResourceContent(
-                        blob=b64decode(blob_resource.blob),
+                        blob=urlsafe_b64decode(blob_resource.blob),
                         mime_type=blob_resource.mimeType or "application/octet-stream",
                     ),
                     meta={"source": self.identifier},
@@ -452,19 +452,19 @@ async def _convert_content(
 
                         case "text/plain":
                             return MultimodalContent.of(
-                                TextContent(text=b64decode(blob.blob).decode())
+                                TextContent(text=urlsafe_b64decode(blob.blob).decode())
                             )
 
                         case "application/json":
                             return MultimodalContent.of(
-                                DataModel.from_json(b64decode(blob.blob).decode())
+                                DataModel.from_json(urlsafe_b64decode(blob.blob).decode())
                             )
 
                         case other:
                             # try to match supported media or raise an exception
                             return MultimodalContent.of(
                                 MediaContent.data(
-                                    b64decode(blob.blob),
+                                    urlsafe_b64decode(blob.blob),
                                     media=other,
                                 )
                             )
