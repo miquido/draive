@@ -1,10 +1,12 @@
+from collections.abc import Iterable, Set
 from types import TracebackType
-from typing import final
+from typing import Any, Literal, final
+
+from haiway import State
 
 from draive.gemini.api import GeminiAPI
 from draive.gemini.embedding import GeminiEmbedding
-from draive.gemini.lmm_invoking import GeminiLMMInvoking
-from draive.gemini.lmm_streaming import GeminiLMMStreaming
+from draive.gemini.lmm_generation import GeminiLMMGeneration
 from draive.gemini.tokenization import GeminiTokenization
 
 __all__ = [
@@ -14,8 +16,7 @@ __all__ = [
 
 @final
 class Gemini(
-    GeminiLMMInvoking,
-    GeminiLMMStreaming,
+    GeminiLMMGeneration,
     GeminiEmbedding,
     GeminiTokenization,
     GeminiAPI,
@@ -24,8 +25,34 @@ class Gemini(
     Access to Gemini services, can be used to prepare various functionalities like lmm.
     """
 
-    async def __aenter__(self) -> None:
-        pass
+    __slots__ = ("_disposable_state",)
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        disposable_state: Set[Literal["lmm", "text_embedding"]] | None = None,
+        **extra: Any,
+    ) -> None:
+        super().__init__(
+            api_key=api_key,
+            **extra,
+        )
+
+        self._disposable_state: frozenset[Literal["lmm", "text_embedding"]] = (
+            frozenset(disposable_state)
+            if disposable_state is not None
+            else frozenset(("lmm", "text_embedding"))
+        )
+
+    async def __aenter__(self) -> Iterable[State]:
+        state: list[State] = []
+        if "lmm" in self._disposable_state:
+            state.append(self.lmm())
+
+        if "text_embedding" in self._disposable_state:
+            state.append(self.text_embedding())
+
+        return state
 
     async def __aexit__(
         self,

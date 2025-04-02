@@ -8,7 +8,6 @@ from openai import NOT_GIVEN, NotGiven
 from openai.types.chat import (
     ChatCompletionContentPartParam,
     ChatCompletionMessageParam,
-    ChatCompletionModality,
     ChatCompletionToolChoiceOptionParam,
     ChatCompletionToolParam,
 )
@@ -139,17 +138,15 @@ def context_element_as_messages(
             )
 
 
-def output_as_response_declaration(  # noqa: PLR0911
+def output_as_response_declaration(
     output: LMMOutputSelection,
 ) -> tuple[
     ResponseFormat | ResponseFormatJSONSchema | NotGiven,
-    list[ChatCompletionModality] | NotGiven,
     Callable[[MultimodalContent], MultimodalContent],
 ]:
     match output:
         case "auto":
             return (
-                NOT_GIVEN,
                 NOT_GIVEN,
                 _auto_output_conversion,
             )
@@ -157,32 +154,26 @@ def output_as_response_declaration(  # noqa: PLR0911
         case ["text"] | "text":
             return (
                 {"type": "text"},
-                ["text"],
                 _auto_output_conversion,
             )
 
         case "json":
             return (
                 {"type": "json_object"},
-                ["text"],
-                _auto_output_conversion,
+                _json_output_conversion,
             )
-            return ({"type": "json_object"}, _json_output_conversion)
 
         case "image":
-            raise NotImplementedError("image output is not supported by OpenAI")
+            raise NotImplementedError("image output is not supported yet")
 
-        case ["audio"] | "audio":
-            return (NOT_GIVEN, ["audio"], _audio_output_conversion)
+        case "audio":
+            raise NotImplementedError("audio output is not supported yet")
 
         case "video":
-            raise NotImplementedError("video output is not supported by OpenAI")
-
-        case ["text", "audio"] | ["audio", "text"]:  # refine multimodal matching?
-            return (NOT_GIVEN, ["text", "audio"], _auto_output_conversion)
+            raise NotImplementedError("video output is not supported yet")
 
         case [*_]:
-            raise NotImplementedError("multimodal output is not supported by OpenAI")
+            raise NotImplementedError("multimodal output is not supported yet")
 
         case model:
             return (
@@ -197,7 +188,6 @@ def output_as_response_declaration(  # noqa: PLR0911
                         "strict": False,
                     },
                 },
-                ["text"],
                 _prepare_model_output_conversion(model),
             )
 

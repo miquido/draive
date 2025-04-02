@@ -64,7 +64,7 @@ def Argument[Value](
 ) -> Value: ...
 
 
-def Argument[Value](  # noqa: PLR0913
+def Argument[Value](
     *,
     aliased: str | None = None,
     description: str | Missing = MISSING,
@@ -100,7 +100,7 @@ def Argument[Value](  # noqa: PLR0913
 
 @final
 class FunctionArgument:
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         aliased: str | None,
         description: str | Missing,

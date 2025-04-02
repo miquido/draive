@@ -7,6 +7,13 @@ __all__ = [
 
 
 class MistralAPI:
+    __slots__ = (
+        "_api_key",
+        "_client",
+        "_server_url",
+        "_timeout_ms",
+    )
+
     def __init__(
         self,
         server_url: str | None = None,

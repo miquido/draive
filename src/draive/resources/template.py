@@ -33,7 +33,7 @@ class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
         "uri",
     )
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         /,
         uri: str,
@@ -85,7 +85,7 @@ class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
             raise ResourceException(f"Resolving resource '{self.declaration.uri}' failed") from exc
 
 
-def resource[**Args, Result: Sequence[Resource] | ResourceContent](  # noqa: PLR0913
+def resource[**Args, Result: Sequence[Resource] | ResourceContent](
     *,
     uri: str,
     mime_type: str | None = None,

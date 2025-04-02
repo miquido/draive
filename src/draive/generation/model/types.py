@@ -23,7 +23,7 @@ class ModelGeneratorDecoder(Protocol):
 
 @runtime_checkable
 class ModelGenerator(Protocol):
-    async def __call__[Generated: DataModel](  # noqa: PLR0913
+    async def __call__[Generated: DataModel](
         self,
         generated: type[Generated],
         /,

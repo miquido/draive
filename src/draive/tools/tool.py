@@ -38,7 +38,7 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
         "specification",
     )
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         /,
         name: str,
@@ -305,7 +305,7 @@ def tool(
     """
 
 
-def tool[**Args, Result](  # noqa: PLR0913
+def tool[**Args, Result](
     function: Callable[Args, Coroutine[None, None, Result]] | None = None,
     *,
     name: str | None = None,

@@ -5,6 +5,7 @@ from typing import (
     Protocol,
     Self,
     TypedDict,
+    overload,
     runtime_checkable,
 )
 
@@ -16,19 +17,18 @@ from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel, ParametersSpecification
 
 __all__ = [
+    "LMMCompleting",
     "LMMCompletion",
     "LMMContext",
     "LMMContextElement",
     "LMMException",
     "LMMInput",
-    "LMMInvocating",
     "LMMOutput",
+    "LMMSessionOutputSelection",
+    "LMMSessionProperties",
     "LMMStreamChunk",
     "LMMStreamInput",
     "LMMStreamOutput",
-    "LMMStreamOutputSelection",
-    "LMMStreamProperties",
-    "LMMStreaming",
     "LMMToolError",
     "LMMToolFunctionSpecification",
     "LMMToolRequest",
@@ -210,37 +210,64 @@ LMMStreamOutput = LMMStreamChunk | LMMToolRequest
 
 
 @runtime_checkable
-class LMMInvocating(Protocol):
+class LMMCompleting(Protocol):
+    @overload
     async def __call__(
         self,
         *,
-        instruction: Instruction | str | None,
+        instruction: Instruction | None,
         context: LMMContext,
         tool_selection: LMMToolSelection,
         tools: Iterable[LMMToolSpecification] | None,
         output: LMMOutputSelection,
+        stream: Literal[False] = False,
         **extra: Any,
     ) -> LMMOutput: ...
 
+    @overload
+    async def __call__(
+        self,
+        *,
+        instruction: Instruction | None,
+        context: LMMContext,
+        tool_selection: LMMToolSelection,
+        tools: Iterable[LMMToolSpecification] | None,
+        output: LMMOutputSelection,
+        stream: Literal[True],
+        **extra: Any,
+    ) -> AsyncIterator[LMMStreamOutput]: ...
 
-type LMMStreamOutputSelection = (
+    async def __call__(
+        self,
+        *,
+        instruction: Instruction | None,
+        context: LMMContext,
+        tool_selection: LMMToolSelection,
+        tools: Iterable[LMMToolSpecification] | None,
+        output: LMMOutputSelection,
+        stream: bool = False,
+        **extra: Any,
+    ) -> AsyncIterator[LMMStreamOutput] | LMMOutput: ...
+
+
+type LMMSessionOutputSelection = (
     Sequence[Literal["text", "audio"]] | Literal["auto", "text", "audio"]
 )
 
 
-class LMMStreamProperties(State):
-    instruction: Instruction | str | None = None
-    output: LMMStreamOutputSelection = "auto"
+class LMMSessionProperties(State):
+    instruction: Instruction | None = None
+    output: LMMSessionOutputSelection = "auto"
     tools: Sequence[LMMToolSpecification] | None
     tool_selection: LMMToolSelection = "auto"
 
 
 @runtime_checkable
-class LMMStreaming(Protocol):
+class LMMSessionPreparing(Protocol):
     async def __call__(
         self,
         *,
-        properties: AsyncIterator[LMMStreamProperties],
+        properties: AsyncIterator[LMMSessionProperties],
         input: AsyncIterator[LMMStreamInput],  # noqa: A002
         context: LMMContext | None,
         **extra: Any,

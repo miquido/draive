@@ -63,7 +63,7 @@ def _split(
     raise ValueError("Text splitting failed")
 
 
-def _merge(  # noqa: C901, PLR0912, PLR0913
+def _merge(  # noqa: C901, PLR0912
     parts: list[str],
     part_size: int,
     count_size: Callable[[str], int],

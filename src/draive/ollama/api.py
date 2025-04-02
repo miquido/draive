@@ -7,6 +7,11 @@ __all__ = [
 
 
 class OllamaAPI:
+    __slots__ = (
+        "_client",
+        "_server_url",
+    )
+
     def __init__(
         self,
         server_url: str | None = None,

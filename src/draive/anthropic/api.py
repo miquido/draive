@@ -1,4 +1,4 @@
-from typing import Literal, cast, overload
+from typing import Literal, cast
 
 from anthropic import AsyncAnthropic
 from haiway import getenv_str
@@ -9,27 +9,6 @@ __all__ = [
 
 
 class AnthropicAPI:
-    @overload
-    def __init__(
-        self,
-        provider: Literal["anthropic"] = "anthropic",
-        /,
-        *,
-        base_url: str | None = None,
-        api_key: str | None = None,
-        timeout: float = 60.0,
-    ) -> None: ...
-
-    @overload
-    def __init__(
-        self,
-        provider: Literal["bedrock"],
-        /,
-        *,
-        base_url: str | None = None,
-        timeout: float = 60.0,
-    ) -> None: ...
-
     def __init__(
         self,
         provider: Literal["anthropic", "bedrock"] = "anthropic",

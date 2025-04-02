@@ -29,7 +29,7 @@ __all__ = [
 
 # it is a naive adjustment of cohere.BedrockClientV2 to work with async interfaces
 class AsyncAwsClientV2(AsyncClientV2):
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         *,
         aws_access_key: str | None = None,

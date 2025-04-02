@@ -90,7 +90,7 @@ def Field[Value](
 ) -> Value: ...
 
 
-def Field[Value](  # noqa: PLR0913
+def Field[Value](
     *,
     aliased: str | None = None,
     description: str | Missing = MISSING,
@@ -128,7 +128,7 @@ def Field[Value](  # noqa: PLR0913
 
 @final
 class DataField:
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         aliased: str | None,
         description: str | Missing,

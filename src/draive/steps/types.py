@@ -58,7 +58,7 @@ class Step(State):
     ) -> Self: ...
 
     @classmethod
-    def of(  # noqa: PLR0913
+    def of(
         cls,
         input: Prompt | Multimodal,  # noqa: A002
         /,
@@ -92,7 +92,7 @@ class Step(State):
                 step_input = LMMInput.of(other)
 
         return cls(
-            instruction=Instruction.of(instruction) if instruction else None,
+            instruction=Instruction.of(instruction),
             input=step_input,
             toolbox=Toolbox.of(tools),
             output=output,

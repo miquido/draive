@@ -30,7 +30,7 @@ def split_text(
 ) -> list[str]: ...
 
 
-def split_text(  # noqa: PLR0913
+def split_text(
     text: str,
     part_size: int,
     count_size: Callable[[str], int],

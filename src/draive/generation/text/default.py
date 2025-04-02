@@ -5,12 +5,12 @@ from haiway import ctx
 
 from draive.instructions import Instruction
 from draive.lmm import (
+    LMM,
     LMMCompletion,
     LMMContextElement,
     LMMInput,
     LMMToolRequests,
     LMMToolResponses,
-    lmm_invoke,
 )
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.prompts import Prompt
@@ -52,7 +52,7 @@ async def default_generate_text(
 
         recursion_level: int = 0
         while recursion_level <= toolbox.repeated_calls_limit:
-            match await lmm_invoke(
+            match await LMM.completion(
                 instruction=instruction,
                 context=context,
                 tools=toolbox.available_tools(),

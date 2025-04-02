@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-async def generate_model[Generated: DataModel](  # noqa: PLR0913
+async def generate_model[Generated: DataModel](
     generated: type[Generated],
     /,
     *,
