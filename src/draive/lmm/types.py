@@ -24,6 +24,8 @@ __all__ = (
     "LMMException",
     "LMMInput",
     "LMMOutput",
+    "LMMSessionEvent",
+    "LMMSessionOutput",
     "LMMSessionOutputSelection",
     "LMMStreamChunk",
     "LMMStreamInput",
@@ -208,6 +210,27 @@ LMMStreamInput = LMMStreamChunk | LMMToolResponse
 LMMStreamOutput = LMMStreamChunk | LMMToolRequest
 
 
+class LMMSessionEvent(DataModel):
+    @classmethod
+    def of(
+        cls,
+        category: Literal["completed", "interrupted"] | str,
+        /,
+        *,
+        meta: Meta | None = None,
+    ) -> Self:
+        return cls(
+            category=category,
+            meta=meta if meta is not None else META_EMPTY,
+        )
+
+    category: Literal["completed", "interrupted"] | str
+    meta: Meta
+
+
+LMMSessionOutput = LMMStreamChunk | LMMToolRequest | LMMSessionEvent
+
+
 @runtime_checkable
 class LMMCompleting(Protocol):
     @overload
@@ -266,4 +289,4 @@ class LMMSessionPreparing(Protocol):
         tools: Sequence[LMMToolSpecification],
         tool_selection: LMMToolSelection,
         **extra: Any,
-    ) -> AsyncIterator[LMMStreamOutput]: ...
+    ) -> AsyncIterator[LMMSessionOutput]: ...

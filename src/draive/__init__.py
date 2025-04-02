@@ -125,6 +125,8 @@ from draive.lmm import (
     LMMException,
     LMMInput,
     LMMSession,
+    LMMSessionEvent,
+    LMMSessionOutput,
     LMMSessionOutputSelection,
     LMMStreamChunk,
     LMMStreamInput,
@@ -174,6 +176,7 @@ from draive.prompts import (
     fetch_prompt_list,
     prompt,
 )
+from draive.realtime import Realtime, RealtimeOutputSelection
 from draive.resources import (
     Resource,
     ResourceContent,
@@ -287,6 +290,8 @@ __all__ = (
     "LMMException",
     "LMMInput",
     "LMMSession",
+    "LMMSessionEvent",
+    "LMMSessionOutput",
     "LMMSessionOutputSelection",
     "LMMStreamChunk",
     "LMMStreamInput",
@@ -339,6 +344,8 @@ __all__ = (
     "PromptRepository",
     "PromptTemplate",
     "RateLimitError",
+    "Realtime",
+    "RealtimeOutputSelection",
     "Resource",
     "ResourceContent",
     "ResourceDeclaration",
