@@ -1,6 +1,4 @@
-__all__ = [
-    "MistralException",
-]
+__all__ = ("MistralException",)
 
 
 class MistralException(Exception):

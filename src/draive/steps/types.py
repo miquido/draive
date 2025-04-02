@@ -10,10 +10,10 @@ from draive.multimodal import Multimodal, MultimodalContent
 from draive.prompts import Prompt
 from draive.tools import AnyTool, Toolbox
 
-__all__ = [
+__all__ = (
     "Step",
     "StepsCompleting",
-]
+)
 
 
 @runtime_checkable

@@ -8,9 +8,7 @@ from draive.ollama.api import OllamaAPI
 from draive.ollama.embedding import OllamaEmbedding
 from draive.ollama.lmm_generation import OllamaLMMGeneration
 
-__all__ = [
-    "Ollama",
-]
+__all__ = ("Ollama",)
 
 
 @final

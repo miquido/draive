@@ -5,9 +5,7 @@ from draive.multimodal.media import MediaContent
 from draive.multimodal.text import TextContent
 from draive.parameters import DataModel
 
-__all__ = [
-    "MetaContent",
-]
+__all__ = ("MetaContent",)
 
 
 class MetaContent(DataModel):

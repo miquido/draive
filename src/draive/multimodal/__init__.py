@@ -17,7 +17,7 @@ from draive.multimodal.meta import MetaContent
 from draive.multimodal.tags import MultimodalTagElement
 from draive.multimodal.text import TextContent
 
-__all__ = [
+__all__ = (
     "MEDIA_KINDS",
     "MediaContent",
     "MediaData",
@@ -32,4 +32,4 @@ __all__ = [
     "MultimodalTagElement",
     "TextContent",
     "validated_media_kind",
-]
+)

@@ -3,9 +3,7 @@ from typing import Any, Protocol, runtime_checkable
 from draive.instructions import Instruction
 from draive.multimodal import MediaContent, Multimodal
 
-__all__ = [
-    "ImageGenerator",
-]
+__all__ = ("ImageGenerator",)
 
 
 @runtime_checkable

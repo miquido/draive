@@ -10,10 +10,10 @@ from draive.instructions.types import (
 )
 from draive.parameters import ParametrizedFunction
 
-__all__ = [
+__all__ = (
     "InstructionTemplate",
     "instruction",
-]
+)
 
 
 @final

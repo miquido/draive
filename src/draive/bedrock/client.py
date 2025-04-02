@@ -7,9 +7,7 @@ from haiway import asynchronous, getenv_str, not_missing
 from draive.bedrock.config import BedrockChatConfig
 from draive.bedrock.models import ChatCompletionResponse, ChatMessage, ChatTool
 
-__all__ = [
-    "BedrockClient",
-]
+__all__ = ("BedrockClient",)
 
 
 @final

@@ -8,7 +8,7 @@ from draive.instructions.types import (
     InstructionMissing,
 )
 
-__all__ = [
+__all__ = (
     "Instruction",
     "InstructionException",
     "InstructionFetching",
@@ -17,4 +17,4 @@ __all__ = [
     "InstructionTemplate",
     "Instructions",
     "instruction",
-]
+)

@@ -3,9 +3,7 @@ from typing import Literal
 from cohere import AsyncClientV2
 from haiway import getenv_str
 
-__all__ = [
-    "CohereAPI",
-]
+__all__ = ("CohereAPI",)
 
 
 class CohereAPI:

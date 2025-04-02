@@ -5,9 +5,9 @@ from draive.helpers.usage_cost import (
 )
 from draive.helpers.volatile_vector_index import VolatileVectorIndex
 
-__all__ = [
+__all__ = (
     "ModelTokenPrice",
     "TokenPrice",
     "VolatileVectorIndex",
     "usage_cost",
-]
+)

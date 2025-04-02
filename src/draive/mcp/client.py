@@ -36,10 +36,10 @@ from draive.prompts import Prompt, PromptDeclaration, PromptDeclarationArgument,
 from draive.resources import Resource, ResourceContent, ResourceDeclaration, Resources
 from draive.tools import AnyTool, ExternalTools, Tool
 
-__all__ = [
+__all__ = (
     "MCPClient",
     "MCPClientAggregate",
-]
+)
 
 
 @final

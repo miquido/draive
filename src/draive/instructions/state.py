@@ -13,9 +13,7 @@ from draive.instructions.types import (
     InstructionMissing,
 )
 
-__all__ = [
-    "Instructions",
-]
+__all__ = ("Instructions",)
 
 
 async def _empty(

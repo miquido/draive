@@ -3,10 +3,10 @@ from typing import Any
 
 from draive.parameters.specification import ParameterSpecification, ParametersSpecification
 
-__all__ = [
+__all__ = (
     "json_schema",
     "simplified_schema",
-]
+)
 
 
 def json_schema(

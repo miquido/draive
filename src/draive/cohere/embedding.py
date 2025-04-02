@@ -11,9 +11,7 @@ from draive.cohere.api import CohereAPI
 from draive.cohere.config import CohereImageEmbeddingConfig, CohereTextEmbeddingConfig
 from draive.embedding import Embedded, ImageEmbedding, TextEmbedding
 
-__all__ = [
-    "CohereEmbedding",
-]
+__all__ = ("CohereEmbedding",)
 
 
 class CohereEmbedding(CohereAPI):

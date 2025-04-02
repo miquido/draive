@@ -10,7 +10,7 @@ from draive.prompts.types import (
     PromptListing,
 )
 
-__all__ = [
+__all__ = (
     "MissingPrompt",
     "Prompt",
     "PromptAvailabilityCheck",
@@ -23,4 +23,4 @@ __all__ = [
     "fetch_prompt",
     "fetch_prompt_list",
     "prompt",
-]
+)

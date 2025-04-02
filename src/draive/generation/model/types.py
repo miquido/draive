@@ -7,10 +7,10 @@ from draive.parameters import DataModel
 from draive.prompts import Prompt
 from draive.tools import AnyTool, Toolbox
 
-__all__ = [
+__all__ = (
     "ModelGenerator",
     "ModelGeneratorDecoder",
-]
+)
 
 
 @runtime_checkable

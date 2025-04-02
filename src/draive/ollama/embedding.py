@@ -10,9 +10,7 @@ from draive.embedding import Embedded, TextEmbedding
 from draive.ollama.api import OllamaAPI
 from draive.ollama.config import OllamaEmbeddingConfig
 
-__all__ = [
-    "OllamaEmbedding",
-]
+__all__ = ("OllamaEmbedding",)
 
 
 class OllamaEmbedding(OllamaAPI):

@@ -23,12 +23,12 @@ from draive.commons import Meta
 from draive.parameters.types import ParameterValidation, ParameterValidationContext
 from draive.parameters.validation import ParameterValidator
 
-__all__ = [
+__all__ = (
     "ParameterSpecification",
     "ParametersSpecification",
     "parameter_specification",
     "validated_specification",
-]
+)
 
 
 @final

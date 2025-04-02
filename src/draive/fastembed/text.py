@@ -8,9 +8,7 @@ from haiway import asynchronous, ctx
 
 from draive.embedding import Embedded, TextEmbedding
 
-__all__ = [
-    "fastembed_text_embedding",
-]
+__all__ = ("fastembed_text_embedding",)
 
 
 async def fastembed_text_embedding(

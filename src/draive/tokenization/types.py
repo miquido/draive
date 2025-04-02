@@ -1,9 +1,7 @@
 from collections.abc import Sequence
 from typing import Any, Protocol, runtime_checkable
 
-__all__ = [
-    "TextTokenizing",
-]
+__all__ = ("TextTokenizing",)
 
 
 @runtime_checkable

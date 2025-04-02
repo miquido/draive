@@ -3,9 +3,7 @@ from typing import Any, Protocol, Self, final, runtime_checkable
 
 from haiway import State
 
-__all__ = [
-    "Memory",
-]
+__all__ = ("Memory",)
 
 
 @runtime_checkable

@@ -8,7 +8,7 @@ from draive.parameters.specification import (
 from draive.parameters.types import BasicValue, ParameterValidationContext, ParameterValidationError
 from draive.parameters.validation import ParameterValidator, ParameterVerification
 
-__all__ = [
+__all__ = (
     "Argument",
     "BasicValue",
     "DataModel",
@@ -22,4 +22,4 @@ __all__ = [
     "ParametersSpecification",
     "ParametrizedFunction",
     "validated_specification",
-]
+)

@@ -12,9 +12,7 @@ from draive.openai.utils import unwrap_missing
 from draive.safeguards import ContentGuardrails, GuardrailsException
 from draive.splitters import split_text
 
-__all__ = [
-    "OpenAIContentFiltering",
-]
+__all__ = ("OpenAIContentFiltering",)
 
 
 class OpenAIContentFiltering(OpenAIAPI):

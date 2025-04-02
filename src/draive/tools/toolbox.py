@@ -16,11 +16,11 @@ from draive.lmm.types import (
 from draive.multimodal import MultimodalContent
 from draive.tools.tool import AnyTool, Tool
 
-__all__ = [
+__all__ = (
     "ExternalTools",
     "Toolbox",
     "ToolsFetching",
-]
+)
 
 
 @final

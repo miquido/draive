@@ -9,9 +9,7 @@ from haiway import asynchronous, ctx
 
 from draive.embedding import Embedded, ValueEmbedder
 
-__all__ = [
-    "fastembed_image_embedding",
-]
+__all__ = ("fastembed_image_embedding",)
 
 
 async def fastembed_image_embedding(

@@ -8,12 +8,12 @@ from draive.multimodal.meta import MetaContent
 from draive.multimodal.text import TextContent
 from draive.parameters import DataModel
 
-__all__ = [
+__all__ = (
     "Multimodal",
     "MultimodalContent",
     "MultimodalContentConvertible",
     "MultimodalContentElement",
-]
+)
 
 
 MultimodalContentElement = TextContent | MediaContent | MetaContent | DataModel

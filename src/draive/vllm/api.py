@@ -4,9 +4,7 @@ from typing import Any
 from haiway import getenv_str
 from openai import AsyncOpenAI
 
-__all__ = [
-    "VLLMAPI",
-]
+__all__ = ("VLLMAPI",)
 
 
 class VLLMAPI:

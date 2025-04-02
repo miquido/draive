@@ -34,9 +34,7 @@ from draive.multimodal import (
 )
 from draive.parameters import DataModel
 
-__all__ = [
-    "bedrock_lmm",
-]
+__all__ = ("bedrock_lmm",)
 
 
 def bedrock_lmm(

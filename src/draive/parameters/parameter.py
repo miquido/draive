@@ -13,9 +13,7 @@ from draive.parameters.types import (
 )
 from draive.parameters.validation import ParameterValidator
 
-__all__ = [
-    "Parameter",
-]
+__all__ = ("Parameter",)
 
 
 @final

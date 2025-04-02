@@ -6,12 +6,12 @@ from haiway import ctx
 from draive.embedding.state import ImageEmbedding, TextEmbedding
 from draive.embedding.types import Embedded
 
-__all__ = [
+__all__ = (
     "embed_image",
     "embed_images",
     "embed_text",
     "embed_texts",
-]
+)
 
 
 async def embed_text(

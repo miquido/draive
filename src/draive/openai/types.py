@@ -1,6 +1,4 @@
-__all__ = [
-    "OpenAIException",
-]
+__all__ = ("OpenAIException",)
 
 
 class OpenAIException(Exception):

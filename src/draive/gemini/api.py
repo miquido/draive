@@ -4,9 +4,7 @@ from google.genai import Client
 from google.genai.client import HttpOptionsDict
 from haiway import getenv_str
 
-__all__ = [
-    "GeminiAPI",
-]
+__all__ = ("GeminiAPI",)
 
 
 class GeminiAPI:

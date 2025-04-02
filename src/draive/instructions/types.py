@@ -7,7 +7,7 @@ from haiway import Default, State
 from draive.commons import META_EMPTY, Meta
 from draive.parameters import DataModel, Field, ParameterSpecification
 
-__all__ = [
+__all__ = (
     "Instruction",
     "InstructionDeclaration",
     "InstructionDeclarationArgument",
@@ -15,7 +15,7 @@ __all__ = [
     "InstructionFetching",
     "InstructionListFetching",
     "InstructionMissing",
-]
+)
 
 
 class InstructionException(Exception):

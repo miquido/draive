@@ -44,9 +44,7 @@ from draive.vllm.lmm import (
 from draive.vllm.types import VLLMException
 from draive.vllm.utils import unwrap_missing
 
-__all__ = [
-    "VLLMLMMGeneration",
-]
+__all__ = ("VLLMLMMGeneration",)
 
 
 class VLLMLMMGeneration(VLLMAPI):

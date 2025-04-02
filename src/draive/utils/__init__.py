@@ -9,7 +9,7 @@ from draive.utils.splitting import split_sequence
 from draive.utils.streams import ConstantStream, FixedStream
 from draive.utils.vector_index import VectorIndex
 
-__all__ = [
+__all__ = (
     "ConstantStream",
     "FixedStream",
     "Memory",
@@ -19,4 +19,4 @@ __all__ = [
     "RateLimitError",
     "VectorIndex",
     "split_sequence",
-]
+)

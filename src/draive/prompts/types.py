@@ -8,14 +8,14 @@ from draive.lmm import LMMContext, LMMContextElement
 from draive.parameters import DataModel, Field
 from draive.parameters.specification import ParameterSpecification
 
-__all__ = [
+__all__ = (
     "MissingPrompt",
     "Prompt",
     "PromptDeclaration",
     "PromptDeclarationArgument",
     "PromptFetching",
     "PromptListing",
-]
+)
 
 
 class MissingPrompt(Exception):

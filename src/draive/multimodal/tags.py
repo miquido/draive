@@ -8,9 +8,7 @@ from draive.multimodal.content import Multimodal, MultimodalContent, MultimodalC
 from draive.multimodal.text import TextContent
 from draive.parameters import DataModel
 
-__all__ = [
-    "MultimodalTagElement",
-]
+__all__ = ("MultimodalTagElement",)
 
 
 # TODO: add streaming support with content input as async iterator

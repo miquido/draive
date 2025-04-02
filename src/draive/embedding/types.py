@@ -5,10 +5,10 @@ from haiway import State
 
 from draive.parameters import DataModel
 
-__all__ = [
+__all__ = (
     "Embedded",
     "ValueEmbedder",
-]
+)
 
 
 class Embedded[Value: DataModel | State | str | bytes](State):

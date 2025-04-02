@@ -1,6 +1,4 @@
-__all__ = [
-    "GuardrailsException",
-]
+__all__ = ("GuardrailsException",)
 
 
 class GuardrailsException(Exception):

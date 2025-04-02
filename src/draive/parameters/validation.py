@@ -17,9 +17,7 @@ from draive.parameters.types import (
     ParameterVerification,
 )
 
-__all__ = [
-    "ParameterValidator",
-]
+__all__ = ("ParameterValidator",)
 
 
 class ParameterValidator[Type]:

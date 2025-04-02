@@ -11,9 +11,7 @@ from draive.gemini.lmm_generation import GeminiLMMGeneration
 from draive.gemini.lmm_session import GeminiLMMSession
 from draive.gemini.tokenization import GeminiTokenization
 
-__all__ = [
-    "Gemini",
-]
+__all__ = ("Gemini",)
 
 
 @final

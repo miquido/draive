@@ -1,8 +1,6 @@
 from collections.abc import Generator, Sequence
 
-__all__ = [
-    "split_sequence",
-]
+__all__ = ("split_sequence",)
 
 
 def split_sequence[Element](

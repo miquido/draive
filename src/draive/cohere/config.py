@@ -2,10 +2,10 @@ from typing import Literal
 
 from haiway import State
 
-__all__ = [
+__all__ = (
     "CohereImageEmbeddingConfig",
     "CohereTextEmbeddingConfig",
-]
+)
 
 
 class CohereTextEmbeddingConfig(State):

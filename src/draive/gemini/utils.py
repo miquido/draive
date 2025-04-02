@@ -3,9 +3,7 @@ from typing import cast, overload
 
 from haiway import MISSING, Missing
 
-__all__ = [
-    "unwrap_missing",
-]
+__all__ = ("unwrap_missing",)
 
 
 @overload

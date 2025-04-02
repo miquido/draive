@@ -1,6 +1,4 @@
-__all__ = [
-    "AgentException",
-]
+__all__ = ("AgentException",)
 
 
 class AgentException(Exception):

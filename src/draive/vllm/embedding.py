@@ -11,9 +11,7 @@ from draive.vllm.api import VLLMAPI
 from draive.vllm.config import VLLMEmbeddingConfig
 from draive.vllm.utils import unwrap_missing
 
-__all__ = [
-    "VLLMEmbedding",
-]
+__all__ = ("VLLMEmbedding",)
 
 
 class VLLMEmbedding(VLLMAPI):

@@ -6,9 +6,7 @@ from tiktoken import Encoding, encoding_for_model
 from draive.openai.api import OpenAIAPI
 from draive.tokenization import Tokenization
 
-__all__ = [
-    "OpenAITokenization",
-]
+__all__ = ("OpenAITokenization",)
 
 
 class OpenAITokenization(OpenAIAPI):

@@ -1,8 +1,6 @@
 from asyncio import sleep
 
-__all__ = [
-    "RateLimitError",
-]
+__all__ = ("RateLimitError",)
 
 
 class RateLimitError(Exception):

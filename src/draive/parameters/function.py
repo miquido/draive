@@ -14,10 +14,10 @@ from draive.parameters.specification import ParameterSpecification
 from draive.parameters.types import ParameterValidation, ParameterVerification
 from draive.parameters.validation import ParameterValidationContext
 
-__all__ = [
+__all__ = (
     "Argument",
     "ParametrizedFunction",
-]
+)
 
 
 @overload

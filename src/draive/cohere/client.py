@@ -7,9 +7,7 @@ from haiway import State
 from draive.cohere.api import CohereAPI
 from draive.cohere.embedding import CohereEmbedding
 
-__all__ = [
-    "Cohere",
-]
+__all__ = ("Cohere",)
 
 
 @final

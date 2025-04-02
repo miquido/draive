@@ -32,9 +32,7 @@ from draive.utils import ProcessingState
 from draive.utils.memory import Memory
 from draive.utils.processing import Processing
 
-__all__ = [
-    "Stage",
-]
+__all__ = ("Stage",)
 
 
 class MakeCacheKey[Key](Protocol):

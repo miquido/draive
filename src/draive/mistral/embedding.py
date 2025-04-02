@@ -10,9 +10,7 @@ from draive.embedding import Embedded, TextEmbedding
 from draive.mistral.api import MistralAPI
 from draive.mistral.config import MistralEmbeddingConfig
 
-__all__ = [
-    "MistralEmbedding",
-]
+__all__ = ("MistralEmbedding",)
 
 
 class MistralEmbedding(MistralAPI):

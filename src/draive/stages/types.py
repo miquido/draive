@@ -4,7 +4,7 @@ from typing import Protocol, runtime_checkable
 from draive.lmm import LMMContext
 from draive.multimodal import MultimodalContent
 
-__all__ = [
+__all__ = (
     "StageCondition",
     "StageContextTransforming",
     "StageException",
@@ -12,7 +12,7 @@ __all__ = [
     "StageMerging",
     "StageResultTransforming",
     "StageStateAccessing",
-]
+)
 
 
 @runtime_checkable

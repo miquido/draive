@@ -22,11 +22,11 @@ from draive.prompts import Prompt, PromptTemplate
 from draive.resources import Resource, ResourceContent, ResourceTemplate
 from draive.tools import AnyTool, Toolbox
 
-__all__ = [
+__all__ = (
     "expose_prompts",
     "expose_resources",
     "expose_tools",
-]
+)
 
 
 def expose_resources(  # noqa: C901

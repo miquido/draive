@@ -2,7 +2,10 @@ from collections.abc import Sequence
 
 from haiway import MISSING, Missing, State
 
-__all__ = ["OllamaChatConfig", "OllamaEmbeddingConfig"]
+__all__ = (
+    "OllamaChatConfig",
+    "OllamaEmbeddingConfig",
+)
 
 
 class OllamaChatConfig(State):

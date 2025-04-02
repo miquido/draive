@@ -10,9 +10,7 @@ from draive.embedding import Embedded, TextEmbedding
 from draive.gemini.api import GeminiAPI
 from draive.gemini.config import GeminiEmbeddingConfig
 
-__all__ = [
-    "GeminiEmbedding",
-]
+__all__ = ("GeminiEmbedding",)
 
 
 class GeminiEmbedding(GeminiAPI):

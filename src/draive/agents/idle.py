@@ -2,9 +2,7 @@ from asyncio import AbstractEventLoop, Event, Handle, gather, get_running_loop
 from types import TracebackType
 from typing import Any, Self, final
 
-__all__ = [
-    "IdleMonitor",
-]
+__all__ = ("IdleMonitor",)
 
 
 @final

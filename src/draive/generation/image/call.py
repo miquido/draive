@@ -6,9 +6,7 @@ from draive.generation.image.state import ImageGeneration
 from draive.instructions import Instruction
 from draive.multimodal import MediaContent, Multimodal
 
-__all__ = [
-    "generate_image",
-]
+__all__ = ("generate_image",)
 
 
 async def generate_image(

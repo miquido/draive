@@ -2,10 +2,10 @@ from collections.abc import Sequence
 
 from haiway import MISSING, Missing, State
 
-__all__ = [
+__all__ = (
     "MistralChatConfig",
     "MistralEmbeddingConfig",
-]
+)
 
 
 class MistralChatConfig(State):

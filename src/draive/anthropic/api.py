@@ -3,9 +3,7 @@ from typing import Literal, cast
 from anthropic import AsyncAnthropic
 from haiway import getenv_str
 
-__all__ = [
-    "AnthropicAPI",
-]
+__all__ = ("AnthropicAPI",)
 
 
 class AnthropicAPI:

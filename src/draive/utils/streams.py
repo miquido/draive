@@ -1,10 +1,10 @@
 from collections import deque
 from collections.abc import AsyncIterator
 
-__all__ = [
+__all__ = (
     "ConstantStream",
     "FixedStream",
-]
+)
 
 
 class ConstantStream[Value](AsyncIterator[Value]):

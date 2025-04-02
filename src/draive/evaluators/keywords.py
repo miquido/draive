@@ -3,9 +3,7 @@ from collections.abc import Callable, Sequence
 from draive.evaluation import EvaluationScore, evaluator
 from draive.multimodal import Multimodal, MultimodalContent
 
-__all__ = [
-    "keywords_evaluator",
-]
+__all__ = ("keywords_evaluator",)
 
 
 @evaluator(name="keywords")

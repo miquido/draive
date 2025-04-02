@@ -1,8 +1,6 @@
 from collections.abc import Callable, Iterator, Sequence
 
-__all__ = [
-    "basic_split_text",
-]
+__all__ = ("basic_split_text",)
 
 
 def basic_split_text(

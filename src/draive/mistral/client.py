@@ -9,9 +9,7 @@ from draive.mistral.embedding import MistralEmbedding
 from draive.mistral.lmm_generation import MistralLMMGeneration
 from draive.mistral.tokenization import MistralTokenization
 
-__all__ = [
-    "Mistral",
-]
+__all__ = ("Mistral",)
 
 
 @final

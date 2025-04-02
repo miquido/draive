@@ -13,7 +13,7 @@ from draive.multimodal import (
 )
 from draive.parameters import DataModel
 
-__all__ = [
+__all__ = (
     "Resource",
     "ResourceContent",
     "ResourceDeclaration",
@@ -21,7 +21,7 @@ __all__ = [
     "ResourceFetching",
     "ResourceListFetching",
     "ResourceMissing",
-]
+)
 
 
 class ResourceException(Exception):

@@ -1,9 +1,7 @@
 from haiway import getenv_str
 from mistralai import Mistral as MistralClient
 
-__all__ = [
-    "MistralAPI",
-]
+__all__ = ("MistralAPI",)
 
 
 class MistralAPI:

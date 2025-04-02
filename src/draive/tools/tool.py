@@ -13,12 +13,12 @@ from draive.lmm.types import (
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalContentConvertible
 from draive.parameters import ParameterSpecification, ParametersSpecification, ParametrizedFunction
 
-__all__ = [
+__all__ = (
     "AnyTool",
     "Tool",
     "ToolAvailabilityCheck",
     "tool",
-]
+)
 
 
 class ToolAvailabilityCheck(Protocol):

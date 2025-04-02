@@ -8,11 +8,11 @@ from draive.lmm import LMMContext
 from draive.parameters import ParametrizedFunction
 from draive.prompts.types import Prompt, PromptDeclaration, PromptDeclarationArgument
 
-__all__ = [
+__all__ = (
     "PromptAvailabilityCheck",
     "PromptTemplate",
     "prompt",
-]
+)
 
 
 class PromptAvailabilityCheck(Protocol):

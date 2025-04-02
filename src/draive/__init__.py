@@ -232,7 +232,7 @@ from draive.utils import (
     split_sequence,
 )
 
-__all__ = [
+__all__ = (
     "LMM",
     "MEDIA_KINDS",
     "META_EMPTY",
@@ -432,4 +432,4 @@ __all__ = [
     "when_missing",
     "workflow",
     "wrap_async",
-]
+)

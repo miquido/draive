@@ -6,9 +6,7 @@ from numpy.typing import NDArray
 
 from draive.similarity.cosine import cosine_similarity
 
-__all__ = [
-    "vector_similarity_search",
-]
+__all__ = ("vector_similarity_search",)
 
 
 def vector_similarity_search(

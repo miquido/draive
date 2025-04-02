@@ -10,10 +10,10 @@ from haiway import AsyncQueue, ctx, freeze
 from draive.agents.idle import IdleMonitor
 from draive.agents.node import Agent, AgentError, AgentMessage, AgentNode
 
-__all__ = [
+__all__ = (
     "AgentRunner",
     "AgentRunnerOutput",
-]
+)
 
 
 @runtime_checkable

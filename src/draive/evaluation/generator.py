@@ -4,9 +4,7 @@ from typing import Any
 from draive.generation import generate_model
 from draive.parameters import DataModel
 
-__all__ = [
-    "generate_case_parameters",
-]
+__all__ = ("generate_case_parameters",)
 
 INSTRUCTION: str = """\
 You are preparing automated evaluation test scenarios.

@@ -11,9 +11,7 @@ from draive.resources.types import (
     ResourceMissing,
 )
 
-__all__ = [
-    "Resources",
-]
+__all__ = ("Resources",)
 
 
 class Resources(State):
