@@ -16,7 +16,7 @@ from draive.instructions import Instruction
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel, ParametersSpecification
 
-__all__ = [
+__all__ = (
     "LMMCompleting",
     "LMMCompletion",
     "LMMContext",
@@ -36,7 +36,7 @@ __all__ = [
     "LMMToolResponses",
     "LMMToolSelection",
     "LMMToolSpecification",
-]
+)
 
 
 class LMMToolFunctionSpecification(TypedDict):

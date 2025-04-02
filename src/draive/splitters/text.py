@@ -5,6 +5,8 @@ from typing import Literal, cast, overload
 from draive.splitters.basic import basic_split_text
 from draive.splitters.exhaustive import exhaustive_regex_split_text, exhaustive_split_text
 
+__all__ = ("split_text",)
+
 
 @overload
 def split_text(

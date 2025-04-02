@@ -5,10 +5,10 @@ from sentencepiece import SentencePieceProcessor  # pyright: ignore[reportMissin
 
 from draive.tokenization import TextTokenizing
 
-__all__ = [
+__all__ = (
     "sentencepiece_processor",
     "sentencepiece_tokenizer",
-]
+)
 
 
 def sentencepiece_tokenizer(

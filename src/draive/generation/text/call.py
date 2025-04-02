@@ -9,9 +9,7 @@ from draive.multimodal import Multimodal
 from draive.prompts import Prompt
 from draive.tools import AnyTool, Toolbox
 
-__all__ = [
-    "generate_text",
-]
+__all__ = ("generate_text",)
 
 
 async def generate_text(

@@ -1,9 +1,7 @@
 from haiway import getenv_str
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 
-__all__ = [
-    "OpenAIAPI",
-]
+__all__ = ("OpenAIAPI",)
 
 
 class OpenAIAPI:

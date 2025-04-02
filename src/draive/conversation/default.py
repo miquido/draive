@@ -23,9 +23,7 @@ from draive.tools import Toolbox
 from draive.utils import ProcessingEvent
 from draive.utils.processing import Processing
 
-__all__ = [
-    "conversation_completion",
-]
+__all__ = ("conversation_completion",)
 
 
 @overload

@@ -3,9 +3,7 @@ from typing import Any, Self
 from draive.evaluation.value import EvaluationScoreValue, evaluation_score_value
 from draive.parameters import DataModel, Field
 
-__all__ = [
-    "EvaluationScore",
-]
+__all__ = ("EvaluationScore",)
 
 
 def _verifier(

@@ -4,9 +4,7 @@ from draive.mistral.api import MistralAPI
 from draive.sentencepiece import sentencepiece_processor, sentencepiece_tokenizer
 from draive.tokenization import Tokenization
 
-__all__ = [
-    "MistralTokenization",
-]
+__all__ = ("MistralTokenization",)
 
 
 class MistralTokenization(MistralAPI):

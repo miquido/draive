@@ -4,12 +4,12 @@ from typing import Final
 
 from haiway import AttributePath
 
-__all__ = [
+__all__ = (
     "META_EMPTY",
     "Meta",
     "MetaPath",
     "MetaValue",
-]
+)
 
 type MetaValue = Mapping[str, MetaValue] | Sequence[MetaValue] | str | float | int | bool | None
 

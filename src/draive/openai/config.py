@@ -3,13 +3,13 @@ from typing import Literal, TypedDict
 
 from haiway import MISSING, Missing, State
 
-__all__ = [
+__all__ = (
     "OpenAIChatConfig",
     "OpenAIEmbeddingConfig",
     "OpenAIImageGenerationConfig",
     "OpenAIModerationConfig",
     "OpenAISystemFingerprint",
-]
+)
 
 
 class AudioResponseFormat(TypedDict):

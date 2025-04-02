@@ -16,9 +16,7 @@ from draive.multimodal import Multimodal, MultimodalContent
 from draive.prompts import Prompt
 from draive.tools import AnyTool, Toolbox
 
-__all__ = [
-    "default_generate_text",
-]
+__all__ = ("default_generate_text",)
 
 
 async def default_generate_text(

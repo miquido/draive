@@ -13,9 +13,7 @@ from draive.instructions.types import (
     InstructionMissing,
 )
 
-__all__ = [
-    "InstructionsFileStorage",
-]
+__all__ = ("InstructionsFileStorage",)
 
 
 @final

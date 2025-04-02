@@ -9,11 +9,11 @@ from draive.multimodal import MultimodalContent
 from draive.multimodal.content import Multimodal
 from draive.parameters import DataModel
 
-__all__ = [
+__all__ = (
     "Processing",
     "ProcessingEvent",
     "ProcessingState",
-]
+)
 
 
 class ProcessingEvent(DataModel):

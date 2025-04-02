@@ -33,11 +33,11 @@ from draive.multimodal import (
 from draive.parameters import DataModel
 from draive.vllm.config import VLLMChatConfig
 
-__all__ = [
+__all__ = (
     "content_element_as_content_part",
     "context_element_as_messages",
     "tools_as_tool_config",
-]
+)
 
 
 def content_element_as_content_part(

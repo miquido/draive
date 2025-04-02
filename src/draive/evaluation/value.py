@@ -1,6 +1,6 @@
 from typing import Final, Literal
 
-__all__ = [
+__all__ = (
     "EXCELLENT",
     "FAIR",
     "GOOD",
@@ -9,7 +9,7 @@ __all__ = [
     "POOR",
     "EvaluationScoreValue",
     "evaluation_score_value",
-]
+)
 
 type EvaluationScoreValue = Literal["none", "poor", "fair", "good", "excellent", "perfect"] | float
 

@@ -2,9 +2,7 @@ from collections.abc import Sequence
 
 from haiway import MISSING, Missing, State
 
-__all__ = [
-    "AnthropicConfig",
-]
+__all__ = ("AnthropicConfig",)
 
 
 class AnthropicConfig(State):

@@ -22,12 +22,12 @@ from draive.prompts import Prompt
 from draive.tools import Toolbox
 from draive.utils import Memory, ProcessingEvent
 
-__all__ = [
+__all__ = (
     "ConversationCompleting",
     "ConversationElement",
     "ConversationMemory",
     "ConversationMessage",
-]
+)
 
 
 class ConversationMessage(DataModel):

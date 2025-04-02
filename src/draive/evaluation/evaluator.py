@@ -9,13 +9,13 @@ from draive.evaluation.score import EvaluationScore
 from draive.evaluation.value import EvaluationScoreValue, evaluation_score_value
 from draive.parameters import DataModel, Field
 
-__all__ = [
+__all__ = (
     "Evaluator",
     "EvaluatorDefinition",
     "EvaluatorResult",
     "PreparedEvaluator",
     "evaluator",
-]
+)
 
 
 def _verifier(

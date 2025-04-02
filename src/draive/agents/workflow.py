@@ -18,14 +18,14 @@ from draive.multimodal import (
 from draive.parameters import DataModel
 from draive.utils import Memory
 
-__all__ = [
+__all__ = (
     "AgentWorkflow",
     "AgentWorkflowIdle",
     "AgentWorkflowInput",
     "AgentWorkflowInvocation",
     "AgentWorkflowOutput",
     "workflow",
-]
+)
 
 
 type AgentWorkflowInput = AgentMessage | AgentException

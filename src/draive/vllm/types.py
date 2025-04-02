@@ -1,6 +1,4 @@
-__all__ = [
-    "VLLMException",
-]
+__all__ = ("VLLMException",)
 
 
 class VLLMException(Exception):

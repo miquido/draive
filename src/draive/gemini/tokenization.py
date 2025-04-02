@@ -4,9 +4,7 @@ from draive.gemini.api import GeminiAPI
 from draive.sentencepiece import sentencepiece_processor, sentencepiece_tokenizer
 from draive.tokenization import Tokenization
 
-__all__ = [
-    "GeminiTokenization",
-]
+__all__ = ("GeminiTokenization",)
 
 
 class GeminiTokenization(GeminiAPI):

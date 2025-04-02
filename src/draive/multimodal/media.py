@@ -8,13 +8,13 @@ from draive.commons import META_EMPTY, Meta
 from draive.multimodal.data_field import b64_data_field
 from draive.parameters import DataModel
 
-__all__ = [
+__all__ = (
     "MEDIA_KINDS",
     "MediaContent",
     "MediaKind",
     "MediaType",
     "validated_media_kind",
-]
+)
 
 MediaType = (
     Literal[

@@ -14,7 +14,7 @@ from draive.evaluators.similarity import (
 )
 from draive.evaluators.truthfulness import truthfulness_evaluator
 
-__all__ = [
+__all__ = (
     "coherence_evaluator",
     "conciseness_evaluator",
     "consistency_evaluator",
@@ -28,4 +28,4 @@ __all__ = [
     "similarity_evaluator",
     "text_vector_similarity_evaluator",
     "truthfulness_evaluator",
-]
+)

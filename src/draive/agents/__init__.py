@@ -10,7 +10,7 @@ from draive.agents.workflow import (
     workflow,
 )
 
-__all__ = [
+__all__ = (
     "Agent",
     "AgentError",
     "AgentException",
@@ -25,4 +25,4 @@ __all__ = [
     "AgentWorkflowOutput",
     "agent",
     "workflow",
-]
+)

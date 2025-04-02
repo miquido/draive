@@ -3,9 +3,7 @@ from haiway import Default
 from draive.commons import META_EMPTY, Meta
 from draive.parameters import DataModel
 
-__all__ = [
-    "TextContent",
-]
+__all__ = ("TextContent",)
 
 
 class TextContent(DataModel):

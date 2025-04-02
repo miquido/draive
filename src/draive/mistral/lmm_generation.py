@@ -51,9 +51,7 @@ from draive.mistral.types import MistralException
 from draive.mistral.utils import unwrap_missing_to_none, unwrap_missing_to_unset
 from draive.multimodal import Multimodal, MultimodalContent
 
-__all__ = [
-    "MistralLMMGeneration",
-]
+__all__ = ("MistralLMMGeneration",)
 
 
 class MistralLMMGeneration(MistralAPI):

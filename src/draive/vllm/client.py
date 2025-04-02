@@ -8,9 +8,7 @@ from draive.vllm.api import VLLMAPI
 from draive.vllm.embedding import VLLMEmbedding
 from draive.vllm.lmm_generation import VLLMLMMGeneration
 
-__all__ = [
-    "VLLM",
-]
+__all__ = ("VLLM",)
 
 
 @final

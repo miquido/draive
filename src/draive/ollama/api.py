@@ -1,9 +1,7 @@
 from haiway import getenv_str
 from ollama import AsyncClient
 
-__all__ = [
-    "OllamaAPI",
-]
+__all__ = ("OllamaAPI",)
 
 
 class OllamaAPI:

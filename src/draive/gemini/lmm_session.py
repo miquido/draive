@@ -43,9 +43,7 @@ from draive.multimodal.content import MultimodalContent
 from draive.multimodal.text import TextContent
 from draive.parameters.model import DataModel
 
-__all__ = [
-    "GeminiLMMSession",
-]
+__all__ = ("GeminiLMMSession",)
 
 
 class GeminiLMMSession(GeminiAPI):

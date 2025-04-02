@@ -27,7 +27,7 @@ from draive.evaluation.suite import (
 )
 from draive.evaluation.value import EvaluationScoreValue
 
-__all__ = [
+__all__ = (
     "EvaluationCaseResult",
     "EvaluationScenarioResult",
     "EvaluationScore",
@@ -50,4 +50,4 @@ __all__ = [
     "evaluation_suite",
     "evaluator",
     "generate_case_parameters",
-]
+)

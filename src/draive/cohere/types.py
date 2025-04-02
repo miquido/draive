@@ -1,6 +1,4 @@
-__all__ = [
-    "CohereException",
-]
+__all__ = ("CohereException",)
 
 
 class CohereException(Exception):

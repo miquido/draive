@@ -22,11 +22,11 @@ from draive.multimodal.media import MediaData
 from draive.ollama.types import OllamaException
 from draive.parameters import DataModel
 
-__all__ = [
+__all__ = (
     "context_element_as_messages",
     "output_as_response_declaration",
     "tools_as_tool_config",
-]
+)
 
 
 def context_element_as_messages(

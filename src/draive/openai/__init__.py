@@ -7,11 +7,11 @@ from draive.openai.config import (
 )
 from draive.openai.types import OpenAIException
 
-__all__ = [
+__all__ = (
     "OpenAI",
     "OpenAIChatConfig",
     "OpenAIEmbeddingConfig",
     "OpenAIException",
     "OpenAIImageGenerationConfig",
     "OpenAIModerationConfig",
-]
+)

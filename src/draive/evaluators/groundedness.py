@@ -4,9 +4,7 @@ from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
 from draive.steps import steps_completion
 
-__all__ = [
-    "groundedness_evaluator",
-]
+__all__ = ("groundedness_evaluator",)
 
 
 INSTRUCTION: str = """\

@@ -1,6 +1,4 @@
-__all__ = [
-    "BedrockException",
-]
+__all__ = ("BedrockException",)
 
 
 class BedrockException(Exception):

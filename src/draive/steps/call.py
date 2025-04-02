@@ -9,9 +9,7 @@ from draive.prompts import Prompt
 from draive.steps.state import Steps
 from draive.steps.types import Step
 
-__all__ = [
-    "steps_completion",
-]
+__all__ = ("steps_completion",)
 
 
 @deprecated("`steps_completion` has been replaced with `Stage`")

@@ -31,9 +31,7 @@ from draive.ollama.lmm import (
 from draive.ollama.types import OllamaException
 from draive.ollama.utils import unwrap_missing
 
-__all__ = [
-    "OllamaLMMGeneration",
-]
+__all__ = ("OllamaLMMGeneration",)
 
 
 class OllamaLMMGeneration(OllamaAPI):

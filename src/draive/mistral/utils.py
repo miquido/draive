@@ -4,10 +4,10 @@ from haiway import MISSING, Missing
 from mistralai import UNSET
 from mistralai.types.basemodel import Unset
 
-__all__ = [
+__all__ = (
     "unwrap_missing_to_none",
     "unwrap_missing_to_unset",
-]
+)
 
 
 def unwrap_missing_to_none[Value, Default](

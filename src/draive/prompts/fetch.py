@@ -8,10 +8,10 @@ from draive.multimodal import MultimodalContent
 from draive.prompts.state import PromptRepository
 from draive.prompts.types import MissingPrompt, Prompt, PromptDeclaration
 
-__all__ = [
+__all__ = (
     "fetch_prompt",
     "fetch_prompt_list",
-]
+)
 
 
 async def fetch_prompt_list(

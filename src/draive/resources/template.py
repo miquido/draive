@@ -10,11 +10,11 @@ from draive.resources.types import (
     ResourceException,
 )
 
-__all__ = [
+__all__ = (
     "ResourceAvailabilityCheck",
     "ResourceTemplate",
     "resource",
-]
+)
 
 
 class ResourceAvailabilityCheck(Protocol):

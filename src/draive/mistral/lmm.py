@@ -36,14 +36,14 @@ from draive.multimodal import (
 from draive.multimodal.meta import MetaContent
 from draive.parameters import DataModel
 
-__all__ = [
+__all__ = (
     "content_chunk_as_content_element",
     "content_element_as_content_chunk",
     "context_element_as_messages",
     "output_as_response_declaration",
     "tool_specification_as_tool",
     "tools_as_tool_config",
-]
+)
 
 
 def context_element_as_messages(

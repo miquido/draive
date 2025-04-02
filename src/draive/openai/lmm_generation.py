@@ -44,9 +44,7 @@ from draive.openai.types import OpenAIException
 from draive.openai.utils import unwrap_missing
 from draive.utils import RateLimitError
 
-__all__ = [
-    "OpenAILMMGeneration",
-]
+__all__ = ("OpenAILMMGeneration",)
 
 
 class OpenAILMMGeneration(OpenAIAPI):

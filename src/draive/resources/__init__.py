@@ -10,7 +10,7 @@ from draive.resources.types import (
     ResourceMissing,
 )
 
-__all__ = [
+__all__ = (
     "Resource",
     "ResourceContent",
     "ResourceDeclaration",
@@ -21,4 +21,4 @@ __all__ = [
     "ResourceTemplate",
     "Resources",
     "resource",
-]
+)

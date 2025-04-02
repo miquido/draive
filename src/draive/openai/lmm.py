@@ -33,11 +33,11 @@ from draive.multimodal import (
 from draive.openai.config import OpenAIChatConfig
 from draive.parameters import DataModel
 
-__all__ = [
+__all__ = (
     "content_element_as_content_part",
     "context_element_as_messages",
     "tools_as_tool_config",
-]
+)
 
 
 def content_element_as_content_part(

@@ -3,14 +3,14 @@ from collections.abc import Callable, Mapping, Sequence
 from types import TracebackType
 from typing import Any, Protocol
 
-__all__ = [
+__all__ = (
     "BasicValue",
     "ParameterConversion",
     "ParameterValidation",
     "ParameterValidationContext",
     "ParameterValidationError",
     "ParameterVerification",
-]
+)
 
 type BasicValue = (
     Mapping[str, "BasicValue"] | Sequence["BasicValue"] | str | float | int | bool | None

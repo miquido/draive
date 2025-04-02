@@ -3,10 +3,10 @@ from typing import Self, overload
 
 from haiway import State
 
-__all__ = [
+__all__ = (
     "ModelTokenUsage",
     "TokenUsage",
-]
+)
 
 
 class ModelTokenUsage(State):

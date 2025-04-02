@@ -4,12 +4,12 @@ from typing import Protocol, overload, runtime_checkable
 from draive.agents.node import Agent, AgentError, AgentMessage, AgentNode, AgentOutput
 from draive.utils import Memory
 
-__all__ = [
+__all__ = (
     "AgentInvocation",
     "AgentMemoryInitializer",
     "AgentStateInitializer",
     "agent",
-]
+)
 
 
 @runtime_checkable

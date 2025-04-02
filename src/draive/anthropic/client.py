@@ -7,9 +7,7 @@ from haiway import State
 from draive.anthropic.api import AnthropicAPI
 from draive.anthropic.lmm_generation import AnthropicLMMGeneration
 
-__all__ = [
-    "Anthropic",
-]
+__all__ = ("Anthropic",)
 
 
 @final

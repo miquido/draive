@@ -11,9 +11,7 @@ from draive.openai.images import OpenAIImageGeneration
 from draive.openai.lmm_generation import OpenAILMMGeneration
 from draive.openai.tokenization import OpenAITokenization
 
-__all__ = [
-    "OpenAI",
-]
+__all__ = ("OpenAI",)
 
 
 @final

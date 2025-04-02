@@ -12,7 +12,7 @@ from draive.evaluation.generator import generate_case_parameters
 from draive.evaluation.scenario import PreparedScenarioEvaluator, ScenarioEvaluatorResult
 from draive.parameters import DataModel, Field
 
-__all__ = [
+__all__ = (
     "EvaluationCaseResult",
     "EvaluationSuite",
     "EvaluationSuiteDefinition",
@@ -20,7 +20,7 @@ __all__ = [
     "SuiteEvaluatorCaseResult",
     "SuiteEvaluatorResult",
     "evaluation_suite",
-]
+)
 
 
 class EvaluationSuiteCase[CaseParameters: DataModel](DataModel):

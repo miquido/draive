@@ -6,9 +6,7 @@ from draive.multimodal import Multimodal
 from draive.prompts import Prompt
 from draive.tools import AnyTool, Toolbox
 
-__all__ = [
-    "TextGenerator",
-]
+__all__ = ("TextGenerator",)
 
 
 @runtime_checkable

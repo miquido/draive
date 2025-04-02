@@ -11,9 +11,7 @@ from draive.parameters import DataModel
 from draive.prompts import Prompt
 from draive.tools import AnyTool, Toolbox
 
-__all__ = [
-    "generate_model",
-]
+__all__ = ("generate_model",)
 
 
 async def generate_model[Generated: DataModel](

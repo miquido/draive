@@ -1,6 +1,6 @@
 from typing import Any, Literal, TypedDict
 
-__all__ = [
+__all__ = (
     "ChatCompletionResponse",
     "ChatCompletionResponseOutput",
     "ChatCompletionResponseUsage",
@@ -15,7 +15,7 @@ __all__ = [
     "ChatMessageToolResult",
     "ChatMessageToolResultContent",
     "ChatTool",
-]
+)
 
 
 class ChatMessageText(TypedDict):

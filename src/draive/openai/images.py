@@ -17,9 +17,7 @@ from draive.openai.config import OpenAIImageGenerationConfig
 from draive.openai.types import OpenAIException
 from draive.openai.utils import unwrap_missing
 
-__all__ = [
-    "OpenAIImageGeneration",
-]
+__all__ = ("OpenAIImageGeneration",)
 
 
 class OpenAIImageGeneration(OpenAIAPI):

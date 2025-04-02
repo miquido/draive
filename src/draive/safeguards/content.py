@@ -2,9 +2,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from draive.multimodal import MultimodalContent
 
-__all__ = [
-    "ContentGuardrails",
-]
+__all__ = ("ContentGuardrails",)
 
 
 # TODO: refine guardrails

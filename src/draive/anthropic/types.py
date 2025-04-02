@@ -1,6 +1,4 @@
-__all__ = [
-    "AnthropicException",
-]
+__all__ = ("AnthropicException",)
 
 
 class AnthropicException(Exception):

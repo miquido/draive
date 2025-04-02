@@ -5,11 +5,11 @@ from haiway import State, ctx
 
 from draive.metrics.tokens import ModelTokenUsage, TokenUsage
 
-__all__ = [
+__all__ = (
     "ModelTokenPrice",
     "TokenPrice",
     "usage_cost",
-]
+)
 
 
 class ModelTokenPrice(State):

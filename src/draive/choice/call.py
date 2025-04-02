@@ -9,9 +9,7 @@ from draive.instructions import Instruction
 from draive.multimodal import Multimodal
 from draive.tools import AnyTool, Toolbox
 
-__all__ = [
-    "choice_completion",
-]
+__all__ = ("choice_completion",)
 
 
 async def choice_completion(

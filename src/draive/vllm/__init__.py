@@ -5,9 +5,9 @@ from draive.vllm.config import (
 )
 from draive.vllm.types import VLLMException
 
-__all__ = [
+__all__ = (
     "VLLM",
     "VLLMChatConfig",
     "VLLMEmbeddingConfig",
     "VLLMException",
-]
+)

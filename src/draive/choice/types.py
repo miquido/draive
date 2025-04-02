@@ -9,11 +9,11 @@ from draive.instructions import Instruction
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.tools import Toolbox
 
-__all__ = [
+__all__ = (
     "ChoiceCompletion",
     "ChoiceOption",
     "SelectionException",
-]
+)
 
 
 class ChoiceOption(State):

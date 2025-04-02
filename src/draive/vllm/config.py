@@ -3,10 +3,10 @@ from typing import Literal
 
 from haiway import MISSING, Missing, State
 
-__all__ = [
+__all__ = (
     "VLLMChatConfig",
     "VLLMEmbeddingConfig",
-]
+)
 
 
 class VLLMChatConfig(State):

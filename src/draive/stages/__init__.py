@@ -9,7 +9,7 @@ from draive.stages.types import (
     StageStateAccessing,
 )
 
-__all__ = [
+__all__ = (
     "Stage",
     "StageCondition",
     "StageContextTransforming",
@@ -18,4 +18,4 @@ __all__ = [
     "StageMerging",
     "StageResultTransforming",
     "StageStateAccessing",
-]
+)

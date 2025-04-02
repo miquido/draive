@@ -16,9 +16,7 @@ from draive.prompts import Prompt
 from draive.steps.types import Step
 from draive.tools import Toolbox
 
-__all__ = [
-    "default_steps_completion",
-]
+__all__ = ("default_steps_completion",)
 
 
 async def default_steps_completion(

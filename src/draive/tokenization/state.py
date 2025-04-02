@@ -2,9 +2,7 @@ from haiway import State
 
 from draive.tokenization.types import TextTokenizing
 
-__all__ = [
-    "Tokenization",
-]
+__all__ = ("Tokenization",)
 
 
 class Tokenization(State):

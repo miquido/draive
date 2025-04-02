@@ -22,9 +22,7 @@ from cohere.manually_maintained.lazy_aws_deps import lazy_boto3, lazy_botocore
 from haiway import asynchronous
 from httpx import URL, AsyncByteStream, ByteStream
 
-__all__ = [
-    "AsyncBedrockClientV2",
-]
+__all__ = ("AsyncBedrockClientV2",)
 
 
 # it is a naive adjustment of cohere.BedrockClientV2 to work with async interfaces

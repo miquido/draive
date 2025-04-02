@@ -40,13 +40,13 @@ from draive.multimodal import (
 )
 from draive.parameters import DataModel
 
-__all__ = [
+__all__ = (
     "content_block_as_content_element",
     "context_element_as_message",
     "convert_content_element",
     "thinking_budget_as_config",
     "tools_as_tool_config",
-]
+)
 
 
 def context_element_as_message(  # noqa: C901

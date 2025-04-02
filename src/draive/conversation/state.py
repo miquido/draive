@@ -17,9 +17,7 @@ from draive.prompts import Prompt
 from draive.tools import AnyTool, Toolbox
 from draive.utils import Memory, ProcessingEvent
 
-__all__ = [
-    "Conversation",
-]
+__all__ = ("Conversation",)
 
 
 @final

@@ -7,14 +7,14 @@ from haiway import MISSING, Missing, freeze, is_missing, not_missing
 from draive.agents.errors import AgentException
 from draive.multimodal import Multimodal, MultimodalContent
 
-__all__ = [
+__all__ = (
     "Agent",
     "AgentError",
     "AgentInitializer",
     "AgentMessage",
     "AgentNode",
     "AgentOutput",
-]
+)
 
 
 class AgentNode:

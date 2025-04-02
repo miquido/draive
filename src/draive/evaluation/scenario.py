@@ -8,13 +8,13 @@ from draive.commons import META_EMPTY, Meta
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.parameters import DataModel, Field
 
-__all__ = [
+__all__ = (
     "EvaluationScenarioResult",
     "ScenarioEvaluator",
     "ScenarioEvaluatorDefinition",
     "ScenarioEvaluatorResult",
     "evaluation_scenario",
-]
+)
 
 
 class ScenarioEvaluatorResult(DataModel):

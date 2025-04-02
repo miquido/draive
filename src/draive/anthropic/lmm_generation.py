@@ -43,9 +43,7 @@ from draive.metrics import TokenUsage
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.utils import RateLimitError
 
-__all__ = [
-    "AnthropicLMMGeneration",
-]
+__all__ = ("AnthropicLMMGeneration",)
 
 
 class AnthropicLMMGeneration(AnthropicAPI):

@@ -1,6 +1,4 @@
-__all__ = [
-    "GeminiException",
-]
+__all__ = ("GeminiException",)
 
 
 class GeminiException(Exception):

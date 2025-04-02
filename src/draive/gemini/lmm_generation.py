@@ -44,9 +44,7 @@ from draive.lmm import (
 from draive.metrics import TokenUsage
 from draive.multimodal.content import MultimodalContent, MultimodalContentElement
 
-__all__ = [
-    "GeminiLMMGeneration",
-]
+__all__ = ("GeminiLMMGeneration",)
 
 
 class GeminiLMMGeneration(GeminiAPI):

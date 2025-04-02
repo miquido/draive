@@ -17,9 +17,7 @@ from draive.lmm import (
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
 from draive.tools import Toolbox
 
-__all__ = [
-    "default_choice_completion",
-]
+__all__ = ("default_choice_completion",)
 
 
 async def default_choice_completion(  # noqa: C901

@@ -39,7 +39,7 @@ from draive.multimodal import (
 from draive.multimodal.meta import MetaContent
 from draive.parameters import DataModel
 
-__all__ = [
+__all__ = (
     "DISABLED_SAFETY_SETTINGS",
     "content_element_as_part",
     "context_element_as_content",
@@ -47,7 +47,7 @@ __all__ = [
     "resoluton_as_media_resulution",
     "result_part_as_content_or_call",
     "tools_as_tools_config",
-]
+)
 
 
 def context_element_as_content(

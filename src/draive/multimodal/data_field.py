@@ -8,9 +8,7 @@ from draive.parameters import (
     ParameterValidationContext,
 )
 
-__all__ = [
-    "b64_data_field",
-]
+__all__ = ("b64_data_field",)
 
 
 def b64_data_field(

@@ -17,10 +17,10 @@ from draive.lmm.types import (
     LMMToolSpecification,
 )
 
-__all__ = [
+__all__ = (
     "LMM",
     "LMMSession",
-]
+)
 
 
 @final

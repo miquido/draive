@@ -3,11 +3,11 @@ from typing import Literal
 
 from haiway import MISSING, Missing, State
 
-__all__ = [
+__all__ = (
     "GeminiEmbeddingConfig",
     "GeminiGenerationConfig",
     "GeminiLiveConfig",
-]
+)
 
 
 class GeminiGenerationConfig(State):

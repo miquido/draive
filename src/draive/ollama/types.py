@@ -1,6 +1,4 @@
-__all__ = [
-    "OllamaException",
-]
+__all__ = ("OllamaException",)
 
 
 class OllamaException(Exception):

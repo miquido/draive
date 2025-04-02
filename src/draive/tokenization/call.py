@@ -5,10 +5,10 @@ from haiway import ctx
 
 from draive.tokenization.state import Tokenization
 
-__all__ = [
+__all__ = (
     "count_text_tokens",
     "tokenize_text",
-]
+)
 
 
 def tokenize_text(

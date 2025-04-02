@@ -11,9 +11,7 @@ from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIEmbeddingConfig
 from draive.openai.utils import unwrap_missing
 
-__all__ = [
-    "OpenAIEmbedding",
-]
+__all__ = ("OpenAIEmbedding",)
 
 
 class OpenAIEmbedding(OpenAIAPI):

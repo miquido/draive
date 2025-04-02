@@ -2,7 +2,7 @@ from draive.embedding.call import embed_image, embed_images, embed_text, embed_t
 from draive.embedding.state import ImageEmbedding, TextEmbedding
 from draive.embedding.types import Embedded, ValueEmbedder
 
-__all__ = [
+__all__ = (
     "Embedded",
     "ImageEmbedding",
     "TextEmbedding",
@@ -11,4 +11,4 @@ __all__ = [
     "embed_images",
     "embed_text",
     "embed_texts",
-]
+)

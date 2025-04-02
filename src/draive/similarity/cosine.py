@@ -3,9 +3,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-__all__ = [
-    "cosine_similarity",
-]
+__all__ = ("cosine_similarity",)
 
 
 def cosine_similarity(

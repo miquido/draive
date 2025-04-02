@@ -11,9 +11,7 @@ from draive.parameters import DataModel
 from draive.similarity import mmr_vector_similarity_search, vector_similarity_search
 from draive.utils import VectorIndex
 
-__all__ = [
-    "VolatileVectorIndex",
-]
+__all__ = ("VolatileVectorIndex",)
 
 
 def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915

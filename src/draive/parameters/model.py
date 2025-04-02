@@ -36,10 +36,10 @@ from draive.parameters.types import (
     ParameterVerification,
 )
 
-__all__ = [
+__all__ = (
     "DataModel",
     "Field",
-]
+)
 
 
 @overload

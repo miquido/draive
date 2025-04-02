@@ -3,9 +3,7 @@ from typing import Any
 from draive.evaluation import EvaluationScore
 from draive.parameters import DataModel, Field, ParameterValidationContext
 
-__all__ = [
-    "CommonScoreModel",
-]
+__all__ = ("CommonScoreModel",)
 
 
 def _score_validator(

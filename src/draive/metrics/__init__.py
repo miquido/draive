@@ -1,6 +1,6 @@
 from draive.metrics.tokens import ModelTokenUsage, TokenUsage
 
-__all__ = [
+__all__ = (
     "ModelTokenUsage",
     "TokenUsage",
-]
+)

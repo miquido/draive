@@ -3,9 +3,7 @@ from haiway import State
 from draive.choice.default import default_choice_completion
 from draive.choice.types import ChoiceCompletion
 
-__all__ = [
-    "Choice",
-]
+__all__ = ("Choice",)
 
 
 class Choice(State):

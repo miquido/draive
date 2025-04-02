@@ -6,11 +6,11 @@ from haiway import AttributePath, AttributeRequirement, State, ctx
 from draive.multimodal import MediaContent, TextContent
 from draive.parameters import DataModel
 
-__all__ = [
+__all__ = (
     "VectorIndex",
     "VectorIndexing",
     "VectorSearching",
-]
+)
 
 
 @runtime_checkable
