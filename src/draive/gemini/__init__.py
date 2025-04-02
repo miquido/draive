@@ -1,5 +1,5 @@
 from draive.gemini.client import Gemini
-from draive.gemini.config import GeminiEmbeddingConfig, GeminiGenerationConfig
+from draive.gemini.config import GeminiEmbeddingConfig, GeminiGenerationConfig, GeminiLiveConfig
 from draive.gemini.types import GeminiException
 
 __all__ = [
@@ -7,4 +7,5 @@ __all__ = [
     "GeminiEmbeddingConfig",
     "GeminiException",
     "GeminiGenerationConfig",
+    "GeminiLiveConfig",
 ]

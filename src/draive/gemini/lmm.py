@@ -9,6 +9,7 @@ from google.genai.types import (
     HarmBlockThreshold,
     HarmCategory,
     MediaResolution,
+    Modality,
     Part,
     PartDict,
     SafetySettingDict,
@@ -183,7 +184,7 @@ def output_as_response_declaration(  # noqa: PLR0911
     /,
 ) -> tuple[
     SchemaDict | None,
-    list[str] | None,
+    list[Modality] | None,
     str | None,
     Callable[[MultimodalContent], MultimodalContent],
 ]:
@@ -200,7 +201,7 @@ def output_as_response_declaration(  # noqa: PLR0911
         case "text":
             return (
                 None,
-                ["Text"],
+                [Modality.TEXT],
                 "text/plain",
                 _text_output_conversion,
             )
@@ -208,7 +209,7 @@ def output_as_response_declaration(  # noqa: PLR0911
         case "json":
             return (
                 None,
-                ["Text"],
+                [Modality.TEXT],
                 "application/json",
                 _json_output_conversion,
             )
@@ -216,7 +217,7 @@ def output_as_response_declaration(  # noqa: PLR0911
         case "image":
             return (
                 None,
-                ["Text", "Image"],  # google api does not allow to specify only image
+                [Modality.TEXT, Modality.IMAGE],  # google api does not allow to specify only image
                 None,  # define mime type?
                 _image_output_conversion,  # we will ignore text anyways
             )
@@ -224,23 +225,18 @@ def output_as_response_declaration(  # noqa: PLR0911
         case "audio":
             return (
                 None,
-                ["Audio"],
+                [Modality.AUDIO],
                 None,  # define mime type?
                 _audio_output_conversion,  # we will ignore text anyways
             )
 
         case "video":
-            return (
-                None,
-                ["Video"],
-                None,  # define mime type?
-                _video_output_conversion,  # we will ignore text anyways
-            )
+            raise NotImplementedError("video output is not supported by Gemini")
 
         case ["text", "image"] | ["image", "text"]:  # refine multimodal matching?
             return (
                 None,
-                ["Text", "Image"],
+                [Modality.TEXT, Modality.IMAGE],
                 None,
                 _auto_output_conversion,
             )
@@ -251,7 +247,7 @@ def output_as_response_declaration(  # noqa: PLR0911
         case model:
             return (
                 cast(SchemaDict, model.__PARAMETERS_SPECIFICATION__),
-                ["Text"],
+                [Modality.TEXT],
                 "application/json",
                 _prepare_model_output_conversion(model),
             )

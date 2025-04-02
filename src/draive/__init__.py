@@ -126,7 +126,6 @@ from draive.lmm import (
     LMMInput,
     LMMSession,
     LMMSessionOutputSelection,
-    LMMSessionProperties,
     LMMStreamChunk,
     LMMStreamInput,
     LMMStreamOutput,
@@ -233,7 +232,6 @@ from draive.utils import (
 
 __all__ = [
     "LMM",
-    "LMM",
     "MEDIA_KINDS",
     "META_EMPTY",
     "MISSING",
@@ -288,7 +286,6 @@ __all__ = [
     "LMMInput",
     "LMMSession",
     "LMMSessionOutputSelection",
-    "LMMSessionProperties",
     "LMMStreamChunk",
     "LMMStreamInput",
     "LMMStreamOutput",
