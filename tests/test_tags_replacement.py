@@ -1,4 +1,4 @@
-from draive import MediaContent, MultimodalContent, MultimodalTagElement
+from draive import MediaReference, MultimodalContent, MultimodalTagElement
 
 
 def test_returns_unchanged_with_empty():
@@ -40,13 +40,13 @@ def test_returns_unchanged_without_tag():
         "test",
         content=MultimodalContent.of(
             "Lorem",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum",
         ),
         replacement="replaced",
     ) == MultimodalContent.of(
         "Lorem",
-        MediaContent.url("http://image", media="image/png"),
+        MediaReference.of("http://image", media="image/png"),
         "ipsum",
     )
 
@@ -75,13 +75,13 @@ def test_returns_unchanged_with_other_tag():
         "test",
         content=MultimodalContent.of(
             "<other>Lorem",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</other>",
         ),
         replacement="replaced",
     ) == MultimodalContent.of(
         "<other>Lorem",
-        MediaContent.url("http://image", media="image/png"),
+        MediaReference.of("http://image", media="image/png"),
         "ipsum</other>",
     )
 
@@ -104,13 +104,13 @@ def test_returns_unchanged_without_closing_tag():
         "test",
         content=MultimodalContent.of(
             "<test>Lorem",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum",
         ),
         replacement="replaced",
     ) == MultimodalContent.of(
         "<test>Lorem",
-        MediaContent.url("http://image", media="image/png"),
+        MediaReference.of("http://image", media="image/png"),
         "ipsum",
     )
 
@@ -133,13 +133,13 @@ def test_returns_unchanged_with_only_closing_tag():
         "test",
         content=MultimodalContent.of(
             "Lorem </test> ",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum",
         ),
         replacement="replaced",
     ) == MultimodalContent.of(
         "Lorem </test> ",
-        MediaContent.url("http://image", media="image/png"),
+        MediaReference.of("http://image", media="image/png"),
         "ipsum",
     )
 
@@ -162,13 +162,13 @@ def test_returns_unchanged_with_reversed_tags():
         "test",
         content=MultimodalContent.of(
             "</test>Lorem <test> ",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum",
         ),
         replacement="replaced",
     ) == MultimodalContent.of(
         "</test>Lorem <test> ",
-        MediaContent.url("http://image", media="image/png"),
+        MediaReference.of("http://image", media="image/png"),
         "ipsum",
     )
 
@@ -197,13 +197,13 @@ def test_returns_unchanged_with_malformed_opening_tag():
         "test",
         content=MultimodalContent.of(
             "<testx>Lorem",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</test>",
         ),
         replacement="replaced",
     ) == MultimodalContent.of(
         "<testx>Lorem",
-        MediaContent.url("http://image", media="image/png"),
+        MediaReference.of("http://image", media="image/png"),
         "ipsum</test>",
     )
 
@@ -232,13 +232,13 @@ def test_returns_unchanged_with_malformed_closing_tag():
         "test",
         content=MultimodalContent.of(
             "<test>Lorem",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</testx>",
         ),
         replacement="replaced",
     ) == MultimodalContent.of(
         "<test>Lorem",
-        MediaContent.url("http://image", media="image/png"),
+        MediaReference.of("http://image", media="image/png"),
         "ipsum</testx>",
     )
 
@@ -261,7 +261,7 @@ def test_returns_replaced_with_valid_tag():
         "test",
         content=MultimodalContent.of(
             "<test>Lorem",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</test>",
         ),
         replacement="replaced",
@@ -288,7 +288,7 @@ def test_returns_replaced_outer_with_multiple_nested_tags():
         "test",
         content=MultimodalContent.of(
             "<test>Other<test>Lorem",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</test></test>",
         ),
         replacement="replaced",
@@ -314,17 +314,17 @@ def test_returns_replaced_with_surrounded_tag():
     assert MultimodalTagElement.replace(
         "test",
         content=MultimodalContent.of(
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "Lorem<test>Lorem",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</test>ipsum",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
         ),
         replacement="replaced",
     ) == MultimodalContent.of(
-        MediaContent.url("http://image", media="image/png"),
+        MediaReference.of("http://image", media="image/png"),
         "Lorem<test>replaced</test>ipsum",
-        MediaContent.url("http://image", media="image/png"),
+        MediaReference.of("http://image", media="image/png"),
     )
 
 
@@ -346,13 +346,13 @@ def test_returns_unchanged_with_nested_in_tags():
         "test",
         content=MultimodalContent.of(
             "<other>Other<test>Lorem",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</test></other>",
         ),
         replacement="replaced",
     ) == MultimodalContent.of(
         "<other>Other<test>Lorem",
-        MediaContent.url("http://image", media="image/png"),
+        MediaReference.of("http://image", media="image/png"),
         "ipsum</test></other>",
     )
 
@@ -388,7 +388,7 @@ def test_returns_replaced_content_with_fake_tags():
         "test",
         content=MultimodalContent.of(
             "<test>Lorem<",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</test>",
         ),
         replacement="replaced",
@@ -400,7 +400,7 @@ def test_returns_replaced_content_with_fake_tags():
         "test",
         content=MultimodalContent.of(
             "<te<test>Lorem<",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</test>",
         ),
         replacement="replaced",
@@ -427,7 +427,7 @@ def test_returns_replaced_with_other_tags():
         "test",
         content=MultimodalContent.of(
             "<other>Other</other><test>Lorem</more>",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</test><more>",
         ),
         replacement="replaced",
@@ -454,17 +454,17 @@ def test_returns_first_replaced_with_multiple_valid_tags():
         "test",
         content=MultimodalContent.of(
             "<test>Lorem",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</test>",
             "<test>Lorem",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</test>",
         ),
         replacement="replaced",
     ) == MultimodalContent.of(
         "<test>replaced</test>",
         "<test>Lorem",
-        MediaContent.url("http://image", media="image/png"),
+        MediaReference.of("http://image", media="image/png"),
         "ipsum</test>",
     )
 
@@ -489,10 +489,10 @@ def test_returns_all_replaced_with_multiple_valid_tags():
         "test",
         content=MultimodalContent.of(
             "<test>Lorem",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</test>",
             "<test>Lorem",
-            MediaContent.url("http://image", media="image/png"),
+            MediaReference.of("http://image", media="image/png"),
             "ipsum</test>",
         ),
         replacement="replaced",
@@ -574,14 +574,14 @@ def test_handles_mixed_content_replacement():
         "test",
         content=MultimodalContent.of(
             "<test>",
-            MediaContent.url("http://image1", media="image/png"),
+            MediaReference.of("http://image1", media="image/png"),
             "text",
-            MediaContent.url("http://image2", media="image/png"),
+            MediaReference.of("http://image2", media="image/png"),
             "</test>",
         ),
-        replacement=MediaContent.url("http://replacement", media="image/jpeg"),
+        replacement=MediaReference.of("http://replacement", media="image/jpeg"),
     ) == MultimodalContent.of(
-        "<test>", MediaContent.url("http://replacement", media="image/jpeg"), "</test>"
+        "<test>", MediaReference.of("http://replacement", media="image/jpeg"), "</test>"
     )
 
 
@@ -679,14 +679,14 @@ def test_handles_replacement_with_multiple_media():
         "test",
         content=MultimodalContent.of("<test>old</test>"),
         replacement=MultimodalContent.of(
-            MediaContent.url("http://image1", media="image/png"),
+            MediaReference.of("http://image1", media="image/png"),
             "text",
-            MediaContent.url("http://image2", media="image/jpeg"),
+            MediaReference.of("http://image2", media="image/jpeg"),
         ),
     ) == MultimodalContent.of(
         "<test>",
-        MediaContent.url("http://image1", media="image/png"),
+        MediaReference.of("http://image1", media="image/png"),
         "text",
-        MediaContent.url("http://image2", media="image/jpeg"),
+        MediaReference.of("http://image2", media="image/jpeg"),
         "</test>",
     )

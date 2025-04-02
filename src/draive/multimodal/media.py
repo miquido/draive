@@ -1,11 +1,11 @@
-from base64 import b64decode, b64encode
+from base64 import b64decode, urlsafe_b64encode
 from collections.abc import Sequence
 from typing import Final, Literal, Self, cast, get_args
 
 from haiway import Default
 
 from draive.commons import META_EMPTY, Meta
-from draive.multimodal.data_field import b64_or_url_field
+from draive.multimodal.data_field import b64_data_field
 from draive.parameters import DataModel
 
 __all__ = [
@@ -39,7 +39,86 @@ MediaKind = Literal[
     "image",
     "audio",
     "video",
+    "document",
 ]
+
+
+class MediaReference(DataModel):
+    @classmethod
+    def of(
+        cls,
+        uri: str,
+        /,
+        media: MediaType | None = None,
+        *,
+        meta: Meta | None = None,
+    ) -> Self:
+        return cls(
+            media=media if media is not None else "unknown",
+            uri=uri,
+            meta=meta if meta is not None else META_EMPTY,
+        )
+
+    media: MediaType
+    uri: str
+    meta: Meta = Default(META_EMPTY)
+
+    @property
+    def kind(self) -> MediaKind:
+        return _media_kind(self.media)
+
+    def as_string(self) -> str:
+        return f"![{self.kind}]({self.uri})"
+
+    def __bool__(self) -> bool:
+        return len(self.uri) > 0
+
+
+class MediaData(DataModel):
+    @classmethod
+    def of(
+        cls,
+        data: str | bytes,
+        /,
+        media: MediaType,
+        *,
+        meta: Meta | None = None,
+    ) -> Self:
+        return cls(
+            media=media,
+            data=data if isinstance(data, bytes) else b64decode(data),
+            meta=meta if meta is not None else META_EMPTY,
+        )
+
+    media: MediaType
+    # special field - base64 content auto converted to bytes
+    data: bytes = b64_data_field()
+    meta: Meta = Default(META_EMPTY)
+
+    @property
+    def kind(self) -> MediaKind:
+        return _media_kind(self.media)
+
+    def as_string(
+        self,
+        *,
+        include_data: bool,
+    ) -> str:
+        if include_data:
+            return f"![{self.kind}]({self.as_data_uri()})"
+
+        else:
+            return f"![{self.kind}]()"
+
+    def as_data_uri(self) -> str:
+        return f"data:{self.media};base64,{urlsafe_b64encode(self.data).decode()}"
+
+    def __bool__(self) -> bool:
+        return len(self.data) > 0
+
+
+MediaContent = MediaReference | MediaData
+
 MEDIA_KINDS: Final[Sequence[str]] = get_args(MediaKind)
 
 
@@ -54,94 +133,18 @@ def validated_media_kind(
         raise ValueError(f"Unsupported media kind: {kind}")
 
 
-# TODO: split to MediaContent and MediaReferenceContent
-class MediaContent(DataModel):
-    @classmethod
-    def url(
-        cls,
-        url: str,
-        /,
-        media: MediaType | MediaKind,
-        meta: Meta | None = None,
-    ) -> Self:
-        return cls(
-            media=media,
-            source=url,
-            meta=meta if meta is not None else META_EMPTY,
-        )
+def _media_kind(
+    media: str,
+    /,
+) -> MediaKind:
+    if media.startswith("image"):
+        return "image"
 
-    @classmethod
-    def base64(
-        cls,
-        data: str,
-        /,
-        media: MediaType,
-        meta: Meta | None = None,
-    ) -> Self:
-        return cls(
-            media=media,
-            source=b64decode(data),
-            meta=meta if meta is not None else META_EMPTY,
-        )
+    elif media.startswith("audio"):
+        return "audio"
 
-    @classmethod
-    def data(
-        cls,
-        data: bytes,
-        /,
-        media: MediaType,
-        meta: Meta | None = None,
-    ) -> Self:
-        return cls(
-            media=media,
-            source=data,
-            meta=meta if meta is not None else META_EMPTY,
-        )
+    elif media.startswith("video"):
+        return "video"
 
-    media: MediaType | MediaKind
-    # special field - url string or base64 content auto converted to bytes
-    source: str | bytes = b64_or_url_field()
-    meta: Meta = Default(META_EMPTY)
-
-    @property
-    def kind(self) -> MediaKind:  # noqa: PLR0911
-        match self.media:
-            case "image" | "image/jpeg" | "image/png" | "image/bmp" | "image/gif":
-                return "image"
-
-            case "audio" | "audio/aac" | "audio/mpeg" | "audio/ogg" | "audio/wav":
-                return "audio"
-
-            case "video" | "video/mp4" | "video/mpeg" | "video/ogg":
-                return "video"
-
-            case other_image if other_image.startswith("image"):
-                return "image"
-
-            case other_audio if other_audio.startswith("audio"):
-                return "audio"
-
-            case other_video if other_video.startswith("video"):
-                return "video"
-
-            case _:
-                return "unknown"
-
-    def as_string(
-        self,
-        *,
-        include_data: bool,
-    ) -> str:
-        match self.source:
-            case str() as string:
-                return f"![{self.kind}]({string})"
-
-            case bytes() as data:
-                if include_data:
-                    return f"![{self.kind}](data:{self.media};base64,{b64encode(data).decode()})"
-
-                else:
-                    return f"![{self.kind}]()"
-
-    def __bool__(self) -> bool:
-        return len(self.source) > 0
+    else:
+        return "unknown"

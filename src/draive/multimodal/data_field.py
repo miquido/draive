@@ -9,11 +9,11 @@ from draive.parameters import (
 )
 
 __all__ = [
-    "b64_or_url_field",
+    "b64_data_field",
 ]
 
 
-def b64_or_url_field(
+def b64_data_field(
     *,
     description: str | Missing = MISSING,
 ) -> Any:
@@ -26,42 +26,28 @@ def b64_or_url_field(
         else {
             "type": "string",
         },
-        validator=_b64_or_url_validator,
-        converter=_b64_or_url_converter,
+        validator=_b64_validator,
+        converter=_b64_converter,
     )
 
 
-def _b64_or_url_validator(
+def _b64_validator(
     value: Any,
     context: ParameterValidationContext,
-) -> str | bytes:
+) -> bytes:
     match value:
-        case str() as string:
-            if string.startswith("http"):
-                return string  # it is url if it starts from http
-
-            try:
-                # try decoding base64...
-                return b64decode(string)
-
-            except Exception:
-                # ...or use as string (url) if it fails
-                return string
-
         case bytes() as data:
             return data
+
+        case str() as string:
+            return b64decode(string)
 
         case _:
             raise TypeError(f"Expected 'str | bytes', received '{type(value).__name__}'")
 
 
-def _b64_or_url_converter(
-    value: str | bytes,
+def _b64_converter(
+    value: bytes,
     /,
 ) -> str:
-    match value:
-        case str() as string:
-            return string
-
-        case bytes() as data:
-            return b64encode(data).decode("utf-8")
+    return b64encode(value).decode("utf-8")

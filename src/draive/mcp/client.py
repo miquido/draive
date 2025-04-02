@@ -27,7 +27,8 @@ from pydantic import AnyUrl
 
 from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
 from draive.lmm.types import LMMToolError
-from draive.multimodal import MediaContent, MultimodalContent, TextContent
+from draive.multimodal import MultimodalContent, TextContent
+from draive.multimodal.media import MediaData
 from draive.parameters import BasicValue
 from draive.parameters.model import DataModel
 from draive.parameters.specification import validated_specification
@@ -432,8 +433,8 @@ async def _convert_content(
 
         case MCPImageContent() as image:
             return MultimodalContent.of(
-                MediaContent.base64(
-                    image.data,
+                MediaData.of(
+                    urlsafe_b64decode(image.data),
                     media=image.mimeType,
                 )
             )
@@ -463,7 +464,7 @@ async def _convert_content(
                         case other:
                             # try to match supported media or raise an exception
                             return MultimodalContent.of(
-                                MediaContent.data(
+                                MediaData.of(
                                     urlsafe_b64decode(blob.blob),
                                     media=other,
                                 )

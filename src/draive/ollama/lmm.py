@@ -18,6 +18,7 @@ from draive.lmm import (
 from draive.multimodal import (
     MultimodalContent,
 )
+from draive.multimodal.media import MediaData
 from draive.ollama.types import OllamaException
 from draive.parameters import DataModel
 
@@ -38,7 +39,12 @@ def context_element_as_messages(
                 Message(
                     role="user",
                     content=element.content.without_media().as_string(),
-                    images=[Image(value=image.source) for image in input.content.media("image")],
+                    images=[
+                        Image(value=image.data)
+                        if isinstance(image, MediaData)
+                        else Image(value=image.uri)
+                        for image in input.content.media("image")
+                    ],
                 ),
             )
 
@@ -48,7 +54,10 @@ def context_element_as_messages(
                     role="assistant",
                     content=element.content.without_media().as_string(),
                     images=[
-                        Image(value=image.source) for image in completion.content.media("image")
+                        Image(value=image.data)
+                        if isinstance(image, MediaData)
+                        else Image(value=image.uri)
+                        for image in completion.content.media("image")
                     ],
                 ),
             )
@@ -75,7 +84,12 @@ def context_element_as_messages(
                 Message(
                     role="assistant",
                     content=response.content.without_media().as_string(),
-                    images=[Image(value=image.source) for image in response.content.media("image")],
+                    images=[
+                        Image(value=image.data)
+                        if isinstance(image, MediaData)
+                        else Image(value=image.uri)
+                        for image in response.content.media("image")
+                    ],
                 )
                 for response in tool_responses.responses
             )

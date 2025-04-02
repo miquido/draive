@@ -3,7 +3,7 @@ from itertools import chain
 from typing import ClassVar, Self, final, overload
 
 from draive.commons import META_EMPTY, Meta
-from draive.multimodal.media import MediaContent, MediaKind
+from draive.multimodal.media import MediaContent, MediaData, MediaKind, MediaReference
 from draive.multimodal.meta import MetaContent
 from draive.multimodal.text import TextContent
 from draive.parameters import DataModel
@@ -264,8 +264,11 @@ def _as_string(
         case TextContent() as text:
             return text.text
 
-        case MediaContent() as media:
-            return media.as_string(include_data=include_data)
+        case MediaData() as media_data:
+            return media_data.as_string(include_data=include_data)
+
+        case MediaReference() as media_reference:
+            return media_reference.as_string()
 
         case MetaContent() as meta:
             return (  # perhaps, we could use meta values within xml tag?
@@ -327,7 +330,7 @@ def _update_meta(
     element: MultimodalContentElement,
 ) -> MultimodalContentElement:
     match element:
-        case (TextContent() | MediaContent() | MetaContent()) as content:
+        case (TextContent() | MediaData() | MediaReference() | MetaContent()) as content:
             if current_meta := content.meta:
                 return content.updated(meta={**current_meta, **meta})
 

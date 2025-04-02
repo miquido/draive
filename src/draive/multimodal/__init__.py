@@ -7,7 +7,9 @@ from draive.multimodal.content import (
 from draive.multimodal.media import (
     MEDIA_KINDS,
     MediaContent,
+    MediaData,
     MediaKind,
+    MediaReference,
     MediaType,
     validated_media_kind,
 )
@@ -18,7 +20,9 @@ from draive.multimodal.text import TextContent
 __all__ = [
     "MEDIA_KINDS",
     "MediaContent",
+    "MediaData",
     "MediaKind",
+    "MediaReference",
     "MediaType",
     "MetaContent",
     "Multimodal",

@@ -17,7 +17,7 @@ from mcp.types import Tool as MCPTool
 from pydantic import AnyUrl
 
 from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
-from draive.multimodal import MediaContent, MultimodalContent, TextContent
+from draive.multimodal import MediaData, MediaReference, MultimodalContent, TextContent
 from draive.prompts import Prompt, PromptTemplate
 from draive.resources import Resource, ResourceContent, ResourceTemplate
 from draive.tools import AnyTool, Toolbox
@@ -277,22 +277,24 @@ def _convert_multimodal_content(
                     )
                 )
 
-            case MediaContent() as media:
-                if media.kind != "image":
-                    raise NotImplementedError(f"Media support for {media.media} is not implemented")
-
-                if not isinstance(media.source, bytes):
-                    # TODO: download images on the fly?
+            case MediaData() as media_data:
+                if media_data.kind != "image":
                     raise NotImplementedError(
-                        "Media support for urls is not implemented, please use data blobs instead"
+                        f"Media support for {media_data.media} is not implemented"
                     )
 
                 converted.append(
                     MCPImageContent(
                         type="image",
-                        data=urlsafe_b64encode(media.source).decode(),
-                        mimeType=media.media,
+                        data=urlsafe_b64encode(media_data.data).decode(),
+                        mimeType=media_data.media,
                     )
+                )
+
+            case MediaReference():
+                # TODO: download images on the fly?
+                raise NotImplementedError(
+                    "Media reference support is not implemented, please use data blobs instead"
                 )
 
             case other:
