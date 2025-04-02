@@ -9,7 +9,7 @@ from typing import (
     runtime_checkable,
 )
 
-from haiway import Default, State
+from haiway import Default
 
 from draive.commons import META_EMPTY, Meta
 from draive.instructions import Instruction
@@ -25,7 +25,6 @@ __all__ = [
     "LMMInput",
     "LMMOutput",
     "LMMSessionOutputSelection",
-    "LMMSessionProperties",
     "LMMStreamChunk",
     "LMMStreamInput",
     "LMMStreamOutput",
@@ -251,15 +250,8 @@ class LMMCompleting(Protocol):
 
 
 type LMMSessionOutputSelection = (
-    Sequence[Literal["text", "audio"]] | Literal["auto", "text", "audio"]
+    Sequence[Literal["text", "audio", "image"]] | Literal["auto", "text", "audio", "image"]
 )
-
-
-class LMMSessionProperties(State):
-    instruction: Instruction | None = None
-    output: LMMSessionOutputSelection = "auto"
-    tools: Sequence[LMMToolSpecification] | None
-    tool_selection: LMMToolSelection = "auto"
 
 
 @runtime_checkable
@@ -267,8 +259,11 @@ class LMMSessionPreparing(Protocol):
     async def __call__(
         self,
         *,
-        properties: AsyncIterator[LMMSessionProperties],
-        input: AsyncIterator[LMMStreamInput],  # noqa: A002
-        context: LMMContext | None,
+        instruction: Instruction | None,
+        initial_context: LMMContext | None,
+        input_stream: AsyncIterator[LMMStreamInput],
+        output: LMMSessionOutputSelection,
+        tools: Sequence[LMMToolSpecification],
+        tool_selection: LMMToolSelection,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput]: ...

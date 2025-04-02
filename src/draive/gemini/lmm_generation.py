@@ -10,6 +10,7 @@ from google.genai.types import (
     FunctionCallingConfigMode,
     FunctionDeclarationDict,
     GenerateContentResponse,
+    Modality,
     SchemaDict,
     SpeechConfigDict,
 )
@@ -115,7 +116,7 @@ class GeminiLMMGeneration(GeminiAPI):
 
             response_schema: SchemaDict | None
             response_mime_type: str | None
-            response_modalities: list[str] | None
+            response_modalities: list[Modality] | None
             response_schema, response_modalities, response_mime_type, output_decoder = (
                 output_as_response_declaration(output)
             )
@@ -152,7 +153,9 @@ class GeminiLMMGeneration(GeminiAPI):
                     "media_resolution": resoluton_as_media_resulution(
                         generation_config.media_resolution
                     ),
-                    "response_modalities": response_modalities,
+                    "response_modalities": [str(modality) for modality in response_modalities]
+                    if response_modalities is not None
+                    else None,
                     "response_mime_type": response_mime_type,
                     "response_schema": response_schema,
                     "speech_config": unwrap_missing(

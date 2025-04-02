@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Iterable, Sequence
 from typing import Any, Literal, final, overload
 
 from haiway import State, ctx
@@ -9,14 +9,13 @@ from draive.lmm.types import (
     LMMContext,
     LMMOutput,
     LMMOutputSelection,
+    LMMSessionOutputSelection,
     LMMSessionPreparing,
-    LMMSessionProperties,
     LMMStreamInput,
     LMMStreamOutput,
     LMMToolSelection,
     LMMToolSpecification,
 )
-from draive.utils import ConstantStream
 
 __all__ = [
     "LMM",
@@ -96,23 +95,21 @@ class LMMSession(State):
     async def prepare(
         cls,
         *,
-        properties: AsyncIterator[LMMSessionProperties] | LMMSessionProperties,
-        input: AsyncIterator[LMMStreamInput],  # noqa: A002
-        context: LMMContext | None = None,
+        instruction: Instruction | None = None,
+        initial_context: LMMContext | None = None,
+        input_stream: AsyncIterator[LMMStreamInput],
+        output: LMMSessionOutputSelection = "auto",
+        tools: Sequence[LMMToolSpecification] | None = None,
+        tool_selection: LMMToolSelection = "auto",
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput]:
-        properties_stream: AsyncIterator[LMMSessionProperties]
-        match properties:
-            case LMMSessionProperties() as constant:
-                properties_stream = ConstantStream(constant)
-
-            case iterable:
-                properties_stream = iterable
-
         return await ctx.state(cls).preparing(
-            properties=properties_stream,
-            input=input,
-            context=context,
+            instruction=instruction,
+            initial_context=initial_context,
+            input_stream=input_stream,
+            output=output,
+            tools=tools if tools is not None else (),
+            tool_selection=tool_selection,
             **extra,
         )
 

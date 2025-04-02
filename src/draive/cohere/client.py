@@ -30,7 +30,7 @@ class Cohere(
         /,
         *,
         timeout: float = 60.0,
-        disposable_state: Set[Literal["text_embedding"]] | None = None,
+        disposable_state: Set[Literal["text_embedding", "image_embedding"]] | None = None,
     ) -> None: ...
 
     @overload
@@ -42,7 +42,7 @@ class Cohere(
         base_url: str | None = None,
         api_key: str | None = None,
         timeout: float = 60.0,
-        disposable_state: Set[Literal["text_embedding"]] | None = None,
+        disposable_state: Set[Literal["text_embedding", "image_embedding"]] | None = None,
     ) -> None: ...
 
     def __init__(
