@@ -8,6 +8,8 @@ from draive.generation import ImageGeneration
 from draive.instructions import Instruction
 from draive.multimodal import (
     MediaContent,
+    MediaData,
+    MediaReference,
     Multimodal,
 )
 from draive.openai.api import OpenAIAPI
@@ -50,13 +52,13 @@ class OpenAIImageGeneration(OpenAIAPI):
 
             image: Image = response.data[0]
             if url := image.url:
-                return MediaContent.url(
+                return MediaReference.of(
                     url,
                     media="image/png",
                 )
 
             elif b64data := image.b64_json:
-                return MediaContent.base64(
+                return MediaData.of(
                     b64data,
                     media="image/png",
                 )

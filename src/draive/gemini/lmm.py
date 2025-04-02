@@ -30,7 +30,8 @@ from draive.lmm import (
     LMMToolSpecification,
 )
 from draive.multimodal import (
-    MediaContent,
+    MediaData,
+    MediaReference,
     MultimodalContent,
     MultimodalContentElement,
     TextContent,
@@ -119,7 +120,7 @@ def context_element_as_content(
             )
 
 
-def content_element_as_part(  # noqa: C901, PLR0911
+def content_element_as_part(  # noqa: PLR0911
     element: MultimodalContentElement,
     /,
 ) -> PartDict:
@@ -129,23 +130,21 @@ def content_element_as_part(  # noqa: C901, PLR0911
                 "text": text.text,
             }
 
-        case MediaContent() as media:
-            match media.source:
-                case str() as uri:
-                    return {
-                        "file_data": {
-                            "file_uri": uri,
-                            "mime_type": media.media,
-                        }
-                    }
+        case MediaData() as media_data:
+            return {
+                "inline_data": {
+                    "data": media_data.data,
+                    "mime_type": media_data.media,
+                },
+            }
 
-                case bytes() as data:
-                    return {
-                        "inline_data": {
-                            "data": data,
-                            "mime_type": media.media,
-                        },
-                    }
+        case MediaReference() as media_reference:
+            return {
+                "file_data": {
+                    "file_uri": media_reference.uri,
+                    "mime_type": media_reference.media,
+                }
+            }
 
         case MetaContent() as meta if meta.category == "thought":
             match meta.content:
@@ -161,12 +160,7 @@ def content_element_as_part(  # noqa: C901, PLR0911
                         "thought": True,
                     }
 
-                case MediaContent() as media:
-                    return {
-                        "text": media.as_string(include_data=False),
-                        "thought": True,
-                    }
-
+                # not expecting media in thinking, treating it as json
                 case DataModel() as model:
                     return {
                         "text": model.as_json(),
@@ -338,7 +332,7 @@ def result_part_as_content_or_call(
 
     if part.inline_data and part.inline_data.data:  # there is no content without content...
         result.append(
-            MediaContent.data(
+            MediaData.of(
                 part.inline_data.data,
                 media=part.inline_data.mime_type or "application/octet-stream",
             ),
@@ -346,7 +340,7 @@ def result_part_as_content_or_call(
 
     if part.file_data and part.file_data.file_uri:  # there is no content without content...
         result.append(
-            MediaContent.url(
+            MediaReference.of(
                 part.file_data.file_uri,
                 media=part.file_data.mime_type or "application/octet-stream",
             ),

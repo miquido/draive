@@ -3,7 +3,8 @@ from typing import cast
 
 from draive.embedding import Embedded, embed_images, embed_texts
 from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
-from draive.multimodal import MediaContent, Multimodal, MultimodalContent, MultimodalTagElement
+from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
+from draive.multimodal.media import MediaData
 from draive.similarity.score import vector_similarity_score
 from draive.steps import steps_completion
 
@@ -110,33 +111,23 @@ async def text_vector_similarity_evaluator(
 
 @evaluator(name="image_vector_similarity")
 async def image_vector_similarity_evaluator(
-    evaluated: MediaContent | bytes,
+    evaluated: MediaData | bytes,
     /,
     *,
-    reference: MediaContent | bytes,
+    reference: MediaData | bytes,
 ) -> float:
     evaluated_data: bytes
     match evaluated:
-        case MediaContent() as media:
-            match media.source:
-                case bytes() as data:
-                    evaluated_data = data
-
-                case str():
-                    raise ValueError("Unsupported media source")
+        case MediaData() as media:
+            evaluated_data = media.data
 
         case raw_data:
             evaluated_data = raw_data
 
     reference_data: bytes
     match reference:
-        case MediaContent() as media:
-            match media.source:
-                case bytes() as data:
-                    reference_data = data
-
-                case str():
-                    raise ValueError("Unsupported media source")
+        case MediaData() as media:
+            reference_data = media.data
 
         case raw_data:
             reference_data = raw_data

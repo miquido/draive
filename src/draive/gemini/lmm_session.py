@@ -38,8 +38,8 @@ from draive.lmm import (
     LMMToolSpecification,
 )
 from draive.lmm.types import LMMStreamChunk, LMMToolRequest, LMMToolResponse
+from draive.multimodal import MediaData, MediaReference
 from draive.multimodal.content import MultimodalContent
-from draive.multimodal.media import MediaContent
 from draive.multimodal.text import TextContent
 from draive.parameters.model import DataModel
 
@@ -147,7 +147,7 @@ class GeminiLMMSession(GeminiAPI):
             return output_queue
 
     @ctx.scope("connection", task_group=TaskGroup())
-    async def _drive_connection(  # noqa: C901, PLR0912
+    async def _drive_connection(  # noqa: C901
         self,
         model: str,
         config: LiveConnectConfigDict,
@@ -184,20 +184,16 @@ class GeminiLMMSession(GeminiAPI):
                                                 },
                                             )
 
-                                        case MediaContent() as media:
-                                            match media.source:
-                                                case str():
-                                                    raise ValueError(
-                                                        "Media reference is not supported"
-                                                    )
+                                        case MediaData() as media_data:
+                                            await session.send_realtime_input(
+                                                media={
+                                                    "data": media_data.data,
+                                                    "mime_type": media_data.media,
+                                                },
+                                            )
 
-                                                case bytes() as data:
-                                                    await session.send_realtime_input(
-                                                        media={
-                                                            "data": data,
-                                                            "mime_type": media.media,
-                                                        },
-                                                    )
+                                        case MediaReference():
+                                            raise ValueError("Media reference is not supported")
 
                                         case DataModel() as data:
                                             await session.send_realtime_input(

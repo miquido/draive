@@ -1,9 +1,9 @@
-from draive import MediaContent, MultimodalContent, TextContent
+from draive import MediaContent, MediaReference, MultimodalContent, TextContent
 
 input_string: str = "Lorem ipsum,\ndolor sit amet"
 input_text: TextContent = TextContent(text=input_string)
 input_text_merged: TextContent = TextContent(text=input_string + input_string)
-input_image: MediaContent = MediaContent.url(
+input_image: MediaContent = MediaReference.of(
     "http://image_url",
     media="image/png",
 )

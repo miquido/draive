@@ -13,11 +13,11 @@ from draive import (
     ConversationMessage,
     DataModel,
     Field,
-    MediaContent,
     Missing,
     MultimodalContent,
     ParameterValidationError,
 )
+from draive.multimodal import MediaData, MediaReference
 
 
 def invalid(value: str) -> None:
@@ -285,7 +285,7 @@ basic_conversation_message_json: str = """\
 media_url_conversation_message_instance: ConversationMessage = ConversationMessage(
     identifier="identifier",
     role="model",
-    content=MultimodalContent.of(MediaContent.url("https://miquido.com/image", media="image/png")),
+    content=MultimodalContent.of(MediaReference.of("https://miquido.com/image", media="image/png")),
 )
 media_url_conversation_message_json: str = """\
 {
@@ -297,7 +297,7 @@ media_url_conversation_message_json: str = """\
         "parts": [
             {
                 "media": "image/png",
-                "source": "https://miquido.com/image",
+                "uri": "https://miquido.com/image",
                 "meta": {}
             }
         ]
@@ -309,7 +309,7 @@ media_url_conversation_message_json: str = """\
 media_data_conversation_message_instance: ConversationMessage = ConversationMessage(
     identifier="identifier",
     role="model",
-    content=MultimodalContent.of(MediaContent.data(b"image_data", media="image/png")),
+    content=MultimodalContent.of(MediaData.of(b"image_data", media="image/png")),
 )
 media_data_conversation_message_json: str = """\
 {
@@ -321,7 +321,7 @@ media_data_conversation_message_json: str = """\
         "parts": [
             {
                 "media": "image/png",
-                "source": "aW1hZ2VfZGF0YQ==",
+                "data": "aW1hZ2VfZGF0YQ==",
                 "meta": {}
             }
         ]

@@ -25,7 +25,8 @@ from draive.lmm import (
 from draive.lmm.types import LMMStreamOutput
 from draive.metrics.tokens import TokenUsage
 from draive.multimodal import (
-    MediaContent,
+    MediaData,
+    MediaReference,
     Multimodal,
     MultimodalContent,
     MultimodalContentElement,
@@ -150,12 +151,12 @@ def _convert_content_element(
         case TextContent() as text:
             return {"text": text.text}
 
-        case MediaContent() as media:
-            if media.kind != "image" or isinstance(media.source, str):
-                raise ValueError("Unsupported message content", media)
+        case MediaData() as media_data:
+            if media_data.kind != "image":
+                raise ValueError("Unsupported message content", media_data)
 
             image_format: Literal["png", "jpeg", "gif"]
-            match media.media:
+            match media_data.media:
                 case "image/png":
                     image_format = "png"
 
@@ -166,14 +167,17 @@ def _convert_content_element(
                     image_format = "gif"
 
                 case _:
-                    raise ValueError("Unsupported message content", media)
+                    raise ValueError("Unsupported message content", media_data)
 
             return {
                 "image": {
                     "format": image_format,
-                    "source": {"bytes": media.source},
+                    "source": {"bytes": media_data.data},
                 }
             }
+
+        case MediaReference() as media_reference:
+            raise ValueError("Unsupported message content", media_reference)
 
         case DataModel() as data:
             return {"text": data.as_json()}
@@ -286,7 +290,7 @@ async def _chat_completion(
                         media_type = "image"
 
                 message_parts.append(
-                    MediaContent.data(
+                    MediaData.of(
                         data,
                         media=media_type,
                     )

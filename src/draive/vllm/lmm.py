@@ -1,5 +1,4 @@
 import json
-from base64 import b64encode
 from collections.abc import Callable, Iterable
 from typing import Any, Literal, cast
 
@@ -25,7 +24,8 @@ from draive.lmm import (
     LMMToolSpecification,
 )
 from draive.multimodal import (
-    MediaContent,
+    MediaData,
+    MediaReference,
     MultimodalContent,
     MultimodalContentElement,
     TextContent,
@@ -51,22 +51,28 @@ def content_element_as_content_part(
                 "text": text.text,
             }
 
-        case MediaContent() as media:
-            if media.kind != "image":
-                raise ValueError("Unsupported message content", media)
-
-            url: str
-            match media.source:
-                case str() as string:
-                    url = string
-
-                case bytes() as data:
-                    url = f"data:{media.media};base64,{b64encode(data).decode()}"
+        case MediaData() as media_data:
+            if media_data.kind != "image":
+                raise ValueError("Unsupported message content", media_data)
 
             return {
                 "type": "image_url",
                 "image_url": {
-                    "url": url,
+                    "url": media_data.as_data_uri(),
+                    "detail": cast(Literal["auto", "low", "high"], config.vision_details)
+                    if not_missing(config.vision_details)
+                    else "auto",
+                },
+            }
+
+        case MediaReference() as media_reference:
+            if media_reference.kind != "image":
+                raise ValueError("Unsupported message content", media_reference)
+
+            return {
+                "type": "image_url",
+                "image_url": {
+                    "url": media_reference.uri,
                     "detail": cast(Literal["auto", "low", "high"], config.vision_details)
                     if not_missing(config.vision_details)
                     else "auto",

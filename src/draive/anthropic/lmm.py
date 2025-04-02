@@ -30,7 +30,8 @@ from draive.lmm import (
     LMMToolSpecification,
 )
 from draive.multimodal import (
-    MediaContent,
+    MediaData,
+    MediaReference,
     MetaContent,
     Multimodal,
     MultimodalContent,
@@ -153,29 +154,30 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
                 "text": text.text,
             }
 
-        case MediaContent() as media:
-            if media.kind != "image":
-                raise ValueError("Unsupported message content", media)
+        case MediaData() as media_data:
+            if media_data.kind != "image":
+                raise ValueError("Unsupported message content", media_data)
 
-            match media.source:
-                case str() as url:
-                    return {
-                        "type": "image",
-                        "source": {
-                            "type": "url",
-                            "url": url,
-                        },
-                    }
+            return {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": cast(Any, media_data.media),
+                    "data": b64encode(media_data.data).decode(),
+                },
+            }
 
-                case bytes() as data:
-                    return {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": cast(Any, media.media),
-                            "data": b64encode(data).decode(),
-                        },
-                    }
+        case MediaReference() as media_reference:
+            if media_reference.kind != "image":
+                raise ValueError("Unsupported message content", media_reference)
+
+            return {
+                "type": "image",
+                "source": {
+                    "type": "url",
+                    "url": media_reference.uri,
+                },
+            }
 
         case MetaContent() as meta if meta.category == "thinking":
             match meta.content:
@@ -193,13 +195,7 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
                         "signature": str(meta.meta.get("signature", "")),
                     }
 
-                case MediaContent() as media:
-                    return {
-                        "type": "thinking",
-                        "thinking": media.as_string(include_data=False),
-                        "signature": str(meta.meta.get("signature", "")),
-                    }
-
+                # we are not expecting media in thinking, treating it as json
                 case DataModel() as model:
                     return {
                         "type": "thinking",
@@ -221,12 +217,7 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
                         "data": text.text,
                     }
 
-                case MediaContent() as media:
-                    return {
-                        "type": "redacted_thinking",
-                        "data": media.as_string(include_data=False),
-                    }
-
+                # we are not expecting media in thinking, treating it as json
                 case DataModel() as model:
                     return {
                         "type": "redacted_thinking",

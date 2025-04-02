@@ -5,7 +5,8 @@ from haiway import Default, State
 
 from draive.commons import META_EMPTY, Meta
 from draive.multimodal import (
-    MediaContent,
+    MediaData,
+    MediaReference,
     MultimodalContentElement,
     TextContent,
     # validated_media_type,
@@ -91,16 +92,14 @@ class ResourceContent(State):
                     blob=text_content.text.encode(),
                 )
 
-            case MediaContent() as media_content:
-                match media_content.source:
-                    case bytes() as data:
-                        return cls(
-                            mime_type=mime_type or media_content.media,
-                            blob=data,
-                        )
+            case MediaData() as media_data:
+                return cls(
+                    mime_type=mime_type or media_data.media,
+                    blob=media_data.data,
+                )
 
-                    case _:
-                        raise ValueError("Resource can't use a content reference")
+            case MediaReference():
+                raise ValueError("Resource can't use a media reference")
 
             case other:
                 return cls(
@@ -123,7 +122,7 @@ class ResourceContent(State):
 
             case other:
                 # try to match supported media
-                return MediaContent.data(
+                return MediaData.of(
                     self.blob,
                     media=other,
                 )

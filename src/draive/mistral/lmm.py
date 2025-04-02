@@ -1,5 +1,4 @@
 import json
-from base64 import b64encode
 from collections.abc import Callable, Iterable
 from typing import Any, cast
 
@@ -28,7 +27,8 @@ from draive.lmm import (
 )
 from draive.mistral.types import MistralException
 from draive.multimodal import (
-    MediaContent,
+    MediaData,
+    MediaReference,
     MultimodalContent,
     MultimodalContentElement,
     TextContent,
@@ -116,21 +116,23 @@ def content_element_as_content_chunk(
                 "text": text.text,
             }
 
-        case MediaContent() as media:
-            if media.kind != "image":
-                raise ValueError("Unsupported content", media)
-
-            url: str
-            match media.source:
-                case str() as uri:
-                    url = uri
-
-                case bytes() as data:
-                    url = f"data:{media.media};base64,{b64encode(data).decode()}"
+        case MediaData() as media_data:
+            if media_data.kind != "image":
+                raise ValueError("Unsupported media content", media_data)
 
             return {
                 "type": "image_url",
-                "image_url": {"url": url},
+                "image_url": {"url": media_data.as_data_uri()},
+                # TODO: there is optional "detail" argument, however undocumented
+            }
+
+        case MediaReference() as media_reference:
+            if media_reference.kind != "image":
+                raise ValueError("Unsupported media content", media_reference)
+
+            return {
+                "type": "image_url",
+                "image_url": {"url": media_reference.uri},
                 # TODO: there is optional "detail" argument, however undocumented
             }
 
@@ -152,13 +154,13 @@ def content_chunk_as_content_element(
         case ImageURLChunk() as image:
             match image.image_url:
                 case str() as url:
-                    return MediaContent.url(
+                    return MediaReference.of(
                         url,
                         media="image",
                     )
 
                 case image_url:
-                    return MediaContent.url(
+                    return MediaReference.of(
                         image_url.url,
                         media="image",
                     )
@@ -172,7 +174,7 @@ def content_chunk_as_content_element(
             )
 
         case DocumentURLChunk() as document:
-            return MediaContent.url(
+            return MediaReference.of(
                 document.document_url,
                 media="document",
                 meta={

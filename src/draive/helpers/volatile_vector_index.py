@@ -6,7 +6,7 @@ from haiway import AttributePath, AttributeRequirement
 
 from draive.embedding import Embedded, embed_text, embed_texts
 from draive.embedding.call import embed_image, embed_images
-from draive.multimodal import MediaContent, TextContent
+from draive.multimodal import MediaContent, MediaData, MediaReference, TextContent
 from draive.parameters import DataModel
 from draive.similarity import mmr_vector_similarity_search, vector_similarity_search
 from draive.utils import VectorIndex
@@ -49,14 +49,14 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                     case TextContent() as text_content:
                         selected_values.append(text_content.text)
 
-                    case MediaContent() as media_content:
-                        if media_content.kind != "image":
-                            raise ValueError(f"{media_content.kind} embedding is not supported")
+                    case MediaData() as media_data:
+                        if media_data.kind != "image":
+                            raise ValueError(f"{media_data.kind} embedding is not supported")
 
-                        if not isinstance(media_content.source, bytes):
-                            raise ValueError("Media references are not supported")
+                        selected_values.append(media_data.data)
 
-                        selected_values.append(media_content.source)
+                    case MediaReference():
+                        raise ValueError("Media references are not supported")
 
             embedded_values: Sequence[Embedded[str] | Embedded[bytes]]
             if all(isinstance(value, str) for value in selected_values):
@@ -148,18 +148,18 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                     )
                     query_vector = embedded_text.vector
 
-                case MediaContent() as media_content:
-                    if media_content.kind != "image":
-                        raise ValueError(f"{media_content.kind} embedding is not supported")
-
-                    if not isinstance(media_content.source, bytes):
-                        raise ValueError("Media references are not supported")
+                case MediaData() as media_data:
+                    if media_data.kind != "image":
+                        raise ValueError(f"{media_data.kind} embedding is not supported")
 
                     embedded_image: Embedded[bytes] = await embed_image(
-                        media_content.source,
+                        media_data.data,
                         **extra,
                     )
                     query_vector = embedded_image.vector
+
+                case MediaReference():
+                    raise ValueError("Media references are not supported")
 
                 case vector:
                     query_vector = vector
