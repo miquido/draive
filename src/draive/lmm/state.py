@@ -9,6 +9,7 @@ from draive.lmm.types import (
     LMMContext,
     LMMOutput,
     LMMOutputSelection,
+    LMMSessionOutput,
     LMMSessionOutputSelection,
     LMMSessionPreparing,
     LMMStreamInput,
@@ -102,7 +103,7 @@ class LMMSession(State):
         tools: Sequence[LMMToolSpecification] | None = None,
         tool_selection: LMMToolSelection = "auto",
         **extra: Any,
-    ) -> AsyncIterator[LMMStreamOutput]:
+    ) -> AsyncIterator[LMMSessionOutput]:
         return await ctx.state(cls).preparing(
             instruction=instruction,
             initial_context=initial_context,

@@ -73,6 +73,9 @@ class MultimodalContent(DataModel):
             parts=tuple(part for part in self.parts if not isinstance(part, MediaContent)),
         )
 
+    def is_artifact(self) -> bool:
+        return all(_is_artifact(part) for part in self.parts)
+
     @property
     def has_artifacts(self) -> bool:
         return any(_is_artifact(part) for part in self.parts)
@@ -106,8 +109,23 @@ class MultimodalContent(DataModel):
             parts=tuple(part for part in self.parts if not _is_artifact(part)),
         )
 
-    def meta(self) -> Sequence[MetaContent]:
-        return tuple(part for part in self.parts if isinstance(part, MetaContent))
+    def is_meta(self) -> bool:
+        return all(isinstance(part, MetaContent) for part in self.parts)
+
+    def meta(
+        self,
+        *,
+        category: str | None = None,
+    ) -> Sequence[MetaContent]:
+        if category is not None:
+            return tuple(
+                part
+                for part in self.parts
+                if isinstance(part, MetaContent) and part.category == category
+            )
+
+        else:
+            return tuple(part for part in self.parts if isinstance(part, MetaContent))
 
     def without_meta(self) -> Self:
         return self.__class__(
