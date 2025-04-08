@@ -68,6 +68,16 @@ class MultimodalContent(DataModel):
                 part for part in self.parts if isinstance(part, MediaContent) and part.kind == media
             )
 
+    def is_media(
+        self,
+        media: MediaKind | None = None,
+    ) -> bool:
+        if media is None:
+            return all(isinstance(part, MediaContent) for part in self.parts)
+
+        else:
+            return all(isinstance(part, MediaContent) and part.kind == media for part in self.parts)
+
     def without_media(self) -> Self:
         return self.__class__(
             parts=tuple(part for part in self.parts if not isinstance(part, MediaContent)),

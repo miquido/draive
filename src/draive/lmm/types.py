@@ -273,7 +273,7 @@ class LMMCompleting(Protocol):
 
 
 type LMMSessionOutputSelection = (
-    Sequence[Literal["text", "audio", "image"]] | Literal["auto", "text", "audio", "image"]
+    Sequence[Literal["text", "audio"]] | Literal["auto", "text", "audio"]
 )
 
 

@@ -2,7 +2,7 @@ import json
 from collections.abc import Callable, Iterable
 from typing import Any, Literal, cast
 
-from haiway import not_missing
+from haiway import Missing, not_missing
 from openai import NOT_GIVEN, NotGiven
 from openai.types.chat import (
     ChatCompletionContentPartParam,
@@ -30,7 +30,6 @@ from draive.multimodal import (
     MultimodalContentElement,
     TextContent,
 )
-from draive.openai.config import OpenAIChatConfig
 from draive.parameters import DataModel
 
 __all__ = (
@@ -42,7 +41,7 @@ __all__ = (
 
 def content_element_as_content_part(
     element: MultimodalContentElement,
-    config: OpenAIChatConfig,
+    vision_details: Literal["auto", "low", "high"] | Missing,
 ) -> ChatCompletionContentPartParam:
     match element:
         case TextContent() as text:
@@ -59,8 +58,8 @@ def content_element_as_content_part(
                 "type": "image_url",
                 "image_url": {
                     "url": media_data.as_data_uri(),
-                    "detail": cast(Literal["auto", "low", "high"], config.vision_details)
-                    if not_missing(config.vision_details)
+                    "detail": cast(Literal["auto", "low", "high"], vision_details)
+                    if not_missing(vision_details)
                     else "auto",
                 },
             }
@@ -73,8 +72,8 @@ def content_element_as_content_part(
                 "type": "image_url",
                 "image_url": {
                     "url": media_reference.uri,
-                    "detail": cast(Literal["auto", "low", "high"], config.vision_details)
-                    if not_missing(config.vision_details)
+                    "detail": cast(Literal["auto", "low", "high"], vision_details)
+                    if not_missing(vision_details)
                     else "auto",
                 },
             }
@@ -89,7 +88,7 @@ def content_element_as_content_part(
 def context_element_as_messages(
     element: LMMContextElement,
     /,
-    config: OpenAIChatConfig,
+    vision_details: Literal["auto", "low", "high"] | Missing,
 ) -> Iterable[ChatCompletionMessageParam]:
     match element:
         case LMMInput() as input:
@@ -99,7 +98,7 @@ def context_element_as_messages(
                     "content": [
                         content_element_as_content_part(
                             element=element,
-                            config=config,
+                            vision_details=vision_details,
                         )
                         for element in input.content.parts
                     ],
