@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import cast
 
-from draive.embedding import Embedded, embed_images, embed_texts
+from draive.embedding import Embedded, ImageEmbedding, TextEmbedding
 from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
 from draive.multimodal.media import MediaData
@@ -101,7 +101,7 @@ async def text_vector_similarity_evaluator(
     *,
     reference: str,
 ) -> float:
-    embedding: Sequence[Embedded[str]] = await embed_texts([reference, evaluated])
+    embedding: Sequence[Embedded[str]] = await TextEmbedding.embed([reference, evaluated])
 
     return vector_similarity_score(
         value_vector=embedding[0].vector,
@@ -132,7 +132,9 @@ async def image_vector_similarity_evaluator(
         case raw_data:
             reference_data = raw_data
 
-    embedding: Sequence[Embedded[bytes]] = await embed_images([reference_data, evaluated_data])
+    embedding: Sequence[Embedded[bytes]] = await ImageEmbedding.embed(
+        [reference_data, evaluated_data]
+    )
 
     return vector_similarity_score(
         value_vector=embedding[0].vector,

@@ -41,7 +41,7 @@ from draive.lmm.types import LMMSessionEvent, LMMStreamChunk, LMMToolRequest, LM
 from draive.multimodal import MediaData, MediaReference
 from draive.multimodal.content import MultimodalContent
 from draive.multimodal.text import TextContent
-from draive.parameters.model import DataModel
+from draive.parameters import DataModel
 
 __all__ = ("GeminiLMMSession",)
 

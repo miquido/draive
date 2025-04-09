@@ -34,9 +34,6 @@ Repository = "https://github.com/miquido/draive.git"
 sentencepiece = [
   "sentencepiece~=0.2",
 ]
-fastembed = [
-  "fastembed~=0.4",
-]
 cohere = [
   "cohere~=5.13"
 ]
@@ -75,7 +72,6 @@ mcp = [
 
 dev = [
   "draive[sentencepiece]",
-  "draive[fastembed]",
   "draive[cohere]",
   "draive[openai]",
   "draive[anthropic]",

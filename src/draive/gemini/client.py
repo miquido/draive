@@ -26,13 +26,13 @@ class Gemini(
     Access to Gemini services, can be used to prepare various functionalities like lmm.
     """
 
-    __slots__ = ("_disposable_state",)
+    __slots__ = ("_features",)
 
     def __init__(
         self,
         api_key: str | None = None,
         http_options: HttpOptionsDict | None = None,
-        disposable_state: Set[Literal["lmm", "lmm_session", "text_embedding"]] | None = None,
+        features: Set[Literal["lmm", "lmm_session", "text_embedding"]] | None = None,
         **extra: Any,
     ) -> None:
         super().__init__(
@@ -41,21 +41,21 @@ class Gemini(
             **extra,
         )
 
-        self._disposable_state: frozenset[Literal["lmm", "lmm_session", "text_embedding"]] = (
-            frozenset(disposable_state)
-            if disposable_state is not None
+        self._features: frozenset[Literal["lmm", "lmm_session", "text_embedding"]] = (
+            frozenset(features)
+            if features is not None
             else frozenset(("lmm", "lmm_session", "text_embedding"))
         )
 
     async def __aenter__(self) -> Iterable[State]:
         state: list[State] = []
-        if "lmm" in self._disposable_state:
+        if "lmm" in self._features:
             state.append(self.lmm())
 
-        if "lmm_session" in self._disposable_state:
+        if "lmm_session" in self._features:
             state.append(self.lmm_session())
 
-        if "text_embedding" in self._disposable_state:
+        if "text_embedding" in self._features:
             state.append(self.text_embedding())
 
         return state

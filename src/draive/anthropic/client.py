@@ -15,7 +15,7 @@ class Anthropic(
     AnthropicLMMGeneration,
     AnthropicAPI,
 ):
-    __slots__ = ("_disposable_state",)
+    __slots__ = ("_features",)
 
     @overload
     def __init__(
@@ -26,7 +26,7 @@ class Anthropic(
         base_url: str | None = None,
         api_key: str | None = None,
         timeout: float = 60.0,
-        disposable_state: Set[Literal["lmm"]] | None = None,
+        features: Set[Literal["lmm"]] | None = None,
     ) -> None: ...
 
     @overload
@@ -37,7 +37,7 @@ class Anthropic(
         *,
         base_url: str | None = None,
         timeout: float = 60.0,
-        disposable_state: Set[Literal["lmm"]] | None = None,
+        features: Set[Literal["lmm"]] | None = None,
     ) -> None: ...
 
     def __init__(
@@ -48,7 +48,7 @@ class Anthropic(
         base_url: str | None = None,
         api_key: str | None = None,
         timeout: float = 60.0,
-        disposable_state: Set[Literal["lmm"]] | None = None,
+        features: Set[Literal["lmm"]] | None = None,
     ) -> None:
         super().__init__(
             base_url=base_url,
@@ -56,13 +56,13 @@ class Anthropic(
             timeout=timeout,
         )
 
-        self._disposable_state: frozenset[Literal["lmm"]] = (
-            frozenset(disposable_state) if disposable_state is not None else frozenset(("lmm",))
+        self._features: frozenset[Literal["lmm"]] = (
+            frozenset(features) if features is not None else frozenset(("lmm",))
         )
 
     async def __aenter__(self) -> Iterable[State]:
         await self._initialize_client()
-        if "lmm" in self._disposable_state:
+        if "lmm" in self._features:
             return (self.lmm(),)
 
         return ()

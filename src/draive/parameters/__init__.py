@@ -12,7 +12,6 @@ __all__ = (
     "Argument",
     "BasicValue",
     "DataModel",
-    "DataModel",
     "Field",
     "ParameterSpecification",
     "ParameterValidationContext",
