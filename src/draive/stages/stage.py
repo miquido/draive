@@ -16,7 +16,7 @@ from draive.lmm import (
     LMMToolResponses,
 )
 from draive.multimodal import Multimodal, MultimodalContent
-from draive.parameters.model import DataModel
+from draive.parameters import DataModel
 from draive.prompts import Prompt
 from draive.stages.types import (
     StageCondition,
@@ -958,9 +958,9 @@ class Stage:
                     context: LMMContext,
                     result: MultimodalContent,
                 ) -> tuple[LMMContext, MultimodalContent]:
-                    async with disposables as disposable_state:
+                    async with disposables as features:
                         # preserve current Processing state by replacing it
-                        with ctx.updated(*disposable_state, ctx.state(Processing)):
+                        with ctx.updated(*features, ctx.state(Processing)):
                             return await execution(
                                 context=context,
                                 result=result,
@@ -991,13 +991,13 @@ class Stage:
                     context: LMMContext,
                     result: MultimodalContent,
                 ) -> tuple[LMMContext, MultimodalContent]:
-                    async with disposables as disposable_state:
+                    async with disposables as features:
                         # it is kind of temporary solution until we figure out a better
                         # solution for updating state on StateContext directly
                         with StateContext(
                             state=state_context._state.updated(
                                 (
-                                    *disposable_state,
+                                    *features,
                                     # preserve current Processing state by replacing it
                                     ctx.state(Processing),
                                 )
@@ -1029,11 +1029,11 @@ class Stage:
                     context: LMMContext,
                     result: MultimodalContent,
                 ) -> tuple[LMMContext, MultimodalContent]:
-                    async with disposables as disposable_state:
+                    async with disposables as features:
                         with ctx.updated(
                             state,
                             *states,
-                            *disposable_state,
+                            *features,
                             # preserve current Processing state by replacing it
                             ctx.state(Processing),
                         ):

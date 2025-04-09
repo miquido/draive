@@ -21,13 +21,13 @@ class VLLM(
     Access to VLLM services, can be used to prepare various functionalities like lmm.
     """
 
-    __slots__ = ("_disposable_state",)
+    __slots__ = ("_features",)
 
     def __init__(
         self,
         base_url: str | None = None,
         default_headers: Mapping[str, str] | None = None,
-        disposable_state: Set[Literal["lmm", "text_embedding"]] | None = None,
+        features: Set[Literal["lmm", "text_embedding"]] | None = None,
         **extra: Any,
     ) -> None:
         super().__init__(
@@ -35,19 +35,17 @@ class VLLM(
             default_headers=default_headers,
             **extra,
         )
-        self._disposable_state: frozenset[Literal["lmm", "text_embedding"]] = (
-            frozenset(disposable_state)
-            if disposable_state is not None
-            else frozenset(("lmm", "text_embedding"))
+        self._features: frozenset[Literal["lmm", "text_embedding"]] = (
+            frozenset(features) if features is not None else frozenset(("lmm", "text_embedding"))
         )
 
     async def __aenter__(self) -> Iterable[State]:
         await self._initialize_client()
         state: list[State] = []
-        if "lmm" in self._disposable_state:
+        if "lmm" in self._features:
             state.append(self.lmm())
 
-        if "text_embedding" in self._disposable_state:
+        if "text_embedding" in self._features:
             state.append(self.text_embedding())
 
         return state

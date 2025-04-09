@@ -4,8 +4,7 @@ from typing import Any, cast
 
 from haiway import AttributePath, AttributeRequirement
 
-from draive.embedding import Embedded, embed_text, embed_texts
-from draive.embedding.call import embed_image, embed_images
+from draive.embedding import Embedded, ImageEmbedding, TextEmbedding
 from draive.multimodal import MediaContent, MediaData, MediaReference, TextContent
 from draive.parameters import DataModel
 from draive.similarity import mmr_vector_similarity_search, vector_similarity_search
@@ -58,13 +57,13 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
 
             embedded_values: Sequence[Embedded[str] | Embedded[bytes]]
             if all(isinstance(value, str) for value in selected_values):
-                embedded_values = await embed_texts(
+                embedded_values = await TextEmbedding.embed(
                     cast(list[str], selected_values),
                     **extra,
                 )
 
             elif all(value for value in selected_values):
-                embedded_values = await embed_images(
+                embedded_values = await ImageEmbedding.embed(
                     cast(list[bytes], selected_values),
                     **extra,
                 )
@@ -133,14 +132,14 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                         return [embedded.value for embedded in filtered]
 
                 case str() as text:
-                    embedded_text: Embedded[str] = await embed_text(
+                    embedded_text: Embedded[str] = await TextEmbedding.embed(
                         text,
                         **extra,
                     )
                     query_vector = embedded_text.vector
 
                 case TextContent() as text_content:
-                    embedded_text: Embedded[str] = await embed_text(
+                    embedded_text: Embedded[str] = await TextEmbedding.embed(
                         text_content.text,
                         **extra,
                     )
@@ -150,7 +149,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                     if media_data.kind != "image":
                         raise ValueError(f"{media_data.kind} embedding is not supported")
 
-                    embedded_image: Embedded[bytes] = await embed_image(
+                    embedded_image: Embedded[bytes] = await ImageEmbedding.embed(
                         media_data.data,
                         **extra,
                     )

@@ -28,8 +28,7 @@ from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
 from draive.lmm.types import LMMToolError
 from draive.multimodal import MultimodalContent, TextContent
 from draive.multimodal.media import MediaData
-from draive.parameters import BasicValue
-from draive.parameters.model import DataModel
+from draive.parameters import BasicValue, DataModel
 from draive.parameters.specification import validated_specification
 from draive.prompts import Prompt, PromptDeclaration, PromptDeclarationArgument, Prompts
 from draive.resources import Resource, ResourceContent, ResourceDeclaration, Resources
@@ -416,9 +415,9 @@ class MCPClient:
         self._session = await self._session_manager.__aenter__()
         await self._session.initialize()
 
-        disposable_state: list[Resources | Prompts | Tools] = []
+        features: list[Resources | Prompts | Tools] = []
         if "resources" in self._features:
-            disposable_state.append(
+            features.append(
                 Resources(
                     list_fetching=self.resources_list,
                     fetching=self.resource_fetch,
@@ -427,7 +426,7 @@ class MCPClient:
             )
 
         if "resources" in self._features:
-            disposable_state.append(
+            features.append(
                 Prompts(
                     list_fetching=self.prompts_list,
                     fetching=self.prompt_fetch,
@@ -435,14 +434,14 @@ class MCPClient:
                 )
             )
         if "resources" in self._features:
-            disposable_state.append(
+            features.append(
                 Tools(
                     fetching=self.tools_fetch,
                     meta={"mcp_server": self.identifier},
                 )
             )
 
-        return disposable_state
+        return features
 
     async def __aexit__(
         self,
@@ -716,9 +715,9 @@ class MCPClients:
                     case Tools() as tools:
                         self._tools[cast(str, tools.meta["mcp_server"])] = tools
 
-        disposable_state: list[Resources | Prompts | Tools] = []
+        inherited_features: list[Resources | Prompts | Tools] = []
         if self._resources:
-            disposable_state.append(
+            inherited_features.append(
                 Resources(
                     list_fetching=self.resources_list,
                     fetching=self.resource_fetch,
@@ -727,7 +726,7 @@ class MCPClients:
             )
 
         if self._prompts:
-            disposable_state.append(
+            inherited_features.append(
                 Prompts(
                     list_fetching=self.prompts_list,
                     fetching=self.prompt_fetch,
@@ -736,14 +735,14 @@ class MCPClients:
             )
 
         if self._tools:
-            disposable_state.append(
+            inherited_features.append(
                 Tools(
                     fetching=self.tools_fetch,
                     meta={"mcp_server": "mcp_aggregate"},
                 )
             )
 
-        return disposable_state
+        return inherited_features
 
     async def __aexit__(
         self,

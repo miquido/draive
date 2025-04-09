@@ -29,7 +29,7 @@ class OpenAI(
     Access to OpenAI services, can be used to prepare various functionalities like lmm.
     """
 
-    __slots__ = ("_disposable_state",)
+    __slots__ = ("_features",)
 
     def __init__(
         self,
@@ -39,7 +39,7 @@ class OpenAI(
         azure_api_endpoint: str | None = None,
         azure_api_version: str | None = None,
         azure_deployment: str | None = None,
-        disposable_state: Set[Literal["lmm", "lmm_session", "text_embedding", "image_generation"]]
+        features: Set[Literal["lmm", "lmm_session", "text_embedding", "image_generation"]]
         | None = None,
     ) -> None:
         super().__init__(
@@ -51,27 +51,27 @@ class OpenAI(
             azure_deployment=azure_deployment,
         )
 
-        self._disposable_state: frozenset[
+        self._features: frozenset[
             Literal["lmm", "lmm_session", "text_embedding", "image_generation"]
         ] = (
-            frozenset(disposable_state)
-            if disposable_state is not None
+            frozenset(features)
+            if features is not None
             else frozenset(("lmm", "lmm_session", "text_embedding", "image_generation"))
         )
 
     async def __aenter__(self) -> Iterable[State]:
         await self._initialize_client()
         state: list[State] = []
-        if "lmm" in self._disposable_state:
+        if "lmm" in self._features:
             state.append(self.lmm())
 
-        if "lmm_session" in self._disposable_state:
+        if "lmm_session" in self._features:
             state.append(self.lmm_session())
 
-        if "text_embedding" in self._disposable_state:
+        if "text_embedding" in self._features:
             state.append(self.text_embedding())
 
-        if "image_generation" in self._disposable_state:
+        if "image_generation" in self._features:
             state.append(self.image_generation())
 
         return state
