@@ -8,6 +8,7 @@ __all__ = (
     "OpenAIEmbeddingConfig",
     "OpenAIImageGenerationConfig",
     "OpenAIModerationConfig",
+    "OpenAIRealtimeConfig",
     "OpenAISystemFingerprint",
 )
 
@@ -29,6 +30,17 @@ class OpenAIChatConfig(State):
     parallel_tool_calls: bool | Missing = MISSING
     timeout: float | Missing = MISSING
     stop_sequences: Sequence[str] | Missing = MISSING
+
+
+class OpenAIRealtimeConfig(State):
+    model: str
+    temperature: float = 1.0
+    max_tokens: int | Missing = MISSING
+    input_audio_format: Literal["pcm16", "g711_ulaw", "g711_alaw"] | Missing = MISSING
+    output_audio_format: Literal["pcm16", "g711_ulaw", "g711_alaw"] = "pcm16"
+    voice: str | Missing = MISSING
+    vad_type: Literal["server_vad", "semantic_vad"] | Missing = MISSING
+    vad_eagerness: Literal["low", "medium", "high", "auto"] = "auto"
 
 
 class OpenAIEmbeddingConfig(State):

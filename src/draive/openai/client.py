@@ -9,6 +9,7 @@ from draive.openai.embedding import OpenAIEmbedding
 from draive.openai.guardrails import OpenAIContentFiltering
 from draive.openai.images import OpenAIImageGeneration
 from draive.openai.lmm_generation import OpenAILMMGeneration
+from draive.openai.lmm_session import OpenAILMMSession
 from draive.openai.tokenization import OpenAITokenization
 
 __all__ = ("OpenAI",)
@@ -17,6 +18,7 @@ __all__ = ("OpenAI",)
 @final
 class OpenAI(
     OpenAILMMGeneration,
+    OpenAILMMSession,
     OpenAIEmbedding,
     OpenAIImageGeneration,
     OpenAIContentFiltering,
@@ -37,7 +39,8 @@ class OpenAI(
         azure_api_endpoint: str | None = None,
         azure_api_version: str | None = None,
         azure_deployment: str | None = None,
-        disposable_state: Set[Literal["lmm", "text_embedding", "image_generation"]] | None = None,
+        disposable_state: Set[Literal["lmm", "lmm_session", "text_embedding", "image_generation"]]
+        | None = None,
     ) -> None:
         super().__init__(
             base_url=base_url,
@@ -48,10 +51,12 @@ class OpenAI(
             azure_deployment=azure_deployment,
         )
 
-        self._disposable_state: frozenset[Literal["lmm", "text_embedding", "image_generation"]] = (
+        self._disposable_state: frozenset[
+            Literal["lmm", "lmm_session", "text_embedding", "image_generation"]
+        ] = (
             frozenset(disposable_state)
             if disposable_state is not None
-            else frozenset(("lmm", "text_embedding", "image_generation"))
+            else frozenset(("lmm", "lmm_session", "text_embedding", "image_generation"))
         )
 
     async def __aenter__(self) -> Iterable[State]:
@@ -59,6 +64,9 @@ class OpenAI(
         state: list[State] = []
         if "lmm" in self._disposable_state:
             state.append(self.lmm())
+
+        if "lmm_session" in self._disposable_state:
+            state.append(self.lmm_session())
 
         if "text_embedding" in self._disposable_state:
             state.append(self.text_embedding())

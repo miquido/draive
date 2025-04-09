@@ -26,6 +26,7 @@ MediaType = (
         "audio/mpeg",
         "audio/ogg",
         "audio/wav",
+        "audio/pcm16",
         "video/mp4",
         "video/mpeg",
         "video/ogg",

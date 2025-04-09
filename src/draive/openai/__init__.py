@@ -4,6 +4,7 @@ from draive.openai.config import (
     OpenAIEmbeddingConfig,
     OpenAIImageGenerationConfig,
     OpenAIModerationConfig,
+    OpenAIRealtimeConfig,
 )
 from draive.openai.types import OpenAIException
 
@@ -14,4 +15,5 @@ __all__ = (
     "OpenAIException",
     "OpenAIImageGenerationConfig",
     "OpenAIModerationConfig",
+    "OpenAIRealtimeConfig",
 )
