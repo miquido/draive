@@ -1,41 +1,35 @@
-from collections.abc import Callable, Coroutine, Mapping
+from collections.abc import Callable, Coroutine
 from typing import Any, Protocol, cast, final, overload
 
 from haiway import ArgumentsTrace, ResultTrace, ctx
 
 from draive.commons import META_EMPTY, Meta
 from draive.lmm.types import (
-    LMMException,
     LMMToolError,
-    LMMToolFunctionSpecification,
-    LMMToolSpecification,
 )
-from draive.multimodal import Multimodal, MultimodalContent, MultimodalContentConvertible
+from draive.multimodal import MultimodalContent, MultimodalContentConvertible
 from draive.parameters import ParameterSpecification, ParametersSpecification, ParametrizedFunction
-
-__all__ = (
-    "AnyTool",
-    "Tool",
-    "ToolAvailabilityCheck",
-    "tool",
+from draive.tools.types import (
+    ToolAvailabilityChecking,
+    ToolErrorFormatting,
+    ToolHandling,
+    ToolResultFormatting,
 )
 
-
-class ToolAvailabilityCheck(Protocol):
-    def __call__(self) -> bool: ...
+__all__ = ("tool",)
 
 
 @final
-class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Result]]):
+class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Result]]):
     __slots__ = (
         "_check_availability",
-        "_direct_result",
+        "_format_failure",
+        "_format_result",
         "description",
-        "format_failure",
-        "format_result",
+        "handling",
         "meta",
         "name",
-        "specification",
+        "parameters",
     )
 
     def __init__(
@@ -46,10 +40,10 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
         function: Callable[Args, Coroutine[None, None, Result]],
         description: str | None,
         specification: ParametersSpecification | None,
-        availability_check: ToolAvailabilityCheck | None,
-        format_result: Callable[[Result], Multimodal],
-        format_failure: Callable[[Exception], Multimodal],
-        direct_result: bool = False,
+        availability_check: ToolAvailabilityChecking | None,
+        format_result: ToolResultFormatting[Result],
+        format_failure: ToolErrorFormatting,
+        handling: ToolHandling = "auto",
         meta: Meta,
     ) -> None:
         super().__init__(function)
@@ -72,20 +66,15 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
         if not specification["properties"]:
             specification = None  # use no parameters without arguments
 
-        self.specification: LMMToolSpecification = LMMToolFunctionSpecification(
-            name=name,
-            description=description,
-            parameters=specification,
-        )
-
         self.name: str = name
         self.description: str | None = description
-        self._direct_result: bool = direct_result
-        self._check_availability: ToolAvailabilityCheck = availability_check or (
+        self.parameters: ParametersSpecification | None = specification
+        self.handling: ToolHandling = handling
+        self._check_availability: ToolAvailabilityChecking = availability_check or (
             lambda: True  # available by default
         )
-        self.format_result: Callable[[Result], Multimodal] = format_result
-        self.format_failure: Callable[[Exception], Multimodal] = format_failure
+        self._format_result: ToolResultFormatting[Result] = format_result
+        self._format_failure: ToolErrorFormatting = format_failure
         self.meta: Meta = meta
 
     @property
@@ -96,40 +85,38 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
         except Exception:
             return False
 
-    @property
-    def requires_direct_result(self) -> bool:
-        return self._direct_result
-
-    # call from toolbox
-    async def _toolbox_call(
+    # call as a tool
+    async def tool_call(
         self,
         call_id: str,
         /,
-        arguments: Mapping[str, Any],
+        **arguments: Any,
     ) -> MultimodalContent:
         with ctx.scope(self.name):
             ctx.record(ArgumentsTrace.of(**arguments))
             try:
                 try:
-                    if not self.available:
-                        raise LMMException(f"Tool {self.name} is not available!")
-
                     result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
-                    ctx.record(ResultTrace.of(result))
+                    formatted_result: MultimodalContent = MultimodalContent.of(
+                        self._format_result(result)
+                    )
 
-                    return MultimodalContent.of(self.format_result(result))
+                    ctx.record(ResultTrace.of(formatted_result))
+
+                    return formatted_result
 
                 except Exception as exc:
                     # return an error with formatted content
                     raise LMMToolError(
-                        f"Tool {self.name}[{call_id}] failed",
-                        content=MultimodalContent.of(self.format_failure(exc)),
+                        f"Tool {self.name}[{call_id}] call failed due to an error:"
+                        f" {type(exc)} {exc}",
+                        content=MultimodalContent.of(self._format_failure(exc)),
                     ) from exc
 
             except BaseException as exc:
                 ctx.record(ResultTrace.of(exc))
                 ctx.log_error(
-                    "Tool call error",
+                    "Tool call exception",
                     exception=exc,
                 )
                 raise exc
@@ -140,48 +127,31 @@ class Tool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Resu
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Result:
-        with ctx.scope(self.name):
-            ctx.record(ArgumentsTrace.of(*args, **kwargs))
-            try:
-                result: Result = await super().__call__(
-                    *args,
-                    **kwargs,
-                )
-                ctx.record(ResultTrace.of(result))
-
-                return result
-
-            except BaseException as exc:
-                ctx.record(ResultTrace.of(exc))
-                ctx.log_error(
-                    "Tool call error",
-                    exception=exc,
-                )
-                raise exc
-
-
-AnyTool = Tool[Any, Any]
+        return await super().__call__(
+            *args,
+            **kwargs,
+        )
 
 
 class ToolWrapper(Protocol):
     def __call__[**Args, Result](
         self,
         function: Callable[Args, Coroutine[None, None, Result]],
-    ) -> Tool[Args, Result]: ...
+    ) -> FunctionTool[Args, Result]: ...
 
 
 class PartialToolWrapper[Result](Protocol):
     def __call__[**Args](
         self,
         function: Callable[Args, Coroutine[None, None, Result]],
-    ) -> Tool[Args, Result]: ...
+    ) -> FunctionTool[Args, Result]: ...
 
 
 @overload
 def tool[**Args, Result](
     function: Callable[Args, Coroutine[None, None, Result]],
     /,
-) -> Tool[Args, Result]:
+) -> FunctionTool[Args, Result]:
     """
     Convert a function to a tool using default parameters and no description.
 
@@ -205,10 +175,10 @@ def tool[Result](
     *,
     name: str | None = None,
     description: str | None = None,
-    availability_check: ToolAvailabilityCheck | None = None,
-    format_result: Callable[[Result], Multimodal],
-    format_failure: Callable[[Exception], Multimodal] | None = None,
-    direct_result: bool = False,
+    availability_check: ToolAvailabilityChecking | None = None,
+    format_result: ToolResultFormatting[Result],
+    format_failure: ToolErrorFormatting | None = None,
+    handling: ToolHandling = "auto",
     meta: Meta | None = None,
 ) -> PartialToolWrapper[Result]:
     """
@@ -227,7 +197,7 @@ def tool[Result](
         description to be used in a tool specification. Allows to present the tool behavior to the
         external system.
         Default is empty.
-    availability_check: ToolAvailabilityCheck
+    availability_check: ToolAvailabilityChecking
         function used to verify availability of the tool in given context. It can be used to check
         permissions or occurrence of a specific state to allow its usage.
         Provided function should raise an Exception when the tool should not be available.
@@ -238,11 +208,11 @@ def tool[Result](
     format_failure: Callable[[Exception], MultimodalContent]
         function converting tool call exception to a fallback MultimodalContent.
         Default implementation return "ERROR" string and logs the exception.
-    direct_result: bool
+    handling: ToolHandling
         controls if tool result should break the ongoing processing and be the direct result of it.
         Note that during concurrent execution of multiple tools the call/result order defines
         direct result and exact behavior is not defined.
-        Default is False.
+        Default is "auto".
     meta: Mapping[str, str | float | int | bool | None] | None
         custom metadata allowing to access tool metadata like its source in case of remote tools.
 
@@ -258,9 +228,9 @@ def tool(
     *,
     name: str | None = None,
     description: str | None = None,
-    availability_check: ToolAvailabilityCheck | None = None,
-    format_failure: Callable[[Exception], Multimodal] | None = None,
-    direct_result: bool = False,
+    availability_check: ToolAvailabilityChecking | None = None,
+    format_failure: ToolErrorFormatting | None = None,
+    handling: ToolHandling = "auto",
     meta: Meta | None = None,
 ) -> ToolWrapper:
     """
@@ -279,22 +249,19 @@ def tool(
         description to be used in a tool specification. Allows to present the tool behavior to the
         external system.
         Default is empty.
-    availability_check: ToolAvailabilityCheck
+    availability_check: ToolAvailabilityChecking
         function used to verify availability of the tool in given context. It can be used to check
         permissions or occurrence of a specific state to allow its usage.
         Provided function should raise an Exception when the tool should not be available.
         Default is always available.
-    format_result: Callable[[Result], MultimodalContent]
-        function converting tool result to MultimodalContent. It is used to format the result
-        for model processing. Default implementation converts the result to string if needed.
     format_failure: Callable[[Exception], MultimodalContent]
         function converting tool call exception to a fallback MultimodalContent.
         Default implementation return "ERROR" string and logs the exception.
-    direct_result: bool
+    handling: ToolHandling
         controls if tool result should break the ongoing processing and be the direct result of it.
         Note that during concurrent execution of multiple tools the call/result order defines
         direct result and exact behavior is not defined.
-        Default is False.
+        Default is "auto".
     meta: Meta | None
         custom metadata allowing to access tool metadata like its source in case of remote tools.
 
@@ -310,16 +277,16 @@ def tool[**Args, Result](
     *,
     name: str | None = None,
     description: str | None = None,
-    availability_check: ToolAvailabilityCheck | None = None,
-    format_result: Callable[[Result], Multimodal] | None = None,
-    format_failure: Callable[[Exception], Multimodal] | None = None,
-    direct_result: bool = False,
+    availability_check: ToolAvailabilityChecking | None = None,
+    format_result: ToolResultFormatting[Result] | None = None,
+    format_failure: ToolErrorFormatting | None = None,
+    handling: ToolHandling = "auto",
     meta: Meta | None = None,
-) -> PartialToolWrapper[Result] | ToolWrapper | Tool[Args, Result]:
+) -> PartialToolWrapper[Result] | ToolWrapper | FunctionTool[Args, Result]:
     def wrap[**Arg](
         function: Callable[Arg, Coroutine[None, None, Result]],
-    ) -> Tool[Arg, Result]:
-        return Tool[Arg, Result](
+    ) -> FunctionTool[Arg, Result]:
+        return FunctionTool[Arg, Result](
             name=name or function.__name__,
             description=description,
             specification=None,
@@ -327,7 +294,7 @@ def tool[**Args, Result](
             availability_check=availability_check,
             format_result=format_result or _default_result_format,
             format_failure=format_failure or _default_failure_result,
-            direct_result=direct_result,
+            handling=handling,
             meta=meta if meta is not None else META_EMPTY,
         )
 
@@ -358,5 +325,5 @@ def _default_result_format(result: Any) -> MultimodalContent:
             return MultimodalContent.of(str(other))
 
 
-def _default_failure_result(exception: Exception) -> MultimodalContent:
+def _default_failure_result(error: Exception) -> MultimodalContent:
     return MultimodalContent.of("ERROR")

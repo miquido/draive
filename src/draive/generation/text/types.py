@@ -4,7 +4,7 @@ from typing import Any, Protocol, runtime_checkable
 from draive.instructions import Instruction
 from draive.multimodal import Multimodal
 from draive.prompts import Prompt
-from draive.tools import AnyTool, Toolbox
+from draive.tools import Tool, Toolbox
 
 __all__ = ("TextGenerator",)
 
@@ -16,7 +16,7 @@ class TextGenerator(Protocol):
         *,
         instruction: Instruction | str | None,
         input: Prompt | Multimodal,  # noqa: A002
-        tools: Toolbox | Iterable[AnyTool] | None,
+        tools: Toolbox | Iterable[Tool] | None,
         examples: Iterable[tuple[Multimodal, str]] | None,
         **extra: Any,
     ) -> str: ...

@@ -3,6 +3,7 @@ from typing import Any, Literal, overload
 
 from haiway import State, ctx
 
+from draive.commons import META_EMPTY, Meta
 from draive.resources.types import (
     Resource,
     ResourceDeclaration,
@@ -79,3 +80,4 @@ class Resources(State):
 
     list_fetching: ResourceListFetching
     fetching: ResourceFetching
+    meta: Meta = META_EMPTY

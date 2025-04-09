@@ -20,7 +20,7 @@ from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
 from draive.multimodal import MediaData, MediaReference, MultimodalContent, TextContent
 from draive.prompts import Prompt, PromptTemplate
 from draive.resources import Resource, ResourceContent, ResourceTemplate
-from draive.tools import AnyTool, Toolbox
+from draive.tools import Tool, Toolbox
 
 __all__ = (
     "expose_prompts",
@@ -226,7 +226,7 @@ def _convert_message(
 
 
 def expose_tools(
-    tools: Toolbox | Iterable[AnyTool],
+    tools: Toolbox | Iterable[Tool],
     /,
     server: Server,
 ) -> None:

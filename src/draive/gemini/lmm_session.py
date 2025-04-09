@@ -323,7 +323,7 @@ class GeminiLMMSession(GeminiAPI):
                                         for element in tool_response.content.parts
                                     ],
                                 }
-                                if tool_response.error
+                                if tool_response.handling == "error"
                                 else {
                                     "output": [
                                         content_element_as_part(element)

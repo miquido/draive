@@ -27,7 +27,7 @@ from draive.stages.types import (
     StageResultTransforming,
     StageStateAccessing,
 )
-from draive.tools import AnyTool, Toolbox
+from draive.tools import Tool, Toolbox
 from draive.utils import ProcessingState
 from draive.utils.memory import Memory
 from draive.utils.processing import Processing
@@ -264,7 +264,7 @@ class Stage:
         /,
         *,
         instruction: Instruction | str | None = None,
-        tools: Toolbox | Iterable[AnyTool] | None = None,
+        tools: Toolbox | Iterable[Tool] | None = None,
         output: LMMOutputSelection = "auto",
         **extra: Any,
     ) -> Self:
@@ -341,7 +341,7 @@ class Stage:
         /,
         *,
         instruction: Instruction | str | None = None,
-        tools: Toolbox | Iterable[AnyTool] | None = None,
+        tools: Toolbox | Iterable[Tool] | None = None,
         output: LMMOutputSelection = "auto",
         **extra: Any,
     ) -> Self:
@@ -414,7 +414,7 @@ class Stage:
         cls,
         *,
         instruction: Instruction | str | None = None,
-        tools: Toolbox | Iterable[AnyTool] | None = None,
+        tools: Toolbox | Iterable[Tool] | None = None,
         output: LMMOutputSelection = "auto",
         **extra: Any,
     ) -> Self:
@@ -1513,7 +1513,9 @@ async def _lmm_completion(
                 tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
                 if direct_results := [
-                    response.content for response in tool_responses.responses if response.direct
+                    response.content
+                    for response in tool_responses.responses
+                    if response.handling == "direct_result"
                 ]:
                     direct_content: MultimodalContent = MultimodalContent.of(*direct_results)
 

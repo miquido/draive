@@ -35,6 +35,7 @@ __all__ = (
     "LMMToolRequest",
     "LMMToolRequests",
     "LMMToolResponse",
+    "LMMToolResponseHandling",
     "LMMToolResponses",
     "LMMToolSelection",
     "LMMToolSpecification",
@@ -110,12 +111,14 @@ class LMMCompletion(DataModel):
         return bool(self.content)
 
 
+LMMToolResponseHandling = Literal["error", "result", "direct_result"]
+
+
 class LMMToolResponse(DataModel):
     identifier: str
     tool: str
     content: MultimodalContent
-    direct: bool
-    error: bool
+    handling: LMMToolResponseHandling
 
 
 class LMMToolResponses(DataModel):

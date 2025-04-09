@@ -14,7 +14,7 @@ from draive.instructions import Instruction
 from draive.lmm import LMMStreamChunk
 from draive.multimodal import Multimodal
 from draive.prompts import Prompt
-from draive.tools import AnyTool, Toolbox
+from draive.tools import Tool, Toolbox
 from draive.utils import Memory, ProcessingEvent
 
 __all__ = ("Conversation",)
@@ -30,7 +30,7 @@ class Conversation(State):
         instruction: Instruction | str | None = None,
         input: ConversationMessage | Prompt | Multimodal,
         memory: ConversationMemory | Iterable[ConversationElement] | None = None,
-        tools: Toolbox | Iterable[AnyTool] | None = None,
+        tools: Toolbox | Iterable[Tool] | None = None,
         stream: Literal[False] = False,
         **extra: Any,
     ) -> ConversationMessage: ...
@@ -43,7 +43,7 @@ class Conversation(State):
         instruction: Instruction | str | None = None,
         input: ConversationMessage | Prompt | Multimodal,
         memory: ConversationMemory | Iterable[ConversationElement] | None = None,
-        tools: Toolbox | Iterable[AnyTool] | None = None,
+        tools: Toolbox | Iterable[Tool] | None = None,
         stream: Literal[True],
         **extra: Any,
     ) -> AsyncIterator[LMMStreamChunk | ProcessingEvent]: ...
@@ -55,7 +55,7 @@ class Conversation(State):
         instruction: Instruction | str | None = None,
         input: ConversationMessage | Prompt | Multimodal,  # noqa: A002
         memory: ConversationMemory | Iterable[ConversationElement] | None = None,
-        tools: Toolbox | Iterable[AnyTool] | None = None,
+        tools: Toolbox | Iterable[Tool] | None = None,
         stream: bool = False,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamChunk | ProcessingEvent] | ConversationMessage:

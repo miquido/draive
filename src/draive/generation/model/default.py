@@ -19,7 +19,7 @@ from draive.multimodal import (
 )
 from draive.parameters import DataModel
 from draive.prompts import Prompt
-from draive.tools import AnyTool, Toolbox
+from draive.tools import Tool, Toolbox
 
 __all__ = ("default_generate_model",)
 
@@ -31,7 +31,7 @@ async def default_generate_model[Generated: DataModel](  # noqa: C901, PLR0912
     instruction: Instruction | str,
     input: Prompt | Multimodal,  # noqa: A002
     schema_injection: Literal["auto", "full", "simplified", "skip"],
-    tools: Toolbox | Iterable[AnyTool] | None,
+    tools: Toolbox | Iterable[Tool] | None,
     examples: Iterable[tuple[Multimodal, Generated]] | None,
     decoder: ModelGeneratorDecoder | None,
     **extra: Any,
@@ -117,7 +117,9 @@ async def default_generate_model[Generated: DataModel](  # noqa: C901, PLR0912
                     tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
                     if direct_responses := [
-                        response for response in tool_responses.responses if response.direct
+                        response
+                        for response in tool_responses.responses
+                        if response.handling == "direct_result"
                     ]:
                         for response in direct_responses:
                             if isinstance(response, generated):
