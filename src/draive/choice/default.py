@@ -98,7 +98,9 @@ async def default_choice_completion(  # noqa: C901
                     tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
                     if direct_content := [
-                        response.content for response in tool_responses.responses if response.direct
+                        response.content
+                        for response in tool_responses.responses
+                        if response.handling == "direct_result"
                     ]:
                         if selection := MultimodalTagElement.parse_first(
                             "CHOICE",

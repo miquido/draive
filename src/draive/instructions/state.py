@@ -4,6 +4,7 @@ from typing import Any, Literal, Self, final, overload
 
 from haiway import State, ctx
 
+from draive.commons import META_EMPTY, Meta
 from draive.instructions.file import InstructionsFileStorage
 from draive.instructions.types import (
     Instruction,
@@ -134,3 +135,4 @@ class Instructions(State):
 
     list_fetching: InstructionListFetching = _empty
     fetching: InstructionFetching = _none
+    meta: Meta = META_EMPTY

@@ -6,7 +6,7 @@ from draive.instructions import Instruction
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.realtime.default import realtime_process
 from draive.realtime.types import RealtimeOutputSelection, RealtimeProcessing
-from draive.tools import AnyTool, Toolbox
+from draive.tools import Tool, Toolbox
 
 __all__ = ("Realtime",)
 
@@ -18,7 +18,7 @@ class Realtime(State):
         *,
         instruction: Instruction | str | None = None,
         input: AsyncIterator[Multimodal],  # noqa: A002
-        tools: Toolbox | Iterable[AnyTool] | None = None,
+        tools: Toolbox | Iterable[Tool] | None = None,
         output: RealtimeOutputSelection = "auto",
     ) -> AsyncIterator[MultimodalContent]:
         async def input_stream() -> AsyncGenerator[MultimodalContent]:

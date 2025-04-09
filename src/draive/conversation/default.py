@@ -164,7 +164,9 @@ async def _conversation_completion(
                 tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
                 if direct_content := [
-                    response.content for response in tool_responses.responses if response.direct
+                    response.content
+                    for response in tool_responses.responses
+                    if response.handling == "direct_result"
                 ]:
                     response_message: ConversationMessage = ConversationMessage.model(
                         created=datetime.now(UTC),
@@ -254,7 +256,9 @@ async def _conversation_completion_stream(
                         await gather(*pending_tool_responses),
                     )
                     if direct_content := [
-                        response.content for response in tool_responses.responses if response.direct
+                        response.content
+                        for response in tool_responses.responses
+                        if response.handling == "direct_result"
                     ]:
                         response_message = ConversationMessage.model(
                             created=datetime.now(UTC),

@@ -5,7 +5,7 @@ from draive.instructions import Instruction
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel
 from draive.prompts import Prompt
-from draive.tools import AnyTool, Toolbox
+from draive.tools import Tool, Toolbox
 
 __all__ = (
     "ModelGenerator",
@@ -31,7 +31,7 @@ class ModelGenerator(Protocol):
         instruction: Instruction | str,
         input: Prompt | Multimodal,  # noqa: A002
         schema_injection: Literal["auto", "full", "simplified", "skip"],
-        tools: Toolbox | Iterable[AnyTool] | None,
+        tools: Toolbox | Iterable[Tool] | None,
         examples: Iterable[tuple[Multimodal, Generated]] | None,
         decoder: ModelGeneratorDecoder | None,
         **extra: Any,

@@ -1,7 +1,7 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol, Self, runtime_checkable
 
-from haiway import Default, State
+from haiway import State
 
 from draive.commons import META_EMPTY, Meta
 from draive.lmm import LMMContext, LMMContextElement
@@ -9,16 +9,21 @@ from draive.parameters import DataModel, Field
 from draive.parameters.specification import ParameterSpecification
 
 __all__ = (
-    "MissingPrompt",
     "Prompt",
     "PromptDeclaration",
     "PromptDeclarationArgument",
+    "PromptException",
     "PromptFetching",
-    "PromptListing",
+    "PromptListFetching",
+    "PromptMissing",
 )
 
 
-class MissingPrompt(Exception):
+class PromptException(Exception):
+    pass
+
+
+class PromptMissing(PromptException):
     pass
 
 
@@ -37,7 +42,7 @@ class PromptDeclaration(DataModel):
     name: str
     description: str | None = None
     arguments: Sequence[PromptDeclarationArgument]
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
 
 class Prompt(State):
@@ -59,11 +64,11 @@ class Prompt(State):
     name: str
     description: str | None = None
     content: LMMContext
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
 
 @runtime_checkable
-class PromptListing(Protocol):
+class PromptListFetching(Protocol):
     async def __call__(
         self,
         **extra: Any,

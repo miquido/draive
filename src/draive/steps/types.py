@@ -8,7 +8,7 @@ from draive.instructions import Instruction
 from draive.lmm import LMMCompletion, LMMInput, LMMOutputSelection
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.prompts import Prompt
-from draive.tools import AnyTool, Toolbox
+from draive.tools import Tool, Toolbox
 
 __all__ = (
     "Step",
@@ -48,7 +48,7 @@ class Step(State):
         /,
         *,
         instruction: Instruction | str | None = None,
-        tools: Toolbox | Iterable[AnyTool] | None = None,
+        tools: Toolbox | Iterable[Tool] | None = None,
         output: LMMOutputSelection = "auto",
         volatile: bool = False,
         extends_result: bool = False,
@@ -64,7 +64,7 @@ class Step(State):
         /,
         *,
         instruction: Instruction | str | None = None,
-        tools: Toolbox | Iterable[AnyTool] | None = None,
+        tools: Toolbox | Iterable[Tool] | None = None,
         output: LMMOutputSelection = "auto",
         completion: Multimodal | None = None,
         volatile: bool = False,

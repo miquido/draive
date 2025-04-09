@@ -130,7 +130,7 @@ def context_element_as_message(  # noqa: C901
                     {
                         "tool_use_id": response.identifier,
                         "type": "tool_result",
-                        "is_error": response.error,
+                        "is_error": response.handling == "error",
                         "content": [
                             cast(  # there will be no thinking within tool results
                                 TextBlockParam | ImageBlockParam,

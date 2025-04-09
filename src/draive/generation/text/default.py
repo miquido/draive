@@ -14,7 +14,7 @@ from draive.lmm import (
 )
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.prompts import Prompt
-from draive.tools import AnyTool, Toolbox
+from draive.tools import Tool, Toolbox
 
 __all__ = ("default_generate_text",)
 
@@ -23,7 +23,7 @@ async def default_generate_text(
     *,
     instruction: Instruction | str | None,
     input: Prompt | Multimodal,  # noqa: A002
-    tools: Toolbox | Iterable[AnyTool] | None,
+    tools: Toolbox | Iterable[Tool] | None,
     examples: Iterable[tuple[Multimodal, str]] | None,
     **extra: Any,
 ) -> str:
@@ -67,7 +67,9 @@ async def default_generate_text(
                     tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
                     if direct_responses := [
-                        response for response in tool_responses.responses if response.direct
+                        response
+                        for response in tool_responses.responses
+                        if response.handling == "direct_result"
                     ]:
                         return MultimodalContent.of(
                             *[response.content for response in direct_responses]

@@ -51,11 +51,9 @@ async def test_toolbox_call_returns_multimodal_content():
             executions += 1
             return value
 
-        assert await compute._toolbox_call(
+        assert await compute.tool_call(
             "call_id",
-            arguments={
-                "value": 42,
-            },
+            value=42,
         ) == MultimodalContent.of("42")
         assert executions == 1
 
@@ -65,8 +63,8 @@ async def test_toolbox_call_returns_custom_content():
     async with ctx.scope("test"):
         executions: int = 0
 
-        def custom_format(value: int) -> str:
-            return f"Value:{value}"
+        def custom_format(result: int) -> str:
+            return f"Value:{result}"
 
         @tool(format_result=custom_format)
         async def compute(value: int) -> int:
@@ -74,11 +72,9 @@ async def test_toolbox_call_returns_custom_content():
             executions += 1
             return value
 
-        assert await compute._toolbox_call(
+        assert await compute.tool_call(
             "call_id",
-            arguments={
-                "value": 42,
-            },
+            value=42,
         ) == MultimodalContent.of("Value:42")
         assert executions == 1
 

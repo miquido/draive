@@ -223,7 +223,7 @@ def _convert_context_element(
                                 cast(Any, _convert_content_element(part))
                                 for part in response.content.parts
                             ],
-                            "status": "error" if response.error else "success",
+                            "status": "error" if response.handling == "error" else "success",
                         },
                     }
                     for response in tool_responses.responses

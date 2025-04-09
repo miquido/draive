@@ -1,6 +1,6 @@
 from asyncio import gather
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any, Literal, Protocol, Self, final, runtime_checkable
+from typing import Any, Literal, Self, final
 
 from haiway import State, ctx
 
@@ -10,85 +10,127 @@ from draive.lmm.types import (
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
+    LMMToolResponseHandling,
     LMMToolResponses,
     LMMToolSpecification,
 )
 from draive.multimodal import MultimodalContent
-from draive.tools.tool import AnyTool, Tool
+from draive.tools.state import Tools
+from draive.tools.types import Tool
 
-__all__ = (
-    "ExternalTools",
-    "Toolbox",
-    "ToolsFetching",
-)
+__all__ = ("Toolbox",)
 
 
 @final
 class Toolbox(State):
     @classmethod
-    def of(
+    def of(  # noqa: C901, PLR0912
         cls,
-        tool_or_toolbox: Self | AnyTool | Iterable[AnyTool] | None = None,
+        tool_or_toolbox: Self | Tool | Iterable[Tool] | None = None,
         /,
-        *tools: AnyTool,
-        suggest: AnyTool | bool | None = None,
+        *tools: Tool,
+        suggest: Tool | str | bool | None = None,
         repeated_calls_limit: int | None = None,
     ) -> Self:
+        tools_mapping: Mapping[str, Tool]
+        suggest_call: Tool | bool
+        calls_limit: int
         match tool_or_toolbox:
             case None:
-                assert not suggest  # nosec: B101
-                return cls(
-                    tools={},
-                    suggest_call=False,
-                    repeated_calls_limit=repeated_calls_limit or 3,
-                )
+                assert suggest is None or suggest is False  # nosec: B101
+                tools_mapping = {}
+                suggest_call = False
+                calls_limit = 0
 
             case Toolbox() as toolbox:
-                assert not isinstance(suggest, Tool) or suggest in tools  # nosec: B101
-                return cls(
-                    tools={
-                        **toolbox.tools,
-                        **{tool.name: tool for tool in tools},
-                    },
-                    suggest_call=suggest or toolbox.suggest_call,
-                    repeated_calls_limit=repeated_calls_limit or toolbox.repeated_calls_limit,
+                tools_mapping = {
+                    **toolbox.tools,
+                    **{tool.name: tool for tool in tools},
+                }
+
+                match suggest if suggest is not None else toolbox.suggest_call:
+                    case bool() as suggestion:
+                        suggest_call = suggestion
+
+                    case str() as tool_name:
+                        suggest_call = tools_mapping[tool_name]
+
+                    case Tool() as tool:
+                        assert tool.name in tools_mapping  # nosec: B101
+                        suggest_call = tool
+
+                calls_limit = (
+                    repeated_calls_limit
+                    if repeated_calls_limit is not None
+                    else toolbox.repeated_calls_limit
                 )
 
             case Tool() as tool:
-                merged_tools: Sequence[AnyTool] = (tool, *tools)
-                assert not isinstance(suggest, Tool) or suggest in merged_tools  # nosec: B101
-                return cls(
-                    tools={tool.name: tool for tool in merged_tools},
-                    suggest_call=suggest or False,
-                    repeated_calls_limit=repeated_calls_limit or 3,
-                )
+                tools_mapping = {
+                    **{tool.name: tool},
+                    **{tool.name: tool for tool in tools},
+                }
+
+                match suggest:
+                    case None:
+                        suggest_call = False
+
+                    case bool() as suggestion:
+                        suggest_call = suggestion
+
+                    case str() as tool_name:
+                        suggest_call = tools_mapping[tool_name]
+
+                    case Tool() as tool:
+                        assert tool.name in tools_mapping  # nosec: B101
+                        suggest_call = tool
+
+                calls_limit = repeated_calls_limit or 3
 
             case iterable_tools:
-                merged_tools: Sequence[AnyTool] = (*iterable_tools, *tools)
-                assert not isinstance(suggest, Tool) or suggest in merged_tools  # nosec: B101
-                return cls(
-                    tools={tool.name: tool for tool in merged_tools},
-                    suggest_call=suggest or False,
-                    repeated_calls_limit=repeated_calls_limit or 3,
-                )
+                tools_mapping = {
+                    **{tool.name: tool for tool in iterable_tools},
+                    **{tool.name: tool for tool in tools},
+                }
+
+                match suggest:
+                    case None:
+                        suggest_call = False
+
+                    case bool() as suggestion:
+                        suggest_call = suggestion
+
+                    case str() as tool_name:
+                        suggest_call = tools_mapping[tool_name]
+
+                    case Tool() as tool:
+                        assert tool.name in tools_mapping  # nosec: B101
+                        suggest_call = tool
+
+                calls_limit = repeated_calls_limit or 3
+
+        return cls(
+            tools=tools_mapping,
+            suggest_call=suggest_call,
+            repeated_calls_limit=calls_limit,
+        )
 
     @classmethod
     async def external(
         cls,
         repeated_calls_limit: int | None = None,
-        suggest_call: AnyTool | bool = False,
-        other_tools: Iterable[AnyTool] | None = None,
+        suggest: str | bool | None = None,
+        other_tools: Iterable[Tool] | None = None,
         **extra: Any,
     ) -> Self:
-        external_tools: Sequence[AnyTool] = await ctx.state(ExternalTools).fetch(**extra)
         return cls.of(
-            *(*external_tools, *(other_tools or ())),
-            suggest=suggest_call or False,
-            repeated_calls_limit=repeated_calls_limit or 3,
+            *(*await Tools.fetch(**extra), *(other_tools or ())),
+            suggest=suggest,
+            repeated_calls_limit=repeated_calls_limit,
         )
 
-    tools: Mapping[str, AnyTool]
-    suggest_call: AnyTool | bool
+    tools: Mapping[str, Tool]
+    suggest_call: Tool | bool
     repeated_calls_limit: int
 
     def tool_selection(
@@ -108,14 +150,26 @@ class Toolbox(State):
         elif self.suggest_call is True:
             return "required"
 
-        elif self.suggest_call.available:
-            return self.suggest_call.specification  # use suggested tool if able
+        elif self.suggest_call.available:  # use suggested tool if able
+            return {
+                "name": self.suggest_call.name,
+                "description": self.suggest_call.description,
+                "parameters": self.suggest_call.parameters,
+            }
 
         else:
             return "auto"
 
     def available_tools(self) -> Sequence[LMMToolSpecification]:
-        return [tool.specification for tool in self.tools.values() if tool.available]
+        return [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters,
+            }
+            for tool in self.tools.values()
+            if tool.available
+        ]
 
     async def call_tool(
         self,
@@ -125,9 +179,9 @@ class Toolbox(State):
         arguments: Mapping[str, Any],
     ) -> MultimodalContent:
         if tool := self.tools.get(name):
-            return await tool._toolbox_call(
+            return await tool.tool_call(
                 call_id,
-                arguments=arguments,
+                **arguments,
             )
 
         else:
@@ -152,15 +206,22 @@ class Toolbox(State):
     ) -> LMMToolResponse:
         if tool := self.tools.get(request.tool):
             try:
+                handling: LMMToolResponseHandling
+                match tool.handling:
+                    case "auto":
+                        handling = "result"
+
+                    case "direct":
+                        handling = "direct_result"
+
                 return LMMToolResponse(
                     identifier=request.identifier,
                     tool=request.tool,
-                    content=await tool._toolbox_call(  # pyright: ignore[reportPrivateUsage]
+                    content=await tool.tool_call(  # pyright: ignore[reportPrivateUsage]
                         request.identifier,
-                        arguments=request.arguments or {},
+                        **request.arguments,
                     ),
-                    direct=tool.requires_direct_result,
-                    error=False,
+                    handling=handling,
                 )
 
             except LMMToolError as error:  # use formatted error, blow up on other exception
@@ -169,12 +230,19 @@ class Toolbox(State):
                     request.tool,
                     exception=error,
                 )
+                handling: LMMToolResponseHandling
+                match tool.handling:
+                    case "auto":
+                        handling = "error"
+
+                    case "direct":
+                        handling = "direct_result"
+
                 return LMMToolResponse(
                     identifier=request.identifier,
                     tool=request.tool,
                     content=error.content,
-                    direct=False,
-                    error=True,
+                    handling=handling,
                 )
 
         else:
@@ -184,30 +252,17 @@ class Toolbox(State):
                 identifier=request.identifier,
                 tool=request.tool,
                 content=MultimodalContent.of("ERROR"),
-                direct=False,
-                error=True,
+                handling="error",
             )
 
     def with_tools(
         self,
-        tool: AnyTool,
+        tool: Tool,
         /,
-        *tools: AnyTool,
+        *tools: Tool,
     ) -> Self:
         return self.__class__.of(
             *(tool, *tools, *self.tools.values()),
             suggest=self.suggest_call,
             repeated_calls_limit=self.repeated_calls_limit,
         )
-
-
-@runtime_checkable
-class ToolsFetching(Protocol):
-    async def __call__(
-        self,
-        **extra: Any,
-    ) -> Sequence[AnyTool]: ...
-
-
-class ExternalTools(State):
-    fetch: ToolsFetching

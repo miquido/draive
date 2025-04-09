@@ -7,7 +7,7 @@ from draive.choice.state import Choice
 from draive.choice.types import ChoiceOption
 from draive.instructions import Instruction
 from draive.multimodal import Multimodal
-from draive.tools import AnyTool, Toolbox
+from draive.tools import Tool, Toolbox
 
 __all__ = ("choice_completion",)
 
@@ -17,7 +17,7 @@ async def choice_completion(
     instruction: Instruction | str,
     options: Iterable[ChoiceOption | Multimodal],
     input: Multimodal,  # noqa: A002
-    tools: Toolbox | Iterable[AnyTool] | None = None,
+    tools: Toolbox | Iterable[Tool] | None = None,
     examples: Iterable[tuple[Multimodal, ChoiceOption]] | None = None,
     **extra: Any,
 ) -> ChoiceOption:

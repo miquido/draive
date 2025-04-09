@@ -105,7 +105,7 @@ def context_element_as_content(
                                         for element in response.content.parts
                                     ],
                                 }
-                                if response.error
+                                if response.handling == "error"
                                 else {
                                     "output": [
                                         content_element_as_part(element)

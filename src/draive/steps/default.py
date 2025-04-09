@@ -128,7 +128,9 @@ async def _process_step(
                 tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
                 if direct_results := [
-                    response.content for response in tool_responses.responses if response.direct
+                    response.content
+                    for response in tool_responses.responses
+                    if response.handling == "direct_result"
                 ]:
                     del context[context_end_index:]  # remove tool calls from context
                     direct_content: MultimodalContent = MultimodalContent.of(*direct_results)
