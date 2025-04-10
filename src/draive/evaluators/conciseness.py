@@ -2,7 +2,7 @@ from typing import cast
 
 from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
-from draive.steps import steps_completion
+from draive.stages import Stage
 
 __all__ = ("conciseness_evaluator",)
 
@@ -65,7 +65,7 @@ async def conciseness_evaluator(
             comment="Reference was empty!",
         )
 
-    completion: MultimodalContent = await steps_completion(
+    completion: MultimodalContent = await Stage.completion(
         MultimodalContent.of(
             "<REFERENCE>",
             reference,
@@ -78,7 +78,7 @@ async def conciseness_evaluator(
             if guidelines is not None
             else ""
         ),
-    )
+    ).execute()
 
     if result := MultimodalTagElement.parse_first(
         "RESULT",
