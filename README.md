@@ -23,8 +23,8 @@ async def current_time(location: str) -> str:
 
 async with  ctx.scope( # create execution context
     "example", # give it a name
-    OpenAI().lmm_invoking(), # define services provider
-    OpenAIChatConfig(model="gpt-4o-mini") # and its configuration
+    OpenAIChatConfig(model="gpt-4o-mini"), # prepare configuration
+    disposables=[OpenAI()], # define resources and service clients available
 ):
     result: str = await generate_text( # choose the right abstraction
         instruction="You are a helpful assistant", # provide clear instructions
