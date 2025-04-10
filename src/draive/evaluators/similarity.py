@@ -6,7 +6,7 @@ from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
 from draive.multimodal.media import MediaData
 from draive.similarity.score import vector_similarity_score
-from draive.steps import steps_completion
+from draive.stages import Stage
 
 __all__ = (
     "image_vector_similarity_evaluator",
@@ -66,7 +66,7 @@ async def similarity_evaluator(
             comment="Reference was empty!",
         )
 
-    completion: MultimodalContent = await steps_completion(
+    completion: MultimodalContent = await Stage.completion(
         MultimodalContent.of(
             "<REFERENCE>",
             reference,
@@ -79,7 +79,7 @@ async def similarity_evaluator(
             if guidelines is not None
             else ""
         ),
-    )
+    ).execute()
 
     if result := MultimodalTagElement.parse_first(
         "RESULT",
