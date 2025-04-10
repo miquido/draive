@@ -24,8 +24,8 @@ class ResourceAvailabilityCheck(Protocol):
 # TODO: add https://modelcontextprotocol.io/docs/concepts/resources#resource-templates
 # support and uri template resolving
 @final
-class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
-    ParametrizedFunction[Args, Coroutine[None, None, Result]]
+class ResourceTemplate[**Args](
+    ParametrizedFunction[Args, Coroutine[None, None, Sequence[Resource] | ResourceContent]]
 ):
     __slots__ = (
         "_check_availability",
@@ -43,7 +43,7 @@ class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
         description: str | None,
         availability_check: ResourceAvailabilityCheck | None,
         meta: Meta,
-        function: Callable[Args, Coroutine[None, None, Result]],
+        function: Callable[Args, Coroutine[None, None, Sequence[Resource] | ResourceContent]],
     ) -> None:
         super().__init__(function)
 
@@ -77,7 +77,26 @@ class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
                 name=self.declaration.name,
                 description=self.declaration.description,
                 uri=self.uri,
-                content=await super().__call__(*args, **kwargs),  # pyright: ignore[reportCallIssue],
+                content=await super().__call__(*args, **kwargs),
+                meta=self.declaration.meta,
+            )
+
+        except Exception as exc:
+            raise ResourceException(f"Resolving resource '{self.declaration.uri}' failed") from exc
+
+    async def resolve_from_uri(
+        self,
+        uri: str,
+        /,
+    ) -> Resource:
+        # TODO: resolve args from uri - it will now work only for resources without args
+        try:
+            return Resource(
+                name=self.declaration.name,
+                description=self.declaration.description,
+                uri=self.uri,
+                # call args will be validated
+                content=await super().__call__(),  # pyright: ignore[reportCallIssue]
                 meta=self.declaration.meta,
             )
 
@@ -85,7 +104,7 @@ class ResourceTemplate[**Args, Result: Sequence[Resource] | ResourceContent](
             raise ResourceException(f"Resolving resource '{self.declaration.uri}' failed") from exc
 
 
-def resource[**Args, Result: Sequence[Resource] | ResourceContent](
+def resource[**Args](
     *,
     uri: str,
     mime_type: str | None = None,
@@ -94,13 +113,13 @@ def resource[**Args, Result: Sequence[Resource] | ResourceContent](
     availability_check: ResourceAvailabilityCheck | None = None,
     meta: Meta | None = None,
 ) -> Callable[
-    [Callable[Args, Coroutine[None, None, Result]]],
-    ResourceTemplate[Args, Result],
+    [Callable[Args, Coroutine[None, None, Sequence[Resource] | ResourceContent]]],
+    ResourceTemplate[Args],
 ]:
     def wrap(
-        function: Callable[Args, Coroutine[None, None, Result]],
-    ) -> ResourceTemplate[Args, Result]:
-        return ResourceTemplate[Args, Result](
+        function: Callable[Args, Coroutine[None, None, Sequence[Resource] | ResourceContent]],
+    ) -> ResourceTemplate[Args]:
+        return ResourceTemplate[Args](
             uri,
             mime_type=mime_type,
             name=name or function.__name__,
