@@ -1,20 +1,24 @@
 from base64 import urlsafe_b64encode
-from collections.abc import Iterable, Mapping, Sequence
-from typing import Any
+from collections.abc import AsyncGenerator, Iterable, Mapping, Sequence
+from contextlib import asynccontextmanager
+from typing import Any, final
 from uuid import uuid4
 
-from haiway import as_dict
-from mcp.server import Server
+from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
+from haiway import Disposable, Disposables, State, as_dict, ctx
+from mcp.server import NotificationOptions, Server
 from mcp.server.lowlevel.helper_types import ReadResourceContents
-from mcp.types import EmbeddedResource, GetPromptResult
+from mcp.types import EmbeddedResource, GetPromptResult, JSONRPCMessage
 from mcp.types import ImageContent as MCPImageContent
 from mcp.types import Prompt as MCPPrompt
 from mcp.types import PromptArgument as MCPPromptArgument
 from mcp.types import PromptMessage as MCPPromptMessage
 from mcp.types import Resource as MCPResource
+from mcp.types import ResourceTemplate as MCPResourceTemplate
 from mcp.types import TextContent as MCPTextContent
 from mcp.types import Tool as MCPTool
 from pydantic import AnyUrl
+from starlette.types import ASGIApp
 
 from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
 from draive.multimodal import MediaData, MediaReference, MultimodalContent, TextContent
@@ -22,154 +26,349 @@ from draive.prompts import Prompt, PromptTemplate
 from draive.resources import Resource, ResourceContent, ResourceTemplate
 from draive.tools import Tool, Toolbox
 
-__all__ = (
-    "expose_prompts",
-    "expose_resources",
-    "expose_tools",
-)
+__all__ = ("MCPServer",)
 
 
-def expose_resources(  # noqa: C901
-    resources: Iterable[ResourceTemplate[Any, Any] | Resource],
-    /,
-    server: Server,
-) -> None:
-    resource_declarations: list[MCPResource] = []
-    available_resources: dict[str, ResourceTemplate[Any, Any] | Resource] = {}
-    for resource in resources:
-        match resource:
-            case Resource():
-                available_resources[resource.uri] = resource
-                match resource.content:
-                    case ResourceContent() as content:
+@final
+class MCPServer:
+    __slots__ = ("_server",)
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        version: str | None = None,
+        instructions: str | None = None,
+        resources: Iterable[ResourceTemplate | Resource] | None = None,
+        prompts: Iterable[PromptTemplate[Any] | Prompt] | None = None,
+        tools: Toolbox | Iterable[Tool] | None = None,
+        disposables: Disposables | Iterable[Disposable] | None = None,
+    ) -> None:
+        disposable: Disposables
+        match disposables:
+            case None:
+                disposable = Disposables()
+
+            case Disposables() as prepared:
+                disposable = prepared
+
+            case other:
+                disposable = Disposables(*other)
+
+        @asynccontextmanager
+        async def lifspan(server: Server) -> AsyncGenerator[Iterable[State]]:
+            async with disposable as state:
+                yield state
+
+        self._server = Server[Iterable[State]](
+            name=name,
+            version=version,
+            instructions=instructions,
+            lifespan=lifspan,
+        )
+
+        if resources is not None:
+            self._expose_resources(resources)
+
+        if prompts is not None:
+            self._expose_prompts(prompts)
+
+        if tools is not None:
+            self._expose_tools(tools)
+
+    async def run_stdio(
+        self,
+        notification_options: NotificationOptions | None = None,
+        experimental_capabilities: dict[str, dict[str, Any]] | None = None,
+    ) -> None:
+        from mcp.server.stdio import stdio_server
+
+        async with stdio_server() as streams:
+            await self.run(
+                read_stream=streams[0],
+                write_stream=streams[1],
+                notification_options=notification_options,
+                experimental_capabilities=experimental_capabilities,
+            )
+
+    def prepare_asgi(
+        self,
+        notification_options: NotificationOptions | None = None,
+        experimental_capabilities: dict[str, dict[str, Any]] | None = None,
+    ) -> ASGIApp:
+        from mcp.server.sse import SseServerTransport
+        from starlette.applications import Starlette
+        from starlette.routing import Mount, Route
+
+        sse = SseServerTransport("/messages/")
+
+        async def handle_sse(request):
+            async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
+                await self.run(
+                    read_stream=streams[0],
+                    write_stream=streams[1],
+                    notification_options=notification_options,
+                    experimental_capabilities=experimental_capabilities,
+                )
+
+        return Starlette(
+            debug=__debug__,
+            routes=[
+                Route("/sse", endpoint=handle_sse),
+                Mount("/messages/", app=sse.handle_post_message),
+            ],
+        )
+
+    async def run(
+        self,
+        read_stream: MemoryObjectReceiveStream[JSONRPCMessage | Exception],
+        write_stream: MemoryObjectSendStream[JSONRPCMessage],
+        notification_options: NotificationOptions | None = None,
+        experimental_capabilities: dict[str, dict[str, Any]] | None = None,
+    ) -> None:
+        await self._server.run(
+            read_stream=read_stream,
+            write_stream=write_stream,
+            initialization_options=self._server.create_initialization_options(
+                notification_options=notification_options,
+                experimental_capabilities=experimental_capabilities,
+            ),
+            raise_exceptions=False,
+        )
+
+    def _expose_resources(  # noqa: C901
+        self,
+        resources: Iterable[ResourceTemplate | Resource],
+        /,
+    ) -> None:
+        resource_declarations: list[MCPResource] = []
+        resource_template_declarations: list[MCPResourceTemplate] = []
+        available_resources: dict[str, ResourceTemplate | Resource] = {}
+        for resource in resources:
+            match resource:
+                case Resource():
+                    available_resources[resource.uri] = resource
+                    match resource.content:
+                        case ResourceContent() as content:
+                            resource_declarations.append(
+                                MCPResource(
+                                    uri=AnyUrl(resource.uri),
+                                    mimeType=content.mime_type,
+                                    name=resource.name,
+                                    description=resource.description,
+                                )
+                            )
+
+                        case _:
+                            raise NotImplementedError(
+                                "Multi-content resources are not supported yet"
+                            )
+
+                case ResourceTemplate():
+                    if resource.arguments:
+                        resource_template_declarations.append(
+                            MCPResourceTemplate(
+                                uriTemplate=resource.uri,
+                                mimeType=resource.declaration.mime_type,
+                                name=resource.declaration.name,
+                                description=resource.declaration.description,
+                            )
+                        )
+                        # TODO: we may not be able to find it by using template uri
+                        available_resources[resource.uri] = resource
+
+                    else:
                         resource_declarations.append(
                             MCPResource(
                                 uri=AnyUrl(resource.uri),
-                                mimeType=content.mime_type,
-                                name=resource.name,
-                                description=resource.description,
+                                mimeType=resource.declaration.mime_type,
+                                name=resource.declaration.name,
+                                description=resource.declaration.description,
                             )
                         )
+                        available_resources[resource.uri] = resource
 
-                    case _:
-                        raise NotImplementedError("Multi-content resources are not supported yet")
+        if resource_declarations:
 
-            case ResourceTemplate():
-                resource_declarations.append(
-                    MCPResource(
-                        uri=AnyUrl(resource.uri),
-                        mimeType=resource.declaration.mime_type,
-                        name=resource.declaration.name,
-                        description=resource.declaration.description,
+            @self._server.list_resources()
+            async def list_resources() -> list[MCPResource]:  # pyright: ignore[reportUnusedFunction]
+                async with ctx.scope(
+                    "list_resources",
+                    *self._server.request_context.lifespan_context,
+                ):
+                    return resource_declarations
+
+        if resource_template_declarations:
+
+            @self._server.list_resource_templates()
+            async def list_template_resources() -> list[MCPResourceTemplate]:  # pyright: ignore[reportUnusedFunction]
+                async with ctx.scope(
+                    "list_template_resources",
+                    *self._server.request_context.lifespan_context,
+                ):
+                    return resource_template_declarations
+
+        @self._server.read_resource()
+        async def read_resource(uri: AnyUrl) -> Iterable[ReadResourceContents]:  # pyright: ignore[reportUnusedFunction]
+            async with ctx.scope(
+                "read_resource",
+                *self._server.request_context.lifespan_context,
+            ):
+                resource: Resource
+                # TODO: look for template resources as well
+                match available_resources.get(uri.unicode_string()):
+                    case None:
+                        raise ValueError(f"Resource '{uri}' is not defined")
+
+                    case Resource() as available_resource:
+                        resource = available_resource
+
+                    case ResourceTemplate() as resource_template:
+                        resource = await resource_template.resolve_from_uri(uri.unicode_string())
+
+                return _resource_content(resource)
+
+    def _expose_prompts(
+        self,
+        prompts: Iterable[PromptTemplate[Any] | Prompt],
+        /,
+    ) -> None:
+        prompt_declarations: list[MCPPrompt] = []
+        available_prompts: dict[str, PromptTemplate[Any] | Prompt] = {}
+        for prompt in prompts:
+            match prompt:
+                case Prompt():
+                    prompt_declarations.append(
+                        MCPPrompt(
+                            name=prompt.name,
+                            arguments=None,
+                            description=prompt.description,
+                        )
                     )
-                )
-                available_resources[resource.uri] = resource
+                    available_prompts[prompt.name] = prompt
 
-    @server.list_resources()
-    async def list_resources() -> list[MCPResource]:  # pyright: ignore[reportUnusedFunction]
-        return resource_declarations
+                case PromptTemplate():
+                    prompt_declarations.append(
+                        MCPPrompt(
+                            name=prompt.declaration.name,
+                            arguments=[
+                                MCPPromptArgument(
+                                    name=argument.name,
+                                    description=argument.specification.get("description"),
+                                    required=argument.required,
+                                )
+                                for argument in prompt.declaration.arguments
+                            ],
+                            description=prompt.declaration.description,
+                        )
+                    )
+                    available_prompts[prompt.declaration.name] = prompt
 
-    @server.read_resource()
-    async def read_resource(uri: AnyUrl) -> Iterable[ReadResourceContents]:  # pyright: ignore[reportUnusedFunction]
-        resource: Resource
-        match available_resources.get(uri.unicode_string()):
-            case None:
-                raise ValueError(f"Resource '{uri}' is not defined")
+        @self._server.list_prompts()
+        async def list_prompts() -> list[MCPPrompt]:  # pyright: ignore[reportUnusedFunction]
+            async with ctx.scope(
+                "list_prompts",
+                *self._server.request_context.lifespan_context,
+            ):
+                return prompt_declarations
 
-            case Resource() as available_resource:
-                resource = available_resource
+        @self._server.get_prompt()
+        async def get_prompt(  # pyright: ignore[reportUnusedFunction]
+            name: str,
+            arguments: Mapping[str, Any] | None,
+        ) -> GetPromptResult:
+            async with ctx.scope(
+                "get_prompt",
+                *self._server.request_context.lifespan_context,
+            ):
+                match available_prompts.get(name):
+                    case None:
+                        raise ValueError(f"Prompt '{name}' is not defined")
 
-            case ResourceTemplate() as resource_template:
-                # TODO: we can support only resource templates without actual arguments?
-                # perhaps we could extract uri arguments
-                resource = await resource_template.resolve()
-
-        return _resource_content(resource)
-
-    def _resource_content(
-        resource: Resource,
-    ) -> Iterable[ReadResourceContents]:
-        match resource.content:
-            case ResourceContent() as content:
-                match content.mime_type:
-                    case "text/plain" | "application/json":
-                        yield ReadResourceContents(
-                            content=content.blob.decode(),
-                            mime_type=content.mime_type,
+                    case Prompt() as direct_prompt:
+                        return GetPromptResult(
+                            description=direct_prompt.description,
+                            messages=[
+                                _convert_message(element) for element in direct_prompt.content
+                            ],
                         )
 
-                    case _:
-                        yield ReadResourceContents(
-                            content=content.blob,
-                            mime_type=content.mime_type,
+                    case PromptTemplate() as dynamic_prompt:
+                        resolved_prompt: Prompt = await dynamic_prompt.resolve(arguments or {})
+                        return GetPromptResult(
+                            description=resolved_prompt.description,
+                            messages=[
+                                _convert_message(element) for element in resolved_prompt.content
+                            ],
                         )
 
-            case [*contents]:  # is it intended use of nested resource contents?
-                for content in contents:
-                    yield from _resource_content(content)
+    def _expose_tools(
+        self,
+        tools: Toolbox | Iterable[Tool],
+        /,
+    ) -> None:
+        toolbox: Toolbox
+        match tools:
+            case Toolbox() as tools:
+                toolbox = tools
 
+            case tools:
+                toolbox = Toolbox.of(*tools)
 
-def expose_prompts(
-    prompts: Iterable[PromptTemplate[Any] | Prompt],
-    /,
-    server: Server,
-) -> None:
-    prompt_declarations: list[MCPPrompt] = []
-    available_prompts: dict[str, PromptTemplate[Any] | Prompt] = {}
-    for prompt in prompts:
-        match prompt:
-            case Prompt():
-                prompt_declarations.append(
-                    MCPPrompt(
-                        name=prompt.name,
-                        arguments=None,
-                        description=prompt.description,
+        @self._server.list_tools()
+        async def list_tools() -> list[MCPTool]:  # pyright: ignore[reportUnusedFunction]
+            async with ctx.scope(
+                "list_tools",
+                *self._server.request_context.lifespan_context,
+            ):
+                return [
+                    MCPTool(
+                        name=tool["name"],
+                        description=tool["description"],
+                        inputSchema=as_dict(tool["parameters"]) or {},
+                    )
+                    for tool in toolbox.available_tools()
+                ]
+
+        @self._server.call_tool()
+        async def call_tool(  # pyright: ignore[reportUnusedFunction]
+            name: str,
+            arguments: Mapping[str, Any],
+        ) -> Sequence[MCPTextContent | MCPImageContent | EmbeddedResource]:
+            async with ctx.scope(
+                "call_tool",
+                *self._server.request_context.lifespan_context,
+            ):
+                return _convert_multimodal_content(
+                    await toolbox.call_tool(
+                        name,
+                        call_id=uuid4().hex,
+                        arguments=arguments,
                     )
                 )
-                available_prompts[prompt.name] = prompt
 
-            case PromptTemplate():
-                prompt_declarations.append(
-                    MCPPrompt(
-                        name=prompt.declaration.name,
-                        arguments=[
-                            MCPPromptArgument(
-                                name=argument.name,
-                                description=argument.specification.get("description"),
-                                required=argument.required,
-                            )
-                            for argument in prompt.declaration.arguments
-                        ],
-                        description=prompt.declaration.description,
+
+def _resource_content(
+    resource: Resource,
+) -> Iterable[ReadResourceContents]:
+    match resource.content:
+        case ResourceContent() as content:
+            match content.mime_type:
+                case "text/plain" | "application/json":
+                    yield ReadResourceContents(
+                        content=content.blob.decode(),
+                        mime_type=content.mime_type,
                     )
-                )
-                available_prompts[prompt.declaration.name] = prompt
 
-    @server.list_prompts()
-    async def list_prompts() -> list[MCPPrompt]:  # pyright: ignore[reportUnusedFunction]
-        return prompt_declarations
+                case _:
+                    yield ReadResourceContents(
+                        content=content.blob,
+                        mime_type=content.mime_type,
+                    )
 
-    @server.get_prompt()
-    async def get_prompt(  # pyright: ignore[reportUnusedFunction]
-        name: str,
-        arguments: Mapping[str, Any] | None,
-    ) -> GetPromptResult:
-        match available_prompts.get(name):
-            case None:
-                raise ValueError(f"Prompt '{name}' is not defined")
-
-            case Prompt() as direct_prompt:
-                return GetPromptResult(
-                    description=direct_prompt.description,
-                    messages=[_convert_message(element) for element in direct_prompt.content],
-                )
-
-            case PromptTemplate() as dynamic_prompt:
-                resolved_prompt: Prompt = await dynamic_prompt.resolve(arguments or {})
-                return GetPromptResult(
-                    description=resolved_prompt.description,
-                    messages=[_convert_message(element) for element in resolved_prompt.content],
-                )
+        case [*contents]:  # is it intended use of nested resource contents?
+            for content in contents:
+                yield from _resource_content(content)
 
 
 def _convert_message(
@@ -223,44 +422,6 @@ def _convert_message(
 
         case _:
             raise NotImplementedError(f"Unsuppoprted MCP prompt context element: {type(element)}!")
-
-
-def expose_tools(
-    tools: Toolbox | Iterable[Tool],
-    /,
-    server: Server,
-) -> None:
-    toolbox: Toolbox
-    match tools:
-        case Toolbox() as tools:
-            toolbox = tools
-
-        case tools:
-            toolbox = Toolbox.of(*tools)
-
-    @server.list_tools()
-    async def list_tools() -> list[MCPTool]:  # pyright: ignore[reportUnusedFunction]
-        return [
-            MCPTool(
-                name=tool["name"],
-                description=tool["description"],
-                inputSchema=as_dict(tool["parameters"]) or {},
-            )
-            for tool in toolbox.available_tools()
-        ]
-
-    @server.call_tool()
-    async def call_tool(  # pyright: ignore[reportUnusedFunction]
-        name: str,
-        arguments: Mapping[str, Any],
-    ) -> Sequence[MCPTextContent | MCPImageContent | EmbeddedResource]:
-        return _convert_multimodal_content(
-            await toolbox.call_tool(
-                name,
-                call_id=uuid4().hex,
-                arguments=arguments,
-            )
-        )
 
 
 def _convert_multimodal_content(

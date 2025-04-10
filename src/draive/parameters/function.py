@@ -1,4 +1,4 @@
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from inspect import Parameter as InspectParameter
 from inspect import _empty as INSPECT_EMPTY  # pyright: ignore[reportPrivateUsage]
 from inspect import signature
@@ -172,6 +172,10 @@ class ParametrizedFunction[**Args, Result]:
                     )
 
         mimic_function(function, within=self)
+
+    @property
+    def arguments(self) -> Iterable[Parameter[Any]]:
+        return self._parameters.values()
 
     def validate_arguments(
         self,

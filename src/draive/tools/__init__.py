@@ -1,4 +1,4 @@
-from draive.tools.function import tool
+from draive.tools.function import FunctionTool, tool
 from draive.tools.state import Tools
 from draive.tools.toolbox import Toolbox
 from draive.tools.types import (
@@ -12,6 +12,7 @@ from draive.tools.types import (
 )
 
 __all__ = (
+    "FunctionTool",
     "Tool",
     "ToolAvailabilityChecking",
     "ToolErrorFormatting",
