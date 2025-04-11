@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
-#   "draive[gemini]~=0.56",
+#   "draive[gemini]~=0.57",
 #   "pyaudio~=0.2",
 #   "beautifulsoup4~=4.13",
 #   "httpx~=0.28",
@@ -29,9 +29,7 @@ from draive import (
 from draive.gemini import Gemini, GeminiLiveConfig
 
 load_env()
-setup_logging(
-    "realtime_chat",
-)
+setup_logging("realtime_chat")
 
 pya = pyaudio.PyAudio()
 FORMAT = pyaudio.paInt16
@@ -104,7 +102,6 @@ async def main():
             ),
             input=record_audio(),
             tools=[website_content],
-            output="audio",
         ):
             if chunk.meta(category="interrupted"):
                 # on interrupt event clear output queue to prevent playing unnecessary content
