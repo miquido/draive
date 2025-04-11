@@ -9,6 +9,12 @@ from draive.tools.types import Tool, ToolsFetching
 __all__ = ("Tools",)
 
 
+async def _no_tools(
+    **extra: Any,
+) -> Sequence[Tool]:
+    return ()
+
+
 class Tools(State):
     @classmethod
     async def fetch(
@@ -17,5 +23,5 @@ class Tools(State):
     ) -> Sequence[Tool]:
         return await ctx.state(cls).fetching(**extra)
 
-    fetching: ToolsFetching
+    fetching: ToolsFetching = _no_tools
     meta: Meta = META_EMPTY

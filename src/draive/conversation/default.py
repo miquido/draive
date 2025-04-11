@@ -260,9 +260,11 @@ async def _conversation_completion_stream(
                         for response in tool_responses.responses
                         if response.handling == "direct_result"
                     ]:
+                        tools_content = MultimodalContent.of(*direct_content)
+                        output_queue.enqueue(LMMStreamChunk.of(tools_content))
                         response_message = ConversationMessage.model(
                             created=datetime.now(UTC),
-                            content=MultimodalContent.of(*direct_content),
+                            content=MultimodalContent.of(accumulated_content, tools_content),
                         )
                         await memory.remember(response_message)
                         ctx.record(ResultTrace.of(response_message))
