@@ -41,6 +41,7 @@ from draive.multimodal.meta import MetaContent
 from draive.multimodal.text import TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIRealtimeConfig
+from draive.openai.types import OpenAIException
 
 __all__ = ("OpenAILMMSession",)
 
@@ -82,7 +83,7 @@ class OpenAILMMSession(OpenAIAPI):
                     modalities = ["text"]
 
                 case "audio":
-                    modalities = ["audio"]
+                    modalities = ["text", "audio"]  # openai does not allow to use only audio
 
                 case ["text", "audio"] | ["audio", "text"]:
                     modalities = ["text", "audio"]
@@ -294,7 +295,11 @@ class OpenAILMMSession(OpenAIAPI):
                             pending_tool_calls.clear()
 
                         case "error":
-                            ctx.log_error(f"Realtime processing error: {event.error.message}")
+                            raise OpenAIException(
+                                f"Realtime processing error:"
+                                f" {event.error.type} - {event.error.message}",
+                                event,
+                            )
 
                         case _:
                             pass  # skip other events
