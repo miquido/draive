@@ -8,7 +8,7 @@ from draive.prompts import Prompt
 from draive.tools import Tool, Toolbox
 
 __all__ = (
-    "ModelGenerator",
+    "ModelGenerating",
     "ModelGeneratorDecoder",
 )
 
@@ -22,7 +22,7 @@ class ModelGeneratorDecoder(Protocol):
 
 
 @runtime_checkable
-class ModelGenerator(Protocol):
+class ModelGenerating(Protocol):
     async def __call__[Generated: DataModel](
         self,
         generated: type[Generated],

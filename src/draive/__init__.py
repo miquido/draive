@@ -89,13 +89,12 @@ from draive.embedding import (
 from draive.generation import (
     ImageGeneration,
     ImageGenerator,
+    ModelGenerating,
     ModelGeneration,
-    ModelGenerator,
     ModelGeneratorDecoder,
     TextGenerating,
     TextGeneration,
     generate_image,
-    generate_model,
 )
 from draive.helpers import (
     ModelTokenPrice,
@@ -310,8 +309,8 @@ __all__ = (
     "Missing",
     "MissingContext",
     "MissingState",
+    "ModelGenerating",
     "ModelGeneration",
-    "ModelGenerator",
     "ModelGeneratorDecoder",
     "ModelTokenPrice",
     "Multimodal",
@@ -396,7 +395,6 @@ __all__ = (
     "freeze",
     "frozenlist",
     "generate_image",
-    "generate_model",
     "getenv_bool",
     "getenv_float",
     "getenv_int",

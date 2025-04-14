@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator, Iterable
 from itertools import chain
-from typing import Any, Literal, overload
+from typing import Any, Literal, cast, overload
 
 from google.genai.types import (
     Candidate,
@@ -151,9 +151,7 @@ class GeminiLMMGeneration(GeminiAPI):
                     "media_resolution": resoluton_as_media_resulution(
                         generation_config.media_resolution
                     ),
-                    "response_modalities": [str(modality) for modality in response_modalities]
-                    if response_modalities is not None
-                    else None,
+                    "response_modalities": cast(list[str] | None, response_modalities),
                     "response_mime_type": response_mime_type,
                     "response_schema": response_schema,
                     "speech_config": unwrap_missing(
