@@ -13,7 +13,7 @@ Dive straight into the code and learn how to use draive with our interactive [gu
 Great, but how it looks like?
 
 ```python
-from draive import ctx, generate_text, tool
+from draive import ctx, TextGeneration, tool
 from draive.openai import OpenAI, OpenAIChatConfig
 
 
@@ -26,7 +26,7 @@ async with  ctx.scope( # create execution context
     OpenAIChatConfig(model="gpt-4o-mini"), # prepare configuration
     disposables=[OpenAI()], # define resources and service clients available
 ):
-    result: str = await generate_text( # choose the right abstraction
+    result: str = await TextGeneration.generate( # choose a right generation abstraction
         instruction="You are a helpful assistant", # provide clear instructions
         input="What is the time in Kraków?", # give it some input (including multimodal)
         tools=[current_time], # and select any tools you like
@@ -91,7 +91,7 @@ Draive library comes with optional integrations to 3rd party services:
 Use OpenAI services client, including GPT, dall-e and embedding. Allows to use Azure services as well.
 
 ```bash
-pip install draive[openai]
+pip install 'draive[openai]'
 ```
 
 - Anthropic:
@@ -99,7 +99,7 @@ pip install draive[openai]
 Use Anthropic services client, including Claude.
 
 ```bash
-pip install draive[anthropic]
+pip install 'draive[anthropic]'
 ```
 
 - Gemini:
@@ -107,7 +107,7 @@ pip install draive[anthropic]
 Use Google AIStudio services client, including Gemini.
 
 ```bash
-pip install draive[gemini]
+pip install 'draive[gemini]'
 ```
 
 - Mistral:
@@ -115,7 +115,7 @@ pip install draive[gemini]
 Use Mistral services client. Allows to use Azure services as well.
 
 ```bash
-pip install draive[mistral]
+pip install 'draive[mistral]'
 ```
 
 - Cohere:
@@ -123,7 +123,7 @@ pip install draive[mistral]
 Use Cohere services client.
 
 ```bash
-pip install draive[cohere]
+pip install 'draive[cohere]'
 ```
 
 - Ollama:
@@ -131,7 +131,7 @@ pip install draive[cohere]
 Use Ollama services client.
 
 ```bash
-pip install draive[ollama]
+pip install 'draive[ollama]'
 ```
 
 - VLLM:
@@ -139,7 +139,7 @@ pip install draive[ollama]
 Use VLLM services through OpenAI client.
 
 ```bash
-pip install draive[vllm]
+pip install 'draive[vllm]'
 ```
 
 ## 👷 Contributing

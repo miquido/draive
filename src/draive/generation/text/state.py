@@ -23,6 +23,7 @@ class TextGeneration(State):
         input: Prompt | Multimodal,
         tools: Toolbox | Iterable[Tool] | None = None,
         examples: Iterable[tuple[Multimodal, str]] | None = None,
+        stream: Literal[False] = False,
         **extra: Any,
     ) -> str: ...
 
