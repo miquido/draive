@@ -21,10 +21,10 @@ from draive.parameters import DataModel
 from draive.prompts import Prompt
 from draive.tools import Tool, Toolbox
 
-__all__ = ("default_generate_model",)
+__all__ = ("generate_model",)
 
 
-async def default_generate_model[Generated: DataModel](  # noqa: C901, PLR0912
+async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
     generated: type[Generated],
     /,
     *,

@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from typing import Any
 
-from draive.generation import generate_model
+from draive.generation import ModelGeneration
 from draive.parameters import DataModel
 
 __all__ = ("generate_case_parameters",)
@@ -41,7 +41,7 @@ async def generate_case_parameters[Parameters: DataModel](
 
     for _ in range(0, count):
         results.append(
-            await generate_model(
+            await ModelGeneration.generate(
                 parameters,
                 instruction=INSTRUCTION.format(
                     guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
