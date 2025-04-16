@@ -18,7 +18,7 @@ class MistralTokenization(MistralAPI):
         """
 
         return Tokenization(
-            tokenize_text=sentencepiece_tokenizer(
+            text_tokenizing=sentencepiece_tokenizer(
                 await sentencepiece_processor(model_path=_model_path(model_name))
             )
         )
