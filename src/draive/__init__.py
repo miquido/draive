@@ -96,6 +96,10 @@ from draive.generation import (
     TextGeneration,
     generate_image,
 )
+from draive.guardrails import (
+    ContentGuardrails,
+    ContentGuardrailsException,
+)
 from draive.helpers import (
     AccumulativeVolatileMemory,
     ConstantMemory,
@@ -187,10 +191,6 @@ from draive.resources import (
     ResourceTemplate,
     resource,
 )
-from draive.safeguards import (
-    ContentGuardrails,
-    GuardrailsException,
-)
 from draive.similarity import (
     mmr_vector_similarity_search,
     vector_similarity_score,
@@ -258,6 +258,7 @@ __all__ = (
     "ChoiceOption",
     "ConstantMemory",
     "ContentGuardrails",
+    "ContentGuardrailsException",
     "Conversation",
     "ConversationElement",
     "ConversationMemory",
@@ -269,7 +270,6 @@ __all__ = (
     "Disposables",
     "Embedded",
     "Field",
-    "GuardrailsException",
     "ImageEmbedding",
     "ImageGeneration",
     "ImageGenerator",
