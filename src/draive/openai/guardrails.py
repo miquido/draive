@@ -1,16 +1,14 @@
-from asyncio import gather
-from itertools import chain
+from base64 import urlsafe_b64encode
 from typing import Any
 
 from haiway import ctx, not_missing
-from openai.types.moderation_create_response import ModerationCreateResponse
+from openai.types import ModerationCreateResponse, ModerationMultiModalInputParam
 
 from draive.guardrails import ContentGuardrails, ContentGuardrailsException
-from draive.multimodal import Multimodal, MultimodalContent
+from draive.multimodal import MediaData, MediaReference, Multimodal, MultimodalContent, TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIModerationConfig
 from draive.openai.utils import unwrap_missing
-from draive.splitters import split_text
 
 __all__ = ("OpenAIContentFiltering",)
 
@@ -31,29 +29,57 @@ class OpenAIContentFiltering(OpenAIAPI):
             OpenAIModerationConfig
         ).updated(**extra)
 
-        verified_content: MultimodalContent = MultimodalContent.of(content)
+        content = MultimodalContent.of(content)
+        moderated_content: list[ModerationMultiModalInputParam] = []
+        for part in content.parts:
+            match part:
+                case TextContent() as text:
+                    moderated_content.append(
+                        {
+                            "type": "text",
+                            "text": text.text,
+                        }
+                    )
 
-        # TODO: add multimodal support
-        content_parts: list[str] = split_text(
-            verified_content.as_string(),
-            part_size=2000,
-            part_overlap_size=200,
-            count_size=len,
-        )
+                case MediaData() as media_data:
+                    base64: str = urlsafe_b64encode(media_data.data).decode()
+                    moderated_content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{media_data.media};base64,{base64}",
+                            },
+                        }
+                    )
 
-        results: list[ModerationCreateResponse] = await gather(
-            *[
-                self._client.moderations.create(
-                    model=moderation_config.model,
-                    input=part,
-                    timeout=unwrap_missing(moderation_config.timeout),
-                )
-                for part in content_parts
-            ]
+                case MediaReference() as media_referencve:
+                    moderated_content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": media_referencve.uri},
+                        }
+                    )
+
+                case other:
+                    ctx.log_warning(
+                        f"Attempting to use moderation on unsupported content ({type(other)}),"
+                        " verifying as json text..."
+                    )
+                    moderated_content.append(
+                        {
+                            "type": "text",
+                            "text": other.as_json(),
+                        }
+                    )
+
+        response: ModerationCreateResponse = await self._client.moderations.create(
+            model=moderation_config.model,
+            input=moderated_content,
+            timeout=unwrap_missing(moderation_config.timeout),
         )
 
         violations: set[str] = set()
-        for result in chain.from_iterable([result.results for result in results]):
+        for result in response.results:
             if (
                 not_missing(moderation_config.harassment_threshold)
                 and result.category_scores.harassment >= moderation_config.harassment_threshold
@@ -159,8 +185,28 @@ class OpenAIContentFiltering(OpenAIAPI):
             elif result.categories.violence_graphic:
                 violations.add("violence_graphic")
 
+            if (
+                not_missing(moderation_config.illicit_threshold)
+                and result.category_scores.illicit >= moderation_config.illicit_threshold
+            ):
+                violations.add("illicit")
+
+            elif result.categories.illicit:
+                violations.add("illicit")
+
+            if (
+                not_missing(moderation_config.illicit_violent_threshold)
+                and result.category_scores.illicit_violent
+                >= moderation_config.illicit_violent_threshold
+            ):
+                violations.add("illicit_violent")
+
+            elif result.categories.illicit_violent:
+                violations.add("illicit_violent")
+
         if violations:
             raise ContentGuardrailsException(
                 f"Content violated rule(s): {violations}",
-                content=verified_content,
+                violations=tuple(violations),
+                content=content,
             )
