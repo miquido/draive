@@ -26,7 +26,7 @@ class OpenAITokenization(OpenAIAPI):
         ) -> list[int]:
             return encoding.encode(text=text)
 
-        return Tokenization(tokenize_text=openai_tokenize_text)
+        return Tokenization(text_tokenizing=openai_tokenize_text)
 
 
 @cache(limit=1)

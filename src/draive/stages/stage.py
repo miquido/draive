@@ -1191,6 +1191,58 @@ class Stage:
             )(self.execution)
         )
 
+    def with_fallback(
+        self,
+        fallback: Self,
+        *,
+        catching: set[type[Exception]] | tuple[type[Exception], ...] | type[Exception] = Exception,
+    ) -> Self:
+        """
+        Creates a copy of this Stage with fallback behavior added.
+
+        The returned Stage will execute fallback stage if it raises
+        any of the exceptions specified in `catching`.
+
+        Parameters
+        ----------
+        fallback : Stage
+            Stage to be executed as fallback.
+        catching : set[type[Exception]] | tuple[type[Exception], ...] | type[Exception]
+            Exception types to catch and fallback on. Defaults to catching all Exceptions.
+
+        Returns
+        -------
+        Self
+            A new Stage instance with fallback behavior.
+        """
+
+        execution: StageExecution = self.execution
+        fallback_execution: StageExecution = fallback.execution
+        exceptions = catching if isinstance(catching, set | tuple) else {catching}
+
+        async def stage(
+            *,
+            context: LMMContext,
+            result: MultimodalContent,
+        ) -> tuple[LMMContext, MultimodalContent]:
+            try:
+                return await execution(
+                    context=context,
+                    result=result,
+                )
+
+            except Exception as exc:
+                if exc in exceptions:
+                    return await fallback_execution(
+                        context=context,
+                        result=result,
+                    )
+
+                else:
+                    raise exc
+
+        return self.__class__(stage)
+
     def with_volatile_context(self) -> Self:
         """
         Creates a copy of this Stage that discards context changes.

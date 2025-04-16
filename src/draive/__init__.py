@@ -203,7 +203,7 @@ from draive.stages import (
     StageResultTransforming,
     StageStateAccessing,
 )
-from draive.tokenization import TextTokenizing, Tokenization, count_text_tokens, tokenize_text
+from draive.tokenization import TextTokenizing, Tokenization
 from draive.tools import (
     Tool,
     ToolAvailabilityChecking,
@@ -389,7 +389,6 @@ __all__ = (
     "asynchronous",
     "cache",
     "choice_completion",
-    "count_text_tokens",
     "ctx",
     "default_choice_completion",
     "freeze",
@@ -413,7 +412,6 @@ __all__ = (
     "split_text",
     "throttle",
     "timeout",
-    "tokenize_text",
     "tool",
     "traced",
     "usage_cost",
