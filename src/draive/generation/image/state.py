@@ -1,9 +1,27 @@
-from haiway import State
+from typing import Any
 
-from draive.generation.image.typing import ImageGenerator
+from haiway import State, ctx
+
+from draive.generation.image.typing import ImageGenerating
+from draive.instructions import Instruction
+from draive.multimodal import MediaContent, Multimodal
 
 __all__ = ("ImageGeneration",)
 
 
 class ImageGeneration(State):
-    generate: ImageGenerator
+    @classmethod
+    async def generate(
+        cls,
+        *,
+        instruction: Instruction | str,
+        input: Multimodal | None = None,  # noqa: A002
+        **extra: Any,
+    ) -> MediaContent:
+        return await ctx.state(ImageGeneration).generate(
+            instruction=instruction,
+            input=input,
+            **extra,
+        )
+
+    generating: ImageGenerating

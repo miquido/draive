@@ -23,7 +23,7 @@ classifiers = [
 license = { file = "LICENSE" }
 dependencies = [
   "numpy~=1.26",
-  "haiway~=0.15.0",
+  "haiway~=0.16.0",
 ]
 
 [project.urls]

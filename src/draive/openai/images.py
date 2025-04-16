@@ -22,7 +22,7 @@ __all__ = ("OpenAIImageGeneration",)
 
 class OpenAIImageGeneration(OpenAIAPI):
     def image_generation(self) -> ImageGeneration:
-        return ImageGeneration(generate=self.generate_image)
+        return ImageGeneration(generating=self.generate_image)
 
     async def generate_image(
         self,

@@ -1,4 +1,4 @@
-from draive.generation.image import ImageGeneration, ImageGenerator, generate_image
+from draive.generation.image import ImageGenerating, ImageGeneration
 from draive.generation.model import (
     ModelGenerating,
     ModelGeneration,
@@ -7,12 +7,11 @@ from draive.generation.model import (
 from draive.generation.text import TextGenerating, TextGeneration
 
 __all__ = (
+    "ImageGenerating",
     "ImageGeneration",
-    "ImageGenerator",
     "ModelGenerating",
     "ModelGeneration",
     "ModelGeneratorDecoder",
     "TextGenerating",
     "TextGeneration",
-    "generate_image",
 )
