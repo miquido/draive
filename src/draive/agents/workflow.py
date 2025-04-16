@@ -11,6 +11,7 @@ from draive.agents.errors import AgentException
 from draive.agents.idle import IdleMonitor
 from draive.agents.node import Agent, AgentOutput
 from draive.agents.runner import AgentRunner
+from draive.helpers import VolatileMemory
 from draive.multimodal import (
     Multimodal,
     MultimodalContent,
@@ -95,7 +96,7 @@ class AgentWorkflow[AgentWorkflowState, AgentWorkflowResult: DataModel | State |
         return await WorkflowRunner[AgentWorkflowState, AgentWorkflowResult].run(
             self,
             input=input,
-            memory=Memory.volatile(initial=state or self._state_initializer()),
+            memory=VolatileMemory(initial=state or self._state_initializer()),
             timeout=timeout,
         )
 
@@ -166,7 +167,7 @@ def workflow[AgentWorkflowState](
         )
 
         def initialize_agent() -> Agent:
-            agent_memory: Memory[AgentWorkflowState, AgentWorkflowState] = Memory.volatile(
+            agent_memory: Memory[AgentWorkflowState, AgentWorkflowState] = VolatileMemory(
                 initial=state()
             )
 

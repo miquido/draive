@@ -238,10 +238,10 @@ class ProcessingState:
         __name: str,
         __value: Any,
     ) -> None:
-        raise RuntimeError("WorkflowState is frozen and can't be modified")
+        raise RuntimeError("ProcessingState is frozen and can't be modified")
 
     def __delattr__(
         self,
         __name: str,
     ) -> None:
-        raise RuntimeError("WorkflowState is frozen and can't be modified")
+        raise RuntimeError("ProcessingState is frozen and can't be modified")

@@ -10,6 +10,7 @@ from draive.conversation.types import (
     ConversationMemory,
     ConversationMessage,
 )
+from draive.helpers import ConstantMemory
 from draive.instructions import Instruction
 from draive.lmm import LMMStreamChunk
 from draive.multimodal import Multimodal
@@ -65,19 +66,13 @@ class Conversation(State):
         conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage]
         match memory or conversation.memory:
             case None:
-                conversation_memory = Memory[
-                    Sequence[ConversationMessage],
-                    ConversationMessage,
-                ].constant(recalled=())
+                conversation_memory = ConstantMemory(recalled=())
 
             case Memory() as memory:
                 conversation_memory = memory
 
             case memory_messages:
-                conversation_memory = Memory[
-                    Sequence[ConversationMessage],
-                    ConversationMessage,
-                ].constant(recalled=tuple(memory_messages))
+                conversation_memory = ConstantMemory(recalled=tuple(memory_messages))
 
         if stream:
             return await conversation.completing(
