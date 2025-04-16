@@ -1,9 +1,7 @@
-from draive.generation.image.call import generate_image
 from draive.generation.image.state import ImageGeneration
-from draive.generation.image.typing import ImageGenerator
+from draive.generation.image.typing import ImageGenerating
 
 __all__ = (
+    "ImageGenerating",
     "ImageGeneration",
-    "ImageGenerator",
-    "generate_image",
 )

@@ -87,14 +87,13 @@ from draive.embedding import (
     ValueEmbedding,
 )
 from draive.generation import (
+    ImageGenerating,
     ImageGeneration,
-    ImageGenerator,
     ModelGenerating,
     ModelGeneration,
     ModelGeneratorDecoder,
     TextGenerating,
     TextGeneration,
-    generate_image,
 )
 from draive.guardrails import (
     ContentGuardrails,
@@ -271,8 +270,8 @@ __all__ = (
     "Embedded",
     "Field",
     "ImageEmbedding",
+    "ImageGenerating",
     "ImageGeneration",
-    "ImageGenerator",
     "Instruction",
     "InstructionException",
     "InstructionFetching",
@@ -401,7 +400,6 @@ __all__ = (
     "default_choice_completion",
     "freeze",
     "frozenlist",
-    "generate_image",
     "getenv_bool",
     "getenv_float",
     "getenv_int",
