@@ -1,5 +1,5 @@
 from asyncio import gather
-from base64 import b64encode
+from base64 import urlsafe_b64encode
 from collections.abc import Callable, Sequence
 from itertools import chain
 from typing import Any, cast
@@ -118,7 +118,7 @@ class CohereEmbedding(CohereAPI):
                     self._client.embed(
                         model=embedding_config.model,
                         images=[
-                            f"data:image/jpeg;base64,{b64encode(image).decode('utf-8')}"
+                            f"data:image/jpeg;base64,{urlsafe_b64encode(image).decode('utf-8')}"
                             for image in attributes[index : index + embedding_config.batch_size]
                         ],
                         embedding_types=["float"],

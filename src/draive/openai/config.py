@@ -64,7 +64,7 @@ class OpenAISystemFingerprint(State):
 
 
 class OpenAIModerationConfig(State):
-    model: str
+    model: str = "omni-moderation-latest"
     timeout: float | Missing = MISSING
     harassment_threshold: float | Missing = MISSING
     harassment_threatening_threshold: float | Missing = MISSING
@@ -77,3 +77,5 @@ class OpenAIModerationConfig(State):
     sexual_minors_threshold: float | Missing = MISSING
     violence_threshold: float | Missing = MISSING
     violence_graphic_threshold: float | Missing = MISSING
+    illicit_threshold: float | Missing = MISSING
+    illicit_violent_threshold: float | Missing = MISSING

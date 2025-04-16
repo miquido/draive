@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any, Protocol, runtime_checkable
 
 from draive.multimodal import MultimodalContent
@@ -12,10 +13,12 @@ class ContentGuardrailsException(Exception):
     def __init__(
         self,
         *args: object,
+        violations: Sequence[str],
         content: MultimodalContent,
         replacement: MultimodalContent | None = None,
     ) -> None:
         super().__init__(*args)
+        self.violations: Sequence[str] = violations
         self.content: MultimodalContent = content
         self.replacement: MultimodalContent | None = replacement
 
