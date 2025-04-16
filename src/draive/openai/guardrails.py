@@ -5,36 +5,37 @@ from typing import Any
 from haiway import ctx, not_missing
 from openai.types.moderation_create_response import ModerationCreateResponse
 
-from draive.multimodal import MultimodalContent
+from draive.guardrails import ContentGuardrails, ContentGuardrailsException
+from draive.multimodal import Multimodal, MultimodalContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIModerationConfig
 from draive.openai.utils import unwrap_missing
-from draive.safeguards import ContentGuardrails, GuardrailsException
 from draive.splitters import split_text
 
 __all__ = ("OpenAIContentFiltering",)
 
 
 class OpenAIContentFiltering(OpenAIAPI):
-    async def content_guardrails(self) -> ContentGuardrails:
-        # TODO: refine guardrails
-        return self.filter_content
+    def content_guardrails(self) -> ContentGuardrails:
+        return ContentGuardrails(verifying=self.content_verification)
 
-    async def filter_content(  # noqa: C901, PLR0912
+    async def content_verification(  # noqa: C901, PLR0912, PLR0915
         self,
-        content: MultimodalContent,
+        content: Multimodal,
         /,
         *,
         config: OpenAIModerationConfig | None = None,
         **extra: Any,
-    ) -> MultimodalContent:
+    ) -> None:
         moderation_config: OpenAIModerationConfig = config or ctx.state(
             OpenAIModerationConfig
         ).updated(**extra)
 
+        verified_content: MultimodalContent = MultimodalContent.of(content)
+
         # TODO: add multimodal support
         content_parts: list[str] = split_text(
-            content.as_string(),
+            verified_content.as_string(),
             part_size=2000,
             part_overlap_size=200,
             count_size=len,
@@ -159,6 +160,7 @@ class OpenAIContentFiltering(OpenAIAPI):
                 violations.add("violence_graphic")
 
         if violations:
-            raise GuardrailsException(f"Content violated rule(s): {violations}")
-
-        return content  # no violation - use content
+            raise ContentGuardrailsException(
+                f"Content violated rule(s): {violations}",
+                content=verified_content,
+            )

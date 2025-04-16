@@ -15,6 +15,15 @@ from draive.openai.tokenization import OpenAITokenization
 __all__ = ("OpenAI",)
 
 
+type Features = Literal[
+    "lmm",
+    "lmm_session",
+    "text_embedding",
+    "image_generation",
+    "content_guardrails",
+]
+
+
 @final
 class OpenAI(
     OpenAILMMGeneration,
@@ -39,8 +48,7 @@ class OpenAI(
         azure_api_endpoint: str | None = None,
         azure_api_version: str | None = None,
         azure_deployment: str | None = None,
-        features: Set[Literal["lmm", "lmm_session", "text_embedding", "image_generation"]]
-        | None = None,
+        features: Set[Features] | None = None,
     ) -> None:
         super().__init__(
             base_url=base_url,
@@ -51,12 +59,18 @@ class OpenAI(
             azure_deployment=azure_deployment,
         )
 
-        self._features: frozenset[
-            Literal["lmm", "lmm_session", "text_embedding", "image_generation"]
-        ] = (
+        self._features: frozenset[Features] = (
             frozenset(features)
             if features is not None
-            else frozenset(("lmm", "lmm_session", "text_embedding", "image_generation"))
+            else frozenset(
+                (
+                    "lmm",
+                    "lmm_session",
+                    "text_embedding",
+                    "image_generation",
+                    "content_guardrails",
+                )
+            )
         )
 
     async def __aenter__(self) -> Iterable[State]:
@@ -73,6 +87,9 @@ class OpenAI(
 
         if "image_generation" in self._features:
             state.append(self.image_generation())
+
+        if "content_guardrails" in self._features:
+            state.append(self.content_guardrails())
 
         return state
 
