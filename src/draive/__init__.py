@@ -97,8 +97,12 @@ from draive.generation import (
     generate_image,
 )
 from draive.helpers import (
+    AccumulativeVolatileMemory,
+    ConstantMemory,
     ModelTokenPrice,
     TokenPrice,
+    VolatileMemory,
+    VolatileVectorIndex,
     usage_cost,
 )
 from draive.instructions import (
@@ -231,6 +235,7 @@ __all__ = (
     "MEDIA_KINDS",
     "META_EMPTY",
     "MISSING",
+    "AccumulativeVolatileMemory",
     "Agent",
     "AgentError",
     "AgentException",
@@ -251,6 +256,7 @@ __all__ = (
     "Choice",
     "ChoiceCompletion",
     "ChoiceOption",
+    "ConstantMemory",
     "ContentGuardrails",
     "Conversation",
     "ConversationElement",
@@ -378,6 +384,8 @@ __all__ = (
     "ToolsFetching",
     "ValueEmbedding",
     "VectorIndex",
+    "VolatileMemory",
+    "VolatileVectorIndex",
     "agent",
     "always",
     "as_dict",

@@ -2,6 +2,7 @@ from inspect import isfunction
 from typing import Protocol, overload, runtime_checkable
 
 from draive.agents.node import Agent, AgentError, AgentMessage, AgentNode, AgentOutput
+from draive.helpers import VolatileMemory
 from draive.utils import Memory
 
 __all__ = (
@@ -161,7 +162,7 @@ def agent[AgentState, AgentStateScratch](  # noqa: C901 # pyright: ignore[report
 
             def initialize() -> Agent:
                 # in this case AgentState has to be the same as AgentStateScratch
-                agent_memory: Memory[AgentState, AgentStateScratch] = Memory.volatile(
+                agent_memory: Memory[AgentState, AgentStateScratch] = VolatileMemory(
                     initial=state_initializer()
                 )
 
