@@ -1,11 +1,15 @@
-from draive.bedrock.client import BedrockClient
-from draive.bedrock.config import BedrockChatConfig
-from draive.bedrock.lmm import bedrock_lmm
+from draive.bedrock.client import Bedrock
+from draive.bedrock.config import (
+    BedrockChatConfig,
+    BedrockInputGuardraisConfig,
+    BedrockOutputGuardraisConfig,
+)
 from draive.bedrock.types import BedrockException
 
 __all__ = (
+    "Bedrock",
     "BedrockChatConfig",
-    "BedrockClient",
     "BedrockException",
-    "bedrock_lmm",
+    "BedrockInputGuardraisConfig",
+    "BedrockOutputGuardraisConfig",
 )

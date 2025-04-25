@@ -65,7 +65,7 @@ async def conversation_completion(
         context: list[LMMContextElement]
         match input:
             case ConversationMessage() as message:
-                await ContentGuardrails.verify(message.content)
+                await ContentGuardrails.verify_input(message.content)
                 await memory.remember(message)
                 context = [
                     *(message.as_lmm_context_element() for message in recalled_messages),
@@ -77,7 +77,7 @@ async def conversation_completion(
                 for element in prompt.content:
                     match element:
                         case LMMCompletion() as completion_element:
-                            await ContentGuardrails.verify(completion_element.content)
+                            await ContentGuardrails.verify_input(completion_element.content)
                             prompt_messages.append(
                                 ConversationMessage.model(
                                     created=datetime.now(UTC),
@@ -86,7 +86,7 @@ async def conversation_completion(
                             )
 
                         case LMMInput() as input_element:
-                            await ContentGuardrails.verify(input_element.content)
+                            await ContentGuardrails.verify_input(input_element.content)
                             prompt_messages.append(
                                 ConversationMessage.user(
                                     created=datetime.now(UTC),
@@ -109,7 +109,7 @@ async def conversation_completion(
                     created=datetime.now(UTC),
                     content=MultimodalContent.of(content),
                 )
-                await ContentGuardrails.verify(message.content)
+                await ContentGuardrails.verify_input(message.content)
                 await memory.remember(message)
                 context = [
                     *(message.as_lmm_context_element() for message in recalled_messages),

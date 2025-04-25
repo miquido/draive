@@ -2,7 +2,11 @@ from collections.abc import Sequence
 
 from haiway import MISSING, Missing, State
 
-__all__ = ("BedrockChatConfig",)
+__all__ = (
+    "BedrockChatConfig",
+    "BedrockInputGuardraisConfig",
+    "BedrockOutputGuardraisConfig",
+)
 
 
 class BedrockChatConfig(State):
@@ -12,3 +16,13 @@ class BedrockChatConfig(State):
     max_tokens: int | Missing = MISSING
     timeout: float | Missing = MISSING
     stop_sequences: Sequence[str] | Missing = MISSING
+
+
+class BedrockInputGuardraisConfig(State):
+    guardrail_identifier: str
+    guardrail_version: str
+
+
+class BedrockOutputGuardraisConfig(State):
+    guardrail_identifier: str
+    guardrail_version: str

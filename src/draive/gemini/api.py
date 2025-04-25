@@ -1,7 +1,7 @@
 from typing import Any
 
 from google.genai import Client
-from google.genai.client import HttpOptionsDict
+from google.genai.client import HttpOptionsDict  # pyright: ignore[reportPrivateImportUsage]
 from haiway import getenv_str
 
 __all__ = ("GeminiAPI",)
