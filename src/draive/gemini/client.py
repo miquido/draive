@@ -2,7 +2,7 @@ from collections.abc import Iterable, Set
 from types import TracebackType
 from typing import Any, Literal, final
 
-from google.genai.client import HttpOptionsDict
+from google.genai.client import HttpOptionsDict  # pyright: ignore[reportPrivateImportUsage]
 from haiway import State
 
 from draive.gemini.api import GeminiAPI

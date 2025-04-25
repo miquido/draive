@@ -97,7 +97,9 @@ from draive.generation import (
 )
 from draive.guardrails import (
     ContentGuardrails,
-    ContentGuardrailsException,
+    GuardrailsContentException,
+    GuardrailsInputException,
+    GuardrailsOutputException,
 )
 from draive.helpers import (
     AccumulativeVolatileMemory,
@@ -257,7 +259,6 @@ __all__ = (
     "ChoiceOption",
     "ConstantMemory",
     "ContentGuardrails",
-    "ContentGuardrailsException",
     "Conversation",
     "ConversationElement",
     "ConversationMemory",
@@ -269,6 +270,9 @@ __all__ = (
     "Disposables",
     "Embedded",
     "Field",
+    "GuardrailsContentException",
+    "GuardrailsInputException",
+    "GuardrailsOutputException",
     "ImageEmbedding",
     "ImageGenerating",
     "ImageGeneration",

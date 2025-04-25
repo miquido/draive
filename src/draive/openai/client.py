@@ -6,7 +6,7 @@ from haiway import State
 
 from draive.openai.api import OpenAIAPI
 from draive.openai.embedding import OpenAIEmbedding
-from draive.openai.guardrails import OpenAIContentFiltering
+from draive.openai.guardrails import OpenAIContentModereation
 from draive.openai.images import OpenAIImageGeneration
 from draive.openai.lmm_generation import OpenAILMMGeneration
 from draive.openai.lmm_session import OpenAILMMSession
@@ -30,7 +30,7 @@ class OpenAI(
     OpenAILMMSession,
     OpenAIEmbedding,
     OpenAIImageGeneration,
-    OpenAIContentFiltering,
+    OpenAIContentModereation,
     OpenAITokenization,
     OpenAIAPI,
 ):

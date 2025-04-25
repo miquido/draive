@@ -1,148 +1,33 @@
-from collections.abc import AsyncIterator, Iterable
-from typing import Any, Literal, cast, overload
+from collections.abc import Callable, Iterable
+from typing import Any, Literal, cast
 
-from haiway import ArgumentsTrace, ResultTrace, ctx
-
-from draive.bedrock.client import BedrockClient
-from draive.bedrock.config import BedrockChatConfig
-from draive.bedrock.models import ChatCompletionResponse, ChatMessage, ChatMessageContent, ChatTool
-from draive.bedrock.types import BedrockException
-from draive.instructions import Instruction
+from draive.bedrock.models import ChatMessage, ChatMessageContent, ChatTool
 from draive.lmm import (
-    LMM,
     LMMCompletion,
-    LMMContext,
     LMMContextElement,
     LMMInput,
-    LMMOutput,
-    LMMOutputSelection,
-    LMMToolRequest,
     LMMToolRequests,
     LMMToolResponses,
-    LMMToolSelection,
     LMMToolSpecification,
 )
-from draive.lmm.types import LMMStreamOutput
-from draive.metrics.tokens import TokenUsage
+from draive.lmm.types import LMMOutputSelection, LMMToolSelection
 from draive.multimodal import (
     MediaData,
     MediaReference,
-    Multimodal,
-    MultimodalContent,
     MultimodalContentElement,
     TextContent,
 )
+from draive.multimodal.content import MultimodalContent
 from draive.parameters import DataModel
 
-__all__ = ("bedrock_lmm",)
+__all__ = (
+    "convert_content_element",
+    "convert_context_element",
+    "convert_tool",
+)
 
 
-def bedrock_lmm(
-    client: BedrockClient | None = None,
-    /,
-) -> LMM:
-    client = client or BedrockClient.shared()
-
-    @overload
-    async def lmm_completion(
-        self,
-        *,
-        instruction: Instruction | None,
-        context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
-        prefill: Multimodal | None = None,
-        config: BedrockChatConfig | None = None,
-        output: LMMOutputSelection,
-        stream: Literal[False] = False,
-        **extra: Any,
-    ) -> LMMOutput: ...
-
-    @overload
-    async def lmm_completion(
-        self,
-        *,
-        instruction: Instruction | None,
-        context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
-        output: LMMOutputSelection,
-        prefill: Multimodal | None = None,
-        config: BedrockChatConfig | None = None,
-        stream: Literal[True],
-        **extra: Any,
-    ) -> AsyncIterator[LMMStreamOutput]: ...
-
-    async def lmm_completion(
-        self,
-        *,
-        instruction: Instruction | None,
-        context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
-        output: LMMOutputSelection,
-        prefill: Multimodal | None = None,
-        config: BedrockChatConfig | None = None,
-        stream: bool = False,
-        **extra: Any,
-    ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
-        if stream:
-            raise NotImplementedError("bedrock streaming is not implemented yet")
-
-        with ctx.scope("bedrock_lmm_completion"):
-            completion_config: BedrockChatConfig = ctx.state(BedrockChatConfig).updated(**extra)
-            ctx.record(
-                ArgumentsTrace.of(
-                    config=completion_config,
-                    instruction=instruction,
-                    context=context,
-                    tools=tools,
-                    tool_selection=tool_selection,
-                    output=output,
-                    **extra,
-                ),
-            )
-
-            match output:
-                case "auto" | "text":
-                    pass
-
-                case "image":
-                    raise NotImplementedError("image output is not supported by bedrock")
-
-                case "audio":
-                    raise NotImplementedError("audio output is not supported by bedrock")
-
-                case "video":
-                    raise NotImplementedError("video output is not supported by bedrock")
-
-                case _:
-                    raise NotImplementedError("model output is not supported by bedrock")
-
-            messages: list[ChatMessage] = [_convert_context_element(element) for element in context]
-
-            tools_list: list[ChatTool] = [_convert_tool(tool) for tool in tools or []]
-            require_tool: bool
-            match tool_selection:
-                case "required":
-                    require_tool = True
-
-                case _:
-                    require_tool = False
-
-            return await _chat_completion(
-                client=client,
-                config=completion_config,
-                instruction=Instruction.formatted(instruction),
-                messages=messages,
-                tools_list=tools_list,
-                require_tool=require_tool,
-            )
-
-    return LMM(completing=lmm_completion)
-
-
-def _convert_content_element(
+def convert_content_element(
     element: MultimodalContentElement,
 ) -> ChatMessageContent:
     match element:
@@ -181,20 +66,20 @@ def _convert_content_element(
             return {"text": data.as_json()}
 
 
-def _convert_context_element(
+def convert_context_element(
     element: LMMContextElement,
 ) -> ChatMessage:
     match element:
         case LMMInput() as input:
             return ChatMessage(
                 role="user",
-                content=[_convert_content_element(part) for part in input.content.parts],
+                content=[convert_content_element(part) for part in input.content.parts],
             )
 
         case LMMCompletion() as completion:
             return ChatMessage(
                 role="assistant",
-                content=[_convert_content_element(part) for part in completion.content.parts],
+                content=[convert_content_element(part) for part in completion.content.parts],
             )
 
         case LMMToolRequests() as requests:
@@ -220,7 +105,7 @@ def _convert_context_element(
                         "toolResult": {
                             "toolUseId": response.identifier,
                             "content": [
-                                cast(Any, _convert_content_element(part))
+                                cast(Any, convert_content_element(part))
                                 for part in response.content.parts
                             ],
                             "status": "error" if response.handling == "error" else "success",
@@ -231,7 +116,7 @@ def _convert_context_element(
             )
 
 
-def _convert_tool(tool: LMMToolSpecification) -> ChatTool:
+def convert_tool(tool: LMMToolSpecification) -> ChatTool:
     return {
         "name": tool["name"],
         "description": tool["description"] or "",
@@ -239,89 +124,101 @@ def _convert_tool(tool: LMMToolSpecification) -> ChatTool:
     }
 
 
-async def _chat_completion(
+def output_as_response_declaration(
+    output: LMMOutputSelection,
+) -> Callable[[MultimodalContent], MultimodalContent]:
+    match output:
+        case "auto":
+            return _auto_output_conversion
+
+        case ["text"] | "text":
+            return _auto_output_conversion
+
+        case "json":
+            return _json_output_conversion
+
+        case "image":
+            raise NotImplementedError("image output is not supported yet")
+
+        case "audio":
+            raise NotImplementedError("audio output is not supported yet")
+
+        case "video":
+            raise NotImplementedError("video output is not supported yet")
+
+        case [*_]:
+            raise NotImplementedError("multimodal output is not supported yet")
+
+        case model:
+            return _prepare_model_output_conversion(model)
+
+
+def _auto_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> MultimodalContent:
+    return output
+
+
+def _text_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> MultimodalContent:
+    return MultimodalContent.of(output.as_string())
+
+
+def _audio_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> MultimodalContent:
+    return MultimodalContent.of(*output.media("audio"))
+
+
+def _json_output_conversion(
+    output: MultimodalContent,
+    /,
+) -> MultimodalContent:
+    return MultimodalContent.of(DataModel.from_json(output.as_string()))
+
+
+def _prepare_model_output_conversion(
+    model: type[DataModel],
+    /,
+) -> Callable[[MultimodalContent], MultimodalContent]:
+    def _model_output_conversion(
+        output: MultimodalContent,
+        /,
+    ) -> MultimodalContent:
+        return MultimodalContent.of(model.from_json(output.as_string()))
+
+    return _model_output_conversion
+
+
+def tools_as_tool_config(
+    tools: Iterable[LMMToolSpecification] | None,
+    /,
     *,
-    client: BedrockClient,
-    config: BedrockChatConfig,
-    instruction: str | None,
-    messages: list[ChatMessage],
-    tools_list: list[ChatTool],
-    require_tool: bool,
-) -> LMMOutput:
-    completion: ChatCompletionResponse = await client.chat_completion(
-        config=config,
-        instruction=instruction,
-        messages=messages,
-        tools=tools_list,
-        require_tool=require_tool,
-    )
+    tool_selection: LMMToolSelection,
+) -> dict[str, Any] | None:
+    toolChoice: dict[str, Any]
+    match tool_selection:
+        case "auto":
+            toolChoice = {"auto": {}}
 
-    ctx.record(
-        TokenUsage.for_model(
-            config.model,
-            input_tokens=completion["usage"]["inputTokens"],
-            cached_tokens=None,
-            output_tokens=completion["usage"]["outputTokens"],
-        ),
-    )
+        case "required":
+            toolChoice = {"any": {}}
 
-    message_parts: list[MultimodalContentElement] = []
-    tool_calls: list[LMMToolRequest] = []
-    for part in completion["output"]["message"]["content"]:
-        match part:
-            case {"text": str() as text}:
-                message_parts.append(TextContent(text=text))
+        case "none":
+            return None
 
-            case {"image": {"format": str() as data_format, "source": {"bytes": bytes() as data}}}:
-                media_type: Any
-                match data_format:
-                    case "png":
-                        media_type = "image/png"
+        case tool:
+            toolChoice = {"tool": {"name": tool}}
 
-                    case "jpeg":
-                        media_type = "image/jpeg"
+    tools_list = [{"toolSpec": convert_tool(tool)} for tool in tools or ()]
+    if not tools_list:
+        return None
 
-                    case "gif":
-                        media_type = "image/gif"
-
-                    case _:  # pyright: ignore[reportUnnecessaryComparison]
-                        media_type = "image"
-
-                message_parts.append(
-                    MediaData.of(
-                        data,
-                        media=media_type,
-                    )
-                )
-
-            case {
-                "toolUse": {
-                    "toolUseId": str() as identifier,
-                    "name": str() as tool,
-                    "input": arguments,
-                }
-            }:
-                tool_calls.append(
-                    LMMToolRequest(
-                        identifier=identifier,
-                        tool=tool,
-                        arguments=arguments,
-                    )
-                )
-
-            case _:
-                pass
-
-    match completion["stopReason"]:
-        case "end_turn" | "stop_sequence":
-            message_completion = LMMCompletion.of(MultimodalContent.of(*message_parts))
-            ctx.record(ResultTrace.of(message_completion))
-            return message_completion
-
-        case "tool_use":
-            tools_completion = LMMToolRequests(requests=tool_calls)
-            ctx.record(ResultTrace.of(tools_completion))
-            return tools_completion
-
-        case _:
-            raise BedrockException("Invalid Bedrock response")
+    return {
+        "tools": tools_list,
+        "toolChoice": toolChoice,
+    }

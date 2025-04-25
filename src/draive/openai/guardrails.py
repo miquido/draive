@@ -4,18 +4,18 @@ from typing import Any
 from haiway import ctx, not_missing
 from openai.types import ModerationCreateResponse, ModerationMultiModalInputParam
 
-from draive.guardrails import ContentGuardrails, ContentGuardrailsException
+from draive.guardrails import ContentGuardrails, GuardrailsContentException
 from draive.multimodal import MediaData, MediaReference, Multimodal, MultimodalContent, TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIModerationConfig
 from draive.openai.utils import unwrap_missing
 
-__all__ = ("OpenAIContentFiltering",)
+__all__ = ("OpenAIContentModereation",)
 
 
-class OpenAIContentFiltering(OpenAIAPI):
+class OpenAIContentModereation(OpenAIAPI):
     def content_guardrails(self) -> ContentGuardrails:
-        return ContentGuardrails(verifying=self.content_verification)
+        return ContentGuardrails(input_verifying=self.content_verification)
 
     async def content_verification(  # noqa: C901, PLR0912, PLR0915
         self,
@@ -205,7 +205,7 @@ class OpenAIContentFiltering(OpenAIAPI):
                 violations.add("illicit_violent")
 
         if violations:
-            raise ContentGuardrailsException(
+            raise GuardrailsContentException(
                 f"Content violated rule(s): {violations}",
                 violations=tuple(violations),
                 content=content,

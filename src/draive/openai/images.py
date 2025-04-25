@@ -48,6 +48,9 @@ class OpenAIImageGeneration(OpenAIAPI):
                 response_format=generation_config.result,
             )
 
+            if response.data is None:
+                raise OpenAIException("Invalid OpenAI response - missing image content")
+
             image: Image = response.data[0]
             if url := image.url:
                 return MediaReference.of(
