@@ -29,7 +29,7 @@ class CohereAPI:
         self._provider: Literal["cohere", "bedrock"] = provider
         self._base_url: str | None = base_url or getenv_str("COHERE_SERVER_URL")
         self._api_key: str | None = api_key or getenv_str("COHERE_API_KEY")
-        self._aws_region: str | None = aws_region or getenv_str("AWS_REGION")
+        self._aws_region: str | None = aws_region or getenv_str("AWS_BEDROCK_REGION")
         self._timeout: float = timeout
         self._client: AsyncClientV2 = self._prepare_client()
 

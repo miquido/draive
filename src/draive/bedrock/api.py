@@ -16,7 +16,7 @@ class BedrockAPI:
         *,
         aws_region: str | None = None,
     ) -> None:
-        self._aws_region: str | None = aws_region or getenv_str("AWS_REGION")
+        self._aws_region: str | None = aws_region or getenv_str("AWS_BEDROCK_REGION")
         self._client: Any
 
     # preparing it lazily on demand, boto does a lot of stuff on initialization

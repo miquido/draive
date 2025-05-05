@@ -29,7 +29,7 @@ class AnthropicAPI:
         self._provider: Literal["anthropic", "bedrock"] = provider
         self._base_url: str | None = base_url
         self._api_key: str | None = api_key or getenv_str("ANTHROPIC_API_KEY")
-        self._aws_region: str | None = aws_region or getenv_str("AWS_REGION")
+        self._aws_region: str | None = aws_region or getenv_str("AWS_BEDROCK_REGION")
         self._timeout: float = timeout
         self._client: AsyncAnthropic = self._prepare_client()
 
