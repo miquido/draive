@@ -39,10 +39,6 @@ class AnthropicAPI:
                     AsyncAnthropic,  # it is not actually the same but for our purpose it works
                     AsyncAnthropicBedrock(
                         base_url=self._base_url,
-                        aws_access_key=getenv_str("AWS_ACCESS_KEY_ID"),
-                        aws_secret_key=getenv_str("AWS_ACCESS_KEY"),
-                        aws_profile=getenv_str("AWS_PROFILE"),
-                        aws_region=getenv_str("AWS_DEFAULT_REGION"),
                         timeout=self._timeout,
                     ),
                 )

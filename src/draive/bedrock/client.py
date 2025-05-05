@@ -27,16 +27,9 @@ class Bedrock(
     def __init__(
         self,
         *,
-        region_name: str | None = None,
-        access_key_id: str | None = None,
-        access_key: str | None = None,
         features: Set[Features] | None = None,
     ) -> None:
-        super().__init__(
-            region_name=region_name,
-            access_key_id=access_key_id,
-            access_key=access_key,
-        )
+        super().__init__()
         self._features: frozenset[Features] = (
             frozenset(features)
             if features is not None
