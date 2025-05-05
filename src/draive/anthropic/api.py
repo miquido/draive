@@ -50,6 +50,7 @@ class AnthropicAPI:
                     AsyncAnthropic,  # it is not actually the same but for our purpose it works
                     AsyncAnthropicBedrock(
                         base_url=self._base_url,
+                        aws_region=self._aws_region,
                         timeout=self._timeout,
                     ),
                 )
