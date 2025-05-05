@@ -30,6 +30,7 @@ class AsyncAwsClientV2(AsyncClientV2):
     def __init__(
         self,
         *,
+        aws_region: str | None = None,
         timeout: float | None = None,
         service: typing.Literal["bedrock"] | typing.Literal["sagemaker"],
     ):
@@ -43,6 +44,7 @@ class AsyncAwsClientV2(AsyncClientV2):
             httpx_client=httpx.AsyncClient(
                 event_hooks=get_event_hooks(
                     service=service,
+                    aws_region=aws_region,
                 ),
                 timeout=timeout,
             ),
@@ -67,11 +69,13 @@ EventHook = typing.Callable[..., typing.Any]
 
 def get_event_hooks(
     service: str,
+    aws_region: str | None,
 ) -> dict[str, list[EventHook]]:
     return {
         "request": [
             map_request_to_bedrock(
                 service=service,
+                aws_region=aws_region,
             ),
         ],
         "response": [map_response_from_bedrock()],
@@ -189,8 +193,9 @@ def map_response_from_bedrock():
 
 def map_request_to_bedrock(
     service: str,
+    aws_region: str | None,
 ) -> EventHook:
-    session = lazy_boto3().Session()
+    session = lazy_boto3().Session(region_name=aws_region)
     aws_region = session.region_name
     credentials = session.get_credentials()
     signer = lazy_botocore().auth.SigV4Auth(credentials, service, aws_region)  # pyright: ignore

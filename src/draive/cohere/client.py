@@ -27,6 +27,7 @@ class Cohere(
         provider: Literal["bedrock"],
         /,
         *,
+        aws_region: str | None = None,
         timeout: float = 60.0,
         features: Set[Literal["text_embedding", "image_embedding"]] | None = None,
     ) -> None: ...
@@ -50,6 +51,7 @@ class Cohere(
         *,
         base_url: str | None = None,
         api_key: str | None = None,
+        aws_region: str | None = None,
         timeout: float = 60.0,
         features: Set[Literal["text_embedding", "image_embedding"]] | None = None,
     ) -> None:
@@ -57,6 +59,7 @@ class Cohere(
             provider,
             base_url=base_url,
             api_key=api_key,
+            aws_region=aws_region,
             timeout=timeout,
         )
 
