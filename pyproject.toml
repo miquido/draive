@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.62.0"
+version = "0.62.1"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
@@ -36,6 +36,10 @@ sentencepiece = [
 ]
 cohere = [
   "cohere~=5.13"
+]
+cohere_bedrock = [
+  "cohere~=5.13",
+  "boto3~=1.37",
 ]
 openai = [
   "openai~=1.64",

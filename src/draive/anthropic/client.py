@@ -51,6 +51,7 @@ class Anthropic(
         features: Set[Literal["lmm"]] | None = None,
     ) -> None:
         super().__init__(
+            provider,
             base_url=base_url,
             api_key=api_key,
             timeout=timeout,
