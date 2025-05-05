@@ -28,8 +28,9 @@ class Bedrock(
         self,
         *,
         features: Set[Features] | None = None,
+        aws_region: str | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__(aws_region=aws_region)
         self._features: frozenset[Features] = (
             frozenset(features)
             if features is not None

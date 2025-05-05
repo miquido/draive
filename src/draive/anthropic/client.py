@@ -36,6 +36,7 @@ class Anthropic(
         /,
         *,
         base_url: str | None = None,
+        aws_region: str | None = None,
         timeout: float = 60.0,
         features: Set[Literal["lmm"]] | None = None,
     ) -> None: ...
@@ -47,6 +48,7 @@ class Anthropic(
         *,
         base_url: str | None = None,
         api_key: str | None = None,
+        aws_region: str | None = None,
         timeout: float = 60.0,
         features: Set[Literal["lmm"]] | None = None,
     ) -> None:
@@ -54,6 +56,7 @@ class Anthropic(
             provider,
             base_url=base_url,
             api_key=api_key,
+            aws_region=aws_region,
             timeout=timeout,
         )
 

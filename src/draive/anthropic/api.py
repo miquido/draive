@@ -7,6 +7,15 @@ __all__ = ("AnthropicAPI",)
 
 
 class AnthropicAPI:
+    __slots__ = (
+        "_api_key",
+        "_aws_region",
+        "_base_url",
+        "_client",
+        "_provider",
+        "_timeout",
+    )
+
     def __init__(
         self,
         provider: Literal["anthropic", "bedrock"] = "anthropic",
@@ -14,11 +23,13 @@ class AnthropicAPI:
         *,
         base_url: str | None = None,
         api_key: str | None = None,
+        aws_region: str | None = None,
         timeout: float = 60.0,
     ) -> None:
         self._provider: Literal["anthropic", "bedrock"] = provider
         self._base_url: str | None = base_url
         self._api_key: str | None = api_key or getenv_str("ANTHROPIC_API_KEY")
+        self._aws_region: str | None = aws_region or getenv_str("AWS_REGION")
         self._timeout: float = timeout
         self._client: AsyncAnthropic = self._prepare_client()
 
