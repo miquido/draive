@@ -55,11 +55,13 @@ class AsyncBedrockClientV2(AsyncAwsClientV2):
     def __init__(
         self,
         *,
+        aws_region: str | None = None,
         timeout: float | None = None,
     ):
         AsyncAwsClientV2.__init__(
             self,
             service="bedrock",
+            aws_region=aws_region,
             timeout=timeout,
         )
 
