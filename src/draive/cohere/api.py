@@ -34,11 +34,7 @@ class CohereAPI:
             case "bedrock":
                 from draive.cohere.bedrock import AsyncBedrockClientV2
 
-                return AsyncBedrockClientV2(
-                    aws_access_key=getenv_str("AWS_ACCESS_KEY_ID"),
-                    aws_secret_key=getenv_str("AWS_ACCESS_KEY"),
-                    aws_region=getenv_str("AWS_DEFAULT_REGION"),
-                )
+                return AsyncBedrockClientV2()
 
     async def _initialize_client(self) -> None:
         await self._client._client_wrapper.httpx_client.httpx_client.aclose()

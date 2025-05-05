@@ -30,10 +30,6 @@ class AsyncAwsClientV2(AsyncClientV2):
     def __init__(
         self,
         *,
-        aws_access_key: str | None = None,
-        aws_secret_key: str | None = None,
-        aws_session_token: str | None = None,
-        aws_region: str | None = None,
         timeout: float | None = None,
         service: typing.Literal["bedrock"] | typing.Literal["sagemaker"],
     ):
@@ -47,10 +43,6 @@ class AsyncAwsClientV2(AsyncClientV2):
             httpx_client=httpx.AsyncClient(
                 event_hooks=get_event_hooks(
                     service=service,
-                    aws_access_key=aws_access_key,
-                    aws_secret_key=aws_secret_key,
-                    aws_session_token=aws_session_token,
-                    aws_region=aws_region,
                 ),
                 timeout=timeout,
             ),
@@ -61,19 +53,11 @@ class AsyncBedrockClientV2(AsyncAwsClientV2):
     def __init__(
         self,
         *,
-        aws_access_key: str | None = None,
-        aws_secret_key: str | None = None,
-        aws_session_token: str | None = None,
-        aws_region: str | None = None,
         timeout: float | None = None,
     ):
         AsyncAwsClientV2.__init__(
             self,
             service="bedrock",
-            aws_access_key=aws_access_key,
-            aws_secret_key=aws_secret_key,
-            aws_session_token=aws_session_token,
-            aws_region=aws_region,
             timeout=timeout,
         )
 
@@ -83,19 +67,11 @@ EventHook = typing.Callable[..., typing.Any]
 
 def get_event_hooks(
     service: str,
-    aws_access_key: str | None = None,
-    aws_secret_key: str | None = None,
-    aws_session_token: str | None = None,
-    aws_region: str | None = None,
 ) -> dict[str, list[EventHook]]:
     return {
         "request": [
             map_request_to_bedrock(
                 service=service,
-                aws_access_key=aws_access_key,
-                aws_secret_key=aws_secret_key,
-                aws_session_token=aws_session_token,
-                aws_region=aws_region,
             ),
         ],
         "response": [map_response_from_bedrock()],
@@ -211,26 +187,10 @@ def map_response_from_bedrock():
     return _hook
 
 
-def get_boto3_session(
-    **kwargs: typing.Any,
-):
-    non_none_args = {k: v for k, v in kwargs.items() if v is not None}
-    return lazy_boto3().Session(**non_none_args)
-
-
 def map_request_to_bedrock(
     service: str,
-    aws_access_key: str | None = None,
-    aws_secret_key: str | None = None,
-    aws_session_token: str | None = None,
-    aws_region: str | None = None,
 ) -> EventHook:
-    session = get_boto3_session(
-        region_name=aws_region,
-        aws_access_key_id=aws_access_key,
-        aws_secret_access_key=aws_secret_key,
-        aws_session_token=aws_session_token,
-    )
+    session = lazy_boto3().Session()
     aws_region = session.region_name
     credentials = session.get_credentials()
     signer = lazy_botocore().auth.SigV4Auth(credentials, service, aws_region)  # pyright: ignore
