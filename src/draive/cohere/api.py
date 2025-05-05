@@ -45,7 +45,7 @@ class CohereAPI:
             case "bedrock":
                 from draive.cohere.bedrock import AsyncBedrockClientV2
 
-                return AsyncBedrockClientV2()
+                return AsyncBedrockClientV2(aws_region=self._aws_region)
 
     async def _initialize_client(self) -> None:
         await self._client._client_wrapper.httpx_client.httpx_client.aclose()
