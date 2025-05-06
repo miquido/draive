@@ -21,58 +21,25 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 license = { file = "LICENSE" }
-dependencies = [
-  "numpy~=1.26",
-  "haiway~=0.17.0",
-]
+dependencies = ["numpy~=2.2", "haiway~=0.17.0"]
 
 [project.urls]
 Homepage = "https://miquido.com"
 Repository = "https://github.com/miquido/draive.git"
 
 [project.optional-dependencies]
-sentencepiece = [
-  "sentencepiece~=0.2",
-]
-cohere = [
-  "cohere~=5.13"
-]
-cohere_bedrock = [
-  "cohere~=5.13",
-  "boto3~=1.37",
-]
-openai = [
-  "openai~=1.64",
-  "tiktoken~=0.8",
-]
-anthropic = [
-  "anthropic~=0.47",
-  "tokenizers~=0.21",
-]
-anthropic_bedrock = [
-  "anthropic[bedrock]~=0.47",
-  "tokenizers~=0.21",
-]
-mistral = [
-  "draive[sentencepiece]",
-  "mistralai~=1.5",
-]
-gemini = [
-  "draive[sentencepiece]",
-  "google-genai~=1.10",
-]
-ollama = [
-  "ollama~=0.4",
-]
-bedrock = [
-  "boto3~=1.37",
-]
-vllm = [
-  "openai~=1.64",
-]
-mcp = [
-  "mcp~=1.5",
-]
+sentencepiece = ["sentencepiece~=0.2"]
+cohere = ["cohere~=5.13"]
+cohere_bedrock = ["cohere~=5.13", "boto3~=1.37"]
+openai = ["openai~=1.64", "tiktoken~=0.8"]
+anthropic = ["anthropic~=0.47", "tokenizers~=0.21"]
+anthropic_bedrock = ["anthropic[bedrock]~=0.47", "tokenizers~=0.21"]
+mistral = ["draive[sentencepiece]", "mistralai~=1.5"]
+gemini = ["draive[sentencepiece]", "google-genai~=1.10"]
+ollama = ["ollama~=0.4"]
+bedrock = ["boto3~=1.37"]
+vllm = ["openai~=1.64"]
+mcp = ["mcp~=1.5"]
 
 dev = [
   "draive[sentencepiece]",
@@ -86,19 +53,19 @@ dev = [
   "draive[bedrock]",
   "draive[vllm]",
   "draive[mcp]",
-  "ruff~=0.9",
+  "bandit~=1.8",
   "pyright~=1.1",
-  "bandit~=1.7",
-  "pytest~=7.4",
-  "pytest-cov~=4.1",
-  "pytest-asyncio~=0.23.0",
+  "pytest~=8.3",
+  "pytest-asyncio~=0.26",
+  "pytest-cov~=6.1",
+  "ruff~=0.11",
 ]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
 extend-exclude = [".venv", ".git", ".cache"]
-lint.select = ["E", "F", "A", "I", "B", "PL", "W", "C", "RUF", "UP"]
+lint.select = ["E", "F", "A", "I", "B", "PL", "W", "C", "RUF", "UP", "NPY201"]
 lint.ignore = ["A005"]
 lint.pydocstyle.convention = "numpy"
 
