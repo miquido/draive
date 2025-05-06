@@ -1,4 +1,4 @@
-from base64 import b64decode, urlsafe_b64encode
+from base64 import b64decode, b64encode, urlsafe_b64encode
 from collections.abc import Sequence
 from typing import Final, Literal, Self, cast, get_args
 
@@ -111,8 +111,19 @@ class MediaData(DataModel):
         else:
             return f"![{self.kind}]()"
 
-    def as_data_uri(self) -> str:
-        return f"data:{self.media};base64,{urlsafe_b64encode(self.data).decode()}"
+    def as_data_uri(
+        self,
+        *,
+        safe_encoding: bool = True,
+    ) -> str:
+        encoded: str
+        if safe_encoding:
+            encoded = urlsafe_b64encode(self.data).decode("utf-8")
+
+        else:
+            encoded = b64encode(self.data).decode("utf-8")
+
+        return f"data:{self.media};base64,{encoded}"
 
     def __bool__(self) -> bool:
         return len(self.data) > 0

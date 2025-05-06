@@ -57,7 +57,7 @@ def content_element_as_content_part(
             return {
                 "type": "image_url",
                 "image_url": {
-                    "url": media_data.as_data_uri(),
+                    "url": media_data.as_data_uri(safe_encoding=False),
                     "detail": cast(Literal["auto", "low", "high"], vision_details)
                     if not_missing(vision_details)
                     else "auto",
