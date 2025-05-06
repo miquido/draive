@@ -99,7 +99,7 @@ class BedrockGuardrais(BedrockAPI):
 
         if response.get("action") == "GUARDRAIL_INTERVENED":
             raise GuardrailsContentException(
-                f"Violated guardrails rules: {response.get("actionReason")}",
+                f"Violated guardrails rules: {response.get('actionReason')}",
                 violations=(config.guardrail_identifier,),
                 content=content,
             )

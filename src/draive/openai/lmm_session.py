@@ -188,7 +188,7 @@ class OpenAILMMSession(OpenAIAPI):
                     return output_stream.finish(exception=exc)
 
                 audio_output_mime: str = (
-                    f"audio/{session_config.get("output_audio_format", "pcm16")}"
+                    f"audio/{session_config.get('output_audio_format', 'pcm16')}"
                 )
                 # start consuming inputs
                 input_task = ctx.spawn(
@@ -474,8 +474,7 @@ class OpenAILMMSession(OpenAIAPI):
                 case MetaContent():
                     # skip not supported with a log to prevent connection break
                     ctx.log_error(
-                        "OpenAI realtime function result (MetaContent) not supported!"
-                        " Skipping..."
+                        "OpenAI realtime function result (MetaContent) not supported! Skipping..."
                     )
 
                 case other:  # treat other as json text
