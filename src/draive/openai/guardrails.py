@@ -1,4 +1,3 @@
-from base64 import urlsafe_b64encode
 from typing import Any
 
 from haiway import ctx, not_missing
@@ -42,12 +41,11 @@ class OpenAIContentModereation(OpenAIAPI):
                     )
 
                 case MediaData() as media_data:
-                    base64: str = urlsafe_b64encode(media_data.data).decode()
                     moderated_content.append(
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:{media_data.media};base64,{base64}",
+                                "url": media_data.as_data_uri(safe_encoding=False),
                             },
                         }
                     )

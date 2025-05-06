@@ -122,7 +122,7 @@ def content_element_as_content_chunk(
 
             return {
                 "type": "image_url",
-                "image_url": {"url": media_data.as_data_uri()},
+                "image_url": {"url": media_data.as_data_uri(safe_encoding=False)},
                 # TODO: there is optional "detail" argument, however undocumented
             }
 
