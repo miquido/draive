@@ -1,7 +1,8 @@
 from collections.abc import Callable, Coroutine
 from typing import Any, Protocol, cast, final, overload
 
-from haiway import ArgumentsTrace, ResultTrace, ctx
+from haiway import ctx
+from haiway.utils import format_str
 
 from draive.commons import META_EMPTY, Meta
 from draive.lmm.types import (
@@ -93,7 +94,12 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         **arguments: Any,
     ) -> MultimodalContent:
         with ctx.scope(self.name):
-            ctx.record(ArgumentsTrace.of(**arguments))
+            ctx.record(
+                attributes={
+                    "call_id": call_id,
+                    **{key: f"{arg}" for key, arg in arguments.items()},
+                }
+            )
             try:
                 try:
                     result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
@@ -101,7 +107,10 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
                         self._format_result(result)
                     )
 
-                    ctx.record(ResultTrace.of(formatted_result))
+                    ctx.record(
+                        event="result",
+                        attributes={"value": format_str(formatted_result)},
+                    )
 
                     return formatted_result
 
@@ -114,7 +123,10 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
                     ) from exc
 
             except BaseException as exc:
-                ctx.record(ResultTrace.of(exc))
+                ctx.record(
+                    event="result",
+                    attributes={"error": f"{type(exc)}: {exc}"},
+                )
                 ctx.log_error(
                     "Tool call exception",
                     exception=exc,

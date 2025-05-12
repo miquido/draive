@@ -1,6 +1,6 @@
 from typing import Any
 
-from haiway import asynchronous, ctx
+from haiway import ObservabilityLevel, asynchronous, ctx
 
 from draive.bedrock.api import BedrockAPI
 from draive.bedrock.config import BedrockInputGuardraisConfig, BedrockOutputGuardraisConfig
@@ -73,13 +73,22 @@ class BedrockGuardrais(BedrockAPI):
     ) -> None:
         guardrails_config: BedrockOutputGuardraisConfig = config or ctx.state(
             BedrockOutputGuardraisConfig
-        ).updated(**extra)
-
-        content = MultimodalContent.of(content)
-        await self._content_output_verification(
-            content,
-            config=guardrails_config,
         )
+        with ctx.scope("bedrock_guardrails", guardrails_config):
+            ctx.record(
+                ObservabilityLevel.INFO,
+                attributes={
+                    "guardrails.provider": "bedrock",
+                    "guardrails.identifier": guardrails_config.guardrail_identifier,
+                    "guardrails.version": guardrails_config.guardrail_version,
+                },
+            )
+
+            content = MultimodalContent.of(content)
+            await self._content_output_verification(
+                content,
+                config=guardrails_config,
+            )
 
     @asynchronous
     def _content_output_verification(
@@ -150,7 +159,7 @@ class BedrockGuardrais(BedrockAPI):
                         moderated_content.append(
                             {
                                 "type": "text",
-                                "text": media_data.as_json(),
+                                "text": media_data.to_json(),
                             }
                         )
 
@@ -162,7 +171,7 @@ class BedrockGuardrais(BedrockAPI):
                     moderated_content.append(
                         {
                             "type": "text",
-                            "text": other.as_json(),
+                            "text": other.to_json(),
                         }
                     )
 

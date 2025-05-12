@@ -8,7 +8,8 @@ from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStre
 from haiway import Disposable, Disposables, State, as_dict, ctx
 from mcp.server import NotificationOptions, Server
 from mcp.server.lowlevel.helper_types import ReadResourceContents
-from mcp.types import EmbeddedResource, GetPromptResult, JSONRPCMessage
+from mcp.shared.message import SessionMessage
+from mcp.types import EmbeddedResource, GetPromptResult
 from mcp.types import ImageContent as MCPImageContent
 from mcp.types import Prompt as MCPPrompt
 from mcp.types import PromptArgument as MCPPromptArgument
@@ -121,8 +122,8 @@ class MCPServer:
 
     async def run(
         self,
-        read_stream: MemoryObjectReceiveStream[JSONRPCMessage | Exception],
-        write_stream: MemoryObjectSendStream[JSONRPCMessage],
+        read_stream: MemoryObjectReceiveStream[SessionMessage | Exception],
+        write_stream: MemoryObjectSendStream[SessionMessage],
         notification_options: NotificationOptions | None = None,
         experimental_capabilities: dict[str, dict[str, Any]] | None = None,
     ) -> None:
@@ -462,7 +463,7 @@ def _convert_multimodal_content(
                 converted.append(
                     MCPTextContent(
                         type="text",
-                        text=other.as_json(),
+                        text=other.to_json(),
                     )
                 )
 

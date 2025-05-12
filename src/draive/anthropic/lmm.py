@@ -199,7 +199,7 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
                 case DataModel() as model:
                     return {
                         "type": "thinking",
-                        "thinking": model.as_json(),
+                        "thinking": model.to_json(),
                         "signature": str(meta.meta.get("signature", "")),
                     }
 
@@ -221,13 +221,13 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
                 case DataModel() as model:
                     return {
                         "type": "redacted_thinking",
-                        "data": model.as_json(),
+                        "data": model.to_json(),
                     }
 
         case DataModel() as data:
             return {
                 "type": "text",
-                "text": data.as_json(),
+                "text": data.to_json(),
             }
 
 
@@ -336,14 +336,14 @@ def _text_output_conversion(
     output: MultimodalContent,
     /,
 ) -> MultimodalContent:
-    return MultimodalContent.of(output.as_string())
+    return MultimodalContent.of(output.to_str())
 
 
 def _json_output_conversion(
     output: MultimodalContent,
     /,
 ) -> MultimodalContent:
-    return MultimodalContent.of(DataModel.from_json(output.as_string()))
+    return MultimodalContent.of(DataModel.from_json(output.to_str()))
 
 
 def _prepare_model_output_conversion(
@@ -354,7 +354,7 @@ def _prepare_model_output_conversion(
         output: MultimodalContent,
         /,
     ) -> MultimodalContent:
-        return MultimodalContent.of(model.from_json(output.as_string()))
+        return MultimodalContent.of(model.from_json(output.to_str()))
 
     return _model_output_conversion
 

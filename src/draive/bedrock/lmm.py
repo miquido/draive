@@ -63,7 +63,7 @@ def convert_content_element(
             raise ValueError("Unsupported message content", media_reference)
 
         case DataModel() as data:
-            return {"text": data.as_json()}
+            return {"text": data.to_json()}
 
 
 def convert_context_element(
@@ -164,7 +164,7 @@ def _text_output_conversion(
     output: MultimodalContent,
     /,
 ) -> MultimodalContent:
-    return MultimodalContent.of(output.as_string())
+    return MultimodalContent.of(output.to_str())
 
 
 def _audio_output_conversion(
@@ -178,7 +178,7 @@ def _json_output_conversion(
     output: MultimodalContent,
     /,
 ) -> MultimodalContent:
-    return MultimodalContent.of(DataModel.from_json(output.as_string()))
+    return MultimodalContent.of(DataModel.from_json(output.to_str()))
 
 
 def _prepare_model_output_conversion(
@@ -189,7 +189,7 @@ def _prepare_model_output_conversion(
         output: MultimodalContent,
         /,
     ) -> MultimodalContent:
-        return MultimodalContent.of(model.from_json(output.as_string()))
+        return MultimodalContent.of(model.from_json(output.to_str()))
 
     return _model_output_conversion
 

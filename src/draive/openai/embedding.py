@@ -3,7 +3,7 @@ from collections.abc import Callable, Sequence
 from itertools import chain
 from typing import Any, cast
 
-from haiway import State, as_list, ctx
+from haiway import ObservabilityLevel, State, as_list, ctx
 from openai.types.create_embedding_response import CreateEmbeddingResponse
 
 from draive.embedding import Embedded, TextEmbedding
@@ -34,11 +34,16 @@ class OpenAIEmbedding(OpenAIAPI):
         """
         Create texts embedding with OpenAI embedding service.
         """
-        embedding_config: OpenAIEmbeddingConfig = config or ctx.state(
-            OpenAIEmbeddingConfig
-        ).updated(**extra)
+        embedding_config: OpenAIEmbeddingConfig = config or ctx.state(OpenAIEmbeddingConfig)
         with ctx.scope("openai_text_embedding", embedding_config):
-            ctx.record(embedding_config)
+            ctx.record(
+                ObservabilityLevel.INFO,
+                attributes={
+                    "embedding.provider": "openai",
+                    "embedding.model": embedding_config.model,
+                    "embedding.dimensions": embedding_config.dimensions,
+                },
+            )
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))

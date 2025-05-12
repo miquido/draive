@@ -11,7 +11,7 @@ from anthropic.types import (
     ThinkingBlock,
     ToolUseBlock,
 )
-from haiway import MISSING, ArgumentsTrace, ResultTrace, as_list, ctx
+from haiway import MISSING, ObservabilityLevel, as_list, ctx
 
 from draive.anthropic.api import AnthropicAPI
 from draive.anthropic.config import AnthropicConfig
@@ -39,7 +39,6 @@ from draive.lmm import (
     LMMToolSpecification,
 )
 from draive.lmm.state import LMM
-from draive.metrics import TokenUsage
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.utils import RateLimitError
 
@@ -96,20 +95,21 @@ class AnthropicLMMGeneration(AnthropicAPI):
         if stream:
             raise NotImplementedError("Anthropic streaming is not implemented yet")
 
-        with ctx.scope("anthropic_lmm_completion"):
-            completion_config: AnthropicConfig = config or ctx.state(AnthropicConfig).updated(
-                **extra
-            )
+        completion_config: AnthropicConfig = config or ctx.state(AnthropicConfig)
+        with ctx.scope("anthropic_lmm_completion", completion_config):
             ctx.record(
-                ArgumentsTrace.of(
-                    config=completion_config,
-                    instruction=instruction,
-                    context=context,
-                    tools=tools,
-                    tool_selection=tool_selection,
-                    output=output,
-                    **extra,
-                )
+                ObservabilityLevel.INFO,
+                attributes={
+                    "lmm.provider": "anthropic",
+                    "lmm.model": completion_config.model,
+                    "lmm.temperature": completion_config.temperature,
+                    "lmm.max_tokens": completion_config.max_tokens,
+                    "lmm.tools": [tool["name"] for tool in tools] if tools else [],
+                    "lmm.tool_selection": f"{tool_selection}",
+                    "lmm.stream": stream,
+                    "lmm.output": f"{output}",
+                    "lmm.context": [element.to_str() for element in context],
+                },
             )
 
             messages: list[MessageParam] = [
@@ -158,6 +158,11 @@ class AnthropicLMMGeneration(AnthropicAPI):
 
             except AnthropicRateLimitError as exc:  # retry on rate limit after delay
                 if delay := exc.response.headers.get("Retry-After"):
+                    ctx.record(
+                        ObservabilityLevel.WARNING,
+                        event="lmm.rate_limit",
+                        attributes={"delay": delay},
+                    )
                     try:
                         raise RateLimitError(retry_after=float(delay)) from exc
 
@@ -165,18 +170,39 @@ class AnthropicLMMGeneration(AnthropicAPI):
                         raise exc from None
 
                 else:
+                    ctx.record(
+                        ObservabilityLevel.WARNING,
+                        event="lmm.rate_limit",
+                    )
                     raise exc
 
             ctx.record(
-                TokenUsage.for_model(
-                    completion.model,
-                    # NOTE: cache input tokens are charged extra
-                    # we are not handling it that specific though
-                    input_tokens=completion.usage.input_tokens
-                    + (completion.usage.cache_creation_input_tokens or 0),
-                    cached_tokens=completion.usage.cache_read_input_tokens,
-                    output_tokens=completion.usage.output_tokens,
-                ),
+                ObservabilityLevel.INFO,
+                metric="lmm.input_tokens",
+                value=completion.usage.input_tokens,
+                unit="tokens",
+                attributes={"lmm.model": completion.model},
+            )
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="lmm.input_tokens.cached",
+                value=completion.usage.cache_creation_input_tokens or 0,
+                unit="tokens",
+                attributes={"lmm.model": completion.model},
+            )
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="lmm.output_tokens",
+                value=completion.usage.output_tokens,
+                unit="tokens",
+                attributes={"lmm.model": completion.model},
+            )
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="lmm.output_tokens.cached",
+                value=completion.usage.cache_read_input_tokens or 0,
+                unit="tokens",
+                attributes={"lmm.model": completion.model},
             )
 
             match completion.stop_reason:
@@ -246,11 +272,18 @@ class AnthropicLMMGeneration(AnthropicAPI):
                     ],
                     meta=META_EMPTY,
                 )
-                ctx.record(ResultTrace.of(completion_tool_calls))
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    event="lmm.tool_requests",
+                    attributes={"lmm.tools": [call.name for call in tool_calls]},
+                )
                 return completion_tool_calls
 
             elif lmm_completion:
-                ctx.record(ResultTrace.of(lmm_completion))
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    event="lmm.completion",
+                )
                 return lmm_completion
 
             else:

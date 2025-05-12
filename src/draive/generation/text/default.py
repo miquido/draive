@@ -2,7 +2,7 @@ from asyncio import Task, gather
 from collections.abc import AsyncIterable, AsyncIterator, Iterable
 from typing import Any
 
-from haiway import AsyncQueue, ResultTrace, ctx
+from haiway import AsyncQueue, ctx
 
 from draive.instructions import Instruction
 from draive.lmm import (
@@ -86,7 +86,7 @@ async def _text_generation(
         ):
             case LMMCompletion() as completion:
                 ctx.log_debug("Received text generation result")
-                return completion.content.as_string()
+                return completion.content.to_str()
 
             case LMMToolRequests() as tool_requests:
                 ctx.log_debug("Received text generation tool calls")
@@ -99,7 +99,7 @@ async def _text_generation(
                 ]:
                     return MultimodalContent.of(
                         *[response.content for response in direct_responses]
-                    ).as_string()
+                    ).to_str()
 
                 else:
                     context.extend(
@@ -141,13 +141,12 @@ async def _text_generation_stream(
                 ):
                     match element:
                         case LMMStreamChunk() as chunk:
-                            chunk_text: str = chunk.content.as_string()
+                            chunk_text: str = chunk.content.to_str()
                             accumulated_text += chunk_text
                             output_queue.enqueue(chunk_text)
 
                             if chunk.eod:
                                 # end of streaming for text generation
-                                ctx.record(ResultTrace.of(accumulated_text))
                                 return output_queue.finish()
 
                         case LMMToolRequest() as tool_request:
@@ -168,8 +167,7 @@ async def _text_generation_stream(
                     for response in tool_responses.responses
                     if response.handling == "direct_result"
                 ]:
-                    response_text: str = MultimodalContent.of(*direct_content).as_string()
-                    ctx.record(ResultTrace.of(response_text))
+                    response_text: str = MultimodalContent.of(*direct_content).to_str()
                     output_queue.enqueue(response_text)
                     return output_queue.finish()
 

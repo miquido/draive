@@ -78,7 +78,7 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
                 for example in examples or []
                 for message in [
                     LMMInput.of(example[0]),
-                    LMMCompletion.of(example[1].as_json(indent=2)),
+                    LMMCompletion.of(example[1].to_json(indent=2)),
                 ]
             ],
         ]
@@ -110,7 +110,7 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
                         return cast(Generated, artifacts[0])
 
                     else:
-                        return generated.from_json(completion.content.as_string())
+                        return generated.from_json(completion.content.to_str())
 
                 case LMMToolRequests() as tool_requests:
                     context.append(tool_requests)
@@ -139,7 +139,7 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
                             return generated.from_dict(decoder(direct_responses_content))
 
                         else:
-                            return generated.from_json(direct_responses_content.as_string())
+                            return generated.from_json(direct_responses_content.to_str())
 
                     else:
                         context.append(tool_responses)

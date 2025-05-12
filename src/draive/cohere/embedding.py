@@ -5,7 +5,7 @@ from itertools import chain
 from typing import Any, cast
 
 from cohere import EmbedByTypeResponse
-from haiway import State, as_list, ctx
+from haiway import ObservabilityLevel, State, as_list, ctx
 
 from draive.cohere.api import CohereAPI
 from draive.cohere.config import CohereImageEmbeddingConfig, CohereTextEmbeddingConfig
@@ -34,11 +34,15 @@ class CohereEmbedding(CohereAPI):
         """
         Create texts embedding with Cohere embedding service.
         """
-        embedding_config: CohereTextEmbeddingConfig = config or ctx.state(
-            CohereTextEmbeddingConfig
-        ).updated(**extra)
+        embedding_config: CohereTextEmbeddingConfig = config or ctx.state(CohereTextEmbeddingConfig)
         with ctx.scope("cohere_text_embedding", embedding_config):
-            ctx.record(embedding_config)
+            ctx.record(
+                ObservabilityLevel.INFO,
+                attributes={
+                    "embedding.model": embedding_config.model,
+                    "embedding.purpose": embedding_config.purpose,
+                },
+            )
 
             attributes: list[str]
             if attribute is None:
@@ -101,9 +105,14 @@ class CohereEmbedding(CohereAPI):
         """
         embedding_config: CohereImageEmbeddingConfig = config or ctx.state(
             CohereImageEmbeddingConfig
-        ).updated(**extra)
+        )
         with ctx.scope("cohere_image_embedding", embedding_config):
-            ctx.record(embedding_config)
+            ctx.record(
+                ObservabilityLevel.INFO,
+                attributes={
+                    "embedding.model": embedding_config.model,
+                },
+            )
             attributes: list[bytes]
             if attribute is None:
                 attributes = cast(list[bytes], as_list(values))

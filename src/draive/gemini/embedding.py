@@ -4,7 +4,7 @@ from itertools import chain
 from typing import Any, cast
 
 from google.genai.types import EmbedContentConfigDict, EmbedContentResponse
-from haiway import State, as_list, ctx, not_missing
+from haiway import ObservabilityLevel, State, as_list, ctx, not_missing
 
 from draive.embedding import Embedded, TextEmbedding
 from draive.gemini.api import GeminiAPI
@@ -43,7 +43,14 @@ class GeminiEmbedding(GeminiAPI):
             config_dict = None
 
         with ctx.scope("gemini_text_embedding", embedding_config):
-            ctx.record(embedding_config)
+            ctx.record(
+                ObservabilityLevel.INFO,
+                attributes={
+                    "embedding.provider": "gemini",
+                    "embedding.model": embedding_config.model,
+                    "embedding.dimensions": embedding_config.dimensions,
+                },
+            )
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))

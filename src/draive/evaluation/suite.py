@@ -590,4 +590,4 @@ class _EvaluationSuiteFileStorage[CaseParameters: DataModel]:
         data: EvaluationSuiteData[CaseParameters],
     ) -> None:
         with open(self._path, mode="wb+") as file:
-            file.write(data.as_json(indent=2).encode("utf-8"))
+            file.write(data.to_json(indent=2).encode("utf-8"))

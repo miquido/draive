@@ -104,7 +104,7 @@ class ResourceContent(State):
             case other:
                 return cls(
                     mime_type=mime_type or "application/json",
-                    blob=other.as_json().encode(),
+                    blob=other.to_json().encode(),
                 )
 
         return cls()
@@ -112,7 +112,7 @@ class ResourceContent(State):
     mime_type: str
     blob: bytes
 
-    def as_multimodal(self) -> MultimodalContentElement:
+    def to_multimodal(self) -> MultimodalContentElement:
         match self.mime_type:
             case "text/plain":
                 return TextContent(text=self.blob.decode())

@@ -88,7 +88,7 @@ async def default_choice_completion(  # noqa: C901
                         "CHOICE",
                         content=completion.content,
                     ):
-                        if option := options_map.get(selection.content.as_string()):
+                        if option := options_map.get(selection.content.to_str()):
                             return option
 
                     raise SelectionException("Invalid or missing selection")
@@ -106,7 +106,7 @@ async def default_choice_completion(  # noqa: C901
                             "CHOICE",
                             content=MultimodalContent.of(*direct_content),
                         ):
-                            if option := options_map.get(selection.content.as_string()):
+                            if option := options_map.get(selection.content.to_str()):
                                 return option
 
                         raise SelectionException("Invalid or missing selection")

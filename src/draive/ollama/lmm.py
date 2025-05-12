@@ -38,7 +38,7 @@ def context_element_as_messages(
             return (
                 Message(
                     role="user",
-                    content=element.content.without_media().as_string(),
+                    content=element.content.without_media().to_str(),
                     images=[
                         Image(value=image.data)
                         if isinstance(image, MediaData)
@@ -52,7 +52,7 @@ def context_element_as_messages(
             return (
                 Message(
                     role="assistant",
-                    content=element.content.without_media().as_string(),
+                    content=element.content.without_media().to_str(),
                     images=[
                         Image(value=image.data)
                         if isinstance(image, MediaData)
@@ -83,7 +83,7 @@ def context_element_as_messages(
             return (
                 Message(
                     role="assistant",
-                    content=response.content.without_media().as_string(),
+                    content=response.content.without_media().to_str(),
                     images=[
                         Image(value=image.data)
                         if isinstance(image, MediaData)
@@ -154,14 +154,14 @@ def _text_output_conversion(
     output: MultimodalContent,
     /,
 ) -> MultimodalContent:
-    return MultimodalContent.of(output.as_string())
+    return MultimodalContent.of(output.to_str())
 
 
 def _json_output_conversion(
     output: MultimodalContent,
     /,
 ) -> MultimodalContent:
-    return MultimodalContent.of(DataModel.from_json(output.as_string()))
+    return MultimodalContent.of(DataModel.from_json(output.to_str()))
 
 
 def _prepare_model_output_conversion(
@@ -172,7 +172,7 @@ def _prepare_model_output_conversion(
         output: MultimodalContent,
         /,
     ) -> MultimodalContent:
-        return MultimodalContent.of(model.from_json(output.as_string()))
+        return MultimodalContent.of(model.from_json(output.to_str()))
 
     return _model_output_conversion
 

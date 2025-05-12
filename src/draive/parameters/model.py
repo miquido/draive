@@ -526,10 +526,13 @@ class DataModel(metaclass=DataModelMeta):
     ) -> Self:
         return cls(**value)
 
-    def as_dict(
+    def to_str(self) -> str:
+        return self.__str__()
+
+    def to_mapping(
         self,
         aliased: bool = True,
-    ) -> dict[str, Any]:
+    ) -> Mapping[str, Any]:
         return _data_dict(
             self,
             aliased=aliased,
@@ -596,7 +599,7 @@ class DataModel(metaclass=DataModelMeta):
         return _data_str(self, aliased=True, converter=None).strip()
 
     def __repr__(self) -> str:
-        return str(self.as_dict())
+        return str(self.to_mapping())
 
     def __eq__(self, other: Any) -> bool:
         if other.__class__ != self.__class__:
@@ -717,7 +720,7 @@ class DataModel(metaclass=DataModelMeta):
         except Exception as exc:
             raise ValueError(f"Failed to decode {cls.__name__} from json:\n{value}") from exc
 
-    def as_json(
+    def to_json(
         self,
         aliased: bool = True,
         indent: int | None = None,
@@ -725,14 +728,14 @@ class DataModel(metaclass=DataModelMeta):
     ) -> str:
         try:
             return json.dumps(
-                self.as_dict(aliased=aliased),
+                self.to_mapping(aliased=aliased),
                 indent=indent,
                 cls=encoder_class or ModelJSONEncoder,
             )
 
         except Exception as exc:
             raise ValueError(
-                f"Failed to encode {self.__class__.__name__} to json:\n{self.as_dict()}"
+                f"Failed to encode {self.__class__.__name__} to json:\n{self.to_mapping()}"
             ) from exc
 
 

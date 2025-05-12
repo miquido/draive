@@ -15,7 +15,7 @@ from google.genai.types import (
     SchemaDict,
     SpeechConfigDict,
 )
-from haiway import ArgumentsTrace, AsyncQueue, as_list, ctx
+from haiway import AsyncQueue, as_list, ctx
 
 from draive.gemini.api import GeminiAPI
 from draive.gemini.config import GeminiLiveConfig
@@ -62,18 +62,22 @@ class GeminiLMMSession(GeminiAPI):
         config: GeminiLiveConfig | None = None,
         **extra: Any,
     ) -> AsyncIterator[LMMSessionOutput]:
-        with ctx.scope("gemini_live"):
-            live_config: GeminiLiveConfig = config or ctx.state(GeminiLiveConfig)
+        live_config: GeminiLiveConfig = config or ctx.state(GeminiLiveConfig)
+        with ctx.scope("gemini_live", live_config):
             ctx.record(
-                ArgumentsTrace.of(
-                    config=live_config,
-                    instruction=instruction,
-                    initial_context=initial_context,
-                    output=output,
-                    tools=tools,
-                    tool_selection=tool_selection,
-                )
+                attributes={
+                    "lmm.provider": "gemini",
+                    "lmm.model": live_config.model,
+                    "lmm.temperature": live_config.temperature,
+                    "lmm.max_tokens": live_config.max_tokens,
+                    "lmm.seed": live_config.seed,
+                    "lmm.tools": [tool["name"] for tool in tools] if tools else [],
+                    "lmm.tool_selection": f"{tool_selection}",
+                    "lmm.output": f"{output}",
+                    "lmm.context": [element.to_str() for element in initial_context or []],
+                }
             )
+
             context_elements: LMMContext
             match initial_context:
                 case None:
@@ -307,7 +311,7 @@ class GeminiLMMSession(GeminiAPI):
                                 case DataModel() as data:
                                     await session.send_realtime_input(
                                         media={
-                                            "data": data.as_json().encode(),
+                                            "data": data.to_json().encode(),
                                             "mime_type": "application/json",
                                         },
                                     )

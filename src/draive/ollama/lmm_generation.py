@@ -4,7 +4,7 @@ from itertools import chain
 from typing import Any, Literal, overload
 from uuid import uuid4
 
-from haiway import ArgumentsTrace, ResultTrace, ctx
+from haiway import ObservabilityLevel, ctx
 from ollama import ChatResponse, Message, Options
 
 from draive.instructions import Instruction
@@ -81,19 +81,23 @@ class OllamaLMMGeneration(OllamaAPI):
         if stream:
             raise NotImplementedError("ollama streaming is not implemented yet")
 
-        with ctx.scope("ollama_lmm_completion"):
+        chat_config: OllamaChatConfig = config or ctx.state(OllamaChatConfig)
+        with ctx.scope("ollama_lmm_completion", chat_config):
             ctx.record(
-                ArgumentsTrace.of(
-                    instruction=instruction,
-                    context=context,
-                    tools=tools,
-                    tool_selection=tool_selection,
-                    output=output,
-                    **extra,
-                )
+                ObservabilityLevel.INFO,
+                attributes={
+                    "lmm.provider": "ollama",
+                    "lmm.model": chat_config.model,
+                    "lmm.temperature": chat_config.temperature,
+                    "lmm.max_tokens": chat_config.max_tokens,
+                    "lmm.seed": chat_config.seed,
+                    "lmm.tools": [tool["name"] for tool in tools] if tools else [],
+                    "lmm.tool_selection": f"{tool_selection}",
+                    "lmm.stream": stream,
+                    "lmm.output": f"{output}",
+                    "lmm.context": [element.to_str() for element in context],
+                },
             )
-            chat_config: OllamaChatConfig = config or ctx.state(OllamaChatConfig).updated(**extra)
-            ctx.record(chat_config)
 
             messages: list[Message] = list(
                 chain.from_iterable([context_element_as_messages(element) for element in context])
@@ -155,11 +159,18 @@ class OllamaLMMGeneration(OllamaAPI):
                         for call in tool_calls
                     ],
                 )
-                ctx.record(ResultTrace.of(completion_tool_calls))
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    event="lmm.tool_requests",
+                    attributes={"lmm.tools": [call.function.name for call in tool_calls]},
+                )
                 return completion_tool_calls
 
             elif lmm_completion:
-                ctx.record(ResultTrace.of(lmm_completion))
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    event="lmm.completion",
+                )
                 return lmm_completion
 
             else:
