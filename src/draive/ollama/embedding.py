@@ -3,7 +3,7 @@ from collections.abc import Callable, Sequence
 from itertools import chain
 from typing import Any, cast
 
-from haiway import State, as_list, ctx
+from haiway import ObservabilityLevel, State, as_list, ctx
 from ollama import EmbedResponse
 
 from draive.embedding import Embedded, TextEmbedding
@@ -33,11 +33,16 @@ class OllamaEmbedding(OllamaAPI):
         """
         Create texts embedding with Ollama embedding service.
         """
-        embedding_config: OllamaEmbeddingConfig = config or ctx.state(
-            OllamaEmbeddingConfig
-        ).updated(**extra)
+        embedding_config: OllamaEmbeddingConfig = config or ctx.state(OllamaEmbeddingConfig)
         with ctx.scope("ollama_text_embedding", embedding_config):
-            ctx.record(embedding_config)
+            ctx.record(
+                ObservabilityLevel.INFO,
+                attributes={
+                    "embedding.provider": "ollama",
+                    "embedding.model": embedding_config.model,
+                },
+            )
+            ctx.record(attributes=embedding_config.to_mapping())
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))

@@ -14,7 +14,7 @@ from google.genai.types import (
     SchemaDict,
     SpeechConfigDict,
 )
-from haiway import ArgumentsTrace, ResultTrace, as_list, ctx
+from haiway import ObservabilityLevel, as_list, ctx
 
 from draive.gemini.api import GeminiAPI
 from draive.gemini.config import GeminiGenerationConfig
@@ -41,7 +41,6 @@ from draive.lmm import (
     LMMToolSelection,
     LMMToolSpecification,
 )
-from draive.metrics import TokenUsage
 from draive.multimodal.content import MultimodalContent, MultimodalContentElement
 
 __all__ = ("GeminiLMMGeneration",)
@@ -79,7 +78,7 @@ class GeminiLMMGeneration(GeminiAPI):
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput]: ...
 
-    async def lmm_completion(  # noqa: C901, PLR0912
+    async def lmm_completion(  # noqa: C901, PLR0912, PLR0915
         self,
         *,
         instruction: Instruction | None,
@@ -94,18 +93,22 @@ class GeminiLMMGeneration(GeminiAPI):
         if stream:
             raise NotImplementedError("gemini streaming is not implemented yet")
 
-        with ctx.scope("gemini_lmm_completion"):
-            generation_config: GeminiGenerationConfig = config or ctx.state(GeminiGenerationConfig)
+        generation_config: GeminiGenerationConfig = config or ctx.state(GeminiGenerationConfig)
+        with ctx.scope("gemini_lmm_completion", generation_config):
             ctx.record(
-                ArgumentsTrace.of(
-                    config=generation_config,
-                    instruction=instruction,
-                    context=context,
-                    tools=tools,
-                    tool_selection=tool_selection,
-                    output=output,
-                    **extra,
-                )
+                ObservabilityLevel.INFO,
+                attributes={
+                    "lmm.provider": "gemini",
+                    "lmm.model": generation_config.model,
+                    "lmm.temperature": generation_config.temperature,
+                    "lmm.max_tokens": generation_config.max_tokens,
+                    "lmm.seed": generation_config.seed,
+                    "lmm.tools": [tool["name"] for tool in tools] if tools else [],
+                    "lmm.tool_selection": f"{tool_selection}",
+                    "lmm.stream": stream,
+                    "lmm.output": f"{output}",
+                    "lmm.context": [element.to_str() for element in context],
+                },
             )
 
             content: ContentListUnionDict = list(
@@ -164,12 +167,32 @@ class GeminiLMMGeneration(GeminiAPI):
 
             if usage := completion.usage_metadata:
                 ctx.record(
-                    TokenUsage.for_model(
-                        generation_config.model,
-                        input_tokens=usage.prompt_token_count,
-                        cached_tokens=usage.cached_content_token_count,
-                        output_tokens=usage.candidates_token_count,
-                    ),
+                    ObservabilityLevel.INFO,
+                    metric="lmm.input_tokens",
+                    value=usage.prompt_token_count or 0,
+                    unit="tokens",
+                    attributes={"lmm.model": generation_config.model},
+                )
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    metric="lmm.input_tokens.cached",
+                    value=usage.cached_content_token_count or 0,
+                    unit="tokens",
+                    attributes={"lmm.model": generation_config.model},
+                )
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    metric="lmm.output_tokens",
+                    value=usage.candidates_token_count or 0,
+                    unit="tokens",
+                    attributes={"lmm.model": generation_config.model},
+                )
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    metric="lmm.output_tokens.thoughts",
+                    value=usage.thoughts_token_count or 0,
+                    unit="tokens",
+                    attributes={"lmm.model": generation_config.model},
                 )
 
             if not completion.candidates:
@@ -224,11 +247,20 @@ class GeminiLMMGeneration(GeminiAPI):
                     content=lmm_completion.content if lmm_completion else None,
                     requests=tool_requests,
                 )
-                ctx.record(ResultTrace.of(completion_tool_calls))
+
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    event="lmm.tool_requests",
+                    attributes={"lmm.tools": [request.tool for request in tool_requests]},
+                )
+
                 return completion_tool_calls
 
             elif lmm_completion:
-                ctx.record(ResultTrace.of(lmm_completion))
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    event="lmm.completion",
+                )
                 return lmm_completion
 
             else:

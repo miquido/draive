@@ -4,7 +4,7 @@ from itertools import chain
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
-from haiway import ArgumentsTrace, ResultTrace, as_list, ctx
+from haiway import ObservabilityLevel, as_list, ctx
 from mistralai import (
     CompletionEvent,
     CompletionResponseStreamChoice,
@@ -37,7 +37,6 @@ from draive.lmm import (
     LMMToolSpecification,
 )
 from draive.lmm.types import LMMStreamChunk, LMMStreamOutput
-from draive.metrics import TokenUsage
 from draive.mistral.api import MistralAPI
 from draive.mistral.config import MistralChatConfig
 from draive.mistral.lmm import (
@@ -101,20 +100,22 @@ class MistralLMMGeneration(MistralAPI):
         stream: bool = False,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
-        with ctx.scope("mistral_lmm_completion"):
-            completion_config: MistralChatConfig = config or ctx.state(MistralChatConfig).updated(
-                **extra
-            )
+        completion_config: MistralChatConfig = config or ctx.state(MistralChatConfig)
+        with ctx.scope("mistral_lmm_completion", completion_config):
             ctx.record(
-                ArgumentsTrace.of(
-                    config=completion_config,
-                    instruction=instruction,
-                    context=context,
-                    tools=tools,
-                    tool_selection=tool_selection,
-                    output=output,
-                    **extra,
-                )
+                ObservabilityLevel.INFO,
+                attributes={
+                    "lmm.provider": "mistral",
+                    "lmm.model": completion_config.model,
+                    "lmm.temperature": completion_config.temperature,
+                    "lmm.max_tokens": completion_config.max_tokens,
+                    "lmm.seed": completion_config.seed,
+                    "lmm.tools": [tool["name"] for tool in tools] if tools else [],
+                    "lmm.tool_selection": f"{tool_selection}",
+                    "lmm.stream": stream,
+                    "lmm.output": f"{output}",
+                    "lmm.context": [element.to_str() for element in context],
+                },
             )
 
             messages: list[MessagesTypedDict] = list(
@@ -209,12 +210,18 @@ class MistralLMMGeneration(MistralAPI):
 
         if usage := completion.usage:
             ctx.record(
-                TokenUsage.for_model(
-                    completion.model,
-                    input_tokens=usage.prompt_tokens,
-                    cached_tokens=None,
-                    output_tokens=usage.completion_tokens,
-                ),
+                ObservabilityLevel.INFO,
+                metric="lmm.input_tokens",
+                value=usage.prompt_tokens,
+                unit="tokens",
+                attributes={"lmm.model": completion.model},
+            )
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="lmm.output_tokens",
+                value=usage.completion_tokens,
+                unit="tokens",
+                attributes={"lmm.model": completion.model},
             )
 
         if not completion.choices:
@@ -272,11 +279,18 @@ class MistralLMMGeneration(MistralAPI):
                     for call in tool_calls
                 ],
             )
-            ctx.record(ResultTrace.of(completion_tool_calls))
+            ctx.record(
+                ObservabilityLevel.INFO,
+                event="lmm.tool_requests",
+                attributes={"lmm.tools": [call.function.name for call in tool_calls]},
+            )
             return completion_tool_calls
 
         elif lmm_completion:
-            ctx.record(ResultTrace.of(lmm_completion))
+            ctx.record(
+                ObservabilityLevel.INFO,
+                event="lmm.completion",
+            )
             return lmm_completion
 
         else:
@@ -316,12 +330,18 @@ class MistralLMMGeneration(MistralAPI):
                 async for completion_chunk in response_stream:
                     if usage := completion_chunk.data.usage:
                         ctx.record(
-                            TokenUsage.for_model(
-                                completion_chunk.data.model,
-                                input_tokens=usage.prompt_tokens,
-                                cached_tokens=None,
-                                output_tokens=usage.completion_tokens,
-                            ),
+                            ObservabilityLevel.INFO,
+                            metric="lmm.input_tokens",
+                            value=usage.prompt_tokens,
+                            unit="tokens",
+                            attributes={"lmm.model": completion_chunk.data.model},
+                        )
+                        ctx.record(
+                            ObservabilityLevel.INFO,
+                            metric="lmm.output_tokens",
+                            value=usage.completion_tokens,
+                            unit="tokens",
+                            attributes={"lmm.model": completion_chunk.data.model},
                         )
 
                     if not completion_chunk.data.choices:
@@ -435,6 +455,11 @@ class MistralLMMGeneration(MistralAPI):
                                     continue  # skip calls with missing names
 
                                 call_identifier: str = call.id or uuid4().hex
+                                ctx.record(
+                                    ObservabilityLevel.INFO,
+                                    event="lmm.tool_request",
+                                    attributes={"lmm.tool": call.function.name},
+                                )
                                 # send tool requests when ensured that all were completed
                                 yield LMMToolRequest(
                                     identifier=call_identifier,

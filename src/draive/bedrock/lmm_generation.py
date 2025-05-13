@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator, Iterable
 from typing import Any, Literal, overload
 
-from haiway import ArgumentsTrace, ResultTrace, asynchronous, ctx
+from haiway import ObservabilityLevel, asynchronous, ctx
 
 from draive.bedrock.api import BedrockAPI
 from draive.bedrock.config import BedrockChatConfig
@@ -25,7 +25,6 @@ from draive.lmm import (
     LMMToolSelection,
     LMMToolSpecification,
 )
-from draive.metrics import TokenUsage
 from draive.multimodal import MediaData, MultimodalContent, MultimodalContentElement, TextContent
 
 
@@ -73,37 +72,25 @@ class BedrockLMMGeneration(BedrockAPI):
         stream: bool = False,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
-        with ctx.scope("bedrock_lmm_completion"):
-            completion_config: BedrockChatConfig = config or ctx.state(BedrockChatConfig).updated(
-                **extra
-            )
+        completion_config: BedrockChatConfig = config or ctx.state(BedrockChatConfig)
+        with ctx.scope("bedrock_lmm_completion", completion_config):
             ctx.record(
-                ArgumentsTrace.of(
-                    config=completion_config,
-                    instruction=instruction,
-                    context=context,
-                    tool_selection=tool_selection,
-                    tools=tools,
-                    output=output,
-                    **extra,
-                ),
+                ObservabilityLevel.INFO,
+                attributes={
+                    "lmm.provider": "bedrock",
+                    "lmm.model": completion_config.model,
+                    "lmm.temperature": completion_config.temperature,
+                    "lmm.max_tokens": completion_config.max_tokens,
+                    "lmm.tools": [tool["name"] for tool in tools] if tools else [],
+                    "lmm.tool_selection": f"{tool_selection}",
+                    "lmm.stream": stream,
+                    "lmm.output": f"{output}",
+                    "lmm.context": [element.to_str() for element in context],
+                },
             )
 
             if stream:
                 raise NotImplementedError("bedrock streaming is not implemented yet")
-
-            completion_config: BedrockChatConfig = ctx.state(BedrockChatConfig).updated(**extra)
-            ctx.record(
-                ArgumentsTrace.of(
-                    config=completion_config,
-                    instruction=instruction,
-                    context=context,
-                    tools=tools,
-                    tool_selection=tool_selection,
-                    output=output,
-                    **extra,
-                ),
-            )
 
             output_decoder = output_as_response_declaration(output)
 
@@ -119,12 +106,18 @@ class BedrockLMMGeneration(BedrockAPI):
             )
 
             ctx.record(
-                TokenUsage.for_model(
-                    completion_config.model,
-                    input_tokens=completion["usage"]["inputTokens"],
-                    cached_tokens=None,
-                    output_tokens=completion["usage"]["outputTokens"],
-                ),
+                ObservabilityLevel.INFO,
+                metric="lmm.input_tokens",
+                value=completion["usage"]["inputTokens"],
+                unit="tokens",
+                attributes={"lmm.model": completion_config.model},
+            )
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="lmm.output_tokens",
+                value=completion["usage"]["outputTokens"],
+                unit="tokens",
+                attributes={"lmm.model": completion_config.model},
             )
 
             message_parts: list[MultimodalContentElement] = []
@@ -184,12 +177,20 @@ class BedrockLMMGeneration(BedrockAPI):
                     message_completion = LMMCompletion.of(
                         output_decoder(MultimodalContent.of(*message_parts))
                     )
-                    ctx.record(ResultTrace.of(message_completion))
+
+                    ctx.record(
+                        ObservabilityLevel.INFO,
+                        event="lmm.completion",
+                    )
                     return message_completion
 
                 case "tool_use":
                     tools_completion = LMMToolRequests(requests=tool_calls)
-                    ctx.record(ResultTrace.of(tools_completion))
+                    ctx.record(
+                        ObservabilityLevel.INFO,
+                        event="lmm.tool_requests",
+                        attributes={"lmm.tools": [call.tool for call in tool_calls]},
+                    )
                     return tools_completion
 
                 case _:

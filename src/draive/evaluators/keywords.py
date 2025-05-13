@@ -33,7 +33,7 @@ async def keywords_evaluator(
     else:
         text_normalization = _lowercased
 
-    normalized_text: str = text_normalization(MultimodalContent.of(content).as_string())
+    normalized_text: str = text_normalization(MultimodalContent.of(content).to_str())
     return EvaluationScore(
         value=len(
             [keyword for keyword in keywords if text_normalization(keyword) in normalized_text]

@@ -3,7 +3,7 @@ from collections.abc import Callable, Sequence
 from itertools import chain
 from typing import Any, cast
 
-from haiway import State, as_list, ctx
+from haiway import ObservabilityLevel, State, as_list, ctx
 from openai.types.create_embedding_response import CreateEmbeddingResponse
 
 from draive.embedding import Embedded, TextEmbedding
@@ -34,11 +34,16 @@ class VLLMEmbedding(VLLMAPI):
         """
         Create texts embedding with VLLM embedding service.
         """
-        embedding_config: VLLMEmbeddingConfig = config or ctx.state(VLLMEmbeddingConfig).updated(
-            **extra
-        )
+        embedding_config: VLLMEmbeddingConfig = config or ctx.state(VLLMEmbeddingConfig)
         with ctx.scope("vllm_text_embedding", embedding_config):
-            ctx.record(embedding_config)
+            ctx.record(
+                ObservabilityLevel.INFO,
+                attributes={
+                    "embedding.provider": "vllm",
+                    "embedding.model": embedding_config.model,
+                    "embedding.dimensions": embedding_config.dimensions,
+                },
+            )
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))

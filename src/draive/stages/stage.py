@@ -169,7 +169,8 @@ class Stage:
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            return ((*context, *context_extension), completion_result)
+            with ctx.scope("stage.predefined"):
+                return ((*context, *context_extension), completion_result)
 
         return cls(stage)
 
@@ -211,7 +212,8 @@ class Stage:
                     context: LMMContext,
                     result: MultimodalContent,
                 ) -> tuple[LMMContext, MultimodalContent]:
-                    return (await memory.recall(), result)
+                    with ctx.scope("stage.memor_recall"):
+                        return (await memory.recall(), result)
 
             case "extend":
 
@@ -220,7 +222,8 @@ class Stage:
                     context: LMMContext,
                     result: MultimodalContent,
                 ) -> tuple[LMMContext, MultimodalContent]:
-                    return ((*context, *await memory.recall()), result)
+                    with ctx.scope("stage.memory_recall"):
+                        return ((*context, *await memory.recall()), result)
 
         return cls(stage)
 
@@ -252,8 +255,9 @@ class Stage:
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            await memory.remember(context)
-            return (context, result)
+            with ctx.scope("stage.memory_remember"):
+                await memory.remember(context)
+                return (context, result)
 
         return cls(stage)
 
@@ -324,13 +328,14 @@ class Stage:
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            return await _lmm_completion(
-                instruction=instruction,
-                context=(*context, *context_extension),
-                toolbox=toolbox,
-                output=output,
-                **extra,
-            )
+            with ctx.scope("stage.completion"):
+                return await _lmm_completion(
+                    instruction=instruction,
+                    context=(*context, *context_extension),
+                    toolbox=toolbox,
+                    output=output,
+                    **extra,
+                )
 
         return cls(stage)
 
@@ -399,13 +404,14 @@ class Stage:
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            return await _lmm_completion(
-                instruction=instruction,
-                context=(*context, LMMInput.of(MultimodalContent.of(await input()))),
-                toolbox=toolbox,
-                output=output,
-                **extra,
-            )
+            with ctx.scope("stage.completion.prompting"):
+                return await _lmm_completion(
+                    instruction=instruction,
+                    context=(*context, LMMInput.of(MultimodalContent.of(await input()))),
+                    toolbox=toolbox,
+                    output=output,
+                    **extra,
+                )
 
         return cls(stage)
 
@@ -453,29 +459,30 @@ class Stage:
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            if not context or not isinstance(context[-1], LMMCompletion):
-                ctx.log_warning("loopback_completion has been skipped due to invalid context")
-                return (context, result)
+            with ctx.scope("stage.completion.loopback"):
+                if not context or not isinstance(context[-1], LMMCompletion):
+                    ctx.log_warning("loopback_completion has been skipped due to invalid context")
+                    return (context, result)
 
-            # Find the index of the last LMMInput in the context
-            last_input_idx = -1
-            for idx, element in enumerate(reversed(context)):
-                if isinstance(element, LMMInput):
-                    last_input_idx = len(context) - idx - 1
-                    break
+                # Find the index of the last LMMInput in the context
+                last_input_idx = -1
+                for idx, element in enumerate(reversed(context)):
+                    if isinstance(element, LMMInput):
+                        last_input_idx = len(context) - idx - 1
+                        break
 
-            else:
-                ctx.log_warning("loopback_completion could not find an LMMInput in the context")
-                return (context, result)
+                else:
+                    ctx.log_warning("loopback_completion could not find an LMMInput in the context")
+                    return (context, result)
 
-            return await _lmm_completion(
-                instruction=instruction,
-                # skipping meta as it is no longer applicable to input converted from output
-                context=(*context[:last_input_idx], LMMInput.of(context[-1].content)),
-                toolbox=toolbox,
-                output=output,
-                **extra,
-            )
+                return await _lmm_completion(
+                    instruction=instruction,
+                    # skipping meta as it is no longer applicable to input converted from output
+                    context=(*context[:last_input_idx], LMMInput.of(context[-1].content)),
+                    toolbox=toolbox,
+                    output=output,
+                    **extra,
+                )
 
         return cls(stage)
 
@@ -507,7 +514,8 @@ class Stage:
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            return (context, await transformation(result))
+            with ctx.scope("stage.transform.result"):
+                return (context, await transformation(result))
 
         return cls(stage)
 
@@ -539,9 +547,10 @@ class Stage:
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            transformed_context: LMMContext = await transformation(context)
-            assert not transformed_context or isinstance(transformed_context[-1], LMMCompletion)  # nosec: B101
-            return (transformed_context, result)
+            with ctx.scope("stage.transform.context"):
+                transformed_context: LMMContext = await transformation(context)
+                assert not transformed_context or isinstance(transformed_context[-1], LMMCompletion)  # nosec: B101
+                return (transformed_context, result)
 
         return cls(stage)
 
@@ -661,8 +670,9 @@ class Stage:
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            await access(context, result)
-            return (context, result)
+            with ctx.scope("stage.access.state"):
+                await access(context, result)
+                return (context, result)
 
         return cls(stage)
 
@@ -712,20 +722,24 @@ class Stage:
                     context: LMMContext,
                     result: MultimodalContent,
                 ) -> tuple[LMMContext, MultimodalContent]:
-                    current_context: LMMContext = context
-                    current_result: MultimodalContent = result
+                    with ctx.scope("stage.loop"):
+                        current_context: LMMContext = context
+                        current_result: MultimodalContent = result
 
-                    while await condition(
-                        context=current_context,
-                        result=current_result,
-                    ):
-                        current_context, current_result = await stage_execution(
+                        while await condition(
                             context=current_context,
                             result=current_result,
-                        )
-                        assert not current_context or isinstance(current_context[-1], LMMCompletion)  # nosec: B101
+                        ):
+                            with ctx.scope("stage.loop.iteration"):
+                                current_context, current_result = await stage_execution(
+                                    context=current_context,
+                                    result=current_result,
+                                )
+                                assert not current_context or isinstance(
+                                    current_context[-1], LMMCompletion
+                                )  # nosec: B101
 
-                    return (current_context, current_result)
+                        return (current_context, current_result)
 
             case "post_check":
 
@@ -734,23 +748,27 @@ class Stage:
                     context: LMMContext,
                     result: MultimodalContent,
                 ) -> tuple[LMMContext, MultimodalContent]:
-                    current_context: LMMContext = context
-                    current_result: MultimodalContent = result
+                    with ctx.scope("stage.loop"):
+                        current_context: LMMContext = context
+                        current_result: MultimodalContent = result
 
-                    while True:
-                        current_context, current_result = await stage_execution(
-                            context=current_context,
-                            result=current_result,
-                        )
-                        assert not current_context or isinstance(current_context[-1], LMMCompletion)  # nosec: B101
+                        while True:
+                            with ctx.scope("stage.loop.iteration"):
+                                current_context, current_result = await stage_execution(
+                                    context=current_context,
+                                    result=current_result,
+                                )
+                                assert not current_context or isinstance(
+                                    current_context[-1], LMMCompletion
+                                )  # nosec: B101
 
-                        if not await condition(
-                            context=current_context,
-                            result=current_result,
-                        ):
-                            break
+                                if not await condition(
+                                    context=current_context,
+                                    result=current_result,
+                                ):
+                                    break
 
-                    return (current_context, current_result)
+                        return (current_context, current_result)
 
         return cls(stage_loop)
 
@@ -841,22 +859,23 @@ class Stage:
             context: LMMContext,
             result: MultimodalContent,
         ) -> tuple[LMMContext, MultimodalContent]:
-            merged_context: LMMContext
-            merged_result: MultimodalContent
-            merged_context, merged_result = await merge(
-                branches=await gather(
-                    *[
-                        execution(
-                            context=context,
-                            result=result,
-                        )
-                        for execution in stage_executions
-                    ],
-                    return_exceptions=True,
+            with ctx.scope("stage.concurrent"):
+                merged_context: LMMContext
+                merged_result: MultimodalContent
+                merged_context, merged_result = await merge(
+                    branches=await gather(
+                        *[
+                            execution(
+                                context=context,
+                                result=result,
+                            )
+                            for execution in stage_executions
+                        ],
+                        return_exceptions=True,
+                    )
                 )
-            )
-            assert not merged_context or isinstance(merged_context[-1], LMMCompletion)  # nosec: B101
-            return (merged_context, merged_result)
+                assert not merged_context or isinstance(merged_context[-1], LMMCompletion)  # nosec: B101
+                return (merged_context, merged_result)
 
         return cls(concurrent_stage)
 
@@ -1232,14 +1251,15 @@ class Stage:
                 )
 
             except Exception as exc:
-                if exc in exceptions:
-                    return await fallback_execution(
-                        context=context,
-                        result=result,
-                    )
+                with ctx.scope("stage.fallback"):
+                    if exc in exceptions:
+                        return await fallback_execution(
+                            context=context,
+                            result=result,
+                        )
 
-                else:
-                    raise exc
+                    else:
+                        raise exc
 
         return self.__class__(stage)
 
@@ -1504,13 +1524,14 @@ class Stage:
             The result produced by executing the Stage.
         """
         stage_state = ProcessingState(state)
-        with ctx.updated(
+        with ctx.scope(
+            "stage.execution",
             ctx.state(Processing).updated(
                 # keep current processing unchanged
                 # but use local state for execution
                 state_reading=stage_state.read,
                 state_writing=stage_state.write,
-            )
+            ),
         ):
             initial_context: LMMContext
             match context:

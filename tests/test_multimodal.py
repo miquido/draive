@@ -19,7 +19,7 @@ def test_empty_is_falsy():
 
 
 def test_as_string_is_equal_input_text():
-    assert MultimodalContent.of(input_string).as_string() == input_string
+    assert MultimodalContent.of(input_string).to_str() == input_string
 
 
 def test_merged_texts_are_concatenated():

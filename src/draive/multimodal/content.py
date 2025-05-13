@@ -142,7 +142,7 @@ class MultimodalContent(DataModel):
             parts=tuple(part for part in self.parts if not isinstance(part, MetaContent)),
         )
 
-    def as_string(
+    def to_str(
         self,
         joiner: str | None = None,
         include_data: bool = False,
@@ -195,7 +195,7 @@ class MultimodalContent(DataModel):
         return bool(self.parts) and any(self.parts)
 
     def __str__(self) -> str:
-        return self.as_string()
+        return self.to_str()
 
 
 MultimodalContent.empty = MultimodalContent(parts=())
@@ -293,10 +293,10 @@ def _as_string(
             return text.text
 
         case MediaData() as media_data:
-            return media_data.as_string(include_data=include_data)
+            return media_data.to_str(include_data=include_data)
 
         case MediaReference() as media_reference:
-            return media_reference.as_string()
+            return media_reference.to_str()
 
         case MetaContent() as meta:
             return (  # perhaps, we could use meta values within xml tag?

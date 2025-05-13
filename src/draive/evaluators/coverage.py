@@ -81,8 +81,8 @@ async def coverage_evaluator(
         content=completion,
     ):
         return EvaluationScore.of(
-            cast(EvaluationScoreValue, result.content.as_string()),
-            comment=completion.as_string(),
+            cast(EvaluationScoreValue, result.content.to_str()),
+            comment=completion.to_str(),
         )
 
     else:

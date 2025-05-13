@@ -122,7 +122,7 @@ def content_element_as_content_chunk(
 
             return {
                 "type": "image_url",
-                "image_url": {"url": media_data.as_data_uri(safe_encoding=False)},
+                "image_url": {"url": media_data.to_data_uri(safe_encoding=False)},
                 # TODO: there is optional "detail" argument, however undocumented
             }
 
@@ -139,7 +139,7 @@ def content_element_as_content_chunk(
         case DataModel() as data:
             return {
                 "type": "text",
-                "text": data.as_json(),
+                "text": data.to_json(),
             }
 
 
@@ -256,14 +256,14 @@ def _text_output_conversion(
     output: MultimodalContent,
     /,
 ) -> MultimodalContent:
-    return MultimodalContent.of(output.as_string())
+    return MultimodalContent.of(output.to_str())
 
 
 def _json_output_conversion(
     output: MultimodalContent,
     /,
 ) -> MultimodalContent:
-    return MultimodalContent.of(DataModel.from_json(output.as_string()))
+    return MultimodalContent.of(DataModel.from_json(output.to_str()))
 
 
 def _prepare_model_output_conversion(
@@ -274,7 +274,7 @@ def _prepare_model_output_conversion(
         output: MultimodalContent,
         /,
     ) -> MultimodalContent:
-        return MultimodalContent.of(model.from_json(output.as_string()))
+        return MultimodalContent.of(model.from_json(output.to_str()))
 
     return _model_output_conversion
 

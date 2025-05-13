@@ -57,7 +57,7 @@ def test_validated_passes_with_valid_values() -> None:
         "all": True,
         "default": "12345678123456781234567812345678",
     }
-    assert json.loads(ExampleModel(**values_dict).as_json()) == values_dict
+    assert json.loads(ExampleModel(**values_dict).to_json()) == values_dict
 
 
 def test_validated_passes_with_default_values() -> None:
@@ -79,7 +79,7 @@ datetime_model_json: str = '{"value": "1970-01-01T00:00:00+00:00"}'
 
 
 def test_datetime_encoding() -> None:
-    assert datetime_model_instance.as_json() == datetime_model_json
+    assert datetime_model_instance.to_json() == datetime_model_json
 
 
 def test_datetime_decoding() -> None:
@@ -97,7 +97,7 @@ uuid_model_json: str = '{"value": "0cf728c0369348e78552e8d86d35e8b0"}'
 
 
 def test_uuid_encoding() -> None:
-    assert uuid_model_instance.as_json() == uuid_model_json
+    assert uuid_model_instance.to_json() == uuid_model_json
 
 
 def test_uuid_decoding() -> None:
@@ -115,7 +115,7 @@ missing_model_json: str = "{}"
 
 
 def test_missing_encoding() -> None:
-    assert missing_model_instance.as_json(indent=4) == missing_model_json
+    assert missing_model_instance.to_json(indent=4) == missing_model_json
 
 
 def test_missing_decoding() -> None:
@@ -190,9 +190,9 @@ typed_dict_not_required_model_json: str = """\
 
 
 def test_typed_dict_encoding() -> None:
-    assert typed_dict_model_instance.as_json(indent=4) == typed_dict_model_json
+    assert typed_dict_model_instance.to_json(indent=4) == typed_dict_model_json
     assert (
-        typed_dict_not_required_model_instance.as_json(indent=4)
+        typed_dict_not_required_model_instance.to_json(indent=4)
         == typed_dict_not_required_model_json
     )
 
@@ -252,7 +252,7 @@ basic_model_json: str = """\
 
 
 def test_basic_encoding() -> None:
-    assert basic_model_instance.as_json(indent=4) == basic_model_json
+    assert basic_model_instance.to_json(indent=4) == basic_model_json
 
 
 def test_basic_decoding() -> None:
@@ -347,13 +347,13 @@ def test_llm_message_decoding() -> None:
 
 
 def test_llm_message_encoding() -> None:
-    assert basic_conversation_message_instance.as_json(indent=4) == basic_conversation_message_json
+    assert basic_conversation_message_instance.to_json(indent=4) == basic_conversation_message_json
     assert (
-        media_url_conversation_message_instance.as_json(indent=4)
+        media_url_conversation_message_instance.to_json(indent=4)
         == media_url_conversation_message_json
     )
     assert (
-        media_data_conversation_message_instance.as_json(indent=4)
+        media_data_conversation_message_instance.to_json(indent=4)
         == media_data_conversation_message_json
     )
 
@@ -381,11 +381,11 @@ any_model_json: str = """\
 
 
 def test_any_encoding() -> None:
-    assert any_model_instance.as_json(indent=4) == any_model_json
+    assert any_model_instance.to_json(indent=4) == any_model_json
 
 
 def test_any_dict_decoding() -> None:
-    assert DataModel.from_json(any_model_json).as_dict() == any_model_instance.as_dict()
+    assert DataModel.from_json(any_model_json).to_mapping() == any_model_instance.to_mapping()
 
 
 def test_generic_subtypes_validation() -> None:

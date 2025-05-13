@@ -4,7 +4,7 @@ from base64 import b64decode, b64encode
 from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Any, Literal
 
-from haiway import MISSING, ArgumentsTrace, AsyncQueue, Missing, ctx, without_missing
+from haiway import MISSING, AsyncQueue, Missing, ctx, without_missing
 from openai.resources.beta.realtime.realtime import (
     AsyncRealtimeConnection,
     AsyncRealtimeConnectionManager,
@@ -62,18 +62,21 @@ class OpenAILMMSession(OpenAIAPI):
         config: OpenAIRealtimeConfig | None = None,
         **extra: Any,
     ) -> AsyncIterator[LMMSessionOutput]:
-        with ctx.scope("openai_realtime"):
-            realtime_config: OpenAIRealtimeConfig = config or ctx.state(OpenAIRealtimeConfig)
+        realtime_config: OpenAIRealtimeConfig = config or ctx.state(OpenAIRealtimeConfig)
+        with ctx.scope("openai_realtime", realtime_config):
             ctx.record(
-                ArgumentsTrace.of(
-                    config=realtime_config,
-                    instruction=instruction,
-                    initial_context=initial_context,
-                    output=output,
-                    tools=tools,
-                    tool_selection=tool_selection,
-                )
+                attributes={
+                    "lmm.provider": "openai",
+                    "lmm.model": realtime_config.model,
+                    "lmm.temperature": realtime_config.temperature,
+                    "lmm.max_tokens": realtime_config.max_tokens,
+                    "lmm.tools": [tool["name"] for tool in tools] if tools else [],
+                    "lmm.tool_selection": f"{tool_selection}",
+                    "lmm.output": f"{output}",
+                    "lmm.context": [element.to_str() for element in initial_context or []],
+                }
             )
+
             modalities: list[Literal["text", "audio"]]
             match output:
                 case "auto":
@@ -449,7 +452,7 @@ class OpenAILMMSession(OpenAIAPI):
                     content_parts.append(
                         {
                             "type": "input_text",
-                            "text": other.as_json(),
+                            "text": other.to_json(),
                         }
                     )
 
@@ -478,7 +481,7 @@ class OpenAILMMSession(OpenAIAPI):
                     )
 
                 case other:  # treat other as json text
-                    response_output += other.as_json()
+                    response_output += other.to_json()
 
         return response_output
 

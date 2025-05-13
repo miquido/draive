@@ -32,11 +32,10 @@ class OpenAIImageGeneration(OpenAIAPI):
         config: OpenAIImageGenerationConfig | None = None,
         **extra: Any,
     ) -> MediaContent:
-        with ctx.scope("generate_image"):
-            generation_config: OpenAIImageGenerationConfig = config or ctx.state(
-                OpenAIImageGenerationConfig
-            ).updated(**extra)
-
+        generation_config: OpenAIImageGenerationConfig = config or ctx.state(
+            OpenAIImageGenerationConfig
+        )
+        with ctx.scope("generate_image", generation_config):
             response: ImagesResponse = await self._client.images.generate(
                 model=generation_config.model,
                 n=1,

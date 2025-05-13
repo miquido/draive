@@ -68,7 +68,7 @@ class MediaReference(DataModel):
     def kind(self) -> MediaKind:
         return _media_kind(self.media)
 
-    def as_string(self) -> str:
+    def to_str(self) -> str:
         return f"![{self.kind}]({self.uri})"
 
     def __bool__(self) -> bool:
@@ -100,18 +100,18 @@ class MediaData(DataModel):
     def kind(self) -> MediaKind:
         return _media_kind(self.media)
 
-    def as_string(
+    def to_str(
         self,
         *,
-        include_data: bool,
+        include_data: bool = False,
     ) -> str:
         if include_data:
-            return f"![{self.kind}]({self.as_data_uri()})"
+            return f"![{self.kind}]({self.to_data_uri()})"
 
         else:
             return f"![{self.kind}]()"
 
-    def as_data_uri(
+    def to_data_uri(
         self,
         *,
         safe_encoding: bool = True,

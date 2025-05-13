@@ -1,7 +1,7 @@
 from collections.abc import Callable, Coroutine
 from typing import Protocol, final, overload
 
-from haiway import ArgumentsTrace, ResultTrace, ctx, freeze
+from haiway import ctx, freeze
 
 from draive.commons import META_EMPTY, Meta
 from draive.lmm import LMMContext
@@ -68,19 +68,16 @@ class PromptTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, LM
         **kwargs: Args.kwargs,
     ) -> Prompt:
         with ctx.scope(f"prompt:{self.declaration.name}"):
-            ctx.record(ArgumentsTrace.of(*args, **kwargs))
             try:
                 result = Prompt(
                     name=self.declaration.name,
                     description=self.declaration.description,
                     content=await super().__call__(*args, **kwargs),  # pyright: ignore[reportCallIssue]
                 )
-                ctx.record(ResultTrace.of(result))
 
                 return result
 
             except BaseException as exc:
-                ctx.record(ResultTrace.of(exc))
                 ctx.log_error(
                     "Prompt resolving error",
                     exception=exc,

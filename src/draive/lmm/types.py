@@ -84,6 +84,7 @@ class LMMInput(DataModel):
             meta=meta if meta is not None else META_EMPTY,
         )
 
+    type: Literal["input"] = "input"
     content: MultimodalContent
     meta: Meta = Default(META_EMPTY)
 
@@ -104,6 +105,7 @@ class LMMCompletion(DataModel):
             meta=meta if meta is not None else META_EMPTY,
         )
 
+    type: Literal["completion"] = "completion"
     content: MultimodalContent
     meta: Meta = Default(META_EMPTY)
 
@@ -115,6 +117,7 @@ LMMToolResponseHandling = Literal["error", "result", "direct_result"]
 
 
 class LMMToolResponse(DataModel):
+    type: Literal["tool_response"] = "tool_response"
     identifier: str
     tool: str
     content: MultimodalContent
@@ -134,6 +137,7 @@ class LMMToolResponses(DataModel):
             meta=meta if meta is not None else META_EMPTY,
         )
 
+    type: Literal["tool_responses"] = "tool_responses"
     responses: Sequence[LMMToolResponse]
     meta: Meta = Default(META_EMPTY)
 
@@ -155,6 +159,7 @@ class LMMToolRequest(DataModel):
             meta=meta if meta is not None else META_EMPTY,
         )
 
+    type: Literal["tool_request"] = "tool_request"
     identifier: str
     tool: str
     arguments: Mapping[str, Any] = Default(factory=dict)
@@ -176,6 +181,7 @@ class LMMToolRequests(DataModel):
             meta=meta if meta is not None else META_EMPTY,
         )
 
+    type: Literal["tool_requests"] = "tool_requests"
     requests: Sequence[LMMToolRequest]
     content: MultimodalContent | None = None
     meta: Meta = Default(META_EMPTY)
@@ -201,6 +207,7 @@ class LMMStreamChunk(DataModel):
             meta=meta if meta is not None else META_EMPTY,
         )
 
+    type: Literal["stream_chunk"] = "stream_chunk"
     content: MultimodalContent
     eod: bool
     meta: Meta = Default(META_EMPTY)
@@ -227,6 +234,7 @@ class LMMSessionEvent(DataModel):
             meta=meta if meta is not None else META_EMPTY,
         )
 
+    type: Literal["session_event"] = "session_event"
     category: Literal["completed", "interrupted"] | str
     meta: Meta
 

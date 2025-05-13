@@ -3,7 +3,7 @@ from collections.abc import Callable, Sequence
 from itertools import chain
 from typing import Any, cast
 
-from haiway import State, as_list, ctx
+from haiway import ObservabilityLevel, State, as_list, ctx
 from mistralai import EmbeddingResponse
 
 from draive.embedding import Embedded, TextEmbedding
@@ -34,11 +34,15 @@ class MistralEmbedding(MistralAPI):
         Create texts embedding with Mistral embedding service.
         """
 
-        embedding_config: MistralEmbeddingConfig = config or ctx.state(
-            MistralEmbeddingConfig
-        ).updated(**extra)
+        embedding_config: MistralEmbeddingConfig = config or ctx.state(MistralEmbeddingConfig)
         with ctx.scope("mistral_text_embedding", embedding_config):
-            ctx.record(embedding_config)
+            ctx.record(
+                ObservabilityLevel.INFO,
+                attributes={
+                    "embedding.provider": "mistral",
+                    "embedding.model": embedding_config.model,
+                },
+            )
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))

@@ -163,13 +163,13 @@ def content_element_as_part(  # noqa: PLR0911
                 # not expecting media in thinking, treating it as json
                 case DataModel() as model:
                     return {
-                        "text": model.as_json(),
+                        "text": model.to_json(),
                         "thought": True,
                     }
 
         case DataModel() as data:
             return {
-                "text": data.as_json(),
+                "text": data.to_json(),
             }
 
 
@@ -258,7 +258,7 @@ def _text_output_conversion(
     output: MultimodalContent,
     /,
 ) -> MultimodalContent:
-    return MultimodalContent.of(output.as_string())
+    return MultimodalContent.of(output.to_str())
 
 
 def _image_output_conversion(
@@ -286,7 +286,7 @@ def _json_output_conversion(
     output: MultimodalContent,
     /,
 ) -> MultimodalContent:
-    return MultimodalContent.of(DataModel.from_json(output.as_string()))
+    return MultimodalContent.of(DataModel.from_json(output.to_str()))
 
 
 def _prepare_model_output_conversion(
@@ -297,7 +297,7 @@ def _prepare_model_output_conversion(
         output: MultimodalContent,
         /,
     ) -> MultimodalContent:
-        return MultimodalContent.of(model.from_json(output.as_string()))
+        return MultimodalContent.of(model.from_json(output.to_str()))
 
     return _model_output_conversion
 

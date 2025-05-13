@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime
 from typing import Any, Literal, overload
 
-from haiway import AsyncQueue, ResultTrace, ctx
+from haiway import AsyncQueue, ctx
 
 from draive.conversation.types import ConversationMemory, ConversationMessage
 from draive.guardrails.state import ContentGuardrails
@@ -159,8 +159,6 @@ async def _conversation_completion(
 
                 await memory.remember(response_message)
 
-                ctx.record(ResultTrace.of(response_message))
-
                 return response_message
 
             case LMMToolRequests() as tool_requests:
@@ -178,8 +176,6 @@ async def _conversation_completion(
                         content=MultimodalContent.of(*direct_content),
                     )
                     await memory.remember(response_message)
-
-                    ctx.record(ResultTrace.of(response_message))
 
                     return response_message
 
@@ -242,7 +238,7 @@ async def _conversation_completion_stream(
                                         content=accumulated_content,
                                     )
                                     await memory.remember(response_message)
-                                    ctx.record(ResultTrace.of(response_message))
+
                                     return output_queue.finish()
 
                             case LMMToolRequest() as tool_request:
@@ -272,7 +268,6 @@ async def _conversation_completion_stream(
                             content=MultimodalContent.of(accumulated_content, tools_content),
                         )
                         await memory.remember(response_message)
-                        ctx.record(ResultTrace.of(response_message))
                         return output_queue.finish()
 
                     else:

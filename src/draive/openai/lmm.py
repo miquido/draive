@@ -57,7 +57,7 @@ def content_element_as_content_part(
             return {
                 "type": "image_url",
                 "image_url": {
-                    "url": media_data.as_data_uri(safe_encoding=False),
+                    "url": media_data.to_data_uri(safe_encoding=False),
                     "detail": cast(Literal["auto", "low", "high"], vision_details)
                     if not_missing(vision_details)
                     else "auto",
@@ -81,7 +81,7 @@ def content_element_as_content_part(
         case DataModel() as data:
             return {
                 "type": "text",
-                "text": data.as_json(),
+                "text": data.to_json(),
             }
 
 
@@ -110,7 +110,7 @@ def context_element_as_messages(
                 {
                     "role": "assistant",
                     # TODO: OpenAI models generating media?
-                    "content": completion.content.as_string(),
+                    "content": completion.content.to_str(),
                 },
             )
 
@@ -137,7 +137,7 @@ def context_element_as_messages(
                 {
                     "role": "tool",
                     "tool_call_id": response.identifier,
-                    "content": response.content.as_string(),
+                    "content": response.content.to_str(),
                 }
                 for response in tool_responses.responses
             )
@@ -208,7 +208,7 @@ def _text_output_conversion(
     output: MultimodalContent,
     /,
 ) -> MultimodalContent:
-    return MultimodalContent.of(output.as_string())
+    return MultimodalContent.of(output.to_str())
 
 
 def _audio_output_conversion(
@@ -222,7 +222,7 @@ def _json_output_conversion(
     output: MultimodalContent,
     /,
 ) -> MultimodalContent:
-    return MultimodalContent.of(DataModel.from_json(output.as_string()))
+    return MultimodalContent.of(DataModel.from_json(output.to_str()))
 
 
 def _prepare_model_output_conversion(
@@ -233,7 +233,7 @@ def _prepare_model_output_conversion(
         output: MultimodalContent,
         /,
     ) -> MultimodalContent:
-        return MultimodalContent.of(model.from_json(output.as_string()))
+        return MultimodalContent.of(model.from_json(output.to_str()))
 
     return _model_output_conversion
 

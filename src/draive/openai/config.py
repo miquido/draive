@@ -9,7 +9,6 @@ __all__ = (
     "OpenAIImageGenerationConfig",
     "OpenAIModerationConfig",
     "OpenAIRealtimeConfig",
-    "OpenAISystemFingerprint",
 )
 
 
@@ -57,10 +56,6 @@ class OpenAIImageGenerationConfig(State):
     size: Literal["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"] = "1024x1024"
     style: Literal["vivid", "natural"] = "vivid"
     timeout: float | Missing = MISSING
-
-
-class OpenAISystemFingerprint(State):
-    system_fingerprint: str
 
 
 class OpenAIModerationConfig(State):

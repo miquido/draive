@@ -4,7 +4,7 @@ from itertools import chain
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
-from haiway import MISSING, ArgumentsTrace, ResultTrace, as_list, ctx
+from haiway import MISSING, ObservabilityLevel, as_list, ctx
 from openai import NOT_GIVEN, AsyncStream, NotGiven
 from openai import RateLimitError as OpenAIRateLimitError
 from openai.types.chat import (
@@ -31,10 +31,9 @@ from draive.lmm import (
     LMMToolSpecification,
 )
 from draive.lmm.types import LMMStreamChunk, LMMStreamOutput
-from draive.metrics import TokenUsage
 from draive.multimodal import MultimodalContent
 from draive.openai.api import OpenAIAPI
-from draive.openai.config import OpenAIChatConfig, OpenAISystemFingerprint
+from draive.openai.config import OpenAIChatConfig
 from draive.openai.lmm import (
     context_element_as_messages,
     output_as_response_declaration,
@@ -91,20 +90,23 @@ class OpenAILMMGeneration(OpenAIAPI):
         stream: bool = False,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
-        with ctx.scope("openai_lmm_completion"):
-            completion_config: OpenAIChatConfig = config or ctx.state(OpenAIChatConfig).updated(
-                **extra
-            )
+        completion_config: OpenAIChatConfig = config or ctx.state(OpenAIChatConfig).updated(**extra)
+        with ctx.scope("openai_lmm_completion", completion_config):
             ctx.record(
-                ArgumentsTrace.of(
-                    config=completion_config,
-                    instruction=instruction,
-                    context=context,
-                    tool_selection=tool_selection,
-                    tools=tools,
-                    output=output,
-                    **extra,
-                ),
+                ObservabilityLevel.INFO,
+                attributes={
+                    "lmm.provider": "openai",
+                    "lmm.model": completion_config.model,
+                    "lmm.temperature": completion_config.temperature,
+                    "lmm.max_tokens": completion_config.max_tokens,
+                    "lmm.seed": completion_config.seed,
+                    "lmm.vision_details": completion_config.vision_details,
+                    "lmm.tools": [tool["name"] for tool in tools] if tools else [],
+                    "lmm.tool_selection": f"{tool_selection}",
+                    "lmm.stream": stream,
+                    "lmm.output": f"{output}",
+                    "lmm.context": [element.to_str() for element in context],
+                },
             )
 
             messages: list[ChatCompletionMessageParam] = list(
@@ -215,6 +217,11 @@ class OpenAILMMGeneration(OpenAIAPI):
 
         except OpenAIRateLimitError as exc:  # retry on rate limit after delay
             if delay := exc.response.headers.get("Retry-After"):
+                ctx.record(
+                    ObservabilityLevel.WARNING,
+                    event="lmm.rate_limit",
+                    attributes={"delay": delay},
+                )
                 try:
                     raise RateLimitError(retry_after=float(delay)) from exc
 
@@ -222,20 +229,30 @@ class OpenAILMMGeneration(OpenAIAPI):
                     raise exc from None
 
             else:
+                ctx.record(
+                    ObservabilityLevel.WARNING,
+                    event="lmm.rate_limit",
+                )
                 raise exc
 
         if usage := completion.usage:
             ctx.record(
-                TokenUsage.for_model(
-                    completion.model,
-                    input_tokens=usage.prompt_tokens,
-                    cached_tokens=None,
-                    output_tokens=usage.completion_tokens,
-                ),
+                ObservabilityLevel.INFO,
+                metric="lmm.input_tokens",
+                value=usage.prompt_tokens,
+                unit="tokens",
+                attributes={"lmm.model": completion.model},
+            )
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="lmm.output_tokens",
+                value=usage.completion_tokens,
+                unit="tokens",
+                attributes={"lmm.model": completion.model},
             )
 
         if fingerprint := completion.system_fingerprint:
-            ctx.record(OpenAISystemFingerprint(system_fingerprint=fingerprint))
+            ctx.log_debug(f"OpenAI system fingerprint:{fingerprint}")
 
         if not completion.choices:
             raise OpenAIException("Invalid OpenAI completion - missing messages!", completion)
@@ -282,11 +299,19 @@ class OpenAILMMGeneration(OpenAIAPI):
                     for call in tool_calls
                 ],
             )
-            ctx.record(ResultTrace.of(completion_tool_calls))
+            ctx.record(
+                ObservabilityLevel.INFO,
+                event="lmm.tool_requests",
+                attributes={"lmm.tools": [call.function.name for call in tool_calls]},
+            )
+
             return completion_tool_calls
 
         elif lmm_completion:
-            ctx.record(ResultTrace.of(lmm_completion))
+            ctx.record(
+                ObservabilityLevel.INFO,
+                event="lmm.completion",
+            )
             return lmm_completion
 
         else:
@@ -335,6 +360,11 @@ class OpenAILMMGeneration(OpenAIAPI):
 
         except OpenAIRateLimitError as exc:  # retry on rate limit after delay
             if delay := exc.response.headers.get("Retry-After"):
+                ctx.record(
+                    ObservabilityLevel.WARNING,
+                    event="lmm.rate_limit",
+                    attributes={"delay": delay},
+                )
                 try:
                     raise RateLimitError(retry_after=float(delay)) from exc
 
@@ -342,22 +372,32 @@ class OpenAILMMGeneration(OpenAIAPI):
                     raise exc from None
 
             else:
+                ctx.record(
+                    ObservabilityLevel.WARNING,
+                    event="lmm.rate_limit",
+                )
                 raise exc
 
         async def stream() -> AsyncGenerator[LMMStreamOutput]:  # noqa: C901, PLR0912, PLR0915
             async for part in completion_stream:
                 if usage := part.usage:  # record usage if able (expected in the last part)
                     ctx.record(
-                        TokenUsage.for_model(
-                            part.model,
-                            input_tokens=usage.prompt_tokens,
-                            cached_tokens=None,
-                            output_tokens=usage.completion_tokens,
-                        ),
+                        ObservabilityLevel.INFO,
+                        metric="lmm.input_tokens",
+                        value=usage.prompt_tokens,
+                        unit="tokens",
+                        attributes={"lmm.model": part.model},
+                    )
+                    ctx.record(
+                        ObservabilityLevel.INFO,
+                        metric="lmm.output_tokens",
+                        value=usage.completion_tokens,
+                        unit="tokens",
+                        attributes={"lmm.model": part.model},
                     )
 
                     if fingerprint := part.system_fingerprint:
-                        ctx.record(OpenAISystemFingerprint(system_fingerprint=fingerprint))
+                        ctx.log_debug(f"OpenAI system fingerprint:{fingerprint}")
 
                 if part.choices:  # usage part does not contain choices
                     # we are always requesting single result - no need to take care of indices
@@ -427,6 +467,12 @@ class OpenAILMMGeneration(OpenAIAPI):
                                     continue  # skip calls with missing names
 
                                 call_identifier: str = call.id or uuid4().hex
+
+                                ctx.record(
+                                    ObservabilityLevel.INFO,
+                                    event="lmm.tool_request",
+                                    attributes={"lmm.tool": call.function.name},
+                                )
 
                                 # send tool requests when ensured that all were completed
                                 yield LMMToolRequest(
