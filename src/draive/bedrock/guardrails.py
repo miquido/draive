@@ -4,17 +4,17 @@ from haiway import ObservabilityLevel, asynchronous, ctx
 
 from draive.bedrock.api import BedrockAPI
 from draive.bedrock.config import BedrockInputGuardraisConfig, BedrockOutputGuardraisConfig
-from draive.guardrails import ContentGuardrails, GuardrailsContentException
+from draive.guardrails import GuardrailsModeration, GuardrailsModerationException
 from draive.multimodal import MediaData, Multimodal, MultimodalContent, TextContent
 
 __all__ = ("BedrockGuardrais",)
 
 
 class BedrockGuardrais(BedrockAPI):
-    def content_guardrails(self) -> ContentGuardrails:
-        return ContentGuardrails(
-            input_verifying=self.content_input_verification,
-            output_verifying=self.content_output_verification,
+    def content_guardrails(self) -> GuardrailsModeration:
+        return GuardrailsModeration(
+            input_checking=self.content_input_verification,
+            output_checking=self.content_output_verification,
         )
 
     async def content_input_verification(
@@ -52,7 +52,7 @@ class BedrockGuardrais(BedrockAPI):
         )
 
         if response.get("action") == "GUARDRAIL_INTERVENED":
-            raise GuardrailsContentException(
+            raise GuardrailsModerationException(
                 f"Content violated guardrails ({config.guardrail_identifier}) rules",
                 violations=tuple(
                     filter["type"]
@@ -107,7 +107,7 @@ class BedrockGuardrais(BedrockAPI):
         )
 
         if response.get("action") == "GUARDRAIL_INTERVENED":
-            raise GuardrailsContentException(
+            raise GuardrailsModerationException(
                 f"Violated guardrails rules: {response.get('actionReason')}",
                 violations=(config.guardrail_identifier,),
                 content=content,

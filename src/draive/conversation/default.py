@@ -6,20 +6,18 @@ from typing import Any, Literal, overload
 from haiway import AsyncQueue, ctx
 
 from draive.conversation.types import ConversationMemory, ConversationMessage
-from draive.guardrails.state import ContentGuardrails
+from draive.guardrails import GuardrailsModeration
 from draive.instructions import Instruction
 from draive.lmm import (
     LMM,
     LMMCompletion,
     LMMContextElement,
-    LMMInput,
     LMMStreamChunk,
     LMMToolRequests,
     LMMToolResponses,
 )
 from draive.lmm.types import LMMToolRequest, LMMToolResponse
 from draive.multimodal import Multimodal, MultimodalContent
-from draive.prompts import Prompt
 from draive.tools import Toolbox
 from draive.utils import ProcessingEvent
 from draive.utils.processing import Processing
@@ -31,7 +29,7 @@ __all__ = ("conversation_completion",)
 async def conversation_completion(
     *,
     instruction: Instruction | None,
-    input: ConversationMessage | Prompt | Multimodal,
+    input: ConversationMessage | Multimodal,
     memory: ConversationMemory,
     toolbox: Toolbox,
     stream: Literal[False] = False,
@@ -43,7 +41,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: Instruction | None,
-    input: ConversationMessage | Prompt | Multimodal,
+    input: ConversationMessage | Multimodal,
     memory: ConversationMemory,
     toolbox: Toolbox,
     stream: Literal[True],
@@ -54,7 +52,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: Instruction | None,
-    input: ConversationMessage | Prompt | Multimodal,  # noqa: A002
+    input: ConversationMessage | Multimodal,  # noqa: A002
     memory: ConversationMemory,
     toolbox: Toolbox,
     stream: bool = False,
@@ -65,43 +63,11 @@ async def conversation_completion(
         context: list[LMMContextElement]
         match input:
             case ConversationMessage() as message:
-                await ContentGuardrails.verify_input(message.content)
+                await GuardrailsModeration.check_input(message.content)
                 await memory.remember(message)
                 context = [
                     *(message.as_lmm_context_element() for message in recalled_messages),
                     message.as_lmm_context_element(),
-                ]
-
-            case Prompt() as prompt:
-                prompt_messages: list[ConversationMessage] = []
-                for element in prompt.content:
-                    match element:
-                        case LMMCompletion() as completion_element:
-                            await ContentGuardrails.verify_input(completion_element.content)
-                            prompt_messages.append(
-                                ConversationMessage.model(
-                                    created=datetime.now(UTC),
-                                    content=completion_element.content,
-                                )
-                            )
-
-                        case LMMInput() as input_element:
-                            await ContentGuardrails.verify_input(input_element.content)
-                            prompt_messages.append(
-                                ConversationMessage.user(
-                                    created=datetime.now(UTC),
-                                    content=input_element.content,
-                                )
-                            )
-
-                        case _:
-                            pass  # TODO add other content to memory when able
-
-                await memory.remember(*prompt_messages)
-
-                context = [
-                    *(message.as_lmm_context_element() for message in recalled_messages),
-                    *prompt.content,
                 ]
 
             case content:
@@ -109,7 +75,7 @@ async def conversation_completion(
                     created=datetime.now(UTC),
                     content=MultimodalContent.of(content),
                 )
-                await ContentGuardrails.verify_input(message.content)
+                await GuardrailsModeration.check_input(message.content)
                 await memory.remember(message)
                 context = [
                     *(message.as_lmm_context_element() for message in recalled_messages),

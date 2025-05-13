@@ -398,6 +398,7 @@ class Evaluator[Value, **Args]:
             attributes={
                 "evaluation.threshold": result.threshold,
                 "evaluation.passed": result.passed,
+                "evaluation.score.comment": result.score.comment,
             },
         )
         return result
