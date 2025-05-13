@@ -164,7 +164,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
         if free_results:
             scenario_results.append(
                 ScenarioEvaluatorResult(
-                    name="EvaluationSuite",
+                    scenario="EvaluationSuite",
                     evaluations=tuple(free_results),
                 )
             )
@@ -292,10 +292,11 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
                 )
 
         else:
-            return await self._evaluate(
-                parameters,
-                reload=reload,
-            )
+            async with ctx.scope("evaluation.suite"):
+                return await self._evaluate(
+                    parameters,
+                    reload=reload,
+                )
 
     async def _evaluate(
         self,
