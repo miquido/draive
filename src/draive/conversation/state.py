@@ -14,7 +14,6 @@ from draive.helpers import ConstantMemory
 from draive.instructions import Instruction
 from draive.lmm import LMMStreamChunk
 from draive.multimodal import Multimodal
-from draive.prompts import Prompt
 from draive.tools import Tool, Toolbox
 from draive.utils import Memory, ProcessingEvent
 
@@ -29,7 +28,7 @@ class Conversation(State):
         cls,
         *,
         instruction: Instruction | str | None = None,
-        input: ConversationMessage | Prompt | Multimodal,
+        input: ConversationMessage | Multimodal,
         memory: ConversationMemory | Iterable[ConversationElement] | None = None,
         tools: Toolbox | Iterable[Tool] | None = None,
         stream: Literal[False] = False,
@@ -42,7 +41,7 @@ class Conversation(State):
         cls,
         *,
         instruction: Instruction | str | None = None,
-        input: ConversationMessage | Prompt | Multimodal,
+        input: ConversationMessage | Multimodal,
         memory: ConversationMemory | Iterable[ConversationElement] | None = None,
         tools: Toolbox | Iterable[Tool] | None = None,
         stream: Literal[True],
@@ -54,7 +53,7 @@ class Conversation(State):
         cls,
         *,
         instruction: Instruction | str | None = None,
-        input: ConversationMessage | Prompt | Multimodal,  # noqa: A002
+        input: ConversationMessage | Multimodal,  # noqa: A002
         memory: ConversationMemory | Iterable[ConversationElement] | None = None,
         tools: Toolbox | Iterable[Tool] | None = None,
         stream: bool = False,

@@ -18,7 +18,6 @@ from draive.multimodal import (
     MultimodalContent,
 )
 from draive.parameters import DataModel
-from draive.prompts import Prompt
 from draive.tools import Toolbox
 from draive.utils import Memory, ProcessingEvent
 
@@ -97,7 +96,7 @@ class ConversationCompleting(Protocol):
         self,
         *,
         instruction: Instruction | None,
-        input: ConversationMessage | Prompt | Multimodal,
+        input: ConversationMessage | Multimodal,
         memory: ConversationMemory,
         toolbox: Toolbox,
         stream: Literal[False] = False,
@@ -109,7 +108,7 @@ class ConversationCompleting(Protocol):
         self,
         *,
         instruction: Instruction | None,
-        input: ConversationMessage | Prompt | Multimodal,
+        input: ConversationMessage | Multimodal,
         memory: ConversationMemory,
         toolbox: Toolbox,
         stream: Literal[True],
@@ -120,7 +119,7 @@ class ConversationCompleting(Protocol):
         self,
         *,
         instruction: Instruction | None,
-        input: ConversationMessage | Prompt | Multimodal,  # noqa: A002
+        input: ConversationMessage | Multimodal,  # noqa: A002
         memory: ConversationMemory,
         toolbox: Toolbox,
         stream: bool = False,
