@@ -253,14 +253,28 @@ class Evaluator[Value, **Args]:
         assert (  # nosec: B101
             threshold is None or 0 <= threshold <= 1
         ), "Evaluation threshold has to be between 0 and 1"
+        assert "\n" not in name  # nosec: B101
 
         self._definition: EvaluatorDefinition[Value, Args] = definition
         self._execution_context: ScopeContext | None = execution_context
-        self.name: str = name
+        self.name: str = name.lower().replace(" ", "_")
         self.threshold: float = 1 if threshold is None else threshold
         self.meta: Meta = meta if meta is not None else META_EMPTY
 
         freeze(self)
+
+    def with_name(
+        self,
+        name: str,
+        /,
+    ) -> Self:
+        return self.__class__(
+            name=name,
+            definition=self._definition,
+            threshold=self.threshold,
+            execution_context=self._execution_context,
+            meta=self.meta,
+        )
 
     def with_execution_context(
         self,
@@ -360,20 +374,33 @@ class Evaluator[Value, **Args]:
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> EvaluatorResult:
+        result: EvaluatorResult
         if context := self._execution_context:
             async with context:
-                return await self._evaluate(
+                result = await self._evaluate(
                     value,
                     *args,
                     **kwargs,
                 )
 
         else:
-            return await self._evaluate(
-                value,
-                *args,
-                **kwargs,
-            )
+            async with ctx.scope(f"evaluator.{self.name}"):
+                result = await self._evaluate(
+                    value,
+                    *args,
+                    **kwargs,
+                )
+
+        ctx.record(
+            metric=f"evaluator.{result.evaluator}.score",
+            value=result.score.value,
+            unit="%",
+            attributes={
+                "evaluation.threshold": result.threshold,
+                "evaluation.passed": result.passed,
+            },
+        )
+        return result
 
     async def _evaluate(
         self,

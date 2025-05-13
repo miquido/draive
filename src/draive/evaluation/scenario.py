@@ -18,7 +18,7 @@ __all__ = (
 
 
 class ScenarioEvaluatorResult(DataModel):
-    name: str = Field(
+    scenario: str = Field(
         description="Name of evaluated scenario",
     )
     evaluations: Sequence[EvaluatorResult] = Field(
@@ -53,16 +53,16 @@ class ScenarioEvaluatorResult(DataModel):
                     if self.meta
                     else "N/A"
                 )
-                return f"Scenario {self.name}, meta: {meta_values}\n---\n{report}"
+                return f"Scenario {self.scenario}, meta: {meta_values}\n---\n{report}"
 
             else:
-                return f"Scenario {self.name}:\n{report}"
+                return f"Scenario {self.scenario}:\n{report}"
 
         elif not self.evaluations:
-            return f"Scenario {self.name} empty!"
+            return f"Scenario {self.scenario} empty!"
 
         else:
-            return f"Scenario {self.name} passed!"
+            return f"Scenario {self.scenario} passed!"
 
     @property
     def relative_score(self) -> float:
@@ -137,7 +137,9 @@ class ScenarioEvaluator[Value, **Args]:
         execution_context: ScopeContext | None,
         meta: Meta | None,
     ) -> None:
-        self.name: str = name
+        assert "\n" not in name  # nosec: B101
+
+        self.name: str = name.lower().replace(" ", "_")
         self._definition: ScenarioEvaluatorDefinition[Value, Args] = definition
         self._execution_context: ScopeContext | None = execution_context
         self.meta: Meta = meta if meta is not None else META_EMPTY
@@ -159,6 +161,18 @@ class ScenarioEvaluator[Value, **Args]:
             )
 
         return evaluate
+
+    def with_name(
+        self,
+        name: str,
+        /,
+    ) -> Self:
+        return self.__class__(
+            name=name,
+            definition=self._definition,
+            execution_context=self._execution_context,
+            meta=self.meta,
+        )
 
     def with_execution_context(
         self,
@@ -226,20 +240,35 @@ class ScenarioEvaluator[Value, **Args]:
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> ScenarioEvaluatorResult:
+        result: ScenarioEvaluatorResult
         if context := self._execution_context:
             async with context:
-                return await self._evaluate(
+                result = await self._evaluate(
                     value,
                     *args,
                     **kwargs,
                 )
 
         else:
-            return await self._evaluate(
-                value,
-                *args,
-                **kwargs,
-            )
+            async with ctx.scope(f"evaluation.scenario.{self.name}"):
+                result = await self._evaluate(
+                    value,
+                    *args,
+                    **kwargs,
+                )
+
+        ctx.record(
+            metric=f"evaluation.scenario.{result.scenario}.score",
+            value=result.relative_score,
+            unit="%",
+            attributes={
+                "evaluation.scenario.evaluations": [
+                    evaluation.evaluator for evaluation in result.evaluations
+                ],
+                "evaluation.passed": result.passed,
+            },
+        )
+        return result
 
     async def _evaluate(
         self,
@@ -267,14 +296,14 @@ class ScenarioEvaluator[Value, **Args]:
                         meta = result.meta
 
                     return ScenarioEvaluatorResult(
-                        name=self.name,
+                        scenario=self.name,
                         evaluations=result.evaluations,
                         meta=meta,
                     )
 
                 case [*results]:
                     return ScenarioEvaluatorResult(
-                        name=self.name,
+                        scenario=self.name,
                         evaluations=tuple(results),
                         meta=self.meta,
                     )
@@ -286,7 +315,7 @@ class ScenarioEvaluator[Value, **Args]:
             )
 
             return ScenarioEvaluatorResult(
-                name=self.name,
+                scenario=self.name,
                 evaluations=(),
                 meta={**(self.meta or {}), "exception": str(exc)},
             )
