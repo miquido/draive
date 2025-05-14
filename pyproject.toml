@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.63.0"
+version = "0.63.1"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
@@ -21,7 +21,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 license = { file = "LICENSE" }
-dependencies = ["numpy~=2.2", "haiway~=0.19.2"]
+dependencies = ["numpy~=2.2", "haiway~=0.19.4"]
 
 [project.urls]
 Homepage = "https://miquido.com"
@@ -40,7 +40,12 @@ ollama = ["ollama~=0.4"]
 bedrock = ["boto3~=1.37"]
 vllm = ["openai~=1.64"]
 mcp = ["mcp~=1.5"]
-opentelemetry = ["haiway[opentelemetry]"]
+opentelemetry = [
+  "haiway[opentelemetry]",
+  "opentelemetry-api",
+  "opentelemetry-sdk",
+  "opentelemetry-exporter-otlp-proto-grpc",
+]
 dev = [
   "bandit~=1.8",
   "pyright~=1.1",
