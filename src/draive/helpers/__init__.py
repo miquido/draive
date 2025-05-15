@@ -1,3 +1,5 @@
+from draive.helpers.instruction_preparation import prepare_instruction
+from draive.helpers.instruction_refinement import refine_instruction
 from draive.helpers.volatile_memory import (
     AccumulativeVolatileMemory,
     ConstantMemory,
@@ -10,4 +12,6 @@ __all__ = (
     "ConstantMemory",
     "VolatileMemory",
     "VolatileVectorIndex",
+    "prepare_instruction",
+    "refine_instruction",
 )
