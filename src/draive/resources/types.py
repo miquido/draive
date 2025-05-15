@@ -21,6 +21,7 @@ __all__ = (
     "ResourceFetching",
     "ResourceListFetching",
     "ResourceMissing",
+    "ResourceUploading",
 )
 
 
@@ -151,3 +152,12 @@ class ResourceListFetching(Protocol):
         self,
         **extra: Any,
     ) -> Sequence[ResourceDeclaration]: ...
+
+
+@runtime_checkable
+class ResourceUploading(Protocol):
+    async def __call__(
+        self,
+        resource: Resource,
+        **extra: Any,
+    ) -> None: ...

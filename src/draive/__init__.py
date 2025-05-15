@@ -197,6 +197,7 @@ from draive.resources import (
     ResourceMissing,
     Resources,
     ResourceTemplate,
+    ResourceUploading,
     resource,
 )
 from draive.similarity import (
@@ -373,6 +374,7 @@ __all__ = (
     "ResourceListFetching",
     "ResourceMissing",
     "ResourceTemplate",
+    "ResourceUploading",
     "Resources",
     "ScopeIdentifier",
     "SelectionException",
