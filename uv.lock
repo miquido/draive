@@ -70,30 +70,30 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.38.15"
+version = "1.38.16"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e2/b5/f2cdcc4f909bd4a3b545571da9e7faa69a7ecc54bc5cc103f39dac53d115/boto3-1.38.15.tar.gz", hash = "sha256:dca60f7a3ead91c05cf471f7750e54d63b92bfc0e61fa122e2e3f5140e020a8d", size = 111836, upload-time = "2025-05-13T19:30:50.904Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/02/e9/f20bbfcdea28329fa07ee353b85bea375d89d854f98c240b12a8a08e3664/boto3-1.38.16.tar.gz", hash = "sha256:0d4d9da05f20cf4bf351735307d9cda8711a5f7ad15de88b4e9372c6ee40d99f", size = 111807, upload-time = "2025-05-14T19:34:57.152Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9a/73/2b01ba5f08ef4fcb8e9b52d276be0747845a16aa712d420fd764cc498869/boto3-1.38.15-py3-none-any.whl", hash = "sha256:f2239b8c2816dd03a2a97297d33d5f7899f23be3a261db9a09ca691c32b7ddc2", size = 139936, upload-time = "2025-05-13T19:30:48.485Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/e2/6a39f2349947ea50a2a41f9f78c650928a072fe01f38f5b58d91acba1831/boto3-1.38.16-py3-none-any.whl", hash = "sha256:ea188276252bf95940925a92bb157239ae0f12406a14e347e2aa2029a1bea038", size = 139936, upload-time = "2025-05-14T19:34:55.173Z" },
 ]
 
 [[package]]
 name = "botocore"
-version = "1.38.15"
+version = "1.38.16"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jmespath" },
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/00/35/0591b8cda1af4f308a0c073b838b02618547ae306504dc5a165a0ee88fd8/botocore-1.38.15.tar.gz", hash = "sha256:6adb3b1b0739153d5dc9758e5e06f7596290999c07ed8f9167ca62a1f97c6592", size = 13896855, upload-time = "2025-05-13T19:30:38.667Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ab/1b/fc86b24cfe9a5e88a9e4ee73ece2c5448cdf4551d9dabd87ff2ff69b2d8b/botocore-1.38.16.tar.gz", hash = "sha256:bf3666611259844b8e9478b88b162009082767789ed929059db4bbd370b75ee8", size = 13897669, upload-time = "2025-05-14T19:34:45.676Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fe/3a/0025fc4de5440d11199efc75f3130e6f15750a9b898a506755da45838b56/botocore-1.38.15-py3-none-any.whl", hash = "sha256:9cc149ef56c3b99aff5436f26b71ad9558a45e4ac6b25b7b7046b0889279e601", size = 13557626, upload-time = "2025-05-13T19:30:33.964Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/7c/5a50b58ad354f8328c1c93dff9414a5556d36255021cd4894d3303dab924/botocore-1.38.16-py3-none-any.whl", hash = "sha256:e0e6f7cf0d94b31561034900e41f97fd0db0a2608ab41ff3605bbebd32325ec3", size = 13559362, upload-time = "2025-05-14T19:34:40.847Z" },
 ]
 
 [[package]]
@@ -252,7 +252,7 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.63.0"
+version = "0.63.2"
 source = { editable = "." }
 dependencies = [
     { name = "haiway" },
@@ -329,7 +329,7 @@ requires-dist = [
     { name = "draive", extras = ["sentencepiece"], marker = "extra == 'gemini'" },
     { name = "draive", extras = ["sentencepiece"], marker = "extra == 'mistral'" },
     { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=1.10" },
-    { name = "haiway", specifier = "~=0.19.4" },
+    { name = "haiway", specifier = "~=0.19.5" },
     { name = "haiway", extras = ["opentelemetry"], marker = "extra == 'opentelemetry'" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = "~=1.5" },
     { name = "mistralai", marker = "extra == 'mistral'", specifier = "~=1.5" },
@@ -482,11 +482,11 @@ wheels = [
 
 [[package]]
 name = "haiway"
-version = "0.19.4"
+version = "0.19.5"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/fe/64/536d4b87edcfde7cc7ec8cd3099af3460eb0a8a3a84e0e8fd8b071880a09/haiway-0.19.4.tar.gz", hash = "sha256:c97ed87830a517fe418c37620f90a71240c44601ef5954df4a7d304a48473e65", size = 100058, upload-time = "2025-05-14T15:08:54.031Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bf/be/84eeff904434af378d9dbe8682b7575ca65e0fbc0df7c87e54486f08f516/haiway-0.19.5.tar.gz", hash = "sha256:2d35fe255f1b1ed9041757b340c17842a6e06d3829f430dc04fc9dea214e4549", size = 100613, upload-time = "2025-05-15T08:04:04.607Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/78/7aa340130a74260c1232d6e6d5c0755b458252f052b21f62c491800f081b/haiway-0.19.4-py3-none-any.whl", hash = "sha256:39f13342c4c2308b99e372b65761709d604d55d638d57998c07741ad6084fcb9", size = 55647, upload-time = "2025-05-14T15:08:52.701Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/03/bb9f2523fdcb504ca8bf6e06ca61e4b18c3c698dc45457c463861333dc10/haiway-0.19.5-py3-none-any.whl", hash = "sha256:77d8d462f4cc41e9bc67ea1477515c41046704a63178d7309649b6c15a1c523e", size = 56666, upload-time = "2025-05-15T08:04:03.111Z" },
 ]
 
 [package.optional-dependencies]
@@ -1230,11 +1230,11 @@ wheels = [
 
 [[package]]
 name = "setuptools"
-version = "80.4.0"
+version = "80.7.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/95/32/0cc40fe41fd2adb80a2f388987f4f8db3c866c69e33e0b4c8b093fdf700e/setuptools-80.4.0.tar.gz", hash = "sha256:5a78f61820bc088c8e4add52932ae6b8cf423da2aff268c23f813cfbb13b4006", size = 1315008, upload-time = "2025-05-09T20:42:27.972Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9e/8b/dc1773e8e5d07fd27c1632c45c1de856ac3dbf09c0147f782ca6d990cf15/setuptools-80.7.1.tar.gz", hash = "sha256:f6ffc5f0142b1bd8d0ca94ee91b30c0ca862ffd50826da1ea85258a06fd94552", size = 1319188, upload-time = "2025-05-15T02:41:00.955Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b1/93/dba5ed08c2e31ec7cdc2ce75705a484ef0be1a2fecac8a58272489349de8/setuptools-80.4.0-py3-none-any.whl", hash = "sha256:6cdc8cb9a7d590b237dbe4493614a9b75d0559b888047c1f67d49ba50fc3edb2", size = 1200812, upload-time = "2025-05-09T20:42:25.325Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/18/0e835c3a557dc5faffc8f91092f62fc337c1dab1066715842e7a4b318ec4/setuptools-80.7.1-py3-none-any.whl", hash = "sha256:ca5cc1069b85dc23070a6628e6bcecb3292acac802399c7f8edc0100619f9009", size = 1200776, upload-time = "2025-05-15T02:40:58.887Z" },
 ]
 
 [[package]]
@@ -1355,14 +1355,14 @@ wheels = [
 
 [[package]]
 name = "types-requests"
-version = "2.32.0.20250328"
+version = "2.32.0.20250515"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/00/7d/eb174f74e3f5634eaacb38031bbe467dfe2e545bc255e5c90096ec46bc46/types_requests-2.32.0.20250328.tar.gz", hash = "sha256:c9e67228ea103bd811c96984fac36ed2ae8da87a36a633964a21f199d60baf32", size = 22995, upload-time = "2025-03-28T02:55:13.271Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/c1/cdc4f9b8cfd9130fbe6276db574f114541f4231fcc6fb29648289e6e3390/types_requests-2.32.0.20250515.tar.gz", hash = "sha256:09c8b63c11318cb2460813871aaa48b671002e59fda67ca909e9883777787581", size = 23012, upload-time = "2025-05-15T03:04:31.817Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cc/15/3700282a9d4ea3b37044264d3e4d1b1f0095a4ebf860a99914fd544e3be3/types_requests-2.32.0.20250328-py3-none-any.whl", hash = "sha256:72ff80f84b15eb3aa7a8e2625fffb6a93f2ad5a0c20215fc1dcfa61117bcb2a2", size = 20663, upload-time = "2025-03-28T02:55:11.946Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/0f/68a997c73a129287785f418c1ebb6004f81e46b53b3caba88c0e03fcd04a/types_requests-2.32.0.20250515-py3-none-any.whl", hash = "sha256:f8eba93b3a892beee32643ff836993f15a785816acca21ea0ffa006f05ef0fb2", size = 20635, upload-time = "2025-05-15T03:04:30.5Z" },
 ]
 
 [[package]]

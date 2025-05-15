@@ -10,6 +10,7 @@ from draive.resources.types import (
     ResourceFetching,
     ResourceListFetching,
     ResourceMissing,
+    ResourceUploading,
 )
 
 __all__ = ("Resources",)
@@ -78,6 +79,16 @@ class Resources(State):
         else:
             return default
 
+    @classmethod
+    async def upload(
+        cls,
+        resource: Resource,
+        /,
+        **extra: Any,
+    ) -> None:
+        return await ctx.state(cls).uploading(resource, **extra)
+
     list_fetching: ResourceListFetching
     fetching: ResourceFetching
+    uploading: ResourceUploading
     meta: Meta = META_EMPTY

@@ -165,6 +165,13 @@ class MCPClient:
                     meta={"mcp_server": self.identifier},
                 )
 
+    async def resource_upload(
+        self,
+        resource: Resource,
+        **extra: Any,
+    ) -> None:
+        raise NotImplementedError("Resource uploading is not supported by MCP servers")
+
     async def prompts_list(
         self,
         **extra: Any,
@@ -417,6 +424,7 @@ class MCPClient:
                 Resources(
                     list_fetching=self.resources_list,
                     fetching=self.resource_fetch,
+                    uploading=self.resource_upload,
                     meta={"mcp_server": self.identifier},
                 )
             )
@@ -597,6 +605,13 @@ class MCPClients:
             ctx.log_warning(f"Requested resource ({uri}) from unknown source")
             return None
 
+    async def resource_upload(
+        self,
+        resource: Resource,
+        **extra: Any,
+    ) -> None:
+        raise NotImplementedError("Resource uploading is not supported by MCP servers")
+
     def _client_identifier_for_uri(
         self,
         uri: str,
@@ -717,6 +732,7 @@ class MCPClients:
                 Resources(
                     list_fetching=self.resources_list,
                     fetching=self.resource_fetch,
+                    uploading=self.resource_upload,
                     meta={"mcp_server": "mcp_aggregate"},
                 )
             )
