@@ -1,5 +1,9 @@
 # 🏎️ draive 🏁
 
+![Python Version](https://img.shields.io/badge/Python-3.12+-blue)
+![License](https://img.shields.io/badge/License-MIT-green)
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/miquido/draive?utm_source=oss&utm_medium=github&utm_campaign=miquido%2Fdraive&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 🏎️ Fast-track your LLM-based apps with an accessible, production-ready library. 🏎️
 
 Are you looking for maximum flexibility and efficiency in your next Python library? Tired of unnecessary complexities and inefficient token usage?
