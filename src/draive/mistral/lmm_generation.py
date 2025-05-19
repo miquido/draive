@@ -110,10 +110,11 @@ class MistralLMMGeneration(MistralAPI):
                     "lmm.temperature": completion_config.temperature,
                     "lmm.max_tokens": completion_config.max_tokens,
                     "lmm.seed": completion_config.seed,
-                    "lmm.tools": [tool["name"] for tool in tools] if tools else [],
-                    "lmm.tool_selection": f"{tool_selection}",
+                    "lmm.tools": [tool["name"] for tool in tools] if tools else None,
+                    "lmm.tool_selection": f"{tool_selection}" if tools else None,
                     "lmm.stream": stream,
                     "lmm.output": f"{output}",
+                    "lmm.instruction": f"{instruction}",
                     "lmm.context": [element.to_str() for element in context],
                 },
             )

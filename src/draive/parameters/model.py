@@ -519,9 +519,9 @@ class DataModel(metaclass=DataModelMeta):
         return validator
 
     @classmethod
-    def from_dict(
+    def from_mapping(
         cls,
-        value: dict[str, Any],
+        value: Mapping[str, Any],
         /,
     ) -> Self:
         return cls(**value)

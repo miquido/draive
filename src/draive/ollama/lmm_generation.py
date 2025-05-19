@@ -91,10 +91,11 @@ class OllamaLMMGeneration(OllamaAPI):
                     "lmm.temperature": chat_config.temperature,
                     "lmm.max_tokens": chat_config.max_tokens,
                     "lmm.seed": chat_config.seed,
-                    "lmm.tools": [tool["name"] for tool in tools] if tools else [],
-                    "lmm.tool_selection": f"{tool_selection}",
+                    "lmm.tools": [tool["name"] for tool in tools] if tools else None,
+                    "lmm.tool_selection": f"{tool_selection}" if tools else None,
                     "lmm.stream": stream,
                     "lmm.output": f"{output}",
+                    "lmm.instruction": f"{instruction}",
                     "lmm.context": [element.to_str() for element in context],
                 },
             )
