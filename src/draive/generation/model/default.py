@@ -102,7 +102,7 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
             ):
                 case LMMCompletion() as completion:
                     if decoder := decoder:
-                        return generated.from_dict(decoder(completion.content))
+                        return generated.from_mapping(decoder(completion.content))
 
                     elif (artifacts := completion.content.artifacts()) and isinstance(
                         artifacts[0], generated
@@ -136,7 +136,7 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
                         # TODO: check if this join makes any sense,
                         # perhaps we could merge json objects instead?
                         if decoder := decoder:
-                            return generated.from_dict(decoder(direct_responses_content))
+                            return generated.from_mapping(decoder(direct_responses_content))
 
                         else:
                             return generated.from_json(direct_responses_content.to_str())

@@ -1,5 +1,5 @@
 from asyncio import gather
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from typing import Any, Literal, Self, final
 
 from haiway import State, ctx
@@ -118,13 +118,22 @@ class Toolbox(State):
     @classmethod
     async def external(
         cls,
+        *,
+        selection: Collection[str] | None = None,
         repeated_calls_limit: int | None = None,
         suggest: str | bool | None = None,
         other_tools: Iterable[Tool] | None = None,
         **extra: Any,
     ) -> Self:
+        external_tools: Sequence[Tool]
+        if selected := selection:
+            external_tools = [tool for tool in await Tools.fetch(**extra) if tool.name in selected]
+
+        else:
+            external_tools = await Tools.fetch(**extra)
+
         return cls.of(
-            *(*await Tools.fetch(**extra), *(other_tools or ())),
+            *(*external_tools, *(other_tools or ())),
             suggest=suggest,
             repeated_calls_limit=repeated_calls_limit,
         )
