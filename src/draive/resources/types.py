@@ -7,9 +7,9 @@ from draive.commons import META_EMPTY, Meta
 from draive.multimodal import (
     MediaData,
     MediaReference,
+    MultimodalContent,
     MultimodalContentElement,
     TextContent,
-    # validated_media_type,
 )
 from draive.parameters import DataModel
 
@@ -130,11 +130,110 @@ class ResourceContent(State):
 
 
 class Resource(State):
+    @overload
+    @classmethod
+    def of(
+        cls,
+        content: bytes,
+        /,
+        *,
+        uri: str,
+        name: str | None = None,
+        description: str | None = None,
+        mime_type: str,
+        meta: Meta | None = None,
+    ) -> Self: ...
+
+    @overload
+    @classmethod
+    def of(
+        cls,
+        content: MultimodalContentElement | str,
+        /,
+        *,
+        uri: str,
+        name: str | None = None,
+        description: str | None = None,
+        mime_type: str | None = None,
+        meta: Meta | None = None,
+    ) -> Self: ...
+
+    @classmethod
+    def of(
+        cls,
+        content: MultimodalContentElement | str | bytes,
+        /,
+        *,
+        uri: str,
+        name: str | None = None,
+        description: str | None = None,
+        mime_type: str | None = None,
+        meta: Meta | None = None,
+    ) -> Self:
+        resource_content: ResourceContent
+        resource_meta: Meta
+        match content:
+            case str() as text:
+                resource_content = ResourceContent(
+                    mime_type=mime_type or "text/plain",
+                    blob=text.encode(),
+                )
+                resource_meta = meta if meta is not None else META_EMPTY
+
+            case bytes() as data:
+                resource_content = ResourceContent(
+                    mime_type=mime_type or "application/octet-stream",
+                    blob=data,
+                )
+                resource_meta = meta if meta is not None else META_EMPTY
+
+            case TextContent() as text_content:
+                resource_content = ResourceContent(
+                    mime_type=mime_type or "text/plain",
+                    blob=text_content.text.encode(),
+                )
+                resource_meta = (
+                    {**text_content.meta, **meta} if meta is not None else text_content.meta
+                )
+
+            case MediaData() as media_data:
+                resource_content = ResourceContent(
+                    mime_type=mime_type or media_data.media,
+                    blob=media_data.data,
+                )
+                resource_meta = {**media_data.meta, **meta} if meta is not None else media_data.meta
+
+            case MediaReference():
+                raise ValueError("Resource can't use a media reference")
+
+            case other:
+                resource_content = ResourceContent(
+                    mime_type=mime_type or "application/json",
+                    blob=other.to_json().encode(),
+                )
+                resource_meta = meta if meta is not None else META_EMPTY
+
+        return cls(
+            uri=uri,
+            name=name or uri,
+            description=description,
+            content=resource_content,
+            meta=resource_meta,
+        )
+
     uri: str
     name: str
     description: str | None
     content: Sequence[Self] | ResourceContent
     meta: Meta = Default(META_EMPTY)
+
+    def to_multimodal(self) -> MultimodalContent:
+        match self.content:
+            case ResourceContent() as content:
+                return MultimodalContent.of(content.to_multimodal())
+
+            case content:
+                return MultimodalContent.of(*[element.to_multimodal() for element in content])
 
 
 @runtime_checkable
@@ -142,7 +241,6 @@ class ResourceFetching(Protocol):
     async def __call__(
         self,
         uri: str,
-        **extra: Any,
     ) -> Resource | None: ...
 
 
