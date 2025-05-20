@@ -30,7 +30,6 @@ class Resources(State):
         cls,
         resource: ResourceDeclaration | str,
         /,
-        **extra: Any,
     ) -> Resource | None: ...
 
     @overload
@@ -41,7 +40,6 @@ class Resources(State):
         /,
         *,
         default: Resource,
-        **extra: Any,
     ) -> Resource: ...
 
     @overload
@@ -52,7 +50,6 @@ class Resources(State):
         /,
         *,
         required: Literal[True],
-        **extra: Any,
     ) -> Resource: ...
 
     @classmethod
@@ -63,14 +60,10 @@ class Resources(State):
         *,
         default: Resource | None = None,
         required: bool = True,
-        **extra: Any,
     ) -> Resource | None:
         uri: str = resource if isinstance(resource, str) else resource.uri
 
-        if fetched := await ctx.state(cls).fetching(
-            uri,
-            **extra,
-        ):
+        if fetched := await ctx.state(cls).fetching(uri):
             return fetched
 
         elif required and default is None:
