@@ -4,7 +4,7 @@ from inspect import isfunction
 from typing import Protocol, cast, final, overload, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import MISSING, AsyncQueue, Missing, State, ctx, freeze, not_missing
+from haiway import MISSING, AsyncQueue, Missing, State, ctx, not_missing
 
 from draive.agents.definition import AgentMessage, AgentNode
 from draive.agents.errors import AgentException
@@ -74,8 +74,6 @@ class AgentWorkflow[AgentWorkflowState, AgentWorkflowResult: DataModel | State |
         self._state_initializer: AgentWorkflowStateInitializer[AgentWorkflowState] = (
             state_initializer
         )
-
-        freeze(self)
 
     async def __call__(
         self,

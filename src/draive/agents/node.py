@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from typing import Protocol, Self, final, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import MISSING, Missing, freeze, is_missing, not_missing
+from haiway import MISSING, Missing, is_missing, not_missing
 
 from draive.agents.errors import AgentException
 from draive.multimodal import Multimodal, MultimodalContent
@@ -90,8 +90,6 @@ class AgentNode:
 
         self._initializer = initializer
         self._concurrent = concurrent
-
-        freeze(self)
 
     def initialize(self) -> "Agent":
         assert not_missing(self._initializer), (  # nosec: B101

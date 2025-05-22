@@ -1,8 +1,8 @@
 from asyncio import gather
 from collections.abc import Callable
-from typing import Protocol, Self, cast, final, overload, runtime_checkable
+from typing import Any, Protocol, Self, cast, final, overload, runtime_checkable
 
-from haiway import AttributePath, ScopeContext, ctx, freeze
+from haiway import AttributePath, ScopeContext, ctx
 
 from draive.commons import META_EMPTY, Meta
 from draive.evaluation.score import EvaluationScore
@@ -242,6 +242,14 @@ class Evaluator[Value, **Args]:
 
         return evaluate
 
+    __slots__ = (
+        "_definition",
+        "_execution_context",
+        "meta",
+        "name",
+        "threshold",
+    )
+
     def __init__(
         self,
         name: str,
@@ -255,13 +263,36 @@ class Evaluator[Value, **Args]:
         ), "Evaluation threshold has to be between 0 and 1"
         assert "\n" not in name  # nosec: B101
 
-        self._definition: EvaluatorDefinition[Value, Args] = definition
-        self._execution_context: ScopeContext | None = execution_context
-        self.name: str = name.lower().replace(" ", "_")
-        self.threshold: float = 1 if threshold is None else threshold
-        self.meta: Meta = meta if meta is not None else META_EMPTY
-
-        freeze(self)
+        self._definition: EvaluatorDefinition[Value, Args]
+        object.__setattr__(
+            self,
+            "_definition",
+            definition,
+        )
+        self._execution_context: ScopeContext | None
+        object.__setattr__(
+            self,
+            "_execution_context",
+            execution_context,
+        )
+        self.name: str
+        object.__setattr__(
+            self,
+            "name",
+            name.lower().replace(" ", "_"),
+        )
+        self.threshold: float
+        object.__setattr__(
+            self,
+            "threshold",
+            1 if threshold is None else threshold,
+        )
+        self.meta: Meta
+        object.__setattr__(
+            self,
+            "meta",
+            meta if meta is not None else META_EMPTY,
+        )
 
     def with_name(
         self,
@@ -461,6 +492,25 @@ class Evaluator[Value, **Args]:
             score=evaluation_score,
             threshold=self.threshold,
             meta=result_meta,
+        )
+
+    def __setattr__(
+        self,
+        name: str,
+        value: Any,
+    ) -> Any:
+        raise AttributeError(
+            f"Can't modify immutable {self.__class__.__qualname__},"
+            f" attribute - '{name}' cannot be modified"
+        )
+
+    def __delattr__(
+        self,
+        name: str,
+    ) -> None:
+        raise AttributeError(
+            f"Can't modify immutable {self.__class__.__qualname__},"
+            f" attribute - '{name}' cannot be deleted"
         )
 
 

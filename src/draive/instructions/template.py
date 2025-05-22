@@ -31,18 +31,23 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
     ) -> None:
         super().__init__(function)
 
-        self.declaration: InstructionDeclaration = InstructionDeclaration(
-            name=name,
-            description=description,
-            arguments=[
-                InstructionDeclarationArgument(
-                    name=parameter.alias or parameter.name,
-                    specification=parameter.specification,
-                    required=parameter.required,
-                )
-                for parameter in self._parameters.values()
-            ],
-            meta=meta if meta is not None else META_EMPTY,
+        self.declaration: InstructionDeclaration
+        object.__setattr__(
+            self,
+            "declaration",
+            InstructionDeclaration(
+                name=name,
+                description=description,
+                arguments=[
+                    InstructionDeclarationArgument(
+                        name=parameter.alias or parameter.name,
+                        specification=parameter.specification,
+                        required=parameter.required,
+                    )
+                    for parameter in self._parameters.values()
+                ],
+                meta=meta if meta is not None else META_EMPTY,
+            ),
         )
 
     async def resolve(

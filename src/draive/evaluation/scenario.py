@@ -1,8 +1,8 @@
 from asyncio import gather
 from collections.abc import Callable, Sequence
-from typing import Protocol, Self, cast, overload, runtime_checkable
+from typing import Any, Protocol, Self, cast, overload, runtime_checkable
 
-from haiway import AttributePath, ScopeContext, ctx, freeze
+from haiway import AttributePath, ScopeContext, ctx
 
 from draive.commons import META_EMPTY, Meta
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
@@ -130,6 +130,8 @@ class ScenarioEvaluatorDefinition[Value, **Args](Protocol):
 
 
 class ScenarioEvaluator[Value, **Args]:
+    __slots__ = ("_definition", "_execution_context", "meta", "name")
+
     def __init__(
         self,
         name: str,
@@ -139,12 +141,30 @@ class ScenarioEvaluator[Value, **Args]:
     ) -> None:
         assert "\n" not in name  # nosec: B101
 
-        self.name: str = name.lower().replace(" ", "_")
-        self._definition: ScenarioEvaluatorDefinition[Value, Args] = definition
-        self._execution_context: ScopeContext | None = execution_context
-        self.meta: Meta = meta if meta is not None else META_EMPTY
-
-        freeze(self)
+        self.name: str
+        object.__setattr__(
+            self,
+            "name",
+            name.lower().replace(" ", "_"),
+        )
+        self._definition: ScenarioEvaluatorDefinition[Value, Args]
+        object.__setattr__(
+            self,
+            "_definition",
+            definition,
+        )
+        self._execution_context: ScopeContext | None
+        object.__setattr__(
+            self,
+            "_execution_context",
+            execution_context,
+        )
+        self.meta: Meta
+        object.__setattr__(
+            self,
+            "meta",
+            meta if meta is not None else META_EMPTY,
+        )
 
     def prepared(
         self,
@@ -319,6 +339,25 @@ class ScenarioEvaluator[Value, **Args]:
                 evaluations=(),
                 meta={**(self.meta or {}), "exception": str(exc)},
             )
+
+    def __setattr__(
+        self,
+        name: str,
+        value: Any,
+    ) -> Any:
+        raise AttributeError(
+            f"Can't modify immutable {self.__class__.__qualname__},"
+            f" attribute - '{name}' cannot be modified"
+        )
+
+    def __delattr__(
+        self,
+        name: str,
+    ) -> None:
+        raise AttributeError(
+            f"Can't modify immutable {self.__class__.__qualname__},"
+            f" attribute - '{name}' cannot be deleted"
+        )
 
 
 @overload

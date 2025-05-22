@@ -67,16 +67,57 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         if not specification["properties"]:
             specification = None  # use no parameters without arguments
 
-        self.name: str = name
-        self.description: str | None = description
-        self.parameters: ParametersSpecification | None = specification
-        self.handling: ToolHandling = handling
-        self._check_availability: ToolAvailabilityChecking = availability_check or (
-            lambda: True  # available by default
+        self.name: str
+        object.__setattr__(
+            self,
+            "name",
+            name,
         )
-        self._format_result: ToolResultFormatting[Result] = format_result
-        self._format_failure: ToolErrorFormatting = format_failure
-        self.meta: Meta = meta
+        self.description: str | None
+        object.__setattr__(
+            self,
+            "description",
+            description,
+        )
+        self.parameters: ParametersSpecification | None
+        object.__setattr__(
+            self,
+            "parameters",
+            specification,
+        )
+        self.handling: ToolHandling
+        object.__setattr__(
+            self,
+            "handling",
+            handling,
+        )
+        self._check_availability: ToolAvailabilityChecking
+        object.__setattr__(
+            self,
+            "_check_availability",
+            availability_check
+            or (
+                lambda: True  # available by default
+            ),
+        )
+        self._format_result: ToolResultFormatting[Result]
+        object.__setattr__(
+            self,
+            "_format_result",
+            format_result,
+        )
+        self._format_failure: ToolErrorFormatting
+        object.__setattr__(
+            self,
+            "_format_failure",
+            format_failure,
+        )
+        self.meta: Meta
+        object.__setattr__(
+            self,
+            "meta",
+            meta,
+        )
 
     @property
     def available(self) -> bool:
@@ -100,6 +141,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
                     **{key: f"{arg}" for key, arg in arguments.items()},
                 }
             )
+
             try:
                 try:
                     result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
