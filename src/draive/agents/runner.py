@@ -5,7 +5,7 @@ from asyncio import (
 from collections.abc import AsyncIterator
 from typing import Protocol, Self, final, overload, runtime_checkable
 
-from haiway import AsyncQueue, ctx, freeze
+from haiway import AsyncQueue, ctx
 
 from draive.agents.idle import IdleMonitor
 from draive.agents.node import Agent, AgentError, AgentMessage, AgentNode
@@ -73,8 +73,6 @@ class AgentRunner:
         self._queue: AsyncQueue[AgentMessage] = queue
         self._task: Task[None] = task
         self._status: IdleMonitor = status
-
-        freeze(self)
 
     def send(
         self,

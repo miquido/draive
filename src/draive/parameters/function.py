@@ -5,9 +5,10 @@ from inspect import signature
 from types import EllipsisType
 from typing import Any, ClassVar, cast, final, get_type_hints, overload
 
-from haiway import MISSING, DefaultValue, Missing, mimic_function
+from haiway import MISSING, DefaultValue, Missing
 from haiway.state import AttributeAnnotation
 from haiway.state.attributes import resolve_attribute_annotation
+from haiway.utils import mimic_function
 
 from draive.parameters.parameter import Parameter
 from draive.parameters.specification import ParameterSpecification
@@ -146,10 +147,30 @@ class ParametrizedFunction[**Args, Result]:
             not isinstance(function, ParametrizedFunction)
         ), "Cannot parametrize the same function more than once!"
 
-        self._call: Callable[Args, Result] = function
-        self._name: str = function.__name__
-        self._parameters: dict[str, Parameter[Any]] = {}
-        self._variadic_keyword_parameters: Parameter[Any] | None = None
+        self._call: Callable[Args, Result]
+        object.__setattr__(
+            self,
+            "_call",
+            function,
+        )
+        self._name: str
+        object.__setattr__(
+            self,
+            "_name",
+            function.__name__,
+        )
+        self._parameters: dict[str, Parameter[Any]]
+        object.__setattr__(
+            self,
+            "_parameters",
+            {},
+        )
+        self._variadic_keyword_parameters: Parameter[Any] | None
+        object.__setattr__(
+            self,
+            "_variadic_keyword_parameters",
+            None,
+        )
         type_hints: Mapping[str, Any] = get_type_hints(function)
         for parameter in signature(function).parameters.values():
             match parameter.kind:
@@ -158,10 +179,14 @@ class ParametrizedFunction[**Args, Result]:
 
                 case InspectParameter.VAR_KEYWORD:
                     assert self._variadic_keyword_parameters is None  # nosec: B101
-                    self._variadic_keyword_parameters = _resolve_argument(
-                        parameter,
-                        module=function.__module__,
-                        type_hint=type_hints.get(parameter.name),
+                    object.__setattr__(
+                        self,
+                        "_variadic_keyword_parameters",
+                        _resolve_argument(
+                            parameter,
+                            module=function.__module__,
+                            type_hint=type_hints.get(parameter.name),
+                        ),
                     )
 
                 case _:
@@ -213,6 +238,25 @@ class ParametrizedFunction[**Args, Result]:
     ) -> Result:
         assert not args, "Positional unkeyed arguments are not supported"  # nosec: B101
         return self._call(*args, **self.validate_arguments(**kwargs))  # pyright: ignore[reportCallIssue]
+
+    def __setattr__(
+        self,
+        name: str,
+        value: Any,
+    ) -> Any:
+        raise AttributeError(
+            f"Can't modify immutable {self.__class__.__qualname__},"
+            f" attribute - '{name}' cannot be modified"
+        )
+
+    def __delattr__(
+        self,
+        name: str,
+    ) -> None:
+        raise AttributeError(
+            f"Can't modify immutable {self.__class__.__qualname__},"
+            f" attribute - '{name}' cannot be deleted"
+        )
 
 
 def _resolve_argument(

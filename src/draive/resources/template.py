@@ -47,16 +47,32 @@ class ResourceTemplate[**Args](
     ) -> None:
         super().__init__(function)
 
-        self.uri: str = uri
-        self.declaration: ResourceDeclaration = ResourceDeclaration(
-            uri=uri,
-            mime_type=mime_type,
-            name=name,
-            description=description,
-            meta=meta,
+        self.uri: str
+        object.__setattr__(
+            self,
+            "uri",
+            uri,
         )
-        self._check_availability: ResourceAvailabilityCheck = availability_check or (
-            lambda: True  # available by default
+        self.declaration: ResourceDeclaration
+        object.__setattr__(
+            self,
+            "declaration",
+            ResourceDeclaration(
+                uri=uri,
+                mime_type=mime_type,
+                name=name,
+                description=description,
+                meta=meta,
+            ),
+        )
+        self._check_availability: ResourceAvailabilityCheck
+        object.__setattr__(
+            self,
+            "_check_availability",
+            availability_check
+            or (
+                lambda: True  # available by default
+            ),
         )
 
     @property

@@ -1,7 +1,7 @@
 from collections.abc import Callable, Coroutine
 from typing import Protocol, final, overload
 
-from haiway import ctx, freeze
+from haiway import ctx
 
 from draive.commons import META_EMPTY, Meta
 from draive.lmm import LMMContext
@@ -35,24 +35,33 @@ class PromptTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, LM
     ) -> None:
         super().__init__(function)
 
-        self.declaration: PromptDeclaration = PromptDeclaration(
-            name=name,
-            description=description,
-            arguments=[
-                PromptDeclarationArgument(
-                    name=parameter.alias or parameter.name,
-                    specification=parameter.specification,
-                    required=parameter.required,
-                )
-                for parameter in self._parameters.values()
-            ],
-            meta=meta if meta is not None else META_EMPTY,
+        self.declaration: PromptDeclaration
+        object.__setattr__(
+            self,
+            "declaration",
+            PromptDeclaration(
+                name=name,
+                description=description,
+                arguments=[
+                    PromptDeclarationArgument(
+                        name=parameter.alias or parameter.name,
+                        specification=parameter.specification,
+                        required=parameter.required,
+                    )
+                    for parameter in self._parameters.values()
+                ],
+                meta=meta if meta is not None else META_EMPTY,
+            ),
         )
-        self._check_availability: PromptAvailabilityCheck = availability_check or (
-            lambda: True  # available by default
+        self._check_availability: PromptAvailabilityCheck
+        object.__setattr__(
+            self,
+            "_check_availability",
+            availability_check
+            or (
+                lambda: True  # available by default
+            ),
         )
-
-        freeze(self)
 
     @property
     def available(self) -> bool:
