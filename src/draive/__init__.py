@@ -63,7 +63,16 @@ from draive.choice import (
     SelectionException,
     choice_completion,
 )
-from draive.commons import META_EMPTY, Meta, MetaPath, MetaValue
+from draive.commons import (
+    META_EMPTY,
+    Meta,
+    MetaPath,
+    MetaTags,
+    MetaValue,
+    check_meta_tags,
+    meta_tags,
+    with_meta_tags,
+)
 from draive.conversation import (
     Conversation,
     ConversationElement,
@@ -277,6 +286,7 @@ __all__ = (
     "Meta",
     "MetaContent",
     "MetaPath",
+    "MetaTags",
     "MetaValue",
     "Missing",
     "MissingContext",
@@ -346,6 +356,7 @@ __all__ = (
     "async_noop",
     "asynchronous",
     "cache",
+    "check_meta_tags",
     "choice_completion",
     "ctx",
     "getenv_bool",
@@ -355,6 +366,7 @@ __all__ = (
     "instruction",
     "is_missing",
     "load_env",
+    "meta_tags",
     "mmr_vector_similarity_search",
     "noop",
     "not_missing",
@@ -371,5 +383,6 @@ __all__ = (
     "vector_similarity_score",
     "vector_similarity_search",
     "when_missing",
+    "with_meta_tags",
     "workflow",
 )

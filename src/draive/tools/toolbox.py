@@ -1,9 +1,10 @@
 from asyncio import gather
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from typing import Any, Literal, Self, final
+from typing import Any, Literal, Self, final, overload
 
 from haiway import State, ctx
 
+from draive.commons.metadata import MetaTags, check_meta_tags
 from draive.lmm.types import (
     LMMException,
     LMMToolError,
@@ -116,24 +117,24 @@ class Toolbox(State):
         )
 
     @classmethod
-    async def external(
+    async def fetched(
         cls,
         *,
-        selection: Collection[str] | None = None,
+        tools: Collection[str] | None = None,
+        tags: MetaTags | None = None,
         repeated_calls_limit: int | None = None,
         suggest: str | bool | None = None,
-        other_tools: Iterable[Tool] | None = None,
         **extra: Any,
     ) -> Self:
-        external_tools: Sequence[Tool]
-        if selected := selection:
-            external_tools = [tool for tool in await Tools.fetch(**extra) if tool.name in selected]
+        selected_tools: Sequence[Tool] = await Tools.fetch(**extra)
+        if tools:
+            selected_tools = [tool for tool in selected_tools if tool.name in tools]
 
-        else:
-            external_tools = await Tools.fetch(**extra)
+        if tags:
+            selected_tools = [tool for tool in selected_tools if check_meta_tags(tool.meta, tags)]
 
         return cls.of(
-            *(*external_tools, *(other_tools or ())),
+            *selected_tools,
             suggest=suggest,
             repeated_calls_limit=repeated_calls_limit,
         )
@@ -275,3 +276,41 @@ class Toolbox(State):
             suggest=self.suggest_call,
             repeated_calls_limit=self.repeated_calls_limit,
         )
+
+    @overload
+    def filtered(
+        self,
+        *,
+        tools: Collection[str],
+    ) -> Self: ...
+
+    @overload
+    def filtered(
+        self,
+        *,
+        tags: MetaTags,
+    ) -> Self: ...
+
+    def filtered(
+        self,
+        *,
+        tools: Collection[str] | None = None,
+        tags: MetaTags | None = None,
+    ) -> Self:
+        assert tools is None or tags is None  # nosec: B101
+        if tools:
+            return self.__class__.of(
+                *(tool for tool in self.tools.values() if tool.name in tools),
+                suggest=self.suggest_call,
+                repeated_calls_limit=self.repeated_calls_limit,
+            )
+
+        elif tags:
+            return self.__class__.of(
+                *(tool for tool in self.tools.values() if check_meta_tags(tool.meta, tags=tags)),
+                suggest=self.suggest_call,
+                repeated_calls_limit=self.repeated_calls_limit,
+            )
+
+        else:
+            return self
