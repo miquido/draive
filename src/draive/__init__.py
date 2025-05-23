@@ -73,7 +73,7 @@ from draive.commons import (
     meta_tags,
     with_meta_tags,
 )
-from draive.configuration import Configuration
+from draive.configuration import Config, Configuration
 from draive.conversation import (
     Conversation,
     ConversationElement,
@@ -104,6 +104,7 @@ from draive.guardrails import (
 from draive.helpers import (
     AccumulativeVolatileMemory,
     ConstantMemory,
+    VolatileConfiguration,
     VolatileMemory,
     VolatileVectorIndex,
 )
@@ -235,6 +236,7 @@ __all__ = (
     "BasicValue",
     "Choice",
     "ChoiceOption",
+    "Config",
     "Configuration",
     "ConstantMemory",
     "Conversation",
@@ -346,6 +348,7 @@ __all__ = (
     "Tools",
     "ValueEmbedding",
     "VectorIndex",
+    "VolatileConfiguration",
     "VolatileMemory",
     "VolatileVectorIndex",
     "agent",

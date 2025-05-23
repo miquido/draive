@@ -1,6 +1,8 @@
 from collections.abc import Sequence
 
-from haiway import MISSING, Missing, State
+from haiway import MISSING, Missing
+
+from draive.configuration import Config
 
 __all__ = (
     "OllamaChatConfig",
@@ -8,7 +10,7 @@ __all__ = (
 )
 
 
-class OllamaChatConfig(State):
+class OllamaChatConfig(Config):
     model: str
     temperature: float = 1.0
     top_k: int | Missing = MISSING
@@ -19,7 +21,7 @@ class OllamaChatConfig(State):
     stop_sequences: Sequence[str] | Missing = MISSING
 
 
-class OllamaEmbeddingConfig(State):
+class OllamaEmbeddingConfig(Config):
     model: str
     concurrent: bool = False
     batch_size: int = 32

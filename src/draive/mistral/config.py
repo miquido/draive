@@ -1,6 +1,8 @@
 from collections.abc import Sequence
 
-from haiway import MISSING, Missing, State
+from haiway import MISSING, Missing
+
+from draive.configuration import Config
 
 __all__ = (
     "MistralChatConfig",
@@ -8,7 +10,7 @@ __all__ = (
 )
 
 
-class MistralChatConfig(State):
+class MistralChatConfig(Config):
     model: str
     temperature: float = 1.0
     top_p: float | Missing = MISSING
@@ -18,6 +20,6 @@ class MistralChatConfig(State):
     stop_sequences: Sequence[str] | Missing = MISSING
 
 
-class MistralEmbeddingConfig(State):
+class MistralEmbeddingConfig(Config):
     model: str
     batch_size: int = 128
