@@ -1,7 +1,9 @@
 from collections.abc import Sequence
 from typing import Literal, TypedDict
 
-from haiway import MISSING, Missing, State
+from haiway import MISSING, Missing
+
+from draive.configuration import Config
 
 __all__ = (
     "OpenAIChatConfig",
@@ -17,7 +19,7 @@ class AudioResponseFormat(TypedDict):
     voice: Literal["ash", "ballad", "coral", "sage", "verse"]
 
 
-class OpenAIChatConfig(State):
+class OpenAIChatConfig(Config):
     model: str
     temperature: float = 1.0
     top_p: float | Missing = MISSING
@@ -31,7 +33,7 @@ class OpenAIChatConfig(State):
     stop_sequences: Sequence[str] | Missing = MISSING
 
 
-class OpenAIRealtimeConfig(State):
+class OpenAIRealtimeConfig(Config):
     model: str
     temperature: float = 1.0
     max_tokens: int | Missing = MISSING
@@ -42,14 +44,14 @@ class OpenAIRealtimeConfig(State):
     vad_eagerness: Literal["low", "medium", "high", "auto"] = "auto"
 
 
-class OpenAIEmbeddingConfig(State):
+class OpenAIEmbeddingConfig(Config):
     model: str
     dimensions: int | Missing = MISSING
     batch_size: int = 128
     timeout: float | Missing = MISSING
 
 
-class OpenAIImageGenerationConfig(State):
+class OpenAIImageGenerationConfig(Config):
     model: str
     result: Literal["url", "b64_json"]
     quality: Literal["standard", "hd"] = "standard"
@@ -58,7 +60,7 @@ class OpenAIImageGenerationConfig(State):
     timeout: float | Missing = MISSING
 
 
-class OpenAIModerationConfig(State):
+class OpenAIModerationConfig(Config):
     model: str = "omni-moderation-latest"
     timeout: float | Missing = MISSING
     harassment_threshold: float | Missing = MISSING

@@ -1,7 +1,9 @@
 from collections.abc import Sequence
 from typing import Literal
 
-from haiway import MISSING, Missing, State
+from haiway import MISSING, Missing
+
+from draive.configuration import Config
 
 __all__ = (
     "GeminiEmbeddingConfig",
@@ -10,7 +12,7 @@ __all__ = (
 )
 
 
-class GeminiGenerationConfig(State):
+class GeminiGenerationConfig(Config):
     model: str
     temperature: float = 1.0
     top_p: float | Missing = MISSING
@@ -22,7 +24,7 @@ class GeminiGenerationConfig(State):
     media_resolution: Literal["low", "medium", "high"] | Missing = MISSING
 
 
-class GeminiLiveConfig(State):
+class GeminiLiveConfig(Config):
     model: str
     temperature: float = 1.0
     top_p: float | Missing = MISSING
@@ -34,7 +36,7 @@ class GeminiLiveConfig(State):
     media_resolution: Literal["low", "medium", "high"] | Missing = MISSING
 
 
-class GeminiEmbeddingConfig(State):
+class GeminiEmbeddingConfig(Config):
     model: str
     dimensions: int | Missing = MISSING
     batch_size: int = 128
