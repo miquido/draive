@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.65.1"
+version = "0.65.2"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
@@ -21,7 +21,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 license = { file = "LICENSE" }
-dependencies = ["numpy~=2.2", "haiway~=0.21.1"]
+dependencies = ["numpy~=2.2", "haiway~=0.21.2"]
 
 [project.urls]
 Homepage = "https://miquido.com"

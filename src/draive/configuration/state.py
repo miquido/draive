@@ -1,12 +1,15 @@
 from collections.abc import Mapping
-from typing import Literal, overload
+from typing import Literal, Self, overload
 
 from haiway import State, ctx
 
 from draive.configuration.types import ConfigurationLoading
 from draive.parameters import BasicValue, DataModel
 
-__all__ = ("Configuration",)
+__all__ = (
+    "Config",
+    "Configuration",
+)
 
 
 async def _no_config(
@@ -48,6 +51,18 @@ class Configuration(State):
         required: Literal[True],
     ) -> Config: ...
 
+    @overload
+    @classmethod
+    async def load[Config: DataModel | State](
+        cls,
+        config: type[Config],
+        /,
+        *,
+        key: str | None,
+        default: Config | None,
+        required: bool,
+    ) -> Config | None: ...
+
     @classmethod
     async def load[Config: DataModel | State](
         cls,
@@ -55,9 +70,9 @@ class Configuration(State):
         /,
         *,
         key: str | None = None,
-        default: Config | Mapping[str, BasicValue] | None = None,
+        default: Config | None = None,
         required: bool = False,
-    ) -> Config | Mapping[str, BasicValue] | None:
+    ) -> Config | None:
         identifier: str = config.__name__ if key is None else key
         loaded: Mapping[str, BasicValue] | None = await ctx.state(cls).loading(identifier)
 
@@ -74,3 +89,46 @@ class Configuration(State):
             return None
 
     loading: ConfigurationLoading = _no_config
+
+
+class Config(State):
+    @overload
+    @classmethod
+    async def load(
+        cls,
+        *,
+        key: str | None = None,
+    ) -> Self | None: ...
+
+    @overload
+    @classmethod
+    async def load(
+        cls,
+        *,
+        key: str | None = None,
+        default: Self,
+    ) -> Self: ...
+
+    @overload
+    @classmethod
+    async def load(
+        cls,
+        *,
+        key: str | None = None,
+        required: Literal[True],
+    ) -> Self: ...
+
+    @classmethod
+    async def load(
+        cls,
+        *,
+        key: str | None = None,
+        default: Self | None = None,
+        required: bool = False,
+    ) -> Self | None:
+        return await Configuration.load(
+            cls,
+            key=key,
+            default=default,
+            required=required,
+        )

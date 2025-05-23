@@ -1,7 +1,9 @@
 from collections.abc import Sequence
 from typing import Literal
 
-from haiway import MISSING, Missing, State
+from haiway import MISSING, Missing
+
+from draive.configuration import Config
 
 __all__ = (
     "VLLMChatConfig",
@@ -9,7 +11,7 @@ __all__ = (
 )
 
 
-class VLLMChatConfig(State):
+class VLLMChatConfig(Config):
     model: str
     temperature: float = 1.0
     top_p: float | Missing = MISSING
@@ -22,7 +24,7 @@ class VLLMChatConfig(State):
     stop_sequences: Sequence[str] | Missing = MISSING
 
 
-class VLLMEmbeddingConfig(State):
+class VLLMEmbeddingConfig(Config):
     model: str
     dimensions: int | Missing = MISSING
     batch_size: int = 128
