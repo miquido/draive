@@ -24,6 +24,7 @@ from mcp.types import ImageContent as MCPImageContent
 from mcp.types import TextContent as MCPTextContent
 from pydantic import AnyUrl
 
+from draive.commons.metadata import MetaTags
 from draive.lmm import LMMCompletion, LMMContextElement, LMMInput, LMMToolError
 from draive.multimodal import MediaData, MultimodalContent, TextContent
 from draive.parameters import BasicValue, DataModel, validated_specification
@@ -48,6 +49,7 @@ class MCPClient:
         args: Sequence[str] | None = None,
         env: Mapping[str, str] | None = None,
         features: Set[Literal["resources", "prompts", "tools"]] | None = None,
+        tags: MetaTags | None = None,
     ) -> Self:
         @asynccontextmanager
         async def mcp_stdio_session() -> AsyncGenerator[ClientSession]:
@@ -65,6 +67,7 @@ class MCPClient:
             identifier or uuid4().hex,
             session_manager=mcp_stdio_session(),
             features=features if features is not None else {"resources", "prompts", "tools"},
+            tags=tags if tags is not None else (),
         )
 
     @classmethod
@@ -77,6 +80,7 @@ class MCPClient:
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
         features: Set[Literal["resources", "prompts", "tools"]] | None = None,
+        tags: MetaTags | None = None,
     ) -> Self:
         @asynccontextmanager
         async def mcp_sse_session() -> AsyncGenerator[ClientSession]:
@@ -93,6 +97,7 @@ class MCPClient:
             identifier or uuid4().hex,
             session_manager=mcp_sse_session(),
             features=features if features is not None else {"resources", "prompts", "tools"},
+            tags=tags if tags is not None else (),
         )
 
     __slots__ = (
@@ -100,6 +105,7 @@ class MCPClient:
         "_session",
         "_session_manager",
         "identifier",
+        "tags",
     )
 
     def __init__(
@@ -108,11 +114,13 @@ class MCPClient:
         *,
         session_manager: AbstractAsyncContextManager[ClientSession],
         features: Set[Literal["resources", "prompts", "tools"]],
+        tags: MetaTags,
     ) -> None:
         self.identifier: str = identifier
         self._session_manager: AbstractAsyncContextManager[ClientSession] = session_manager
         self._session: ClientSession
         self._features: Set[Literal["resources", "prompts", "tools"]] = features
+        self.tags: MetaTags = tags
 
     async def resources_list(
         self,
@@ -133,7 +141,10 @@ class MCPClient:
                 name=resource.name,
                 description=resource.description,
                 mime_type=resource.mimeType,
-                meta={"mcp_server": self.identifier},
+                meta={
+                    "mcp_server": self.identifier,
+                    "tags": self.tags,
+                },
             )
             for resource in result.resources
         ]
@@ -162,7 +173,10 @@ class MCPClient:
                     name="resources",
                     description=None,
                     content=resources,
-                    meta={"mcp_server": self.identifier},
+                    meta={
+                        "mcp_server": self.identifier,
+                        "tags": self.tags,
+                    },
                 )
 
     async def resource_upload(
@@ -204,7 +218,10 @@ class MCPClient:
                 )
                 if prompt.arguments
                 else (),
-                meta={"mcp_server": self.identifier},
+                meta={
+                    "mcp_server": self.identifier,
+                    "tags": self.tags,
+                },
             )
             for prompt in (await self._session.list_prompts()).prompts
         )
@@ -241,7 +258,10 @@ class MCPClient:
             name=name,
             description=fetched_prompt.description,
             content=prompt_context,
-            meta={"mcp_server": self.identifier},
+            meta={
+                "mcp_server": self.identifier,
+                "tags": self.tags,
+            },
         )
 
     async def tools_fetch(
@@ -255,6 +275,7 @@ class MCPClient:
                 tool,
                 tool_call=self._tool_call,
                 source=self.identifier,
+                tags=self.tags,
             )
             for tool in tools.tools
         )
@@ -399,7 +420,10 @@ class MCPClient:
                         blob=text_resource.text.encode(),
                         mime_type=text_resource.mimeType or "text/plain",
                     ),
-                    meta={"mcp_server": self.identifier},
+                    meta={
+                        "mcp_server": self.identifier,
+                        "tags": self.tags,
+                    },
                 )
 
             case BlobResourceContents() as blob_resource:
@@ -411,7 +435,10 @@ class MCPClient:
                         blob=urlsafe_b64decode(blob_resource.blob),
                         mime_type=blob_resource.mimeType or "application/octet-stream",
                     ),
-                    meta={"mcp_server": self.identifier},
+                    meta={
+                        "mcp_server": self.identifier,
+                        "tags": self.tags,
+                    },
                 )
 
     async def __aenter__(self) -> Sequence[Resources | Prompts | Tools]:
@@ -425,23 +452,32 @@ class MCPClient:
                     list_fetching=self.resources_list,
                     fetching=self.resource_fetch,
                     uploading=self.resource_upload,
-                    meta={"mcp_server": self.identifier},
+                    meta={
+                        "mcp_server": self.identifier,
+                        "tags": self.tags,
+                    },
                 )
             )
 
-        if "resources" in self._features:
+        if "prompts" in self._features:
             features.append(
                 Prompts(
                     list_fetching=self.prompts_list,
                     fetching=self.prompt_fetch,
-                    meta={"mcp_server": self.identifier},
+                    meta={
+                        "mcp_server": self.identifier,
+                        "tags": self.tags,
+                    },
                 )
             )
-        if "resources" in self._features:
+        if "tools" in self._features:
             features.append(
                 Tools(
                     fetching=self.tools_fetch,
-                    meta={"mcp_server": self.identifier},
+                    meta={
+                        "mcp_server": self.identifier,
+                        "tags": self.tags,
+                    },
                 )
             )
 
@@ -515,6 +551,7 @@ def _convert_tool(
     *,
     tool_call: Callable[[str, Mapping[str, BasicValue]], Coroutine[None, None, MultimodalContent]],
     source: str,
+    tags: MetaTags,
 ) -> Tool:
     name: str = mcp_tool.name
 
@@ -533,7 +570,10 @@ def _convert_tool(
         format_result=_format_tool_result,
         format_failure=_format_tool_failure,
         handling="auto",
-        meta={"mcp_server": source},
+        meta={
+            "mcp_server": source,
+            "tags": tags,
+        },
     )
 
 

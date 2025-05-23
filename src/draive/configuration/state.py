@@ -9,6 +9,12 @@ from draive.parameters import BasicValue, DataModel
 __all__ = ("Configuration",)
 
 
+async def _no_config(
+    identifier: str,
+) -> Mapping[str, BasicValue] | None:
+    return None
+
+
 class Configuration(State):
     @overload
     @classmethod
@@ -67,4 +73,4 @@ class Configuration(State):
         else:
             return None
 
-    loading: ConfigurationLoading
+    loading: ConfigurationLoading = _no_config

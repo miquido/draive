@@ -154,7 +154,7 @@ class Processing(State):
 
     @overload
     @classmethod
-    async def report_event(
+    async def event(
         cls,
         event: ProcessingEvent,
         /,
@@ -162,7 +162,7 @@ class Processing(State):
 
     @overload
     @classmethod
-    async def report_event(
+    async def event(
         cls,
         /,
         *,
@@ -173,7 +173,7 @@ class Processing(State):
     ) -> None: ...
 
     @classmethod
-    async def report_event(
+    async def event(
         cls,
         event: ProcessingEvent | None = None,
         /,
