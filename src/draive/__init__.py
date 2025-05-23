@@ -73,6 +73,7 @@ from draive.commons import (
     meta_tags,
     with_meta_tags,
 )
+from draive.configuration import Configuration
 from draive.conversation import (
     Conversation,
     ConversationElement,
@@ -234,6 +235,7 @@ __all__ = (
     "BasicValue",
     "Choice",
     "ChoiceOption",
+    "Configuration",
     "ConstantMemory",
     "Conversation",
     "ConversationElement",
