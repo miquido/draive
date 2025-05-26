@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from haiway import Default, State
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.parameters import DataModel, Field, ParameterSpecification
 
 __all__ = (
@@ -96,7 +96,7 @@ class Instruction(State):
         *,
         name: str | None = None,
         description: str | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
         arguments: Mapping[str, str | float | int] | None = None,
     ) -> Self: ...
 
@@ -109,7 +109,7 @@ class Instruction(State):
         *,
         name: str | None = None,
         description: str | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
         arguments: Mapping[str, str | float | int] | None = None,
     ) -> Self | None: ...
 
@@ -121,7 +121,7 @@ class Instruction(State):
         *,
         name: str | None = None,
         description: str | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
         arguments: Mapping[str, str | float | int] | None = None,
     ) -> Self | None:
         match instruction:
@@ -134,7 +134,7 @@ class Instruction(State):
                     description=description,
                     content=content,
                     arguments=arguments if arguments is not None else {},
-                    meta=meta if meta is not None else META_EMPTY,
+                    meta=Meta.of(meta),
                 )
 
             case instruction:
@@ -148,7 +148,9 @@ class Instruction(State):
                     arguments={**instruction.arguments, **arguments}
                     if arguments is not None
                     else instruction.arguments,
-                    meta={**instruction.meta, **meta} if meta is not None else instruction.meta,
+                    meta=instruction.meta.merged_with(meta)
+                    if meta is not None
+                    else instruction.meta,
                 )
 
     name: str

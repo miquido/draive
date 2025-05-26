@@ -6,6 +6,7 @@ from typing import Any, final
 
 from haiway import asynchronous
 
+from draive.commons import Meta
 from draive.instructions.types import (
     Instruction,
     InstructionDeclaration,
@@ -61,7 +62,7 @@ class InstructionsFileStorage:
                     for _, arg_name, _, _ in formatter.parse(content)
                     if arg_name  # we could also check for positional arguments
                 ),
-                meta={"file": str(self._path)},
+                meta=Meta({"file": str(self._path)}),
             )
             for name, content in self._storage.items()
         )

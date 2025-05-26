@@ -4,6 +4,7 @@ from typing import Any, ClassVar, Literal, Protocol, Self, cast, final, overload
 
 from haiway import Disposable, Disposables, State, StateContext, cache, ctx, retry, traced
 
+from draive.commons import Meta, MetaValues
 from draive.instructions import Instruction
 from draive.lmm import (
     LMM,
@@ -32,7 +33,10 @@ from draive.utils import ProcessingState
 from draive.utils.memory import Memory
 from draive.utils.processing import Processing
 
-__all__ = ("Stage",)
+__all__ = (
+    "Stage",
+    "stage",
+)
 
 
 class MakeCacheKey[Key](Protocol):
@@ -89,6 +93,7 @@ class Stage:
         element: LMMContextElement,
         /,
         *elements: LMMContextElement,
+        meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
     @overload
@@ -98,6 +103,7 @@ class Stage:
         element: Prompt | Multimodal,
         /,
         *elements: Multimodal,
+        meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
     @classmethod
@@ -106,6 +112,7 @@ class Stage:
         element: Prompt | LMMContextElement | Multimodal,
         /,
         *elements: LMMContextElement | Multimodal,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
         Creates a Stage that inserts predefined elements into the context.
@@ -121,6 +128,8 @@ class Stage:
             The first element to add to the context.
         *elements : LMMContextElement | Multimodal
             Additional elements to add to the context.
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
 
         Returns
         -------
@@ -172,7 +181,7 @@ class Stage:
             with ctx.scope("stage.predefined"):
                 return ((*context, *context_extension), completion_result)
 
-        return cls(stage)
+        return cls(stage, meta=Meta.of(meta))
 
     @classmethod
     def memory_recall(
@@ -181,6 +190,7 @@ class Stage:
         /,
         *,
         handling: Literal["replace", "extend"] = "replace",
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
         Creates a Stage that recalls context from memory.
@@ -197,6 +207,8 @@ class Stage:
             - "replace": Completely replaces the current context with the recalled one.
             - "extend": Appends the recalled context to the current one.
             Default is "replace".
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
 
         Returns
         -------
@@ -225,13 +237,15 @@ class Stage:
                     with ctx.scope("stage.memory_recall"):
                         return ((*context, *await memory.recall()), result)
 
-        return cls(stage)
+        return cls(stage, meta=Meta.of(meta))
 
     @classmethod
     def memory_remember(
         cls,
         memory: Memory[Any, LMMContext],
         /,
+        *,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
         Creates a Stage that stores the current context in memory.
@@ -243,6 +257,8 @@ class Stage:
         ----------
         memory : Memory[Any, LMMContext]
             The memory instance in which to store the current LMM context.
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
 
         Returns
         -------
@@ -259,7 +275,7 @@ class Stage:
                 await memory.remember(context)
                 return (context, result)
 
-        return cls(stage)
+        return cls(stage, meta=Meta.of(meta))
 
     @classmethod
     def completion(
@@ -270,6 +286,7 @@ class Stage:
         instruction: Instruction | str | None = None,
         tools: Toolbox | Iterable[Tool] | None = None,
         output: LMMOutputSelection = "auto",
+        meta: Meta | MetaValues | None = None,
         **extra: Any,
     ) -> Self:
         """
@@ -293,6 +310,8 @@ class Stage:
             Optional tools that the LMM can use during completion generation.
         output : LMMOutputSelection
             Controls the modality/type of the generated completion, default is "auto".
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
         **extra : Any
             Additional parameters to pass to the LMM invocation.
 
@@ -337,7 +356,7 @@ class Stage:
                     **extra,
                 )
 
-        return cls(stage)
+        return cls(stage, meta=Meta.of(meta))
 
     @classmethod
     def prompting_completion(
@@ -348,6 +367,7 @@ class Stage:
         instruction: Instruction | str | None = None,
         tools: Toolbox | Iterable[Tool] | None = None,
         output: LMMOutputSelection = "auto",
+        meta: Meta | MetaValues | None = None,
         **extra: Any,
     ) -> Self:
         """
@@ -373,6 +393,8 @@ class Stage:
             Optional tools that the LMM can use during completion generation.
         output : LMMOutputSelection
             Controls the modality/type of the generated completion, default is "auto".
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
         **extra : Any
             Additional parameters to pass to the LMM invocation.
 
@@ -413,7 +435,7 @@ class Stage:
                     **extra,
                 )
 
-        return cls(stage)
+        return cls(stage, meta=Meta.of(meta))
 
     @classmethod
     def loopback_completion(
@@ -422,6 +444,7 @@ class Stage:
         instruction: Instruction | str | None = None,
         tools: Toolbox | Iterable[Tool] | None = None,
         output: LMMOutputSelection = "auto",
+        meta: Meta | MetaValues | None = None,
         **extra: Any,
     ) -> Self:
         """
@@ -439,6 +462,8 @@ class Stage:
             Optional tools that the LMM can use during completion generation.
         output : LMMOutputSelection
             Controls the modality/type of the generated completion, default is "auto".
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
         **extra : Any
             Additional parameters to pass to the LMM invocation.
 
@@ -484,13 +509,15 @@ class Stage:
                     **extra,
                 )
 
-        return cls(stage)
+        return cls(stage, meta=Meta.of(meta))
 
     @classmethod
     def transform_result(
         cls,
         transformation: StageResultTransforming,
         /,
+        *,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
         Creates a Stage that transforms the current result without altering the context.
@@ -502,6 +529,8 @@ class Stage:
         ----------
         transformation : StageResultTransforming
             Function that takes the current result and returns a transformed result.
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
 
         Returns
         -------
@@ -517,13 +546,15 @@ class Stage:
             with ctx.scope("stage.transform.result"):
                 return (context, await transformation(result))
 
-        return cls(stage)
+        return cls(stage, meta=Meta.of(meta))
 
     @classmethod
     def transform_context(
         cls,
         transformation: StageContextTransforming,
         /,
+        *,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
         Creates a Stage that transforms the current context without altering the result.
@@ -535,6 +566,8 @@ class Stage:
         ----------
         transformation : StageContextTransforming
             Function that takes the current context and returns a transformed context.
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
 
         Returns
         -------
@@ -552,13 +585,14 @@ class Stage:
                 assert not transformed_context or isinstance(transformed_context[-1], LMMCompletion)  # nosec: B101
                 return (transformed_context, result)
 
-        return cls(stage)
+        return cls(stage, meta=Meta.of(meta))
 
     @classmethod
     def trim_context(
         cls,
         *,
         limit: slice | int | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
         Creates a Stage that trims the current context to a specified limit.
@@ -573,6 +607,8 @@ class Stage:
             - None: Clear the context completely
             - int: Keep only the first N elements
             - slice: Apply a slice operation to the context
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
 
         Returns
         -------
@@ -611,12 +647,21 @@ class Stage:
                     assert not trimmed_context or isinstance(trimmed_context[-1], LMMCompletion)  # nosec: B101
                     return (trimmed_context, result)
 
-        return cls(stage)
+        return cls(stage, meta=Meta.of(meta))
 
     @classmethod
-    def strip_context_tools(cls) -> Self:
+    def strip_context_tools(
+        cls,
+        *,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
         """
         Creates a Stage that trims the current context by removing tool calls.
+
+        Parameters
+        ----------
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
 
         Returns
         -------
@@ -638,13 +683,15 @@ class Stage:
                 result,
             )
 
-        return cls(stage)
+        return cls(stage, meta=Meta.of(meta))
 
     @classmethod
     def access_state(
         cls,
         access: StageStateAccessing,
         /,
+        *,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
         Creates a Stage that allows access to the state without changing context or result.
@@ -658,6 +705,8 @@ class Stage:
         access : StageStateAccessing
             A function that accesses the state. It should be an async function
             that accepts the current context and result but doesn't need to return anything.
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
 
         Returns
         -------
@@ -674,7 +723,7 @@ class Stage:
                 await access(context, result)
                 return (context, result)
 
-        return cls(stage)
+        return cls(stage, meta=Meta.of(meta))
 
     @classmethod
     def loop(
@@ -687,6 +736,7 @@ class Stage:
             "pre_check",
             "post_check",
         ] = "post_check",
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
         Creates a Stage that executes another Stage in a loop while a condition is met.
@@ -706,6 +756,8 @@ class Stage:
             A loop mode determining the first condition check behavior.
             "pre_check" will check the condition before executing stage
             "post_check" will check the condition affter executing stage
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
 
         Returns
         -------
@@ -713,6 +765,7 @@ class Stage:
             A new Stage instance that implements the looping behavior.
         """
         stage_execution: StageExecution = stage.execution
+        stage_meta: Meta = stage.meta
 
         match mode:
             case "pre_check":
@@ -727,6 +780,7 @@ class Stage:
                         current_result: MultimodalContent = result
 
                         while await condition(
+                            meta=stage_meta,
                             context=current_context,
                             result=current_result,
                         ):
@@ -763,6 +817,7 @@ class Stage:
                                 )  # nosec: B101
 
                                 if not await condition(
+                                    meta=stage_meta,
                                     context=current_context,
                                     result=current_result,
                                 ):
@@ -770,7 +825,7 @@ class Stage:
 
                         return (current_context, current_result)
 
-        return cls(stage_loop)
+        return cls(stage_loop, meta=Meta.of(meta))
 
     @classmethod
     def sequence(
@@ -778,6 +833,7 @@ class Stage:
         stage: Self,
         /,
         *stages: Self,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
         Creates a Stage that executes multiple Stages in sequence.
@@ -791,6 +847,8 @@ class Stage:
             The first Stage in the sequence.
         *stages : Stage
             Additional Stages to execute in order after the first Stage.
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
 
         Returns
         -------
@@ -817,7 +875,7 @@ class Stage:
 
             return (current_context, current_result)
 
-        return cls(stage_sequence)
+        return cls(stage_sequence, meta=Meta.of(meta))
 
     @classmethod
     def concurrent(
@@ -826,6 +884,7 @@ class Stage:
         /,
         *stages: Self,
         merge: StageMerging,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
         Creates a Stage that executes multiple Stages concurrently.
@@ -844,6 +903,8 @@ class Stage:
             A function that merges the results from all concurrent Stage executions.
             It should be an async function that accepts a sequence of (context, result)
             tuples and returns a single (context, result) tuple.
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
 
         Returns
         -------
@@ -877,14 +938,18 @@ class Stage:
                 assert not merged_context or isinstance(merged_context[-1], LMMCompletion)  # nosec: B101
                 return (merged_context, merged_result)
 
-        return cls(concurrent_stage)
+        return cls(concurrent_stage, meta=Meta.of(meta))
 
-    __slots__ = ("execution",)
+    __slots__ = (
+        "execution",
+        "meta",
+    )
 
     def __init__(
         self,
         execution: StageExecution,
         /,
+        meta: Meta,
     ) -> None:
         assert not isinstance(execution, Stage)  # nosec: B101
         assert isinstance(execution, StageExecution)  # nosec: B101
@@ -893,6 +958,12 @@ class Stage:
             self,
             "execution",
             execution,
+        )
+        self.meta: Meta
+        object.__setattr__(
+            self,
+            "meta",
+            meta,
         )
 
     @overload
@@ -1061,7 +1132,7 @@ class Stage:
                                 result=result,
                             )
 
-        return self.__class__(stage)
+        return self.__class__(stage, meta=self.meta)
 
     def traced(
         self,
@@ -1085,7 +1156,7 @@ class Stage:
             A new Stage instance with tracing enabled.
         """
 
-        return self.__class__(traced(label=label)(self.execution))
+        return self.__class__(traced(label=label)(self.execution), meta=self.meta)
 
     @overload
     def cached[Key: Hashable](
@@ -1157,7 +1228,8 @@ class Stage:
                         read=read,
                         write=write,
                     )(self.execution),
-                )
+                ),
+                meta=self.meta,
             )
 
         else:
@@ -1167,7 +1239,8 @@ class Stage:
                     limit=limit,
                     expiration=expiration,
                     make_key=make_key,
-                )(self.execution)
+                )(self.execution),
+                meta=self.meta,
             )
 
     def with_retry(
@@ -1207,7 +1280,8 @@ class Stage:
                 limit=limit,
                 delay=delay,
                 catching=catching,
-            )(self.execution)
+            )(self.execution),
+            meta=self.meta,
         )
 
     def with_fallback(
@@ -1261,7 +1335,7 @@ class Stage:
                     else:
                         raise exc
 
-        return self.__class__(stage)
+        return self.__class__(stage, meta=self.meta)
 
     def with_volatile_context(self) -> Self:
         """
@@ -1288,7 +1362,7 @@ class Stage:
             )
             return (context, processed_result)
 
-        return self.__class__(stage)
+        return self.__class__(stage, meta=self.meta)
 
     def with_volatile_tools_context(self) -> Self:
         """
@@ -1336,7 +1410,7 @@ class Stage:
             assert not merged_context or isinstance(merged_context[-1], LMMCompletion)  # nosec: B101
             return (merged_context, processed_result)
 
-        return self.__class__(stage)
+        return self.__class__(stage, meta=self.meta)
 
     def when(
         self,
@@ -1377,6 +1451,7 @@ class Stage:
         >>> primary_stage.when(is_premium_user, alternative=basic_stage)
         """
         execution: StageExecution = self.execution
+        meta: Meta = self.meta
         alternative_execution: StageExecution | None = (
             alternative.execution if alternative else None
         )
@@ -1411,7 +1486,7 @@ class Stage:
                     context: LMMContext,
                     result: MultimodalContent,
                 ) -> tuple[LMMContext, MultimodalContent]:
-                    if await function(context=context, result=result):
+                    if await function(meta=meta, context=context, result=result):
                         return await execution(
                             context=context,
                             result=result,
@@ -1426,7 +1501,7 @@ class Stage:
                     else:
                         return (context, result)
 
-        return self.__class__(stage)
+        return self.__class__(stage, meta=self.meta)
 
     def ignore_result(self) -> Self:
         """
@@ -1454,7 +1529,7 @@ class Stage:
 
             return (processed_context, result)
 
-        return self.__class__(stage)
+        return self.__class__(stage, meta=self.meta)
 
     def extend_result(self) -> Self:
         """
@@ -1481,7 +1556,7 @@ class Stage:
             )
             return (processed_context, result.extending(processed_result))
 
-        return self.__class__(stage)
+        return self.__class__(stage, meta=self.meta)
 
     def __setattr__(
         self,
@@ -1611,7 +1686,37 @@ async def _lmm_completion(
     raise RuntimeError("LMM exceeded limit of recursive calls")
 
 
-@Stage
+@overload
+def stage(
+    execution: StageExecution,
+    /,
+) -> Stage: ...
+
+
+@overload
+def stage(
+    *,
+    meta: Meta | MetaValues | None = None,
+) -> Callable[[StageExecution], Stage]: ...
+
+
+def stage(
+    execution: StageExecution | None = None,
+    /,
+    *,
+    meta: Meta | MetaValues | None = None,
+) -> Callable[[StageExecution], Stage] | Stage:
+    def wrap(execution: StageExecution) -> Stage:
+        return Stage(execution, meta=Meta.of(meta))
+
+    if execution is None:
+        return wrap
+
+    else:
+        return wrap(execution)
+
+
+@stage
 async def _noop(
     *,
     context: LMMContext,

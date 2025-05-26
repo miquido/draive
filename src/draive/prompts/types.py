@@ -3,7 +3,7 @@ from typing import Any, Protocol, Self, runtime_checkable
 
 from haiway import State
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.lmm import LMMContext, LMMContextElement
 from draive.parameters import DataModel, Field
 from draive.parameters.specification import ParameterSpecification
@@ -52,13 +52,13 @@ class Prompt(State):
         *content: LMMContextElement,
         name: str,
         description: str | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             name=name,
             description=description,
             content=content,
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     name: str

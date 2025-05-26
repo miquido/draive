@@ -346,23 +346,6 @@ def _prepare_specification_of_mapping(
     /,
     description: str | None,
 ) -> ParameterSpecification:
-    # special handlig for meta as it is recursive type
-    # which is an equivalent of json object
-    # asuming type aliases are put within extra in haiway
-    if annotation.extra.get("TYPE_ALIAS") == Meta.__name__:
-        if description := description:
-            return {
-                "type": "object",
-                "additionalProperties": True,
-                "description": description,
-            }
-
-        else:
-            return {
-                "type": "object",
-                "additionalProperties": True,
-            }
-
     if description := description:
         return {
             "type": "object",
@@ -380,6 +363,26 @@ def _prepare_specification_of_mapping(
                 annotation.arguments[1],
                 description=None,
             ),
+        }
+
+
+def _prepare_specification_of_meta(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    # TODO: prepare actual property types declaration
+    if description := description:
+        return {
+            "type": "object",
+            "additionalProperties": True,
+            "description": description,
+        }
+
+    else:
+        return {
+            "type": "object",
+            "additionalProperties": True,
         }
 
 
@@ -639,6 +642,7 @@ SPECIFICATIONS: Mapping[
     Literal: _prepare_specification_of_literal,
     Sequence: _prepare_specification_of_sequence,
     Mapping: _prepare_specification_of_mapping,
+    Meta: _prepare_specification_of_meta,
     UUID: _prepare_specification_of_uuid,
     date: _prepare_specification_of_date,
     datetime: _prepare_specification_of_datetime,

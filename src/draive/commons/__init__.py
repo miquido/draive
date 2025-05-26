@@ -1,21 +1,17 @@
 from draive.commons.metadata import (
     META_EMPTY,
     Meta,
-    MetaPath,
     MetaTags,
     MetaValue,
-    check_meta_tags,
-    meta_tags,
-    with_meta_tags,
+    MetaValues,
+    validated_meta_value,
 )
 
 __all__ = (
     "META_EMPTY",
     "Meta",
-    "MetaPath",
     "MetaTags",
     "MetaValue",
-    "check_meta_tags",
-    "meta_tags",
-    "with_meta_tags",
+    "MetaValues",
+    "validated_meta_value",
 )

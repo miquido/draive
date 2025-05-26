@@ -4,7 +4,7 @@ from typing import Any, Protocol, Self, cast, final, overload, runtime_checkable
 
 from haiway import AttributePath, ScopeContext, ctx
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.evaluation.score import EvaluationScore
 from draive.evaluation.value import EvaluationScoreValue, evaluation_score_value
 from draive.parameters import DataModel, Field
@@ -35,7 +35,7 @@ class EvaluatorResult(DataModel):
         score: EvaluationScoreValue,
         score_comment: str | None = None,
         threshold: EvaluationScoreValue,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             evaluator=evaluator,
@@ -44,7 +44,7 @@ class EvaluatorResult(DataModel):
                 comment=score_comment,
             ),
             threshold=evaluation_score_value(threshold),
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     evaluator: str = Field(
@@ -134,7 +134,7 @@ class EvaluationResult(DataModel):
         cls,
         score: EvaluationScore | float | bool,
         /,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         evaluation_score: EvaluationScore
         match score:
@@ -149,7 +149,7 @@ class EvaluationResult(DataModel):
 
         return cls(
             score=evaluation_score,
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     score: EvaluationScore = Field(
@@ -256,7 +256,7 @@ class Evaluator[Value, **Args]:
         definition: EvaluatorDefinition[Value, Args],
         threshold: float | None,
         execution_context: ScopeContext | None,
-        meta: Meta | None,
+        meta: Meta,
     ) -> None:
         assert (  # nosec: B101
             threshold is None or 0 <= threshold <= 1
@@ -291,7 +291,7 @@ class Evaluator[Value, **Args]:
         object.__setattr__(
             self,
             "meta",
-            meta if meta is not None else META_EMPTY,
+            meta,
         )
 
     def with_name(
@@ -335,7 +335,7 @@ class Evaluator[Value, **Args]:
 
     def with_meta(
         self,
-        meta: Meta,
+        meta: Meta | MetaValues,
         /,
     ) -> Self:
         return self.__class__(
@@ -343,7 +343,7 @@ class Evaluator[Value, **Args]:
             definition=self._definition,
             threshold=self.threshold,
             execution_context=self._execution_context,
-            meta={**self.meta, **meta} if self.meta else meta,
+            meta=self.meta.merged_with(meta),
         )
 
     def prepared(
@@ -474,12 +474,12 @@ class Evaluator[Value, **Args]:
                 value=0,
                 comment="Evaluation failed",
             )
-            evaluation_meta = {"exception": str(exc)}
+            evaluation_meta = Meta({"exception": str(exc)})
 
         result_meta: Meta
         if self.meta:
             if evaluation_meta:
-                result_meta = {**self.meta, **evaluation_meta}
+                result_meta = self.meta.merged_with(evaluation_meta)
 
             else:
                 result_meta = self.meta
@@ -527,7 +527,7 @@ def evaluator[Value, **Args](
     name: str | None = None,
     threshold: EvaluationScoreValue | None = None,
     execution_context: ScopeContext | None = None,
-    meta: Meta | None = None,
+    meta: Meta | MetaValues | None = None,
 ) -> Callable[
     [EvaluatorDefinition[Value, Args]],
     Evaluator[Value, Args],
@@ -541,7 +541,7 @@ def evaluator[Value, **Args](
     name: str | None = None,
     threshold: EvaluationScoreValue | None = None,
     execution_context: ScopeContext | None = None,
-    meta: Meta | None = None,
+    meta: Meta | MetaValues | None = None,
 ) -> (
     Callable[
         [EvaluatorDefinition[Value, Args]],
@@ -557,7 +557,7 @@ def evaluator[Value, **Args](
             definition=definition,
             threshold=evaluation_score_value(threshold) if threshold is not None else None,
             execution_context=execution_context,
-            meta=meta,
+            meta=Meta.of(meta),
         )
 
     if evaluation:

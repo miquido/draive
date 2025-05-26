@@ -66,12 +66,9 @@ from draive.choice import (
 from draive.commons import (
     META_EMPTY,
     Meta,
-    MetaPath,
     MetaTags,
     MetaValue,
-    check_meta_tags,
-    meta_tags,
-    with_meta_tags,
+    MetaValues,
 )
 from draive.configuration import Config, Configuration
 from draive.conversation import (
@@ -192,6 +189,7 @@ from draive.stages import (
     Stage,
     StageCondition,
     StageException,
+    stage,
 )
 from draive.tokenization import Tokenization
 from draive.tools import (
@@ -289,9 +287,9 @@ __all__ = (
     "Memory",
     "Meta",
     "MetaContent",
-    "MetaPath",
     "MetaTags",
     "MetaValue",
+    "MetaValues",
     "Missing",
     "MissingContext",
     "MissingState",
@@ -361,7 +359,6 @@ __all__ = (
     "async_noop",
     "asynchronous",
     "cache",
-    "check_meta_tags",
     "choice_completion",
     "ctx",
     "getenv_bool",
@@ -371,7 +368,6 @@ __all__ = (
     "instruction",
     "is_missing",
     "load_env",
-    "meta_tags",
     "mmr_vector_similarity_search",
     "noop",
     "not_missing",
@@ -381,6 +377,7 @@ __all__ = (
     "setup_logging",
     "split_sequence",
     "split_text",
+    "stage",
     "throttle",
     "timeout",
     "tool",
@@ -388,6 +385,5 @@ __all__ = (
     "vector_similarity_score",
     "vector_similarity_search",
     "when_missing",
-    "with_meta_tags",
     "workflow",
 )

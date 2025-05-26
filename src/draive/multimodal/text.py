@@ -1,12 +1,26 @@
+from typing import Self
+
 from haiway import Default
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.parameters import DataModel
 
 __all__ = ("TextContent",)
 
 
 class TextContent(DataModel):
+    @classmethod
+    def of(
+        cls,
+        text: str,
+        *,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        return cls(
+            text=text,
+            meta=Meta.of(meta),
+        )
+
     text: str
     meta: Meta = Default(META_EMPTY)
 

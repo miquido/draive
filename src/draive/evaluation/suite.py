@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 
 from haiway import ScopeContext, asynchronous, ctx
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.evaluation.generator import generate_case_parameters
 from draive.evaluation.scenario import PreparedScenarioEvaluator, ScenarioEvaluatorResult
@@ -149,7 +149,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
         results: ScenarioEvaluatorResult | EvaluatorResult,
         *_results: ScenarioEvaluatorResult | EvaluatorResult,
         value: Value,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         free_results: list[EvaluatorResult] = []
         scenario_results: list[ScenarioEvaluatorResult] = []
@@ -172,7 +172,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
         return cls(
             value=value,
             results=tuple(scenario_results),
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     @classmethod
@@ -182,7 +182,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
         /,
         evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
         *_evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls.of(
             *await gather(
@@ -190,7 +190,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
                 return_exceptions=False,
             ),
             value=value,
-            meta=meta,
+            meta=Meta.of(meta),
         )
 
     value: Value = Field(

@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from itertools import chain
 from typing import ClassVar, Self, final, overload
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import Meta, MetaValues
 from draive.multimodal.media import MediaContent, MediaData, MediaKind, MediaReference
 from draive.multimodal.meta import MetaContent
 from draive.multimodal.text import TextContent
@@ -28,7 +28,7 @@ class MultimodalContent(DataModel):
     def of(
         cls,
         *elements: Self | MultimodalContentConvertible,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         match elements:
             case [MultimodalContent() as content]:
@@ -42,7 +42,7 @@ class MultimodalContent(DataModel):
                             *chain.from_iterable(
                                 _extract_parts(
                                     element,
-                                    meta=meta if meta is not None else META_EMPTY,
+                                    meta=Meta.of(meta),
                                 )
                                 for element in elements
                             )

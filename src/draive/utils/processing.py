@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from haiway import Default, MissingState, State, ctx
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.multimodal import MultimodalContent
 from draive.multimodal.content import Multimodal
 from draive.parameters import DataModel
@@ -25,13 +25,13 @@ class ProcessingEvent(DataModel):
         *,
         name: str,
         content: Multimodal | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             identifier=identifier if identifier is not None else uuid4().hex,
             name=name,
             content=MultimodalContent.of(content) if content is not None else None,
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     identifier: str
@@ -168,8 +168,8 @@ class Processing(State):
         *,
         identifier: str,
         name: str | None,
-        content: Multimodal | None | None = None,
-        meta: Meta | None = None,
+        content: Multimodal | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> None: ...
 
     @classmethod
@@ -180,8 +180,8 @@ class Processing(State):
         *,
         identifier: str | None = None,
         name: str | None = None,
-        content: Multimodal | None | None = None,
-        meta: Meta | None = None,
+        content: Multimodal | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> None:
         if event is not None:
             assert identifier is None and name is None  # nosec: B101
@@ -193,7 +193,7 @@ class Processing(State):
                 identifier=identifier,
                 name=name,
                 content=MultimodalContent.of(content) if content is not None else None,
-                meta=meta if meta is not None else META_EMPTY,
+                meta=Meta.of(meta),
             )
         )
 

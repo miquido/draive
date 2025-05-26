@@ -4,10 +4,8 @@ from typing import Any, Protocol, cast, final, overload
 from haiway import ctx
 from haiway.utils import format_str
 
-from draive.commons import META_EMPTY, Meta
-from draive.lmm.types import (
-    LMMToolError,
-)
+from draive.commons import Meta, MetaValues
+from draive.lmm.types import LMMToolError
 from draive.multimodal import MultimodalContent, MultimodalContentConvertible
 from draive.parameters import ParameterSpecification, ParametersSpecification, ParametrizedFunction
 from draive.tools.types import (
@@ -26,7 +24,6 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         "_check_availability",
         "_format_failure",
         "_format_result",
-        "description",
         "handling",
         "meta",
         "name",
@@ -73,12 +70,6 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
             "name",
             name,
         )
-        self.description: str | None
-        object.__setattr__(
-            self,
-            "description",
-            description,
-        )
         self.parameters: ParametersSpecification | None
         object.__setattr__(
             self,
@@ -116,8 +107,12 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         object.__setattr__(
             self,
             "meta",
-            meta,
+            meta.with_description(description) if description else meta,
         )
+
+    @property
+    def description(self) -> str | None:
+        return self.meta.description
 
     @property
     def available(self) -> bool:
@@ -233,7 +228,7 @@ def tool[Result](
     format_result: ToolResultFormatting[Result],
     format_failure: ToolErrorFormatting | None = None,
     handling: ToolHandling = "auto",
-    meta: Meta | None = None,
+    meta: Meta | MetaValues | None = None,
 ) -> PartialToolWrapper[Result]:
     """
     Convert a function to a tool using provided parameters.
@@ -285,7 +280,7 @@ def tool(
     availability_check: ToolAvailabilityChecking | None = None,
     format_failure: ToolErrorFormatting | None = None,
     handling: ToolHandling = "auto",
-    meta: Meta | None = None,
+    meta: Meta | MetaValues | None = None,
 ) -> ToolWrapper:
     """
     Convert a function to a tool using provided parameters.
@@ -316,7 +311,7 @@ def tool(
         Note that during concurrent execution of multiple tools the call/result order defines
         direct result and exact behavior is not defined.
         Default is "auto".
-    meta: Meta | None
+    meta: Meta | MetaValues | None
         custom metadata allowing to access tool metadata like its source in case of remote tools.
 
     Returns
@@ -335,7 +330,7 @@ def tool[**Args, Result](
     format_result: ToolResultFormatting[Result] | None = None,
     format_failure: ToolErrorFormatting | None = None,
     handling: ToolHandling = "auto",
-    meta: Meta | None = None,
+    meta: Meta | MetaValues | None = None,
 ) -> PartialToolWrapper[Result] | ToolWrapper | FunctionTool[Args, Result]:
     def wrap[**Arg](
         function: Callable[Arg, Coroutine[None, None, Result]],
@@ -349,7 +344,7 @@ def tool[**Args, Result](
             format_result=format_result or _default_result_format,
             format_failure=format_failure or _default_failure_result,
             handling=handling,
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     if function := function:

@@ -11,6 +11,8 @@ from haiway.state.attributes import (
     _resolve_type_typeddict,
 )
 
+from draive.commons import Meta
+from draive.commons.metadata import validated_meta_value
 from draive.parameters.types import (
     ParameterValidation,
     ParameterValidationContext,
@@ -80,6 +82,7 @@ class ParameterValidator[Type]:
         elif issubclass(annotation.origin, StrEnum):
             # TODO: FIXME: str enums !!!
             validator.validation = _prepare_validator_of_enum(annotation, verifier, recursion_guard)
+
         elif issubclass(annotation.origin, IntEnum):
             # TODO: FIXME: int enums !!!
             validator.validation = _prepare_validator_of_enum(annotation, verifier, recursion_guard)
@@ -445,6 +448,69 @@ def _prepare_validator_of_mapping(
                     # TODO: FIXME: make sure dict is not mutable?
                     # return MappingProxyType(validated)
                     return validated
+
+                case _:
+                    raise TypeError(
+                        f"'{value}' is not matching expected type of '{formatted_type}'"
+                    )
+
+    return validator
+
+
+def _prepare_validator_of_meta(  # noqa: C901
+    annotation: AttributeAnnotation,
+    /,
+    verifier: ParameterVerification[Any] | None,
+    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
+) -> ParameterValidation[Any]:
+    formatted_type: str = str(annotation)
+
+    if verifier := verifier:
+
+        def validator(
+            value: Any,
+            /,
+            context: ParameterValidationContext,
+        ) -> Any:
+            match value:
+                case Meta() as meta:
+                    return meta
+
+                case {**elements}:
+                    validated: MutableMapping[Any, Any] = {}
+                    for key, element in elements.items():
+                        if not isinstance(key, str):
+                            raise TypeError(f"'{key}' is not matching expected type of '{str}'")
+
+                        with context.scope(f"[{key}]"):
+                            validated[key] = validated_meta_value(element)
+
+                    meta: Meta = Meta(validated)
+                    verifier(meta)
+                    return meta
+
+                case _:
+                    raise TypeError(
+                        f"'{value}' is not matching expected type of '{formatted_type}'"
+                    )
+    else:
+
+        def validator(
+            value: Any,
+            /,
+            context: ParameterValidationContext,
+        ) -> Any:
+            match value:
+                case {**elements}:
+                    validated: MutableMapping[Any, Any] = {}
+                    for key, element in elements.items():
+                        if not isinstance(key, str):
+                            raise TypeError(f"'{key}' is not matching expected type of '{str}'")
+
+                        with context.scope(f"[{key}]"):
+                            validated[key] = validated_meta_value(element)
+
+                    return Meta(validated)
 
                 case _:
                     raise TypeError(
@@ -1065,6 +1131,7 @@ VALIDATORS: Mapping[
     Literal: _prepare_validator_of_literal,
     Sequence: _prepare_validator_of_sequence,
     Mapping: _prepare_validator_of_mapping,
+    Meta: _prepare_validator_of_meta,
     UUID: _prepare_validator_of_uuid,
     date: _prepare_validator_of_date,
     datetime: _prepare_validator_of_datetime,
