@@ -2,7 +2,7 @@ from collections.abc import Iterable, Mapping, MutableMapping
 
 from haiway import State
 
-from draive.configuration import Configuration
+from draive.configuration import Config, Configuration
 from draive.parameters import DataModel
 from draive.parameters.types import BasicValue
 
@@ -22,11 +22,14 @@ def VolatileConfiguration(
     configurations: MutableMapping[str, Mapping[str, BasicValue]] = {}
     for config in configuration:
         match config:
-            case State() as state:
-                configurations[state.__name__] = state.to_mapping()
+            case Config():  # it is state although it fails to match for State
+                configurations[type(config).__name__] = config.to_mapping()
 
-            case DataModel() as model:
-                configurations[model.__name__] = model.to_mapping()
+            case State():
+                configurations[type(config).__name__] = config.to_mapping()
+
+            case DataModel():
+                configurations[type(config).__name__] = config.to_mapping()
 
             case (str() as key, State() as state):
                 configurations[key] = state.to_mapping()

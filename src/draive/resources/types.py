@@ -3,7 +3,7 @@ from typing import Any, Protocol, Self, overload, runtime_checkable
 
 from haiway import Default, State
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.multimodal import (
     MediaData,
     MediaReference,
@@ -141,7 +141,7 @@ class Resource(State):
         name: str | None = None,
         description: str | None = None,
         mime_type: str,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
     @overload
@@ -155,7 +155,7 @@ class Resource(State):
         name: str | None = None,
         description: str | None = None,
         mime_type: str | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
     @classmethod
@@ -168,7 +168,7 @@ class Resource(State):
         name: str | None = None,
         description: str | None = None,
         mime_type: str | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         resource_content: ResourceContent
         resource_meta: Meta
@@ -178,14 +178,14 @@ class Resource(State):
                     mime_type=mime_type or "text/plain",
                     blob=text.encode(),
                 )
-                resource_meta = meta if meta is not None else META_EMPTY
+                resource_meta = Meta.of(meta)
 
             case bytes() as data:
                 resource_content = ResourceContent(
                     mime_type=mime_type or "application/octet-stream",
                     blob=data,
                 )
-                resource_meta = meta if meta is not None else META_EMPTY
+                resource_meta = Meta.of(meta)
 
             case TextContent() as text_content:
                 resource_content = ResourceContent(
@@ -193,7 +193,7 @@ class Resource(State):
                     blob=text_content.text.encode(),
                 )
                 resource_meta = (
-                    {**text_content.meta, **meta} if meta is not None else text_content.meta
+                    text_content.meta.merged_with(meta) if meta is not None else text_content.meta
                 )
 
             case MediaData() as media_data:
@@ -201,7 +201,9 @@ class Resource(State):
                     mime_type=mime_type or media_data.media,
                     blob=media_data.data,
                 )
-                resource_meta = {**media_data.meta, **meta} if meta is not None else media_data.meta
+                resource_meta = (
+                    media_data.meta.merged_with(meta) if meta is not None else media_data.meta
+                )
 
             case MediaReference():
                 raise ValueError("Resource can't use a media reference")
@@ -211,7 +213,7 @@ class Resource(State):
                     mime_type=mime_type or "application/json",
                     blob=other.to_json().encode(),
                 )
-                resource_meta = meta if meta is not None else META_EMPTY
+                resource_meta = Meta.of(meta)
 
         return cls(
             uri=uri,

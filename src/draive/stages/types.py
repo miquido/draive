@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
+from draive.commons import Meta
 from draive.lmm import LMMContext
 from draive.multimodal import MultimodalContent
 
@@ -38,6 +39,7 @@ class StageMerging(Protocol):
 class StageCondition(Protocol):
     async def __call__(
         self,
+        meta: Meta,
         context: LMMContext,
         result: MultimodalContent,
     ) -> bool: ...

@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Any, Protocol, runtime_checkable
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import Meta, MetaValues
 from draive.multimodal import MultimodalContent
 
 __all__ = (
@@ -19,13 +19,13 @@ class GuardrailsModerationException(Exception):
         violations: Sequence[str],
         content: MultimodalContent,
         replacement: MultimodalContent | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> None:
         super().__init__(*args)
         self.violations: Sequence[str] = violations
         self.content: MultimodalContent = content
         self.replacement: MultimodalContent | None = replacement
-        self.meta: Meta = meta if meta is not None else META_EMPTY
+        self.meta: Meta = Meta.of(meta)
 
 
 class GuardrailsInputModerationException(GuardrailsModerationException):
@@ -35,7 +35,7 @@ class GuardrailsInputModerationException(GuardrailsModerationException):
         violations: Sequence[str],
         content: MultimodalContent,
         replacement: MultimodalContent | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> None:
         super().__init__(
             *args,
@@ -53,7 +53,7 @@ class GuardrailsOutputModerationException(GuardrailsModerationException):
         violations: Sequence[str],
         content: MultimodalContent,
         replacement: MultimodalContent | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> None:
         super().__init__(
             *args,

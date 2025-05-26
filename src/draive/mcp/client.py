@@ -24,7 +24,7 @@ from mcp.types import ImageContent as MCPImageContent
 from mcp.types import TextContent as MCPTextContent
 from pydantic import AnyUrl
 
-from draive.commons.metadata import MetaTags
+from draive.commons import Meta, MetaTags
 from draive.lmm import LMMCompletion, LMMContextElement, LMMInput, LMMToolError
 from draive.multimodal import MediaData, MultimodalContent, TextContent
 from draive.parameters import BasicValue, DataModel, validated_specification
@@ -141,10 +141,12 @@ class MCPClient:
                 name=resource.name,
                 description=resource.description,
                 mime_type=resource.mimeType,
-                meta={
-                    "mcp_server": self.identifier,
-                    "tags": self.tags,
-                },
+                meta=Meta(
+                    {
+                        "mcp_server": self.identifier,
+                        "tags": self.tags,
+                    }
+                ),
             )
             for resource in result.resources
         ]
@@ -173,10 +175,12 @@ class MCPClient:
                     name="resources",
                     description=None,
                     content=resources,
-                    meta={
-                        "mcp_server": self.identifier,
-                        "tags": self.tags,
-                    },
+                    meta=Meta(
+                        {
+                            "mcp_server": self.identifier,
+                            "tags": self.tags,
+                        }
+                    ),
                 )
 
     async def resource_upload(
@@ -218,10 +222,12 @@ class MCPClient:
                 )
                 if prompt.arguments
                 else (),
-                meta={
-                    "mcp_server": self.identifier,
-                    "tags": self.tags,
-                },
+                meta=Meta(
+                    {
+                        "mcp_server": self.identifier,
+                        "tags": self.tags,
+                    }
+                ),
             )
             for prompt in (await self._session.list_prompts()).prompts
         )
@@ -258,10 +264,12 @@ class MCPClient:
             name=name,
             description=fetched_prompt.description,
             content=prompt_context,
-            meta={
-                "mcp_server": self.identifier,
-                "tags": self.tags,
-            },
+            meta=Meta(
+                {
+                    "mcp_server": self.identifier,
+                    "tags": self.tags,
+                }
+            ),
         )
 
     async def tools_fetch(
@@ -420,10 +428,12 @@ class MCPClient:
                         blob=text_resource.text.encode(),
                         mime_type=text_resource.mimeType or "text/plain",
                     ),
-                    meta={
-                        "mcp_server": self.identifier,
-                        "tags": self.tags,
-                    },
+                    meta=Meta(
+                        {
+                            "mcp_server": self.identifier,
+                            "tags": self.tags,
+                        }
+                    ),
                 )
 
             case BlobResourceContents() as blob_resource:
@@ -435,10 +445,12 @@ class MCPClient:
                         blob=urlsafe_b64decode(blob_resource.blob),
                         mime_type=blob_resource.mimeType or "application/octet-stream",
                     ),
-                    meta={
-                        "mcp_server": self.identifier,
-                        "tags": self.tags,
-                    },
+                    meta=Meta(
+                        {
+                            "mcp_server": self.identifier,
+                            "tags": self.tags,
+                        }
+                    ),
                 )
 
     async def __aenter__(self) -> Sequence[Resources | Prompts | Tools]:
@@ -452,10 +464,12 @@ class MCPClient:
                     list_fetching=self.resources_list,
                     fetching=self.resource_fetch,
                     uploading=self.resource_upload,
-                    meta={
-                        "mcp_server": self.identifier,
-                        "tags": self.tags,
-                    },
+                    meta=Meta(
+                        {
+                            "mcp_server": self.identifier,
+                            "tags": self.tags,
+                        }
+                    ),
                 )
             )
 
@@ -464,20 +478,24 @@ class MCPClient:
                 Prompts(
                     list_fetching=self.prompts_list,
                     fetching=self.prompt_fetch,
-                    meta={
-                        "mcp_server": self.identifier,
-                        "tags": self.tags,
-                    },
+                    meta=Meta(
+                        {
+                            "mcp_server": self.identifier,
+                            "tags": self.tags,
+                        }
+                    ),
                 )
             )
         if "tools" in self._features:
             features.append(
                 Tools(
                     fetching=self.tools_fetch,
-                    meta={
-                        "mcp_server": self.identifier,
-                        "tags": self.tags,
-                    },
+                    meta=Meta(
+                        {
+                            "mcp_server": self.identifier,
+                            "tags": self.tags,
+                        }
+                    ),
                 )
             )
 
@@ -570,10 +588,12 @@ def _convert_tool(
         format_result=_format_tool_result,
         format_failure=_format_tool_failure,
         handling="auto",
-        meta={
-            "mcp_server": source,
-            "tags": tags,
-        },
+        meta=Meta(
+            {
+                "mcp_server": source,
+                "tags": tags,
+            }
+        ),
     )
 
 
@@ -773,7 +793,7 @@ class MCPClients:
                     list_fetching=self.resources_list,
                     fetching=self.resource_fetch,
                     uploading=self.resource_upload,
-                    meta={"mcp_server": "mcp_aggregate"},
+                    meta=Meta({"mcp_server": "mcp_aggregate"}),
                 )
             )
 
@@ -782,7 +802,7 @@ class MCPClients:
                 Prompts(
                     list_fetching=self.prompts_list,
                     fetching=self.prompt_fetch,
-                    meta={"mcp_server": "mcp_aggregate"},
+                    meta=Meta({"mcp_server": "mcp_aggregate"}),
                 )
             )
 
@@ -790,7 +810,7 @@ class MCPClients:
             inherited_features.append(
                 Tools(
                     fetching=self.tools_fetch,
-                    meta={"mcp_server": "mcp_aggregate"},
+                    meta=Meta({"mcp_server": "mcp_aggregate"}),
                 )
             )
 

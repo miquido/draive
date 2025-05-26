@@ -4,7 +4,7 @@ from typing import Final, Literal, Self, cast, get_args
 
 from haiway import Default
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.multimodal.data_field import b64_data_field
 from draive.parameters import DataModel
 
@@ -52,12 +52,12 @@ class MediaReference(DataModel):
         /,
         media: MediaType | None = None,
         *,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             media=media if media is not None else "unknown",
             uri=uri,
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     media: MediaType
@@ -83,12 +83,12 @@ class MediaData(DataModel):
         /,
         media: MediaType,
         *,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             media=media,
             data=data if isinstance(data, bytes) else b64decode(data),
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     media: MediaType

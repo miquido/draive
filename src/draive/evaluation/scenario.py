@@ -4,7 +4,7 @@ from typing import Any, Protocol, Self, cast, overload, runtime_checkable
 
 from haiway import AttributePath, ScopeContext, ctx
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.parameters import DataModel, Field
 
@@ -85,16 +85,16 @@ class EvaluationScenarioResult(DataModel):
         /,
         evaluators: PreparedEvaluator[Value],
         *_evaluators: PreparedEvaluator[Value],
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             evaluations=tuple(
                 await gather(
-                    *[evaluator(value) for evaluator in [evaluators, *_evaluators]],
+                    *(evaluator(value) for evaluator in (evaluators, *_evaluators)),
                     return_exceptions=False,
                 ),
             ),
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     evaluations: Sequence[EvaluatorResult] = Field(
@@ -137,7 +137,7 @@ class ScenarioEvaluator[Value, **Args]:
         name: str,
         definition: ScenarioEvaluatorDefinition[Value, Args],
         execution_context: ScopeContext | None,
-        meta: Meta | None,
+        meta: Meta,
     ) -> None:
         assert "\n" not in name  # nosec: B101
 
@@ -163,7 +163,7 @@ class ScenarioEvaluator[Value, **Args]:
         object.__setattr__(
             self,
             "meta",
-            meta if meta is not None else META_EMPTY,
+            meta,
         )
 
     def prepared(
@@ -208,14 +208,14 @@ class ScenarioEvaluator[Value, **Args]:
 
     def with_meta(
         self,
-        meta: Meta,
+        meta: Meta | MetaValues,
         /,
     ) -> Self:
         return self.__class__(
             name=self.name,
             definition=self._definition,
             execution_context=self._execution_context,
-            meta={**self.meta, **meta} if self.meta else meta,
+            meta=self.meta.merged_with(meta),
         )
 
     def contra_map[Mapped](
@@ -307,7 +307,7 @@ class ScenarioEvaluator[Value, **Args]:
                     meta: Meta
                     if self.meta:
                         if result.meta:
-                            meta = {**self.meta, **result.meta}
+                            meta = self.meta.merged_with(result.meta)
 
                         else:
                             meta = self.meta
@@ -337,7 +337,7 @@ class ScenarioEvaluator[Value, **Args]:
             return ScenarioEvaluatorResult(
                 scenario=self.name,
                 evaluations=(),
-                meta={**(self.meta or {}), "exception": str(exc)},
+                meta=self.meta.updated(exception=str(exc)),
             )
 
     def __setattr__(
@@ -372,7 +372,7 @@ def evaluation_scenario[Value, **Args](
     *,
     name: str | None = None,
     execution_context: ScopeContext | None = None,
-    meta: Meta | None = None,
+    meta: Meta | MetaValues | None = None,
 ) -> Callable[
     [ScenarioEvaluatorDefinition[Value, Args]],
     ScenarioEvaluator[Value, Args],
@@ -385,7 +385,7 @@ def evaluation_scenario[Value, **Args](  # pyright: ignore[reportInconsistentOve
     *,
     name: str | None = None,
     execution_context: ScopeContext | None = None,
-    meta: Meta | None = None,
+    meta: Meta | MetaValues | None = None,
 ) -> (
     Callable[
         [ScenarioEvaluatorDefinition[Value, Args]],
@@ -400,7 +400,7 @@ def evaluation_scenario[Value, **Args](  # pyright: ignore[reportInconsistentOve
             name=name or definition.__name__,
             definition=definition,
             execution_context=execution_context,
-            meta=meta,
+            meta=Meta.of(meta),
         )
 
     if definition:

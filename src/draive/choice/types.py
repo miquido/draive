@@ -30,7 +30,7 @@ class ChoiceOption(State):
         return cls(
             identifier=identifier or uuid4().hex,
             content=MultimodalContent.of(content),
-            meta=meta,
+            meta=Meta.of(meta),
         )
 
     identifier: str

@@ -1,7 +1,7 @@
 from collections.abc import Callable, Coroutine
 from typing import Protocol, final, overload
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import Meta, MetaValues
 from draive.instructions.types import (
     Instruction,
     InstructionDeclaration,
@@ -26,7 +26,7 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
         name: str,
         *,
         description: str | None,
-        meta: Meta | None,
+        meta: Meta,
         function: Callable[Args, Coroutine[None, None, str]],
     ) -> None:
         super().__init__(function)
@@ -46,7 +46,7 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
                     )
                     for parameter in self._parameters.values()
                 ],
-                meta=meta if meta is not None else META_EMPTY,
+                meta=meta,
             ),
         )
 
@@ -89,7 +89,7 @@ def instruction(
     *,
     name: str | None = None,
     description: str | None = None,
-    meta: Meta | None = None,
+    meta: Meta | MetaValues | None = None,
 ) -> InstructionTemplateWrapper: ...
 
 
@@ -98,7 +98,7 @@ def instruction[**Args](
     *,
     name: str | None = None,
     description: str | None = None,
-    meta: Meta | None = None,
+    meta: Meta | MetaValues | None = None,
 ) -> InstructionTemplateWrapper | InstructionTemplate[Args]:
     def wrap[**Arg](
         function: Callable[Arg, Coroutine[None, None, str]],
@@ -106,7 +106,7 @@ def instruction[**Args](
         return InstructionTemplate[Arg](
             name=name or function.__name__,
             description=description,
-            meta=meta,
+            meta=Meta.of(meta),
             function=function,
         )
 

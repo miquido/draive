@@ -1,6 +1,6 @@
 from typing import Any, Protocol, runtime_checkable
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import Meta, MetaValues
 from draive.multimodal import MultimodalContent
 
 __all__ = (
@@ -15,12 +15,12 @@ class GuardrailsQualityException(Exception):
         *args: object,
         reason: str,
         content: MultimodalContent,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> None:
         super().__init__(*args)
         self.reason: str = reason
         self.content: MultimodalContent = content
-        self.meta: Meta = meta if meta is not None else META_EMPTY
+        self.meta: Meta = Meta.of(meta)
 
 
 @runtime_checkable

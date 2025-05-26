@@ -3,7 +3,7 @@ from typing import Protocol, final, overload
 
 from haiway import ctx
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import Meta, MetaValues
 from draive.lmm import LMMContext
 from draive.parameters import ParametrizedFunction
 from draive.prompts.types import Prompt, PromptDeclaration, PromptDeclarationArgument
@@ -30,7 +30,7 @@ class PromptTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, LM
         *,
         description: str | None = None,
         availability_check: PromptAvailabilityCheck | None,
-        meta: Meta | None,
+        meta: Meta,
         function: Callable[Args, Coroutine[None, None, LMMContext]],
     ) -> None:
         super().__init__(function)
@@ -50,7 +50,7 @@ class PromptTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, LM
                     )
                     for parameter in self._parameters.values()
                 ],
-                meta=meta if meta is not None else META_EMPTY,
+                meta=meta,
             ),
         )
         self._check_availability: PromptAvailabilityCheck
@@ -114,7 +114,7 @@ def prompt[**Args](
     name: str | None = None,
     description: str | None = None,
     availability_check: PromptAvailabilityCheck | None = None,
-    meta: Meta | None = None,
+    meta: Meta | MetaValues | None = None,
 ) -> PromptTemplateWrapper: ...
 
 
@@ -124,7 +124,7 @@ def prompt[**Args](
     name: str | None = None,
     description: str | None = None,
     availability_check: PromptAvailabilityCheck | None = None,
-    meta: Meta | None = None,
+    meta: Meta | MetaValues | None = None,
 ) -> PromptTemplateWrapper | PromptTemplate[Args]:
     def wrap[**Arg](
         function: Callable[Arg, Coroutine[None, None, LMMContext]],
@@ -133,7 +133,7 @@ def prompt[**Args](
             name=name or function.__name__,
             description=description,
             availability_check=availability_check,
-            meta=meta,
+            meta=Meta.of(meta),
             function=function,
         )
 

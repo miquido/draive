@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from haiway import Default
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.instructions import Instruction
 from draive.lmm import (
     LMMCompletion,
@@ -37,7 +37,7 @@ class ConversationMessage(DataModel):
         identifier: str | None = None,
         author: str | None = None,
         created: datetime | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             identifier=identifier or uuid4().hex,
@@ -45,7 +45,7 @@ class ConversationMessage(DataModel):
             author=author,
             created=created,
             content=MultimodalContent.of(content),
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     @classmethod
@@ -55,7 +55,7 @@ class ConversationMessage(DataModel):
         identifier: str | None = None,
         author: str | None = None,
         created: datetime | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             identifier=identifier or uuid4().hex,
@@ -63,7 +63,7 @@ class ConversationMessage(DataModel):
             author=author,
             created=created,
             content=MultimodalContent.of(content),
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     identifier: str = Default(factory=lambda: uuid4().hex)

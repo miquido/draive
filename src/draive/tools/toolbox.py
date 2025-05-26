@@ -4,7 +4,7 @@ from typing import Any, Literal, Self, final, overload
 
 from haiway import State, ctx
 
-from draive.commons.metadata import MetaTags, check_meta_tags
+from draive.commons import MetaTags
 from draive.lmm.types import (
     LMMException,
     LMMToolError,
@@ -131,7 +131,7 @@ class Toolbox(State):
             selected_tools = [tool for tool in selected_tools if tool.name in tools]
 
         if tags:
-            selected_tools = [tool for tool in selected_tools if check_meta_tags(tool.meta, tags)]
+            selected_tools = [tool for tool in selected_tools if tool.meta.has_tags(tags)]
 
         return cls.of(
             *selected_tools,
@@ -307,7 +307,7 @@ class Toolbox(State):
 
         elif tags:
             return self.__class__.of(
-                *(tool for tool in self.tools.values() if check_meta_tags(tool.meta, tags=tags)),
+                *(tool for tool in self.tools.values() if tool.meta.has_tags(tags)),
                 suggest=self.suggest_call,
                 repeated_calls_limit=self.repeated_calls_limit,
             )

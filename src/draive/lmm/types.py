@@ -11,7 +11,7 @@ from typing import (
 
 from haiway import Default
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.instructions import Instruction
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel, ParametersSpecification
@@ -77,11 +77,11 @@ class LMMInput(DataModel):
         cls,
         content: Multimodal,
         /,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             content=MultimodalContent.of(content),
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     type: Literal["input"] = "input"
@@ -98,11 +98,11 @@ class LMMCompletion(DataModel):
         cls,
         content: Multimodal,
         /,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             content=MultimodalContent.of(content),
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     type: Literal["completion"] = "completion"
@@ -130,11 +130,11 @@ class LMMToolResponses(DataModel):
         cls,
         responses: Sequence[LMMToolResponse],
         /,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             responses=responses,
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     type: Literal["tool_responses"] = "tool_responses"
@@ -150,13 +150,13 @@ class LMMToolRequest(DataModel):
         /,
         tool: str,
         arguments: Mapping[str, Any] | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             identifier=identifier,
             tool=tool,
             arguments=arguments if arguments is not None else {},
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     type: Literal["tool_request"] = "tool_request"
@@ -173,12 +173,12 @@ class LMMToolRequests(DataModel):
         requests: Sequence[LMMToolRequest],
         /,
         content: MultimodalContent | None = None,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             requests=requests,
             content=content,
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     type: Literal["tool_requests"] = "tool_requests"
@@ -199,12 +199,12 @@ class LMMStreamChunk(DataModel):
         content: Multimodal,
         /,
         eod: bool = False,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             content=MultimodalContent.of(content),
             eod=eod,
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     type: Literal["stream_chunk"] = "stream_chunk"
@@ -227,11 +227,11 @@ class LMMSessionEvent(DataModel):
         category: Literal["completed", "interrupted"] | str,
         /,
         *,
-        meta: Meta | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             category=category,
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     type: Literal["session_event"] = "session_event"

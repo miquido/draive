@@ -1,7 +1,7 @@
 from collections.abc import Callable, Coroutine, Sequence
 from typing import Protocol, final
 
-from draive.commons import META_EMPTY, Meta
+from draive.commons import Meta, MetaValues
 from draive.parameters import ParametrizedFunction
 from draive.resources.types import (
     Resource,
@@ -127,7 +127,7 @@ def resource[**Args](
     name: str | None = None,
     description: str | None = None,
     availability_check: ResourceAvailabilityCheck | None = None,
-    meta: Meta | None = None,
+    meta: Meta | MetaValues | None = None,
 ) -> Callable[
     [Callable[Args, Coroutine[None, None, Sequence[Resource] | ResourceContent]]],
     ResourceTemplate[Args],
@@ -142,7 +142,7 @@ def resource[**Args](
             description=description,
             availability_check=availability_check,
             function=function,
-            meta=meta if meta is not None else META_EMPTY,
+            meta=Meta.of(meta),
         )
 
     return wrap
