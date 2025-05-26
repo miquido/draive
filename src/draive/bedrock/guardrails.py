@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from haiway import ObservabilityLevel, asynchronous, ctx
 
@@ -48,7 +48,10 @@ class BedrockGuardrais(BedrockAPI):
             guardrailIdentifier=config.guardrail_identifier,
             guardrailVersion=config.guardrail_version,
             source="INPUT",
-            content=self._convert_content(content),
+            content=self._convert_content(
+                content,
+                qualifier="query",
+            ),
         )
 
         if response.get("action") == "GUARDRAIL_INTERVENED":
@@ -103,7 +106,10 @@ class BedrockGuardrais(BedrockAPI):
             guardrailIdentifier=config.guardrail_identifier,
             guardrailVersion=config.guardrail_version,
             source="OUTPUT",
-            content=self._convert_content(content),
+            content=self._convert_content(
+                content,
+                qualifier="guard_content",
+            ),
         )
 
         if response.get("action") == "GUARDRAIL_INTERVENED":
@@ -117,6 +123,8 @@ class BedrockGuardrais(BedrockAPI):
         self,
         content: MultimodalContent,
         /,
+        *,
+        qualifier: Literal["guard_content", "query"],
     ) -> list[dict[str, Any]]:
         moderated_content: list[dict[str, Any]] = []
         for part in content.parts:
@@ -126,6 +134,7 @@ class BedrockGuardrais(BedrockAPI):
                         {
                             "text": {
                                 "text": text.text,
+                                "qualifiers": [qualifier],
                             },
                         }
                     )
@@ -160,6 +169,7 @@ class BedrockGuardrais(BedrockAPI):
                             {
                                 "type": "text",
                                 "text": media_data.to_json(),
+                                "qualifiers": ["guard_content"],
                             }
                         )
 
@@ -172,6 +182,7 @@ class BedrockGuardrais(BedrockAPI):
                         {
                             "type": "text",
                             "text": other.to_json(),
+                            "qualifiers": ["guard_content"],
                         }
                     )
 
