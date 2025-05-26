@@ -1,11 +1,13 @@
 from collections.abc import Sequence
 
-from haiway import MISSING, Missing, State
+from haiway import MISSING, Missing
+
+from draive.configuration import Config
 
 __all__ = ("AnthropicConfig",)
 
 
-class AnthropicConfig(State):
+class AnthropicConfig(Config):
     model: str
     temperature: float = 1.0
     top_p: float | Missing = MISSING

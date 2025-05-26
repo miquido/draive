@@ -1,6 +1,8 @@
 from collections.abc import Sequence
 
-from haiway import MISSING, Missing, State
+from haiway import MISSING, Missing
+
+from draive.configuration import Config
 
 __all__ = (
     "BedrockChatConfig",
@@ -9,7 +11,7 @@ __all__ = (
 )
 
 
-class BedrockChatConfig(State):
+class BedrockChatConfig(Config):
     model: str
     temperature: float = 1.0
     top_p: float | Missing = MISSING
@@ -18,11 +20,11 @@ class BedrockChatConfig(State):
     stop_sequences: Sequence[str] | Missing = MISSING
 
 
-class BedrockInputGuardraisConfig(State):
+class BedrockInputGuardraisConfig(Config):
     guardrail_identifier: str
     guardrail_version: str
 
 
-class BedrockOutputGuardraisConfig(State):
+class BedrockOutputGuardraisConfig(Config):
     guardrail_identifier: str
     guardrail_version: str

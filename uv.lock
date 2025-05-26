@@ -255,7 +255,7 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.65.0"
+version = "0.65.1"
 source = { editable = "." }
 dependencies = [
     { name = "haiway" },
@@ -332,7 +332,7 @@ requires-dist = [
     { name = "draive", extras = ["sentencepiece"], marker = "extra == 'gemini'" },
     { name = "draive", extras = ["sentencepiece"], marker = "extra == 'mistral'" },
     { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=1.10" },
-    { name = "haiway", specifier = "~=0.21.1" },
+    { name = "haiway", specifier = "~=0.21.2" },
     { name = "haiway", extras = ["opentelemetry"], marker = "extra == 'opentelemetry'" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = "~=1.5" },
     { name = "mistralai", marker = "extra == 'mistral'", specifier = "~=1.5" },
@@ -490,11 +490,10 @@ wheels = [
 
 [[package]]
 name = "haiway"
-version = "0.21.1"
+version = "0.21.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b2/76/9db01dae595ed8b40f5e653e2a64bfc932f7d62318280db7511c17f00ceb/haiway-0.21.1.tar.gz", hash = "sha256:cde646fd387a3b01c8a7da2249cfaca22ffc693e18b715db4c58d00e29953ff5", size = 123267, upload-time = "2025-05-22T14:52:33.714Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/27/76/bca967e06a9fcdd71259526caf7e374f87a46177eae9ead9d05c831242f7/haiway-0.21.1-py3-none-any.whl", hash = "sha256:ff0ef93f7601aec14e70b0ea7c4dfc59eed3270889edd97d468a63d762d9ff4c", size = 79217, upload-time = "2025-05-22T14:52:32.31Z" },
+    { url = "https://files.pythonhosted.org/packages/56/6d/35166912f838a00d3e6e8cd98ac10be3b8db73317ba0e84f28d73379d3d7/haiway-0.21.2-py3-none-any.whl", hash = "sha256:f4515efef3ad567248e8b7eaf93a7490ccd3d08f685b4eceb8ed4b5b3cb9ff67", size = 79232, upload-time = "2025-05-23T15:40:05.405Z" },
 ]
 
 [package.optional-dependencies]
