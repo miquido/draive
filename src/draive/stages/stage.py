@@ -76,6 +76,7 @@ class WriteCache[Key](Protocol):
 
 
 async def _lmm_routing(
+    *,
     context: LMMContext,
     result: MultimodalContent,
     options: Mapping[str, Meta],
@@ -822,7 +823,10 @@ class Stage:
             result: MultimodalContent,
         ) -> StageState:
             with ctx.scope("stage.access.state"):
-                await access(context, result)
+                await access(
+                    context=context,
+                    result=result,
+                )
                 return StageState(
                     context=context,
                     result=result,
