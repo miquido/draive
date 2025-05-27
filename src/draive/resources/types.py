@@ -21,6 +21,7 @@ __all__ = (
     "ResourceFetching",
     "ResourceListFetching",
     "ResourceMissing",
+    "ResourceTemplateDeclaration",
     "ResourceUploading",
 )
 
@@ -41,8 +42,12 @@ class ResourceDeclaration(DataModel):
     meta: Meta = Default(META_EMPTY)
 
 
-# TODO: add ResourceTemplateDeclaration for ResourceTemplates support
-# https://modelcontextprotocol.io/docs/concepts/resources#resource-templates
+class ResourceTemplateDeclaration(DataModel):
+    uri_template: str
+    mime_type: str | None
+    name: str
+    description: str | None = None
+    meta: Meta = Default(META_EMPTY)
 
 
 class ResourceContent(State):

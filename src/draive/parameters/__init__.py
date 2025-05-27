@@ -1,5 +1,6 @@
 from draive.parameters.function import Argument, ParametrizedFunction
 from draive.parameters.model import DataModel, Field
+from draive.parameters.parameter import Parameter
 from draive.parameters.specification import (
     ParameterSpecification,
     ParametersSpecification,
@@ -13,6 +14,7 @@ __all__ = (
     "BasicValue",
     "DataModel",
     "Field",
+    "Parameter",
     "ParameterSpecification",
     "ParameterValidationContext",
     "ParameterValidationError",

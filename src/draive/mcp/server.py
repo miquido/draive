@@ -145,6 +145,7 @@ class MCPServer:
         resource_declarations: list[MCPResource] = []
         resource_template_declarations: list[MCPResourceTemplate] = []
         available_resources: dict[str, ResourceTemplate | Resource] = {}
+        available_resource_templates: list[ResourceTemplate] = []
         for resource in resources:
             match resource:
                 case Resource():
@@ -169,25 +170,26 @@ class MCPServer:
                     if resource.arguments:
                         resource_template_declarations.append(
                             MCPResourceTemplate(
-                                uriTemplate=resource.uri,
+                                uriTemplate=resource.declaration.uri_template,
                                 mimeType=resource.declaration.mime_type,
                                 name=resource.declaration.name,
                                 description=resource.declaration.description,
                             )
                         )
-                        # TODO: we may not be able to find it by using template uri
-                        available_resources[resource.uri] = resource
+                        # TODO: we might need to sort based on template uri matching priorities
+                        available_resource_templates.append(resource)
 
                     else:
                         resource_declarations.append(
                             MCPResource(
-                                uri=AnyUrl(resource.uri),
+                                uri=AnyUrl(resource.declaration.uri_template),
                                 mimeType=resource.declaration.mime_type,
                                 name=resource.declaration.name,
                                 description=resource.declaration.description,
                             )
                         )
-                        available_resources[resource.uri] = resource
+                        # we treat it as a regular resource if template has no arguments
+                        available_resources[resource.declaration.uri_template] = resource
 
         if resource_declarations:
 
@@ -216,16 +218,24 @@ class MCPServer:
                 *self._server.request_context.lifespan_context,
             ):
                 resource: Resource
-                # TODO: look for template resources as well
-                match available_resources.get(uri.unicode_string()):
-                    case None:
-                        raise ValueError(f"Resource '{uri}' is not defined")
-
+                uri_string: str = uri.unicode_string()
+                # First check for exact match in available_resources
+                match available_resources.get(uri_string):
                     case Resource() as available_resource:
                         resource = available_resource
 
                     case ResourceTemplate() as resource_template:
-                        resource = await resource_template.resolve_from_uri(uri.unicode_string())
+                        resource = await resource_template.resolve_from_uri(uri_string)
+
+                    case None:
+                        # if there is no exact match check in templates
+                        for template in available_resource_templates:
+                            if not template.matches_uri(uri_string):
+                                resource = await template.resolve_from_uri(uri_string)
+                                break
+
+                        else:
+                            raise ValueError(f"Resource '{uri}' is not defined")
 
                 return _resource_content(resource)
 
