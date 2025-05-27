@@ -59,7 +59,7 @@ class PromptTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, LM
             "_check_availability",
             availability_check
             or (
-                lambda: True  # available by default
+                lambda meta: True  # available by default
             ),
         )
 

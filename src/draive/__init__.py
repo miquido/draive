@@ -189,6 +189,7 @@ from draive.stages import (
     Stage,
     StageCondition,
     StageException,
+    StageState,
     stage,
 )
 from draive.tokenization import Tokenization
@@ -333,6 +334,7 @@ __all__ = (
     "Stage",
     "StageCondition",
     "StageException",
+    "StageState",
     "State",
     "TextContent",
     "TextEmbedding",

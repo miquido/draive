@@ -1,10 +1,19 @@
 from asyncio import gather
-from collections.abc import Callable, Coroutine, Hashable, Iterable, Sequence
+from collections.abc import (
+    Callable,
+    Coroutine,
+    Hashable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from typing import Any, ClassVar, Literal, Protocol, Self, cast, final, overload
+from uuid import uuid4
 
 from haiway import Disposable, Disposables, State, StateContext, cache, ctx, retry, traced
 
-from draive.commons import Meta, MetaValues
+from draive.commons import Meta, MetaValue, MetaValues
 from draive.instructions import Instruction
 from draive.lmm import (
     LMM,
@@ -17,6 +26,7 @@ from draive.lmm import (
     LMMToolResponses,
 )
 from draive.multimodal import Multimodal, MultimodalContent
+from draive.multimodal.tags import MultimodalTagElement
 from draive.parameters import DataModel
 from draive.prompts import Prompt
 from draive.stages.types import (
@@ -26,6 +36,8 @@ from draive.stages.types import (
     StageExecution,
     StageMerging,
     StageResultTransforming,
+    StageRouting,
+    StageState,
     StageStateAccessing,
 )
 from draive.tools import Tool, Toolbox
@@ -61,6 +73,63 @@ class WriteCache[Key](Protocol):
         key: Key,
         value: tuple[LMMContext, MultimodalContent],
     ) -> None: ...
+
+
+async def _lmm_routing(
+    context: LMMContext,
+    result: MultimodalContent,
+    options: Mapping[str, Meta],
+) -> str:
+    options_text = "\n".join(
+        [f"- {key}: {meta.description or 'No description'}" for key, meta in options.items()]
+    )
+
+    instruction: str = (
+        "Based on the conversation context and current result,"  # nosec: B608 - false positive
+        " select the most appropriate option from the following:"
+        f"\n\n{options_text}"
+        "\n\nRespond with with the exact option name within SELECTION xml tag"
+        f" like (e.g., '<SELECTION>{next(iter(options.keys()))}</SELECTION>'"
+    )
+
+    # Create routing context with the current result as input
+    routing_context: LMMContext = (
+        *context,
+        LMMInput.of(
+            MultimodalContent.of(
+                "<RESULT>",
+                result,
+                "</RESULT>",
+            )
+        ),
+    )
+
+    selection: str
+    match await LMM.completion(
+        instruction=instruction,
+        context=routing_context,
+        output="text",
+    ):
+        case LMMCompletion() as completion:
+            if selection_tag := MultimodalTagElement.parse_first(
+                "SELECTION",
+                content=completion.content,
+            ):
+                selection = selection_tag.content.to_str().strip().lower()
+
+            else:
+                selection = "__INVALID_SELECTION__"
+
+        case other:
+            raise RuntimeError(f"LMM routing failed: unexpected result {type(other)}")
+
+    if selection not in options:
+        raise ValueError(
+            f"LMM routing failed: invalid selection '{selection}'. "
+            f"Available options: {list(options.keys())}"
+        )
+
+    return selection
 
 
 @final
@@ -177,9 +246,12 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             with ctx.scope("stage.predefined"):
-                return ((*context, *context_extension), completion_result)
+                return StageState(
+                    context=(*context, *context_extension),
+                    result=completion_result,
+                )
 
         return cls(stage, meta=Meta.of(meta))
 
@@ -223,9 +295,12 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
+                ) -> StageState:
                     with ctx.scope("stage.memor_recall"):
-                        return (await memory.recall(), result)
+                        return StageState(
+                            context=await memory.recall(),
+                            result=result,
+                        )
 
             case "extend":
 
@@ -233,9 +308,12 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
+                ) -> StageState:
                     with ctx.scope("stage.memory_recall"):
-                        return ((*context, *await memory.recall()), result)
+                        return StageState(
+                            context=(*context, *await memory.recall()),
+                            result=result,
+                        )
 
         return cls(stage, meta=Meta.of(meta))
 
@@ -270,10 +348,13 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             with ctx.scope("stage.memory_remember"):
                 await memory.remember(context)
-                return (context, result)
+                return StageState(
+                    context=context,
+                    result=result,
+                )
 
         return cls(stage, meta=Meta.of(meta))
 
@@ -346,7 +427,7 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             with ctx.scope("stage.completion"):
                 return await _lmm_completion(
                     instruction=instruction,
@@ -425,7 +506,7 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             with ctx.scope("stage.completion.prompting"):
                 return await _lmm_completion(
                     instruction=instruction,
@@ -483,11 +564,14 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             with ctx.scope("stage.completion.loopback"):
                 if not context or not isinstance(context[-1], LMMCompletion):
                     ctx.log_warning("loopback_completion has been skipped due to invalid context")
-                    return (context, result)
+                    return StageState(
+                        context=context,
+                        result=result,
+                    )
 
                 # Find the index of the last LMMInput in the context
                 last_input_idx = -1
@@ -498,7 +582,10 @@ class Stage:
 
                 else:
                     ctx.log_warning("loopback_completion could not find an LMMInput in the context")
-                    return (context, result)
+                    return StageState(
+                        context=context,
+                        result=result,
+                    )
 
                 return await _lmm_completion(
                     instruction=instruction,
@@ -542,9 +629,12 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             with ctx.scope("stage.transform.result"):
-                return (context, await transformation(result))
+                return StageState(
+                    context=context,
+                    result=await transformation(result),
+                )
 
         return cls(stage, meta=Meta.of(meta))
 
@@ -579,11 +669,14 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             with ctx.scope("stage.transform.context"):
                 transformed_context: LMMContext = await transformation(context)
                 assert not transformed_context or isinstance(transformed_context[-1], LMMCompletion)  # nosec: B101
-                return (transformed_context, result)
+                return StageState(
+                    context=transformed_context,
+                    result=result,
+                )
 
         return cls(stage, meta=Meta.of(meta))
 
@@ -622,8 +715,11 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
-                    return ((), result)
+                ) -> StageState:
+                    return StageState(
+                        context=(),
+                        result=result,
+                    )
 
             case int() as index:
 
@@ -631,10 +727,13 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
+                ) -> StageState:
                     trimmed_context: LMMContext = context[:index]
                     assert not trimmed_context or isinstance(trimmed_context[-1], LMMCompletion)  # nosec: B101
-                    return (trimmed_context, result)
+                    return StageState(
+                        context=trimmed_context,
+                        result=result,
+                    )
 
             case slice() as index_slice:
 
@@ -642,10 +741,13 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
+                ) -> StageState:
                     trimmed_context: LMMContext = context[index_slice]
                     assert not trimmed_context or isinstance(trimmed_context[-1], LMMCompletion)  # nosec: B101
-                    return (trimmed_context, result)
+                    return StageState(
+                        context=trimmed_context,
+                        result=result,
+                    )
 
         return cls(stage, meta=Meta.of(meta))
 
@@ -673,14 +775,14 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
-            return (
-                tuple(
+        ) -> StageState:
+            return StageState(
+                context=tuple(
                     element
                     for element in context
                     if not isinstance(element, LMMToolRequests | LMMToolResponses)
                 ),
-                result,
+                result=result,
             )
 
         return cls(stage, meta=Meta.of(meta))
@@ -718,10 +820,13 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             with ctx.scope("stage.access.state"):
                 await access(context, result)
-                return (context, result)
+                return StageState(
+                    context=context,
+                    result=result,
+                )
 
         return cls(stage, meta=Meta.of(meta))
 
@@ -774,7 +879,7 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
+                ) -> StageState:
                     with ctx.scope("stage.loop"):
                         current_context: LMMContext = context
                         current_result: MultimodalContent = result
@@ -793,7 +898,10 @@ class Stage:
                                     current_context[-1], LMMCompletion
                                 )  # nosec: B101
 
-                        return (current_context, current_result)
+                        return StageState(
+                            context=current_context,
+                            result=current_result,
+                        )
 
             case "post_check":
 
@@ -801,7 +909,7 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
+                ) -> StageState:
                     with ctx.scope("stage.loop"):
                         current_context: LMMContext = context
                         current_result: MultimodalContent = result
@@ -823,7 +931,10 @@ class Stage:
                                 ):
                                     break
 
-                        return (current_context, current_result)
+                        return StageState(
+                            context=current_context,
+                            result=current_result,
+                        )
 
         return cls(stage_loop, meta=Meta.of(meta))
 
@@ -863,7 +974,7 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             current_context: LMMContext = context
             current_result: MultimodalContent = result
             for execution in stage_executions:
@@ -873,7 +984,10 @@ class Stage:
                 )
                 assert not current_context or isinstance(current_context[-1], LMMCompletion)  # nosec: B101
 
-            return (current_context, current_result)
+            return StageState(
+                context=current_context,
+                result=current_result,
+            )
 
         return cls(stage_sequence, meta=Meta.of(meta))
 
@@ -919,7 +1033,7 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             with ctx.scope("stage.concurrent"):
                 merged_context: LMMContext
                 merged_result: MultimodalContent
@@ -936,9 +1050,126 @@ class Stage:
                     )
                 )
                 assert not merged_context or isinstance(merged_context[-1], LMMCompletion)  # nosec: B101
-                return (merged_context, merged_result)
+                return StageState(
+                    context=merged_context,
+                    result=merged_result,
+                )
 
         return cls(concurrent_stage, meta=Meta.of(meta))
+
+    @classmethod
+    def router(
+        cls,
+        stage: Self,
+        /,
+        *stages: Self,
+        routing: StageRouting = _lmm_routing,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        """
+        Creates a Stage that routes execution to one of several stages based on a routing function.
+
+        This Stage uses a routing function to select which of the provided stages to execute
+        based on the current context and result. Each stage is identified by its metadata name
+        (required) and description (required). Stage names are normalized to lowercase for matching.
+
+        By default, uses LLM-based routing that analyzes the context and result to intelligently
+        select the most appropriate stage based on stage descriptions.
+
+        Parameters
+        ----------
+        stage : Stage
+            The first stage option for routing. Must have name and description in metadata.
+        *stages : Stage
+            Additional stage options for routing. Each must have name and description in metadata.
+        routing : StageRouting, optional
+            A function that selects which stage to execute. Defaults to `_lmm_routing` which
+            uses LLM analysis. The function receives the current context, result, and available
+            options, and returns the key of the selected stage.
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
+
+        Returns
+        -------
+        Self
+            A new Stage instance that routes execution to the selected stage.
+
+        Raises
+        ------
+        AssertionError
+            If any stage is missing required name or description metadata.
+        ValueError
+            If the routing function returns a selection that doesn't match any available stage.
+
+        Examples
+        --------
+        >>> # Using default LLM-based routing
+        >>> router = Stage.router(
+        ...     normal_stage.with_meta(
+        ...         name="process_data",
+        ...         description="Process and analyze the input data"
+        ...     ),
+        ...     error_stage.with_meta(
+        ...         name="handle_error",
+        ...         description="Handle errors and provide error responses"
+        ...     )
+        ... )
+        >>>
+        >>> # Using custom routing function
+        >>> async def custom_routing(
+        ...     context: LMMContext,
+        ...     result: MultimodalContent,
+        ...     options: Mapping[str, Meta],
+        ... ):
+        ...     if "error" in result.as_string():
+        ...         return "handle_error"
+        ...     return "process_data"
+        ...
+        >>> router = Stage.router(
+        ...     normal_stage.with_meta(name="process_data", description="..."),
+        ...     error_stage.with_meta(name="handle_error", description="..."),
+        ...     routing=custom_routing
+        ... )
+        """
+        if not stages:  # there is no selection when there is only one option
+            ctx.log_debug("Stage.router prepared with single option, skipping routing...")
+            return stage
+
+        routes: MutableMapping[str, StageExecution] = {}
+        options: MutableMapping[str, Meta] = {}
+        for route in (stage, *stages):
+            assert route.meta.name, "Stage names are required for routing"  # nosec: B101
+            assert route.meta.description, "Stage descriptions are required for routing"  # nosec: B101
+            key: str = (route.meta.name or uuid4().hex).strip().lower()
+            assert "\n" not in key, "Stage names can't have newlines"  # nosec: B101
+            routes[key] = route.execution
+            options[key] = route.meta
+
+        async def router_stage(
+            *,
+            context: LMMContext,
+            result: MultimodalContent,
+        ) -> StageState:
+            with ctx.scope("stage.router"):
+                selection: str = await routing(
+                    context=context,
+                    result=result,
+                    options=options,
+                )
+
+            if selected := routes.get(selection):
+                return await selected(
+                    context=context,
+                    result=result,
+                )
+
+            else:
+                raise RuntimeError(
+                    "Stage.router selection invalid"
+                    f" - missing selection ({selection}) in available options"
+                )
+
+        return cls(router_stage, meta=Meta.of(meta))
 
     __slots__ = (
         "execution",
@@ -964,6 +1195,53 @@ class Stage:
             self,
             "meta",
             meta,
+        )
+
+    def with_meta(
+        self,
+        **values: MetaValue,
+    ) -> Self:
+        """
+        Creates a copy of this Stage with updated metadata.
+
+        This method allows you to add or update metadata fields for the Stage,
+        such as name, description, tags, and other custom metadata values.
+        The metadata is particularly important for routing stages where name
+        and description are required.
+
+        Parameters
+        ----------
+        **values : MetaValue
+            Metadata values to add or update. Common values include:
+            - name: str - A unique identifier for the stage
+            - description: str - A description of what the stage does
+            - tags: Sequence[str] - Tags for categorizing the stage
+            - Any other custom metadata fields
+
+        Returns
+        -------
+        Self
+            A new Stage instance with the updated metadata.
+
+        Examples
+        --------
+        >>> stage = Stage.completion("Calculate 2+2")
+        >>> named_stage = stage.with_meta(
+        ...     name="calculator",
+        ...     description="Performs basic arithmetic calculations",
+        ...     tags=["math", "arithmetic"]
+        ... )
+        >>>
+        >>> # Required for routing stages
+        >>> router = Stage.router(
+        ...     stage1.with_meta(name="option1", description="First option"),
+        ...     stage2.with_meta(name="option2", description="Second option"),
+        ...     routing=my_routing_function
+        ... )
+        """
+        return self.__class__(
+            self.execution,
+            meta=self.meta.merged_with(values),
         )
 
     @overload
@@ -1047,7 +1325,7 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
+                ) -> StageState:
                     async with disposables as features:
                         # preserve current Processing state by replacing it
                         with ctx.updated(*features, ctx.state(Processing)):
@@ -1063,7 +1341,7 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
+                ) -> StageState:
                     # it is kind of temporary solution until we figure out a better
                     # solution for updating state on StateContext directly
                     # preserve current Processing state by replacing it
@@ -1080,7 +1358,7 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
+                ) -> StageState:
                     async with disposables as features:
                         # it is kind of temporary solution until we figure out a better
                         # solution for updating state on StateContext directly
@@ -1104,7 +1382,7 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
+                ) -> StageState:
                     # preserve current Processing state by replacing it
                     with ctx.updated(state, *states, ctx.state(Processing)):
                         return await execution(
@@ -1118,7 +1396,7 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
+                ) -> StageState:
                     async with disposables as features:
                         with ctx.updated(
                             state,
@@ -1317,7 +1595,7 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             try:
                 return await execution(
                     context=context,
@@ -1355,12 +1633,15 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             _, processed_result = await execution(
                 context=context,
                 result=result,
             )
-            return (context, processed_result)
+            return StageState(
+                context=context,
+                result=processed_result,
+            )
 
         return self.__class__(stage, meta=self.meta)
 
@@ -1385,7 +1666,7 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             processed_context, processed_result = await execution(
                 context=context,
                 result=result,
@@ -1408,7 +1689,10 @@ class Stage:
 
             merged_context: LMMContext = (*common_prefix, *striped_suffix)
             assert not merged_context or isinstance(merged_context[-1], LMMCompletion)  # nosec: B101
-            return (merged_context, processed_result)
+            return StageState(
+                context=merged_context,
+                result=processed_result,
+            )
 
         return self.__class__(stage, meta=self.meta)
 
@@ -1463,7 +1747,7 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
+                ) -> StageState:
                     if value:
                         return await execution(
                             context=context,
@@ -1477,7 +1761,10 @@ class Stage:
                         )
 
                     else:
-                        return (context, result)
+                        return StageState(
+                            context=context,
+                            result=result,
+                        )
 
             case function:
 
@@ -1485,7 +1772,7 @@ class Stage:
                     *,
                     context: LMMContext,
                     result: MultimodalContent,
-                ) -> tuple[LMMContext, MultimodalContent]:
+                ) -> StageState:
                     if await function(meta=meta, context=context, result=result):
                         return await execution(
                             context=context,
@@ -1499,7 +1786,10 @@ class Stage:
                         )
 
                     else:
-                        return (context, result)
+                        return StageState(
+                            context=context,
+                            result=result,
+                        )
 
         return self.__class__(stage, meta=self.meta)
 
@@ -1521,13 +1811,16 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             processed_context, _ = await execution(
                 context=context,
                 result=result,
             )
 
-            return (processed_context, result)
+            return StageState(
+                context=processed_context,
+                result=result,
+            )
 
         return self.__class__(stage, meta=self.meta)
 
@@ -1549,12 +1842,15 @@ class Stage:
             *,
             context: LMMContext,
             result: MultimodalContent,
-        ) -> tuple[LMMContext, MultimodalContent]:
+        ) -> StageState:
             processed_context, processed_result = await execution(
                 context=context,
                 result=result,
             )
-            return (processed_context, result.extending(processed_result))
+            return StageState(
+                context=processed_context,
+                result=result.extending(processed_result),
+            )
 
         return self.__class__(stage, meta=self.meta)
 
@@ -1640,7 +1936,7 @@ async def _lmm_completion(
     toolbox: Toolbox,
     output: LMMOutputSelection,
     **extra: Any,
-) -> tuple[LMMContext, MultimodalContent]:
+) -> StageState:
     current_context: LMMContext = context
     recursion_level: int = 0
     while recursion_level <= toolbox.repeated_calls_limit:
@@ -1655,7 +1951,10 @@ async def _lmm_completion(
             case LMMCompletion() as completion:
                 current_context = (*current_context, completion)
 
-                return (current_context, completion.content)
+                return StageState(
+                    context=current_context,
+                    result=completion.content,
+                )
 
             case LMMToolRequests() as tool_requests:
                 tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
@@ -1672,7 +1971,10 @@ async def _lmm_completion(
                         LMMCompletion.of(direct_content),
                     )
 
-                    return (current_context, direct_content)
+                    return StageState(
+                        context=current_context,
+                        result=direct_content,
+                    )
 
                 else:
                     current_context = (
@@ -1721,8 +2023,11 @@ async def _noop(
     *,
     context: LMMContext,
     result: MultimodalContent,
-) -> tuple[LMMContext, MultimodalContent]:
-    return (context, result)
+) -> StageState:
+    return StageState(
+        context=context,
+        result=result,
+    )
 
 
 Stage.noop = _noop
