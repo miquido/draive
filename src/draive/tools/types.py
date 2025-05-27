@@ -31,7 +31,10 @@ class ToolExcepion(Exception):
 
 @runtime_checkable
 class ToolAvailabilityChecking(Protocol):
-    def __call__(self) -> bool: ...
+    def __call__(
+        self,
+        meta: Meta,
+    ) -> bool: ...
 
 
 @runtime_checkable

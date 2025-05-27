@@ -24,6 +24,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         "_check_availability",
         "_format_failure",
         "_format_result",
+        "description",
         "handling",
         "meta",
         "name",
@@ -70,6 +71,12 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
             "name",
             name,
         )
+        self.description: str | None
+        object.__setattr__(
+            self,
+            "description",
+            description,
+        )
         self.parameters: ParametersSpecification | None
         object.__setattr__(
             self,
@@ -104,20 +111,31 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
             format_failure,
         )
         self.meta: Meta
-        object.__setattr__(
-            self,
-            "meta",
-            meta.with_description(description) if description else meta,
-        )
+        if description:
+            object.__setattr__(
+                self,
+                "meta",
+                meta.updated(
+                    kind="tool",
+                    name=name,
+                    description=description,
+                ),
+            )
 
-    @property
-    def description(self) -> str | None:
-        return self.meta.description
+        else:
+            object.__setattr__(
+                self,
+                "meta",
+                meta.updated(
+                    kind="tool",
+                    name=name,
+                ),
+            )
 
     @property
     def available(self) -> bool:
         try:
-            return self._check_availability()
+            return self._check_availability(meta=self.meta)
 
         except Exception:
             return False

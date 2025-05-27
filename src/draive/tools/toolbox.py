@@ -4,7 +4,7 @@ from typing import Any, Literal, Self, final, overload
 
 from haiway import State, ctx
 
-from draive.commons import MetaTags
+from draive.commons import Meta, MetaTags, MetaValues
 from draive.lmm.types import (
     LMMException,
     LMMToolError,
@@ -25,23 +25,26 @@ __all__ = ("Toolbox",)
 @final
 class Toolbox(State):
     @classmethod
-    def of(  # noqa: C901, PLR0912
+    def of(  # noqa: C901, PLR0912, PLR0915
         cls,
         tool_or_toolbox: Self | Tool | Iterable[Tool] | None = None,
         /,
         *tools: Tool,
         suggest: Tool | str | bool | None = None,
         repeated_calls_limit: int | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         tools_mapping: Mapping[str, Tool]
         suggest_call: Tool | bool
         calls_limit: int
+        metadata: Meta
         match tool_or_toolbox:
             case None:
                 assert suggest is None or suggest is False  # nosec: B101
                 tools_mapping = {}
                 suggest_call = False
                 calls_limit = 0
+                metadata = Meta.of(meta)
 
             case Toolbox() as toolbox:
                 tools_mapping = {
@@ -65,6 +68,9 @@ class Toolbox(State):
                     if repeated_calls_limit is not None
                     else toolbox.repeated_calls_limit
                 )
+                metadata = (
+                    toolbox.meta.merged_with(Meta.of(meta)) if meta is not None else toolbox.meta
+                )
 
             case Tool() as tool:
                 tools_mapping = {
@@ -87,6 +93,7 @@ class Toolbox(State):
                         suggest_call = tool
 
                 calls_limit = repeated_calls_limit or 3
+                metadata = Meta.of(meta)
 
             case iterable_tools:
                 tools_mapping = {
@@ -109,11 +116,13 @@ class Toolbox(State):
                         suggest_call = tool
 
                 calls_limit = repeated_calls_limit or 3
+                metadata = Meta.of(meta)
 
         return cls(
             tools=tools_mapping,
             suggest_call=suggest_call,
             repeated_calls_limit=calls_limit,
+            meta=metadata,
         )
 
     @classmethod
@@ -124,6 +133,7 @@ class Toolbox(State):
         tags: MetaTags | None = None,
         repeated_calls_limit: int | None = None,
         suggest: str | bool | None = None,
+        meta: Meta | MetaValues | None,
         **extra: Any,
     ) -> Self:
         selected_tools: Sequence[Tool] = await Tools.fetch(**extra)
@@ -137,11 +147,13 @@ class Toolbox(State):
             *selected_tools,
             suggest=suggest,
             repeated_calls_limit=repeated_calls_limit,
+            meta=meta,
         )
 
     tools: Mapping[str, Tool]
     suggest_call: Tool | bool
     repeated_calls_limit: int
+    meta: Meta
 
     def tool_selection(
         self,
@@ -275,6 +287,7 @@ class Toolbox(State):
             *(tool, *tools, *self.tools.values()),
             suggest=self.suggest_call,
             repeated_calls_limit=self.repeated_calls_limit,
+            meta=self.meta,
         )
 
     @overload
@@ -303,6 +316,7 @@ class Toolbox(State):
                 *(tool for tool in self.tools.values() if tool.name in tools),
                 suggest=self.suggest_call,
                 repeated_calls_limit=self.repeated_calls_limit,
+                meta=self.meta,
             )
 
         elif tags:
@@ -310,6 +324,7 @@ class Toolbox(State):
                 *(tool for tool in self.tools.values() if tool.meta.has_tags(tags)),
                 suggest=self.suggest_call,
                 repeated_calls_limit=self.repeated_calls_limit,
+                meta=self.meta,
             )
 
         else:

@@ -76,6 +76,48 @@ class Meta(Mapping[str, MetaValue]):
         return self._values
 
     @property
+    def kind(self) -> str | None:
+        match self._values.get("kind"):
+            case str() as kind:
+                return kind
+
+            case _:
+                return None
+
+    def with_kind(
+        self,
+        kind: str,
+        /,
+    ) -> Self:
+        return self.__class__(
+            {
+                **self._values,
+                "kind": kind,
+            }
+        )
+
+    @property
+    def name(self) -> str | None:
+        match self._values.get("name"):
+            case str() as name:
+                return name
+
+            case _:
+                return None
+
+    def with_name(
+        self,
+        name: str,
+        /,
+    ) -> Self:
+        return self.__class__(
+            {
+                **self._values,
+                "name": name,
+            }
+        )
+
+    @property
     def description(self) -> str | None:
         match self._values.get("description"):
             case str() as description:
