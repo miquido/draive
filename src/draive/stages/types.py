@@ -116,6 +116,7 @@ class StageCondition(Protocol):
 
     async def __call__(
         self,
+        *,
         meta: Meta,
         context: LMMContext,
         result: MultimodalContent,
@@ -168,6 +169,7 @@ class StageStateAccessing(Protocol):
 
     async def __call__(
         self,
+        *,
         context: LMMContext,
         result: MultimodalContent,
     ) -> None: ...
@@ -221,6 +223,7 @@ class StageRouting(Protocol):
 
     async def __call__(
         self,
+        *,
         context: LMMContext,
         result: MultimodalContent,
         options: Mapping[str, Meta],
