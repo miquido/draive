@@ -230,7 +230,7 @@ class MCPServer:
                     case None:
                         # if there is no exact match check in templates
                         for template in available_resource_templates:
-                            if not template.matches_uri(uri_string):
+                            if template.matches_uri(uri_string):
                                 resource = await template.resolve_from_uri(uri_string)
                                 break
 
