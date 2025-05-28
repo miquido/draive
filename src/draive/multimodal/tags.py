@@ -419,7 +419,7 @@ def _parse_tag_opening(  # noqa: C901, PLR0912
                     )
                     return  # end of parsing
 
-                case char if str.isalnum(char):  # part of the tag name
+                case char if str.isalnum(char) or char == "_":  # part of the tag name
                     accumulator += char
 
                 case "/" if accumulator and not closed:  # possible closed tag
@@ -634,7 +634,7 @@ def _parse_tag_closing(  # noqa: C901, PLR0912
                         yield "</" + accumulator + ">"  # add opening and closing char
                         accumulator = None
 
-                case char if str.isalnum(char):  # part of the tag name
+                case char if str.isalnum(char) or char == "_":  # part of the tag name
                     accumulator += char
 
                 case "<":  # potential new tag opening
