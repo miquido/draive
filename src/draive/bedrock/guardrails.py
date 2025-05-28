@@ -140,17 +140,18 @@ class BedrockGuardrais(BedrockAPI):
                     )
 
                 case MediaData() as media_data:
-                    if "jpg" in media_data.media or "jpeg" in media_data.media:
+                    # Check media type properly using startswith for MIME types
+                    if media_data.media.startswith("image/jpeg"):
                         moderated_content.append(
                             {
                                 "image": {
-                                    "format": "jpg",
+                                    "format": "jpeg",
                                     "source": {"bytes": media_data.data},
                                 }
                             }
                         )
 
-                    elif "png" in media_data.media:
+                    elif media_data.media.startswith("image/png"):
                         moderated_content.append(
                             {
                                 "image": {
@@ -167,9 +168,10 @@ class BedrockGuardrais(BedrockAPI):
                         )
                         moderated_content.append(
                             {
-                                "type": "text",
-                                "text": media_data.to_json(),
-                                "qualifiers": ["guard_content"],
+                                "text": {
+                                    "text": media_data.to_json(),
+                                    "qualifiers": [qualifier],
+                                }
                             }
                         )
 
@@ -180,9 +182,10 @@ class BedrockGuardrais(BedrockAPI):
                     )
                     moderated_content.append(
                         {
-                            "type": "text",
-                            "text": other.to_json(),
-                            "qualifiers": ["guard_content"],
+                            "text": {
+                                "text": other.to_json(),
+                                "qualifiers": [qualifier],
+                            }
                         }
                     )
 
