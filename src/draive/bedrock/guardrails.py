@@ -110,6 +110,7 @@ class BedrockGuardrais(BedrockAPI):
                 content,
                 qualifier="guard_content",
             ),
+            outputScope="INTERVENTIONS",
         )
 
         if response.get("action") == "GUARDRAIL_INTERVENED":
