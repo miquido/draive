@@ -177,6 +177,7 @@ from draive.resources import (
     ResourceMissing,
     Resources,
     ResourceTemplate,
+    ResourceTemplateDeclaration,
     resource,
 )
 from draive.similarity import (
@@ -328,6 +329,7 @@ __all__ = (
     "ResourceException",
     "ResourceMissing",
     "ResourceTemplate",
+    "ResourceTemplateDeclaration",
     "Resources",
     "ScopeIdentifier",
     "SelectionException",

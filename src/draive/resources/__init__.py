@@ -8,6 +8,7 @@ from draive.resources.types import (
     ResourceFetching,
     ResourceListFetching,
     ResourceMissing,
+    ResourceTemplateDeclaration,
     ResourceUploading,
 )
 
@@ -20,6 +21,7 @@ __all__ = (
     "ResourceListFetching",
     "ResourceMissing",
     "ResourceTemplate",
+    "ResourceTemplateDeclaration",
     "ResourceUploading",
     "Resources",
     "resource",

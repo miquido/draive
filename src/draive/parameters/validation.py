@@ -710,7 +710,7 @@ def _prepare_validator_of_union(
     return validator
 
 
-def _prepare_validator_of_float(
+def _prepare_validator_of_float(  # noqa: C901
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
@@ -723,16 +723,32 @@ def _prepare_validator_of_float(
             /,
             context: ParameterValidationContext,
         ) -> Any:
-            if isinstance(value, float):
-                verifier(value)
-                return value
+            match value:
+                case float():
+                    verifier(value)
+                    return value
 
-            elif isinstance(value, int):
-                validated = float(value)
-                verifier(validated)
-                return validated
+                case int():
+                    validated = float(value)
+                    verifier(validated)
+                    return validated
+
+                case str():
+                    try:
+                        validated = float(value)
+
+                    except (ValueError, TypeError):
+                        pass  # invalid
+
+                    else:
+                        verifier(validated)
+                        return validated
+
+                case _:
+                    pass  # invalid
 
             raise TypeError(f"'{value}' is not matching expected type of 'float'")
+
     else:
 
         def validator(
@@ -740,13 +756,99 @@ def _prepare_validator_of_float(
             /,
             context: ParameterValidationContext,
         ) -> Any:
-            if isinstance(value, float):
-                return value
+            match value:
+                case float():
+                    return value
 
-            elif isinstance(value, int):
-                return float(value)
+                case int():
+                    return float(value)
+
+                case str():
+                    try:
+                        return float(value)
+
+                    except (ValueError, TypeError):
+                        pass  # invalid
+
+                case _:
+                    pass  # invalid
 
             raise TypeError(f"'{value}' is not matching expected type of 'float'")
+
+    return validator
+
+
+def _prepare_validator_of_int(  # noqa: C901
+    annotation: AttributeAnnotation,
+    /,
+    verifier: ParameterVerification[Any] | None,
+    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
+) -> ParameterValidation[Any]:
+    if verifier := verifier:
+
+        def validator(
+            value: Any,
+            /,
+            context: ParameterValidationContext,
+        ) -> Any:
+            match value:
+                case int():
+                    verifier(value)
+                    return value
+
+                case float():
+                    validated = int(value)
+                    if value == validated:
+                        verifier(validated)
+                        return int(validated)
+
+                    # else invalid
+
+                case str():
+                    try:
+                        validated = int(value)
+
+                    except (ValueError, TypeError):
+                        pass  # invalid
+
+                    else:
+                        verifier(validated)
+                        return validated
+
+                case _:
+                    pass  # invalid
+
+            raise TypeError(f"'{value}' is not matching expected type of 'int'")
+
+    else:
+
+        def validator(
+            value: Any,
+            /,
+            context: ParameterValidationContext,
+        ) -> Any:
+            match value:
+                case int():
+                    return value
+
+                case float():
+                    validated = int(value)
+                    if value == validated:
+                        return int(validated)
+
+                    # else invalid
+
+                case str():
+                    try:
+                        return int(value)
+
+                    except (ValueError, TypeError):
+                        pass  # invalid
+
+                case _:
+                    pass  # invalid
+
+            raise TypeError(f"'{value}' is not matching expected type of 'int'")
 
     return validator
 
@@ -764,27 +866,31 @@ def _prepare_validator_of_bool(  # noqa: C901
             /,
             context: ParameterValidationContext,
         ) -> Any:
-            if isinstance(value, bool):
-                verifier(value)
-                return value
+            match value:
+                case bool():
+                    verifier(value)
+                    return value
 
-            elif isinstance(value, int):
-                validated = bool(value != 0)
-                verifier(validated)
-                return validated
+                case int():
+                    validated = bool(value != 0)
+                    verifier(validated)
+                    return validated
 
-            elif isinstance(value, str):
-                match value.lower():
-                    case "true":
-                        verifier(True)
-                        return True
+                case str():
+                    match value.lower():
+                        case "true" | "t" | "1":
+                            verifier(True)
+                            return True
 
-                    case "false":
-                        verifier(False)
-                        return False
+                        case "false" | "f" | "0":
+                            verifier(False)
+                            return False
 
-                    case _:
-                        pass  # invalid
+                        case _:
+                            pass  # invalid
+
+                case _:
+                    pass  # invalid
 
             raise TypeError(f"'{value}' is not matching expected type of 'bool'")
     else:
@@ -794,22 +900,27 @@ def _prepare_validator_of_bool(  # noqa: C901
             /,
             context: ParameterValidationContext,
         ) -> Any:
-            if isinstance(value, bool):
-                return value
+            match value:
+                case bool():
+                    return value
 
-            elif isinstance(value, int):
-                return bool(value != 0)
+                case int():
+                    validated = bool(value != 0)
+                    return validated
 
-            elif isinstance(value, str):
-                match value.lower():
-                    case "true":
-                        return True
+                case str():
+                    match value.lower():
+                        case "true" | "t" | "1":
+                            return True
 
-                    case "false":
-                        return False
+                        case "false" | "f" | "0":
+                            return False
 
-                    case _:
-                        pass  # invalid
+                        case _:
+                            pass  # invalid
+
+                case _:
+                    pass  # invalid
 
             raise TypeError(f"'{value}' is not matching expected type of 'bool'")
 
@@ -1124,7 +1235,7 @@ VALIDATORS: Mapping[
     Missing: _prepare_validator_of_missing,
     type: _prepare_validator_of_type,
     bool: _prepare_validator_of_bool,
-    int: _prepare_validator_of_type,
+    int: _prepare_validator_of_int,
     float: _prepare_validator_of_float,
     str: _prepare_validator_of_type,
     tuple: _prepare_validator_of_tuple,
