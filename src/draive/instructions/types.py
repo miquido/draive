@@ -1,11 +1,12 @@
 from collections.abc import Mapping, Sequence
+from string import Formatter
 from typing import Any, Protocol, Self, final, overload, runtime_checkable
 from uuid import uuid4
 
 from haiway import Default, State
 
 from draive.commons import META_EMPTY, Meta, MetaValues
-from draive.parameters import DataModel, Field, ParameterSpecification
+from draive.parameters import DataModel
 
 __all__ = (
     "Instruction",
@@ -29,12 +30,7 @@ class InstructionMissing(InstructionException):
 @final
 class InstructionDeclarationArgument(DataModel):
     name: str
-    specification: ParameterSpecification = Field(
-        specification={
-            "type": "object",
-            "additionalProperties": True,
-        }
-    )
+    description: str | None = None
     required: bool = True
 
 
@@ -159,6 +155,15 @@ class Instruction(State):
     arguments: Mapping[str, str | float | int] = Default(factory=dict)
     meta: Meta = Default(META_EMPTY)
 
+    @property
+    def declaration(self) -> InstructionDeclaration:
+        return InstructionDeclaration(
+            name=self.name,
+            description=self.description,
+            arguments=extract_variables(self.content),
+            meta=self.meta,
+        )
+
     def format(
         self,
         **arguments: str | float | int,
@@ -209,6 +214,20 @@ class Instruction(State):
 
         else:  # nothing to update
             return self
+
+
+def extract_variables(
+    string: str,
+    /,
+) -> Sequence[InstructionDeclarationArgument]:
+    seen: set[str] = set()
+    unique_args: list[InstructionDeclarationArgument] = []
+    for _, field_name, _, _ in Formatter().parse(string):
+        if field_name and field_name not in seen:
+            seen.add(field_name)
+            unique_args.append(InstructionDeclarationArgument(name=field_name))
+
+    return unique_args
 
 
 @runtime_checkable

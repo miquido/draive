@@ -13,6 +13,7 @@ from draive.instructions.types import (
     InstructionListFetching,
     InstructionMissing,
 )
+from draive.instructions.volatile import InstructionsVolatileStorage
 
 __all__ = ("Instructions",)
 
@@ -36,6 +37,19 @@ async def _none(
 
 @final
 class Instructions(State):
+    @classmethod
+    def of(
+        cls,
+        instruction: Instruction,
+        *instructions: Instruction,
+    ) -> Self:
+        storage = InstructionsVolatileStorage((instruction, *instructions))
+
+        return cls(
+            list_fetching=storage.listing,
+            fetching=storage.instruction,
+        )
+
     @classmethod
     def file(
         cls,

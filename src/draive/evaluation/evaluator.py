@@ -71,26 +71,32 @@ class EvaluatorResult(DataModel):
         self,
         include_details: bool = True,
     ) -> str:
+        status: str = "passed" if self.passed else "failed"
         if include_details:
-            meta_values: str = (
-                f"\n{'\n'.join(f'{key}: {value}' for key, value in self.meta.items())}"
-                if self.meta
-                else "N/A"
-            )
+            comment: str = f"'{self.score.comment}'" if self.score.comment else "N/A"
 
             return (
-                f"{self.evaluator} {'passed' if self.passed else 'failed'}"
-                f" with score {self.score.value},"
-                f" required {self.threshold},"
-                f" comment: {f"'{self.score.comment}'" or 'N/A'}"
-                f" meta:\n{meta_values}"
+                f"<evaluator name='{self.evaluator}' status='{status}'>"
+                f"\n<score>{self.score.value}</score>"
+                f"\n<threshold>{self.threshold}</threshold>"
+                f"\n<relative_score>{self.relative_score*100:.2f}%</relative_score>"
+                f"\n<comment>{comment}</comment>"
+                "\n</evaluator>"
             )
 
         else:
             return (
-                f"{self.evaluator} {'passed' if self.passed else 'failed'}"
-                f" comment: {f"'{self.score.comment}'" or 'N/A'}"
+                f"{self.evaluator}: {status}, comment: {self.score.comment}"
+                if self.score.comment
+                else f"{self.evaluator}: {status}"
             )
+
+    @property
+    def relative_score(self) -> float:
+        if self.threshold <= 0:
+            return 1
+
+        return min(1, self.score.value / self.threshold)
 
     def __gt__(self, other: Self) -> bool:
         assert isinstance(other, self.__class__)  # nosec: B101

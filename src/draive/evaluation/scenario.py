@@ -40,23 +40,23 @@ class ScenarioEvaluatorResult(DataModel):
         include_passed: bool = True,
         include_details: bool = True,
     ) -> str:
-        report: str = "\n- ".join(
+        evaluations_report: str = "\n".join(
             result.report(include_details=include_details)
             for result in self.evaluations
             if include_passed or not result.passed
         )
 
-        if report:  # nonempty report
+        if evaluations_report:  # nonempty report
             if include_details:
-                meta_values: str = (
-                    f"\n{'\n'.join(f'{key}: {value}' for key, value in self.meta.items())}"
-                    if self.meta
-                    else "N/A"
+                return (
+                    f"<scenario name='{self.scenario}'>"
+                    f"\n<relative_score>{self.relative_score*100:.2f}%</relative_score>"
+                    f"\n<evaluations>\n{evaluations_report}\n</evaluations>"
+                    "\n</scenario>"
                 )
-                return f"Scenario {self.scenario}, meta: {meta_values}\n---\n{report}"
 
             else:
-                return f"Scenario {self.scenario}:\n{report}"
+                return f"Scenario {self.scenario}:\n{evaluations_report}"
 
         elif not self.evaluations:
             return f"Scenario {self.scenario} empty!"
@@ -69,12 +69,9 @@ class ScenarioEvaluatorResult(DataModel):
         if not self.evaluations:
             return 0
 
-        passed: int = 0
-        for evaluation in self.evaluations:
-            if evaluation.passed:
-                passed += 1
-
-        return passed / len(self.evaluations)
+        return len([evaluation for evaluation in self.evaluations if evaluation.passed]) / len(
+            self.evaluations
+        )
 
 
 class EvaluationScenarioResult(DataModel):

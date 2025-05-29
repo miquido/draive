@@ -36,9 +36,6 @@ class InstructionsFileStorage:
 
     async def listing(
         self,
-        name: str,
-        *,
-        arguments: Mapping[str, str | float | int] | None = None,
         **extra: Any,
     ) -> Sequence[InstructionDeclaration]:
         if self._listing is not None:
@@ -52,13 +49,7 @@ class InstructionsFileStorage:
             InstructionDeclaration(
                 name=name,
                 arguments=tuple(
-                    InstructionDeclarationArgument(
-                        name=arg_name,
-                        specification={
-                            # assuming all will be strings
-                            "type": "string",
-                        },
-                    )
+                    InstructionDeclarationArgument(name=arg_name)
                     for _, arg_name, _, _ in formatter.parse(content)
                     if arg_name  # we could also check for positional arguments
                 ),

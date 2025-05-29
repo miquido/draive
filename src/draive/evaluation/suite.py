@@ -55,7 +55,7 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
         include_passed: bool = True,
         include_details: bool = True,
     ) -> str:
-        report: str = "\n---\n".join(
+        report: str = "\n".join(
             [
                 result.report(
                     include_passed=include_passed,
@@ -69,13 +69,17 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
         if report:  # nonempty report
             if include_details:
                 return (
-                    f"Evaluation case {self.case.identifier}:"
-                    f"\nvalue: {self.value}"
-                    f"\n{self.case.parameters}\n---\n{report}"
+                    f"<evaluation_case identifier='{self.case.identifier}'>"
+                    f"\n<relative_score>{self.relative_score*100:.2f}%</relative_score>"
+                    f"\n<evaluated_value>{self.value}</evaluated_value>"
+                    # TODO: convert DataModel to xml representation when avaialble
+                    f"\n<parameters>{self.case.parameters}</parameters>"
+                    f"\n{report}"
+                    "\n</evaluation_case>"
                 )
 
             else:
-                return f"Evaluation case {self.case.identifier}:\n---\n{report}"
+                return f"Evaluation case {self.case.identifier}:\n{report}\n---\n"
 
         elif not self.results:
             return f"Evaluation case {self.case.identifier} empty!"
@@ -88,12 +92,11 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
         if not self.results:
             return 0
 
-        passed: int = 0
+        score: float = 0
         for evaluation in self.results:
-            if evaluation.passed:
-                passed += 1
+            score += evaluation.relative_score
 
-        return passed / len(self.results)
+        return score / len(self.results)
 
 
 class SuiteEvaluatorResult[CaseParameters: DataModel, Value: DataModel | str](DataModel):
@@ -109,7 +112,7 @@ class SuiteEvaluatorResult[CaseParameters: DataModel, Value: DataModel | str](Da
         include_passed: bool = True,
         include_details: bool = True,
     ) -> str:
-        report: str = "\n---\n".join(
+        report: str = "\n".join(
             [
                 result.report(
                     include_passed=include_passed,
@@ -134,12 +137,11 @@ class SuiteEvaluatorResult[CaseParameters: DataModel, Value: DataModel | str](Da
         if not self.cases:
             return 0
 
-        passed: int = 0
-        for case in self.cases:
-            if case.passed:
-                passed += 1
+        score: float = 0
+        for evaluation in self.cases:
+            score += evaluation.relative_score
 
-        return passed / len(self.cases)
+        return score / len(self.cases)
 
 
 class EvaluationCaseResult[Value: DataModel | str](DataModel):
@@ -380,7 +382,7 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
 
     def with_storage(
         self,
-        storage: EvaluationSuiteStorage[CaseParameters] | Path | str,
+        storage: EvaluationSuiteStorage[CaseParameters] | Sequence[CaseParameters] | Path | str,
         /,
     ) -> Self:
         suite_storage: EvaluationSuiteStorage[CaseParameters]
@@ -395,6 +397,12 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
                 suite_storage = _EvaluationSuiteFileStorage[CaseParameters](
                     path=path,
                     data_type=EvaluationSuiteData[self._parameters],
+                )
+
+            case [*cases]:
+                suite_storage = _EvaluationSuiteMemoryStorage[CaseParameters](
+                    data_type=EvaluationSuiteData[CaseParameters],
+                    cases=[EvaluationSuiteCase(parameters=parameters) for parameters in cases],
                 )
 
             case storage:
@@ -477,7 +485,11 @@ class EvaluationSuite[CaseParameters: DataModel, Value: DataModel | str]:
 def evaluation_suite[CaseParameters: DataModel, Value: DataModel | str](
     case: type[CaseParameters],
     /,
-    storage: EvaluationSuiteStorage[CaseParameters] | Path | str | None = None,
+    storage: EvaluationSuiteStorage[CaseParameters]
+    | Sequence[CaseParameters]
+    | Path
+    | str
+    | None = None,
     execution_context: ScopeContext | None = None,
 ) -> Callable[
     [EvaluationSuiteDefinition[CaseParameters, Value]],
@@ -488,6 +500,7 @@ def evaluation_suite[CaseParameters: DataModel, Value: DataModel | str](
         case None:
             suite_storage = _EvaluationSuiteMemoryStorage[CaseParameters](
                 data_type=EvaluationSuiteData[case],
+                cases=(),
             )
 
         case str() as path_str:
@@ -500,6 +513,12 @@ def evaluation_suite[CaseParameters: DataModel, Value: DataModel | str](
             suite_storage = _EvaluationSuiteFileStorage[CaseParameters](
                 path=path,
                 data_type=EvaluationSuiteData[case],
+            )
+
+        case [*cases]:
+            suite_storage = _EvaluationSuiteMemoryStorage[CaseParameters](
+                data_type=EvaluationSuiteData[case],
+                cases=[EvaluationSuiteCase(parameters=parameters) for parameters in cases],
             )
 
         case storage:
@@ -522,8 +541,9 @@ class _EvaluationSuiteMemoryStorage[CaseParameters: DataModel]:
     def __init__(
         self,
         data_type: type[EvaluationSuiteData[CaseParameters]],
+        cases: Sequence[EvaluationSuiteCase[CaseParameters]] | None,
     ) -> None:
-        self.store: Sequence[EvaluationSuiteCase[CaseParameters]] = ()
+        self.store: Sequence[EvaluationSuiteCase[CaseParameters]] = cases or ()
         self._data_type: type[EvaluationSuiteData[CaseParameters]] = data_type
 
     async def load(
