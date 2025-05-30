@@ -5,7 +5,13 @@ from typing import Any, Literal, overload
 
 from haiway import AsyncQueue, ctx
 
-from draive.conversation.types import ConversationMemory, ConversationMessage
+from draive.conversation.completion.types import ConversationMemory, ConversationMessage
+from draive.conversation.types import (
+    ConversationElement,
+    ConversationEvent,
+    ConversationMessageChunk,
+    ConversationStreamElement,
+)
 from draive.guardrails import GuardrailsModeration
 from draive.instructions import Instruction
 from draive.lmm import (
@@ -46,7 +52,7 @@ async def conversation_completion(
     toolbox: Toolbox,
     stream: Literal[True],
     **extra: Any,
-) -> AsyncIterator[LMMStreamChunk | ProcessingEvent]: ...
+) -> AsyncIterator[ConversationStreamElement]: ...
 
 
 async def conversation_completion(
@@ -57,16 +63,20 @@ async def conversation_completion(
     toolbox: Toolbox,
     stream: bool = False,
     **extra: Any,
-) -> AsyncIterator[LMMStreamChunk | ProcessingEvent] | ConversationMessage:
+) -> AsyncIterator[ConversationStreamElement] | ConversationMessage:
     with ctx.scope("conversation_completion"):
-        recalled_messages: Sequence[ConversationMessage] = await memory.recall()
+        recalled_messages: Sequence[ConversationElement] = await memory.recall()
         context: list[LMMContextElement]
         match input:
             case ConversationMessage() as message:
                 await GuardrailsModeration.check_input(message.content)
                 await memory.remember(message)
                 context = [
-                    *(message.as_lmm_context_element() for message in recalled_messages),
+                    *(
+                        message.as_lmm_context_element()
+                        for message in recalled_messages
+                        if isinstance(message, ConversationMessage)
+                    ),
                     message.as_lmm_context_element(),
                 ]
 
@@ -78,7 +88,11 @@ async def conversation_completion(
                 await GuardrailsModeration.check_input(message.content)
                 await memory.remember(message)
                 context = [
-                    *(message.as_lmm_context_element() for message in recalled_messages),
+                    *(
+                        message.as_lmm_context_element()
+                        for message in recalled_messages
+                        if isinstance(message, ConversationMessage)
+                    ),
                     message.as_lmm_context_element(),
                 ]
 
@@ -164,14 +178,21 @@ async def _conversation_completion_stream(
     memory: ConversationMemory,
     toolbox: Toolbox,
     **extra: Any,
-) -> AsyncIterator[LMMStreamChunk | ProcessingEvent]:
-    output_queue = AsyncQueue[LMMStreamChunk | ProcessingEvent]()
+) -> AsyncIterator[ConversationStreamElement]:
+    output_queue = AsyncQueue[ConversationStreamElement]()
 
     async def report_event(
         event: ProcessingEvent,
         /,
     ) -> None:
-        output_queue.enqueue(event)
+        output_queue.enqueue(
+            ConversationEvent.of(
+                event.name,
+                identifier=event.identifier,
+                content=event.content,
+                meta=event.meta,
+            )
+        )
 
     with ctx.updated(ctx.state(Processing).updated(event_reporting=report_event)):
 
@@ -194,8 +215,13 @@ async def _conversation_completion_stream(
                     ):
                         match element:
                             case LMMStreamChunk() as chunk:
-                                accumulated_content = accumulated_content.extending(chunk.content)
-                                output_queue.enqueue(chunk)
+                                accumulated_content = accumulated_content.appending(chunk.content)
+                                output_queue.enqueue(
+                                    ConversationMessageChunk.model(
+                                        chunk.content,
+                                        eod=chunk.eod,
+                                    )
+                                )
 
                                 if chunk.eod:
                                     # end of streaming for conversation completion
@@ -228,7 +254,7 @@ async def _conversation_completion_stream(
                         if response.handling == "direct_result"
                     ]:
                         tools_content = MultimodalContent.of(*direct_content)
-                        output_queue.enqueue(LMMStreamChunk.of(tools_content))
+                        output_queue.enqueue(ConversationMessageChunk.model(tools_content))
                         response_message = ConversationMessage.model(
                             created=datetime.now(UTC),
                             content=MultimodalContent.of(accumulated_content, tools_content),

@@ -1,6 +1,6 @@
 from typing import Any, Protocol, runtime_checkable
 
-from haiway import Default, State
+from haiway import State
 
 from draive.commons import META_EMPTY, Meta
 from draive.multimodal import MultimodalContent
@@ -24,7 +24,7 @@ class GuardrailsContentDeanonymizing(Protocol):
 class GuardrailsAnonymizedContent(State):
     content: MultimodalContent
     deanonymize: GuardrailsContentDeanonymizing | None = None
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
 
 @runtime_checkable

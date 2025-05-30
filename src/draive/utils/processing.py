@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from haiway import Default, MissingState, State, ctx
 
@@ -20,24 +20,24 @@ class ProcessingEvent(DataModel):
     @classmethod
     def of(
         cls,
-        identifier: str | None = None,
+        name: str,
         /,
         *,
-        name: str,
+        identifier: UUID | None = None,
         content: Multimodal | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
-            identifier=identifier if identifier is not None else uuid4().hex,
+            identifier=identifier if identifier is not None else uuid4(),
             name=name,
             content=MultimodalContent.of(content) if content is not None else None,
             meta=Meta.of(meta),
         )
 
-    identifier: str
+    identifier: UUID = Default(factory=uuid4)
     name: str
     content: MultimodalContent | None = None
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
 
 @runtime_checkable
@@ -166,7 +166,7 @@ class Processing(State):
         cls,
         /,
         *,
-        identifier: str,
+        identifier: UUID | None = None,
         name: str | None,
         content: Multimodal | None = None,
         meta: Meta | MetaValues | None = None,
@@ -178,7 +178,7 @@ class Processing(State):
         event: ProcessingEvent | None = None,
         /,
         *,
-        identifier: str | None = None,
+        identifier: UUID | None = None,
         name: str | None = None,
         content: Multimodal | None = None,
         meta: Meta | MetaValues | None = None,
@@ -187,11 +187,11 @@ class Processing(State):
             assert identifier is None and name is None  # nosec: B101
             return await ctx.state(cls).event_reporting(event)
 
-        assert identifier is not None and name is not None  # nosec: B101
+        assert name is not None  # nosec: B101
         return await ctx.state(cls).event_reporting(
-            ProcessingEvent(
+            ProcessingEvent.of(
+                name,
                 identifier=identifier,
-                name=name,
                 content=MultimodalContent.of(content) if content is not None else None,
                 meta=Meta.of(meta),
             )

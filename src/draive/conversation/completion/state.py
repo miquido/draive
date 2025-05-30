@@ -1,21 +1,21 @@
-from collections.abc import AsyncIterator, Iterable, Sequence
-from typing import Any, Literal, final, overload
+from collections.abc import AsyncIterator, Iterable
+from typing import Any, Literal, cast, final, overload
 
 from haiway import State, ctx
 
-from draive.conversation.default import conversation_completion
+from draive.conversation.completion.default import conversation_completion
+from draive.conversation.completion.types import ConversationCompleting
 from draive.conversation.types import (
-    ConversationCompleting,
     ConversationElement,
     ConversationMemory,
     ConversationMessage,
+    ConversationStreamElement,
 )
 from draive.helpers import ConstantMemory
 from draive.instructions import Instruction
-from draive.lmm import LMMStreamChunk
 from draive.multimodal import Multimodal
 from draive.tools import Tool, Toolbox
-from draive.utils import Memory, ProcessingEvent
+from draive.utils import Memory
 
 __all__ = ("Conversation",)
 
@@ -46,7 +46,7 @@ class Conversation(State):
         tools: Toolbox | Iterable[Tool] | None = None,
         stream: Literal[True],
         **extra: Any,
-    ) -> AsyncIterator[LMMStreamChunk | ProcessingEvent]: ...
+    ) -> AsyncIterator[ConversationStreamElement]: ...
 
     @classmethod
     async def completion(
@@ -58,12 +58,12 @@ class Conversation(State):
         tools: Toolbox | Iterable[Tool] | None = None,
         stream: bool = False,
         **extra: Any,
-    ) -> AsyncIterator[LMMStreamChunk | ProcessingEvent] | ConversationMessage:
+    ) -> AsyncIterator[ConversationStreamElement] | ConversationMessage:
         conversation: Conversation = ctx.state(cls)
 
         # prepare memory
-        conversation_memory: Memory[Sequence[ConversationMessage], ConversationMessage]
-        match memory or conversation.memory:
+        conversation_memory: ConversationMemory
+        match memory if memory is not None else conversation.memory:
             case None:
                 conversation_memory = ConstantMemory(recalled=())
 
@@ -71,7 +71,10 @@ class Conversation(State):
                 conversation_memory = memory
 
             case memory_messages:
-                conversation_memory = ConstantMemory(recalled=tuple(memory_messages))
+                conversation_memory = cast(
+                    ConversationMemory,
+                    ConstantMemory(recalled=tuple(memory_messages)),
+                )
 
         if stream:
             return await conversation.completing(
@@ -91,4 +94,4 @@ class Conversation(State):
             )
 
     completing: ConversationCompleting = conversation_completion
-    memory: Memory[Sequence[ConversationMessage], ConversationMessage] | None = None
+    memory: ConversationMemory | None = None

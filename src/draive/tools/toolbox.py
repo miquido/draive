@@ -4,7 +4,7 @@ from typing import Any, Literal, Self, final, overload
 
 from haiway import State, ctx
 
-from draive.commons import Meta, MetaTags, MetaValues
+from draive.commons import META_EMPTY, Meta, MetaTags, MetaValues
 from draive.lmm.types import (
     LMMException,
     LMMToolError,
@@ -153,7 +153,7 @@ class Toolbox(State):
     tools: Mapping[str, Tool]
     suggest_call: Tool | bool
     repeated_calls_limit: int
-    meta: Meta
+    meta: Meta = META_EMPTY
 
     def tool_selection(
         self,

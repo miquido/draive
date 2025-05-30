@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Any, Protocol, Self, overload, runtime_checkable
 
-from haiway import Default, State
+from haiway import State
 
 from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.multimodal import (
@@ -39,7 +39,7 @@ class ResourceDeclaration(DataModel):
     mime_type: str | None
     name: str
     description: str | None = None
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
 
 class ResourceTemplateDeclaration(DataModel):
@@ -47,7 +47,7 @@ class ResourceTemplateDeclaration(DataModel):
     mime_type: str | None
     name: str
     description: str | None = None
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
 
 class ResourceContent(State):
@@ -232,7 +232,7 @@ class Resource(State):
     name: str
     description: str | None
     content: Sequence[Self] | ResourceContent
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
     def to_multimodal(self) -> MultimodalContent:
         match self.content:

@@ -76,6 +76,10 @@ from draive.conversation import (
     ConversationElement,
     ConversationMemory,
     ConversationMessage,
+    ConversationMessageChunk,
+    ConversationStreamElement,
+    RealtimeConversation,
+    RealtimeConversationMemory,
 )
 from draive.embedding import (
     Embedded,
@@ -247,6 +251,8 @@ __all__ = (
     "ConversationElement",
     "ConversationMemory",
     "ConversationMessage",
+    "ConversationMessageChunk",
+    "ConversationStreamElement",
     "DataModel",
     "Default",
     "DefaultValue",
@@ -328,6 +334,8 @@ __all__ = (
     "Prompts",
     "RateLimitError",
     "Realtime",
+    "RealtimeConversation",
+    "RealtimeConversationMemory",
     "RealtimeOutputSelection",
     "Resource",
     "ResourceContent",

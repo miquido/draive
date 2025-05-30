@@ -86,7 +86,7 @@ class LMMInput(DataModel):
 
     type: Literal["input"] = "input"
     content: MultimodalContent
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
     def __bool__(self) -> bool:
         return bool(self.content)
@@ -107,7 +107,7 @@ class LMMCompletion(DataModel):
 
     type: Literal["completion"] = "completion"
     content: MultimodalContent
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
     def __bool__(self) -> bool:
         return bool(self.content)
@@ -139,7 +139,7 @@ class LMMToolResponses(DataModel):
 
     type: Literal["tool_responses"] = "tool_responses"
     responses: Sequence[LMMToolResponse]
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
 
 class LMMToolRequest(DataModel):
@@ -163,7 +163,7 @@ class LMMToolRequest(DataModel):
     identifier: str
     tool: str
     arguments: Mapping[str, Any] = Default(factory=dict)
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
 
 class LMMToolRequests(DataModel):
@@ -184,7 +184,7 @@ class LMMToolRequests(DataModel):
     type: Literal["tool_requests"] = "tool_requests"
     requests: Sequence[LMMToolRequest]
     content: MultimodalContent | None = None
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
 
 LMMContextElement = LMMInput | LMMCompletion | LMMToolRequests | LMMToolResponses
@@ -210,7 +210,7 @@ class LMMStreamChunk(DataModel):
     type: Literal["stream_chunk"] = "stream_chunk"
     content: MultimodalContent
     eod: bool
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
     def __bool__(self) -> bool:
         return bool(self.content)

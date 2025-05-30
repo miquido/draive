@@ -1,49 +1,130 @@
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import Iterable, Sequence
 from datetime import datetime
-from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
-from uuid import uuid4
+from typing import Literal, Self
+from uuid import UUID, uuid4
 
 from haiway import Default
 
 from draive.commons import META_EMPTY, Meta, MetaValues
-from draive.instructions import Instruction
-from draive.lmm import (
-    LMMCompletion,
-    LMMContextElement,
-    LMMInput,
-    LMMStreamChunk,
-)
-from draive.multimodal import (
-    Multimodal,
-    MultimodalContent,
-)
+from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
+from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel
-from draive.tools import Toolbox
-from draive.utils import Memory, ProcessingEvent
+from draive.utils import Memory
 
 __all__ = (
-    "ConversationCompleting",
     "ConversationElement",
-    "ConversationMemory",
     "ConversationMessage",
+    "ConversationMessageChunk",
+    "ConversationStreamElement",
 )
 
 
-class ConversationMessage(DataModel):
+class ConversationMessageChunk(DataModel):
     @classmethod
     def user(
         cls,
         content: Multimodal,
-        identifier: str | None = None,
-        author: str | None = None,
+        *,
+        identifier: UUID | None = None,
+        created: datetime | None = None,
+        meta: Meta | MetaValues | None = None,
+        eod: bool = False,
+    ) -> Self:
+        return cls(
+            identifier=identifier if identifier is not None else uuid4(),
+            role="user",
+            created=created if created is not None else datetime.now(),
+            content=MultimodalContent.of(content),
+            eod=eod,
+            meta=Meta.of(meta),
+        )
+
+    @classmethod
+    def model(
+        cls,
+        content: Multimodal,
+        *,
+        identifier: UUID | None = None,
+        created: datetime | None = None,
+        meta: Meta | MetaValues | None = None,
+        eod: bool = False,
+    ) -> Self:
+        return cls(
+            identifier=identifier if identifier is not None else uuid4(),
+            role="model",
+            created=created if created is not None else datetime.now(),
+            content=MultimodalContent.of(content),
+            eod=eod,
+            meta=Meta.of(meta),
+        )
+
+    type: Literal["message_chunk"] = "message_chunk"
+    identifier: UUID = Default(factory=uuid4)
+    role: Literal["user", "model"]
+    created: datetime = Default(factory=datetime.now)
+    content: MultimodalContent
+    eod: bool = False
+    meta: Meta = META_EMPTY
+
+    def __bool__(self) -> bool:
+        return bool(self.content)
+
+
+class ConversationMessage(DataModel):
+    @classmethod
+    def from_chunks(
+        cls,
+        chunks: Iterable[ConversationMessageChunk],
+        /,
+    ) -> Sequence[Self]:
+        messages: list[Self] = []
+        current: Self | None = None
+        for chunk in chunks:
+            if current is None:
+                current = cls(
+                    role=chunk.role,
+                    created=chunk.created,
+                    content=chunk.content,
+                    meta=chunk.meta,
+                )
+
+            elif current.role == chunk.role:
+                current = current.updated(
+                    content=current.content.appending(chunk.content),
+                    meta=current.meta.merged_with(chunk.meta),
+                )
+
+            else:
+                messages.append(current)
+                current = cls(
+                    role=chunk.role,
+                    created=chunk.created,
+                    content=chunk.content,
+                    meta=chunk.meta,
+                )
+
+            if chunk.eod:
+                messages.append(current)
+                current = None
+
+        if current is not None:
+            messages.append(current)
+
+        return messages
+
+    @classmethod
+    def user(
+        cls,
+        content: Multimodal,
+        *,
+        identifier: UUID | None = None,
         created: datetime | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
-            identifier=identifier or uuid4().hex,
+            identifier=identifier if identifier is not None else uuid4(),
             role="user",
-            author=author,
-            created=created,
+            created=created if created is not None else datetime.now(),
             content=MultimodalContent.of(content),
             meta=Meta.of(meta),
         )
@@ -52,26 +133,25 @@ class ConversationMessage(DataModel):
     def model(
         cls,
         content: Multimodal,
-        identifier: str | None = None,
-        author: str | None = None,
+        *,
+        identifier: UUID | None = None,
         created: datetime | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
-            identifier=identifier or uuid4().hex,
+            identifier=identifier if identifier is not None else uuid4(),
             role="model",
-            author=author,
-            created=created,
+            created=created if created is not None else datetime.now(),
             content=MultimodalContent.of(content),
             meta=Meta.of(meta),
         )
 
-    identifier: str = Default(factory=lambda: uuid4().hex)
+    type: Literal["message"] = "message"
+    identifier: UUID = Default(factory=uuid4)
     role: Literal["user", "model"]
-    author: str | None = None
-    created: datetime | None = None
+    created: datetime = Default(factory=datetime.now)
     content: MultimodalContent
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
     def as_lmm_context_element(self) -> LMMContextElement:
         match self.role:
@@ -85,43 +165,36 @@ class ConversationMessage(DataModel):
         return bool(self.content)
 
 
-ConversationElement = ConversationMessage  # TODO: allow events/tool statuses
+class ConversationEvent(DataModel):
+    @classmethod
+    def of(
+        cls,
+        name: str,
+        *,
+        content: Multimodal | None = None,
+        identifier: UUID | None = None,
+        created: datetime | None = None,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        return cls(
+            identifier=identifier if identifier is not None else uuid4(),
+            name=name,
+            created=created if created is not None else datetime.now(),
+            content=MultimodalContent.of(content)
+            if content is not None
+            else MultimodalContent.empty,
+            meta=Meta.of(meta),
+        )
+
+    type: Literal["event"] = "event"
+    identifier: UUID = Default(factory=uuid4)
+    name: str
+    created: datetime = Default(factory=datetime.now)
+    content: MultimodalContent = MultimodalContent.empty
+    meta: Meta = META_EMPTY
+
+
+ConversationElement = ConversationMessage | ConversationEvent
 ConversationMemory = Memory[Sequence[ConversationElement], ConversationElement]
-
-
-@runtime_checkable
-class ConversationCompleting(Protocol):
-    @overload
-    async def __call__(
-        self,
-        *,
-        instruction: Instruction | None,
-        input: ConversationMessage | Multimodal,
-        memory: ConversationMemory,
-        toolbox: Toolbox,
-        stream: Literal[False] = False,
-        **extra: Any,
-    ) -> ConversationMessage: ...
-
-    @overload
-    async def __call__(
-        self,
-        *,
-        instruction: Instruction | None,
-        input: ConversationMessage | Multimodal,
-        memory: ConversationMemory,
-        toolbox: Toolbox,
-        stream: Literal[True],
-        **extra: Any,
-    ) -> AsyncIterator[LMMStreamChunk | ProcessingEvent]: ...
-
-    async def __call__(
-        self,
-        *,
-        instruction: Instruction | None,
-        input: ConversationMessage | Multimodal,  # noqa: A002
-        memory: ConversationMemory,
-        toolbox: Toolbox,
-        stream: bool = False,
-        **extra: Any,
-    ) -> AsyncIterator[LMMStreamChunk | ProcessingEvent] | ConversationMessage: ...
+ConversationStreamElement = ConversationMessageChunk | ConversationEvent
+RealtimeConversationMemory = Memory[Sequence[ConversationElement], ConversationStreamElement]
