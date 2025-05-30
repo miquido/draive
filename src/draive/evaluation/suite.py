@@ -90,9 +90,9 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
     @property
     def relative_score(self) -> float:
         if not self.results:
-            return 0
+            return 0.0
 
-        score: float = 0
+        score: float = 0.0
         for evaluation in self.results:
             score += evaluation.relative_score
 
@@ -135,9 +135,9 @@ class SuiteEvaluatorResult[CaseParameters: DataModel, Value: DataModel | str](Da
     @property
     def relative_score(self) -> float:
         if not self.cases:
-            return 0
+            return 0.0
 
-        score: float = 0
+        score: float = 0.0
         for evaluation in self.cases:
             score += evaluation.relative_score
 
