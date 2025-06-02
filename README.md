@@ -4,17 +4,18 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/miquido/draive?utm_source=oss&utm_medium=github&utm_campaign=miquido%2Fdraive&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
-🏎️ Fast-track your LLM-based apps with an accessible, production-ready library. 🏎️
+🏎️ A fast, flexible Python library for building powerful LLM workflows and AI apps. 🏎️
 
-Are you looking for maximum flexibility and efficiency in your next Python library? Tired of unnecessary complexities and inefficient token usage?
+Draive gives you everything you need to turn large language models into production-ready software: structured workflows, tool use, instruction refinement, guardrails, observability, and seamless multi-model integration — all in one clean, composable package.
 
-👉 Introducing **draive** - an open-source Python library under the Miquido AI Kickstarter framework, designed to simplify and accelerate the development of LLM-based applications. Get started with draive to streamline your workflow and build powerful, efficient apps with ease.
+If you've ever felt like you’re stitching together glue code and hoping for the best — Draive is what you wish you'd started with!
 
 ## 🚀 Quick start
 
-Dive straight into the code and learn how to use draive with our interactive [guides](https://github.com/miquido/draive/tree/main/guides). Check out [Draive AI Course on YouTube](https://www.youtube.com/watch?v=C257Y7-y3ok&list=PLbS8Yksu3iAoRpDOGwP_UmK5s6B3SDz8T) to understand our unique architecture and see real-world applications of Draive in action. For quick solutions to common problems, explore our [cookbooks](https://github.com/miquido/draive/tree/main/cookbooks).
+Dive straight into the code and learn how to use draive with our interactive [guides](https://github.com/miquido/draive/tree/main/guides).
+For quick solutions to common problems, explore our [cookbooks](https://github.com/miquido/draive/tree/main/cookbooks).
 
-Great, but how it looks like?
+Here’s what a simple Draive setup looks like:
 
 ```python
 from draive import ctx, TextGeneration, tool
@@ -40,43 +41,42 @@ async with  ctx.scope( # create execution context
     # output: The current time in Kraków is 9:53:22.
 ```
 
-Fully functional examples of using the Draive library are also available in [Draive Examples](https://github.com/miquido/draive-examples) repository.
+For full examples, head over to the [Draive Examples](https://github.com/miquido/draive-examples) repository.
 
-## ❓ What is draive?
+## ❓ What is Draive good for?
 
-**draive** is an open-source Python library for developing apps powered by large language models. It stands out for its simplicity, consistent behavior, and transparency.
+Draive is built for developers who want clarity, flexibility, and control when working with LLMs.
 
-### Key Features:
+Whether you’re building an autonomous agent, automating customer support, generating structured data, or routing across multiple models — Draive has your back.
 
-- **🧱 Abstract building blocks**: Easily connect multiple functionalities with LLMs and link various LLMs together.
-- **🧩 Flexible integration**: Supports any LLM, external service, and other AI solutions.
-- **🧒 User-friendly framework**: Designed to build scalable and composable data processing pipelines with ease.
-- **⚙️ Function-oriented design**: Utilizes basic programming concepts, allowing you to represent complex programs as simple functions.
-- **🏗️ Composable and reusable**: Combine functions to create complex programs, while retaining the ability to use them individually.
-- **📊 Diagnostics and metrics**: Offers extensive tools for measuring and debugging complex functionalities.
-- **🔄 Fully typed and asynchronous**: Ensures type safety and efficient asynchronous operations for modern Python apps.
+### What you can do with Draive:
+
+- **🔁 Write smarter instructions** — and refine them programmatically
+- **🛠 Turn any Python function into a tool** that LLMs can call
+- **🔄 Switch between providers** like OpenAI, Claude, Gemini, or Mistral in seconds
+- **🧱 Design structured workflows** using stages, retries, and routing logic
+- **🛡 Enforce output structure using guardrails** (e.g., typed JSON)
+- **📊 Monitor everything with telemetry** and evaluation tools
+- **⚙️ Make your flows configuration-driven** and easy to test or deploy
+
+### Why you'll like it:
+
+- **Instruction Optimization**: Draive gives you clean ways to write and refine prompts, including metaprompts, instruction helpers, and optimizers. You can go from raw prompt text to a reusable, structured config in no time.
+- **Composable Workflows**: Use Stage, Router, and Tool components to build modular flows. Each piece is reusable, debuggable, and works with the rest of your Python stack.
+- **Tooling = Just Python**: Define a tool by writing a function. Annotate it. That’s it. Draive handles the rest — serialization, context, and integration with LLMs.
+- **Telemetry + Evaluators**: Draive logs everything you care about: timing, output shape, tool usage, error cases. Evaluators let you benchmark or regression-test LLM behavior like a normal part of your CI.
+- **Model-Agnostic by Design**: Built-in support for most major providers.
 
 ## 🧱 What can you build with draive?
 
-### 🦾 RAG applications
+These are the kinds of projects Draive was built for:
 
-RAG enhances model capabilities and personalizes the outputs.
-
-- **Examples**: Question answering, custom knowledge bases.
-
-### 🧹 Extracting structured output
-
-Simplified data extraction and structuring.
-
-- **Examples**: Data parsing, report generation.
-
-### 🤖 Chatbots
-
-Sophisticated conversational agents.
-
-- **Examples**: Customer service bots, virtual assistants.
-
-… and much more!
+- **AI agent for content marketing**: Automates blog post drafts, inserts SEO keywords, fetches trends via tools, and publishes to a CMS.
+- **Developer assistant bot**: Parses pull requests, summarizes diffs, generates release notes, and responds to GitHub issues.
+- **AI-powered customer support**: Reads company docs, routes queries, and calls real tools (like product status or order lookup) to respond accurately.
+- **Document parser for finance teams**: Converts PDFs to structured JSON using multimodal input, validates format, and sends summaries via Slack.
+- **Realtime dashboard builder**: Accepts natural language queries and builds charts from your own data sources using custom tools.
+- and much, much more!
 
 ## 🖥️ Install
 
@@ -148,9 +148,12 @@ pip install 'draive[vllm]'
 
 ## 👷 Contributing
 
-As an open-source project in a rapidly evolving field, we welcome all contributions. Whether you can add a new feature, enhance our infrastructure, or improve our documentation, your input is valuable to us.
+Draive is open-source and always growing — and we’d love your help.
 
-We welcome any feedback and suggestions! Feel free to open an issue or pull request.
+Got an idea for a new feature? Spotted a bug? Want to improve the docs or share an example? Awesome. Open a PR or start a discussion — no contribution is too small!
+
+Whether you're fixing typos, building new integrations, or just testing things out and giving feedback — you're welcome here.
+
 
 ## License
 
