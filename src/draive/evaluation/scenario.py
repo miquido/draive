@@ -67,7 +67,7 @@ class ScenarioEvaluatorResult(DataModel):
     @property
     def relative_score(self) -> float:
         if not self.evaluations:
-            return 0
+            return 0.0
 
         return len([evaluation for evaluation in self.evaluations if evaluation.passed]) / len(
             self.evaluations

@@ -94,9 +94,9 @@ class EvaluatorResult(DataModel):
     @property
     def relative_score(self) -> float:
         if self.threshold <= 0:
-            return 1
+            return 1.0
 
-        return min(1, self.score.value / self.threshold)
+        return min(1.0, self.score.value / self.threshold)
 
     def __gt__(self, other: Self) -> bool:
         assert isinstance(other, self.__class__)  # nosec: B101
