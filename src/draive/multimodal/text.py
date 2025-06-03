@@ -1,7 +1,5 @@
 from typing import Self
 
-from haiway import Default
-
 from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.parameters import DataModel
 
@@ -22,7 +20,7 @@ class TextContent(DataModel):
         )
 
     text: str
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
     def __bool__(self) -> bool:
         return len(self.text) > 0

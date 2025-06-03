@@ -42,6 +42,7 @@ class OpenAIRealtimeConfig(Config):
     voice: str | Missing = MISSING
     vad_type: Literal["server_vad", "semantic_vad"] | Missing = MISSING
     vad_eagerness: Literal["low", "medium", "high", "auto"] = "auto"
+    transcribe_audio: bool | Missing = MISSING
 
 
 class OpenAIEmbeddingConfig(Config):

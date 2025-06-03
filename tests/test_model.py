@@ -260,16 +260,17 @@ def test_basic_decoding() -> None:
 
 
 basic_conversation_message_instance: ConversationMessage = ConversationMessage(
-    identifier="identifier",
+    identifier=UUID(hex="f6da0a47556744cdb8334d263020907f"),
     role="model",
+    created=datetime.fromisoformat("2025-06-03T18:15:58.985599"),
     content=MultimodalContent.of("string"),
 )
 basic_conversation_message_json: str = """\
 {
-    "identifier": "identifier",
+    "type": "message",
+    "identifier": "f6da0a47556744cdb8334d263020907f",
     "role": "model",
-    "author": null,
-    "created": null,
+    "created": "2025-06-03T18:15:58.985599",
     "content": {
         "parts": [
             {
@@ -283,16 +284,17 @@ basic_conversation_message_json: str = """\
 """
 
 media_url_conversation_message_instance: ConversationMessage = ConversationMessage(
-    identifier="identifier",
+    identifier=UUID(hex="f6da0a47556744cdb8334d263020907f"),
     role="model",
+    created=datetime.fromisoformat("2025-06-03T18:15:58.985599"),
     content=MultimodalContent.of(MediaReference.of("https://miquido.com/image", media="image/png")),
 )
 media_url_conversation_message_json: str = """\
 {
-    "identifier": "identifier",
+    "type": "message",
+    "identifier": "f6da0a47556744cdb8334d263020907f",
     "role": "model",
-    "author": null,
-    "created": null,
+    "created": "2025-06-03T18:15:58.985599",
     "content": {
         "parts": [
             {
@@ -307,16 +309,17 @@ media_url_conversation_message_json: str = """\
 """
 
 media_data_conversation_message_instance: ConversationMessage = ConversationMessage(
-    identifier="identifier",
+    identifier=UUID(hex="f6da0a47556744cdb8334d263020907f"),
     role="model",
+    created=datetime.fromisoformat("2025-06-03T18:15:58.985599"),
     content=MultimodalContent.of(MediaData.of(b"image_data", media="image/png")),
 )
 media_data_conversation_message_json: str = """\
 {
-    "identifier": "identifier",
+    "type": "message",
+    "identifier": "f6da0a47556744cdb8334d263020907f",
     "role": "model",
-    "author": null,
-    "created": null,
+    "created": "2025-06-03T18:15:58.985599",
     "content": {
         "parts": [
             {

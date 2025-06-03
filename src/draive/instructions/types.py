@@ -39,7 +39,7 @@ class InstructionDeclaration(DataModel):
     name: str
     description: str | None = None
     arguments: Sequence[InstructionDeclarationArgument]
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
 
 @final
@@ -153,7 +153,7 @@ class Instruction(State):
     description: str | None = None
     content: str
     arguments: Mapping[str, str | float | int] = Default(factory=dict)
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
     @property
     def declaration(self) -> InstructionDeclaration:

@@ -20,7 +20,7 @@ MultimodalContentElement = TextContent | MediaContent | MetaContent | DataModel
 MultimodalContentConvertible = str | MultimodalContentElement
 
 
-@final
+@final  # TODO: optimize performance
 class MultimodalContent(DataModel):
     empty: ClassVar[Self]  # defined after the class
 
@@ -157,22 +157,30 @@ class MultimodalContent(DataModel):
 
     def appending(
         self,
-        *parts: MultimodalContentConvertible,
+        *parts: Self | MultimodalContentConvertible,
     ) -> Self:
-        assert not any(isinstance(part, MultimodalContent) for part in parts)  # nosec: B101
+        if not parts:
+            return self
+
         if len(self.parts) == 0:
             return self.__class__(
-                parts=tuple(_merge_texts(*(_as_content(element) for element in parts))),
+                parts=tuple(
+                    _merge_texts(*chain.from_iterable(_extract_parts(part) for part in parts))
+                ),
             )
 
         # check the last part
         match self.parts[-1]:
             case TextContent() as text:
                 # if it is a text append merge starting with it
+
                 return self.__class__(
                     parts=(
                         *self.parts[:-1],
-                        *_merge_texts(text, *(_as_content(element) for element in parts)),
+                        *_merge_texts(
+                            text,
+                            *chain.from_iterable(_extract_parts(part) for part in parts),
+                        ),
                     )
                 )
 
@@ -181,11 +189,11 @@ class MultimodalContent(DataModel):
                 return self.__class__(
                     parts=(
                         *self.parts,
-                        *_merge_texts(*(_as_content(element) for element in parts)),
+                        *_merge_texts(*chain.from_iterable(_extract_parts(part) for part in parts)),
                     )
                 )
 
-    def extending(
+    def extended_by(
         self,
         *other: Self,
     ) -> Self:
@@ -205,7 +213,7 @@ Multimodal = MultimodalContent | MultimodalContentConvertible
 def _extract_parts(  # noqa: PLR0911
     element: Multimodal,
     /,
-    meta: Meta,
+    meta: Meta | None = None,
 ) -> Sequence[MultimodalContentElement]:
     match element:
         case MultimodalContent() as content:
@@ -232,7 +240,7 @@ def _extract_parts(  # noqa: PLR0911
                 return (
                     TextContent(
                         text=text,
-                        meta=meta,
+                        meta=Meta.of(meta),
                     ),
                 )
 

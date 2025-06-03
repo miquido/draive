@@ -1853,7 +1853,7 @@ class Stage:
             )
             return StageState(
                 context=processed_context,
-                result=result.extending(processed_result),
+                result=result.appending(processed_result),
             )
 
         return self.__class__(stage, meta=self.meta)

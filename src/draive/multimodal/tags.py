@@ -1,7 +1,7 @@
 from collections.abc import Generator, Iterator, Mapping
 from typing import Self, overload
 
-from haiway import Default, State
+from haiway import State
 
 from draive.commons import META_EMPTY, Meta
 from draive.multimodal.content import Multimodal, MultimodalContent, MultimodalContentElement
@@ -377,7 +377,7 @@ class _TagOpening(State):
     name: str
     attributes: Mapping[str, str] | None
     raw: str
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
     closed: bool
 
 
@@ -595,7 +595,7 @@ def _parse_tag_attribute_value(  # noqa: C901, PLR0912
 class _TagClosing(State):
     name: str
     raw: str
-    meta: Meta = Default(META_EMPTY)
+    meta: Meta = META_EMPTY
 
 
 # look for tag closing and pass through everything else]
