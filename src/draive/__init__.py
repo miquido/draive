@@ -74,6 +74,7 @@ from draive.configuration import Config, Configuration
 from draive.conversation import (
     Conversation,
     ConversationElement,
+    ConversationEvent,
     ConversationMemory,
     ConversationMessage,
     ConversationMessageChunk,
@@ -248,6 +249,7 @@ __all__ = (
     "ConstantMemory",
     "Conversation",
     "ConversationElement",
+    "ConversationEvent",
     "ConversationMemory",
     "ConversationMessage",
     "ConversationMessageChunk",
