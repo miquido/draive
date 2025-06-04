@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Set
+from collections.abc import Collection, Iterable
 from types import TracebackType
 from typing import Literal, final
 
@@ -27,7 +27,7 @@ class Bedrock(
     def __init__(
         self,
         *,
-        features: Set[Features] | None = None,
+        features: Collection[Features] | None = None,
         aws_region: str | None = None,
     ) -> None:
         super().__init__(aws_region=aws_region)

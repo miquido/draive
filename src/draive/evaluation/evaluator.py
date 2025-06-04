@@ -79,7 +79,7 @@ class EvaluatorResult(DataModel):
                 f"<evaluator name='{self.evaluator}' status='{status}'>"
                 f"\n<score>{self.score.value}</score>"
                 f"\n<threshold>{self.threshold}</threshold>"
-                f"\n<relative_score>{self.relative_score*100:.2f}%</relative_score>"
+                f"\n<relative_score>{self.relative_score * 100:.2f}%</relative_score>"
                 f"\n<comment>{comment}</comment>"
                 "\n</evaluator>"
             )

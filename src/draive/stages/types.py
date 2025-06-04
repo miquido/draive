@@ -1,15 +1,21 @@
 from collections.abc import Mapping, Sequence
-from typing import NamedTuple, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, Self, cast, final, overload, runtime_checkable
+
+from haiway import MissingState, State
 
 from draive.commons import Meta
-from draive.lmm import LMMContext
-from draive.multimodal import MultimodalContent
+from draive.lmm import LMMCompletion, LMMContext
+from draive.multimodal import Multimodal, MultimodalContent
+from draive.parameters import DataModel
+from draive.utils import Memory
 
 __all__ = (
-    "StageCondition",
+    "StageConditioning",
     "StageContextTransforming",
     "StageException",
     "StageExecution",
+    "StageLoopConditioning",
+    "StageMemory",
     "StageMerging",
     "StageResultTransforming",
     "StageRouting",
@@ -18,241 +24,429 @@ __all__ = (
 )
 
 
-class StageState(NamedTuple):
-    """Named tuple representing the state of a stage execution.
+@final
+class StageState:
+    """
+    Immutable state container for stage execution.
 
-    This type encapsulates both the LMM context and result content that flows
-    through stage processing pipelines. It provides a structured way to handle
-    the dual nature of stage transformations where both context and result
-    can be modified.
+    StageState encapsulates the complete execution state of a stage, including
+    the LMM context, current result, and any associated state models. It provides
+    methods for creating new states with updated values while maintaining immutability.
 
-    Attributes
-    ----------
-    context : LMMContext
-        The LMM context containing conversation history and elements.
-    result : MultimodalContent
-        The current result content from stage processing.
+    The state includes:
+    - context: The LMM conversation context (input/output pairs, tool calls, etc.)
+    - result: The current multimodal result content
+    - state: Dictionary of state models indexed by their types
     """
 
-    context: LMMContext
-    result: MultimodalContent
+    @classmethod
+    def of(
+        cls,
+        *state: DataModel | State,
+        context: LMMContext,
+        result: Multimodal | None = None,
+    ) -> Self:
+        """
+        Create a new StageState from individual components.
 
+        Parameters
+        ----------
+        *state : DataModel | State
+            State models to include in the stage state.
+        context : LMMContext
+            The LMM conversation context.
+        result : Multimodal | None
+            The result content, or None for empty content.
 
-@runtime_checkable
-class StageExecution(Protocol):
-    """Protocol for stage execution functions.
+        Returns
+        -------
+        Self
+            A new StageState instance.
+        """
+        return cls(
+            context=context,
+            result=MultimodalContent.of(result) if result is not None else MultimodalContent.empty,
+            state={type(element): element for element in state},
+        )
 
-    Defines the signature for functions that execute a stage's processing logic.
-    These functions transform both the LMM context and result value.
+    __slots__ = (
+        "_state",
+        "context",
+        "result",
+    )
 
-    Parameters
-    ----------
-    context : LMMContext
-        The current LMM context containing conversation history.
-    result : MultimodalContent
-        The current result value from previous stages.
-
-    Returns
-    -------
-    StageState
-        A named tuple containing the updated context and result.
-    """
-
-    async def __call__(
+    def __init__(
         self,
         *,
         context: LMMContext,
         result: MultimodalContent,
-    ) -> StageState: ...
+        state: Mapping[type[DataModel] | type[State], DataModel | State],
+    ) -> None:
+        """
+        Initialize a new StageState instance.
 
+        Parameters
+        ----------
+        context : LMMContext
+            The LMM conversation context.
+        result : MultimodalContent
+            The current result content.
+        state : Mapping[type[DataModel] | type[State], DataModel | State]
+            Dictionary mapping state types to their instances.
+        """
 
-@runtime_checkable
-class StageMerging(Protocol):
-    """Protocol for merging results from concurrent stage executions.
+        assert not context or isinstance(context[-1], LMMCompletion)  # nosec: B101
+        self.context: LMMContext
+        object.__setattr__(
+            self,
+            "context",
+            context if isinstance(context, tuple) else tuple(context),
+        )
+        self.result: MultimodalContent
+        object.__setattr__(
+            self,
+            "result",
+            result,
+        )
+        self._state: Mapping[type[DataModel] | type[State], DataModel | State]
+        object.__setattr__(
+            self,
+            "_state",
+            state,
+        )
 
-    Defines the signature for functions that combine results from multiple
-    concurrent stage executions into a single context and result.
-
-    Parameters
-    ----------
-    branches : Sequence[StageState | BaseException]
-        Results from concurrent stage executions. Each element is either
-        a successful result tuple or an exception from a failed execution.
-
-    Returns
-    -------
-    StageState
-        A single merged state containing context and result from all branch results.
-    """
-
-    async def __call__(
+    def __setattr__(
         self,
+        name: str,
+        value: Any,
+    ) -> Any:
+        """Prevent attribute modification to maintain immutability."""
+        raise AttributeError(
+            f"Can't modify immutable {self.__class__.__qualname__},"
+            f" attribute - '{name}' cannot be modified"
+        )
+
+    def __delattr__(
+        self,
+        name: str,
+    ) -> None:
+        """Prevent attribute deletion to maintain immutability."""
+        raise AttributeError(
+            f"Can't modify immutable {self.__class__.__qualname__},"
+            f" attribute - '{name}' cannot be deleted"
+        )
+
+    @overload
+    def get[StateType: DataModel | State](
+        self,
+        state: type[StateType],
+        /,
+    ) -> StateType | None: ...
+
+    @overload
+    def get[StateType: DataModel | State](
+        self,
+        state: type[StateType],
+        /,
         *,
-        branches: Sequence[StageState | BaseException],
-    ) -> StageState: ...
+        required: Literal[True],
+    ) -> StateType: ...
 
-
-@runtime_checkable
-class StageCondition(Protocol):
-    """Protocol for stage condition evaluation functions.
-
-    Defines the signature for functions that evaluate conditions based on
-    stage metadata, context, and result to determine control flow.
-
-    Parameters
-    ----------
-    meta : Meta
-        Metadata associated with the stage being evaluated.
-    context : LMMContext
-        The current LMM context.
-    result : MultimodalContent
-        The current result value.
-
-    Returns
-    -------
-    bool
-        True if the condition is met, False otherwise.
-    """
-
-    async def __call__(
+    @overload
+    def get[StateType: DataModel | State](
         self,
+        state: type[StateType],
+        /,
         *,
-        meta: Meta,
-        context: LMMContext,
-        result: MultimodalContent,
-    ) -> bool: ...
+        default: StateType,
+    ) -> StateType: ...
 
-
-@runtime_checkable
-class StageResultTransforming(Protocol):
-    """Protocol for result transformation functions.
-
-    Defines the signature for functions that transform the result content
-    without modifying the LMM context.
-
-    Parameters
-    ----------
-    content : MultimodalContent
-        The current result content to be transformed.
-
-    Returns
-    -------
-    MultimodalContent
-        The transformed result content.
-    """
-
-    async def __call__(
+    def get[StateType: DataModel | State](
         self,
-        content: MultimodalContent,
-    ) -> MultimodalContent: ...
-
-
-@runtime_checkable
-class StageStateAccessing(Protocol):
-    """Protocol for state accessing functions.
-
-    Defines the signature for functions that access or modify state
-    based on the current context and result without changing them.
-
-    Parameters
-    ----------
-    context : LMMContext
-        The current LMM context for state access.
-    result : MultimodalContent
-        The current result for state access.
-
-    Returns
-    -------
-    None
-        These functions perform side effects but don't return values.
-    """
-
-    async def __call__(
-        self,
+        state: type[StateType],
+        /,
         *,
-        context: LMMContext,
-        result: MultimodalContent,
-    ) -> None: ...
+        default: StateType | None = None,
+        required: bool = False,
+    ) -> StateType | None:
+        """
+        Retrieve a state model by its type.
 
+        Parameters
+        ----------
+        state : type[StateType]
+            The type of state model to retrieve.
+        default : StateType | None
+            Default value to return if the state is not found.
+        required : bool
+            If True, raises MissingState when the state is not found.
 
-@runtime_checkable
-class StageContextTransforming(Protocol):
-    """Protocol for context transformation functions.
+        Returns
+        -------
+        StateType | None
+            The state model if found, the default value, or None.
 
-    Defines the signature for functions that transform the LMM context
-    without modifying the result content.
+        Raises
+        ------
+        MissingState
+            When required=True and the state is not found.
+        """
 
-    Parameters
-    ----------
-    context : LMMContext
-        The current LMM context to be transformed.
+        current: StateType | None = cast(StateType | None, self._state.get(state))
+        if current is not None:
+            return current
 
-    Returns
-    -------
-    LMMContext
-        The transformed LMM context.
-    """
+        elif default is not None:
+            return default
 
-    async def __call__(
+        elif required:
+            raise MissingState(f"{state.__qualname__} is not available within stage state")
+
+        else:
+            return None
+
+    def updated(
         self,
-        context: LMMContext,
-    ) -> LMMContext: ...
+        *state: DataModel | State,
+        context: LMMContext | None = None,
+        result: Multimodal | None = None,
+    ) -> Self:
+        """
+        Create a new StageState with updated values.
 
+        Returns a new StageState instance with the specified values updated
+        while preserving existing values for unspecified parameters.
 
-@runtime_checkable
-class StageRouting(Protocol):
-    """Protocol for stage routing functions.
+        Parameters
+        ----------
+        *state : DataModel | State
+            State models to add or update.
+        context : LMMContext | None
+            New context to use, or None to preserve current context.
+        result : Multimodal | None
+            New result to use, or None to preserve current result.
 
-    Defines the signature for functions that select which stage to execute
-    from a set of available options based on context and result.
+        Returns
+        -------
+        Self
+            A new StageState instance with the updated values.
+        """
 
-    Parameters
-    ----------
-    context : LMMContext
-        The current LMM context for routing decision.
-    result : MultimodalContent
-        The current result for routing decision.
-    options : Mapping[str, Meta]
-        Available routing options with their metadata.
+        return self.__class__(
+            state={**self._state, **{type(element): element for element in state}}
+            if state
+            else self._state,
+            context=context if context is not None else self.context,
+            result=MultimodalContent.of(result) if result is not None else self.result,
+        )
 
-    Returns
-    -------
-    str
-        The key of the selected routing option.
-    """
-
-    async def __call__(
+    def merged(
         self,
-        *,
-        context: LMMContext,
-        result: MultimodalContent,
-        options: Mapping[str, Meta],
-    ) -> str: ...
+        other: Self,
+        /,
+    ) -> Self:
+        """
+        Create a new StageState by merging with another StageState.
+
+        Combines the state models, concatenates the contexts, and merges
+        the results from both StageState instances.
+
+        Parameters
+        ----------
+        other : Self
+            The other StageState to merge with.
+
+        Returns
+        -------
+        Self
+            A new StageState containing the merged data.
+        """
+
+        return self.__class__(
+            state={**self._state, **other._state},
+            context=(*self.context, *other.context),
+            result=MultimodalContent.of(self.result, other.result),
+        )
 
 
 class StageException(Exception):
-    """Exception that can carry an execution result.
+    """
+    Exception that preserves stage state when an error occurs.
 
-    This exception allows stage execution to fail while still providing
-    a partial result that can be used by calling code.
-
-    Parameters
-    ----------
-    *args : object
-        Standard exception arguments.
-    execution_result : MultimodalContent | None
-        Optional partial result from the failed execution.
-
-    Attributes
-    ----------
-    execution_result : MultimodalContent | None
-        The partial result from execution, if any.
+    This exception type allows stage execution errors to carry the current
+    stage state, enabling recovery or inspection of the state at the time
+    of failure.
     """
 
     def __init__(
         self,
         *args: object,
-        execution_result: MultimodalContent | None = None,
+        state: StageState,
     ) -> None:
+        """
+        Initialize a new StageException.
+
+        Parameters
+        ----------
+        *args : object
+            Exception arguments passed to the parent Exception class.
+        state : StageState
+            The stage state at the time the exception occurred.
+        """
         super().__init__(*args)
-        self.execution_result: MultimodalContent | None = execution_result
+        self.state: StageState = state
+
+
+@runtime_checkable
+class StageExecution(Protocol):
+    """
+    Protocol defining the interface for stage execution functions.
+
+    Any callable that accepts a StageState and returns a StageState
+    (potentially modified) conforms to this protocol. This is the core
+    execution interface for all stages.
+    """
+
+    async def __call__(
+        self,
+        *,
+        state: StageState,
+    ) -> StageState:
+        """Execute the stage with the given state and return the updated state."""
+        ...
+
+
+@runtime_checkable
+class StageMerging(Protocol):
+    """
+    Protocol for merging results from concurrent stage executions.
+
+    Defines functions that can combine multiple stage execution results
+    (which may include exceptions) into a single consolidated result.
+    Used by Stage.concurrent() to merge parallel execution results.
+    """
+
+    async def __call__(
+        self,
+        *,
+        branches: Sequence[StageState | StageException],
+    ) -> StageState:
+        """Merge multiple stage execution results into a single state."""
+        ...
+
+
+@runtime_checkable
+class StageConditioning(Protocol):
+    """
+    Protocol for stage condition evaluation functions.
+
+    Defines functions that evaluate whether a condition is met based on
+    the current stage state. Used by Stage.when() for conditional execution.
+    """
+
+    async def __call__(
+        self,
+        *,
+        state: StageState,
+    ) -> bool:
+        """Evaluate whether a condition is met based on the stage state."""
+        ...
+
+
+@runtime_checkable
+class StageLoopConditioning(Protocol):
+    """
+    Protocol for stage loop condition evaluation functions.
+
+    Defines functions that determine whether to continue looping based on
+    the current stage state and iteration number. Used by Stage.loop() to
+    control loop termination.
+    """
+
+    async def __call__(
+        self,
+        *,
+        state: StageState,
+        iteration: int,
+    ) -> bool:
+        """Evaluate whether to continue looping based on state and iteration."""
+        ...
+
+
+@runtime_checkable
+class StageStateAccessing(Protocol):
+    """
+    Protocol for functions that access stage state without modification.
+
+    Defines functions that can read or inspect stage state but do not
+    return any value. Useful for logging, monitoring, or side-effect
+    operations that need access to the current state.
+    """
+
+    async def __call__(
+        self,
+        *,
+        state: StageState,
+    ) -> None:
+        """Access or inspect the stage state without modification."""
+        ...
+
+
+@runtime_checkable
+class StageContextTransforming(Protocol):
+    """
+    Protocol for LMM context transformation functions.
+
+    Defines functions that can transform an LMM context into a new context.
+    Used by Stage.transform_context() to modify conversation context while
+    preserving the result.
+    """
+
+    async def __call__(
+        self,
+        context: LMMContext,
+    ) -> LMMContext:
+        """Transform an LMM context into a new context."""
+        ...
+
+
+@runtime_checkable
+class StageResultTransforming(Protocol):
+    """
+    Protocol for result transformation functions.
+
+    Defines functions that can transform multimodal content into new content.
+    Used by Stage.transform_result() to modify stage results while preserving
+    the context.
+    """
+
+    async def __call__(
+        self,
+        result: MultimodalContent,
+    ) -> MultimodalContent:
+        """Transform multimodal content into new content."""
+        ...
+
+
+@runtime_checkable
+class StageRouting(Protocol):
+    """
+    Protocol for stage routing functions.
+
+    Defines functions that can select one stage from multiple options based on
+    the current state and available stage metadata. Used by Stage.router() to
+    dynamically choose which stage to execute.
+    """
+
+    async def __call__(
+        self,
+        *,
+        state: StageState,
+        options: Mapping[str, Meta],
+    ) -> str:
+        """Select a stage option based on state and available metadata."""
+        ...
+
+
+type StageMemory = Memory[StageState, StageState]
+"""Type alias for memory that stores and retrieves StageState objects."""

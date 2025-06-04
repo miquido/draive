@@ -8,7 +8,7 @@ Stages are the core processing pipeline units in draive that provide a composabl
 
 A Stage is an **immutable unit of work** that encapsulates transformations within an LMM context. Each stage:
 
-- Receives `StageState(context: LMMContext, result: MultimodalContent)`
+- Receives `StageState` containing context and result
 - Performs processing or transformation
 - Returns updated `StageState`
 - Can be chained, looped, run concurrently, or conditionally executed
@@ -64,7 +64,35 @@ static_stage = Stage.predefined(
 
 Predefined stage will extend the context with provided elements. When elements are not explicitly declared as a concrete LMMContext types, each odd element will become LMMInput and each even element will become LMMCompletion in the result context. Make sure to have equal number of inputs and outputs in the result context. Last LMMOutput will be used as the result of this stage.
 
-### 3. Context and Result Transformations
+### 3. Prompting Completion
+
+Generate completions with dynamic input:
+
+```python
+async def get_user_query():
+    # Simulated user input
+    return "What is the weather like today?"
+
+prompting_stage = Stage.prompting_completion(
+    get_user_query,
+    instruction="Answer the user's question",
+    tools=[weather_tool]
+)
+```
+
+### 4. Loopback Completion
+
+Use the last completion as new input for iterative refinement:
+
+```python
+# This takes the last completion and feeds it back as input
+refinement_stage = Stage.loopback_completion(
+    instruction="Improve and refine the previous response",
+    tools=[research_tool]
+)
+```
+
+### 5. Context and Result Transformations
 
 Modify context or result without full reprocessing:
 
@@ -85,6 +113,26 @@ transform_context_stage = Stage.transform_context(
 Context transformation does not change the result. Make sure to have equal number of inputs and outputs in the result context.
 
 ## Stage Composition
+
+### Looping
+
+Execute stages repeatedly while a condition is met:
+
+```python
+async def should_continue(
+    *,
+    state: StageState,
+    iteration: int
+) -> bool:
+    # Stop after 3 iterations or when result contains "done"
+    return iteration < 3 and "done" not in state.result.as_string()
+
+loop_stage = Stage.loop(
+    Stage.completion("Refine the analysis further"),
+    condition=should_continue,
+    mode="post_check"  # Check condition after each execution
+)
+```
 
 ### Sequential Execution
 
@@ -116,16 +164,74 @@ pipeline = Stage.sequence(
 result = await pipeline.execute()
 ```
 
+### Routing
+
+Route execution to different stages based on conditions:
+
+```python
+# Create stages with metadata for routing
+analysis_stage = Stage.completion(
+    "Perform detailed analysis",
+    instruction="Analyze the data thoroughly"
+).with_meta(
+    name="detailed_analysis",
+    description="Performs comprehensive data analysis"
+)
+
+summary_stage = Stage.completion(
+    "Create a brief summary",
+    instruction="Summarize the key points"
+).with_meta(
+    name="quick_summary", 
+    description="Creates a quick summary of the data"
+)
+
+# Router automatically selects the appropriate stage
+router_stage = Stage.router(
+    analysis_stage,
+    summary_stage,
+    # Optional: custom routing function
+    # routing=custom_routing_function
+)
+```
+
+### Concurrent Execution
+
+Run stages in parallel and merge results:
+
+```python
+async def merge_results(
+    branches: Sequence[StageState | StageException]
+) -> StageState:
+    # Custom logic to merge multiple stage results
+    successful_states = [
+        state for state in branches 
+        if isinstance(state, StageState)
+    ]
+    
+    # Combine all results
+    combined_content = MultimodalContent.of(
+        *[state.result for state in successful_states]
+    )
+    
+    return successful_states[0].updated(result=combined_content)
+
+concurrent_stage = Stage.concurrent(
+    Stage.completion("Analyze aspect A"),
+    Stage.completion("Analyze aspect B"), 
+    Stage.completion("Analyze aspect C"),
+    merge=merge_results
+)
+```
+
 ### Conditional Execution
 
 Execute stages based on conditions:
 
 ```python
-def needs_analysis(
+async def needs_analysis(
     *,
-    meta: Meta,
-    context: LMMContext,
-    result: MultimodalContent,
+    state: StageState,
 ) -> bool:
     # check if needs analysis...
 
@@ -215,14 +321,10 @@ from draive.helpers import VolatileMemory
 memory: Memory[LMMContext, LMMContext] = VolatileMemory(initial=())
 
 # Stage that remembers context
-remember_stage = Stage.completion(
-    "Process and remember this information"
-).memory_remember(memory)
+remember_stage = Stage.memory_remember(memory)
 
 # Stage that recalls previous context
-recall_stage = Stage.completion(
-    "Use previous context to answer"
-).memory_recall(memory, handling="append")
+recall_stage = Stage.memory_recall(memory, handling="merge")
 ```
 
 ## Error Handling
@@ -251,9 +353,50 @@ robust_stage = primary_stage.with_fallback(
 Manage context size to avoid token limits:
 
 ```python
-trimmed_stage = Stage.completion(
-    "Process with limited context"
-).trim_context(limit=4)  # Keep only last 4 context elements
+# Create a sequence that first trims context, then processes
+trimmed_stage = Stage.sequence(
+    Stage.trim_context(limit=4),  # Keep only last 4 context elements
+    Stage.completion("Process with limited context")
+)
+
+# Strip tool-related elements from context
+clean_stage = Stage.sequence(
+    Stage.completion("Process with tools", tools=[some_tool]),
+    Stage.strip_context_tools()  # Remove tool calls from context
+)
+```
+
+### Volatile Context Management
+
+Control what changes persist in the context:
+
+```python
+# Stage that discards context changes but keeps result
+volatile_stage = Stage.completion(
+    "Process but don't save context changes"
+).with_volatile_context()
+
+# Stage that discards only tool-related context changes
+volatile_tools_stage = Stage.completion(
+    "Use tools but don't keep tool calls in context",
+    tools=[some_tool]
+).with_volatile_tools_context()
+```
+
+### Result Manipulation
+
+Control how stage results are handled:
+
+```python
+# Stage that ignores its result and keeps the previous one
+ignored_stage = Stage.completion(
+    "Process something but ignore the result"
+).ignore_result()
+
+# Stage that extends the current result instead of replacing it
+extending_stage = Stage.completion(
+    "Add more information"
+).extend_result()
 ```
 
 ## Advanced Patterns
@@ -269,7 +412,7 @@ comprehensive_stage = (
     .cached(limit=5)
     .with_retry(limit=2)
     .traced(label="data_processing")
-    .when(lambda state: len(state.result.as_string()) > 10)
+    .when(lambda *, state: len(state.result.as_string()) > 10)
 )
 ```
 
@@ -283,14 +426,13 @@ from draive import stage
 @stage
 async def custom_processor(
     *,
-    context: LMMContext,
-    result: MultimodalContent
+    state: StageState,
 ) -> StageState:
     # Custom processing logic
     processed_result = MultimodalContent.of(
-        f"Processed: {result.as_string()}"
+        f"Processed: {state.result.as_string()}"
     )
-    return StageState(context=context, result=processed_result)
+    return state.updated(result=processed_result)
 
 # Use the custom stage as regular stage
 custom_stage: Stage = custom_processor
@@ -301,8 +443,10 @@ custom_stage: Stage = custom_processor
 Here's a comprehensive example combining multiple concepts:
 
 ```python
-from draive import ctx, Stage, MultimodalContent, tool
+from draive import ctx, Stage, MultimodalContent, StageState, tool
 from draive.openai import OpenAI, OpenAIChatConfig
+from collections.abc import Sequence
+from draive.stages.types import StageException
 
 @tool
 async def word_count(text: str) -> int:
@@ -328,7 +472,7 @@ async def process_document(document: str):
                 "Add word count information using the tool",
                 tools=[word_count]
             ).when(
-                condition=lambda state: len(state.result.as_string()) > 100
+                condition=lambda *, state: len(state.result.as_string()) > 100
             ),
 
             # Step 3: Generate summary

@@ -196,7 +196,6 @@ from draive.similarity import (
 from draive.splitters import split_text
 from draive.stages import (
     Stage,
-    StageCondition,
     StageException,
     StageState,
     stage,
@@ -348,7 +347,6 @@ __all__ = (
     "ScopeIdentifier",
     "SelectionException",
     "Stage",
-    "StageCondition",
     "StageException",
     "StageState",
     "State",

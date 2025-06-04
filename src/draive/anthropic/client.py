@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Set
+from collections.abc import Collection, Iterable
 from types import TracebackType
 from typing import Literal, final, overload
 
@@ -26,7 +26,7 @@ class Anthropic(
         base_url: str | None = None,
         api_key: str | None = None,
         timeout: float = 60.0,
-        features: Set[Literal["lmm"]] | None = None,
+        features: Collection[Literal["lmm"]] | None = None,
     ) -> None: ...
 
     @overload
@@ -38,7 +38,7 @@ class Anthropic(
         base_url: str | None = None,
         aws_region: str | None = None,
         timeout: float = 60.0,
-        features: Set[Literal["lmm"]] | None = None,
+        features: Collection[Literal["lmm"]] | None = None,
     ) -> None: ...
 
     def __init__(
@@ -50,7 +50,7 @@ class Anthropic(
         api_key: str | None = None,
         aws_region: str | None = None,
         timeout: float = 60.0,
-        features: Set[Literal["lmm"]] | None = None,
+        features: Collection[Literal["lmm"]] | None = None,
     ) -> None:
         super().__init__(
             provider,

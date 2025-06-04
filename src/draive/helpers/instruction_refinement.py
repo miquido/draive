@@ -3,18 +3,11 @@ from typing import Any
 
 from haiway import State, ctx, traced
 
-from draive.commons import Meta
-from draive.evaluation import (
-    EvaluationSuite,
-    SuiteEvaluatorResult,
-)
+from draive.evaluation import EvaluationSuite, SuiteEvaluatorResult
 from draive.instructions import Instruction, Instructions
-from draive.lmm import LMMContext
-from draive.multimodal import MultimodalContent
-from draive.multimodal.tags import MultimodalTagElement
+from draive.multimodal import MultimodalContent, MultimodalTagElement
 from draive.parameters import DataModel
-from draive.stages import Stage, StageCondition, StageState, stage
-from draive.utils import Processing
+from draive.stages import Stage, StageLoopConditioning, StageState, stage
 
 __all__ = ("refine_instruction",)
 
@@ -133,7 +126,6 @@ def _instructions(
 class _RefinementState(State):
     instruction: Instruction
     evaluation: SuiteEvaluatorResult[Any, Any]
-    round: int
     history: _RefinementHistory
     analysis: _RefinementAnalysis
     candidates: Sequence[_RefinementCandidate]
@@ -148,8 +140,7 @@ def _initialization_stage[CaseParameters: DataModel, Result: DataModel | str](
     @stage
     async def initialization(
         *,
-        context: LMMContext,
-        result: MultimodalContent,
+        state: StageState,
     ) -> StageState:
         ctx.log_info("...evaluating initial instruction...")
         evaluation: SuiteEvaluatorResult[CaseParameters, Result]
@@ -157,11 +148,10 @@ def _initialization_stage[CaseParameters: DataModel, Result: DataModel | str](
             evaluation = await evaluation_suite()
 
         ctx.log_info("...using initial evaluation as a baseline...")
-        await Processing.write(
+        return state.updated(
             _RefinementState(
                 instruction=instruction,
                 evaluation=evaluation,
-                round=0,
                 history=_RefinementHistory(
                     elements=(
                         _RefinementHistoryElement(
@@ -179,11 +169,7 @@ def _initialization_stage[CaseParameters: DataModel, Result: DataModel | str](
                     analysis_summary="N/A",
                 ),
                 candidates=(),
-            )
-        )
-
-        return StageState(
-            context=context,
+            ),
             # set the result to be initial instruction
             result=MultimodalContent.of(instruction.content),
         )
@@ -221,16 +207,15 @@ def _failure_analysis_stage() -> Stage:
     @stage
     async def _failure_analysis(
         *,
-        context: LMMContext,
-        result: MultimodalContent,
+        state: StageState,
     ) -> StageState:
         ctx.log_info("...analyzing evaluation failures...")
-        processing_state: _RefinementState = await Processing.read(
+        refinement_state: _RefinementState = state.get(
             _RefinementState,
             required=True,
         )
 
-        evaluation: SuiteEvaluatorResult[Any, Any] = processing_state.evaluation
+        evaluation: SuiteEvaluatorResult[Any, Any] = refinement_state.evaluation
         if not evaluation.cases:
             raise ValueError("Evaluation results unavailable, can't refine instruction")
 
@@ -275,17 +260,13 @@ def _failure_analysis_stage() -> Stage:
                 f"Incomplete failure analysis response - missing summary:\n{analysis_response}"
             )
 
-        await Processing.write(
-            processing_state.updated(
+        return state.updated(
+            refinement_state.updated(
                 analysis=_RefinementAnalysis(
                     recommended_strategies=tuple(recommended_strategies),
                     analysis_summary=analysis_summary,
                 ),
             ),
-        )
-        return StageState(
-            context=context,
-            result=result,
         )
 
     return _failure_analysis
@@ -298,23 +279,22 @@ def _multi_strategy_refinement_stage(
     @stage
     async def _multi_refinement(
         *,
-        context: LMMContext,
-        result: MultimodalContent,
+        state: StageState,
     ) -> StageState:
         ctx.log_info("...generating multi-strategy refinement candidates...")
-        processing_state: _RefinementState = await Processing.read(
+        refinement_state: _RefinementState = state.get(
             _RefinementState,
             required=True,
         )
 
-        analysis: _RefinementAnalysis = processing_state.analysis
+        analysis: _RefinementAnalysis = refinement_state.analysis
 
         # Prepare context with analysis and instruction
         analysis_context = MultimodalContent.of(
-            f"<SUBJECT>{processing_state.instruction.content}</SUBJECT>",
+            f"<SUBJECT>{refinement_state.instruction.content}</SUBJECT>",
             (
-                f"\n<DESCRIPTION>{processing_state.instruction.description}</DESCRIPTION>"
-                if processing_state.instruction.description
+                f"\n<DESCRIPTION>{refinement_state.instruction.description}</DESCRIPTION>"
+                if refinement_state.instruction.description
                 else ""
             ),
             "\n<FAILURE_ANALYSIS>",
@@ -374,13 +354,10 @@ def _multi_strategy_refinement_stage(
         ctx.log_info(f"...generated {len(candidates)} refinement candidates...")
 
         # Store candidates for evaluation and return first candidate for now
-        await Processing.write(
-            processing_state.updated(
+        return state.updated(
+            refinement_state.updated(
                 candidates=candidates,
             ),
-        )
-        return StageState(
-            context=context,
             result=MultimodalContent.of(candidates[0].content),
         )
 
@@ -394,20 +371,19 @@ def _ensemble_evaluation_stage[CaseParameters: DataModel, Result: DataModel | st
     @stage
     async def _ensemble_eval(
         *,
-        context: LMMContext,
-        result: MultimodalContent,
+        state: StageState,
     ) -> StageState:
         ctx.log_info("...evaluating refinement candidates...")
-        processing_state: _RefinementState = await Processing.read(
+        refinement_state: _RefinementState = state.get(
             _RefinementState,
             required=True,
         )
 
-        if not processing_state.candidates:
+        if not refinement_state.candidates:
             # No candidates to evaluate, return as-is
-            return StageState(context=context, result=result)
+            return state
 
-        candidates: Sequence[_RefinementCandidate] = processing_state.candidates
+        candidates: Sequence[_RefinementCandidate] = refinement_state.candidates
         ctx.log_info(f"...evaluating {len(candidates)} candidates...")
 
         best_candidate: _RefinementCandidate | None = None
@@ -419,7 +395,7 @@ def _ensemble_evaluation_stage[CaseParameters: DataModel, Result: DataModel | st
             ctx.log_info(f"...evaluating candidate {i + 1} ({candidate.strategy})...")
 
             # Create temporary instruction with candidate content
-            candidate_instruction: Instruction = processing_state.instruction.updated(
+            candidate_instruction: Instruction = refinement_state.instruction.updated(
                 content=candidate.content
             )
 
@@ -446,33 +422,30 @@ def _ensemble_evaluation_stage[CaseParameters: DataModel, Result: DataModel | st
             f"(strategy: {best_candidate.strategy})..."
         )
 
-        # Update state with best candidate and its evaluation
-        best_instruction: Instruction = processing_state.instruction.updated(
+        best_instruction: Instruction = refinement_state.instruction.updated(
             content=best_candidate.content
         )
-        await Processing.write(
-            processing_state.updated(
+
+        return state.updated(
+            # Update state with best candidate and its evaluation
+            refinement_state.updated(
                 instruction=best_instruction,
                 evaluation=best_evaluation,
                 history=_RefinementHistory(
                     elements=(
-                        *processing_state.history.elements,
+                        *refinement_state.history.elements,
                         _RefinementHistoryElement(
                             instruction=best_instruction,
                             evaluation=best_evaluation,
                             strategy=best_candidate.strategy,
                             score=best_evaluation.relative_score,
                             improvement=best_evaluation.relative_score
-                            - processing_state.evaluation.relative_score,
+                            - refinement_state.evaluation.relative_score,
                         ),
                     ),
-                    failed_strategies=processing_state.history.failed_strategies,
+                    failed_strategies=refinement_state.history.failed_strategies,
                 ),
-            )
-        )
-
-        return StageState(
-            context=context,
+            ),
             result=MultimodalContent.of(best_instruction.content),
         )
 
@@ -495,35 +468,34 @@ def _refinement_loop_condition[CaseParameters: DataModel, Result: DataModel | st
     quality_threshold: float,
     convergence_window: int = 3,
     min_improvement_rate: float = 0.001,
-) -> StageCondition:
+) -> StageLoopConditioning:
     async def condition(
         *,
-        meta: Meta,
-        context: LMMContext,
-        result: MultimodalContent,
+        state: StageState,
+        iteration: int,
     ) -> bool:
-        processing_state: _RefinementState = await Processing.read(
+        refinement_state: _RefinementState = state.get(
             _RefinementState,
             required=True,
         )
-        ctx.log_info(f"...refinement round {processing_state.round}...")
+        ctx.log_info(f"...refinement round {iteration}...")
 
         # Standard termination conditions
-        if processing_state.round >= rounds_limit:
+        if iteration >= rounds_limit:
             ctx.log_info("...refinement round limit reached...")
             return False
 
-        if not processing_state.evaluation.cases:
+        if not refinement_state.evaluation.cases:
             ctx.log_info("...evaluation results empty...")
             return False
 
-        if processing_state.evaluation.relative_score >= quality_threshold:
+        if refinement_state.evaluation.relative_score >= quality_threshold:
             ctx.log_info("...refinement quality threshold reached...")
             return False
 
         # Convergence detection
-        if len(processing_state.history.elements) >= convergence_window:
-            history: Sequence[_RefinementHistoryElement] = processing_state.history.elements[
+        if len(refinement_state.history.elements) >= convergence_window:
+            history: Sequence[_RefinementHistoryElement] = refinement_state.history.elements[
                 -convergence_window:
             ]
             avg_improvement: float = sum(element.improvement for element in history) / len(history)
@@ -540,11 +512,6 @@ def _refinement_loop_condition[CaseParameters: DataModel, Result: DataModel | st
                 f">= {min_improvement_rate}..."
             )
 
-        await Processing.write(
-            processing_state.updated(
-                round=processing_state.round + 1,
-            ),
-        )
         return True
 
     return condition
