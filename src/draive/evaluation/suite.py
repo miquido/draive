@@ -70,7 +70,7 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
             if include_details:
                 return (
                     f"<evaluation_case identifier='{self.case.identifier}'>"
-                    f"\n<relative_score>{self.relative_score*100:.2f}%</relative_score>"
+                    f"\n<relative_score>{self.relative_score * 100:.2f}%</relative_score>"
                     f"\n<evaluated_value>{self.value}</evaluated_value>"
                     # TODO: convert DataModel to xml representation when avaialble
                     f"\n<parameters>{self.case.parameters}</parameters>"

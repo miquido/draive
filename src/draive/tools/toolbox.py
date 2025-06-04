@@ -182,8 +182,15 @@ class Toolbox(State):
         else:
             return "auto"
 
-    def available_tools(self) -> Sequence[LMMToolSpecification]:
-        return [
+    def available_tools(
+        self,
+        *,
+        repetition_level: int = 0,
+    ) -> Sequence[LMMToolSpecification]:
+        if repetition_level >= self.repeated_calls_limit:
+            return ()  # provide no tools if reached the limit
+
+        return tuple(
             {
                 "name": tool.name,
                 "description": tool.description,
@@ -191,7 +198,7 @@ class Toolbox(State):
             }
             for tool in self.tools.values()
             if tool.available
-        ]
+        )
 
     async def call_tool(
         self,

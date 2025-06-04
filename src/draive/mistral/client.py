@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Set
+from collections.abc import Collection, Iterable
 from types import TracebackType
 from typing import Literal, final
 
@@ -30,7 +30,7 @@ class Mistral(
         server_url: str | None = None,
         api_key: str | None = None,
         timeout: float = 60.0,
-        features: Set[Literal["lmm", "text_embedding"]] | None = None,
+        features: Collection[Literal["lmm", "text_embedding"]] | None = None,
     ) -> None:
         super().__init__(
             server_url=server_url,

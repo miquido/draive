@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Set
+from collections.abc import Collection, Iterable
 from types import TracebackType
 from typing import Any, Literal, final
 
@@ -32,7 +32,7 @@ class Gemini(
         self,
         api_key: str | None = None,
         http_options: HttpOptionsDict | None = None,
-        features: Set[Literal["lmm", "lmm_session", "text_embedding"]] | None = None,
+        features: Collection[Literal["lmm", "lmm_session", "text_embedding"]] | None = None,
         **extra: Any,
     ) -> None:
         super().__init__(

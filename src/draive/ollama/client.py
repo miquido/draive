@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Set
+from collections.abc import Collection, Iterable
 from types import TracebackType
 from typing import Literal, final
 
@@ -26,7 +26,7 @@ class Ollama(
     def __init__(
         self,
         server_url: str | None = None,
-        features: Set[Literal["lmm", "text_embedding"]] | None = None,
+        features: Collection[Literal["lmm", "text_embedding"]] | None = None,
     ) -> None:
         super().__init__(server_url=server_url)
 

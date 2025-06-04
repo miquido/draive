@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Set
+from collections.abc import Collection, Iterable
 from types import TracebackType
 from typing import Literal, final
 
@@ -48,7 +48,7 @@ class OpenAI(
         azure_api_endpoint: str | None = None,
         azure_api_version: str | None = None,
         azure_deployment: str | None = None,
-        features: Set[Features] | None = None,
+        features: Collection[Features] | None = None,
     ) -> None:
         super().__init__(
             base_url=base_url,

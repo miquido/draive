@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Mapping, Set
+from collections.abc import Collection, Iterable, Mapping
 from types import TracebackType
 from typing import Any, Literal, final
 
@@ -27,7 +27,7 @@ class VLLM(
         self,
         base_url: str | None = None,
         default_headers: Mapping[str, str] | None = None,
-        features: Set[Literal["lmm", "text_embedding"]] | None = None,
+        features: Collection[Literal["lmm", "text_embedding"]] | None = None,
         **extra: Any,
     ) -> None:
         super().__init__(

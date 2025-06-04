@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Set
+from collections.abc import Collection, Iterable
 from types import TracebackType
 from typing import Literal, final, overload
 
@@ -29,7 +29,7 @@ class Cohere(
         *,
         aws_region: str | None = None,
         timeout: float = 60.0,
-        features: Set[Literal["text_embedding", "image_embedding"]] | None = None,
+        features: Collection[Literal["text_embedding", "image_embedding"]] | None = None,
     ) -> None: ...
 
     @overload
@@ -41,7 +41,7 @@ class Cohere(
         base_url: str | None = None,
         api_key: str | None = None,
         timeout: float = 60.0,
-        features: Set[Literal["text_embedding", "image_embedding"]] | None = None,
+        features: Collection[Literal["text_embedding", "image_embedding"]] | None = None,
     ) -> None: ...
 
     def __init__(
@@ -53,7 +53,7 @@ class Cohere(
         api_key: str | None = None,
         aws_region: str | None = None,
         timeout: float = 60.0,
-        features: Set[Literal["text_embedding", "image_embedding"]] | None = None,
+        features: Collection[Literal["text_embedding", "image_embedding"]] | None = None,
     ) -> None:
         super().__init__(
             provider,

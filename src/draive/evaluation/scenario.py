@@ -50,7 +50,7 @@ class ScenarioEvaluatorResult(DataModel):
             if include_details:
                 return (
                     f"<scenario name='{self.scenario}'>"
-                    f"\n<relative_score>{self.relative_score*100:.2f}%</relative_score>"
+                    f"\n<relative_score>{self.relative_score * 100:.2f}%</relative_score>"
                     f"\n<evaluations>\n{evaluations_report}\n</evaluations>"
                     "\n</scenario>"
                 )

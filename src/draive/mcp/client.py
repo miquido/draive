@@ -1,6 +1,6 @@
 from asyncio import gather
 from base64 import urlsafe_b64decode
-from collections.abc import AsyncGenerator, Callable, Coroutine, Mapping, Sequence, Set
+from collections.abc import AsyncGenerator, Callable, Collection, Coroutine, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from itertools import chain
 from types import TracebackType
@@ -48,7 +48,7 @@ class MCPClient:
         command: str,
         args: Sequence[str] | None = None,
         env: Mapping[str, str] | None = None,
-        features: Set[Literal["resources", "prompts", "tools"]] | None = None,
+        features: Collection[Literal["resources", "prompts", "tools"]] | None = None,
         tags: MetaTags | None = None,
     ) -> Self:
         @asynccontextmanager
@@ -79,7 +79,7 @@ class MCPClient:
         headers: Mapping[str, Any] | None = None,
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
-        features: Set[Literal["resources", "prompts", "tools"]] | None = None,
+        features: Collection[Literal["resources", "prompts", "tools"]] | None = None,
         tags: MetaTags | None = None,
     ) -> Self:
         @asynccontextmanager
@@ -113,13 +113,13 @@ class MCPClient:
         identifier: str,
         *,
         session_manager: AbstractAsyncContextManager[ClientSession],
-        features: Set[Literal["resources", "prompts", "tools"]],
+        features: Collection[Literal["resources", "prompts", "tools"]],
         tags: MetaTags,
     ) -> None:
         self.identifier: str = identifier
         self._session_manager: AbstractAsyncContextManager[ClientSession] = session_manager
         self._session: ClientSession
-        self._features: Set[Literal["resources", "prompts", "tools"]] = features
+        self._features: Collection[Literal["resources", "prompts", "tools"]] = features
         self.tags: MetaTags = tags
 
     async def resources_list(
