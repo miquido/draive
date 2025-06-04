@@ -133,7 +133,7 @@ class Toolbox(State):
         tags: MetaTags | None = None,
         repeated_calls_limit: int | None = None,
         suggest: str | bool | None = None,
-        meta: Meta | MetaValues | None,
+        meta: Meta | MetaValues | None = None,
         **extra: Any,
     ) -> Self:
         selected_tools: Sequence[Tool] = await Tools.fetch(**extra)
