@@ -2,6 +2,7 @@ from asyncio import Task, gather
 from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime
 from typing import Any, Literal, overload
+from uuid import UUID, uuid4
 
 from haiway import AsyncQueue, ctx
 
@@ -65,6 +66,7 @@ async def conversation_completion(
     **extra: Any,
 ) -> AsyncIterator[ConversationStreamElement] | ConversationMessage:
     with ctx.scope("conversation_completion"):
+        # relying on memory recall correctness
         recalled_messages: Sequence[ConversationElement] = await memory.recall()
         context: list[LMMContextElement]
         match input:
@@ -120,13 +122,13 @@ async def _conversation_completion(
     toolbox: Toolbox,
     **extra: Any,
 ) -> ConversationMessage:
-    recursion_level: int = 0
-    while recursion_level <= toolbox.repeated_calls_limit:
+    repetition_level: int = 0
+    while True:
         match await LMM.completion(
             instruction=instruction,
             context=context,
-            tools=toolbox.available_tools(),
-            tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
+            tool_selection=toolbox.tool_selection(repetition_level=repetition_level),
+            tools=toolbox.available_tools(repetition_level=repetition_level),
             output="text",
             **extra,
         ):
@@ -167,7 +169,7 @@ async def _conversation_completion(
                         ]
                     )
 
-        recursion_level += 1  # continue with next recursion level
+        repetition_level += 1  # continue with next repetition level
 
     raise RuntimeError("LMM exceeded limit of tool calls")
 
@@ -180,6 +182,8 @@ async def _conversation_completion_stream(
     **extra: Any,
 ) -> AsyncIterator[ConversationStreamElement]:
     output_queue = AsyncQueue[ConversationStreamElement]()
+    # completion message identifier to match chunks and events
+    message_identifier: UUID = uuid4()
 
     async def report_event(
         event: ProcessingEvent,
@@ -188,6 +192,7 @@ async def _conversation_completion_stream(
         output_queue.enqueue(
             ConversationEvent.of(
                 event.name,
+                message_identifier=message_identifier,
                 identifier=event.identifier,
                 content=event.content,
                 meta=event.meta,
@@ -197,9 +202,9 @@ async def _conversation_completion_stream(
     with ctx.updated(ctx.state(Processing).updated(event_reporting=report_event)):
 
         async def consume_lmm_output() -> None:
-            recursion_level: int = 0
+            repetition_level: int = 0
             try:
-                while recursion_level <= toolbox.repeated_calls_limit:
+                while True:
                     pending_tool_requests: list[LMMToolRequest] = []
                     pending_tool_responses: list[Task[LMMToolResponse]] = []
                     accumulated_content: MultimodalContent = MultimodalContent.empty
@@ -207,8 +212,8 @@ async def _conversation_completion_stream(
                     async for element in await LMM.completion(
                         instruction=instruction,
                         context=context,
-                        tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
-                        tools=toolbox.available_tools(),
+                        tool_selection=toolbox.tool_selection(repetition_level=repetition_level),
+                        tools=toolbox.available_tools(repetition_level=repetition_level),
                         output="text",
                         stream=True,
                         **extra,
@@ -219,17 +224,20 @@ async def _conversation_completion_stream(
                                 output_queue.enqueue(
                                     ConversationMessageChunk.model(
                                         chunk.content,
+                                        message_identifier=message_identifier,
                                         eod=chunk.eod,
                                     )
                                 )
 
                                 if chunk.eod:
                                     # end of streaming for conversation completion
-                                    response_message = ConversationMessage.model(
-                                        created=datetime.now(UTC),
-                                        content=accumulated_content,
+                                    await memory.remember(
+                                        ConversationMessage.model(
+                                            accumulated_content,
+                                            identifier=message_identifier,
+                                            created=datetime.now(UTC),
+                                        )
                                     )
-                                    await memory.remember(response_message)
 
                                     return output_queue.finish()
 
@@ -254,12 +262,20 @@ async def _conversation_completion_stream(
                         if response.handling == "direct_result"
                     ]:
                         tools_content = MultimodalContent.of(*direct_content)
-                        output_queue.enqueue(ConversationMessageChunk.model(tools_content))
-                        response_message = ConversationMessage.model(
-                            created=datetime.now(UTC),
-                            content=MultimodalContent.of(accumulated_content, tools_content),
+                        output_queue.enqueue(
+                            ConversationMessageChunk.model(
+                                tools_content,
+                                message_identifier=message_identifier,
+                            )
                         )
-                        await memory.remember(response_message)
+
+                        await memory.remember(
+                            ConversationMessage.model(
+                                MultimodalContent.of(accumulated_content, tools_content),
+                                identifier=message_identifier,
+                                created=datetime.now(UTC),
+                            )
+                        )
                         return output_queue.finish()
 
                     else:
@@ -270,7 +286,7 @@ async def _conversation_completion_stream(
                             ]
                         )
 
-                    recursion_level += 1  # continue with next recursion level
+                    repetition_level += 1  # continue with next repetition level
 
                 raise RuntimeError("LMM exceeded limit of tool calls")
 

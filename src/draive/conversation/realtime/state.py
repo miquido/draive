@@ -5,6 +5,7 @@ from haiway import State, ctx
 
 from draive.conversation.realtime.default import realtime_conversation
 from draive.conversation.realtime.types import (
+    ConversationMessageChunk,
     RealtimeConversationMemory,
     RealtimeConversationStarting,
 )
@@ -27,7 +28,7 @@ class RealtimeConversation(State):
         cls,
         *,
         instruction: Instruction | None = None,
-        input_stream: AsyncIterator[ConversationStreamElement],
+        input_stream: AsyncIterator[ConversationMessageChunk],
         memory: RealtimeConversationMemory | Iterable[Sequence[ConversationElement]] | None = None,
         tools: Toolbox | Iterable[Tool] | None = None,
         **extra: Any,

@@ -1,6 +1,7 @@
 from asyncio import CancelledError, Task
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
+from uuid import UUID, uuid4
 
 from haiway import AsyncQueue, ctx
 
@@ -32,14 +33,14 @@ __all__ = ("realtime_conversation",)
 async def realtime_conversation(  # noqa: C901, PLR0915
     *,
     instruction: Instruction | None,
-    input_stream: AsyncIterator[ConversationStreamElement],
+    input_stream: AsyncIterator[ConversationMessageChunk],
     memory: RealtimeConversationMemory,
     toolbox: Toolbox,
     **extra: Any,
 ) -> AsyncIterator[ConversationStreamElement]:
     initial_context: Sequence[LMMContextElement] = tuple(
         message.as_lmm_context_element()
-        for message in await memory.recall()
+        for message in await memory.recall()  # relying on memory recall correctness
         if isinstance(message, ConversationMessage)  # skip events in LMM context
     )
 
@@ -110,6 +111,8 @@ async def realtime_conversation(  # noqa: C901, PLR0915
         raise exc
 
     output_queue = AsyncQueue[ConversationStreamElement]()
+    # current output message identifier to match chunks and events
+    output_message_identifier: UUID = uuid4()
 
     async def report_event(
         event: ProcessingEvent,
@@ -118,6 +121,7 @@ async def realtime_conversation(  # noqa: C901, PLR0915
         output_queue.enqueue(
             ConversationEvent.of(
                 event.name,
+                message_identifier=output_message_identifier,
                 identifier=event.identifier,
                 content=event.content,
                 meta=event.meta,
@@ -127,18 +131,22 @@ async def realtime_conversation(  # noqa: C901, PLR0915
     with ctx.updated(ctx.state(Processing).updated(event_reporting=report_event)):
 
         async def process_output() -> None:
+            nonlocal output_message_identifier
             try:
                 async for chunk in session_output:
                     match chunk:
                         case LMMStreamChunk() as chunk:
                             output_chunk: ConversationMessageChunk = ConversationMessageChunk.model(
                                 chunk.content,
+                                message_identifier=output_message_identifier,
                                 eod=chunk.eod,
                             )
-                            ctx.spawn(
-                                memory.remember, output_chunk
-                            )  # add to memory without waiting
+                            # add to memory without waiting
+                            ctx.spawn(memory.remember, output_chunk)
                             output_queue.enqueue(output_chunk)
+                            if chunk.eod:
+                                # start next message when current finished
+                                output_message_identifier = uuid4()
 
                         case LMMSessionEvent() as event:
                             conversation_event: ConversationEvent
@@ -150,6 +158,7 @@ async def realtime_conversation(  # noqa: C901, PLR0915
 
                                     conversation_event = ConversationEvent.of(
                                         "interrupted",
+                                        message_identifier=output_message_identifier,
                                         meta=event.meta,
                                     )
 
@@ -157,12 +166,14 @@ async def realtime_conversation(  # noqa: C901, PLR0915
                                     assert not pending_tool_requests  # nosec: B101
                                     conversation_event = ConversationEvent.of(
                                         "completed",
+                                        message_identifier=output_message_identifier,
                                         meta=event.meta,
                                     )
 
                                 case other:
                                     conversation_event = ConversationEvent.of(
                                         other,
+                                        message_identifier=output_message_identifier,
                                         content=MetaContent.of(other),
                                         meta=event.meta,
                                     )

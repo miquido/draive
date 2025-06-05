@@ -25,12 +25,14 @@ class ConversationMessageChunk(DataModel):
         cls,
         content: Multimodal,
         *,
+        message_identifier: UUID,
         identifier: UUID | None = None,
         created: datetime | None = None,
         meta: Meta | MetaValues | None = None,
         eod: bool = False,
     ) -> Self:
         return cls(
+            message_identifier=message_identifier,
             identifier=identifier if identifier is not None else uuid4(),
             role="user",
             created=created if created is not None else datetime.now(),
@@ -44,12 +46,14 @@ class ConversationMessageChunk(DataModel):
         cls,
         content: Multimodal,
         *,
+        message_identifier: UUID,
         identifier: UUID | None = None,
         created: datetime | None = None,
         meta: Meta | MetaValues | None = None,
         eod: bool = False,
     ) -> Self:
         return cls(
+            message_identifier=message_identifier,
             identifier=identifier if identifier is not None else uuid4(),
             role="model",
             created=created if created is not None else datetime.now(),
@@ -59,6 +63,7 @@ class ConversationMessageChunk(DataModel):
         )
 
     type: Literal["message_chunk"] = "message_chunk"
+    message_identifier: UUID
     identifier: UUID = Default(factory=uuid4)
     role: Literal["user", "model"]
     created: datetime = Default(factory=datetime.now)
@@ -79,9 +84,10 @@ class ConversationMessage(DataModel):
     ) -> Sequence[Self]:
         messages: list[Self] = []
         current: Self | None = None
-        for chunk in chunks:
+        for chunk in chunks:  # assuming correct order
             if current is None:
                 current = cls(
+                    identifier=chunk.message_identifier,
                     role=chunk.role,
                     created=chunk.created,
                     content=chunk.content,
@@ -89,10 +95,10 @@ class ConversationMessage(DataModel):
                 )
 
             elif current.role == chunk.role:
-                current = current.updated(
-                    content=current.content.appending(chunk.content),
-                    meta=current.meta.merged_with(chunk.meta),
-                )
+                assert current.created < chunk.created  # nosec: B101
+                assert current.identifier == chunk.message_identifier  # nosec: B101
+
+                current = current.with_chunk(chunk, merge_meta=True)
 
             else:
                 messages.append(current)
@@ -164,6 +170,21 @@ class ConversationMessage(DataModel):
     def __bool__(self) -> bool:
         return bool(self.content)
 
+    def with_chunk(
+        self,
+        chunk: ConversationMessageChunk,
+        /,
+        merge_meta: bool = False,
+    ) -> Self:
+        assert self.identifier == chunk.message_identifier  # nosec: B101
+        return self.__class__(
+            identifier=self.identifier,
+            role=self.role,
+            created=self.created,
+            content=self.content.appending(chunk.content),
+            meta=self.meta.merged_with(chunk.meta) if merge_meta else self.meta,
+        )
+
 
 class ConversationEvent(DataModel):
     @classmethod
@@ -171,12 +192,14 @@ class ConversationEvent(DataModel):
         cls,
         name: str,
         *,
+        message_identifier: UUID,
         content: Multimodal | None = None,
         identifier: UUID | None = None,
         created: datetime | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
+            message_identifier=message_identifier,
             identifier=identifier if identifier is not None else uuid4(),
             name=name,
             created=created if created is not None else datetime.now(),
@@ -187,6 +210,7 @@ class ConversationEvent(DataModel):
         )
 
     type: Literal["event"] = "event"
+    message_identifier: UUID
     identifier: UUID = Default(factory=uuid4)
     name: str
     created: datetime = Default(factory=datetime.now)
