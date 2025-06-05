@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator, Mapping, Sequence
 from types import EllipsisType
 from typing import Any, ClassVar, Final, Self, cast, final
@@ -66,14 +67,31 @@ class Meta(Mapping[str, MetaValue]):
     ) -> Self:
         return cls({key: validated_meta_value(value) for key, value in mapping.items()})
 
+    @classmethod
+    def from_json(
+        cls,
+        value: str | bytes,
+        /,
+    ) -> Self:
+        match json.loads(value):
+            case {**values}:
+                return cls({key: validated_meta_value(val) for key, val in values.items()})
+
+            case other:
+                raise ValueError(f"Invalid json: {other}")
+
     def to_str(self) -> str:
         return self.__str__()
 
     def to_mapping(
         self,
-        aliased: bool = True,
     ) -> Mapping[str, Any]:
         return self._values
+
+    def to_json(
+        self,
+    ) -> str:
+        return json.dumps(self._values)
 
     @property
     def kind(self) -> str | None:
