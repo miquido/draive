@@ -5,7 +5,7 @@ from haiway import ctx
 from haiway.utils import format_str
 
 from draive.commons import Meta, MetaValues
-from draive.lmm.types import LMMToolError
+from draive.lmm import LMMToolError, LMMToolSpecification
 from draive.multimodal import MultimodalContent, MultimodalContentConvertible
 from draive.parameters import ParameterSpecification, ParametersSpecification, ParametrizedFunction
 from draive.tools.types import (
@@ -29,6 +29,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         "meta",
         "name",
         "parameters",
+        "specification",
     )
 
     def __init__(
@@ -38,7 +39,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         *,
         function: Callable[Args, Coroutine[None, None, Result]],
         description: str | None,
-        specification: ParametersSpecification | None,
+        parameters: ParametersSpecification | None,
         availability_check: ToolAvailabilityChecking | None,
         format_result: ToolResultFormatting[Result],
         format_failure: ToolErrorFormatting,
@@ -47,23 +48,23 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
     ) -> None:
         super().__init__(function)
 
-        if specification is None:
+        if parameters is None:
             aliased_required: list[str] = []
-            parameters: dict[str, ParameterSpecification] = {}
+            specifications: dict[str, ParameterSpecification] = {}
             for parameter in self._parameters.values():
-                parameters[parameter.alias or parameter.name] = parameter.specification
+                specifications[parameter.alias or parameter.name] = parameter.specification
 
                 if parameter.required:
                     aliased_required.append(parameter.alias or parameter.name)
 
-            specification = {
+            parameters = {
                 "type": "object",
-                "properties": parameters,
+                "properties": specifications,
                 "required": aliased_required,
             }
 
-        if not specification["properties"]:
-            specification = None  # use no parameters without arguments
+        if not parameters["properties"]:
+            parameters = None  # use no parameters without arguments
 
         self.name: str
         object.__setattr__(
@@ -81,7 +82,17 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         object.__setattr__(
             self,
             "parameters",
-            specification,
+            parameters,
+        )
+        self.specification: LMMToolSpecification
+        object.__setattr__(
+            self,
+            "specification",
+            {
+                "name": name,
+                "description": description,
+                "parameters": parameters,
+            },
         )
         self.handling: ToolHandling
         object.__setattr__(
@@ -356,7 +367,7 @@ def tool[**Args, Result](
         return FunctionTool[Arg, Result](
             name=name or function.__name__,
             description=description,
-            specification=None,
+            parameters=None,
             function=function,
             availability_check=availability_check,
             format_result=format_result or _default_result_format,

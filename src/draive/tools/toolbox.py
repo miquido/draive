@@ -13,6 +13,8 @@ from draive.lmm.types import (
     LMMToolResponse,
     LMMToolResponseHandling,
     LMMToolResponses,
+    LMMTools,
+    LMMToolSelection,
     LMMToolSpecification,
 )
 from draive.multimodal import MultimodalContent
@@ -198,6 +200,41 @@ class Toolbox(State):
             }
             for tool in self.tools.values()
             if tool.available
+        )
+
+    def current_tools(
+        self,
+        *,
+        repetition_level: int = 0,
+    ) -> LMMTools:
+        if repetition_level >= self.repeated_calls_limit:
+            # provide no tools if reached the limit
+            return LMMTools.of((), selection="none")
+
+        tools_selection: LMMToolSelection
+        if repetition_level != 0:
+            # require tools only for the first call, use auto otherwise
+            tools_selection = "auto"
+
+        elif self.suggest_call is False:
+            tools_selection = "auto"
+
+        elif self.suggest_call is True:
+            tools_selection = "required"
+
+        elif self.suggest_call.available:  # use suggested tool if able
+            tools_selection = {
+                "name": self.suggest_call.name,
+                "description": self.suggest_call.description,
+                "parameters": self.suggest_call.parameters,
+            }
+
+        else:
+            tools_selection = "auto"
+
+        return LMMTools.of(
+            tuple(tool.specification for tool in self.tools.values() if tool.available),
+            selection=tools_selection,
         )
 
     async def call_tool(

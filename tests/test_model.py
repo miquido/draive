@@ -267,7 +267,6 @@ basic_conversation_message_instance: ConversationMessage = ConversationMessage(
 )
 basic_conversation_message_json: str = """\
 {
-    "type": "message",
     "identifier": "f6da0a47556744cdb8334d263020907f",
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",
@@ -291,7 +290,6 @@ media_url_conversation_message_instance: ConversationMessage = ConversationMessa
 )
 media_url_conversation_message_json: str = """\
 {
-    "type": "message",
     "identifier": "f6da0a47556744cdb8334d263020907f",
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",
@@ -316,7 +314,6 @@ media_data_conversation_message_instance: ConversationMessage = ConversationMess
 )
 media_data_conversation_message_json: str = """\
 {
-    "type": "message",
     "identifier": "f6da0a47556744cdb8334d263020907f",
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",

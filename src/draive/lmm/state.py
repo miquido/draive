@@ -1,26 +1,25 @@
-from collections.abc import AsyncIterator, Iterable, Sequence
+from collections.abc import AsyncIterator
 from typing import Any, Literal, final, overload
 
 from haiway import State, ctx
 
-from draive.instructions import Instruction
 from draive.lmm.types import (
     LMMCompleting,
     LMMContext,
+    LMMInstruction,
+    LMMMemory,
     LMMOutput,
     LMMOutputSelection,
-    LMMSessionOutput,
     LMMSessionOutputSelection,
     LMMSessionPreparing,
-    LMMStreamInput,
+    LMMSessionScope,
     LMMStreamOutput,
-    LMMToolSelection,
-    LMMToolSpecification,
+    LMMTools,
 )
 
 __all__ = (
     "LMM",
-    "LMMSession",
+    "RealtimeLMM",
 )
 
 
@@ -31,10 +30,9 @@ class LMM(State):
     async def completion(
         cls,
         *,
-        instruction: Instruction | str | None = None,
+        instruction: LMMInstruction | None = None,
         context: LMMContext,
-        tool_selection: LMMToolSelection = "auto",
-        tools: Iterable[LMMToolSpecification] | None = None,
+        tools: LMMTools | None = None,
         output: LMMOutputSelection = "auto",
         stream: Literal[False] = False,
         **extra: Any,
@@ -45,10 +43,9 @@ class LMM(State):
     async def completion(
         cls,
         *,
-        instruction: Instruction | str | None = None,
+        instruction: LMMInstruction | None = None,
         context: LMMContext,
-        tool_selection: LMMToolSelection = "auto",
-        tools: Iterable[LMMToolSpecification] | None = None,
+        tools: LMMTools | None = None,
         output: LMMOutputSelection = "auto",
         stream: Literal[True],
         **extra: Any,
@@ -58,19 +55,17 @@ class LMM(State):
     async def completion(
         cls,
         *,
-        instruction: Instruction | str | None = None,
+        instruction: LMMInstruction | None = None,
         context: LMMContext,
-        tool_selection: LMMToolSelection = "auto",
-        tools: Iterable[LMMToolSpecification] | None = None,
+        tools: LMMTools | None = None,
         output: LMMOutputSelection = "auto",
         stream: bool = False,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
         if stream:
             return await ctx.state(cls).completing(
-                instruction=Instruction.of(instruction),
+                instruction=instruction,
                 context=context,
-                tool_selection=tool_selection,
                 tools=tools,
                 output=output,
                 stream=True,
@@ -79,9 +74,8 @@ class LMM(State):
 
         else:
             return await ctx.state(cls).completing(
-                instruction=Instruction.of(instruction),
+                instruction=instruction,
                 context=context,
-                tool_selection=tool_selection,
                 tools=tools,
                 output=output,
                 **extra,
@@ -91,27 +85,23 @@ class LMM(State):
 
 
 @final
-class LMMSession(State):
+class RealtimeLMM(State):
     @classmethod
-    async def prepare(
+    async def session(
         cls,
         *,
-        instruction: Instruction | None = None,
-        initial_context: LMMContext | None = None,
-        input_stream: AsyncIterator[LMMStreamInput],
+        instruction: LMMInstruction | None = None,
+        memory: LMMMemory | None = None,
+        tools: LMMTools | None = None,
         output: LMMSessionOutputSelection = "auto",
-        tools: Sequence[LMMToolSpecification] | None = None,
-        tool_selection: LMMToolSelection = "auto",
         **extra: Any,
-    ) -> AsyncIterator[LMMSessionOutput]:
-        return await ctx.state(cls).preparing(
+    ) -> LMMSessionScope:
+        return await ctx.state(cls).session_preparing(
             instruction=instruction,
-            initial_context=initial_context,
-            input_stream=input_stream,
+            memory=memory,
             output=output,
-            tools=tools if tools is not None else (),
-            tool_selection=tool_selection,
+            tools=tools,
             **extra,
         )
 
-    preparing: LMMSessionPreparing
+    session_preparing: LMMSessionPreparing
