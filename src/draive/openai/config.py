@@ -35,14 +35,13 @@ class OpenAIChatConfig(Config):
 
 class OpenAIRealtimeConfig(Config):
     model: str
-    temperature: float = 1.0
-    max_tokens: int | Missing = MISSING
     input_audio_format: Literal["pcm16", "g711_ulaw", "g711_alaw"] | Missing = MISSING
     output_audio_format: Literal["pcm16", "g711_ulaw", "g711_alaw"] = "pcm16"
+    input_audio_noise_reduction: Literal["near_field", "far_field"] | Missing = MISSING
     voice: str | Missing = MISSING
     vad_type: Literal["server_vad", "semantic_vad"] | Missing = MISSING
     vad_eagerness: Literal["low", "medium", "high", "auto"] = "auto"
-    transcribe_audio: bool | Missing = MISSING
+    transcribe_model: str | Missing = MISSING
 
 
 class OpenAIEmbeddingConfig(Config):
