@@ -48,24 +48,22 @@ async def realtime_conversation(  # noqa: C901, PLR0915
 
     async def process_input() -> None:
         try:
+            ctx.log_debug("Starting input processing...")
             # TODO: include guardrails check
             async for element in input_stream:
-                ctx.spawn(memory.remember, element)  # add to memory without waiting
-
                 if isinstance(element, ConversationEvent):
                     continue  # skip events in LMM context
 
-                # we are expecting continuous stream of data without turns,
-                # this api will work only with LMMSession implementations
-                # which can automatically detect turn ends if needed
                 input_queue.enqueue(
                     LMMStreamChunk.of(
                         element.content,
                         eod=element.eod,
                     )
                 )
+                await memory.remember(element)  # add to memory
 
             input_queue.finish()
+            ctx.log_debug("...input processing finished!")
 
         except CancelledError:
             # just finish input on cancel
@@ -81,6 +79,7 @@ async def realtime_conversation(  # noqa: C901, PLR0915
         /,
     ) -> None:
         try:
+            ctx.log_debug(f"Handling tool request ({tool_request.identifier})...")
             response: LMMToolResponse = await toolbox.respond(tool_request)
             # check if task was not cancelled before passing the result to input
             ctx.check_cancellation()
@@ -93,11 +92,13 @@ async def realtime_conversation(  # noqa: C901, PLR0915
         finally:
             # update pending tools - we have delivered or ignored the result
             del pending_tool_requests[tool_request.identifier]
+            ctx.log_debug(f"...tool request ({tool_request.identifier}) handling finished!")
 
     input_processing_task: Task[None] = ctx.spawn(process_input)
 
     session_output: AsyncIterator[LMMSessionOutput]
     try:
+        ctx.log_debug("Preparing LMM session...")
         session_output = await LMMSession.prepare(
             instruction=instruction,
             input_stream=input_queue,
@@ -107,6 +108,10 @@ async def realtime_conversation(  # noqa: C901, PLR0915
         del initial_context
 
     except BaseException as exc:
+        ctx.log_error(
+            "...failed to prepare LMM session!",
+            exception=exc,
+        )
         input_processing_task.cancel()
         raise exc
 
@@ -118,6 +123,7 @@ async def realtime_conversation(  # noqa: C901, PLR0915
         event: ProcessingEvent,
         /,
     ) -> None:
+        ctx.log_debug("Processing conversation event")
         output_queue.enqueue(
             ConversationEvent.of(
                 event.name,
@@ -133,6 +139,7 @@ async def realtime_conversation(  # noqa: C901, PLR0915
         async def process_output() -> None:
             nonlocal output_message_identifier
             try:
+                ctx.log_debug("Starting output processing...")
                 async for chunk in session_output:
                     match chunk:
                         case LMMStreamChunk() as chunk:
@@ -141,12 +148,13 @@ async def realtime_conversation(  # noqa: C901, PLR0915
                                 message_identifier=output_message_identifier,
                                 eod=chunk.eod,
                             )
-                            # add to memory without waiting
-                            ctx.spawn(memory.remember, output_chunk)
+                            # send to output
                             output_queue.enqueue(output_chunk)
                             if chunk.eod:
                                 # start next message when current finished
                                 output_message_identifier = uuid4()
+                            # and add to memory
+                            await memory.remember(output_chunk)
 
                         case LMMSessionEvent() as event:
                             conversation_event: ConversationEvent
@@ -163,7 +171,6 @@ async def realtime_conversation(  # noqa: C901, PLR0915
                                     )
 
                                 case "completed":
-                                    assert not pending_tool_requests  # nosec: B101
                                     conversation_event = ConversationEvent.of(
                                         "completed",
                                         message_identifier=output_message_identifier,
@@ -178,11 +185,10 @@ async def realtime_conversation(  # noqa: C901, PLR0915
                                         meta=event.meta,
                                     )
 
-                            ctx.spawn(
-                                memory.remember,
-                                conversation_event,
-                            )  # add to memory without waiting
+                            # send to output
                             output_queue.enqueue(conversation_event)
+                            # and add to memory
+                            await memory.remember(conversation_event)
 
                         case LMMToolRequest() as tool_request:
                             pending_tool_requests[tool_request.identifier] = ctx.spawn(
@@ -191,7 +197,13 @@ async def realtime_conversation(  # noqa: C901, PLR0915
                             )
 
             finally:
+                # cancel input reading
                 input_processing_task.cancel()
+                # cancel pending tools
+                for task in pending_tool_requests.values():
+                    task.cancel()
+
+                ctx.log_debug("...output processing finished!")
 
         ctx.spawn(process_output)
 
