@@ -171,8 +171,6 @@ async def _conversation_completion(
 
         repetition_level += 1  # continue with next repetition level
 
-    raise RuntimeError("LMM exceeded limit of tool calls")
-
 
 async def _conversation_completion_stream(
     instruction: Instruction | None,
@@ -287,8 +285,6 @@ async def _conversation_completion_stream(
                         )
 
                     repetition_level += 1  # continue with next repetition level
-
-                raise RuntimeError("LMM exceeded limit of tool calls")
 
             except BaseException as exc:
                 output_queue.finish(exception=exc)
