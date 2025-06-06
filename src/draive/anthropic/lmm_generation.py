@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Iterable, Sequence
+from collections.abc import AsyncIterator, Sequence
 from typing import Any, Literal, cast, overload
 
 from anthropic import NOT_GIVEN
@@ -26,19 +26,18 @@ from draive.anthropic.lmm import (
 from draive.anthropic.types import AnthropicException
 from draive.anthropic.utils import unwrap_missing
 from draive.commons import META_EMPTY
-from draive.instructions import Instruction
 from draive.lmm import (
+    LMM,
     LMMCompletion,
     LMMContext,
+    LMMInstruction,
     LMMOutput,
     LMMOutputSelection,
     LMMStreamOutput,
     LMMToolRequest,
     LMMToolRequests,
-    LMMToolSelection,
-    LMMToolSpecification,
+    LMMTools,
 )
-from draive.lmm.state import LMM
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.utils import RateLimitError
 
@@ -53,14 +52,13 @@ class AnthropicLMMGeneration(AnthropicAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
-        prefill: Multimodal | None = None,
-        config: AnthropicConfig | None = None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
         stream: Literal[False] = False,
+        config: AnthropicConfig | None = None,
+        prefill: Multimodal | None = None,
         **extra: Any,
     ) -> LMMOutput: ...
 
@@ -68,34 +66,33 @@ class AnthropicLMMGeneration(AnthropicAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
-        prefill: Multimodal | None = None,
-        config: AnthropicConfig | None = None,
         stream: Literal[True],
+        config: AnthropicConfig | None = None,
+        prefill: Multimodal | None = None,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput]: ...
 
     async def lmm_completion(  # noqa: C901, PLR0912, PLR0915
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
-        prefill: Multimodal | None = None,
-        config: AnthropicConfig | None = None,
         stream: bool = False,
+        config: AnthropicConfig | None = None,
+        prefill: Multimodal | None = None,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
         if stream:
             raise NotImplementedError("Anthropic streaming is not implemented yet")
 
         completion_config: AnthropicConfig = config or ctx.state(AnthropicConfig)
+        tools = tools or LMMTools.none
         with ctx.scope("anthropic_lmm_completion", completion_config):
             ctx.record(
                 ObservabilityLevel.INFO,
@@ -104,8 +101,8 @@ class AnthropicLMMGeneration(AnthropicAPI):
                     "lmm.model": completion_config.model,
                     "lmm.temperature": completion_config.temperature,
                     "lmm.max_tokens": completion_config.max_tokens,
-                    "lmm.tools": [tool["name"] for tool in tools] if tools else None,
-                    "lmm.tool_selection": f"{tool_selection}" if tools else None,
+                    "lmm.tools": [tool["name"] for tool in tools.specifications],
+                    "lmm.tool_selection": f"{tools.selection}",
                     "lmm.stream": stream,
                     "lmm.output": f"{output}",
                     "lmm.instruction": f"{instruction}",
@@ -133,15 +130,15 @@ class AnthropicLMMGeneration(AnthropicAPI):
                 )
 
             tool_choice, tools_list = tools_as_tool_config(
-                tools,
-                tool_selection=tool_selection,
+                tools.specifications,
+                tool_selection=tools.selection,
             )
 
             completion: Message
             try:
                 completion = await self._client.messages.create(
                     model=completion_config.model,
-                    system=Instruction.formatted(instruction) if instruction else NOT_GIVEN,
+                    system=instruction if instruction else NOT_GIVEN,
                     messages=messages,
                     temperature=completion_config.temperature,
                     top_p=unwrap_missing(completion_config.top_p),

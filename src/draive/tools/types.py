@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from typing import Any, Literal, Protocol, runtime_checkable
 
 from draive.commons import Meta
+from draive.lmm import LMMToolSpecification
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import ParametersSpecification
 
@@ -9,7 +10,7 @@ __all__ = (
     "Tool",
     "ToolAvailabilityChecking",
     "ToolErrorFormatting",
-    "ToolExcepion",
+    "ToolException",
     "ToolHandling",
     "ToolResultFormatting",
     "ToolsFetching",
@@ -19,7 +20,7 @@ __all__ = (
 ToolHandling = Literal["auto", "direct"]
 
 
-class ToolExcepion(Exception):
+class ToolException(Exception):
     def __init__(
         self,
         *args: object,
@@ -63,6 +64,9 @@ class Tool(Protocol):
 
     @property
     def parameters(self) -> ParametersSpecification | None: ...
+
+    @property
+    def specification(self) -> LMMToolSpecification: ...
 
     @property
     def meta(self) -> Meta: ...

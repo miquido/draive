@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator
 from typing import Any, Literal, overload
 
 from haiway import ObservabilityLevel, asynchronous, ctx
@@ -12,18 +12,17 @@ from draive.bedrock.lmm import (
 )
 from draive.bedrock.models import ChatCompletionResponse, ChatMessage
 from draive.bedrock.types import BedrockException
-from draive.instructions import Instruction
 from draive.lmm import (
     LMM,
     LMMCompletion,
     LMMContext,
+    LMMInstruction,
     LMMOutput,
     LMMOutputSelection,
     LMMStreamOutput,
     LMMToolRequest,
     LMMToolRequests,
-    LMMToolSelection,
-    LMMToolSpecification,
+    LMMTools,
 )
 from draive.multimodal import MediaData, MultimodalContent, MultimodalContentElement, TextContent
 
@@ -36,13 +35,12 @@ class BedrockLMMGeneration(BedrockAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
-        config: BedrockChatConfig | None = None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
         stream: Literal[False] = False,
+        config: BedrockChatConfig | None = None,
         **extra: Any,
     ) -> LMMOutput: ...
 
@@ -50,29 +48,28 @@ class BedrockLMMGeneration(BedrockAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
-        config: BedrockChatConfig | None = None,
         stream: Literal[True],
+        config: BedrockChatConfig | None = None,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput]: ...
 
     async def lmm_completion(  # noqa: C901, PLR0912
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
-        config: BedrockChatConfig | None = None,
         stream: bool = False,
+        config: BedrockChatConfig | None = None,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
         completion_config: BedrockChatConfig = config or ctx.state(BedrockChatConfig)
+        tools = tools or LMMTools.none
         with ctx.scope("bedrock_lmm_completion", completion_config):
             ctx.record(
                 ObservabilityLevel.INFO,
@@ -81,8 +78,8 @@ class BedrockLMMGeneration(BedrockAPI):
                     "lmm.model": completion_config.model,
                     "lmm.temperature": completion_config.temperature,
                     "lmm.max_tokens": completion_config.max_tokens,
-                    "lmm.tools": [tool["name"] for tool in tools] if tools else None,
-                    "lmm.tool_selection": f"{tool_selection}" if tools else None,
+                    "lmm.tools": [tool["name"] for tool in tools.specifications],
+                    "lmm.tool_selection": f"{tools.selection}",
                     "lmm.stream": stream,
                     "lmm.output": f"{output}",
                     "lmm.instruction": f"{instruction}",
@@ -97,11 +94,14 @@ class BedrockLMMGeneration(BedrockAPI):
 
             messages: list[ChatMessage] = [convert_context_element(element) for element in context]
 
-            tool_config = tools_as_tool_config(tools, tool_selection=tool_selection)
+            tool_config = tools_as_tool_config(
+                tools.specifications,
+                tool_selection=tools.selection,
+            )
 
             completion: ChatCompletionResponse = await self._chat_completion(
                 config=completion_config,
-                instruction=Instruction.formatted(instruction),
+                instruction=instruction,
                 messages=messages,
                 tool_config=tool_config,
             )

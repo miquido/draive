@@ -19,15 +19,16 @@ from draive.lmm import (
     LMM,
     LMMCompletion,
     LMMContextElement,
+    LMMInstruction,
     LMMStreamChunk,
+    LMMToolRequest,
     LMMToolRequests,
+    LMMToolResponse,
     LMMToolResponses,
 )
-from draive.lmm.types import LMMToolRequest, LMMToolResponse
-from draive.multimodal import Multimodal, MultimodalContent
+from draive.multimodal import MultimodalContent
 from draive.tools import Toolbox
-from draive.utils import ProcessingEvent
-from draive.utils.processing import Processing
+from draive.utils import Processing, ProcessingEvent
 
 __all__ = ("conversation_completion",)
 
@@ -36,7 +37,7 @@ __all__ = ("conversation_completion",)
 async def conversation_completion(
     *,
     instruction: Instruction | None,
-    input: ConversationMessage | Multimodal,
+    input: ConversationMessage,
     memory: ConversationMemory,
     toolbox: Toolbox,
     stream: Literal[False] = False,
@@ -48,7 +49,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: Instruction | None,
-    input: ConversationMessage | Multimodal,
+    input: ConversationMessage,
     memory: ConversationMemory,
     toolbox: Toolbox,
     stream: Literal[True],
@@ -59,7 +60,7 @@ async def conversation_completion(
 async def conversation_completion(
     *,
     instruction: Instruction | None,
-    input: ConversationMessage | Multimodal,  # noqa: A002
+    input: ConversationMessage,  # noqa: A002
     memory: ConversationMemory,
     toolbox: Toolbox,
     stream: bool = False,
@@ -75,11 +76,11 @@ async def conversation_completion(
                 await memory.remember(message)
                 context = [
                     *(
-                        message.as_lmm_context_element()
+                        message.to_lmm_context()
                         for message in recalled_messages
                         if isinstance(message, ConversationMessage)
                     ),
-                    message.as_lmm_context_element(),
+                    message.to_lmm_context(),
                 ]
 
             case content:
@@ -91,11 +92,11 @@ async def conversation_completion(
                 await memory.remember(message)
                 context = [
                     *(
-                        message.as_lmm_context_element()
+                        message.to_lmm_context()
                         for message in recalled_messages
                         if isinstance(message, ConversationMessage)
                     ),
-                    message.as_lmm_context_element(),
+                    message.to_lmm_context(),
                 ]
 
         if stream:
@@ -123,11 +124,11 @@ async def _conversation_completion(
     **extra: Any,
 ) -> ConversationMessage:
     repetition_level: int = 0
+    formatted_instruction: LMMInstruction | None = Instruction.formatted(instruction)
     while True:
         match await LMM.completion(
-            instruction=instruction,
+            instruction=formatted_instruction,
             context=context,
-            tool_selection=toolbox.tool_selection(repetition_level=repetition_level),
             tools=toolbox.available_tools(repetition_level=repetition_level),
             output="text",
             **extra,
@@ -190,7 +191,6 @@ async def _conversation_completion_stream(
         output_queue.enqueue(
             ConversationEvent.of(
                 event.name,
-                message_identifier=message_identifier,
                 identifier=event.identifier,
                 content=event.content,
                 meta=event.meta,
@@ -202,15 +202,15 @@ async def _conversation_completion_stream(
         async def consume_lmm_output() -> None:
             repetition_level: int = 0
             try:
+                formatted_instruction: LMMInstruction | None = Instruction.formatted(instruction)
                 while True:
                     pending_tool_requests: list[LMMToolRequest] = []
                     pending_tool_responses: list[Task[LMMToolResponse]] = []
                     accumulated_content: MultimodalContent = MultimodalContent.empty
 
                     async for element in await LMM.completion(
-                        instruction=instruction,
+                        instruction=formatted_instruction,
                         context=context,
-                        tool_selection=toolbox.tool_selection(repetition_level=repetition_level),
                         tools=toolbox.available_tools(repetition_level=repetition_level),
                         output="text",
                         stream=True,

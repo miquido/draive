@@ -1,7 +1,9 @@
 import json
 from collections.abc import Iterator, Mapping, Sequence
+from datetime import datetime
 from types import EllipsisType
 from typing import Any, ClassVar, Final, Self, cast, final
+from uuid import UUID
 
 __all__ = (
     "META_EMPTY",
@@ -114,6 +116,111 @@ class Meta(Mapping[str, MetaValue]):
             }
         )
 
+    def _get_uuid(
+        self,
+        key: str,
+        /,
+    ) -> UUID | None:
+        match self._values.get(key):
+            case str() as identifier:
+                try:
+                    return UUID(identifier)
+                except ValueError:
+                    return None
+            case _:
+                return None
+
+    def _with_uuid(
+        self,
+        key: str,
+        /,
+        *,
+        value: UUID,
+    ) -> Self:
+        return self.__class__(
+            {
+                **self._values,
+                key: str(value),
+            }
+        )
+
+    @property
+    def identifier(self) -> UUID | None:
+        return self._get_uuid("identifier")
+
+    def with_identifier(
+        self,
+        identifier: UUID,
+        /,
+    ) -> Self:
+        return self._with_uuid(
+            "identifier",
+            value=identifier,
+        )
+
+    @property
+    def origin_identifier(self) -> UUID | None:
+        return self._get_uuid("origin_identifier")
+
+    def with_origin_identifier(
+        self,
+        identifier: UUID,
+        /,
+    ) -> Self:
+        return self._with_uuid(
+            "origin_identifier",
+            value=identifier,
+        )
+
+    @property
+    def predecessor_identifier(self) -> UUID | None:
+        return self._get_uuid("predecessor_identifier")
+
+    def with_predecessor_identifier(
+        self,
+        identifier: UUID,
+        /,
+    ) -> Self:
+        return self._with_uuid(
+            "predecessor_identifier",
+            value=identifier,
+        )
+
+    @property
+    def successor_identifier(self) -> UUID | None:
+        return self._get_uuid("successor_identifier")
+
+    def with_successor_identifier(
+        self,
+        identifier: UUID,
+        /,
+    ) -> Self:
+        return self._with_uuid(
+            "successor_identifier",
+            value=identifier,
+        )
+
+    @property
+    def custom_identifier(self) -> str | None:
+        match self._values.get("custom_identifier"):
+            case str() as identifier:
+                return identifier
+
+            case _:
+                return None
+
+    def with_custom_identifier(
+        self,
+        identifier: str,
+        /,
+    ) -> Self:
+        return self.__class__(
+            {
+                **self._values,
+                "custom_identifier": identifier,
+            }
+        )
+
     @property
     def name(self) -> str | None:
         match self._values.get("name"):
@@ -197,6 +304,31 @@ class Meta(Mapping[str, MetaValue]):
             case _:
                 return False
 
+    @property
+    def creation(self) -> datetime | None:
+        match self._values.get("creation"):
+            case str() as iso_value:
+                try:
+                    return datetime.fromisoformat(iso_value)
+
+                except ValueError:
+                    return None
+
+            case _:
+                return None
+
+    def with_creation(
+        self,
+        creation: datetime,
+        /,
+    ) -> Self:
+        return self.__class__(
+            {
+                **self._values,
+                "creation": creation.isoformat(),
+            }
+        )
+
     def merged_with(
         self,
         values: Self | MetaValues,
@@ -210,6 +342,18 @@ class Meta(Mapping[str, MetaValue]):
                 **self._values,  # already validated
                 **{key: validated_meta_value(value) for key, value in values.items()},
             }
+        )
+
+    def excluding(
+        self,
+        *excluded: str,
+    ) -> Self:
+        if not excluded:
+            return self
+
+        excluded_set: set[str] = set(excluded)
+        return self.__class__(
+            {key: value for key, value in self._values.items() if key not in excluded_set}
         )
 
     def updated(

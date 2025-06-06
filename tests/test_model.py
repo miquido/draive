@@ -91,7 +91,7 @@ class UUIDModel(DataModel):
 
 
 uuid_model_instance: UUIDModel = UUIDModel(
-    value=UUID(hex="0cf728c0369348e78552e8d86d35e8b0"),
+    value=UUID("0cf728c0369348e78552e8d86d35e8b0"),
 )
 uuid_model_json: str = '{"value": "0cf728c0369348e78552e8d86d35e8b0"}'
 
@@ -260,14 +260,13 @@ def test_basic_decoding() -> None:
 
 
 basic_conversation_message_instance: ConversationMessage = ConversationMessage(
-    identifier=UUID(hex="f6da0a47556744cdb8334d263020907f"),
+    identifier=UUID("f6da0a47556744cdb8334d263020907f"),
     role="model",
     created=datetime.fromisoformat("2025-06-03T18:15:58.985599"),
     content=MultimodalContent.of("string"),
 )
 basic_conversation_message_json: str = """\
 {
-    "type": "message",
     "identifier": "f6da0a47556744cdb8334d263020907f",
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",
@@ -284,14 +283,13 @@ basic_conversation_message_json: str = """\
 """
 
 media_url_conversation_message_instance: ConversationMessage = ConversationMessage(
-    identifier=UUID(hex="f6da0a47556744cdb8334d263020907f"),
+    identifier=UUID("f6da0a47556744cdb8334d263020907f"),
     role="model",
     created=datetime.fromisoformat("2025-06-03T18:15:58.985599"),
     content=MultimodalContent.of(MediaReference.of("https://miquido.com/image", media="image/png")),
 )
 media_url_conversation_message_json: str = """\
 {
-    "type": "message",
     "identifier": "f6da0a47556744cdb8334d263020907f",
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",
@@ -309,14 +307,13 @@ media_url_conversation_message_json: str = """\
 """
 
 media_data_conversation_message_instance: ConversationMessage = ConversationMessage(
-    identifier=UUID(hex="f6da0a47556744cdb8334d263020907f"),
+    identifier=UUID("f6da0a47556744cdb8334d263020907f"),
     role="model",
     created=datetime.fromisoformat("2025-06-03T18:15:58.985599"),
     content=MultimodalContent.of(MediaData.of(b"image_data", media="image/png")),
 )
 media_data_conversation_message_json: str = """\
 {
-    "type": "message",
     "identifier": "f6da0a47556744cdb8334d263020907f",
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",

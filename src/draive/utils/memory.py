@@ -2,7 +2,7 @@ from typing import Any, Protocol, final, runtime_checkable
 
 from haiway import State
 
-__all__ = ("Memory",)
+__all__ = ("Memory", "MemoryRecalling", "MemoryRemembering")
 
 
 @runtime_checkable

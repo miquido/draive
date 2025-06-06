@@ -10,16 +10,16 @@ from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
+    LMMInstruction,
     LMMToolRequests,
     LMMToolResponses,
 )
 from draive.multimodal import (
-    Multimodal,
     MultimodalContent,
 )
 from draive.parameters import DataModel
 from draive.prompts import Prompt
-from draive.tools import Tool, Toolbox
+from draive.tools import Toolbox
 
 __all__ = ("generate_model",)
 
@@ -28,29 +28,19 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
     generated: type[Generated],
     /,
     *,
-    instruction: Instruction | str,
-    input: Prompt | Multimodal,  # noqa: A002
+    instruction: Instruction,
+    input: Prompt | MultimodalContent,  # noqa: A002
     schema_injection: Literal["auto", "full", "simplified", "skip"],
-    tools: Toolbox | Iterable[Tool] | None,
-    examples: Iterable[tuple[Multimodal, Generated]] | None,
+    toolbox: Toolbox,
+    examples: Iterable[tuple[MultimodalContent, Generated]] | None,
     decoder: ModelGeneratorDecoder | None,
     **extra: Any,
 ) -> Generated:
     with ctx.scope("generate_model"):
-        toolbox: Toolbox = Toolbox.of(tools)
-
-        generation_instruction: Instruction
-        match instruction:
-            case str(instruction):
-                generation_instruction = Instruction.of(instruction)
-
-            case Instruction() as instruction:
-                generation_instruction = instruction
-
         extended_instruction: Instruction
         match schema_injection:
             case "auto":
-                extended_instruction = generation_instruction.extended(
+                extended_instruction = instruction.extended(
                     DEFAULT_INSTRUCTION_EXTENSION.format(
                         schema=generated.simplified_schema(indent=2),
                     ),
@@ -58,19 +48,17 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
                 )
 
             case "full":
-                extended_instruction = generation_instruction.updated(
+                extended_instruction = instruction.updated(
                     schema=generated.json_schema(indent=2),
                 )
 
             case "simplified":
-                extended_instruction = generation_instruction.updated(
+                extended_instruction = instruction.updated(
                     schema=generated.simplified_schema(indent=2),
                 )
 
             case "skip":
-                extended_instruction = Instruction.of(
-                    generation_instruction,
-                )
+                extended_instruction = instruction
 
         context: list[LMMContextElement] = [
             *[
@@ -90,13 +78,13 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
             case value:
                 context.append(LMMInput.of(value))
 
-        recursion_level: int = 0
-        while recursion_level <= toolbox.repeated_calls_limit:
+        formatted_instruction: LMMInstruction = Instruction.formatted(extended_instruction)
+        repetition_level: int = 0
+        while True:
             match await LMM.completion(
-                instruction=extended_instruction,
+                instruction=formatted_instruction,
                 context=context,
-                tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
-                tools=toolbox.available_tools(),
+                tools=toolbox.available_tools(repetition_level=repetition_level),
                 output=generated,  # provide model specification
                 **extra,
             ):
@@ -144,9 +132,7 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
                     else:
                         context.append(tool_responses)
 
-            recursion_level += 1  # continue with next recursion level
-
-        raise RuntimeError("LMM exceeded limit of recursive calls")
+            repetition_level += 1  # continue with next recursion level
 
 
 DEFAULT_INSTRUCTION_EXTENSION: str = """\

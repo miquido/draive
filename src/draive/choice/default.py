@@ -11,6 +11,7 @@ from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
+    LMMInstruction,
     LMMToolRequests,
     LMMToolResponses,
 )
@@ -72,13 +73,13 @@ async def default_choice_completion(  # noqa: C901
             ),
         ]
 
-        recursion_level: int = 0
-        while recursion_level <= toolbox.repeated_calls_limit:
+        formatted_instruction: LMMInstruction = Instruction.formatted(extended_instruction)
+        repetition_level: int = 0
+        while True:
             match await LMM.completion(
-                instruction=extended_instruction,
+                instruction=formatted_instruction,
                 context=context,
-                tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
-                tools=toolbox.available_tools(),
+                tools=toolbox.available_tools(repetition_level=repetition_level),
                 output="text",
                 **extra,
             ):
@@ -119,9 +120,7 @@ async def default_choice_completion(  # noqa: C901
                             ]
                         )
 
-            recursion_level += 1  # continue with next recursion level
-
-        raise RuntimeError("LMM exceeded limit of recursive calls")
+            repetition_level += 1  # continue with next recursion level
 
 
 def _format_option(
@@ -144,7 +143,7 @@ def _format_input(
         MultimodalContent.of(
             "<INPUT>",
             input,
-            "</INPUT>/n/n<OPTIONS>",
+            "</INPUT>\n\n<OPTIONS>",
             options,
             "</OPTIONS>",
         )

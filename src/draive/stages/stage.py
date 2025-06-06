@@ -22,6 +22,7 @@ from draive.lmm import (
     LMMContext,
     LMMContextElement,
     LMMInput,
+    LMMInstruction,
     LMMOutputSelection,
     LMMToolRequests,
     LMMToolResponses,
@@ -1626,14 +1627,14 @@ async def _lmm_completion(
     **extra: Any,
 ) -> tuple[LMMContext, MultimodalContent]:
     current_context: LMMContext = context
+    formatted_instruction: LMMInstruction | None = Instruction.formatted(instruction)
     repetition_level: int = 0
     while True:
         match await LMM.completion(
-            instruction=instruction,
+            instruction=formatted_instruction,
             context=current_context,
             output=output,
             tools=toolbox.available_tools(repetition_level=repetition_level),
-            tool_selection=toolbox.tool_selection(repetition_level=repetition_level),
             **extra,
         ):
             case LMMCompletion() as completion:

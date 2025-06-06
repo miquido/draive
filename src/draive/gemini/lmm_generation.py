@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator
 from itertools import chain
 from typing import Any, Literal, cast, overload
 
@@ -28,18 +28,17 @@ from draive.gemini.lmm import (
 )
 from draive.gemini.types import GeminiException
 from draive.gemini.utils import unwrap_missing
-from draive.instructions import Instruction
 from draive.lmm import (
     LMM,
     LMMCompletion,
     LMMContext,
+    LMMInstruction,
     LMMOutput,
     LMMOutputSelection,
     LMMStreamOutput,
     LMMToolRequest,
     LMMToolRequests,
-    LMMToolSelection,
-    LMMToolSpecification,
+    LMMTools,
 )
 from draive.multimodal.content import MultimodalContent, MultimodalContentElement
 
@@ -54,13 +53,12 @@ class GeminiLMMGeneration(GeminiAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
-        config: GeminiGenerationConfig | None = None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
         stream: Literal[False] = False,
+        config: GeminiGenerationConfig | None = None,
         **extra: Any,
     ) -> LMMOutput: ...
 
@@ -68,32 +66,31 @@ class GeminiLMMGeneration(GeminiAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
-        config: GeminiGenerationConfig | None = None,
         stream: Literal[True],
+        config: GeminiGenerationConfig | None = None,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput]: ...
 
     async def lmm_completion(  # noqa: C901, PLR0912, PLR0915
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
-        config: GeminiGenerationConfig | None = None,
         stream: bool = False,
+        config: GeminiGenerationConfig | None = None,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
         if stream:
             raise NotImplementedError("gemini streaming is not implemented yet")
 
         generation_config: GeminiGenerationConfig = config or ctx.state(GeminiGenerationConfig)
+        tools = tools or LMMTools.none
         with ctx.scope("gemini_lmm_completion", generation_config):
             ctx.record(
                 ObservabilityLevel.INFO,
@@ -103,8 +100,8 @@ class GeminiLMMGeneration(GeminiAPI):
                     "lmm.temperature": generation_config.temperature,
                     "lmm.max_tokens": generation_config.max_tokens,
                     "lmm.seed": generation_config.seed,
-                    "lmm.tools": [tool["name"] for tool in tools] if tools else None,
-                    "lmm.tool_selection": f"{tool_selection}" if tools else None,
+                    "lmm.tools": [tool["name"] for tool in tools.specifications],
+                    "lmm.tool_selection": f"{tools.selection}",
                     "lmm.stream": stream,
                     "lmm.output": f"{output}",
                     "lmm.instruction": f"{instruction}",
@@ -126,8 +123,8 @@ class GeminiLMMGeneration(GeminiAPI):
             functions: list[FunctionDeclarationDict] | None
             function_calling_mode: FunctionCallingConfigMode | None
             functions, function_calling_mode = tools_as_tools_config(
-                tools,
-                tool_selection=tool_selection,
+                tools.specifications,
+                tool_selection=tools.selection,
             )
 
             completion: GenerateContentResponse = await self._client.aio.models.generate_content(
@@ -145,7 +142,7 @@ class GeminiLMMGeneration(GeminiAPI):
                     ),
                     # gemini safety is really bad and often triggers false positive
                     "safety_settings": DISABLED_SAFETY_SETTINGS,
-                    "system_instruction": Instruction.formatted(instruction),
+                    "system_instruction": instruction if instruction is not None else {},
                     "tools": [{"function_declarations": functions}] if functions else None,
                     "tool_config": {"function_calling_config": {"mode": function_calling_mode}}
                     if function_calling_mode

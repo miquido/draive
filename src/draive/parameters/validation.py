@@ -945,7 +945,12 @@ def _prepare_validator_of_uuid(
                 return value
 
             elif isinstance(value, str):
-                validated = UUID(hex=value)
+                try:
+                    validated = UUID(value)
+
+                except ValueError:
+                    raise TypeError(f"'{value}' is not matching expected type of 'UUID'") from None
+
                 verifier(validated)
                 return validated
 
@@ -961,7 +966,11 @@ def _prepare_validator_of_uuid(
                 return value
 
             elif isinstance(value, str):
-                return UUID(hex=value)
+                try:
+                    return UUID(value)
+
+                except ValueError:
+                    raise TypeError(f"'{value}' is not matching expected type of 'UUID'") from None
 
             raise TypeError(f"'{value}' is not matching expected type of 'UUID'")
 

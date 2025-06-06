@@ -6,7 +6,7 @@ from haiway import State, ctx
 from draive.generation.model.default import generate_model
 from draive.generation.model.types import ModelGenerating, ModelGeneratorDecoder
 from draive.instructions import Instruction
-from draive.multimodal import Multimodal
+from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel
 from draive.prompts import Prompt
 from draive.tools import Tool, Toolbox
@@ -31,11 +31,13 @@ class ModelGeneration(State):
     ) -> Generated:
         return await ctx.state(cls).generating(
             generated,
-            instruction=instruction,
-            input=input,
+            instruction=Instruction.of(instruction),
             schema_injection=schema_injection,
-            tools=tools,
-            examples=examples,
+            input=input if isinstance(input, Prompt) else MultimodalContent.of(input),
+            toolbox=Toolbox.of(tools),
+            examples=((MultimodalContent.of(example[0]), example[1]) for example in examples)
+            if examples is not None
+            else (),
             decoder=decoder,
             **extra,
         )

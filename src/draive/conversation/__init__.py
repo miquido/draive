@@ -1,5 +1,5 @@
 from draive.conversation.completion import Conversation
-from draive.conversation.realtime import RealtimeConversation
+from draive.conversation.realtime import RealtimeConversation, RealtimeConversationSession
 from draive.conversation.types import (
     ConversationElement,
     ConversationEvent,
@@ -7,7 +7,6 @@ from draive.conversation.types import (
     ConversationMessage,
     ConversationMessageChunk,
     ConversationStreamElement,
-    RealtimeConversationMemory,
 )
 
 __all__ = (
@@ -19,5 +18,5 @@ __all__ = (
     "ConversationMessageChunk",
     "ConversationStreamElement",
     "RealtimeConversation",
-    "RealtimeConversationMemory",
+    "RealtimeConversationSession",
 )

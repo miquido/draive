@@ -13,6 +13,8 @@ from draive.utils import Memory
 
 __all__ = (
     "ConversationElement",
+    "ConversationEvent",
+    "ConversationMemory",
     "ConversationMessage",
     "ConversationMessageChunk",
     "ConversationStreamElement",
@@ -119,6 +121,29 @@ class ConversationMessage(DataModel):
         return messages
 
     @classmethod
+    def from_lmm_context(
+        cls,
+        element: LMMInput | LMMCompletion,
+        /,
+    ) -> Self:
+        match element:
+            case LMMInput():
+                return cls.user(
+                    element.content,
+                    identifier=element.meta.identifier,
+                    created=element.meta.creation,
+                    meta=element.meta.excluding("kind", "identifier", "creation"),
+                )
+
+            case LMMCompletion():
+                return cls.model(
+                    element.content,
+                    identifier=element.meta.identifier,
+                    created=element.meta.creation,
+                    meta=element.meta.excluding("kind", "identifier", "creation"),
+                )
+
+    @classmethod
     def user(
         cls,
         content: Multimodal,
@@ -152,20 +177,37 @@ class ConversationMessage(DataModel):
             meta=Meta.of(meta),
         )
 
-    type: Literal["message"] = "message"
     identifier: UUID = Default(factory=uuid4)
     role: Literal["user", "model"]
     created: datetime = Default(factory=datetime.now)
     content: MultimodalContent
     meta: Meta = META_EMPTY
 
-    def as_lmm_context_element(self) -> LMMContextElement:
+    def to_lmm_context(
+        self,
+    ) -> LMMContextElement:
         match self.role:
             case "user":
-                return LMMInput.of(self.content)
+                return LMMInput.of(
+                    self.content,
+                    meta=self.meta.updated(
+                        # using predefined meta keys
+                        kind="message",
+                        identifier=self.identifier.hex,
+                        creation=self.created.isoformat(),
+                    ),
+                )
 
             case "model":
-                return LMMCompletion.of(self.content)
+                return LMMCompletion.of(
+                    self.content,
+                    meta=self.meta.updated(
+                        # using predefined meta keys
+                        kind="message",
+                        identifier=self.identifier.hex,
+                        creation=self.created.isoformat(),
+                    ),
+                )
 
     def __bool__(self) -> bool:
         return bool(self.content)
@@ -190,18 +232,16 @@ class ConversationEvent(DataModel):
     @classmethod
     def of(
         cls,
-        name: str,
+        category: str,
         *,
-        message_identifier: UUID,
         content: Multimodal | None = None,
         identifier: UUID | None = None,
         created: datetime | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
-            message_identifier=message_identifier,
             identifier=identifier if identifier is not None else uuid4(),
-            name=name,
+            category=category,
             created=created if created is not None else datetime.now(),
             content=MultimodalContent.of(content)
             if content is not None
@@ -209,16 +249,14 @@ class ConversationEvent(DataModel):
             meta=Meta.of(meta),
         )
 
-    type: Literal["event"] = "event"
-    message_identifier: UUID
     identifier: UUID = Default(factory=uuid4)
-    name: str
+    category: str
     created: datetime = Default(factory=datetime.now)
     content: MultimodalContent = MultimodalContent.empty
     meta: Meta = META_EMPTY
 
 
 ConversationElement = ConversationMessage | ConversationEvent
-ConversationMemory = Memory[Sequence[ConversationElement], ConversationElement]
 ConversationStreamElement = ConversationMessageChunk | ConversationEvent
-RealtimeConversationMemory = Memory[Sequence[ConversationElement], ConversationStreamElement]
+
+ConversationMemory = Memory[Sequence[ConversationMessage], ConversationMessage]
