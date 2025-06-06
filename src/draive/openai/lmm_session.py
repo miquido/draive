@@ -68,8 +68,11 @@ class OpenAILMMSession(OpenAIAPI):
                 attributes={
                     "lmm.provider": "openai",
                     "lmm.model": realtime_config.model,
-                    "lmm.temperature": realtime_config.temperature,
-                    "lmm.max_tokens": realtime_config.max_tokens,
+                    "lmm.transcribe_model": realtime_config.transcribe_model,
+                    "lmm.input_audio_noise_reduction": realtime_config.input_audio_noise_reduction,
+                    "lmm.vad_type": realtime_config.vad_type,
+                    "lmm.vad_eagerness": realtime_config.vad_eagerness,
+                    "lmm.voice": realtime_config.voice,
                     "lmm.tools": [tool["name"] for tool in tools] if tools else [],
                     "lmm.tool_selection": f"{tool_selection}",
                     "lmm.output": f"{output}",
@@ -137,7 +140,6 @@ class OpenAILMMSession(OpenAIAPI):
                         "instructions": Instruction.formatted(instruction)
                         if instruction is not None
                         else MISSING,
-                        "temperature": realtime_config.temperature,
                         "modalities": modalities,
                         "input_audio_format": realtime_config.input_audio_format,
                         "output_audio_format": realtime_config.output_audio_format,
@@ -150,9 +152,18 @@ class OpenAILMMSession(OpenAIAPI):
                         if realtime_config.vad_type is not MISSING
                         else MISSING,
                         "voice": realtime_config.voice,
-                        "max_response_output_tokens": realtime_config.max_tokens,
                         "tools": session_tools,
                         "tool_choice": tool_choice if session_tools is not MISSING else MISSING,
+                        "input_audio_noise_reduction": {
+                            "type": realtime_config.input_audio_noise_reduction,
+                        }
+                        if realtime_config.input_audio_noise_reduction is not MISSING
+                        else MISSING,
+                        "input_audio_transcription": {
+                            "model": realtime_config.transcribe_model,
+                        }
+                        if realtime_config.transcribe_model is not MISSING
+                        else MISSING,
                     },
                     typed=Session,
                 ),
@@ -509,6 +520,9 @@ class OpenAILMMSession(OpenAIAPI):
     ) -> None:
         try:
             async for element in input_stream:
+                if output_stream.is_finished:
+                    return  # finish when output has finished
+
                 match element:
                     case LMMStreamChunk() as chunk:
                         await self._send_input_chunk(
@@ -524,6 +538,3 @@ class OpenAILMMSession(OpenAIAPI):
 
         except BaseException as exc:
             output_stream.finish(exception=exc)
-
-        else:
-            output_stream.finish()
