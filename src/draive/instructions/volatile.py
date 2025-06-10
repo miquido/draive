@@ -37,7 +37,11 @@ class InstructionsVolatileStorage:
         **extra: Any,
     ) -> Instruction:
         if instruction := self._storage.get(name):
-            return instruction
+            if arguments:
+                return instruction.updated(arguments={**instruction.arguments, **arguments})
+
+            else:
+                return instruction
 
         else:
             raise InstructionMissing(f"Instruction '{name}' is not defined")
