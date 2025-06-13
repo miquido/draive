@@ -6,7 +6,7 @@ from haiway import State, ctx
 from draive.generation.text.default import generate_text
 from draive.generation.text.types import TextGenerating
 from draive.instructions import Instruction
-from draive.multimodal import Multimodal
+from draive.multimodal import Multimodal, MultimodalContent
 from draive.prompts import Prompt
 from draive.tools import Tool, Toolbox
 
@@ -52,10 +52,12 @@ class TextGeneration(State):
         **extra: Any,
     ) -> AsyncIterable[str] | str:
         return await ctx.state(cls).generation(
-            instruction=instruction,
-            input=input,
-            tools=tools,
-            examples=examples,
+            instruction=Instruction.of(instruction),
+            input=input if isinstance(input, Prompt) else MultimodalContent.of(input),
+            toolbox=Toolbox.of(tools),
+            examples=((MultimodalContent.of(example[0]), example[1]) for example in examples)
+            if examples is not None
+            else (),
             stream=stream,
             **extra,
         )

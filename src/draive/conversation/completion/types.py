@@ -7,9 +7,6 @@ from draive.conversation.types import (
     ConversationStreamElement,
 )
 from draive.instructions import Instruction
-from draive.multimodal import (
-    Multimodal,
-)
 from draive.tools import Toolbox
 
 __all__ = ("ConversationCompleting",)
@@ -22,7 +19,7 @@ class ConversationCompleting(Protocol):
         self,
         *,
         instruction: Instruction | None,
-        input: ConversationMessage | Multimodal,
+        input: ConversationMessage,
         memory: ConversationMemory,
         toolbox: Toolbox,
         stream: Literal[False] = False,
@@ -34,7 +31,7 @@ class ConversationCompleting(Protocol):
         self,
         *,
         instruction: Instruction | None,
-        input: ConversationMessage | Multimodal,
+        input: ConversationMessage,
         memory: ConversationMemory,
         toolbox: Toolbox,
         stream: Literal[True],
@@ -45,7 +42,7 @@ class ConversationCompleting(Protocol):
         self,
         *,
         instruction: Instruction | None,
-        input: ConversationMessage | Multimodal,  # noqa: A002
+        input: ConversationMessage,  # noqa: A002
         memory: ConversationMemory,
         toolbox: Toolbox,
         stream: bool = False,

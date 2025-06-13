@@ -1,18 +1,25 @@
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import (
+    AsyncIterator,
+    Iterable,
+    Mapping,
+    Sequence,
+)
+from types import TracebackType
 from typing import (
     Any,
+    ClassVar,
     Literal,
     Protocol,
     Self,
     TypedDict,
+    final,
     overload,
     runtime_checkable,
 )
 
-from haiway import Default
+from haiway import Default, State, as_tuple, ctx
 
 from draive.commons import META_EMPTY, Meta, MetaValues
-from draive.instructions import Instruction
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel, ParametersSpecification
 
@@ -23,10 +30,21 @@ __all__ = (
     "LMMContextElement",
     "LMMException",
     "LMMInput",
+    "LMMInstruction",
+    "LMMMemory",
+    "LMMMemoryRecalling",
+    "LMMMemoryRemembering",
     "LMMOutput",
+    "LMMSession",
+    "LMMSessionClosing",
     "LMMSessionEvent",
+    "LMMSessionInput",
+    "LMMSessionOpening",
     "LMMSessionOutput",
     "LMMSessionOutputSelection",
+    "LMMSessionReading",
+    "LMMSessionScope",
+    "LMMSessionWriting",
     "LMMStreamChunk",
     "LMMStreamInput",
     "LMMStreamOutput",
@@ -39,7 +57,10 @@ __all__ = (
     "LMMToolResponses",
     "LMMToolSelection",
     "LMMToolSpecification",
+    "LMMTools",
 )
+
+LMMInstruction = str
 
 
 class LMMToolFunctionSpecification(TypedDict):
@@ -55,6 +76,45 @@ type LMMOutputSelection = (
     | type[DataModel]
 )
 type LMMToolSelection = Literal["auto", "required", "none"] | LMMToolSpecification
+
+
+class LMMTools(State):
+    none: ClassVar[Self]  # defined after the class
+
+    @classmethod
+    def of(
+        cls,
+        tools: Iterable[LMMToolSpecification] | None,
+        /,
+        *,
+        selection: LMMToolSelection = "auto",
+    ) -> Self:
+        specifications: tuple[LMMToolSpecification, ...] | None = as_tuple(tools)
+        if not specifications:
+            return cls(
+                selection="none",
+                specifications=(),
+            )
+
+        if not isinstance(selection, str) and selection not in specifications:
+            return cls(
+                selection="auto",
+                specifications=specifications,
+            )
+
+        return cls(
+            selection=selection,
+            specifications=specifications,
+        )
+
+    selection: LMMToolSelection
+    specifications: Sequence[LMMToolSpecification]
+
+    def __bool__(self) -> bool:
+        return bool(self.specifications)
+
+
+LMMTools.none = LMMTools.of((), selection="none")
 
 
 class LMMException(Exception):
@@ -84,7 +144,6 @@ class LMMInput(DataModel):
             meta=Meta.of(meta),
         )
 
-    type: Literal["input"] = "input"
     content: MultimodalContent
     meta: Meta = META_EMPTY
 
@@ -105,7 +164,6 @@ class LMMCompletion(DataModel):
             meta=Meta.of(meta),
         )
 
-    type: Literal["completion"] = "completion"
     content: MultimodalContent
     meta: Meta = META_EMPTY
 
@@ -117,11 +175,30 @@ LMMToolResponseHandling = Literal["error", "result", "direct_result"]
 
 
 class LMMToolResponse(DataModel):
-    type: Literal["tool_response"] = "tool_response"
+    @classmethod
+    def of(
+        cls,
+        identifier: str,
+        /,
+        *,
+        tool: str,
+        content: MultimodalContent,
+        handling: LMMToolResponseHandling,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        return cls(
+            identifier=identifier,
+            tool=tool,
+            content=content,
+            handling=handling,
+            meta=Meta.of(meta),
+        )
+
     identifier: str
     tool: str
     content: MultimodalContent
     handling: LMMToolResponseHandling
+    meta: Meta = META_EMPTY
 
 
 class LMMToolResponses(DataModel):
@@ -137,7 +214,6 @@ class LMMToolResponses(DataModel):
             meta=Meta.of(meta),
         )
 
-    type: Literal["tool_responses"] = "tool_responses"
     responses: Sequence[LMMToolResponse]
     meta: Meta = META_EMPTY
 
@@ -148,6 +224,7 @@ class LMMToolRequest(DataModel):
         cls,
         identifier: str,
         /,
+        *,
         tool: str,
         arguments: Mapping[str, Any] | None = None,
         meta: Meta | MetaValues | None = None,
@@ -159,7 +236,6 @@ class LMMToolRequest(DataModel):
             meta=Meta.of(meta),
         )
 
-    type: Literal["tool_request"] = "tool_request"
     identifier: str
     tool: str
     arguments: Mapping[str, Any] = Default(factory=dict)
@@ -181,7 +257,6 @@ class LMMToolRequests(DataModel):
             meta=Meta.of(meta),
         )
 
-    type: Literal["tool_requests"] = "tool_requests"
     requests: Sequence[LMMToolRequest]
     content: MultimodalContent | None = None
     meta: Meta = META_EMPTY
@@ -207,7 +282,6 @@ class LMMStreamChunk(DataModel):
             meta=Meta.of(meta),
         )
 
-    type: Literal["stream_chunk"] = "stream_chunk"
     content: MultimodalContent
     eod: bool
     meta: Meta = META_EMPTY
@@ -220,26 +294,141 @@ LMMStreamInput = LMMStreamChunk | LMMToolResponse
 LMMStreamOutput = LMMStreamChunk | LMMToolRequest
 
 
-class LMMSessionEvent(DataModel):
+@runtime_checkable
+class LMMMemoryRecalling(Protocol):
+    async def __call__(
+        self,
+        **extra: Any,
+    ) -> LMMContext: ...
+
+
+@runtime_checkable
+class LMMMemoryRemembering(Protocol):
+    async def __call__(
+        self,
+        elements: LMMContext,
+        **extra: Any,
+    ) -> None: ...
+
+
+@final
+class LMMMemory(State):
+    none: ClassVar[Self]  # defined after the class
+
+    @overload
     @classmethod
-    def of(
+    def constant(
         cls,
-        category: Literal["completed", "interrupted"] | str,
+        element: LMMContext,
         /,
-        *,
-        meta: Meta | MetaValues | None = None,
+    ) -> Self: ...
+
+    @overload
+    @classmethod
+    def constant(
+        cls,
+        element: LMMContextElement,
+        /,
+        *elements: LMMContextElement,
+    ) -> Self: ...
+
+    @classmethod
+    def constant(
+        cls,
+        element: LMMContext | LMMContextElement,
+        /,
+        *elements: LMMContextElement,
     ) -> Self:
+        current_context: LMMContext
+        match element:
+            case [*context]:
+                assert not elements  # nosec: B101
+                current_context = context
+
+            case element:
+                current_context = (element, *elements)
+
+        async def recall(
+            **extra: Any,
+        ) -> LMMContext:
+            return current_context
+
+        async def remember(
+            elements: LMMContext,
+            **extra: Any,
+        ) -> None:
+            pass  # constant
+
         return cls(
-            category=category,
-            meta=Meta.of(meta),
+            recalling=recall,
+            remembering=remember,
         )
 
-    type: Literal["session_event"] = "session_event"
-    category: Literal["completed", "interrupted"] | str
-    meta: Meta
+    @classmethod
+    def volatile(
+        cls,
+        context: LMMContext | None = None,
+        /,
+    ) -> Self:
+        current_context: LMMContext = context if context is not None else ()
+
+        async def recall(
+            **extra: Any,
+        ) -> LMMContext:
+            return current_context
+
+        async def remember(
+            elements: LMMContext,
+            **extra: Any,
+        ) -> None:
+            nonlocal current_context
+            current_context = (*current_context, *elements)
+
+        return cls(
+            recalling=recall,
+            remembering=remember,
+        )
+
+    @classmethod
+    async def recall(
+        cls,
+        **extra: Any,
+    ) -> LMMContext:
+        return await ctx.state(cls).recalling(**extra)
+
+    @classmethod
+    async def remember(
+        cls,
+        element: LMMContextElement,
+        *elements: LMMContextElement,
+        **extra: Any,
+    ) -> None:
+        await ctx.state(cls).remembering(
+            elements=(element, *elements),
+            **extra,
+        )
+
+    recalling: LMMMemoryRecalling
+    remembering: LMMMemoryRemembering
 
 
-LMMSessionOutput = LMMStreamChunk | LMMToolRequest | LMMSessionEvent
+async def _empty_recall(
+    **extra: Any,
+) -> LMMContext:
+    return ()
+
+
+async def _no_remember(
+    elements: LMMContext,
+    **extra: Any,
+) -> None:
+    pass  # skip
+
+
+LMMMemory.none = LMMMemory(
+    recalling=_empty_recall,
+    remembering=_no_remember,
+)
 
 
 @runtime_checkable
@@ -248,10 +437,9 @@ class LMMCompleting(Protocol):
     async def __call__(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
         stream: Literal[False] = False,
         **extra: Any,
@@ -261,10 +449,9 @@ class LMMCompleting(Protocol):
     async def __call__(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
         stream: Literal[True],
         **extra: Any,
@@ -273,19 +460,117 @@ class LMMCompleting(Protocol):
     async def __call__(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
         stream: bool = False,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput: ...
 
 
+class LMMSessionEvent(DataModel):
+    @classmethod
+    def of(
+        cls,
+        category: str,
+        /,
+        *,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        return cls(
+            category=category,
+            meta=Meta.of(meta),
+        )
+
+    category: str
+    meta: Meta
+
+
+LMMSessionInput = LMMStreamChunk | LMMToolResponse | LMMSessionEvent
+LMMSessionOutput = LMMStreamChunk | LMMToolRequest | LMMSessionEvent
 type LMMSessionOutputSelection = (
     Sequence[Literal["text", "audio"]] | Literal["auto", "text", "audio"]
 )
+
+
+@runtime_checkable
+class LMMSessionReading(Protocol):
+    async def __call__(self) -> LMMSessionOutput: ...
+
+
+@runtime_checkable
+class LMMSessionWriting(Protocol):
+    async def __call__(
+        self,
+        input: LMMSessionInput,  # noqa: A002
+    ) -> None: ...
+
+
+class LMMSession(State):
+    @classmethod
+    async def read(cls) -> LMMSessionOutput:
+        return await ctx.state(cls).reading()
+
+    @classmethod
+    async def reader(cls) -> AsyncIterator[LMMSessionOutput]:
+        session: Self = ctx.state(cls)
+        while True:  # breaks on exception
+            yield await session.reading()
+
+    @classmethod
+    async def write(
+        cls,
+        input: LMMSessionInput,  # noqa: A002
+    ) -> None:
+        await ctx.state(cls).writing(input=input)
+
+    @classmethod
+    async def writer(
+        cls,
+        input: AsyncIterator[LMMSessionInput],  # noqa: A002
+    ) -> None:
+        session: Self = ctx.state(cls)
+        while True:  # breaks on exception
+            await session.writing(input=await anext(input))
+
+    reading: LMMSessionReading
+    writing: LMMSessionWriting
+
+
+@runtime_checkable
+class LMMSessionOpening(Protocol):
+    async def __call__(self) -> LMMSession: ...
+
+
+@runtime_checkable
+class LMMSessionClosing(Protocol):
+    async def __call__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None: ...
+
+
+class LMMSessionScope(State):
+    opening: LMMSessionOpening
+    closing: LMMSessionClosing
+
+    async def __aenter__(self) -> LMMSession:
+        return await self.opening()
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        await self.closing(
+            exc_type=exc_type,
+            exc_val=exc_val,
+            exc_tb=exc_tb,
+        )
 
 
 @runtime_checkable
@@ -293,11 +578,9 @@ class LMMSessionPreparing(Protocol):
     async def __call__(
         self,
         *,
-        instruction: Instruction | None,
-        initial_context: LMMContext | None,
-        input_stream: AsyncIterator[LMMStreamInput],
+        instruction: LMMInstruction | None,
+        memory: LMMMemory | None,
+        tools: LMMTools | None,
         output: LMMSessionOutputSelection,
-        tools: Sequence[LMMToolSpecification],
-        tool_selection: LMMToolSelection,
         **extra: Any,
-    ) -> AsyncIterator[LMMSessionOutput]: ...
+    ) -> LMMSessionScope: ...

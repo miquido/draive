@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from typing import Any, Literal, Protocol, runtime_checkable
 
 from draive.commons import Meta
+from draive.lmm import LMMToolSpecification
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import ParametersSpecification
 
@@ -63,6 +64,9 @@ class Tool(Protocol):
 
     @property
     def parameters(self) -> ParametersSpecification | None: ...
+
+    @property
+    def specification(self) -> LMMToolSpecification: ...
 
     @property
     def meta(self) -> Meta: ...

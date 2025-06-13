@@ -72,13 +72,12 @@ async def default_choice_completion(  # noqa: C901
             ),
         ]
 
-        recursion_level: int = 0
-        while recursion_level <= toolbox.repeated_calls_limit:
+        repetition_level: int = 0
+        while True:
             match await LMM.completion(
-                instruction=extended_instruction,
+                instruction=Instruction.formatted(extended_instruction),
                 context=context,
-                tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
-                tools=toolbox.available_tools(),
+                tools=toolbox.current_tools(repetition_level=repetition_level),
                 output="text",
                 **extra,
             ):
@@ -119,9 +118,7 @@ async def default_choice_completion(  # noqa: C901
                             ]
                         )
 
-            recursion_level += 1  # continue with next recursion level
-
-        raise RuntimeError("LMM exceeded limit of recursive calls")
+            repetition_level += 1  # continue with next recursion level
 
 
 def _format_option(

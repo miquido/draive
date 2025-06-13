@@ -1,210 +1,156 @@
 from asyncio import CancelledError, Task
-from collections.abc import AsyncIterator, Sequence
+from types import TracebackType
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
-from haiway import AsyncQueue, ctx
+from haiway import ctx
 
+from draive.conversation.realtime.types import (
+    RealtimeConversationSession,
+    RealtimeConversationSessionScope,
+)
 from draive.conversation.types import (
     ConversationEvent,
-    ConversationMessage,
     ConversationMessageChunk,
     ConversationStreamElement,
-    RealtimeConversationMemory,
 )
 from draive.instructions import Instruction
 from draive.lmm import (
+    LMMMemory,
     LMMSession,
     LMMSessionEvent,
-    LMMSessionOutput,
+    LMMSessionScope,
     LMMStreamChunk,
-    LMMStreamInput,
     LMMToolRequest,
     LMMToolResponse,
+    RealtimeLMM,
 )
-from draive.lmm.types import LMMContextElement
-from draive.multimodal import MetaContent
+from draive.multimodal import MultimodalContent
 from draive.tools import Toolbox
-from draive.utils import Processing, ProcessingEvent
 
-__all__ = ("realtime_conversation",)
+__all__ = ("realtime_conversation_preparing",)
 
 
-async def realtime_conversation(  # noqa: C901, PLR0915
+async def realtime_conversation_preparing(  # noqa: C901
     *,
     instruction: Instruction | None,
-    input_stream: AsyncIterator[ConversationMessageChunk],
-    memory: RealtimeConversationMemory,
+    memory: LMMMemory | None,
     toolbox: Toolbox,
     **extra: Any,
-) -> AsyncIterator[ConversationStreamElement]:
-    initial_context: Sequence[LMMContextElement] = tuple(
-        message.as_lmm_context_element()
-        for message in await memory.recall()  # relying on memory recall correctness
-        if isinstance(message, ConversationMessage)  # skip events in LMM context
+) -> RealtimeConversationSessionScope:
+    session_memory: LMMMemory
+    match memory:
+        case None:
+            session_memory = LMMMemory.none
+
+        case LMMMemory():
+            session_memory = memory
+
+        case context:
+            session_memory = LMMMemory.constant(context)
+
+    session_scope: LMMSessionScope = await RealtimeLMM.session(
+        instruction=Instruction.formatted(instruction),
+        memory=session_memory,
+        tools=toolbox.current_tools(),
+        output="auto",
     )
 
-    input_queue = AsyncQueue[LMMStreamInput]()
+    async def open_session() -> RealtimeConversationSession:  # noqa: C901
+        session: LMMSession = await session_scope.__aenter__()
+        pending_tool_requests: dict[str, Task[None]] = {}
 
-    async def process_input() -> None:
-        try:
-            ctx.log_debug("Starting input processing...")
-            # TODO: include guardrails check
-            async for element in input_stream:
-                if isinstance(element, ConversationEvent):
-                    continue  # skip events in LMM context
-
-                input_queue.enqueue(
-                    LMMStreamChunk.of(
-                        element.content,
-                        eod=element.eod,
-                    )
-                )
-                await memory.remember(element)  # add to memory
-
-            input_queue.finish()
-            ctx.log_debug("...input processing finished!")
-
-        except CancelledError:
-            # just finish input on cancel
-            input_queue.finish()
-
-        except BaseException as exc:
-            input_queue.finish(exception=exc)
-
-    pending_tool_requests: dict[str, Task[None]] = {}
-
-    async def handle_tool_request(
-        tool_request: LMMToolRequest,
-        /,
-    ) -> None:
-        try:
-            ctx.log_debug(f"Handling tool request ({tool_request.identifier})...")
-            response: LMMToolResponse = await toolbox.respond(tool_request)
-            # check if task was not cancelled before passing the result to input
-            ctx.check_cancellation()
-            # deliver the result directly to input
-            input_queue.enqueue(response)
-
-        except CancelledError:
-            pass  # just cancelled, ignore
-
-        finally:
-            # update pending tools - we have delivered or ignored the result
-            del pending_tool_requests[tool_request.identifier]
-            ctx.log_debug(f"...tool request ({tool_request.identifier}) handling finished!")
-
-    input_processing_task: Task[None] = ctx.spawn(process_input)
-
-    session_output: AsyncIterator[LMMSessionOutput]
-    try:
-        ctx.log_debug("Preparing LMM session...")
-        session_output = await LMMSession.prepare(
-            instruction=instruction,
-            input_stream=input_queue,
-            initial_context=initial_context,
-            tools=toolbox.available_tools(),
-        )
-        del initial_context
-
-    except BaseException as exc:
-        ctx.log_error(
-            "...failed to prepare LMM session!",
-            exception=exc,
-        )
-        input_processing_task.cancel()
-        raise exc
-
-    output_queue = AsyncQueue[ConversationStreamElement]()
-    # current output message identifier to match chunks and events
-    output_message_identifier: UUID = uuid4()
-
-    async def report_event(
-        event: ProcessingEvent,
-        /,
-    ) -> None:
-        ctx.log_debug("Processing conversation event")
-        output_queue.enqueue(
-            ConversationEvent.of(
-                event.name,
-                message_identifier=output_message_identifier,
-                identifier=event.identifier,
-                content=event.content,
-                meta=event.meta,
-            )
-        )
-
-    with ctx.updated(ctx.state(Processing).updated(event_reporting=report_event)):
-
-        async def process_output() -> None:
-            nonlocal output_message_identifier
+        async def handle_tool_request(
+            tool_request: LMMToolRequest,
+            /,
+        ) -> None:
             try:
-                ctx.log_debug("Starting output processing...")
-                async for chunk in session_output:
-                    match chunk:
-                        case LMMStreamChunk() as chunk:
-                            output_chunk: ConversationMessageChunk = ConversationMessageChunk.model(
-                                chunk.content,
-                                message_identifier=output_message_identifier,
-                                eod=chunk.eod,
-                            )
-                            # send to output
-                            output_queue.enqueue(output_chunk)
-                            if chunk.eod:
-                                # start next message when current finished
-                                output_message_identifier = uuid4()
-                            # and add to memory
-                            await memory.remember(output_chunk)
+                ctx.log_debug(f"Handling tool request ({tool_request.identifier})...")
+                response: LMMToolResponse = await toolbox.respond(tool_request)
+                # check if task was not cancelled before passing the result to input
+                ctx.check_cancellation()
+                # deliver the result directly to input
+                await session.write(response)
 
-                        case LMMSessionEvent() as event:
-                            conversation_event: ConversationEvent
-                            match event.category:
-                                case "interrupted":
-                                    # cancel pending tools on interrupt
-                                    for task in pending_tool_requests.values():
-                                        task.cancel()
-
-                                    conversation_event = ConversationEvent.of(
-                                        "interrupted",
-                                        message_identifier=output_message_identifier,
-                                        meta=event.meta,
-                                    )
-
-                                case "completed":
-                                    conversation_event = ConversationEvent.of(
-                                        "completed",
-                                        message_identifier=output_message_identifier,
-                                        meta=event.meta,
-                                    )
-
-                                case other:
-                                    conversation_event = ConversationEvent.of(
-                                        other,
-                                        message_identifier=output_message_identifier,
-                                        content=MetaContent.of(other),
-                                        meta=event.meta,
-                                    )
-
-                            # send to output
-                            output_queue.enqueue(conversation_event)
-                            # and add to memory
-                            await memory.remember(conversation_event)
-
-                        case LMMToolRequest() as tool_request:
-                            pending_tool_requests[tool_request.identifier] = ctx.spawn(
-                                handle_tool_request,
-                                tool_request,
-                            )
+            except CancelledError:
+                pass  # just cancelled, ignore
 
             finally:
-                # cancel input reading
-                input_processing_task.cancel()
-                # cancel pending tools
-                for task in pending_tool_requests.values():
-                    task.cancel()
+                # update pending tools - we have delivered or ignored the result
+                del pending_tool_requests[tool_request.identifier]
+                ctx.log_debug(f"...tool request ({tool_request.identifier}) handling finished!")
 
-                ctx.log_debug("...output processing finished!")
+        async def read() -> ConversationStreamElement:
+            while True:
+                match await session.reading():
+                    case LMMStreamChunk() as chunk:
+                        return ConversationMessageChunk.model(
+                            chunk.content,
+                            message_identifier=chunk.meta.origin_identifier or uuid4(),
+                            eod=chunk.eod,
+                        )
 
-        ctx.spawn(process_output)
+                    case LMMSessionEvent() as event:
+                        match event.category:
+                            case "output.completed":
+                                return ConversationMessageChunk.model(
+                                    MultimodalContent.empty,
+                                    message_identifier=event.meta.origin_identifier or uuid4(),
+                                    eod=True,  # ensure sending eod
+                                )
 
-    return output_queue
+                            case "input.started":
+                                return ConversationEvent.of(
+                                    "interrupted",
+                                    meta=event.meta,
+                                )
+
+                            case _:
+                                pass  # temporary ignore of other events
+
+                        return ConversationEvent.of(
+                            event.category,
+                            meta=event.meta,
+                        )
+
+                    case LMMToolRequest() as tool_request:
+                        pending_tool_requests[tool_request.identifier] = ctx.spawn(
+                            handle_tool_request,
+                            tool_request,
+                        )
+                        continue
+
+        async def write(
+            input: ConversationStreamElement,  # noqa: A002
+        ) -> None:
+            if isinstance(input, ConversationEvent):
+                return  # events do not propagate to LMM
+
+            chunk: LMMStreamChunk = LMMStreamChunk.of(
+                input.content,
+                eod=input.eod,
+                meta=input.meta,
+            )
+            # pass chunk to LMM
+            await session.writing(input=chunk)
+
+        return RealtimeConversationSession(
+            reading=read,
+            writing=write,
+        )
+
+    async def close_session(
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        await session_scope.__aexit__(
+            exc_type,
+            exc_val,
+            exc_tb,
+        )
+
+    return RealtimeConversationSessionScope(
+        opening=open_session,
+        closing=close_session,
+    )

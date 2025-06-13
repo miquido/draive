@@ -9,7 +9,7 @@ from draive.openai.embedding import OpenAIEmbedding
 from draive.openai.guardrails import OpenAIContentModereation
 from draive.openai.images import OpenAIImageGeneration
 from draive.openai.lmm_generation import OpenAILMMGeneration
-from draive.openai.lmm_session import OpenAILMMSession
+from draive.openai.lmm_session import OpenAIRealtimeLMM
 from draive.openai.tokenization import OpenAITokenization
 
 __all__ = ("OpenAI",)
@@ -27,7 +27,7 @@ type Features = Literal[
 @final
 class OpenAI(
     OpenAILMMGeneration,
-    OpenAILMMSession,
+    OpenAIRealtimeLMM,
     OpenAIEmbedding,
     OpenAIImageGeneration,
     OpenAIContentModereation,

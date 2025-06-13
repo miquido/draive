@@ -582,7 +582,7 @@ def _convert_tool(
     return FunctionTool(
         name=name,
         description=mcp_tool.description,
-        specification=validated_specification(mcp_tool.inputSchema),
+        parameters=validated_specification(mcp_tool.inputSchema),
         function=remote_call,
         availability_check=None,
         format_result=_format_tool_result,
