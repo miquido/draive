@@ -10,35 +10,34 @@ from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
+    LMMInstruction,
+    LMMStreamChunk,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
     LMMToolResponses,
 )
-from draive.lmm.types import LMMStreamChunk
-from draive.multimodal import Multimodal, MultimodalContent
+from draive.multimodal import MultimodalContent
 from draive.prompts import Prompt
-from draive.tools import Tool, Toolbox
+from draive.tools import Toolbox
 
 __all__ = ("generate_text",)
 
 
 async def generate_text(
     *,
-    instruction: Instruction | str | None,
-    input: Prompt | Multimodal,  # noqa: A002
-    tools: Toolbox | Iterable[Tool] | None,
-    examples: Iterable[tuple[Multimodal, str]] | None,
+    instruction: Instruction | None,
+    input: Prompt | MultimodalContent,  # noqa: A002
+    toolbox: Toolbox,
+    examples: Iterable[tuple[MultimodalContent, str]],
     stream: bool,
     **extra: Any,
 ) -> AsyncIterable[str] | str:
     with ctx.scope("generate_text"):
-        toolbox: Toolbox = Toolbox.of(tools)
-
         context: list[LMMContextElement] = [
             *[
                 message
-                for example in examples or []
+                for example in examples
                 for message in [
                     LMMInput.of(example[0]),
                     LMMCompletion.of(example[1]),
@@ -69,18 +68,18 @@ async def generate_text(
 
 
 async def _text_generation(
-    instruction: Instruction | str | None,
+    instruction: Instruction | None,
     context: list[LMMContextElement],
     toolbox: Toolbox,
     **extra: Any,
 ) -> str:
-    recursion_level: int = 0
-    while recursion_level <= toolbox.repeated_calls_limit:
+    formatted_instruction: LMMInstruction | None = Instruction.formatted(instruction)
+    repetition_level: int = 0
+    while True:
         match await LMM.completion(
-            instruction=instruction,
+            instruction=formatted_instruction,
             context=context,
-            tools=toolbox.available_tools(),
-            tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
+            tools=toolbox.available_tools(repetition_level=repetition_level),
             output="text",
             **extra,
         ):
@@ -109,13 +108,11 @@ async def _text_generation(
                         ]
                     )
 
-        recursion_level += 1  # continue with next recursion level
-
-    raise RuntimeError("LMM exceeded limit of recursive calls")
+        repetition_level += 1  # continue with next recursion level
 
 
 async def _text_generation_stream(
-    instruction: Instruction | str | None,
+    instruction: Instruction | None,
     context: list[LMMContextElement],
     toolbox: Toolbox,
     **extra: Any,
@@ -123,18 +120,18 @@ async def _text_generation_stream(
     output_queue = AsyncQueue[str]()
 
     async def consume_lmm_output() -> None:
-        recursion_level: int = 0
+        repetition_level: int = 0
         try:
-            while recursion_level <= toolbox.repeated_calls_limit:
+            formatted_instruction: LMMInstruction | None = Instruction.formatted(instruction)
+            while True:
                 pending_tool_requests: list[LMMToolRequest] = []
                 pending_tool_responses: list[Task[LMMToolResponse]] = []
                 accumulated_text: str = ""
 
                 async for element in await LMM.completion(
-                    instruction=instruction,
+                    instruction=formatted_instruction,
                     context=context,
-                    tool_selection=toolbox.tool_selection(repetition_level=recursion_level),
-                    tools=toolbox.available_tools(),
+                    tools=toolbox.available_tools(repetition_level=repetition_level),
                     output="text",
                     stream=True,
                     **extra,
@@ -179,9 +176,7 @@ async def _text_generation_stream(
                         ]
                     )
 
-                recursion_level += 1  # continue with next recursion level
-
-            raise RuntimeError("LMM exceeded limit of tool calls")
+                repetition_level += 1  # continue
 
         except BaseException as exc:
             output_queue.finish(exception=exc)

@@ -1,5 +1,5 @@
 import json
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator
 from itertools import chain
 from typing import Any, Literal, overload
 from uuid import uuid4
@@ -7,17 +7,16 @@ from uuid import uuid4
 from haiway import ObservabilityLevel, ctx
 from ollama import ChatResponse, Message, Options
 
-from draive.instructions import Instruction
 from draive.lmm import (
     LMM,
     LMMCompletion,
     LMMContext,
+    LMMInstruction,
     LMMOutput,
     LMMOutputSelection,
     LMMToolRequest,
     LMMToolRequests,
-    LMMToolSelection,
-    LMMToolSpecification,
+    LMMTools,
 )
 from draive.lmm.types import LMMStreamOutput
 from draive.multimodal import MultimodalContent
@@ -42,10 +41,9 @@ class OllamaLMMGeneration(OllamaAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         config: OllamaChatConfig | None = None,
         output: LMMOutputSelection,
         stream: Literal[False] = False,
@@ -56,10 +54,9 @@ class OllamaLMMGeneration(OllamaAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
         config: OllamaChatConfig | None = None,
         stream: Literal[True],
@@ -69,10 +66,9 @@ class OllamaLMMGeneration(OllamaAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
         config: OllamaChatConfig | None = None,
         stream: bool = False,
@@ -82,6 +78,7 @@ class OllamaLMMGeneration(OllamaAPI):
             raise NotImplementedError("ollama streaming is not implemented yet")
 
         chat_config: OllamaChatConfig = config or ctx.state(OllamaChatConfig)
+        tools = tools or LMMTools.none
         with ctx.scope("ollama_lmm_completion", chat_config):
             ctx.record(
                 ObservabilityLevel.INFO,
@@ -91,8 +88,8 @@ class OllamaLMMGeneration(OllamaAPI):
                     "lmm.temperature": chat_config.temperature,
                     "lmm.max_tokens": chat_config.max_tokens,
                     "lmm.seed": chat_config.seed,
-                    "lmm.tools": [tool["name"] for tool in tools] if tools else None,
-                    "lmm.tool_selection": f"{tool_selection}" if tools else None,
+                    "lmm.tools": [tool["name"] for tool in tools.specifications],
+                    "lmm.tool_selection": f"{tools.selection}",
                     "lmm.stream": stream,
                     "lmm.output": f"{output}",
                     "lmm.instruction": f"{instruction}",
@@ -108,7 +105,7 @@ class OllamaLMMGeneration(OllamaAPI):
                 messages = [
                     Message(
                         role="system",
-                        content=Instruction.formatted(instruction),
+                        content=instruction,
                     ),
                     *messages,
                 ]
@@ -116,8 +113,8 @@ class OllamaLMMGeneration(OllamaAPI):
             response_format, output_decoder = output_as_response_declaration(output)
 
             tools_list = tools_as_tool_config(
-                tools,
-                tool_selection=tool_selection,
+                tools.specifications,
+                tool_selection=tools.selection,
             )
 
             completion: ChatResponse = await self._client.chat(

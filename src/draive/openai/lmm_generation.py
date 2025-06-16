@@ -18,17 +18,16 @@ from openai.types.chat import (
 from openai.types.chat.chat_completion_chunk import Choice, ChoiceDeltaToolCall
 from openai.types.chat.completion_create_params import ResponseFormat
 
-from draive.instructions import Instruction
 from draive.lmm import (
     LMM,
     LMMCompletion,
     LMMContext,
+    LMMInstruction,
     LMMOutput,
     LMMOutputSelection,
     LMMToolRequest,
     LMMToolRequests,
-    LMMToolSelection,
-    LMMToolSpecification,
+    LMMTools,
 )
 from draive.lmm.types import LMMStreamChunk, LMMStreamOutput
 from draive.multimodal import MultimodalContent
@@ -54,13 +53,12 @@ class OpenAILMMGeneration(OpenAIAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
-        config: OpenAIChatConfig | None = None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
         stream: Literal[False] = False,
+        config: OpenAIChatConfig | None = None,
         **extra: Any,
     ) -> LMMOutput: ...
 
@@ -68,28 +66,27 @@ class OpenAILMMGeneration(OpenAIAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
-        config: OpenAIChatConfig | None = None,
         stream: Literal[True],
+        config: OpenAIChatConfig | None = None,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput]: ...
 
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
-        config: OpenAIChatConfig | None = None,
         stream: bool = False,
+        config: OpenAIChatConfig | None = None,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
+        tools = tools or LMMTools.none
         completion_config: OpenAIChatConfig = config or ctx.state(OpenAIChatConfig).updated(**extra)
         with ctx.scope("openai_lmm_completion", completion_config):
             ctx.record(
@@ -101,8 +98,8 @@ class OpenAILMMGeneration(OpenAIAPI):
                     "lmm.max_tokens": completion_config.max_tokens,
                     "lmm.seed": completion_config.seed,
                     "lmm.vision_details": completion_config.vision_details,
-                    "lmm.tools": [tool["name"] for tool in tools] if tools else None,
-                    "lmm.tool_selection": f"{tool_selection}" if tools else None,
+                    "lmm.tools": [tool["name"] for tool in tools.specifications],
+                    "lmm.tool_selection": f"{tools.selection}",
                     "lmm.stream": stream,
                     "lmm.output": f"{output}",
                     "lmm.instruction": f"{instruction}",
@@ -126,14 +123,17 @@ class OpenAILMMGeneration(OpenAIAPI):
                 messages = [
                     {
                         "role": "system",
-                        "content": Instruction.formatted(instruction),
+                        "content": instruction,
                     },
                     *messages,
                 ]
 
             response_format, output_decoder = output_as_response_declaration(output)
 
-            tool_choice, tools_list = tools_as_tool_config(tools, tool_selection=tool_selection)
+            tool_choice, tools_list = tools_as_tool_config(
+                tools.specifications,
+                tool_selection=tools.selection,
+            )
 
             if stream:
                 return await self._completion_stream(

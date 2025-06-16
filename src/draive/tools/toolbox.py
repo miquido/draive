@@ -1,6 +1,6 @@
 from asyncio import gather
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from typing import Any, Literal, Self, final, overload
+from typing import Any, Self, final, overload
 
 from haiway import State, ctx
 
@@ -13,7 +13,8 @@ from draive.lmm.types import (
     LMMToolResponse,
     LMMToolResponseHandling,
     LMMToolResponses,
-    LMMToolSpecification,
+    LMMTools,
+    LMMToolSelection,
 )
 from draive.multimodal import MultimodalContent
 from draive.tools.state import Tools
@@ -155,49 +156,39 @@ class Toolbox(State):
     repeated_calls_limit: int
     meta: Meta = META_EMPTY
 
-    def tool_selection(
+    def available_tools(
         self,
         *,
         repetition_level: int = 0,
-    ) -> LMMToolSpecification | Literal["auto", "required", "none"]:
+    ) -> LMMTools:
         if repetition_level >= self.repeated_calls_limit:
-            return "none"  # require no tools if reached the limit
+            # provide no tools if reached the limit
+            return LMMTools.of((), selection="none")
 
-        elif repetition_level != 0:
-            return "auto"  # require tools only for the first call, use auto otherwise
+        tools_selection: LMMToolSelection
+        if repetition_level != 0:
+            # require tools only for the first call, use auto otherwise
+            tools_selection = "auto"
 
         elif self.suggest_call is False:
-            return "auto"
+            tools_selection = "auto"
 
         elif self.suggest_call is True:
-            return "required"
+            tools_selection = "required"
 
         elif self.suggest_call.available:  # use suggested tool if able
-            return {
+            tools_selection = {
                 "name": self.suggest_call.name,
                 "description": self.suggest_call.description,
                 "parameters": self.suggest_call.parameters,
             }
 
         else:
-            return "auto"
+            tools_selection = "auto"
 
-    def available_tools(
-        self,
-        *,
-        repetition_level: int = 0,
-    ) -> Sequence[LMMToolSpecification]:
-        if repetition_level >= self.repeated_calls_limit:
-            return ()  # provide no tools if reached the limit
-
-        return tuple(
-            {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": tool.parameters,
-            }
-            for tool in self.tools.values()
-            if tool.available
+        return LMMTools.of(
+            tuple(tool.specification for tool in self.tools.values() if tool.available),
+            selection=tools_selection,
         )
 
     async def call_tool(

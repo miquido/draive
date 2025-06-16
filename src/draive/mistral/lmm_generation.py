@@ -1,5 +1,5 @@
 import json
-from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterable
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
 from itertools import chain
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
@@ -24,17 +24,16 @@ from mistralai.models import (
 from mistralai.types.basemodel import Unset
 from mistralai.utils.eventstreaming import EventStreamAsync
 
-from draive.instructions import Instruction
 from draive.lmm import (
     LMM,
     LMMCompletion,
     LMMContext,
+    LMMInstruction,
     LMMOutput,
     LMMOutputSelection,
     LMMToolRequest,
     LMMToolRequests,
-    LMMToolSelection,
-    LMMToolSpecification,
+    LMMTools,
 )
 from draive.lmm.types import LMMStreamChunk, LMMStreamOutput
 from draive.mistral.api import MistralAPI
@@ -61,10 +60,9 @@ class MistralLMMGeneration(MistralAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         prefill: Multimodal | None = None,
         config: MistralChatConfig | None = None,
         output: LMMOutputSelection,
@@ -76,10 +74,9 @@ class MistralLMMGeneration(MistralAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
         prefill: Multimodal | None = None,
         config: MistralChatConfig | None = None,
@@ -90,10 +87,9 @@ class MistralLMMGeneration(MistralAPI):
     async def lmm_completion(
         self,
         *,
-        instruction: Instruction | None,
+        instruction: LMMInstruction | None,
         context: LMMContext,
-        tool_selection: LMMToolSelection,
-        tools: Iterable[LMMToolSpecification] | None,
+        tools: LMMTools | None,
         output: LMMOutputSelection,
         prefill: Multimodal | None = None,
         config: MistralChatConfig | None = None,
@@ -101,6 +97,7 @@ class MistralLMMGeneration(MistralAPI):
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
         completion_config: MistralChatConfig = config or ctx.state(MistralChatConfig)
+        tools = tools or LMMTools.none
         with ctx.scope("mistral_lmm_completion", completion_config):
             ctx.record(
                 ObservabilityLevel.INFO,
@@ -110,8 +107,8 @@ class MistralLMMGeneration(MistralAPI):
                     "lmm.temperature": completion_config.temperature,
                     "lmm.max_tokens": completion_config.max_tokens,
                     "lmm.seed": completion_config.seed,
-                    "lmm.tools": [tool["name"] for tool in tools] if tools else None,
-                    "lmm.tool_selection": f"{tool_selection}" if tools else None,
+                    "lmm.tools": [tool["name"] for tool in tools.specifications],
+                    "lmm.tool_selection": f"{tools.selection}",
                     "lmm.stream": stream,
                     "lmm.output": f"{output}",
                     "lmm.instruction": f"{instruction}",
@@ -139,7 +136,7 @@ class MistralLMMGeneration(MistralAPI):
                 messages = [
                     {
                         "role": "system",
-                        "content": Instruction.formatted(instruction),
+                        "content": instruction,
                     },
                     *messages,
                 ]
@@ -147,8 +144,8 @@ class MistralLMMGeneration(MistralAPI):
             response_format, output_decoder = output_as_response_declaration(output)
 
             tool_choice, tools_list = tools_as_tool_config(
-                tools,
-                tool_selection=tool_selection,
+                tools.specifications,
+                tool_selection=tools.selection,
             )
 
             if stream:

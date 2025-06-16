@@ -12,6 +12,7 @@ from haiway import as_dict, as_list, ctx
 from mcp import ClientSession, GetPromptResult, ListToolsResult, StdioServerParameters, stdio_client
 from mcp import Tool as MCPTool
 from mcp.client.sse import sse_client
+from mcp.types import AudioContent as MCPAudioContent
 from mcp.types import (
     BlobResourceContents,
     CallToolResult,
@@ -515,8 +516,8 @@ class MCPClient:
         del self._session
 
 
-async def _convert_content(
-    content: MCPTextContent | MCPImageContent | EmbeddedResource,
+async def _convert_content(  # noqa: PLR0911
+    content: MCPTextContent | MCPImageContent | MCPAudioContent | EmbeddedResource,
     /,
 ) -> MultimodalContent:
     match content:
@@ -528,6 +529,14 @@ async def _convert_content(
                 MediaData.of(
                     urlsafe_b64decode(image.data),
                     media=image.mimeType,
+                )
+            )
+
+        case MCPAudioContent() as audio:
+            return MultimodalContent.of(
+                MediaData.of(
+                    urlsafe_b64decode(audio.data),
+                    media=audio.mimeType,
                 )
             )
 
@@ -582,7 +591,7 @@ def _convert_tool(
     return FunctionTool(
         name=name,
         description=mcp_tool.description,
-        specification=validated_specification(mcp_tool.inputSchema),
+        parameters=validated_specification(mcp_tool.inputSchema),
         function=remote_call,
         availability_check=None,
         format_result=_format_tool_result,

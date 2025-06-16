@@ -338,7 +338,9 @@ class MCPServer:
                         description=tool["description"],
                         inputSchema=as_dict(tool["parameters"]) or {},
                     )
-                    for tool in toolbox.available_tools()
+                    for tool in (
+                        tool.specification for tool in toolbox.tools.values() if tool.available
+                    )
                 ]
 
         @self._server.call_tool()

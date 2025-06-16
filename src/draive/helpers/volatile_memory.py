@@ -1,12 +1,32 @@
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Final
 
 from draive.utils.memory import Memory
 
 __all__ = (
+    "MEMORY_NONE",
     "AccumulativeVolatileMemory",
     "ConstantMemory",
     "VolatileMemory",
+)
+
+
+async def _recall_none(
+    **extra: Any,
+) -> Any:
+    return ()
+
+
+async def _remember_none(
+    *items: Any,
+    **extra: Any,
+) -> None:
+    pass  # noop
+
+
+MEMORY_NONE: Final[Memory[Any, Any]] = Memory[Any, Any](
+    recall=_recall_none,
+    remember=_remember_none,
 )
 
 
@@ -18,15 +38,9 @@ def ConstantMemory[Recalled](
     ) -> Recalled:
         return recalled
 
-    async def remember(
-        *items: Any,
-        **extra: Any,
-    ) -> None:
-        pass  # noop
-
     return Memory[Recalled, Any](
         recall=recall,
-        remember=remember,
+        remember=_remember_none,
     )
 
 

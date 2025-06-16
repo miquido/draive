@@ -1,4 +1,4 @@
-from draive.utils.memory import Memory
+from draive.utils.memory import Memory, MemoryRecalling, MemoryRemembering
 from draive.utils.processing import (
     Processing,
     ProcessingEvent,
@@ -13,6 +13,8 @@ __all__ = (
     "ConstantStream",
     "FixedStream",
     "Memory",
+    "MemoryRecalling",
+    "MemoryRemembering",
     "Processing",
     "ProcessingEvent",
     "ProcessingState",
