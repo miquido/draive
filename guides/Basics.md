@@ -73,7 +73,7 @@ print(f"JSON Schema:\n{BasicModel.json_schema(indent=2)}")
 
     Decoded model:
     username: John Doe
-    tags: 
+    tags:
       - example
       - json
     JSON Schema:
@@ -211,18 +211,18 @@ from draive import load_env
 load_env()
 ```
 
-Those two helpers should be called when initializing your application to ensure proper environment and logging. Now let's go back to the metrics. When dealing with metrics we have to define a metrics handler, otherwise all metrics will be ignored. Draive comes with a predefined metrics handler called `MetricsLogger` converting all metrics into logs with a call tree summary at the scope exit:
+Those two helpers should be called when initializing your application to ensure proper environment and logging. Now let's go back to the metrics. When dealing with metrics, we have to define an observability handler; otherwise, all metrics will be simply logged. Draive comes with a predefined logger observability called `LoggerObservability` converting all metrics into logs with a call tree summary at the scope exit:
 
 
 ```python
-from draive import MetricsLogger
+from haiway import LoggerObservability
 
 async with ctx.scope(
     # we can explicitly pass the logger as an argument
     # or use the assigned label as the default logger name
     "logging",
-    # define the scope completion method to log the scope details
-    metrics=MetricsLogger.handler(),
+    # define the scope observability to log the scope details
+    observability=LoggerObservability(),
 ):
     ctx.log_info("Now we can see the logs!")
     # we can see recorded custom metrics for the context scope as well
@@ -271,7 +271,7 @@ async with ctx.scope(
     |  |  ├ identifier: "recorded"
     |  |  ├ value: 42
     |  ⌊
-    |  
+    |
     |  ⎡ @nested [aa01c8e4dad44122bfa79447d964f016](0.00s):
     |  |  ⎡ •BasicState:
     |  |  |  ├ identifier: "recorded-nested"

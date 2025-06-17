@@ -1,6 +1,6 @@
 # Basic data extraction
 
-One of the most useful abilities of LLMs is to extract the information from an unstructured source and put it into a desired structure. The typical flow would be to load some kind of a document and instruct the model to provide a json with a list of required fields. Draive comes with a dedicated solution for generating structured output which we can use to extract required information from any source. We will use OpenAI for this task, make sure to provide .env file with `OPENAI_API_KEY` key before running. 
+One of the most useful abilities of LLMs is to extract information from an unstructured source and put it into a desired structure. The typical flow would be to load some kind of document and instruct the model to provide a JSON with a list of required fields. Draive comes with a dedicated solution for generating structured output which we can use to extract required information from any source. We will use OpenAI for this task, make sure to provide .env file with `OPENAI_API_KEY` key before running.
 
 
 ```python
@@ -52,16 +52,16 @@ Since we are going to generate a structured output we will use the `generate_mod
 
 
 ```python
-from draive import ctx, generate_model
+from draive import ctx, ModelGeneration
 from draive.openai import OpenAIChatConfig, OpenAI
 
 async with ctx.scope(
     "data_extraction",
     # define used LMM to be OpenAI within the context
-    OpenAI().lmm_invoking(),
     OpenAIChatConfig(model="gpt-4o-mini")
+    disposables=(OpenAI(),),
 ):
-    result: PersonalData = await generate_model(
+    result: PersonalData = await ModelGeneration.generate(
         # define model to generate
         PersonalData,
         # provide additional instructions
@@ -85,15 +85,15 @@ We can customize data extraction by specifying more details about the model itse
 
 
 ```python
-from draive import ctx, generate_model
+from draive import ctx, ModelGeneration
 
 async with ctx.scope(
     "customized_extraction",
     # define used LMM to be OpenAI within the context
-    OpenAI().lmm_invoking(),
     OpenAIChatConfig(model="gpt-4o-mini")
+    disposables=(OpenAI(),),
 ):
-    result: PersonalData = await generate_model(
+    result: PersonalData = await ModelGeneration.generate(
         PersonalData,
         instruction=(
             # provide extended instructions and take full control over the prompt
@@ -160,4 +160,3 @@ async with ctx.scope(
     last_name: Doe
     age: 21
     country: Canada
-

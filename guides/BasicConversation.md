@@ -25,17 +25,17 @@ async def utc_datetime() -> str:
 
 
 ```python
-from draive import ConversationMessage, conversation_completion, ctx
+from draive import ConversationMessage, Conversation, ctx
 from draive.openai import OpenAIChatConfig, OpenAI
 
 # initialize dependencies and configuration
 async with ctx.scope(
     "basics",
-    OpenAI().lmm_invoking(),  # define used LMM to use OpenAI
     OpenAIChatConfig(model="gpt-3.5-turbo-0125"),  # configure OpenAI model
+    disposables=(OpenAI(),),  # specify OpenAI as the LMM resource
 ):
     # request conversation completion
-    response: ConversationMessage = await conversation_completion(
+    response: ConversationMessage = await Conversation.completion(
         # provide a prompt instruction
         instruction="You are a helpful assistant.",
         # add user input
@@ -50,9 +50,8 @@ async with ctx.scope(
     role: model
     author: None
     created: 2025-03-07 12:40:30.130777+00:00
-    content: 
-      parts: 
+    content:
+      parts:
         - text: The current UTC time and date is Friday, 7th March 2025, 12:40:29.
           meta: None
     meta: None
-
