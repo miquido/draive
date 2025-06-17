@@ -2,7 +2,13 @@ from collections.abc import AsyncIterator, Callable
 from itertools import chain
 from typing import Any, Literal, overload
 
-from google.api_core.exceptions import ResourceExhausted
+try:
+    from google.api_core.exceptions import ResourceExhausted
+except ImportError:
+    # Define a fallback for when google-api-core is not available
+    # (optional dependencies do not get installed automatically)
+    ResourceExhausted = Exception
+
 from google.genai.types import (
     Candidate,
     Content,
