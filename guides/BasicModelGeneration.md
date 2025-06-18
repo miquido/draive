@@ -22,17 +22,17 @@ class InterestingPlace(DataModel):
 
 
 ```python
-from draive import ctx, generate_model
+from draive import ctx, ModelGeneration
 from draive.openai import OpenAIChatConfig, OpenAI
 
 # initialize dependencies and configuration
 async with ctx.scope(
     "basics",
-    OpenAI().lmm_invoking(),  # define used LMM use OpenAI
     OpenAIChatConfig(model="gpt-4o-mini"),  # configure OpenAI model
+    disposables=(OpenAI(),),  # specify OpenAI as the LMM resource
 ):
     # request model generation
-    generated: InterestingPlace = await generate_model(
+    generated: InterestingPlace = await ModelGeneration.generate(
         # define model to generate
         InterestingPlace,
         # provide a prompt instruction
@@ -45,4 +45,3 @@ async with ctx.scope(
 
     name: The British Museum
     description: A world-famous museum dedicated to human history, art, and culture, home to millions of works from ancient civilizations.
-

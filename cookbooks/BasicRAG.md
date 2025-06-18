@@ -1,6 +1,6 @@
 # Basic RAG
 
-RAG is a technique of adding additional information to the LLM context to achieve better results. This applies to adding a knowledge source to be used by LLM to generate correct response as well as to introducing details about the task or personalization for more tailored result. The typical flow would be to prepare a vector index and search through the data to extend the model input with suitable context. We will use OpenAI services for this task, make sure to provide .env file with `OPENAI_API_KEY` key before running. 
+RAG is a technique of adding additional information to the LLM context, to achieve better results. This applies to adding a knowledge source to be used by LLM to generate correct response as well as to introducing details about the task or personalization for more tailored result. The typical flow would be to prepare a vector index and search through the data to extend the model input with suitable context. We will use OpenAI services for this task, make sure to provide .env file with `OPENAI_API_KEY` key before running.
 
 
 ```python
@@ -93,11 +93,11 @@ from draive.openai import OpenAIEmbeddingConfig, OpenAI
 vector_index: VectorIndex = VectorIndex.volatile()
 async with ctx.scope(
     "indexing",
-    # define embedding provider for this context
-    OpenAI().text_embedding(),
-    OpenAIEmbeddingConfig(model="text-embedding-3-small"),
     # use vector index
     vector_index,
+    # define embedding provider for this context
+    OpenAIEmbeddingConfig(model="text-embedding-3-small"),
+    disposables=(OpenAI(),),
 ):
     # add document chunks to the index
     await vector_index.index(
@@ -114,7 +114,7 @@ Now we have everything set up to do our search. Instead of searching directly, w
 
 
 ```python
-from draive import Toolbox, generate_text, tool
+from draive import Toolbox, TextGeneration, tool
 from draive.openai import OpenAIChatConfig, OpenAI
 
 
@@ -131,16 +131,15 @@ async def index_search_tool(query: str) -> str:
 
 async with ctx.scope(
     "searching",
-    # define used dependencies and services
-    OpenAI().lmm_invoking(),
-    OpenAIChatConfig(model="gpt-4o-mini"),
-    OpenAI().lmm_invoking(),
-    OpenAIEmbeddingConfig(model="text-embedding-3-small"),
     # use our vector index
     vector_index,
+    # define used dependencies and services
+    OpenAIChatConfig(model="gpt-4o-mini"),
+    OpenAIEmbeddingConfig(model="text-embedding-3-small"),
+    disposables=(OpenAI(),),
 ):
     # use the tool to augment LLM generation by suitable document parts
-    result: str = await generate_text(
+    result: str = await TextGeneration.generate(
         instruction="Answer the questions based on provided data",
         input="Where is John Doe living?",
         # suggest the tool to ensure its usage
@@ -149,4 +148,3 @@ async with ctx.scope(
     print(result)
 ```
     According to available sources, John Doe lives in Vancouver.
-

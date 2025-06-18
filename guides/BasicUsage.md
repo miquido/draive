@@ -1,15 +1,15 @@
 # Basic LLM usage
 
-Draive framework provides various ways to use LLM depending on the use case. The simplest interface is to generate text by using `generate_text` function. We can use it to make a simple text completion function.
+Draive framework provides various ways to use LLM depending on the use case. The simplest interface is to generate text by using `TextGeneration.generate` method. We can use it to make a simple text completion function.
 
 
 ```python
-from draive import generate_text
+from draive import TextGeneration
 
 
 async def text_completion(text: str) -> str:
-    # generate_text is a simple interface for generating text
-    return await generate_text(
+    # TextGeneration.generate is a simple interface for generating text
+    return await TextGeneration.generate(
         # We have to provide instructions / system prompt to instruct the model
         instruction="Prepare the simplest completion of a given text",
         # input is provided separately
@@ -35,7 +35,7 @@ from draive.openai import OpenAIChatConfig, OpenAI
 
 async with ctx.scope(  # prepare new context
     "basics",
-    OpenAI().lmm_invoking(),  # set currently used LMM to OpenAI
+    disposables=(OpenAI(),),  # set currently used LMM to OpenAI
     OpenAIChatConfig(model="gpt-4o-mini"), # select used model
 ):
     result: str = await text_completion(
@@ -45,8 +45,8 @@ async with ctx.scope(  # prepare new context
     print(result)
 ```
 
-    Violets are blue,  
-    Sugar is sweet,  
+    Violets are blue,
+    Sugar is sweet,
     And so are you.
 
 
@@ -58,7 +58,7 @@ from draive.openai import OpenAIChatConfig
 
 async with ctx.scope(  # prepare the new context
     "basics",
-    OpenAI().lmm_invoking(),
+    disposables=(OpenAI(),),
     # define GPT model configuration as a context scope state
     OpenAIChatConfig(
         model="gpt-3.5-turbo",
@@ -88,9 +88,9 @@ async with ctx.scope(  # prepare the new context
         print("RESULT GPT 4o | temperature 0.4:", result)
 
     # we can also update the configuration for a single call
-    # when using generate_text function directly
+    # when using TextGeneration.generate method directly
     # here we are using gpt-3.5-turbo with temperature of 0.7
-    result = await generate_text(
+    result = await TextGeneration.generate(
         instruction="Prepare simplest completion of given text",
         input="Roses are red...",
         temperature=0.7,
@@ -112,18 +112,19 @@ Since we know the basics, now we can examine the details of our execution to see
 
 
 ```python
-from draive import MetricsLogger, setup_logging
+from draive import setup_logging
+from haiway import LoggerObservability
 
 setup_logging("basics")  # setup logger
 
 async with ctx.scope(  # prepare the context and see the execution metrics report
     "basics",
-    OpenAI().lmm_invoking(),
+    disposables=(OpenAI(),),
     OpenAIChatConfig(  # define GPT model configuration
         model="gpt-3.5-turbo",
         temperature=0.4,
     ),
-    metrics=MetricsLogger.handler()
+    observability=LoggerObservability(),
 ):
     await text_completion(
         text="Roses are red...",
@@ -144,16 +145,16 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
 
     07/Mar/2025:13:40:52 +0000 [DEBUG] [basics] [8d198c3d552b48f1b7473f1e14ba50ed] [basics] [057c9032a45a48f38dcbb7861e4b172e] Metrics summary:
     ⎡ @basics [057c9032a45a48f38dcbb7861e4b172e](1.38s):
-    |  
+    |
     |  ⎡ @generate_text [872ecd2b612e4fcbb19f4d6aa674e22d](0.63s):
-    |  |  
+    |  |
     |  |  ⎡ @openai_lmm_invocation [db5e56df44d2478ca1fcac959c29bdd3](0.63s):
     |  |  |  ⎡ •ArgumentsTrace:
-    |  |  |  |  ├ kwargs: 
+    |  |  |  |  ├ kwargs:
     |  |  |  |  |  [instruction]: "Prepare the simplest completion of a given text"
-    |  |  |  |  |  [context]: 
-    |  |  |  |  |  |  [0] content: 
-    |  |  |  |  |  |  |    parts: 
+    |  |  |  |  |  [context]:
+    |  |  |  |  |  |  [0] content:
+    |  |  |  |  |  |  |    parts:
     |  |  |  |  |  |  |      - text: Roses are red...
     |  |  |  |  |  |  |        meta: None
     |  |  |  |  |  |  |  meta: None
@@ -165,31 +166,31 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
     |  |  |  |  ├ temperature: 0.4
     |  |  |  ⌊
     |  |  |  ⎡ •TokenUsage:
-    |  |  |  |  ├ usage: 
-    |  |  |  |  |  [gpt-3.5-turbo-0125]: 
+    |  |  |  |  ├ usage:
+    |  |  |  |  |  [gpt-3.5-turbo-0125]:
     |  |  |  |  |  ├ input_tokens: 24
     |  |  |  |  |  ├ cached_tokens: 0
     |  |  |  |  |  ├ output_tokens: 7
     |  |  |  ⌊
     |  |  |  ⎡ •ResultTrace:
-    |  |  |  |  ├ result: content: 
-    |  |  |  |  |    parts: 
+    |  |  |  |  ├ result: content:
+    |  |  |  |  |    parts:
     |  |  |  |  |      - text: Violets are blue.
     |  |  |  |  |        meta: None
     |  |  |  |  |  meta: None
     |  |  |  ⌊
     |  |  ⌊
     |  ⌊
-    |  
+    |
     |  ⎡ @generate_text [38c8e1bd88a4444681f1bd2e61bce296](0.76s):
-    |  |  
+    |  |
     |  |  ⎡ @openai_lmm_invocation [f63a2825efa6406f8019635aa9892b2e](0.76s):
     |  |  |  ⎡ •ArgumentsTrace:
-    |  |  |  |  ├ kwargs: 
+    |  |  |  |  ├ kwargs:
     |  |  |  |  |  [instruction]: "Prepare the simplest completion of a given text"
-    |  |  |  |  |  [context]: 
-    |  |  |  |  |  |  [0] content: 
-    |  |  |  |  |  |  |    parts: 
+    |  |  |  |  |  [context]:
+    |  |  |  |  |  |  [0] content:
+    |  |  |  |  |  |  |    parts:
     |  |  |  |  |  |  |      - text: Roses are red...
     |  |  |  |  |  |  |        meta: None
     |  |  |  |  |  |  |  meta: None
@@ -201,8 +202,8 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
     |  |  |  |  ├ temperature: 0.4
     |  |  |  ⌊
     |  |  |  ⎡ •TokenUsage:
-    |  |  |  |  ├ usage: 
-    |  |  |  |  |  [gpt-4o-2024-08-06]: 
+    |  |  |  |  ├ usage:
+    |  |  |  |  |  [gpt-4o-2024-08-06]:
     |  |  |  |  |  ├ input_tokens: 24
     |  |  |  |  |  ├ cached_tokens: 0
     |  |  |  |  |  ├ output_tokens: 7
@@ -211,8 +212,8 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
     |  |  |  |  ├ system_fingerprint: "fp_eb9dce56a8"
     |  |  |  ⌊
     |  |  |  ⎡ •ResultTrace:
-    |  |  |  |  ├ result: content: 
-    |  |  |  |  |    parts: 
+    |  |  |  |  ├ result: content:
+    |  |  |  |  |    parts:
     |  |  |  |  |      - text: Violets are blue.
     |  |  |  |  |        meta: None
     |  |  |  |  |  meta: None

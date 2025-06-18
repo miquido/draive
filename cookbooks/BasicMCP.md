@@ -15,7 +15,7 @@ checkmeout/
 from draive import (
     ConversationMessage,
     Toolbox,
-    conversation_completion,
+    Conversation,
     ctx,
     load_env,
     setup_logging,
@@ -30,11 +30,11 @@ setup_logging("mcp")
 # initialize dependencies and configuration
 async with ctx.scope(
     "mcp",
-    OpenAI().lmm_invoking(),  # define used LMM to use OpenAI
     OpenAIChatConfig(model="gpt-4o-mini"),  # configure OpenAI model
     # prepare MCPClient, it will handle connection lifetime through context
     # and provide associated state with MCP functionalities
-    disposables=[
+    disposables=(
+        OpenAI(),  # specify OpenAI as the LMM resource
         # we are going to use stdio connection with one of the example servers
         MCPClient.stdio(
             command="npx",
@@ -44,22 +44,22 @@ async with ctx.scope(
                 "/Users/myname/checkmeout",
             ],
         ),
-    ]
+    )
 ):
     # request model using any appropriate method, i.e. conversation for chat
-    response: ConversationMessage = await conversation_completion(
+    response: ConversationMessage = await Conversation.completion(
         # provide a prompt instruction
         instruction="You can access files on behalf of the user on their machine using available tools."
         " Desktop directory path is `/Users/myname/checkmeout`",
         # add user input
         input="What files are in checkmeout directory?",
         # define tools available to the model from MCP extensions
-        tools=await Toolbox.external(),
+        tools=await Toolbox.fetched(),
     )
     print(response.content)
 ```
     The `checkmeout` directory contains the following files:
-    
+
     - file1
     - file10
     - file2

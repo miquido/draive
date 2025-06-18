@@ -19,7 +19,7 @@ async def current_time(location: str) -> str:
 
 ## Tool use
 
-After defining a tool we can use it in multiple scenarios to extend LLM capabilities. All of the tool arguments will be validated when calling. It includes type check and any additional validation if defined. You can still use it as a regular function, although, all tools have to be executed within draive context scope. 
+After defining a tool, we can use it in multiple scenarios to extend LLM capabilities. All tool arguments are validated when calling. It includes type check and any additional validation if defined. You can still use it as a regular function, although, all tools have to be executed within draive context scope.
 
 
 ```python
@@ -36,11 +36,13 @@ async with ctx.scope("basics"):
     Time in London is 9:53:22
 
 
-The biggest benefit of defining a tool is when using LLM. We can tell the model to use available tools to extend its capabilities. Higher level interfaces automatically handle tool calls and going back with its result to LLM to receive the final result. We can see how it works within a simple text generator. Tools are provided within an iterable collection like list or tuple or within the `Toolbox` object which allows customizing tools execution. You can prepare tools collection each time it is used or reuse preconstructed one. We will use OpenAI GPT model as it natively supports tool use. Make sure to provide .env file with `OPENAI_API_KEY` key before running. 
+The biggest benefit of defining a tool becomes apparent when using an LLM. We can instruct the model to use available tools to extend its capabilities. Higher-level interfaces automatically handle tool calls and return results to the LLM to generate the final output.
+We can observe how this works within a simple text generator. Tools are provided through an iterable collection such as a list or tuple, or within a Toolbox object that allows for customized tool execution. You can prepare a tools collection each time it is used, or you can reuse a preconstructed one.
+We will use the OpenAI GPT model since it natively supports tool use. Make sure to provide an .env file with an OPENAI_API_KEY key before running the code.
 
 
 ```python
-from draive import generate_text, load_env
+from draive import TextGeneration, load_env
 from draive.openai import OpenAIChatConfig, OpenAI
 
 load_env()
@@ -48,10 +50,10 @@ load_env()
 async with ctx.scope(
     "basics",
     # define used LMM to be OpenAI within the context
-    OpenAI().lmm_invoking(),
     OpenAIChatConfig(model="gpt-4o-mini"),
+    disposables=(OpenAI(),),
 ):
-    result: str = await generate_text(
+    result: str = await TextGeneration.generate(
         instruction="You are a helpful assistant",
         input="What is the time in New York?",
         tools=[current_time], # or `Toolbox(current_time)`
@@ -131,10 +133,10 @@ from draive import Toolbox
 async with ctx.scope(
     "basics",
     # define used LMM to be OpenAI within the context
-    OpenAI().lmm_invoking(),
     OpenAIChatConfig(model="gpt-4o-mini"),
+    disposables=(OpenAI(),),
 ):
-    result: str = await generate_text(
+    result: str = await TextGeneration.generate(
         instruction="You are a funny assistant",
         input="What is the funny thing about LLMs?",
         tools=Toolbox.of(
@@ -161,18 +163,19 @@ All of the tool usage is automatically traced within scope metrics. We can see t
 
 
 ```python
-from draive import MetricsLogger, setup_logging
+from haiway import LoggerObservability
+from draive import setup_logging
 
 setup_logging("basics")
 
 async with ctx.scope(
     "basics",
     # define used LMM to be OpenAI within the context
-    OpenAI().lmm_invoking(),
     OpenAIChatConfig(model="gpt-4o-mini"),
-    metrics=MetricsLogger.handler(),
+    disposables=(OpenAI(),),
+    observability=LoggerObservability(),
 ):
-    result: str = await generate_text(
+    result: str = await TextGeneration.generate(
         instruction="You are a funny assistant",
         input="What is the funny thing about LLMs?",
         # we will now be able to see what tools were used
@@ -190,67 +193,67 @@ async with ctx.scope(
     07/Mar/2025:13:40:43 +0000 [DEBUG] [basics] [8ffed39264134e679e87ae5a34311ad8] [basics] [24eee7a7577b4f25b7c59a43c20a3423] Entering context...
 
 
-    
+
     Result:
     One funny thing about LLMs (Large Language Models) is that they can generate text that sounds like it was written by a human, but sometimes they mix up facts in the most amusing ways! For example, they might describe a cat as "a small, furry creature that loves to swim" – which is definitely not the case for most cats! They have a knack for making up their own versions of reality, which can lead to some hilarious misunderstandings!
-    
+
     07/Mar/2025:13:40:47 +0000 [DEBUG] [basics] [8ffed39264134e679e87ae5a34311ad8] [basics] [24eee7a7577b4f25b7c59a43c20a3423] Metrics summary:
     ⎡ @basics [24eee7a7577b4f25b7c59a43c20a3423](3.82s):
-    |  
+    |
     |  ⎡ @generate_text [484bad5216bf4a2db28dad924f5d0de9](3.82s):
-    |  |  
+    |  |
     |  |  ⎡ @openai_lmm_invocation [aea1a47734504cc38267ea31a42aa31e](1.04s):
     |  |  |  ⎡ •ArgumentsTrace:
-    |  |  |  |  ├ kwargs: 
+    |  |  |  |  ├ kwargs:
     |  |  |  |  |  [instruction]: "You are a funny assistant"
-    |  |  |  |  |  [context]: 
-    |  |  |  |  |  |  [0] content: 
-    |  |  |  |  |  |  |    parts: 
+    |  |  |  |  |  [context]:
+    |  |  |  |  |  |  [0] content:
+    |  |  |  |  |  |  |    parts:
     |  |  |  |  |  |  |      - text: What is the funny thing about LLMs?
     |  |  |  |  |  |  |        meta: None
     |  |  |  |  |  |  |  meta: None
     |  |  |  |  |  |  [1] completion: None
-    |  |  |  |  |  |  |  requests: 
+    |  |  |  |  |  |  |  requests:
     |  |  |  |  |  |  |    - identifier: call_QpvQQ89llJxvuuW7rmMY9CqA
     |  |  |  |  |  |  |      tool: fun_fact
-    |  |  |  |  |  |  |      arguments: 
+    |  |  |  |  |  |  |      arguments:
     |  |  |  |  |  |  |        topic: LLMs
-    |  |  |  |  |  |  [2] responses: 
+    |  |  |  |  |  |  [2] responses:
     |  |  |  |  |  |  |    - identifier: call_QpvQQ89llJxvuuW7rmMY9CqA
     |  |  |  |  |  |  |      tool: fun_fact
-    |  |  |  |  |  |  |      content: 
-    |  |  |  |  |  |  |        parts: 
+    |  |  |  |  |  |  |      content:
+    |  |  |  |  |  |  |        parts:
     |  |  |  |  |  |  |          - text: LLMs is very funny on its own!
     |  |  |  |  |  |  |            meta: None
     |  |  |  |  |  |  |      direct: False
     |  |  |  |  |  |  |      error: False
-    |  |  |  |  |  [tool_selection]: 
+    |  |  |  |  |  [tool_selection]:
     |  |  |  |  |  |  [name]: "fun_fact"
     |  |  |  |  |  |  [description]: "Find a fun fact in a given topic"
-    |  |  |  |  |  |  [parameters]: 
+    |  |  |  |  |  |  [parameters]:
     |  |  |  |  |  |  |  [type]: "object"
-    |  |  |  |  |  |  |  [properties]: 
-    |  |  |  |  |  |  |  |  [topic]: 
+    |  |  |  |  |  |  |  [properties]:
+    |  |  |  |  |  |  |  |  [topic]:
     |  |  |  |  |  |  |  |  |  [type]: "string"
     |  |  |  |  |  |  |  |  |  [description]: "Topic of a fact to find"
-    |  |  |  |  |  [tools]: 
-    |  |  |  |  |  |  [0] 
+    |  |  |  |  |  [tools]:
+    |  |  |  |  |  |  [0]
     |  |  |  |  |  |  |  [name]: "current_time"
     |  |  |  |  |  |  |  [description]: None
-    |  |  |  |  |  |  |  [parameters]: 
+    |  |  |  |  |  |  |  [parameters]:
     |  |  |  |  |  |  |  |  [type]: "object"
-    |  |  |  |  |  |  |  |  [properties]: 
-    |  |  |  |  |  |  |  |  |  [location]: 
+    |  |  |  |  |  |  |  |  [properties]:
+    |  |  |  |  |  |  |  |  |  [location]:
     |  |  |  |  |  |  |  |  |  |  [type]: "string"
-    |  |  |  |  |  |  |  |  [required]: 
+    |  |  |  |  |  |  |  |  [required]:
     |  |  |  |  |  |  |  |  |  [0] "location"
-    |  |  |  |  |  |  [1] 
+    |  |  |  |  |  |  [1]
     |  |  |  |  |  |  |  [name]: "fun_fact"
     |  |  |  |  |  |  |  [description]: "Find a fun fact in a given topic"
-    |  |  |  |  |  |  |  [parameters]: 
+    |  |  |  |  |  |  |  [parameters]:
     |  |  |  |  |  |  |  |  [type]: "object"
-    |  |  |  |  |  |  |  |  [properties]: 
-    |  |  |  |  |  |  |  |  |  [topic]: 
+    |  |  |  |  |  |  |  |  [properties]:
+    |  |  |  |  |  |  |  |  |  [topic]:
     |  |  |  |  |  |  |  |  |  |  [type]: "string"
     |  |  |  |  |  |  |  |  |  |  [description]: "Topic of a fact to find"
     |  |  |  |  |  [output]: "text"
@@ -260,8 +263,8 @@ async with ctx.scope(
     |  |  |  |  ├ temperature: 1.0
     |  |  |  ⌊
     |  |  |  ⎡ •TokenUsage:
-    |  |  |  |  ├ usage: 
-    |  |  |  |  |  [gpt-4o-mini-2024-07-18]: 
+    |  |  |  |  ├ usage:
+    |  |  |  |  |  [gpt-4o-mini-2024-07-18]:
     |  |  |  |  |  ├ input_tokens: 93
     |  |  |  |  |  ├ cached_tokens: 0
     |  |  |  |  |  ├ output_tokens: 7
@@ -271,68 +274,68 @@ async with ctx.scope(
     |  |  |  ⌊
     |  |  |  ⎡ •ResultTrace:
     |  |  |  |  ├ result: completion: None
-    |  |  |  |  |  requests: 
+    |  |  |  |  |  requests:
     |  |  |  |  |    - identifier: call_QpvQQ89llJxvuuW7rmMY9CqA
     |  |  |  |  |      tool: fun_fact
-    |  |  |  |  |      arguments: 
+    |  |  |  |  |      arguments:
     |  |  |  |  |        topic: LLMs
     |  |  |  ⌊
     |  |  ⌊
-    |  |  
+    |  |
     |  |  ⎡ @fun_fact [1344c3efabdb4f9a8387c164662f1770](0.00s):
     |  |  |  ⎡ •ArgumentsTrace:
-    |  |  |  |  ├ kwargs: 
+    |  |  |  |  ├ kwargs:
     |  |  |  |  |  [topic]: "LLMs"
     |  |  |  ⌊
     |  |  |  ⎡ •ResultTrace:
     |  |  |  |  ├ result: "LLMs is very funny on its own!"
     |  |  |  ⌊
     |  |  ⌊
-    |  |  
+    |  |
     |  |  ⎡ @openai_lmm_invocation [1f0d7b3c69aa40bca7eb48fbd36ca4d6](2.78s):
     |  |  |  ⎡ •ArgumentsTrace:
-    |  |  |  |  ├ kwargs: 
+    |  |  |  |  ├ kwargs:
     |  |  |  |  |  [instruction]: "You are a funny assistant"
-    |  |  |  |  |  [context]: 
-    |  |  |  |  |  |  [0] content: 
-    |  |  |  |  |  |  |    parts: 
+    |  |  |  |  |  [context]:
+    |  |  |  |  |  |  [0] content:
+    |  |  |  |  |  |  |    parts:
     |  |  |  |  |  |  |      - text: What is the funny thing about LLMs?
     |  |  |  |  |  |  |        meta: None
     |  |  |  |  |  |  |  meta: None
     |  |  |  |  |  |  [1] completion: None
-    |  |  |  |  |  |  |  requests: 
+    |  |  |  |  |  |  |  requests:
     |  |  |  |  |  |  |    - identifier: call_QpvQQ89llJxvuuW7rmMY9CqA
     |  |  |  |  |  |  |      tool: fun_fact
-    |  |  |  |  |  |  |      arguments: 
+    |  |  |  |  |  |  |      arguments:
     |  |  |  |  |  |  |        topic: LLMs
-    |  |  |  |  |  |  [2] responses: 
+    |  |  |  |  |  |  [2] responses:
     |  |  |  |  |  |  |    - identifier: call_QpvQQ89llJxvuuW7rmMY9CqA
     |  |  |  |  |  |  |      tool: fun_fact
-    |  |  |  |  |  |  |      content: 
-    |  |  |  |  |  |  |        parts: 
+    |  |  |  |  |  |  |      content:
+    |  |  |  |  |  |  |        parts:
     |  |  |  |  |  |  |          - text: LLMs is very funny on its own!
     |  |  |  |  |  |  |            meta: None
     |  |  |  |  |  |  |      direct: False
     |  |  |  |  |  |  |      error: False
     |  |  |  |  |  [tool_selection]: "auto"
-    |  |  |  |  |  [tools]: 
-    |  |  |  |  |  |  [0] 
+    |  |  |  |  |  [tools]:
+    |  |  |  |  |  |  [0]
     |  |  |  |  |  |  |  [name]: "current_time"
     |  |  |  |  |  |  |  [description]: None
-    |  |  |  |  |  |  |  [parameters]: 
+    |  |  |  |  |  |  |  [parameters]:
     |  |  |  |  |  |  |  |  [type]: "object"
-    |  |  |  |  |  |  |  |  [properties]: 
-    |  |  |  |  |  |  |  |  |  [location]: 
+    |  |  |  |  |  |  |  |  [properties]:
+    |  |  |  |  |  |  |  |  |  [location]:
     |  |  |  |  |  |  |  |  |  |  [type]: "string"
-    |  |  |  |  |  |  |  |  [required]: 
+    |  |  |  |  |  |  |  |  [required]:
     |  |  |  |  |  |  |  |  |  [0] "location"
-    |  |  |  |  |  |  [1] 
+    |  |  |  |  |  |  [1]
     |  |  |  |  |  |  |  [name]: "fun_fact"
     |  |  |  |  |  |  |  [description]: "Find a fun fact in a given topic"
-    |  |  |  |  |  |  |  [parameters]: 
+    |  |  |  |  |  |  |  [parameters]:
     |  |  |  |  |  |  |  |  [type]: "object"
-    |  |  |  |  |  |  |  |  [properties]: 
-    |  |  |  |  |  |  |  |  |  [topic]: 
+    |  |  |  |  |  |  |  |  [properties]:
+    |  |  |  |  |  |  |  |  |  [topic]:
     |  |  |  |  |  |  |  |  |  |  [type]: "string"
     |  |  |  |  |  |  |  |  |  |  [description]: "Topic of a fact to find"
     |  |  |  |  |  [output]: "text"
@@ -342,8 +345,8 @@ async with ctx.scope(
     |  |  |  |  ├ temperature: 1.0
     |  |  |  ⌊
     |  |  |  ⎡ •TokenUsage:
-    |  |  |  |  ├ usage: 
-    |  |  |  |  |  [gpt-4o-mini-2024-07-18]: 
+    |  |  |  |  ├ usage:
+    |  |  |  |  |  [gpt-4o-mini-2024-07-18]:
     |  |  |  |  |  ├ input_tokens: 116
     |  |  |  |  |  ├ cached_tokens: 0
     |  |  |  |  |  ├ output_tokens: 95
@@ -352,8 +355,8 @@ async with ctx.scope(
     |  |  |  |  ├ system_fingerprint: "fp_06737a9306"
     |  |  |  ⌊
     |  |  |  ⎡ •ResultTrace:
-    |  |  |  |  ├ result: content: 
-    |  |  |  |  |    parts: 
+    |  |  |  |  ├ result: content:
+    |  |  |  |  |    parts:
     |  |  |  |  |      - text: One funny thing about LLMs (Large Language Models) is that they can generate text that sounds like it was written by a human, but sometimes they mix up facts in the most amusing ways! For example, they might describe a cat as "a small, furry creature that loves to swim" – which is definitely not the case for most cats! They have a knack for making up their own versions of reality, which can lead to some hilarious misunderstandings!
     |  |  |  |  |        meta: None
     |  |  |  |  |  meta: None
@@ -364,4 +367,3 @@ async with ctx.scope(
 
 
     07/Mar/2025:13:40:47 +0000 [DEBUG] [basics] [8ffed39264134e679e87ae5a34311ad8] [basics] [24eee7a7577b4f25b7c59a43c20a3423] ...exiting context after 3.82s
-

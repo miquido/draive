@@ -42,8 +42,8 @@ load_env()
 
 async with ctx.scope(
     "evaluation_example",
-    OpenAI().lmm_invoking(),
     OpenAIChatConfig(model="gpt-4o-mini"),
+    disposables=(OpenAI(),),
 ):
     content = "AI and machine learning are transforming technology"
 
