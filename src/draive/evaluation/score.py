@@ -101,3 +101,6 @@ class EvaluationScore(DataModel):
 
             case _:
                 return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash((self.value, self.comment))

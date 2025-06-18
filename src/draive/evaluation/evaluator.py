@@ -133,6 +133,9 @@ class EvaluatorResult(DataModel):
 
         return self.score == other.score
 
+    def __hash__(self) -> int:  # explicitly using super to silence warnings
+        return hash((self.evaluator, self.score, self.threshold))
+
 
 class EvaluationResult(DataModel):
     @classmethod
