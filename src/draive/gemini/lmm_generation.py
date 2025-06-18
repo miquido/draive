@@ -3,7 +3,7 @@ from itertools import chain
 from typing import Any, Literal, overload
 
 try:
-    from google.api_core.exceptions import ResourceExhausted
+    from google.api_core.exceptions import ResourceExhausted  # type: ignore[import-untyped]
 except ImportError:
     # Define a fallback for when google-api-core is not available
     # (optional dependencies do not get installed automatically)
@@ -16,6 +16,7 @@ from google.genai.types import (
     FinishReason,
     FunctionCallingConfigMode,
     FunctionDeclarationDict,
+    GenerateContentConfigDict,
     GenerateContentResponse,
     MediaResolution,
     Modality,
@@ -221,32 +222,22 @@ class GeminiLMMGeneration(GeminiAPI):
         try:
             completion: GenerateContentResponse = await self._client.aio.models.generate_content(
                 model=model,
-                config={
-                    "temperature": temperature,
-                    "top_p": top_p,
-                    "top_k": top_k,
-                    "max_output_tokens": max_tokens,
-                    "candidate_count": 1,
-                    "seed": seed,
-                    "stop_sequences": stop_sequences,
-                    # gemini safety is really bad and often triggers false positive
-                    "safety_settings": DISABLED_SAFETY_SETTINGS,
-                    "system_instruction": instruction if instruction is not None else {},
-                    "tools": [{"function_declarations": functions}] if functions else None,
-                    "tool_config": {"function_calling_config": {"mode": function_calling_mode}}
-                    if function_calling_mode
-                    else None,
-                    # prevent google from automatically resolving function calls
-                    "automatic_function_calling": {
-                        "disable": True,
-                        "maximum_remote_calls": None,
-                    },
-                    "media_resolution": media_resolution,
-                    "response_modalities": response_modalities,
-                    "response_mime_type": response_mime_type,
-                    "response_schema": response_schema,
-                    "speech_config": speech_voice_name,
-                },
+                config=_build_request(
+                    temperature=temperature,
+                    top_p=top_p,
+                    top_k=top_k,
+                    max_tokens=max_tokens,
+                    seed=seed,
+                    stop_sequences=stop_sequences,
+                    instruction=instruction,
+                    functions=functions,
+                    function_calling_mode=function_calling_mode,
+                    media_resolution=media_resolution,
+                    response_modalities=response_modalities,
+                    response_mime_type=response_mime_type,
+                    response_schema=response_schema,
+                    speech_voice_name=speech_voice_name,
+                ),
                 contents=content,
             )
         except ResourceExhausted as exc:  # retry on rate limit after delay
@@ -389,31 +380,27 @@ class GeminiLMMGeneration(GeminiAPI):
         try:
             completion_stream = await self._client.aio.models.generate_content_stream(
                 model=model,
-                config={
-                    "temperature": temperature,
-                    "top_p": top_p,
-                    "top_k": top_k,
-                    "max_output_tokens": max_tokens,
-                    "candidate_count": 1,
-                    "seed": seed,
-                    "stop_sequences": stop_sequences,
-                    # gemini safety is really bad and often triggers false positive
-                    "safety_settings": DISABLED_SAFETY_SETTINGS,
-                    "system_instruction": instruction if instruction is not None else {},
-                    "tools": [{"function_declarations": functions}] if functions else None,
-                    "tool_config": {"function_calling_config": {"mode": function_calling_mode}}
-                    if function_calling_mode
-                    else None,
-                    # prevent google from automatically resolving function calls
-                    "automatic_function_calling": {"disable": True, "maximum_remote_calls": None},
-                    "media_resolution": media_resolution,
-                    "response_modalities": response_modalities,
-                    "response_mime_type": response_mime_type,
-                    "response_schema": response_schema,
-                    "speech_config": speech_voice_name,
-                },
+                config=_build_request(
+                    temperature=temperature,
+                    top_p=top_p,
+                    top_k=top_k,
+                    max_tokens=max_tokens,
+                    seed=seed,
+                    stop_sequences=stop_sequences,
+                    instruction=instruction,
+                    functions=functions,
+                    function_calling_mode=function_calling_mode,
+                    media_resolution=media_resolution,
+                    response_modalities=response_modalities,
+                    response_mime_type=response_mime_type,
+                    response_schema=response_schema,
+                    speech_voice_name=speech_voice_name,
+                ),
                 contents=content,
             )
+        except ResourceExhausted as exc:
+            ctx.record(ObservabilityLevel.WARNING, event="lmm.rate_limit")
+            raise RateLimitError(retry_after=0) from exc
         except Exception as exc:
             raise GeminiException(f"Failed to initialize Gemini streaming: {exc}") from exc
 
@@ -474,7 +461,7 @@ class GeminiLMMGeneration(GeminiAPI):
                                         if isinstance(tool_request.arguments, dict) and isinstance(
                                             existing_tool_call.arguments, dict
                                         ):
-                                            # Merge dictionaries for partial function call arguments
+                                            # Merge dictionaries for partial function call args
                                             merged_arguments = {
                                                 **existing_tool_call.arguments,
                                                 **tool_request.arguments,
@@ -545,6 +532,51 @@ class GeminiLMMGeneration(GeminiAPI):
                             )
 
         return ctx.stream(stream)
+
+
+def _build_request(  # noqa PLR0913
+    *,
+    temperature: float | None,
+    top_p: float | None,
+    top_k: int | None,
+    max_tokens: int | None,
+    seed: int | None,
+    stop_sequences: list[str] | None,
+    instruction: str | None,
+    functions: list[FunctionDeclarationDict] | None,
+    function_calling_mode: FunctionCallingConfigMode | None,
+    media_resolution: MediaResolution | None,
+    response_modalities: list[str] | None,
+    response_mime_type: str | None,
+    response_schema: SchemaDict | None,
+    speech_voice_name: SpeechConfigDict | None,
+) -> GenerateContentConfigDict:
+    return {
+        "temperature": temperature,
+        "top_p": top_p,
+        "top_k": top_k,
+        "max_output_tokens": max_tokens,
+        "candidate_count": 1,
+        "seed": seed,
+        "stop_sequences": stop_sequences,
+        # gemini safety is really bad and often triggers false positive
+        "safety_settings": DISABLED_SAFETY_SETTINGS,
+        "system_instruction": instruction if instruction is not None else {},
+        "tools": [{"function_declarations": functions}] if functions else None,
+        "tool_config": {"function_calling_config": {"mode": function_calling_mode}}
+        if function_calling_mode
+        else None,
+        # prevent google from automatically resolving function calls
+        "automatic_function_calling": {
+            "disable": True,
+            "maximum_remote_calls": None,
+        },
+        "media_resolution": media_resolution,
+        "response_modalities": response_modalities,
+        "response_mime_type": response_mime_type,
+        "response_schema": response_schema,
+        "speech_config": speech_voice_name,
+    }
 
 
 def _speech_config(voice_name: str) -> SpeechConfigDict:
