@@ -58,8 +58,12 @@ class MCPServer:
 
         @asynccontextmanager
         async def lifspan(server: Server) -> AsyncGenerator[Iterable[State]]:
-            async with disposable as state:
+            state: Iterable[State] = await disposable.prepare()
+            try:
                 yield state
+
+            finally:
+                await disposable.dispose()
 
         self._server = Server[Iterable[State]](
             name=name,

@@ -613,6 +613,24 @@ class DataModel(metaclass=DataModelMeta):
                 for key in self.__PARAMETERS__.keys()
             )
 
+    def __hash__(self) -> int:
+        hash_values: list[int] = []
+        for key in self.__PARAMETERS__.keys():
+            value: Any = getattr(self, key, MISSING)
+
+            # Skip MISSING values to ensure consistent hashing
+            if value is MISSING:
+                continue
+
+            # Convert to hashable representation
+            try:
+                hash_values.append(hash(value))
+
+            except TypeError:
+                continue  # skip unhashable
+
+        return hash((self.__class__, tuple(hash_values)))
+
     def __contains__(
         self,
         element: Any,

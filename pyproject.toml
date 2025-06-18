@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.70.0"
+version = "0.71.0"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
@@ -21,7 +21,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 license = { file = "LICENSE" }
-dependencies = ["numpy~=2.2", "haiway~=0.21.4"]
+dependencies = ["numpy~=2.2", "haiway~=0.22"]
 
 [project.urls]
 Homepage = "https://miquido.com"
@@ -29,17 +29,17 @@ Repository = "https://github.com/miquido/draive.git"
 
 [project.optional-dependencies]
 sentencepiece = ["sentencepiece~=0.2"]
-cohere = ["cohere~=5.13"]
+cohere = ["cohere~=5.15"]
 cohere_bedrock = ["cohere~=5.13", "boto3~=1.37"]
-openai = ["openai~=1.64", "tiktoken~=0.8"]
-anthropic = ["anthropic~=0.47", "tokenizers~=0.21"]
-anthropic_bedrock = ["anthropic[bedrock]~=0.47", "tokenizers~=0.21"]
-mistral = ["draive[sentencepiece]", "mistralai~=1.5"]
-gemini = ["draive[sentencepiece]", "google-genai~=1.10"]
-ollama = ["ollama~=0.4"]
-bedrock = ["boto3~=1.37"]
-vllm = ["openai~=1.64"]
-mcp = ["mcp~=1.5"]
+openai = ["openai~=1.88", "tiktoken~=0.9"]
+anthropic = ["anthropic~=0.54", "tokenizers~=0.21"]
+anthropic_bedrock = ["anthropic[bedrock]~=0.54", "tokenizers~=0.21"]
+mistral = ["draive[sentencepiece]", "mistralai~=1.8"]
+gemini = ["draive[sentencepiece]", "google-genai~=1.20"]
+ollama = ["ollama~=0.5"]
+bedrock = ["boto3~=1.38"]
+vllm = ["openai~=1.88"]
+mcp = ["mcp~=1.9"]
 opentelemetry = [
   "haiway[opentelemetry]",
   "opentelemetry-api",
@@ -52,7 +52,7 @@ dev = [
   "pytest~=8.3",
   "pytest-asyncio~=0.26",
   "pytest-cov~=6.1",
-  "ruff~=0.11",
+  "ruff~=0.12",
 ]
 
 [tool.ruff]
@@ -60,7 +60,7 @@ target-version = "py312"
 line-length = 100
 extend-exclude = [".venv", ".git", ".cache"]
 lint.select = ["E", "F", "A", "I", "B", "PL", "W", "C", "RUF", "UP", "NPY201"]
-lint.ignore = ["A005"]
+lint.ignore = ["A005", "PLC0415"]
 lint.pydocstyle.convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]

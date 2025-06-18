@@ -1144,9 +1144,8 @@ class Stage:
                     *,
                     state: StageState,
                 ) -> StageState:
-                    async with ctx_disposables as features:
-                        with ctx.updated(*features):
-                            return await execution(state=state)
+                    async with ctx_disposables:
+                        return await execution(state=state)
 
             case (ctx_state, None):
 
@@ -1163,11 +1162,10 @@ class Stage:
                     *,
                     state: StageState,
                 ) -> StageState:
-                    async with ctx_disposables as features:
+                    async with ctx_disposables:
                         with ctx.updated(
                             ctx_state,
                             *states,
-                            *features,
                             # preserve current Processing state by replacing it
                             ctx.state(Processing),
                         ):
