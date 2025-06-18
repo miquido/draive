@@ -229,9 +229,7 @@ class GeminiLMMGeneration(GeminiAPI):
 
         lmm_completion = self._create_lmm_completion(result_content_elements, output_decoder)
 
-        return self._handle_completion_result(
-            lmm_completion, tool_requests, functions, is_streaming=False
-        )
+        return self._handle_completion_result(lmm_completion, tool_requests, functions)
 
     async def _completion_stream(
         self,
@@ -401,7 +399,6 @@ class GeminiLMMGeneration(GeminiAPI):
         lmm_completion: LMMCompletion | None,
         tool_requests: list[LMMToolRequest],
         functions: list[FunctionDeclarationDict] | None,
-        is_streaming: bool = False,
     ) -> LMMOutput:
         """Handle the final completion result."""
         if tool_requests:

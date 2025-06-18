@@ -38,7 +38,7 @@ mistral = ["draive[sentencepiece]", "mistralai~=1.8"]
 gemini = [
   "draive[sentencepiece]",
   "google-genai~=1.20",
-  "google-api-core~=2.25",
+  "google-api-core~=2.25,<3.0",
 ]
 ollama = ["ollama~=0.5"]
 bedrock = ["boto3~=1.38"]
