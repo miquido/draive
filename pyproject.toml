@@ -35,7 +35,11 @@ openai = ["openai~=1.88", "tiktoken~=0.9"]
 anthropic = ["anthropic~=0.54", "tokenizers~=0.21"]
 anthropic_bedrock = ["anthropic[bedrock]~=0.54", "tokenizers~=0.21"]
 mistral = ["draive[sentencepiece]", "mistralai~=1.8"]
-gemini = ["draive[sentencepiece]", "google-genai~=1.20"]
+gemini = [
+  "draive[sentencepiece]",
+  "google-genai~=1.20",
+  "google-api-core~=2.25,<3.0",
+]
 ollama = ["ollama~=0.5"]
 bedrock = ["boto3~=1.38"]
 vllm = ["openai~=1.88"]

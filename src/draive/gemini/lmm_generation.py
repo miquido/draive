@@ -1,6 +1,15 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from itertools import chain
-from typing import Any, Literal, cast, overload
+from typing import Any, Literal, overload
+
+try:
+    from google.api_core.exceptions import ResourceExhausted  # type: ignore[import-untyped]
+except ImportError:
+    # Define a fallback for when google-api-core is not available
+    # (optional dependencies do not get installed automatically)
+    class ResourceExhausted(Exception):  # pragma: no cover
+        """Stub raised when google-api-core is absent."""
+
 
 from google.genai.types import (
     Candidate,
@@ -9,7 +18,9 @@ from google.genai.types import (
     FinishReason,
     FunctionCallingConfigMode,
     FunctionDeclarationDict,
+    GenerateContentConfigDict,
     GenerateContentResponse,
+    MediaResolution,
     Modality,
     SchemaDict,
     SpeechConfigDict,
@@ -22,7 +33,7 @@ from draive.gemini.lmm import (
     DISABLED_SAFETY_SETTINGS,
     context_element_as_content,
     output_as_response_declaration,
-    resoluton_as_media_resulution,
+    resolution_as_media_resolution,
     result_part_as_content_or_call,
     tools_as_tools_config,
 )
@@ -35,12 +46,14 @@ from draive.lmm import (
     LMMInstruction,
     LMMOutput,
     LMMOutputSelection,
+    LMMStreamChunk,
     LMMStreamOutput,
     LMMToolRequest,
     LMMToolRequests,
     LMMTools,
 )
 from draive.multimodal.content import MultimodalContent, MultimodalContentElement
+from draive.utils import RateLimitError
 
 __all__ = ("GeminiLMMGeneration",)
 
@@ -75,7 +88,7 @@ class GeminiLMMGeneration(GeminiAPI):
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput]: ...
 
-    async def lmm_completion(  # noqa: C901, PLR0912, PLR0915
+    async def lmm_completion(
         self,
         *,
         instruction: LMMInstruction | None,
@@ -86,11 +99,26 @@ class GeminiLMMGeneration(GeminiAPI):
         config: GeminiGenerationConfig | None = None,
         **extra: Any,
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
-        if stream:
-            raise NotImplementedError("gemini streaming is not implemented yet")
+        """
+        Generate completion using Gemini model.
 
-        generation_config: GeminiGenerationConfig = config or ctx.state(GeminiGenerationConfig)
+        Args:
+            instruction: System instruction for the model
+            context: Context elements for the conversation
+            tools: Available tools for the model to use
+            output: Output specification
+            stream: Whether to stream the response
+            config: Generation configuration
+            **extra: Additional configuration parameters
+
+        Returns:
+            LMM output or async iterator of stream outputs
+        """
         tools = tools or LMMTools.none
+        generation_config: GeminiGenerationConfig = config or ctx.state(
+            GeminiGenerationConfig
+        ).updated(**extra)
+
         with ctx.scope("gemini_lmm_completion", generation_config):
             ctx.record(
                 ObservabilityLevel.INFO,
@@ -114,8 +142,8 @@ class GeminiLMMGeneration(GeminiAPI):
             )
 
             response_schema: SchemaDict | None
-            response_mime_type: str | None
             response_modalities: list[Modality] | None
+            response_mime_type: str | None
             response_schema, response_modalities, response_mime_type, output_decoder = (
                 output_as_response_declaration(output)
             )
@@ -127,142 +155,358 @@ class GeminiLMMGeneration(GeminiAPI):
                 tool_selection=tools.selection,
             )
 
-            completion: GenerateContentResponse = await self._client.aio.models.generate_content(
-                model=generation_config.model,
-                config={
-                    "temperature": unwrap_missing(generation_config.temperature),
-                    "top_p": unwrap_missing(generation_config.top_p),
-                    "top_k": unwrap_missing(generation_config.top_k),
-                    "max_output_tokens": unwrap_missing(generation_config.max_tokens),
-                    "candidate_count": 1,
-                    "seed": unwrap_missing(generation_config.seed),
-                    "stop_sequences": unwrap_missing(
-                        generation_config.stop_sequences,
-                        transform=as_list,
-                    ),
-                    # gemini safety is really bad and often triggers false positive
-                    "safety_settings": DISABLED_SAFETY_SETTINGS,
-                    "system_instruction": instruction if instruction is not None else {},
-                    "tools": [{"function_declarations": functions}] if functions else None,
-                    "tool_config": {"function_calling_config": {"mode": function_calling_mode}}
-                    if function_calling_mode
-                    else None,
-                    # prevent google from automatically resolving function calls
-                    "automatic_function_calling": {"disable": True, "maximum_remote_calls": None},
-                    "media_resolution": resoluton_as_media_resulution(
-                        generation_config.media_resolution
-                    ),
-                    "response_modalities": cast(list[str] | None, response_modalities),
-                    "response_mime_type": response_mime_type,
-                    "response_schema": response_schema,
-                    "speech_config": unwrap_missing(
-                        generation_config.speech_voice_name,
-                        transform=_speech_config,
-                    ),
-                },
-                contents=content,
+            request_config = _build_request(
+                temperature=unwrap_missing(generation_config.temperature),
+                top_p=unwrap_missing(generation_config.top_p),
+                top_k=unwrap_missing(generation_config.top_k),
+                max_tokens=unwrap_missing(generation_config.max_tokens),
+                seed=unwrap_missing(generation_config.seed),
+                stop_sequences=unwrap_missing(
+                    generation_config.stop_sequences,
+                    transform=as_list,
+                ),
+                instruction=instruction,
+                functions=functions,
+                function_calling_mode=function_calling_mode,
+                media_resolution=resolution_as_media_resolution(generation_config.media_resolution),
+                response_modalities=[m.name for m in response_modalities]
+                if response_modalities
+                else None,
+                response_mime_type=response_mime_type,
+                response_schema=response_schema,
+                speech_voice_name=unwrap_missing(
+                    generation_config.speech_voice_name,
+                    transform=_speech_config,
+                ),
             )
 
-            if usage := completion.usage_metadata:
-                ctx.record(
-                    ObservabilityLevel.INFO,
-                    metric="lmm.input_tokens",
-                    value=usage.prompt_token_count or 0,
-                    unit="tokens",
-                    attributes={"lmm.model": generation_config.model},
+            if stream:
+                return await self._completion_stream(
+                    model=generation_config.model,
+                    content=content,
+                    config=request_config,
+                    functions=functions,
+                    output_decoder=output_decoder,
                 )
-                ctx.record(
-                    ObservabilityLevel.INFO,
-                    metric="lmm.input_tokens.cached",
-                    value=usage.cached_content_token_count or 0,
-                    unit="tokens",
-                    attributes={"lmm.model": generation_config.model},
-                )
-                ctx.record(
-                    ObservabilityLevel.INFO,
-                    metric="lmm.output_tokens",
-                    value=usage.candidates_token_count or 0,
-                    unit="tokens",
-                    attributes={"lmm.model": generation_config.model},
-                )
-                ctx.record(
-                    ObservabilityLevel.INFO,
-                    metric="lmm.output_tokens.thoughts",
-                    value=usage.thoughts_token_count or 0,
-                    unit="tokens",
-                    attributes={"lmm.model": generation_config.model},
-                )
+            return await self._completion(
+                model=generation_config.model,
+                content=content,
+                config=request_config,
+                functions=functions,
+                output_decoder=output_decoder,
+            )
 
-            if not completion.candidates:
-                raise GeminiException(
-                    "Invalid Gemini completion - missing candidates!",
-                    completion,
-                )
+    async def _completion(
+        self,
+        model: str,
+        content: ContentListUnionDict,
+        config: GenerateContentConfigDict,
+        functions: list[FunctionDeclarationDict] | None,
+        output_decoder: Callable[[MultimodalContent], MultimodalContent],
+    ) -> LMMOutput:
+        """Generate non-streaming completion."""
+        try:
+            completion: GenerateContentResponse = await self._client.aio.models.generate_content(
+                model=model,
+                config=config,
+                contents=content,
+            )
+        except ResourceExhausted as exc:
+            ctx.record(ObservabilityLevel.WARNING, event="lmm.rate_limit")
+            raise RateLimitError(retry_after=0) from exc
+        except Exception as exc:
+            raise GeminiException(f"Failed to generate Gemini completion: {exc}") from exc
 
-            completion_choice: Candidate = completion.candidates[0]
+        self._record_usage_metrics(completion.usage_metadata, model)
 
-            match completion_choice.finish_reason:
-                case FinishReason.STOP:
-                    pass  # process results
+        if not completion.candidates:
+            raise GeminiException("Invalid Gemini completion - missing candidates!", completion)
 
-                case reason:  # other cases are errors
+        completion_choice: Candidate = completion.candidates[0]
+        self._validate_finish_reason(completion_choice.finish_reason, completion)
+
+        completion_content = self._extract_completion_content(completion_choice)
+        result_content_elements, tool_requests = self._process_completion_parts(completion_content)
+
+        lmm_completion = self._create_lmm_completion(result_content_elements, output_decoder)
+
+        return self._handle_completion_result(lmm_completion, tool_requests, functions)
+
+    async def _completion_stream(
+        self,
+        model: str,
+        content: ContentListUnionDict,
+        config: GenerateContentConfigDict,
+        functions: list[FunctionDeclarationDict] | None,
+        output_decoder: Callable[[MultimodalContent], MultimodalContent],
+    ) -> AsyncIterator[LMMStreamOutput]:
+        """Generate streaming completion."""
+        try:
+            completion_stream = await self._client.aio.models.generate_content_stream(
+                model=model,
+                config=config,
+                contents=content,
+            )
+        except ResourceExhausted as exc:
+            ctx.record(ObservabilityLevel.WARNING, event="lmm.rate_limit")
+            raise RateLimitError(retry_after=0) from exc
+        except Exception as exc:
+            raise GeminiException(f"Failed to initialize Gemini streaming: {exc}") from exc
+
+        async def stream():
+            async for chunk in self._stream_processor(
+                completion_stream, model, functions, output_decoder
+            ):
+                yield chunk
+
+        return ctx.stream(stream)
+
+    async def _stream_processor(  # noqa PLR0912
+        self,
+        completion_stream,
+        model: str,
+        functions: list[FunctionDeclarationDict] | None,
+        output_decoder: Callable[[MultimodalContent], MultimodalContent],
+    ):
+        """Process streaming completion chunks."""
+        accumulated_tool_calls: list[LMMToolRequest] = []
+
+        async for completion_chunk in completion_stream:
+            # Record usage if available (expected in the last chunk)
+            self._record_usage_metrics(completion_chunk.usage_metadata, model)
+
+            if not completion_chunk.candidates:
+                continue  # Skip chunks without candidates
+
+            completion_choice: Candidate = completion_chunk.candidates[0]
+
+            # Handle the content of the chunk
+            if completion_choice.content and completion_choice.content.parts:
+                for part in completion_choice.content.parts:
+                    for element in result_part_as_content_or_call(part):
+                        if isinstance(element, LMMToolRequest):
+                            accumulated_tool_calls = self._accumulate_tool_call(
+                                accumulated_tool_calls, element
+                            )
+                        else:
+                            yield LMMStreamChunk.of(output_decoder(MultimodalContent.of(element)))
+
+            # Handle finish reason
+            if finish_reason := completion_choice.finish_reason:
+                if finish_reason == FinishReason.STOP:
+                    if accumulated_tool_calls:
+                        if not functions:
+                            raise GeminiException(
+                                "Received tool call requests but no tools were provided "
+                                "in the configuration. This indicates a mismatch between "
+                                "the model's response and the provided tools."
+                            )
+                        for tool_request in accumulated_tool_calls:
+                            ctx.record(
+                                ObservabilityLevel.INFO,
+                                event="lmm.tool_request",
+                                attributes={"lmm.tool": tool_request.tool},
+                            )
+                            yield tool_request
+                    else:
+                        yield LMMStreamChunk.of(MultimodalContent.empty, eod=True)
+                    break
+                elif finish_reason == FinishReason.MAX_TOKENS:
                     raise GeminiException(
-                        f"Gemini completion generation failed! Reason: {reason}",
-                        completion,
+                        "Invalid Gemini completion - exceeded maximum length!",
+                        completion_chunk,
+                    )
+                else:
+                    raise GeminiException(
+                        f"Gemini completion generation failed! Reason: {finish_reason}",
+                        completion_chunk,
                     )
 
-            completion_content: Content
-            if candidate_content := completion_choice.content:
-                completion_content = candidate_content
+    def _record_usage_metrics(self, usage_metadata, model: str) -> None:
+        """Record token usage metrics."""
+        if usage := usage_metadata:
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="lmm.input_tokens",
+                value=usage.prompt_token_count or 0,
+                unit="tokens",
+                attributes={"lmm.model": model},
+            )
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="lmm.input_tokens.cached",
+                value=usage.cached_content_token_count or 0,
+                unit="tokens",
+                attributes={"lmm.model": model},
+            )
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="lmm.output_tokens",
+                value=usage.candidates_token_count or 0,
+                unit="tokens",
+                attributes={"lmm.model": model},
+            )
 
+    def _validate_finish_reason(self, finish_reason, completion) -> None:
+        """Validate completion finish reason."""
+        match finish_reason:
+            case FinishReason.STOP:
+                pass  # Valid completion
+            case FinishReason.MAX_TOKENS:
+                raise GeminiException(
+                    "Invalid Gemini completion - exceeded maximum length!", completion
+                )
+            case reason:
+                raise GeminiException(
+                    f"Gemini completion generation failed! Reason: {reason}", completion
+                )
+
+    def _extract_completion_content(self, completion_choice: Candidate) -> Content:
+        """Extract content from completion choice."""
+        if candidate_content := completion_choice.content:
+            return candidate_content
+        else:
+            raise GeminiException("Missing Gemini completion content!")
+
+    def _process_completion_parts(
+        self, completion_content: Content
+    ) -> tuple[list[MultimodalContentElement], list[LMMToolRequest]]:
+        """Process completion parts into content elements and tool requests."""
+        result_content_elements: list[MultimodalContentElement] = []
+        tool_requests: list[LMMToolRequest] = []
+
+        for element in chain.from_iterable(
+            result_part_as_content_or_call(part) for part in completion_content.parts or []
+        ):
+            if isinstance(element, LMMToolRequest):
+                tool_requests.append(element)
             else:
-                raise GeminiException("Missing Gemini completion content!")
+                result_content_elements.append(element)
 
-            result_content_elements: list[MultimodalContentElement] = []
-            tool_requests: list[LMMToolRequest] = []
-            for element in chain.from_iterable(
-                result_part_as_content_or_call(part) for part in completion_content.parts or []
+        return result_content_elements, tool_requests
+
+    def _create_lmm_completion(
+        self,
+        result_content_elements: list[MultimodalContentElement],
+        output_decoder: Callable[[MultimodalContent], MultimodalContent],
+    ) -> LMMCompletion | None:
+        """Create LMM completion from content elements."""
+        if result_content_elements:
+            return LMMCompletion.of(output_decoder(MultimodalContent.of(*result_content_elements)))
+        return None
+
+    def _handle_completion_result(
+        self,
+        lmm_completion: LMMCompletion | None,
+        tool_requests: list[LMMToolRequest],
+        functions: list[FunctionDeclarationDict] | None,
+    ) -> LMMOutput:
+        """Handle the final completion result."""
+        if tool_requests:
+            if not functions:
+                raise GeminiException(
+                    "Received tool call requests but no tools were provided "
+                    "in the configuration. This indicates a mismatch between "
+                    "the model's response and the provided tools."
+                )
+            completion_tool_calls = LMMToolRequests(
+                content=lmm_completion.content if lmm_completion else None,
+                requests=tool_requests,
+            )
+            ctx.record(
+                ObservabilityLevel.INFO,
+                event="lmm.tool_requests",
+                attributes={"lmm.tools": [call.tool for call in tool_requests]},
+            )
+            return completion_tool_calls
+        elif lmm_completion:
+            ctx.record(ObservabilityLevel.INFO, event="lmm.completion")
+            return lmm_completion
+        else:
+            raise GeminiException("Invalid Gemini completion, missing content!")
+
+    def _accumulate_tool_call(
+        self, accumulated_tool_calls: list[LMMToolRequest], tool_request: LMMToolRequest
+    ) -> list[LMMToolRequest]:
+        """Accumulate tool calls, merging partial calls with the same identifier."""
+        existing_tool_call = next(
+            (call for call in accumulated_tool_calls if call.identifier == tool_request.identifier),
+            None,
+        )
+
+        if existing_tool_call:
+            # Merge arguments for existing tool call
+            merged_arguments: Any
+            if isinstance(tool_request.arguments, dict) and isinstance(
+                existing_tool_call.arguments, dict
             ):
-                match element:
-                    case LMMToolRequest() as tool_request:
-                        tool_requests.append(tool_request)
-
-                    case content_element:
-                        result_content_elements.append(content_element)
-
-            lmm_completion: LMMCompletion | None
-            if result_content_elements:
-                lmm_completion = LMMCompletion.of(
-                    output_decoder(MultimodalContent.of(*result_content_elements))
-                )
-
+                merged_arguments = {
+                    **existing_tool_call.arguments,
+                    **tool_request.arguments,
+                }
             else:
-                lmm_completion = None
+                merged_arguments = tool_request.arguments
 
-            if tool_requests:
-                assert tools, "Requesting tool call without tools"  # nosec: B101
-                completion_tool_calls = LMMToolRequests(
-                    content=lmm_completion.content if lmm_completion else None,
-                    requests=tool_requests,
-                )
+            # Replace the existing tool call with updated version
+            for i, call in enumerate(accumulated_tool_calls):
+                if call.identifier == tool_request.identifier:
+                    accumulated_tool_calls[i] = LMMToolRequest(
+                        identifier=existing_tool_call.identifier,
+                        tool=existing_tool_call.tool,
+                        arguments=merged_arguments,
+                        meta=existing_tool_call.meta,
+                    )
+                    break
+        else:
+            accumulated_tool_calls.append(tool_request)
 
-                ctx.record(
-                    ObservabilityLevel.INFO,
-                    event="lmm.tool_requests",
-                    attributes={"lmm.tools": [request.tool for request in tool_requests]},
-                )
+        return accumulated_tool_calls
 
-                return completion_tool_calls
 
-            elif lmm_completion:
-                ctx.record(
-                    ObservabilityLevel.INFO,
-                    event="lmm.completion",
-                )
-                return lmm_completion
-
-            else:
-                raise GeminiException("Invalid Gemini completion, missing content!", completion)
+def _build_request(  # noqa PLR0913
+    *,
+    temperature: float | None,
+    top_p: float | None,
+    top_k: int | None,
+    max_tokens: int | None,
+    seed: int | None,
+    stop_sequences: list[str] | None,
+    instruction: str | None,
+    functions: list[FunctionDeclarationDict] | None,
+    function_calling_mode: FunctionCallingConfigMode | None,
+    media_resolution: MediaResolution | None,
+    response_modalities: list[str] | None,
+    response_mime_type: str | None,
+    response_schema: SchemaDict | None,
+    speech_voice_name: SpeechConfigDict | None,
+) -> GenerateContentConfigDict:
+    """Build request configuration for Gemini API."""
+    return {
+        "temperature": temperature,
+        "top_p": top_p,
+        "top_k": top_k,
+        "max_output_tokens": max_tokens,
+        "candidate_count": 1,
+        "seed": seed,
+        "stop_sequences": stop_sequences,
+        # gemini safety is really bad and often triggers false positive
+        "safety_settings": DISABLED_SAFETY_SETTINGS,
+        "system_instruction": instruction if instruction is not None else {},
+        "tools": [{"function_declarations": functions}] if functions else None,
+        "tool_config": {"function_calling_config": {"mode": function_calling_mode}}
+        if function_calling_mode
+        else None,
+        # prevent google from automatically resolving function calls
+        "automatic_function_calling": {
+            "disable": True,
+            "maximum_remote_calls": None,
+        },
+        "media_resolution": media_resolution,
+        "response_modalities": response_modalities,
+        "response_mime_type": response_mime_type,
+        "response_schema": response_schema,
+        "speech_config": speech_voice_name,
+    }
 
 
 def _speech_config(voice_name: str) -> SpeechConfigDict:

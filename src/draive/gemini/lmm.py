@@ -44,7 +44,7 @@ __all__ = (
     "content_element_as_part",
     "context_element_as_content",
     "output_as_response_declaration",
-    "resoluton_as_media_resulution",
+    "resolution_as_media_resolution",
     "result_part_as_content_or_call",
     "tools_as_tools_config",
 )
@@ -349,7 +349,7 @@ def result_part_as_content_or_call(
     return result
 
 
-def resoluton_as_media_resulution(
+def resolution_as_media_resolution(
     resolution: Literal["low", "medium", "high"] | Missing,
     /,
 ) -> MediaResolution | None:
@@ -357,7 +357,7 @@ def resoluton_as_media_resulution(
         case "low":
             return MediaResolution.MEDIA_RESOLUTION_LOW
 
-        case "modeium":
+        case "medium":
             return MediaResolution.MEDIA_RESOLUTION_MEDIUM
 
         case "high":
