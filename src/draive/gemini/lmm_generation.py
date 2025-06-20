@@ -7,7 +7,9 @@ try:
 except ImportError:
     # Define a fallback for when google-api-core is not available
     # (optional dependencies do not get installed automatically)
-    ResourceExhausted = Exception
+    class ResourceExhausted(Exception):  # pragma: no cover
+        """Stub raised when google-api-core is absent."""
+
 
 from google.genai.types import (
     Candidate,
@@ -186,14 +188,13 @@ class GeminiLMMGeneration(GeminiAPI):
                     functions=functions,
                     output_decoder=output_decoder,
                 )
-            else:
-                return await self._completion(
-                    model=generation_config.model,
-                    content=content,
-                    config=request_config,
-                    functions=functions,
-                    output_decoder=output_decoder,
-                )
+            return await self._completion(
+                model=generation_config.model,
+                content=content,
+                config=request_config,
+                functions=functions,
+                output_decoder=output_decoder,
+            )
 
     async def _completion(
         self,
