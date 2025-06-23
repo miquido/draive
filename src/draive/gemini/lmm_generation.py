@@ -1,16 +1,9 @@
+import random
 from collections.abc import AsyncIterator, Callable
 from itertools import chain
 from typing import Any, Literal, overload
 
-try:
-    from google.api_core.exceptions import ResourceExhausted  # type: ignore[import-untyped]
-except ImportError:
-    # Define a fallback for when google-api-core is not available
-    # (optional dependencies do not get installed automatically)
-    class ResourceExhausted(Exception):  # pragma: no cover
-        """Stub raised when google-api-core is absent."""
-
-
+from google.api_core.exceptions import ResourceExhausted  # pyright: ignore[reportMissingImport]
 from google.genai.types import (
     Candidate,
     Content,
@@ -20,6 +13,7 @@ from google.genai.types import (
     FunctionDeclarationDict,
     GenerateContentConfigDict,
     GenerateContentResponse,
+    GenerateContentResponseUsageMetadata,
     MediaResolution,
     Modality,
     SchemaDict,
@@ -204,33 +198,54 @@ class GeminiLMMGeneration(GeminiAPI):
         functions: list[FunctionDeclarationDict] | None,
         output_decoder: Callable[[MultimodalContent], MultimodalContent],
     ) -> LMMOutput:
-        """Generate non-streaming completion."""
         try:
             completion: GenerateContentResponse = await self._client.aio.models.generate_content(
                 model=model,
                 config=config,
                 contents=content,
             )
+
         except ResourceExhausted as exc:
-            ctx.record(ObservabilityLevel.WARNING, event="lmm.rate_limit")
-            raise RateLimitError(retry_after=0) from exc
+            ctx.record(
+                ObservabilityLevel.WARNING,
+                event="lmm.rate_limit",
+            )
+            raise RateLimitError(
+                retry_after=random.uniform(0.3, 3.0),  # nosec: B311
+            ) from exc
+
         except Exception as exc:
             raise GeminiException(f"Failed to generate Gemini completion: {exc}") from exc
 
-        self._record_usage_metrics(completion.usage_metadata, model)
+        self._record_usage_metrics(
+            completion.usage_metadata,
+            model=model,
+        )
 
         if not completion.candidates:
             raise GeminiException("Invalid Gemini completion - missing candidates!", completion)
 
         completion_choice: Candidate = completion.candidates[0]
-        self._validate_finish_reason(completion_choice.finish_reason, completion)
+        self._validate_finish_reason(
+            completion_choice.finish_reason,
+            completion=completion,
+        )
 
-        completion_content = self._extract_completion_content(completion_choice)
+        completion_content: Content = self._extract_completion_content(completion_choice)
+        result_content_elements: list[MultimodalContentElement]
+        tool_requests: list[LMMToolRequest]
         result_content_elements, tool_requests = self._process_completion_parts(completion_content)
 
-        lmm_completion = self._create_lmm_completion(result_content_elements, output_decoder)
+        lmm_completion: LMMCompletion | None = self._create_lmm_completion(
+            result_content_elements,
+            output_decoder=output_decoder,
+        )
 
-        return self._handle_completion_result(lmm_completion, tool_requests, functions)
+        return self._handle_completion_result(
+            lmm_completion,
+            tool_requests=tool_requests,
+            functions=functions,
+        )
 
     async def _completion_stream(
         self,
@@ -247,9 +262,16 @@ class GeminiLMMGeneration(GeminiAPI):
                 config=config,
                 contents=content,
             )
+
         except ResourceExhausted as exc:
-            ctx.record(ObservabilityLevel.WARNING, event="lmm.rate_limit")
-            raise RateLimitError(retry_after=0) from exc
+            ctx.record(
+                ObservabilityLevel.WARNING,
+                event="lmm.rate_limit",
+            )
+            raise RateLimitError(
+                retry_after=random.uniform(0.3, 3.0),  # nosec: B311
+            ) from exc
+
         except Exception as exc:
             raise GeminiException(f"Failed to initialize Gemini streaming: {exc}") from exc
 
@@ -268,12 +290,14 @@ class GeminiLMMGeneration(GeminiAPI):
         functions: list[FunctionDeclarationDict] | None,
         output_decoder: Callable[[MultimodalContent], MultimodalContent],
     ):
-        """Process streaming completion chunks."""
         accumulated_tool_calls: list[LMMToolRequest] = []
 
         async for completion_chunk in completion_stream:
             # Record usage if available (expected in the last chunk)
-            self._record_usage_metrics(completion_chunk.usage_metadata, model)
+            self._record_usage_metrics(
+                completion_chunk.usage_metadata,
+                model=model,
+            )
 
             if not completion_chunk.candidates:
                 continue  # Skip chunks without candidates
@@ -288,8 +312,13 @@ class GeminiLMMGeneration(GeminiAPI):
                             accumulated_tool_calls = self._accumulate_tool_call(
                                 accumulated_tool_calls, element
                             )
+
                         else:
-                            yield LMMStreamChunk.of(output_decoder(MultimodalContent.of(element)))
+                            yield LMMStreamChunk.of(
+                                output_decoder(
+                                    MultimodalContent.of(element),
+                                ),
+                            )
 
             # Handle finish reason
             if finish_reason := completion_choice.finish_reason:
@@ -301,6 +330,7 @@ class GeminiLMMGeneration(GeminiAPI):
                                 "in the configuration. This indicates a mismatch between "
                                 "the model's response and the provided tools."
                             )
+
                         for tool_request in accumulated_tool_calls:
                             ctx.record(
                                 ObservabilityLevel.INFO,
@@ -308,70 +338,98 @@ class GeminiLMMGeneration(GeminiAPI):
                                 attributes={"lmm.tool": tool_request.tool},
                             )
                             yield tool_request
+
                     else:
-                        yield LMMStreamChunk.of(MultimodalContent.empty, eod=True)
-                    break
+                        yield LMMStreamChunk.of(
+                            MultimodalContent.empty,
+                            eod=True,
+                        )
+
+                    return  # end of processing
+
                 elif finish_reason == FinishReason.MAX_TOKENS:
                     raise GeminiException(
                         "Invalid Gemini completion - exceeded maximum length!",
                         completion_chunk,
                     )
+
                 else:
                     raise GeminiException(
                         f"Gemini completion generation failed! Reason: {finish_reason}",
                         completion_chunk,
                     )
 
-    def _record_usage_metrics(self, usage_metadata, model: str) -> None:
-        """Record token usage metrics."""
-        if usage := usage_metadata:
-            ctx.record(
-                ObservabilityLevel.INFO,
-                metric="lmm.input_tokens",
-                value=usage.prompt_token_count or 0,
-                unit="tokens",
-                attributes={"lmm.model": model},
-            )
-            ctx.record(
-                ObservabilityLevel.INFO,
-                metric="lmm.input_tokens.cached",
-                value=usage.cached_content_token_count or 0,
-                unit="tokens",
-                attributes={"lmm.model": model},
-            )
-            ctx.record(
-                ObservabilityLevel.INFO,
-                metric="lmm.output_tokens",
-                value=usage.candidates_token_count or 0,
-                unit="tokens",
-                attributes={"lmm.model": model},
-            )
+    def _record_usage_metrics(
+        self,
+        usage: GenerateContentResponseUsageMetadata | None,
+        *,
+        model: str,
+    ) -> None:
+        if usage is None:
+            return
 
-    def _validate_finish_reason(self, finish_reason, completion) -> None:
-        """Validate completion finish reason."""
+        ctx.record(
+            ObservabilityLevel.INFO,
+            metric="lmm.input_tokens",
+            value=usage.prompt_token_count or 0,
+            unit="tokens",
+            attributes={"lmm.model": model},
+        )
+
+        ctx.record(
+            ObservabilityLevel.INFO,
+            metric="lmm.input_tokens.cached",
+            value=usage.cached_content_token_count or 0,
+            unit="tokens",
+            attributes={"lmm.model": model},
+        )
+        ctx.record(
+            ObservabilityLevel.INFO,
+            metric="lmm.output_tokens",
+            value=usage.candidates_token_count or 0,
+            unit="tokens",
+            attributes={"lmm.model": model},
+        )
+
+    def _validate_finish_reason(
+        self,
+        finish_reason: FinishReason | None,
+        *,
+        completion: GenerateContentResponse,
+    ) -> None:
         match finish_reason:
+            case None:
+                pass  # not finished
+
             case FinishReason.STOP:
                 pass  # Valid completion
+
             case FinishReason.MAX_TOKENS:
                 raise GeminiException(
-                    "Invalid Gemini completion - exceeded maximum length!", completion
-                )
-            case reason:
-                raise GeminiException(
-                    f"Gemini completion generation failed! Reason: {reason}", completion
+                    "Invalid Gemini completion - exceeded maximum length!",
+                    completion,
                 )
 
-    def _extract_completion_content(self, completion_choice: Candidate) -> Content:
-        """Extract content from completion choice."""
+            case reason:
+                raise GeminiException(
+                    f"Gemini completion generation failed! Reason: {reason}",
+                    completion,
+                )
+
+    def _extract_completion_content(
+        self,
+        completion_choice: Candidate,
+    ) -> Content:
         if candidate_content := completion_choice.content:
             return candidate_content
+
         else:
             raise GeminiException("Missing Gemini completion content!")
 
     def _process_completion_parts(
-        self, completion_content: Content
+        self,
+        completion_content: Content,
     ) -> tuple[list[MultimodalContentElement], list[LMMToolRequest]]:
-        """Process completion parts into content elements and tool requests."""
         result_content_elements: list[MultimodalContentElement] = []
         tool_requests: list[LMMToolRequest] = []
 
@@ -388,6 +446,7 @@ class GeminiLMMGeneration(GeminiAPI):
     def _create_lmm_completion(
         self,
         result_content_elements: list[MultimodalContentElement],
+        *,
         output_decoder: Callable[[MultimodalContent], MultimodalContent],
     ) -> LMMCompletion | None:
         """Create LMM completion from content elements."""
@@ -398,6 +457,7 @@ class GeminiLMMGeneration(GeminiAPI):
     def _handle_completion_result(
         self,
         lmm_completion: LMMCompletion | None,
+        *,
         tool_requests: list[LMMToolRequest],
         functions: list[FunctionDeclarationDict] | None,
     ) -> LMMOutput:
@@ -409,19 +469,26 @@ class GeminiLMMGeneration(GeminiAPI):
                     "in the configuration. This indicates a mismatch between "
                     "the model's response and the provided tools."
                 )
+
             completion_tool_calls = LMMToolRequests(
                 content=lmm_completion.content if lmm_completion else None,
                 requests=tool_requests,
             )
+
             ctx.record(
                 ObservabilityLevel.INFO,
                 event="lmm.tool_requests",
                 attributes={"lmm.tools": [call.tool for call in tool_requests]},
             )
             return completion_tool_calls
+
         elif lmm_completion:
-            ctx.record(ObservabilityLevel.INFO, event="lmm.completion")
+            ctx.record(
+                ObservabilityLevel.INFO,
+                event="lmm.completion",
+            )
             return lmm_completion
+
         else:
             raise GeminiException("Invalid Gemini completion, missing content!")
 
@@ -491,7 +558,7 @@ def _build_request(  # noqa PLR0913
         "stop_sequences": stop_sequences,
         # gemini safety is really bad and often triggers false positive
         "safety_settings": DISABLED_SAFETY_SETTINGS,
-        "system_instruction": instruction if instruction is not None else {},
+        "system_instruction": instruction,
         "tools": [{"function_declarations": functions}] if functions else None,
         "tool_config": {"function_calling_config": {"mode": function_calling_mode}}
         if function_calling_mode

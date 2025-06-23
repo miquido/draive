@@ -19,7 +19,6 @@ __all__ = ("Instructions",)
 
 
 async def _empty(
-    name: str,
     **extra: Any,
 ) -> Sequence[InstructionDeclaration]:
     return ()
