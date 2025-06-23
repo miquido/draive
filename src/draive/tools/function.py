@@ -106,7 +106,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
             "_check_availability",
             availability_check
             or (
-                lambda: True  # available by default
+                lambda meta: True  # available by default
             ),
         )
         self._format_result: ToolResultFormatting[Result]
@@ -148,7 +148,11 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         try:
             return self._check_availability(meta=self.meta)
 
-        except Exception:
+        except Exception as e:
+            ctx.log_error(
+                "Availability check exception",
+                exception=e,
+            )
             return False
 
     # call as a tool
