@@ -22,9 +22,9 @@ __all__ = ("tool",)
 class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Result]]):
     __slots__ = (
         "_check_availability",
-        "_format_failure",
-        "_format_result",
         "description",
+        "format_failure",
+        "format_result",
         "handling",
         "meta",
         "name",
@@ -109,16 +109,16 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
                 lambda _: True  # available by default
             ),
         )
-        self._format_result: ToolResultFormatting[Result]
+        self.format_result: ToolResultFormatting[Result]
         object.__setattr__(
             self,
-            "_format_result",
+            "format_result",
             format_result,
         )
-        self._format_failure: ToolErrorFormatting
+        self.format_failure: ToolErrorFormatting
         object.__setattr__(
             self,
-            "_format_failure",
+            "format_failure",
             format_failure,
         )
         self.meta: Meta
@@ -174,7 +174,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
                 try:
                     result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
                     formatted_result: MultimodalContent = MultimodalContent.of(
-                        self._format_result(result)
+                        self.format_result(result)
                     )
 
                     ctx.record(
@@ -189,7 +189,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
                     raise LMMToolError(
                         f"Tool {self.name}[{call_id}] call failed due to an error:"
                         f" {type(exc)} {exc}",
-                        content=MultimodalContent.of(self._format_failure(exc)),
+                        content=MultimodalContent.of(self.format_failure(exc)),
                     ) from exc
 
             except BaseException as exc:
