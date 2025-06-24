@@ -53,7 +53,7 @@ Generation APIs → Stages → LMM → Provider Implementation
 2. **Context Scoping**: Configuration flows through execution contexts
 3. **Async First**: Fully asynchronous throughout
 4. **Composability**: Small focused components combine into complex workflows
-5. **Type Safety**: Heavy use of generics and protocols
+5. **Type Safety**: Heavy use of generics and protocols, full typing when possible
 
 ### Entry Points
 

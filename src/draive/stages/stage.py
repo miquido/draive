@@ -890,7 +890,7 @@ class Stage:
                 score: float = evaluation_result.relative_score
                 report: str = evaluation_result.report(include_details=__debug__)
                 raise StageException(
-                    f"Result evaluation failed with relative score: {score *100:.2f}%",
+                    f"Result evaluation failed with relative score: {score * 100:.2f}%",
                     state=state,
                     meta={
                         "evaluation_score": score,
@@ -949,7 +949,7 @@ class Stage:
                 score: float = evaluation_result.relative_score
                 report: str = evaluation_result.report(include_details=__debug__)
                 raise StageException(
-                    f"Context evaluation failed with relative score: {score *100:.2f}%",
+                    f"Context evaluation failed with relative score: {score * 100:.2f}%",
                     state=state,
                     meta={
                         "evaluation_score": score,

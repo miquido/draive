@@ -751,13 +751,41 @@ def test_handles_malformed_closing_tags():
     )
 
 
-def test_handles_case_sensitivity():
-    assert (
-        MultimodalTagElement.parse_first(
-            "test",
-            content=MultimodalContent.of("<TEST>content</TEST>"),
-        )
-        is None
+def test_handles_case_insensitive_matching():
+    # Test that uppercase tags match lowercase search
+    assert MultimodalTagElement.parse_first(
+        "test",
+        content=MultimodalContent.of("<TEST>content</TEST>"),
+    ) == MultimodalTagElement(
+        name="TEST",
+        content=MultimodalContent.of("content"),
+    )
+
+    # Test that mixed case tags match lowercase search
+    assert MultimodalTagElement.parse_first(
+        "test",
+        content=MultimodalContent.of("<Test>content</Test>"),
+    ) == MultimodalTagElement(
+        name="Test",
+        content=MultimodalContent.of("content"),
+    )
+
+    # Test that lowercase search matches uppercase tag
+    assert MultimodalTagElement.parse_first(
+        "TEST",
+        content=MultimodalContent.of("<test>content</test>"),
+    ) == MultimodalTagElement(
+        name="test",
+        content=MultimodalContent.of("content"),
+    )
+
+    # Test mixed case in both search and tag
+    assert MultimodalTagElement.parse_first(
+        "TeSt",
+        content=MultimodalContent.of("<tEsT>content</tEsT>"),
+    ) == MultimodalTagElement(
+        name="tEsT",
+        content=MultimodalContent.of("content"),
     )
 
 
@@ -795,4 +823,62 @@ def test_handles_attribute_without_value():
             content=MultimodalContent.of("<test solo>content</test>"),
         )
         is None
+    )
+
+
+def test_case_insensitive_self_closing_tags():
+    # Test case insensitive self-closing tags
+    assert MultimodalTagElement.parse_first(
+        "test",
+        content=MultimodalContent.of("<TEST/>"),
+    ) == MultimodalTagElement(
+        name="TEST",
+        content=MultimodalContent.empty,
+    )
+
+    assert MultimodalTagElement.parse_first(
+        "TEST",
+        content=MultimodalContent.of("<test/>"),
+    ) == MultimodalTagElement(
+        name="test",
+        content=MultimodalContent.empty,
+    )
+
+
+def test_case_insensitive_with_attributes():
+    # Test case insensitive matching with attributes
+    assert MultimodalTagElement.parse_first(
+        "test",
+        content=MultimodalContent.of('<TEST id="1" class="example">content</TEST>'),
+    ) == MultimodalTagElement(
+        name="TEST",
+        content=MultimodalContent.of("content"),
+        attributes={"id": "1", "class": "example"},
+    )
+
+
+def test_case_insensitive_multiple_tags():
+    # Test case insensitive parsing with multiple mixed case tags
+    result = list(
+        MultimodalTagElement.parse(
+            "test",
+            content=MultimodalContent.of("<TEST>first</TEST><test>second</test><Test>third</Test>"),
+        )
+    )
+
+    assert result == [
+        MultimodalTagElement(name="TEST", content=MultimodalContent.of("first")),
+        MultimodalTagElement(name="test", content=MultimodalContent.of("second")),
+        MultimodalTagElement(name="Test", content=MultimodalContent.of("third")),
+    ]
+
+
+def test_case_insensitive_nested_tags():
+    # Test case insensitive with nested structure - first matching closing tag is found
+    assert MultimodalTagElement.parse_first(
+        "test",
+        content=MultimodalContent.of("<TEST>outer<test>inner</test>content</TEST>"),
+    ) == MultimodalTagElement(
+        name="TEST",
+        content=MultimodalContent.of("outer<test>inner"),
     )

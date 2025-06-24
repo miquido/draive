@@ -63,6 +63,8 @@ class MultimodalTagElement(DataModel):
         *,
         content: Multimodal,
     ) -> Generator[Self]:
+        # Normalize tag to lowercase for case-insensitive matching
+        normalized_tag: str | None = tag.lower() if tag else None
         current_tag: _TagOpening | None = None
         current_tag_content: list[MultimodalContentElement] = []
         for part in MultimodalContent.of(content).parts:
@@ -81,7 +83,10 @@ class MultimodalTagElement(DataModel):
                                         # check if tag is already closed
                                         if opening.closed:
                                             # check if it is the tag we are looking for
-                                            if not tag or opening.name == tag:
+                                            if (
+                                                not normalized_tag
+                                                or opening.name.lower() == normalized_tag
+                                            ):
                                                 yield cls(
                                                     name=opening.name,
                                                     attributes=opening.attributes,
@@ -121,7 +126,10 @@ class MultimodalTagElement(DataModel):
                                             text_accumulator = ""  # cleanup
 
                                         # check if it is the tag we are looking for
-                                        if not tag or current_tag.name == tag:
+                                        if (
+                                            not normalized_tag
+                                            or current_tag.name.lower() == normalized_tag
+                                        ):
                                             yield cls(
                                                 name=current_tag.name,
                                                 attributes=current_tag.attributes,
@@ -162,6 +170,8 @@ class MultimodalTagElement(DataModel):
         strip_tags: bool = False,
         replace_all: bool = False,
     ) -> MultimodalContent:
+        # Normalize tag to lowercase for case-insensitive matching
+        normalized_tag: str = tag.lower()
         # TODO: add support for tag id attribute or custom matching?
         replacement_content = MultimodalContent.of(replacement).parts
         result_content: list[MultimodalContentElement] = []
@@ -213,9 +223,9 @@ class MultimodalTagElement(DataModel):
                                         # check if tag is already closed
                                         if opening.closed:
                                             # check if it is the tag we are looking for
-                                            if (not tag or opening.name == tag) and (
-                                                replace_all or not replaced
-                                            ):
+                                            if (
+                                                not tag or opening.name.lower() == normalized_tag
+                                            ) and (replace_all or not replaced):
                                                 replaced = True
 
                                                 if strip_tags:
@@ -272,9 +282,9 @@ class MultimodalTagElement(DataModel):
                                 match element:
                                     case _TagClosing() as closing:
                                         # check if we should replace
-                                        if (not tag or current_tag.name == tag) and (
-                                            replace_all or not replaced
-                                        ):
+                                        if (
+                                            not tag or current_tag.name.lower() == normalized_tag
+                                        ) and (replace_all or not replaced):
                                             replaced = True
 
                                             if strip_tags:
@@ -621,7 +631,8 @@ def _parse_tag_closing(  # noqa: C901, PLR0912
         elif closing:
             match character:
                 case ">" if accumulator:  # closing
-                    if accumulator == tag.name:  # check if it is what we were looking for
+                    # check if it is what we were looking for
+                    if accumulator.lower() == tag.name.lower():
                         yield _TagClosing(
                             name=accumulator,
                             raw="</" + accumulator + ">",

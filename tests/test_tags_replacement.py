@@ -634,12 +634,42 @@ def test_handles_multiline_content():
     ) == MultimodalContent.of("<test>replaced</test>")
 
 
-def test_handles_mixed_case_sensitivity():
+def test_handles_case_insensitive_replacement():
+    # Test that uppercase tags get replaced by lowercase search
     assert MultimodalTagElement.replace(
         "test",
         content=MultimodalContent.of("<TEST>content</TEST>"),
         replacement="replaced",
-    ) == MultimodalContent.of("<TEST>content</TEST>")
+    ) == MultimodalContent.of("<TEST>replaced</TEST>")
+
+    # Test mixed case tag replacement
+    assert MultimodalTagElement.replace(
+        "test",
+        content=MultimodalContent.of("<Test>content</Test>"),
+        replacement="replaced",
+    ) == MultimodalContent.of("<Test>replaced</Test>")
+
+    # Test uppercase search replacing lowercase tag
+    assert MultimodalTagElement.replace(
+        "TEST",
+        content=MultimodalContent.of("<test>content</test>"),
+        replacement="replaced",
+    ) == MultimodalContent.of("<test>replaced</test>")
+
+    # Test mixed cache search replacing mixed tag
+    assert MultimodalTagElement.replace(
+        "TeSt",
+        content=MultimodalContent.of("<tEsT>content</tEsT>"),
+        replacement="replaced",
+    ) == MultimodalContent.of("<tEsT>replaced</tEsT>")
+
+    # Test with strip_tags
+    assert MultimodalTagElement.replace(
+        "test",
+        content=MultimodalContent.of("<TEST>content</TEST>"),
+        replacement="replaced",
+        strip_tags=True,
+    ) == MultimodalContent.of("replaced")
 
 
 def test_handles_multiple_attributes_with_quotes():
@@ -690,3 +720,51 @@ def test_handles_replacement_with_multiple_media():
         MediaReference.of("http://image2", media="image/jpeg"),
         "</test>",
     )
+
+
+def test_case_insensitive_self_closing_replacement():
+    # Test case insensitive self-closing tag replacement
+    assert MultimodalTagElement.replace(
+        "test",
+        content=MultimodalContent.of("<TEST/>"),
+        replacement="content",
+    ) == MultimodalContent.of("<TEST>content</TEST>")
+
+    assert MultimodalTagElement.replace(
+        "TEST",
+        content=MultimodalContent.of("<test/>"),
+        replacement="content",
+        strip_tags=True,
+    ) == MultimodalContent.of("content")
+
+
+def test_case_insensitive_multiple_replacements():
+    # Test case insensitive replacement with multiple mixed case tags
+    assert MultimodalTagElement.replace(
+        "test",
+        content=MultimodalContent.of("<TEST>first</TEST><test>second</test><Test>third</Test>"),
+        replacement="replaced",
+        replace_all=True,
+    ) == MultimodalContent.of("<TEST>replaced</TEST><test>replaced</test><Test>replaced</Test>")
+
+
+def test_case_insensitive_with_attributes_replacement():
+    # Test case insensitive replacement preserves attributes
+    assert MultimodalTagElement.replace(
+        "test",
+        content=MultimodalContent.of('<TEST id="1" class="example">old</TEST>'),
+        replacement="new",
+    ) == MultimodalContent.of('<TEST id="1" class="example">new</TEST>')
+
+
+def test_case_insensitive_mixed_with_media():
+    # Test case insensitive replacement with media content
+    assert MultimodalTagElement.replace(
+        "test",
+        content=MultimodalContent.of(
+            "<TEST>old",
+            MediaReference.of("http://image", media="image/png"),
+            "content</TEST>",
+        ),
+        replacement="replaced",
+    ) == MultimodalContent.of("<TEST>replaced</TEST>")
