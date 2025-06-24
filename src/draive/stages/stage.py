@@ -15,6 +15,12 @@ from uuid import uuid4
 from haiway import Disposable, Disposables, State, cache, ctx, retry
 
 from draive.commons import Meta, MetaValue, MetaValues
+from draive.evaluation import (
+    EvaluatorResult,
+    PreparedEvaluator,
+    PreparedScenarioEvaluator,
+    ScenarioEvaluatorResult,
+)
 from draive.instructions import Instruction
 from draive.lmm import (
     LMM,
@@ -834,6 +840,126 @@ class Stage:
         return cls(
             stage,
             meta=Meta.of({"tool_call": tool.name}),
+        )
+
+    @classmethod
+    def result_evaluation(
+        cls,
+        evaluator: PreparedScenarioEvaluator[MultimodalContent]
+        | PreparedEvaluator[MultimodalContent],
+        /,
+        *,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        """
+        Creates a Stage that evaluates the current result using an evaluator.
+
+        This Stage takes the current stage result and runs it through the provided
+        evaluator or scenario evaluator. The stage raises StageException when evaluation fails.
+
+        Parameters
+        ----------
+        evaluator : PreparedScenarioEvaluator[MultimodalContent]
+        | PreparedEvaluator[MultimodalContent]
+            The evaluator or scenario evaluator to use for evaluation.
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
+
+        Returns
+        -------
+        Self
+            A new Stage instance that evaluates the result.
+
+        Examples
+        --------
+        >>> stage = Stage.result_evaluation(evaluator)
+        """
+
+        async def stage(
+            *,
+            state: StageState,
+        ) -> StageState:
+            with ctx.scope("stage.result_evaluation"):
+                evaluation_result: ScenarioEvaluatorResult | EvaluatorResult = await evaluator(
+                    state.result
+                )
+
+                if evaluation_result.passed:
+                    return state  # evaluation passed, keep going
+
+                score: float = evaluation_result.relative_score
+                report: str = evaluation_result.report(include_details=__debug__)
+                raise StageException(
+                    f"Result evaluation failed with relative score: {score *100:.2f}%",
+                    state=state,
+                    meta={
+                        "evaluation_score": score,
+                        "evaluation_report": report,
+                    },
+                )
+
+        return cls(
+            stage,
+            meta=Meta.of(meta),
+        )
+
+    @classmethod
+    def context_evaluation(
+        cls,
+        evaluator: PreparedScenarioEvaluator[LMMContext] | PreparedEvaluator[LMMContext],
+        /,
+        *,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        """
+        Creates a Stage that evaluates the current context using an evaluator.
+
+        This Stage takes the current LMM context and runs it through the provided
+        evaluator or scenario evaluator. The stage raises StageException when evaluation fails.
+
+        Parameters
+        ----------
+        evaluator : PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value]
+            The evaluator or scenario evaluator to use for evaluation.
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
+
+        Returns
+        -------
+        Self
+            A new Stage instance that evaluates the context.
+
+        Examples
+        --------
+        >>> stage = Stage.context_evaluation(evaluator)
+        """
+
+        async def stage(
+            *,
+            state: StageState,
+        ) -> StageState:
+            with ctx.scope("stage.context_evaluation"):
+                evaluation_result: ScenarioEvaluatorResult | EvaluatorResult = await evaluator(
+                    state.context
+                )
+
+                if evaluation_result.passed:
+                    return state  # evaluation passed, keep going
+
+                score: float = evaluation_result.relative_score
+                report: str = evaluation_result.report(include_details=__debug__)
+                raise StageException(
+                    f"Context evaluation failed with relative score: {score *100:.2f}%",
+                    state=state,
+                    meta={
+                        "evaluation_score": score,
+                        "evaluation_report": report,
+                    },
+                )
+
+        return cls(
+            stage,
+            meta=Meta.of(meta),
         )
 
     @classmethod
