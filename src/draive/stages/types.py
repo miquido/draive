@@ -3,7 +3,7 @@ from typing import Any, Literal, Protocol, Self, cast, final, overload, runtime_
 
 from haiway import MissingState, State
 
-from draive.commons import Meta
+from draive.commons import Meta, MetaValues
 from draive.lmm import LMMCompletion, LMMContext
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel
@@ -282,6 +282,7 @@ class StageException(Exception):
         self,
         *args: object,
         state: StageState,
+        meta: Meta | MetaValues | None = None,
     ) -> None:
         """
         Initialize a new StageException.
@@ -292,9 +293,14 @@ class StageException(Exception):
             Exception arguments passed to the parent Exception class.
         state : StageState
             The stage state at the time the exception occurred.
+
+        meta : Meta | None = None
+            Additional exception metadata
+
         """
         super().__init__(*args)
         self.state: StageState = state
+        self.meta: Meta = Meta.of(meta)
 
 
 @runtime_checkable
