@@ -69,35 +69,16 @@ async def conversation_completion(
     with ctx.scope("conversation_completion"):
         # relying on memory recall correctness
         recalled_messages: Sequence[ConversationElement] = await memory.recall()
-        context: list[LMMContextElement]
-        match input:
-            case ConversationMessage() as message:
-                await GuardrailsModeration.check_input(message.content)
-                await memory.remember(message)
-                context = [
-                    *(
-                        message.to_lmm_context()
-                        for message in recalled_messages
-                        if isinstance(message, ConversationMessage)
-                    ),
-                    message.to_lmm_context(),
-                ]
-
-            case content:
-                message = ConversationMessage.user(
-                    created=datetime.now(UTC),
-                    content=MultimodalContent.of(content),
-                )
-                await GuardrailsModeration.check_input(message.content)
-                await memory.remember(message)
-                context = [
-                    *(
-                        message.to_lmm_context()
-                        for message in recalled_messages
-                        if isinstance(message, ConversationMessage)
-                    ),
-                    message.to_lmm_context(),
-                ]
+        await GuardrailsModeration.check_input(input.content)
+        await memory.remember(input)
+        context: list[LMMContextElement] = [
+            *(
+                message.to_lmm_context()
+                for message in recalled_messages
+                if isinstance(message, ConversationMessage)
+            ),
+            input.to_lmm_context(),
+        ]
 
         if stream:
             return await _conversation_completion_stream(

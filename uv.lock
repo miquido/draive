@@ -243,7 +243,7 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.71.2"
+version = "0.71.3"
 source = { editable = "." }
 dependencies = [
     { name = "haiway" },
@@ -497,11 +497,11 @@ wheels = [
 
 [[package]]
 name = "haiway"
-version = "0.23.0"
+version = "0.23.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/31/e8/8ebd0331e9c879359d5d6adc051d61fb5984a3b00fce78f7610b6c48c5ab/haiway-0.23.0.tar.gz", hash = "sha256:fe30a848bf66832d767f43cbb906c4d2969068ed26bbf223c158254746e516c9", size = 113004, upload-time = "2025-06-25T10:10:02.574Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/93/e8/31bb750c7e06daa6434ed7d0c9bc344544d05e00aa8c82096fe868d1bc19/haiway-0.23.2.tar.gz", hash = "sha256:84315cfaa6bd0ad7613626c4ee1fba6135c9ad8dffd2e56bc72b89ce8058254a", size = 112972, upload-time = "2025-06-25T10:38:12.348Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/44/37/7e23f0b6d2c10eef18bcff77eee117f3d128fbfcb33f89a76c8c8a85de46/haiway-0.23.0-py3-none-any.whl", hash = "sha256:7c9bbc9e883cadf450d2cde68512049ba57a7aa875bc256a61d12712ef35d891", size = 85717, upload-time = "2025-06-25T10:10:01.441Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/84/7f04ea9a83b43c4e90bf84c14e247a358e25dfaa8d53123cf54001f156dd/haiway-0.23.2-py3-none-any.whl", hash = "sha256:230117aa3bd09e570fd95c73d3cf80adef7ae74962a3b984bb11ecce1718f8df", size = 85680, upload-time = "2025-06-25T10:38:10.676Z" },
 ]
 
 [package.optional-dependencies]

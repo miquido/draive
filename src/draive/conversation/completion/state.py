@@ -81,7 +81,7 @@ class Conversation(State):
             case messages:
                 conversation_memory = cast(
                     ConversationMemory,
-                    ConstantMemory(tuple(message.to_lmm_context() for message in messages)),
+                    ConstantMemory(messages),
                 )
 
         if stream:
