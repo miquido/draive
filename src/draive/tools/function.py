@@ -104,10 +104,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         object.__setattr__(
             self,
             "_check_availability",
-            availability_check
-            or (
-                lambda _: True  # available by default
-            ),
+            availability_check or _available,  # available by default
         )
         self.format_result: ToolResultFormatting[Result]
         object.__setattr__(
@@ -213,6 +210,10 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
             *args,
             **kwargs,
         )
+
+
+def _available(meta: Meta) -> bool:
+    return True
 
 
 class ToolWrapper(Protocol):
