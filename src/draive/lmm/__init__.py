@@ -1,3 +1,4 @@
+from draive.lmm.helpers import lmm_output_decoder
 from draive.lmm.state import LMM, LMMMemory, RealtimeLMM
 from draive.lmm.types import (
     LMMCompleting,
@@ -8,6 +9,9 @@ from draive.lmm.types import (
     LMMInput,
     LMMInstruction,
     LMMOutput,
+    LMMOutputDecoder,
+    LMMOutputInvalid,
+    LMMOutputLimit,
     LMMOutputSelection,
     LMMSession,
     LMMSessionClosing,
@@ -44,6 +48,9 @@ __all__ = (
     "LMMInstruction",
     "LMMMemory",
     "LMMOutput",
+    "LMMOutputDecoder",
+    "LMMOutputInvalid",
+    "LMMOutputLimit",
     "LMMOutputSelection",
     "LMMSession",
     "LMMSessionClosing",
@@ -68,4 +75,5 @@ __all__ = (
     "LMMToolSpecification",
     "LMMTools",
     "RealtimeLMM",
+    "lmm_output_decoder",
 )

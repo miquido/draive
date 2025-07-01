@@ -70,7 +70,6 @@ async def conversation_completion(
         # relying on memory recall correctness
         recalled_messages: Sequence[ConversationElement] = await memory.recall()
         await GuardrailsModeration.check_input(input.content)
-        await memory.remember(input)
         context: list[LMMContextElement] = [
             *(
                 message.to_lmm_context()
@@ -83,6 +82,7 @@ async def conversation_completion(
         if stream:
             return await _conversation_completion_stream(
                 instruction=instruction,
+                input=input,
                 context=context,
                 memory=memory,
                 toolbox=toolbox,
@@ -91,6 +91,7 @@ async def conversation_completion(
         else:
             return await _conversation_completion(
                 instruction=instruction,
+                input=input,
                 context=context,
                 memory=memory,
                 toolbox=toolbox,
@@ -99,6 +100,7 @@ async def conversation_completion(
 
 async def _conversation_completion(
     instruction: Instruction | None,
+    input: ConversationMessage,  # noqa: A002
     context: list[LMMContextElement],
     memory: ConversationMemory,
     toolbox: Toolbox,
@@ -121,7 +123,7 @@ async def _conversation_completion(
                     content=completion.content,
                 )
 
-                await memory.remember(response_message)
+                await memory.remember(input, response_message)
 
                 return response_message
 
@@ -156,6 +158,7 @@ async def _conversation_completion(
 
 async def _conversation_completion_stream(
     instruction: Instruction | None,
+    input: ConversationMessage,  # noqa: A002
     context: list[LMMContextElement],
     memory: ConversationMemory,
     toolbox: Toolbox,
@@ -249,11 +252,12 @@ async def _conversation_completion_stream(
                         )
 
                         await memory.remember(
+                            input,
                             ConversationMessage.model(
                                 MultimodalContent.of(accumulated_content, tools_content),
                                 identifier=message_identifier,
                                 created=datetime.now(UTC),
-                            )
+                            ),
                         )
                         return output_queue.finish()
 

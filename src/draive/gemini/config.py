@@ -22,6 +22,7 @@ class GeminiGenerationConfig(Config):
     stop_sequences: Sequence[str] | Missing = MISSING
     speech_voice_name: str | Missing = MISSING
     media_resolution: Literal["low", "medium", "high"] | Missing = MISSING
+    thinking_budget: int | Missing = MISSING
 
 
 class GeminiLiveConfig(Config):
