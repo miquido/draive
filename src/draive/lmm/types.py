@@ -33,6 +33,9 @@ __all__ = (
     "LMMInstruction",
     "LMMMemory",
     "LMMOutput",
+    "LMMOutputDecoder",
+    "LMMOutputInvalid",
+    "LMMOutputLimit",
     "LMMSession",
     "LMMSessionClosing",
     "LMMSessionEvent",
@@ -119,6 +122,14 @@ class LMMException(Exception):
     pass
 
 
+class LMMOutputLimit(LMMException):
+    pass
+
+
+class LMMOutputInvalid(LMMException):
+    pass
+
+
 class LMMToolError(LMMException):
     def __init__(
         self,
@@ -167,6 +178,14 @@ class LMMCompletion(DataModel):
 
     def __bool__(self) -> bool:
         return bool(self.content)
+
+
+@runtime_checkable
+class LMMOutputDecoder(Protocol):
+    def __call__(
+        self,
+        content: MultimodalContent,
+    ) -> MultimodalContent: ...
 
 
 LMMToolResponseHandling = Literal["error", "result", "direct_result"]

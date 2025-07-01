@@ -1,19 +1,15 @@
-from collections.abc import Callable, Iterable
-from typing import Literal, cast
+from collections.abc import Iterable
+from typing import Literal
 from uuid import uuid4
 
 from google.genai.types import (
     ContentDict,
-    FunctionCallingConfigMode,
-    FunctionDeclarationDict,
     HarmBlockThreshold,
     HarmCategory,
     MediaResolution,
-    Modality,
     Part,
     PartDict,
     SafetySettingDict,
-    SchemaDict,
 )
 from haiway import Missing, as_dict
 
@@ -22,17 +18,13 @@ from draive.lmm import (
     LMMCompletion,
     LMMContextElement,
     LMMInput,
-    LMMOutputSelection,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponses,
-    LMMToolSelection,
-    LMMToolSpecification,
 )
 from draive.multimodal import (
     MediaData,
     MediaReference,
-    MultimodalContent,
     MultimodalContentElement,
     TextContent,
 )
@@ -43,10 +35,8 @@ __all__ = (
     "DISABLED_SAFETY_SETTINGS",
     "content_element_as_part",
     "context_element_as_content",
-    "output_as_response_declaration",
     "resolution_as_media_resolution",
     "result_part_as_content_or_call",
-    "tools_as_tools_config",
 )
 
 
@@ -173,135 +163,6 @@ def content_element_as_part(  # noqa: PLR0911
             }
 
 
-def output_as_response_declaration(  # noqa: PLR0911
-    output: LMMOutputSelection,
-    /,
-) -> tuple[
-    SchemaDict | None,
-    list[Modality] | None,
-    str | None,
-    Callable[[MultimodalContent], MultimodalContent],
-]:
-    match output:
-        case "auto":
-            # not specified at all - use defaults
-            return (
-                None,
-                None,
-                None,
-                _auto_output_conversion,
-            )
-
-        case "text":
-            return (
-                None,
-                [Modality.TEXT],
-                "text/plain",
-                _text_output_conversion,
-            )
-
-        case "json":
-            return (
-                None,
-                [Modality.TEXT],
-                "application/json",
-                _json_output_conversion,
-            )
-
-        case "image":
-            return (
-                None,
-                [Modality.TEXT, Modality.IMAGE],  # google api does not allow to specify only image
-                None,  # define mime type?
-                _image_output_conversion,  # we will ignore text anyways
-            )
-
-        case "audio":
-            return (
-                None,
-                [Modality.AUDIO],
-                None,  # define mime type?
-                _audio_output_conversion,  # we will ignore text anyways
-            )
-
-        case "video":
-            raise NotImplementedError("video output is not supported by Gemini")
-
-        case ["text", "image"] | ["image", "text"]:  # refine multimodal matching?
-            return (
-                None,
-                [Modality.TEXT, Modality.IMAGE],
-                None,
-                _auto_output_conversion,
-            )
-
-        case [*_]:
-            raise NotImplementedError("multimodal output is not supported by Gemini")
-
-        case model:
-            return (
-                cast(SchemaDict, model.__PARAMETERS_SPECIFICATION__),
-                [Modality.TEXT],
-                "application/json",
-                _prepare_model_output_conversion(model),
-            )
-
-
-def _auto_output_conversion(
-    output: MultimodalContent,
-    /,
-) -> MultimodalContent:
-    return output
-
-
-def _text_output_conversion(
-    output: MultimodalContent,
-    /,
-) -> MultimodalContent:
-    return MultimodalContent.of(output.to_str())
-
-
-def _image_output_conversion(
-    output: MultimodalContent,
-    /,
-) -> MultimodalContent:
-    return MultimodalContent.of(*output.media("image"))
-
-
-def _audio_output_conversion(
-    output: MultimodalContent,
-    /,
-) -> MultimodalContent:
-    return MultimodalContent.of(*output.media("audio"))
-
-
-def _video_output_conversion(
-    output: MultimodalContent,
-    /,
-) -> MultimodalContent:
-    return MultimodalContent.of(*output.media("video"))
-
-
-def _json_output_conversion(
-    output: MultimodalContent,
-    /,
-) -> MultimodalContent:
-    return MultimodalContent.of(DataModel.from_json(output.to_str()))
-
-
-def _prepare_model_output_conversion(
-    model: type[DataModel],
-    /,
-) -> Callable[[MultimodalContent], MultimodalContent]:
-    def _model_output_conversion(
-        output: MultimodalContent,
-        /,
-    ) -> MultimodalContent:
-        return MultimodalContent.of(model.from_json(output.to_str()))
-
-    return _model_output_conversion
-
-
 def result_part_as_content_or_call(
     part: Part,
     /,
@@ -365,53 +226,6 @@ def resolution_as_media_resolution(
 
         case _:
             return None
-
-
-def tools_as_tools_config(
-    tools: Iterable[LMMToolSpecification] | None,
-    /,
-    tool_selection: LMMToolSelection,
-) -> tuple[list[FunctionDeclarationDict] | None, FunctionCallingConfigMode | None]:
-    functions: list[FunctionDeclarationDict] = []
-    for tool in tools or []:
-        declaration: FunctionDeclarationDict = FunctionDeclarationDict(
-            name=tool["name"],
-            description=tool["description"],
-            parameters=cast(SchemaDict, tool["parameters"]),
-        )
-
-        functions.append(declaration)
-
-    if not functions:
-        return (
-            None,
-            FunctionCallingConfigMode.NONE,
-        )
-
-    match tool_selection:
-        case "auto":
-            return (
-                functions,
-                FunctionCallingConfigMode.AUTO,
-            )
-
-        case "required":
-            return (
-                functions,
-                FunctionCallingConfigMode.ANY,
-            )
-
-        case "none":
-            return (
-                None,  # no need to pass functions if none can be used
-                FunctionCallingConfigMode.NONE,
-            )
-
-        case _:  # TODO: FIXME: specific tool selection?
-            return (
-                functions,
-                FunctionCallingConfigMode.AUTO,
-            )
 
 
 DISABLED_SAFETY_SETTINGS: list[SafetySettingDict] = [
