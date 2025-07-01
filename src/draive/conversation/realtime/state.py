@@ -1,7 +1,7 @@
 from collections.abc import Iterable
-from typing import Any, cast, final
+from typing import Any, final
 
-from haiway import State, ctx
+from haiway import State, as_tuple, ctx
 
 from draive.conversation.realtime.default import realtime_conversation_preparing
 from draive.conversation.realtime.types import (
@@ -9,7 +9,6 @@ from draive.conversation.realtime.types import (
     RealtimeConversationSessionScope,
 )
 from draive.conversation.types import ConversationMemory, ConversationMessage
-from draive.helpers import ConstantMemory
 from draive.instructions import Instruction
 from draive.tools import Tool, Toolbox
 from draive.utils import Memory
@@ -40,10 +39,7 @@ class RealtimeConversation(State):
                 conversation_memory = memory
 
             case memory_messages:
-                conversation_memory = cast(
-                    ConversationMemory,
-                    ConstantMemory(tuple(message.to_lmm_context() for message in memory_messages)),
-                )
+                conversation_memory = ConversationMemory.constant(as_tuple(memory_messages))
 
         return await conversation.preparing(
             instruction=Instruction.of(instruction),

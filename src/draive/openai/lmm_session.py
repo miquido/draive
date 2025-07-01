@@ -18,7 +18,6 @@ from openai.types.beta.realtime import (
 )
 from openai.types.beta.realtime.session_update_event_param import Session, SessionTool
 
-from draive.helpers import MEMORY_NONE
 from draive.lmm import (
     LMMCompletion,
     LMMContext,
@@ -50,6 +49,7 @@ from draive.multimodal import (
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIRealtimeConfig
 from draive.openai.types import OpenAIException
+from draive.utils import MEMORY_NONE
 
 __all__ = ("OpenAIRealtimeLMM",)
 

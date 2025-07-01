@@ -17,7 +17,6 @@ from draive.conversation.types import (
     ConversationMessageChunk,
     ConversationStreamElement,
 )
-from draive.helpers import MEMORY_NONE
 from draive.instructions import Instruction
 from draive.lmm import (
     LMMContext,
@@ -34,7 +33,7 @@ from draive.lmm import (
 from draive.lmm.types import LMMCompletion, LMMInput
 from draive.multimodal import MultimodalContent
 from draive.tools import Toolbox
-from draive.utils import Memory, MemoryRecalling, MemoryRemembering
+from draive.utils import MEMORY_NONE, Memory, MemoryRecalling, MemoryRemembering
 
 __all__ = ("realtime_conversation_preparing",)
 

@@ -11,7 +11,6 @@ from draive.agents.errors import AgentException
 from draive.agents.idle import IdleMonitor
 from draive.agents.node import Agent, AgentOutput
 from draive.agents.runner import AgentRunner
-from draive.helpers import VolatileMemory
 from draive.multimodal import (
     Multimodal,
     MultimodalContent,
@@ -94,7 +93,9 @@ class AgentWorkflow[AgentWorkflowState, AgentWorkflowResult: DataModel | State |
         return await WorkflowRunner[AgentWorkflowState, AgentWorkflowResult].run(
             self,
             input=input,
-            memory=VolatileMemory(initial=state or self._state_initializer()),
+            memory=Memory[AgentWorkflowState, AgentWorkflowState].volatile(
+                initial=state or self._state_initializer()
+            ),
             timeout=timeout,
         )
 
@@ -165,9 +166,9 @@ def workflow[AgentWorkflowState](
         )
 
         def initialize_agent() -> Agent:
-            agent_memory: Memory[AgentWorkflowState, AgentWorkflowState] = VolatileMemory(
-                initial=state()
-            )
+            agent_memory: Memory[AgentWorkflowState, AgentWorkflowState] = Memory[
+                AgentWorkflowState, AgentWorkflowState
+            ].volatile(initial=state())
 
             async def agent(message: AgentMessage) -> AgentOutput:
                 match await cast(  # pyright fails to properly type this function
