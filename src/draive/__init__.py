@@ -112,12 +112,7 @@ from draive.guardrails import (
     GuardrailsQualityVerification,
 )
 from draive.helpers import (
-    MEMORY_NONE,
-    AccumulativeVolatileMemory,
-    ConstantMemory,
     InstructionPreparationAmbiguity,
-    VolatileConfiguration,
-    VolatileMemory,
     VolatileVectorIndex,
     prepare_instruction,
     refine_instruction,
@@ -226,6 +221,7 @@ from draive.tools import (
     tool,
 )
 from draive.utils import (
+    MEMORY_NONE,
     Memory,
     Processing,
     ProcessingEvent,
@@ -241,7 +237,6 @@ __all__ = (
     "MEMORY_NONE",
     "META_EMPTY",
     "MISSING",
-    "AccumulativeVolatileMemory",
     "Agent",
     "AgentError",
     "AgentException",
@@ -261,7 +256,6 @@ __all__ = (
     "ChoiceOption",
     "Config",
     "Configuration",
-    "ConstantMemory",
     "Conversation",
     "ConversationElement",
     "ConversationEvent",
@@ -388,8 +382,6 @@ __all__ = (
     "Tools",
     "ValueEmbedding",
     "VectorIndex",
-    "VolatileConfiguration",
-    "VolatileMemory",
     "VolatileVectorIndex",
     "agent",
     "always",

@@ -1,4 +1,4 @@
-from draive.utils.memory import Memory, MemoryRecalling, MemoryRemembering
+from draive.utils.memory import MEMORY_NONE, Memory, MemoryRecalling, MemoryRemembering
 from draive.utils.processing import (
     Processing,
     ProcessingEvent,
@@ -10,6 +10,7 @@ from draive.utils.streams import ConstantStream, FixedStream
 from draive.utils.vector_index import VectorIndex
 
 __all__ = (
+    "MEMORY_NONE",
     "ConstantStream",
     "FixedStream",
     "Memory",

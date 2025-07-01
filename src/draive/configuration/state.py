@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from typing import Literal, Self, overload
 
 from haiway import State, ctx
@@ -19,6 +19,67 @@ async def _no_config(
 
 
 class Configuration(State):
+    @classmethod
+    def of(
+        cls,
+        config: tuple[str, DataModel]
+        | tuple[str, State]
+        | tuple[str, Mapping[str, BasicValue]]
+        | DataModel
+        | State,
+        *configs: tuple[str, DataModel]
+        | tuple[str, State]
+        | tuple[str, Mapping[str, BasicValue]]
+        | DataModel
+        | State,
+    ) -> Self:
+        storage: MutableMapping[str, Mapping[str, BasicValue]] = {}
+        for element in (config, *configs):
+            match element:
+                case Config():  # it is state although it fails to match for State
+                    storage[type(element).__name__] = element.to_mapping()
+
+                case State():
+                    storage[type(element).__name__] = element.to_mapping()
+
+                case DataModel():
+                    storage[type(element).__name__] = element.to_mapping()
+
+                case (
+                    str() as key,
+                    Config() as config,
+                ):  # it is state although it fails to match for State
+                    storage[key] = config.to_mapping()
+
+                case (
+                    str() as key,
+                    State() as state,
+                ):
+                    storage[key] = state.to_mapping()
+
+                case (
+                    str() as key,
+                    DataModel() as model,
+                ):
+                    storage[key] = model.to_mapping()
+
+                case (
+                    str() as key,
+                    mapping,
+                ):
+                    assert isinstance(mapping, Mapping)  # nosec: B101
+
+                    storage[key] = mapping
+
+        async def load(
+            identifier: str,
+        ) -> Mapping[str, BasicValue] | None:
+            return storage.get(identifier, None)
+
+        return cls(
+            loading=load,
+        )
+
     @overload
     @classmethod
     async def load[Config: DataModel | State](

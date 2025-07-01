@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator, Iterable
-from typing import Any, Literal, cast, final, overload
+from typing import Any, Literal, final, overload
 
-from haiway import State, ctx
+from haiway import State, as_tuple, ctx
 
 from draive.conversation.completion.default import conversation_completion
 from draive.conversation.completion.types import ConversationCompleting
@@ -10,7 +10,6 @@ from draive.conversation.types import (
     ConversationMessage,
     ConversationStreamElement,
 )
-from draive.helpers import ConstantMemory
 from draive.instructions import Instruction
 from draive.multimodal import Multimodal
 from draive.tools import Tool, Toolbox
@@ -70,19 +69,13 @@ class Conversation(State):
         conversation_memory: ConversationMemory
         match memory:
             case None:
-                conversation_memory = cast(
-                    ConversationMemory,
-                    ConstantMemory(()),
-                )
+                conversation_memory = ConversationMemory.constant(())
 
             case Memory():
                 conversation_memory = memory
 
             case messages:
-                conversation_memory = cast(
-                    ConversationMemory,
-                    ConstantMemory(messages),
-                )
+                conversation_memory = ConversationMemory.constant(as_tuple(messages))
 
         if stream:
             return await ctx.state(cls).completing(
