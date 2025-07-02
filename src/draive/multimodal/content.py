@@ -68,6 +68,33 @@ class MultimodalContent(DataModel):
                 part for part in self.parts if isinstance(part, MediaContent) and part.kind == media
             )
 
+    def images(self) -> Self:
+        return self.__class__(
+            parts=tuple(
+                part
+                for part in self.parts
+                if isinstance(part, MediaContent) and part.kind == "image"
+            )
+        )
+
+    def audio(self) -> Self:
+        return self.__class__(
+            parts=tuple(
+                part
+                for part in self.parts
+                if isinstance(part, MediaContent) and part.kind == "audio"
+            )
+        )
+
+    def video(self) -> Self:
+        return self.__class__(
+            parts=tuple(
+                part
+                for part in self.parts
+                if isinstance(part, MediaContent) and part.kind == "video"
+            )
+        )
+
     def is_media(
         self,
         media: MediaKind | None = None,
@@ -140,6 +167,11 @@ class MultimodalContent(DataModel):
     def without_meta(self) -> Self:
         return self.__class__(
             parts=tuple(part for part in self.parts if not isinstance(part, MetaContent)),
+        )
+
+    def text(self) -> Self:
+        return self.__class__(
+            parts=tuple(part for part in self.parts if isinstance(part, TextContent)),
         )
 
     def to_str(
