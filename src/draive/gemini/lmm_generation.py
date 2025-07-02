@@ -13,6 +13,7 @@ from google.genai.types import (
     GenerateContentConfigDict,
     GenerateContentResponse,
     GenerateContentResponseUsageMetadata,
+    HarmCategory,
     MediaResolution,
     Modality,
     SchemaDict,
@@ -21,12 +22,8 @@ from google.genai.types import (
 from haiway import ObservabilityLevel, as_list, ctx
 
 from draive.gemini.api import GeminiAPI
-from draive.gemini.config import GeminiGenerationConfig
-from draive.gemini.lmm import (
-    DISABLED_SAFETY_SETTINGS,
-    context_element_as_content,
-    result_part_as_content_or_call,
-)
+from draive.gemini.config import GeminiGenerationConfig, GeminiSafetyConfig
+from draive.gemini.lmm import context_element_as_content, result_part_as_content_or_call
 from draive.gemini.types import GeminiException
 from draive.gemini.utils import unwrap_missing
 from draive.lmm import (
@@ -172,10 +169,7 @@ class GeminiLMMGeneration(GeminiAPI):
             ctx.record(
                 ObservabilityLevel.ERROR,
                 event="lmm.completion.error",
-                attributes={
-                    "model": model,
-                    "error": "Empty response",
-                },
+                attributes={"error": "Missing candidates"},
             )
             raise GeminiException("Invalid Gemini completion - missing candidates!", completion)
 
@@ -204,25 +198,11 @@ class GeminiLMMGeneration(GeminiAPI):
             )
             raise GeminiException("Gemini moderation blocked", completion)
 
-        if not completion_candidate.content:
+        if not completion_candidate.content or not completion_candidate.content.parts:
             ctx.record(
                 ObservabilityLevel.ERROR,
                 event="lmm.completion.error",
-                attributes={
-                    "model": model,
-                    "error": "Missing content",
-                },
-            )
-            raise GeminiException("Missing Gemini completion content!")
-
-        if not completion_candidate.content.parts:
-            ctx.record(
-                ObservabilityLevel.ERROR,
-                event="lmm.completion.error",
-                attributes={
-                    "model": model,
-                    "error": "Empty content",
-                },
+                attributes={"error": "Missing content"},
             )
             raise GeminiException("Empty Gemini completion content!")
 
@@ -248,12 +228,8 @@ class GeminiLMMGeneration(GeminiAPI):
             ctx.record(
                 ObservabilityLevel.WARNING,
                 event="lmm.completion.warning",
-                attributes={
-                    "model": model,
-                    "warning": "Max tokens",
-                },
+                attributes={"finish_reason": str(completion_candidate.finish_message)},
             )
-            # TODO: handle warning event
 
         elif completion_candidate.finish_reason != FinishReason.STOP:
             ctx.record(
@@ -267,28 +243,33 @@ class GeminiLMMGeneration(GeminiAPI):
             ctx.record(
                 ObservabilityLevel.INFO,
                 event="lmm.tool_requests",
-                attributes={"lmm.tools": [call.tool for call in tool_requests]},
+                attributes={
+                    "finish_reason": str(completion_candidate.finish_reason),
+                    "lmm.tools": [call.tool for call in tool_requests],
+                },
             )
-            return LMMToolRequests(
+            return LMMToolRequests.of(
+                tool_requests,
                 content=completion_content,
-                requests=tool_requests,
+                meta={"finish_reason": str(completion_candidate.finish_reason)},
             )
 
         elif completion_content:
             ctx.record(
                 ObservabilityLevel.INFO,
                 event="lmm.completion",
+                attributes={"finish_reason": str(completion_candidate.finish_reason)},
             )
-            return LMMCompletion.of(completion_content)
+            return LMMCompletion.of(
+                completion_content,
+                meta={"finish_reason": str(completion_candidate.finish_reason)},
+            )
 
         else:
             ctx.record(
                 ObservabilityLevel.ERROR,
                 event="lmm.completion.error",
-                attributes={
-                    "model": model,
-                    "error": "Empty content",
-                },
+                attributes={"error": "Empty content"},
             )
             raise GeminiException("Empty Gemini completion content!")
 
@@ -320,183 +301,153 @@ class GeminiLMMGeneration(GeminiAPI):
             raise GeminiException(f"Failed to initialize Gemini streaming: {exc}") from exc
 
         return ctx.stream(
-            self._process_stream,
+            _process_stream,
             stream=completion_stream,
             model=model,
             output_decoder=output_decoder,
         )
 
-    async def _process_stream(  # noqa PLR0912
-        self,
-        /,
-        *,
-        stream: AsyncIterator[GenerateContentResponse],
-        model: str,
-        output_decoder: LMMOutputDecoder,
-    ) -> AsyncGenerator[LMMStreamChunk | LMMToolRequest]:
-        accumulated_tool_calls: list[LMMToolRequest] = []
 
-        async for chunk in stream:
-            _record_usage_metrics(
-                chunk.usage_metadata,
-                model=model,
+async def _process_stream(  # noqa PLR0912
+    *,
+    stream: AsyncIterator[GenerateContentResponse],
+    model: str,
+    output_decoder: LMMOutputDecoder,
+) -> AsyncGenerator[LMMStreamChunk | LMMToolRequest]:
+    async for chunk in stream:
+        _record_usage_metrics(
+            chunk.usage_metadata,
+            model=model,
+        )
+
+        if not chunk.candidates:
+            ctx.record(
+                ObservabilityLevel.ERROR,
+                event="lmm.completion.error",
+                attributes={"error": "Missing candidates"},
+            )
+            raise GeminiException("Invalid Gemini chunk - missing candidates!", chunk)
+
+        completion_candidate: Candidate = chunk.candidates[0]  # we always request only one
+
+        if completion_candidate.safety_ratings:
+            ctx.record(
+                ObservabilityLevel.INFO,
+                event="lmm.safety.results",
+                attributes={
+                    "results": [
+                        f"{rating.category} |blocked: {rating.blocked}"
+                        f" |probability:{rating.probability_score}"
+                        f" |severity:{rating.severity_score}"
+                        for rating in completion_candidate.safety_ratings
+                        if rating.category
+                    ],
+                },
             )
 
-            if not chunk.candidates:
-                ctx.record(
-                    ObservabilityLevel.ERROR,
-                    event="lmm.completion.error",
-                    attributes={
-                        "model": model,
-                        "error": "Empty chunk",
-                    },
-                )
-                raise GeminiException("Invalid Gemini chunk - missing candidates!", chunk)
+        if completion_candidate.finish_reason == FinishReason.SAFETY:
+            ctx.record(
+                ObservabilityLevel.ERROR,
+                event="lmm.safety.blocked",
+                attributes={"finish_reason": str(completion_candidate.finish_message)},
+            )
+            raise GeminiException("Gemini moderation blocked", chunk)
 
-            completion_candidate: Candidate = chunk.candidates[0]  # we always request only one
+        if not completion_candidate.content or not completion_candidate.content.parts:
+            match completion_candidate.finish_reason:
+                case None:
+                    ctx.record(
+                        ObservabilityLevel.WARNING,
+                        event="lmm.completion.warning",
+                        attributes={"warning": "Empty chunk content"},
+                    )
+                    continue  # skip empty content
 
-            if completion_candidate.safety_ratings:
-                ctx.record(
-                    ObservabilityLevel.INFO,
-                    event="lmm.safety.results",
-                    attributes={
-                        "results": [
-                            f"{rating.category} |blocked: {rating.blocked}"
-                            f" |probability:{rating.probability_score}"
-                            f" |severity:{rating.severity_score}"
-                            for rating in completion_candidate.safety_ratings
-                            if rating.category
-                        ],
-                    },
-                )
-
-            if completion_candidate.finish_reason == FinishReason.SAFETY:
-                ctx.record(
-                    ObservabilityLevel.ERROR,
-                    event="lmm.safety.blocked",
-                    attributes={"finish_reason": str(completion_candidate.finish_message)},
-                )
-                raise GeminiException("Gemini moderation blocked", chunk)
-
-            if not completion_candidate.content:
-                ctx.record(
-                    ObservabilityLevel.ERROR,
-                    event="lmm.completion.error",
-                    attributes={
-                        "model": model,
-                        "error": "Missing content",
-                    },
-                )
-                raise GeminiException("Missing Gemini completion content!")
-
-            if not completion_candidate.content.parts:
-                ctx.record(
-                    ObservabilityLevel.ERROR,
-                    event="lmm.completion.error",
-                    attributes={
-                        "model": model,
-                        "error": "Empty content",
-                    },
-                )
-                raise GeminiException("Empty Gemini completion content!")
-
-            # Handle the content of the chunk
-            for part in completion_candidate.content.parts:
-                for element in result_part_as_content_or_call(part):
-                    if isinstance(element, LMMToolRequest):
-                        accumulated_tool_calls = _accumulate_tool_request(
-                            element,
-                            accumulated=accumulated_tool_calls,
-                        )
-
-                    else:
-                        yield LMMStreamChunk.of(
-                            output_decoder(
-                                MultimodalContent.of(element),
-                            ),
-                        )
-
-            if completion_candidate.finish_reason == FinishReason.MAX_TOKENS:
-                ctx.record(
-                    ObservabilityLevel.WARNING,
-                    event="lmm.completion.warning",
-                    attributes={
-                        "model": model,
-                        "warning": "Max tokens",
-                    },
-                )
-                # TODO: handle warning event
-                yield LMMStreamChunk.of(
-                    MultimodalContent.empty,
-                    eod=True,
-                )
-
-            elif completion_candidate.finish_reason == FinishReason.STOP:
-                if accumulated_tool_calls:
-                    for tool_request in accumulated_tool_calls:
-                        ctx.record(
-                            ObservabilityLevel.INFO,
-                            event="lmm.tool_request",
-                            attributes={"lmm.tool": tool_request.tool},
-                        )
-                        yield tool_request
-
-                else:
+                case FinishReason.STOP:
+                    ctx.record(
+                        ObservabilityLevel.INFO,
+                        event="lmm.completion",
+                        attributes={"finish_reason": str(completion_candidate.finish_message)},
+                    )
                     yield LMMStreamChunk.of(
                         MultimodalContent.empty,
                         eod=True,
+                        meta={"finish_reason": str(completion_candidate.finish_message)},
                     )
+                    return  # end of stream
 
-            elif completion_candidate.finish_reason is not None:
-                ctx.record(
-                    ObservabilityLevel.ERROR,
-                    event="lmm.completion.error",
-                    attributes={"finish_reason": str(completion_candidate.finish_message)},
-                )
-                raise GeminiException(
-                    f"Gemini completion error: {completion_candidate.finish_message}"
-                )
+                case FinishReason.MAX_TOKENS:
+                    ctx.record(
+                        ObservabilityLevel.WARNING,
+                        event="lmm.completion.warning",
+                        attributes={"finish_reason": str(completion_candidate.finish_message)},
+                    )
+                    yield LMMStreamChunk.of(
+                        MultimodalContent.empty,
+                        eod=True,
+                        meta={"finish_reason": str(completion_candidate.finish_message)},
+                    )
+                    return  # end of stream
 
+                case other:
+                    ctx.record(
+                        ObservabilityLevel.ERROR,
+                        event="lmm.completion.error",
+                        attributes={"finish_reason": str(other)},
+                    )
+                    raise GeminiException(f"Gemini completion error: {other}")
 
-def _accumulate_tool_request(
-    tool_request: LMMToolRequest,
-    /,
-    *,
-    accumulated: list[LMMToolRequest],
-) -> list[LMMToolRequest]:
-    existing_tool_call = next(
-        (call for call in accumulated if call.identifier == tool_request.identifier),
-        None,
-    )
+        chunk_content: list[MultimodalContentElement] = []
+        for part in completion_candidate.content.parts:
+            for element in result_part_as_content_or_call(part):
+                if isinstance(element, LMMToolRequest):
+                    ctx.record(
+                        ObservabilityLevel.INFO,
+                        event="lmm.tool_request",
+                        attributes={"lmm.tool": element.tool},
+                    )
+                    yield element
 
-    if existing_tool_call:
-        # Merge arguments for existing tool call
-        merged_arguments: Any
-        if isinstance(tool_request.arguments, dict) and isinstance(
-            existing_tool_call.arguments, dict
-        ):
-            merged_arguments = {
-                **existing_tool_call.arguments,
-                **tool_request.arguments,
-            }
-        else:
-            merged_arguments = tool_request.arguments
+                else:
+                    chunk_content.append(element)
 
-        # Replace the existing tool call with updated version
-        for i, call in enumerate(accumulated):
-            if call.identifier == tool_request.identifier:
-                accumulated[i] = LMMToolRequest(
-                    identifier=existing_tool_call.identifier,
-                    tool=existing_tool_call.tool,
-                    arguments=merged_arguments,
-                    meta=existing_tool_call.meta,
-                )
-                break
+        if completion_candidate.finish_reason == FinishReason.STOP:
+            yield LMMStreamChunk.of(
+                output_decoder(MultimodalContent.of(*chunk_content)),
+                eod=True,
+                meta={"finish_reason": str(completion_candidate.finish_reason)},
+            )
+            return  # end of stream
 
-    else:
-        accumulated.append(tool_request)
+        elif completion_candidate.finish_reason == FinishReason.MAX_TOKENS:
+            ctx.record(
+                ObservabilityLevel.WARNING,
+                event="lmm.completion.warning",
+                attributes={"finish_reason": str(completion_candidate.finish_message)},
+            )
 
-    return accumulated
+            yield LMMStreamChunk.of(
+                output_decoder(MultimodalContent.of(*chunk_content)),
+                eod=True,
+                meta={"finish_reason": str(completion_candidate.finish_reason)},
+            )
+            return  # end of stream
+
+        elif completion_candidate.finish_reason is not None:
+            ctx.record(
+                ObservabilityLevel.ERROR,
+                event="lmm.completion.error",
+                attributes={"finish_reason": str(completion_candidate.finish_message)},
+            )
+            raise GeminiException(f"Gemini completion error: {completion_candidate.finish_message}")
+
+        elif chunk_content:  # continue with chunk
+            yield LMMStreamChunk.of(
+                MultimodalContent.of(*chunk_content),
+                eod=False,
+            )
+
+        # else just continue
 
 
 def _record_usage_metrics(
@@ -667,6 +618,11 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
     else:
         speech_config = None
 
+    safety_config: GeminiSafetyConfig = unwrap_missing(
+        config.safety,
+        default=GeminiSafetyConfig(),
+    )
+
     return {
         "temperature": temperature,
         "top_p": unwrap_missing(config.top_p),
@@ -678,8 +634,28 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
             config.stop_sequences,
             transform=as_list,
         ),
-        # gemini safety is really bad and often triggers false positive
-        "safety_settings": DISABLED_SAFETY_SETTINGS,
+        "safety_settings": [
+            {
+                "category": HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                "threshold": safety_config.harm_category_hate_speech_threshold,
+            },
+            {
+                "category": HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                "threshold": safety_config.harm_category_dangerous_content_threshold,
+            },
+            {
+                "category": HarmCategory.HARM_CATEGORY_HARASSMENT,
+                "threshold": safety_config.harm_category_harassment_threshold,
+            },
+            {
+                "category": HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                "threshold": safety_config.harm_category_sexually_explicit_threshold,
+            },
+            {
+                "category": HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
+                "threshold": safety_config.harm_category_civic_integrity_threshold,
+            },
+        ],
         "system_instruction": instruction,
         "tools": [{"function_declarations": functions}] if functions else None,
         "tool_config": {"function_calling_config": {"mode": function_calling_mode}}
@@ -689,7 +665,9 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
         "automatic_function_calling": {
             "disable": True,
             "maximum_remote_calls": None,
-        },
+        }
+        if function_calling_mode
+        else None,
         "media_resolution": media_resolution,
         "response_modalities": response_modalities,
         "response_mime_type": response_mime_type,

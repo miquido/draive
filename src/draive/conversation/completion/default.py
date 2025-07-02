@@ -19,6 +19,7 @@ from draive.lmm import (
     LMM,
     LMMCompletion,
     LMMContextElement,
+    LMMException,
     LMMInstruction,
     LMMStreamChunk,
     LMMToolRequest,
@@ -156,7 +157,7 @@ async def _conversation_completion(
         repetition_level += 1  # continue with next repetition level
 
 
-async def _conversation_completion_stream(
+async def _conversation_completion_stream(  # noqa: C901
     instruction: Instruction | None,
     input: ConversationMessage,  # noqa: A002
     context: list[LMMContextElement],
@@ -203,22 +204,29 @@ async def _conversation_completion_stream(
                         match element:
                             case LMMStreamChunk() as chunk:
                                 accumulated_content = accumulated_content.appending(chunk.content)
+                                # we are ending the stream when all tool results are provided
+                                # and a chunk is marked as final
+                                eod: bool = chunk.eod and not pending_tool_requests
                                 output_queue.enqueue(
                                     ConversationMessageChunk.model(
                                         chunk.content,
                                         message_identifier=message_identifier,
-                                        eod=chunk.eod,
+                                        eod=eod,
                                     )
                                 )
 
-                                if chunk.eod:
+                                if eod:
+                                    if not accumulated_content:
+                                        raise LMMException("Empty completion content")
+
                                     # end of streaming for conversation completion
                                     await memory.remember(
+                                        input,
                                         ConversationMessage.model(
                                             accumulated_content,
                                             identifier=message_identifier,
                                             created=datetime.now(UTC),
-                                        )
+                                        ),
                                     )
 
                                     return output_queue.finish()

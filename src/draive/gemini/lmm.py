@@ -1,17 +1,12 @@
 from collections.abc import Iterable
-from typing import Literal
 from uuid import uuid4
 
 from google.genai.types import (
     ContentDict,
-    HarmBlockThreshold,
-    HarmCategory,
-    MediaResolution,
     Part,
     PartDict,
-    SafetySettingDict,
 )
-from haiway import Missing, as_dict
+from haiway import as_dict
 
 from draive.commons import META_EMPTY
 from draive.lmm import (
@@ -32,10 +27,8 @@ from draive.multimodal.meta import MetaContent
 from draive.parameters import DataModel
 
 __all__ = (
-    "DISABLED_SAFETY_SETTINGS",
     "content_element_as_part",
     "context_element_as_content",
-    "resolution_as_media_resolution",
     "result_part_as_content_or_call",
 )
 
@@ -174,13 +167,13 @@ def result_part_as_content_or_call(
             result.append(
                 MetaContent.of(
                     "thought",
-                    content=TextContent(text=part.text),
+                    content=TextContent.of(part.text),
                     meta=META_EMPTY,
                 ),
             )
 
         else:
-            result.append(TextContent(text=part.text))
+            result.append(TextContent.of(part.text))
 
     if part.function_call and part.function_call.name:  # can't call without a name
         result.append(
@@ -208,45 +201,3 @@ def result_part_as_content_or_call(
         )
 
     return result
-
-
-def resolution_as_media_resolution(
-    resolution: Literal["low", "medium", "high"] | Missing,
-    /,
-) -> MediaResolution | None:
-    match resolution:
-        case "low":
-            return MediaResolution.MEDIA_RESOLUTION_LOW
-
-        case "medium":
-            return MediaResolution.MEDIA_RESOLUTION_MEDIUM
-
-        case "high":
-            return MediaResolution.MEDIA_RESOLUTION_HIGH
-
-        case _:
-            return None
-
-
-DISABLED_SAFETY_SETTINGS: list[SafetySettingDict] = [
-    SafetySettingDict(
-        category=HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-        threshold=HarmBlockThreshold.OFF,
-    ),
-    SafetySettingDict(
-        category=HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-        threshold=HarmBlockThreshold.OFF,
-    ),
-    SafetySettingDict(
-        category=HarmCategory.HARM_CATEGORY_HARASSMENT,
-        threshold=HarmBlockThreshold.OFF,
-    ),
-    SafetySettingDict(
-        category=HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-        threshold=HarmBlockThreshold.OFF,
-    ),
-    SafetySettingDict(
-        category=HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
-        threshold=HarmBlockThreshold.OFF,
-    ),
-]
