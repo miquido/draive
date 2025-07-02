@@ -44,7 +44,7 @@ def _auto_output_conversion(
 def _text_output_conversion(
     content: MultimodalContent,
 ) -> MultimodalContent:
-    return MultimodalContent.of(content.to_str())
+    return content.text()
 
 
 def _image_output_conversion(

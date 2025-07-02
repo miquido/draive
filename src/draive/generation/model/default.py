@@ -92,9 +92,7 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
                     if decoder := decoder:
                         return generated.from_mapping(decoder(completion.content))
 
-                    elif (artifacts := completion.content.artifacts()) and isinstance(
-                        artifacts[0], generated
-                    ):
+                    elif artifacts := completion.content.artifacts(generated):
                         return cast(Generated, artifacts[0])
 
                     else:

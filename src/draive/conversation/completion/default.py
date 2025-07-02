@@ -114,7 +114,6 @@ async def _conversation_completion(
             instruction=formatted_instruction,
             context=context,
             tools=toolbox.available_tools(repetition_level=repetition_level),
-            output="text",
             **extra,
         ):
             case LMMCompletion() as completion:
@@ -205,19 +204,20 @@ async def _conversation_completion_stream(  # noqa: C901
                             case LMMStreamChunk() as chunk:
                                 accumulated_content = accumulated_content.appending(chunk.content)
                                 # we are ending the stream when all tool results are provided
-                                # and a chunk is marked as final
-                                eod: bool = chunk.eod and not pending_tool_requests
-                                output_queue.enqueue(
-                                    ConversationMessageChunk.model(
-                                        chunk.content,
-                                        message_identifier=message_identifier,
-                                        eod=eod,
-                                    )
-                                )
-
-                                if eod:
+                                # and a chunk is marked as final, final mark before all tool
+                                # calls are resolved typically means that there will be no more
+                                # tool related content, also models may produce content and tools
+                                if chunk.eod and not pending_tool_requests:
                                     if not accumulated_content:
                                         raise LMMException("Empty completion content")
+
+                                    output_queue.enqueue(  # send the last part
+                                        ConversationMessageChunk.model(
+                                            chunk.content,
+                                            message_identifier=message_identifier,
+                                            eod=True,
+                                        )
+                                    )
 
                                     # end of streaming for conversation completion
                                     await memory.remember(
@@ -230,6 +230,15 @@ async def _conversation_completion_stream(  # noqa: C901
                                     )
 
                                     return output_queue.finish()
+
+                                elif chunk.content:  # skip empty chunks
+                                    output_queue.enqueue(
+                                        ConversationMessageChunk.model(
+                                            chunk.content,
+                                            message_identifier=message_identifier,
+                                            eod=False,
+                                        )
+                                    )
 
                             case LMMToolRequest() as tool_request:
                                 # we could start processing immediately
@@ -256,6 +265,7 @@ async def _conversation_completion_stream(  # noqa: C901
                             ConversationMessageChunk.model(
                                 tools_content,
                                 message_identifier=message_identifier,
+                                eod=True,
                             )
                         )
 
@@ -267,6 +277,7 @@ async def _conversation_completion_stream(  # noqa: C901
                                 created=datetime.now(UTC),
                             ),
                         )
+
                         return output_queue.finish()
 
                     else:
