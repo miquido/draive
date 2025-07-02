@@ -69,9 +69,11 @@ class ScenarioEvaluatorResult(DataModel):
         if not self.evaluations:
             return 0.0
 
-        return len([evaluation for evaluation in self.evaluations if evaluation.passed]) / len(
-            self.evaluations
-        )
+        score: float = 0.0
+        for evaluation in self.evaluations:
+            score += evaluation.relative_score
+
+        return score / len(self.evaluations)
 
 
 class EvaluationScenarioResult(DataModel):
