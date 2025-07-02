@@ -56,12 +56,16 @@ class _RefinementHistory(State):
 
 
 @traced
-async def refine_instruction[CaseParameters: DataModel, Result: DataModel | str](
+async def refine_instruction[
+    SuiteParameters: DataModel,
+    CaseParameters: DataModel,
+    Result: DataModel | str,
+](
     instruction: Instruction,
     /,
     *,
     guidelines: str | None = None,
-    evaluation_suite: EvaluationSuite[CaseParameters, Result],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
     rounds_limit: int,
     quality_threshold: float = 0.99,
     convergence_window: int = 3,
@@ -131,11 +135,15 @@ class _RefinementState(State):
     candidates: Sequence[_RefinementCandidate]
 
 
-def _initialization_stage[CaseParameters: DataModel, Result: DataModel | str](
+def _initialization_stage[
+    SuiteParameters: DataModel,
+    CaseParameters: DataModel,
+    Result: DataModel | str,
+](
     *,
     instruction: Instruction,
     guidelines: str | None,
-    evaluation_suite: EvaluationSuite[CaseParameters, Result],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
 ) -> Stage:
     @stage
     async def initialization(
@@ -177,9 +185,13 @@ def _initialization_stage[CaseParameters: DataModel, Result: DataModel | str](
     return initialization
 
 
-def _refinement_loop_stage[CaseParameters: DataModel, Result: DataModel | str](
+def _refinement_loop_stage[
+    SuiteParameters: DataModel,
+    CaseParameters: DataModel,
+    Result: DataModel | str,
+](
     *,
-    evaluation_suite: EvaluationSuite[CaseParameters, Result],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
     guidelines: str | None,
     rounds_limit: int,
     quality_threshold: float,
@@ -364,9 +376,13 @@ def _multi_strategy_refinement_stage(
     return _multi_refinement
 
 
-def _ensemble_evaluation_stage[CaseParameters: DataModel, Result: DataModel | str](
+def _ensemble_evaluation_stage[
+    SuiteParameters: DataModel,
+    CaseParameters: DataModel,
+    Result: DataModel | str,
+](
     *,
-    evaluation_suite: EvaluationSuite[CaseParameters, Result],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
 ) -> Stage:
     @stage
     async def _ensemble_eval(
