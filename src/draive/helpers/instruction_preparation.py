@@ -3,7 +3,6 @@ from haiway import ctx
 from draive.instructions import Instruction, InstructionDeclaration
 from draive.multimodal import MultimodalContent
 from draive.multimodal.tags import MultimodalTagElement
-from draive.parameters import DataModel
 from draive.stages import Stage
 
 __all__ = (
@@ -22,7 +21,7 @@ class InstructionPreparationAmbiguity(Exception):
         self.questions: str = questions
 
 
-async def prepare_instruction[CaseParameters: DataModel, Result: DataModel | str](
+async def prepare_instruction(
     instruction: InstructionDeclaration | str,
     /,
     *,

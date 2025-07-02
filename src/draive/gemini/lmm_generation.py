@@ -254,7 +254,7 @@ class GeminiLMMGeneration(GeminiAPI):
                 meta={"finish_reason": str(completion_candidate.finish_reason)},
             )
 
-        elif completion_content:
+        else:
             ctx.record(
                 ObservabilityLevel.INFO,
                 event="lmm.completion",
@@ -264,14 +264,6 @@ class GeminiLMMGeneration(GeminiAPI):
                 completion_content,
                 meta={"finish_reason": str(completion_candidate.finish_reason)},
             )
-
-        else:
-            ctx.record(
-                ObservabilityLevel.ERROR,
-                event="lmm.completion.error",
-                attributes={"error": "Empty content"},
-            )
-            raise GeminiException("Empty Gemini completion content!")
 
     async def _completion_stream(
         self,
@@ -441,13 +433,11 @@ async def _process_stream(  # noqa PLR0912
             )
             raise GeminiException(f"Gemini completion error: {completion_candidate.finish_message}")
 
-        elif chunk_content:  # continue with chunk
+        else:  # continue with chunk
             yield LMMStreamChunk.of(
                 MultimodalContent.of(*chunk_content),
                 eod=False,
             )
-
-        # else just continue
 
 
 def _record_usage_metrics(
