@@ -9,7 +9,20 @@ __all__ = (
     "GeminiEmbeddingConfig",
     "GeminiGenerationConfig",
     "GeminiLiveConfig",
+    "GeminiSafetyConfig",
+    "GeminiSafetyThreshold",
 )
+
+GeminiSafetyThreshold = Literal["off", "none", "high", "medium", "low"]
+
+
+class GeminiSafetyConfig(Config):
+    # gemini safety is really bad and often triggers false positive so disabling by default
+    harm_category_hate_speech_threshold: GeminiSafetyThreshold = "off"
+    harm_category_harassment_threshold: GeminiSafetyThreshold = "off"
+    harm_category_sexually_explicit_threshold: GeminiSafetyThreshold = "off"
+    harm_category_civic_integrity_threshold: GeminiSafetyThreshold = "off"
+    harm_category_dangerous_content_threshold: GeminiSafetyThreshold = "off"
 
 
 class GeminiGenerationConfig(Config):
@@ -23,6 +36,7 @@ class GeminiGenerationConfig(Config):
     speech_voice_name: str | Missing = MISSING
     media_resolution: Literal["low", "medium", "high"] | Missing = MISSING
     thinking_budget: int | Missing = MISSING
+    safety: GeminiSafetyConfig | Missing = MISSING
 
 
 class GeminiLiveConfig(Config):
