@@ -1,7 +1,7 @@
 from asyncio import Lock, gather
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
-from typing import Protocol, Self, overload, runtime_checkable
+from typing import Protocol, Self, runtime_checkable
 from uuid import UUID, uuid4
 
 from haiway import ScopeContext, asynchronous, ctx
@@ -99,7 +99,12 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
         return score / len(self.results)
 
 
-class SuiteEvaluatorResult[CaseParameters: DataModel, Value: DataModel | str](DataModel):
+class SuiteEvaluatorResult[
+    SuiteParameters: DataModel,
+    CaseParameters: DataModel,
+    Value: DataModel | str,
+](DataModel):
+    parameters: SuiteParameters
     cases: Sequence[SuiteEvaluatorCaseResult[CaseParameters, Value]]
 
     @property
@@ -270,44 +275,12 @@ class EvaluationSuite[
         self._data_cache: EvaluationSuiteData[SuiteParameters, CaseParameters] | None = None
         self._lock: Lock = Lock()
 
-    @overload
     async def __call__(
         self,
-        parameters: SuiteParameters,
-        /,
-        *,
-        case_parameters: CaseParameters,
-    ) -> SuiteEvaluatorCaseResult[CaseParameters, Value]: ...
-
-    @overload
-    async def __call__(
-        self,
-        parameters: SuiteParameters,
-        /,
-        *,
-        case_parameters: UUID,
-        reload: bool = False,
-    ) -> SuiteEvaluatorCaseResult[CaseParameters, Value]: ...
-
-    @overload
-    async def __call__(
-        self,
-        /,
-        *,
-        reload: bool = False,
-    ) -> SuiteEvaluatorResult[CaseParameters, Value]: ...
-
-    async def __call__(
-        self,
+        *case_parameters: EvaluationSuiteCase[CaseParameters] | CaseParameters | UUID,
         parameters: SuiteParameters | None = None,
-        /,
-        *,
-        case_parameters: CaseParameters | UUID | None = None,
         reload: bool = False,
-    ) -> (
-        SuiteEvaluatorResult[CaseParameters, Value]
-        | SuiteEvaluatorCaseResult[CaseParameters, Value]
-    ):
+    ) -> SuiteEvaluatorResult[SuiteParameters, CaseParameters, Value]:
         if context := self._execution_context:
             async with context:
                 return await self._evaluate(
@@ -326,54 +299,54 @@ class EvaluationSuite[
 
     async def _evaluate(
         self,
-        case_parameters: CaseParameters | UUID | None = None,
+        case_parameters: Sequence[EvaluationSuiteCase[CaseParameters] | CaseParameters | UUID],
         /,
         *,
         suite_parameters: SuiteParameters | None = None,
         reload: bool = False,
-    ) -> (
-        SuiteEvaluatorResult[CaseParameters, Value]
-        | SuiteEvaluatorCaseResult[CaseParameters, Value]
-    ):
-        suite_data: EvaluationSuiteData[SuiteParameters, CaseParameters] = await self._data(
-            reload=reload
-        )
+    ) -> SuiteEvaluatorResult[SuiteParameters, CaseParameters, Value]:
+        suite_data: EvaluationSuiteData[SuiteParameters, CaseParameters]
         async with self._lock:
-            match case_parameters:
-                case None:
-                    return SuiteEvaluatorResult(
-                        cases=await gather(
-                            *[
-                                self._evaluate_case(
-                                    case,
-                                    suite_parameters=suite_parameters or suite_data.parameters,
-                                )
-                                for case in suite_data.cases
-                            ],
-                            return_exceptions=False,
-                        )
+            suite_data = await self._data(reload=reload)
+
+        cases: Sequence[EvaluationSuiteCase[CaseParameters]] = []
+        if not case_parameters:
+            cases = suite_data.cases
+
+        else:
+            cases = []
+            for case in case_parameters:
+                match case:
+                    case UUID() as case_id:
+                        if evaluation_case := next(
+                            iter(case for case in suite_data.cases if case.identifier == case_id),
+                            None,
+                        ):
+                            cases.append(evaluation_case)
+
+                        else:
+                            raise ValueError(f"Evaluation case with ID {case_id} does not exists.")
+
+                    case EvaluationSuiteCase():
+                        cases.append(case)
+
+                    case _:
+                        cases.append(EvaluationSuiteCase[CaseParameters](parameters=case))
+
+        parameters: SuiteParameters = suite_parameters or suite_data.parameters
+        return SuiteEvaluatorResult(
+            parameters=parameters,
+            cases=await gather(
+                *[
+                    self._evaluate_case(
+                        case,
+                        suite_parameters=parameters,
                     )
-
-                case UUID() as identifier:
-                    if evaluation_case := next(
-                        iter([case for case in suite_data.cases if case.identifier == identifier]),
-                        None,
-                    ):
-                        return await self._evaluate_case(
-                            evaluation_case,
-                            suite_parameters=suite_parameters or suite_data.parameters,
-                        )
-
-                    else:
-                        raise ValueError(f"Evaluation case with ID {identifier} does not exists.")
-
-                case case_parameters:
-                    return await self._evaluate_case(
-                        EvaluationSuiteCase[CaseParameters](
-                            parameters=case_parameters,
-                        ),
-                        suite_parameters=suite_parameters or suite_data.parameters,
-                    )
+                    for case in cases
+                ],
+                return_exceptions=False,
+            ),
+        )
 
     async def _evaluate_case(
         self,

@@ -1,58 +1,19 @@
+import random
+from asyncio import gather
 from collections.abc import Mapping, Sequence
 from typing import Any
+from uuid import UUID, uuid4
 
-from haiway import State, ctx, traced
+from haiway import State, as_dict, ctx, traced
 
 from draive.evaluation import EvaluationSuite, SuiteEvaluatorResult
+from draive.evaluation.suite import EvaluationSuiteCase
 from draive.instructions import Instruction, Instructions
 from draive.multimodal import MultimodalContent, MultimodalTagElement
 from draive.parameters import DataModel
-from draive.stages import Stage, StageLoopConditioning, StageState, stage
+from draive.stages import Stage, StageState, stage
 
 __all__ = ("refine_instruction",)
-
-
-class _RefinementCandidate(State):
-    strategy: str
-    reasoning: str
-    content: str
-
-
-class _RefinementAnalysis(State):
-    recommended_strategies: Sequence[str]
-    analysis_summary: str
-
-
-class _RefinementHistoryElement(State):
-    instruction: Instruction
-    evaluation: SuiteEvaluatorResult[Any, Any]
-    strategy: str
-    score: float
-    improvement: float
-
-
-class _RefinementHistory(State):
-    elements: Sequence[_RefinementHistoryElement] = ()
-    failed_strategies: Sequence[str] = ()
-
-    def convergence_trend(
-        self,
-        *,
-        window: int,
-    ) -> float:
-        if len(self.elements) < window:
-            return float("inf")
-
-        recent: Sequence[float] = [element.improvement for element in self.elements[-window:]]
-        return sum(recent) / len(recent)
-
-    def is_plateauing(
-        self,
-        *,
-        window: int,
-        threshold: float,
-    ) -> bool:
-        return abs(self.convergence_trend(window=window)) < threshold
 
 
 @traced
@@ -67,33 +28,63 @@ async def refine_instruction[
     guidelines: str | None = None,
     evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
     rounds_limit: int,
+    sample_ratio: float = 0.1,
+    candidates_limit: int = 3,
+    performance_drop_threshold: float = 0.5,
     quality_threshold: float = 0.99,
-    convergence_window: int = 3,
-    min_improvement_rate: float = 0.001,
 ) -> Instruction:
+    """
+    Refine instruction using binary tree exploration with performance pruning.
+
+    Each node generates exactly 2 complementary strategies.
+    Branches are pruned if performance drops below threshold.
+
+    Args:
+        instruction: The instruction to refine
+        guidelines: Optional guidelines for refinement
+        evaluation_suite: Suite to evaluate instruction performance
+        rounds_limit: Maximum depth of refinement tree
+        sample_ratio: Fraction of passing cases to include in focused evaluation
+        candidates_limit: Number of top candidates to fully evaluate
+        performance_drop_threshold: Prune branches with score drop > this threshold
+        quality_threshold: Stop if score reaches this threshold
+    """
+
     assert rounds_limit > 0  # nosec: B101
-    assert convergence_window > 0  # nosec: B101
+    assert 1 >= sample_ratio > 0  # nosec: B101
+    assert candidates_limit > 0  # nosec: B101
+    assert 1 >= performance_drop_threshold > 0  # nosec: B101
     assert 1 >= quality_threshold >= 0  # nosec: B101
-    assert 1 >= min_improvement_rate >= 0  # nosec: B101
-    ctx.log_info("Preparing instruction refinement...")
+
+    ctx.log_info(
+        f"Starting tree-based refinement: "
+        f"max_depth={rounds_limit}, "
+        f"sample_ratio={sample_ratio}, "
+        f"performance_drop_threshold={performance_drop_threshold}"
+    )
 
     result: MultimodalContent = await Stage.sequence(
-        _initialization_stage(
+        _tree_initialization_stage(
             instruction=instruction,
-            guidelines=guidelines,
             evaluation_suite=evaluation_suite,
-        ),
-        _refinement_loop_stage(
-            evaluation_suite=evaluation_suite,
+            sample_ratio=sample_ratio,
+            performance_drop_threshold=performance_drop_threshold,
             guidelines=guidelines,
             rounds_limit=rounds_limit,
+        ),
+        _tree_exploration_stage(
+            evaluation_suite=evaluation_suite,
+            rounds_limit=rounds_limit,
             quality_threshold=quality_threshold,
-            convergence_window=convergence_window,
-            min_improvement_rate=min_improvement_rate,
+        ),
+        _tree_finalization_stage(
+            evaluation_suite=evaluation_suite,
+            quality_threshold=quality_threshold,
+            candidates_limit=candidates_limit,
         ),
     ).execute()
-    ctx.log_info("...instruction refinement finished!")
 
+    ctx.log_info("...instruction refinement finished!")
     return instruction.updated(content=result.to_str())
 
 
@@ -127,364 +118,225 @@ def _instructions(
     return Instructions(fetching=instruction_fetch)
 
 
-class _RefinementState(State):
+class _RefinementTreeNode[
+    SuiteParameters: DataModel,
+    CaseParameters: DataModel,
+    Result: DataModel | str,
+](State):
+    identifier: UUID
     instruction: Instruction
-    evaluation: SuiteEvaluatorResult[Any, Any]
-    history: _RefinementHistory
-    analysis: _RefinementAnalysis
-    candidates: Sequence[_RefinementCandidate]
+    strategy: str
+    parent_id: UUID | None
+    depth: int
+    focused_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result]
+    complete_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result] | None
+    children: Sequence[UUID]
+    pruned: bool
+
+    @property
+    def is_root(self) -> bool:
+        return self.parent_id is None
+
+    @property
+    def is_leaf(self) -> bool:
+        return len(self.children) == 0
+
+    @property
+    def focused_evaluation_score(self) -> float:
+        return self.focused_evaluation.relative_score
+
+    @property
+    def complete_evaluation_score(self) -> float | None:
+        if self.complete_evaluation is None:
+            return None
+
+        return self.complete_evaluation.relative_score
 
 
-def _initialization_stage[
+class _RefinementState[
+    SuiteParameters: DataModel,
+    CaseParameters: DataModel,
+    Result: DataModel | str,
+](State):
+    root: _RefinementTreeNode
+    nodes: Mapping[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters, Result]]
+    sample_ratio: float
+    performance_drop_threshold: float
+    guidelines: str | None = None
+    rounds_remaining: int
+
+    def leafs(self) -> Sequence[_RefinementTreeNode[SuiteParameters, CaseParameters, Result]]:
+        return [node for node in self.nodes.values() if node.is_leaf and not node.pruned]
+
+
+def _select_focused_cases[
+    SuiteParameters: DataModel,
+    CaseParameters: DataModel,
+    Result: DataModel | str,
+](
+    *,
+    evaluation_result: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result],
+    evaluation_cases: Sequence[EvaluationSuiteCase[CaseParameters]],
+    sample_ratio: float,
+) -> Sequence[EvaluationSuiteCase[CaseParameters]]:
+    # Get all failing cases
+    failing_cases: list[EvaluationSuiteCase[CaseParameters]] = [
+        case_result.case for case_result in evaluation_result.cases if not case_result.passed
+    ]
+
+    # Get passing cases and sample
+    passing_cases: list[EvaluationSuiteCase[CaseParameters]] = [
+        case_result.case for case_result in evaluation_result.cases if case_result.passed
+    ]
+
+    # Get other, previously excluded cases
+    additional_cases: list[EvaluationSuiteCase[CaseParameters]] = [
+        case for case in evaluation_cases if case not in evaluation_result.cases
+    ]
+
+    # Intelligent sampling: sample some passing cases
+    sampling_cases_pool: list[EvaluationSuiteCase[CaseParameters]] = (
+        passing_cases + additional_cases
+    )
+    sample_size: int = (
+        max(1, int(len(sampling_cases_pool) * sample_ratio)) if sampling_cases_pool else 0
+    )
+    sampling_cases: list[EvaluationSuiteCase[CaseParameters]] = (
+        random.sample(sampling_cases_pool, min(len(sampling_cases_pool), sample_size))  # nosec: B311
+        if sample_size > 0
+        else []
+    )
+
+    ctx.log_info(
+        f"Created focused evaluation suite: "
+        f"{len(failing_cases)} failing + {len(sampling_cases)} sampled other "
+        f"(out of {len(passing_cases)} total passing)"
+    )
+
+    # Combine for focused evaluation
+    return failing_cases + sampling_cases
+
+
+def _tree_initialization_stage[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
     Result: DataModel | str,
 ](
     *,
     instruction: Instruction,
-    guidelines: str | None,
     evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
+    sample_ratio: float,
+    performance_drop_threshold: float,
+    guidelines: str | None,
+    rounds_limit: int,
 ) -> Stage:
     @stage
-    async def initialization(
+    async def tree_initialization(
         *,
         state: StageState,
     ) -> StageState:
-        ctx.log_info("...evaluating initial instruction...")
-        evaluation: SuiteEvaluatorResult[CaseParameters, Result]
+        ctx.log_info("...evaluating initial instruction with full suite...")
+        # Make initial evaluation
+        evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result]
         with ctx.updated(_instructions(instruction=instruction)):
             evaluation = await evaluation_suite()
 
-        ctx.log_info("...using initial evaluation as a baseline...")
+        ctx.log_info(f"...initial score: {evaluation.relative_score:.4f}...")
+
+        # Create root node
+        root_node = _RefinementTreeNode(
+            identifier=uuid4(),
+            instruction=instruction,
+            strategy="initial",
+            parent_id=None,
+            depth=0,
+            children=(),
+            # for root complete evaluation is the same as focused
+            focused_evaluation=evaluation,
+            complete_evaluation=evaluation,
+            pruned=False,
+        )
+
+        # Setup initial state
         return state.updated(
-            _RefinementState(
-                instruction=instruction,
-                evaluation=evaluation,
-                history=_RefinementHistory(
-                    elements=(
-                        _RefinementHistoryElement(
-                            instruction=instruction,
-                            evaluation=evaluation,
-                            strategy="initial",
-                            score=evaluation.relative_score,
-                            improvement=0.0,
-                        ),
-                    ),
-                    failed_strategies=(),
-                ),
-                analysis=_RefinementAnalysis(
-                    recommended_strategies=(),
-                    analysis_summary="N/A",
-                ),
-                candidates=(),
+            _RefinementState[SuiteParameters, CaseParameters, Result](
+                root=root_node,
+                nodes={root_node.identifier: root_node},
+                sample_ratio=sample_ratio,
+                performance_drop_threshold=performance_drop_threshold,
+                guidelines=guidelines,
+                rounds_remaining=rounds_limit,
             ),
             # set the result to be initial instruction
             result=MultimodalContent.of(instruction.content),
         )
 
-    return initialization
+    return tree_initialization
 
 
-def _refinement_loop_stage[
+def _tree_exploration_stage[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
     Result: DataModel | str,
 ](
     *,
     evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
-    guidelines: str | None,
     rounds_limit: int,
     quality_threshold: float,
-    convergence_window: int,
-    min_improvement_rate: float,
 ) -> Stage:
-    return Stage.loop(
-        Stage.sequence(
-            _refinement_stage(guidelines=guidelines),
-            _ensemble_evaluation_stage(evaluation_suite=evaluation_suite),
-            # cut out stage context - keep only the result
-            Stage.trim_context(limit=0),
-        ),
-        mode="pre_check",
-        condition=_refinement_loop_condition(
-            rounds_limit=rounds_limit,
-            quality_threshold=quality_threshold,
-            convergence_window=convergence_window,
-            min_improvement_rate=min_improvement_rate,
-        ),
-    )
-
-
-def _failure_analysis_stage() -> Stage:
     @stage
-    async def _failure_analysis(
+    async def tree_exploration(
         *,
         state: StageState,
     ) -> StageState:
-        ctx.log_info("...analyzing evaluation failures...")
         refinement_state: _RefinementState = state.get(
             _RefinementState,
             required=True,
         )
+        evaluation_cases: Sequence[
+            EvaluationSuiteCase[CaseParameters]
+        ] = await evaluation_suite.cases()
 
-        evaluation: SuiteEvaluatorResult[Any, Any] = refinement_state.evaluation
-        if not evaluation.cases:
-            raise ValueError("Evaluation results unavailable, can't refine instruction")
-
-        analysis_response: MultimodalContent = await Stage.completion(
-            MultimodalContent.of(
-                "\n<EVALUATION_RESULT>",
-                evaluation.report(
-                    include_passed=False,
-                    include_details=True,
-                ),
-                "</EVALUATION_RESULT>",
-            ),
-            instruction=FAILURE_ANALYSIS_INSTRUCTION,
-        ).execute()
-
-        recommended_strategies: set[str] = set()
-        if strategies := MultimodalTagElement.parse_first(
-            "RECOMMENDED_STRATEGIES",
-            content=analysis_response,
-        ):
-            for strategy in strategies.content.to_str().split(","):
-                recommended_strategies.add(strategy.strip().upper())
-
-            if not recommended_strategies:
-                raise ValueError("Evaluation analysis unavailable, can't refine instruction")
-
-        else:
-            raise ValueError(
-                "Incomplete failure analysis response"
-                f" - missing recommendation:\n{analysis_response}"
-            )
-
-        analysis_summary: str
-        if summary := MultimodalTagElement.parse_first(
-            "ANALYSIS_SUMMARY",
-            content=analysis_response,
-        ):
-            analysis_summary = summary.content.to_str()
-
-        else:
-            raise ValueError(
-                f"Incomplete failure analysis response - missing summary:\n{analysis_response}"
-            )
-
-        return state.updated(
-            refinement_state.updated(
-                analysis=_RefinementAnalysis(
-                    recommended_strategies=tuple(recommended_strategies),
-                    analysis_summary=analysis_summary,
-                ),
-            ),
-        )
-
-    return _failure_analysis
-
-
-def _multi_strategy_refinement_stage(
-    *,
-    guidelines: str | None,
-) -> Stage:
-    @stage
-    async def _multi_refinement(
-        *,
-        state: StageState,
-    ) -> StageState:
-        ctx.log_info("...generating multi-strategy refinement candidates...")
-        refinement_state: _RefinementState = state.get(
-            _RefinementState,
-            required=True,
-        )
-
-        analysis: _RefinementAnalysis = refinement_state.analysis
-
-        # Prepare context with analysis and instruction
-        analysis_context = MultimodalContent.of(
-            f"<SUBJECT>{refinement_state.instruction.content}</SUBJECT>",
-            (
-                f"\n<DESCRIPTION>{refinement_state.instruction.description}</DESCRIPTION>"
-                if refinement_state.instruction.description
-                else ""
-            ),
-            "\n<FAILURE_ANALYSIS>",
-            analysis.analysis_summary,
-            "</FAILURE_ANALYSIS>",
-            "\n<RECOMMENDED_STRATEGIES>",
-            ", ".join(analysis.recommended_strategies),
-            "</RECOMMENDED_STRATEGIES>",
-        )
-
-        # Generate multiple candidates
-        candidates_response = await Stage.completion(
-            analysis_context,
-            instruction=MULTI_STRATEGY_REFINEMENT_INSTRUCTION.format(
-                guidelines=f"\n<GUIDELINES>{guidelines}</GUIDELINES>\n" if guidelines else "",
-            ),
-        ).execute()
-
-        # Parse candidates
-        candidates: list[_RefinementCandidate] = []
-        for candidate_element in MultimodalTagElement.parse(
-            "CANDIDATE",
-            content=candidates_response,
-        ):
-            strategy_elem: MultimodalTagElement | None = MultimodalTagElement.parse_first(
-                "STRATEGY",
-                content=candidate_element.content,
-            )
-            if strategy_elem is None:
-                continue
-
-            reasoning_elem: MultimodalTagElement | None = MultimodalTagElement.parse_first(
-                "REASONING",
-                content=candidate_element.content,
-            )
-            if reasoning_elem is None:
-                continue
-
-            content_elem: MultimodalTagElement | None = MultimodalTagElement.parse_first(
-                "CONTENT",
-                content=candidate_element.content,
-            )
-            if content_elem is None:
-                continue
-
-            candidates.append(
-                _RefinementCandidate(
-                    content=content_elem.content.to_str().strip(),
-                    strategy=strategy_elem.content.to_str().strip(),
-                    reasoning=reasoning_elem.content.to_str().strip(),
+        node_updates: Sequence[
+            Mapping[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters, Result]]
+        ] = await gather(
+            *[
+                _explore_node(
+                    node=leaf,
+                    evaluation_suite=evaluation_suite,
+                    evaluation_cases=evaluation_cases,
+                    sample_ratio=refinement_state.sample_ratio,
+                    performance_drop_threshold=refinement_state.performance_drop_threshold,
+                    guidelines=refinement_state.guidelines,
                 )
-            )
-
-        if not candidates:
-            raise ValueError("No valid refinement candidates generated")
-
-        ctx.log_info(f"...generated {len(candidates)} refinement candidates...")
-
-        # Store candidates for evaluation and return first candidate for now
-        return state.updated(
-            refinement_state.updated(
-                candidates=candidates,
-            ),
-            result=MultimodalContent.of(candidates[0].content),
+                for leaf in refinement_state.leafs()
+            ]
         )
 
-    return _multi_refinement
-
-
-def _ensemble_evaluation_stage[
-    SuiteParameters: DataModel,
-    CaseParameters: DataModel,
-    Result: DataModel | str,
-](
-    *,
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
-) -> Stage:
-    @stage
-    async def _ensemble_eval(
-        *,
-        state: StageState,
-    ) -> StageState:
-        ctx.log_info("...evaluating refinement candidates...")
-        refinement_state: _RefinementState = state.get(
-            _RefinementState,
-            required=True,
+        updated_nodes: dict[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters, Result]] = (
+            as_dict(refinement_state.nodes)
         )
+        for nodes in node_updates:
+            updated_nodes = {
+                **updated_nodes,
+                **nodes,
+            }
 
-        if not refinement_state.candidates:
-            # No candidates to evaluate, return as-is
-            return state
+        # Update the refinement state with the updated nodes
+        refinement_state = refinement_state.updated(nodes=updated_nodes)
 
-        candidates: Sequence[_RefinementCandidate] = refinement_state.candidates
-        ctx.log_info(f"...evaluating {len(candidates)} candidates...")
-
-        best_candidate: _RefinementCandidate | None = None
-        best_score: float = -1.0
-        best_evaluation: SuiteEvaluatorResult[Any, Any] | None = None
-
-        # Evaluate each candidate
-        for i, candidate in enumerate(candidates):
-            ctx.log_info(f"...evaluating candidate {i + 1} ({candidate.strategy})...")
-
-            # Create temporary instruction with candidate content
-            candidate_instruction: Instruction = refinement_state.instruction.updated(
-                content=candidate.content
-            )
-
-            # Evaluate this candidate
-            with ctx.updated(_instructions(instruction=candidate_instruction)):
-                candidate_evaluation: SuiteEvaluatorResult[Any, Any] = await evaluation_suite()
-
-            ctx.log_info(
-                f"...candidate {i + 1} score: {candidate_evaluation.relative_score:.4f} "
-                f"(strategy: {candidate.strategy})..."
-            )
-
-            # Track best candidate
-            if candidate_evaluation.relative_score > best_score:
-                best_candidate = candidate
-                best_score = candidate_evaluation.relative_score
-                best_evaluation = candidate_evaluation
-
-        if best_candidate is None or best_evaluation is None:
-            raise ValueError("No valid candidate found during ensemble evaluation")
+        # Log tree statistics
+        total_nodes: int = len(refinement_state.nodes)
+        pruned_count: int = len([node for node in refinement_state.nodes.values() if node.pruned])
+        active_nodes: int = total_nodes - pruned_count
 
         ctx.log_info(
-            f"...selected best candidate with score {best_score:.4f} "
-            f"(strategy: {best_candidate.strategy})..."
+            f"Tree exploration round complete. Nodes: {total_nodes} total, "
+            f"{active_nodes} active, {pruned_count} pruned"
         )
 
-        best_instruction: Instruction = refinement_state.instruction.updated(
-            content=best_candidate.content
-        )
+        return state.updated(refinement_state)
 
-        return state.updated(
-            # Update state with best candidate and its evaluation
-            refinement_state.updated(
-                instruction=best_instruction,
-                evaluation=best_evaluation,
-                history=_RefinementHistory(
-                    elements=(
-                        *refinement_state.history.elements,
-                        _RefinementHistoryElement(
-                            instruction=best_instruction,
-                            evaluation=best_evaluation,
-                            strategy=best_candidate.strategy,
-                            score=best_evaluation.relative_score,
-                            improvement=best_evaluation.relative_score
-                            - refinement_state.evaluation.relative_score,
-                        ),
-                    ),
-                    failed_strategies=refinement_state.history.failed_strategies,
-                ),
-            ),
-            result=MultimodalContent.of(best_instruction.content),
-        )
-
-    return _ensemble_eval
-
-
-def _refinement_stage(
-    *,
-    guidelines: str | None,
-) -> Stage:
-    return Stage.sequence(
-        _failure_analysis_stage(),
-        _multi_strategy_refinement_stage(guidelines=guidelines),
-    )
-
-
-def _refinement_loop_condition[CaseParameters: DataModel, Result: DataModel | str](
-    *,
-    rounds_limit: int,
-    quality_threshold: float,
-    convergence_window: int = 3,
-    min_improvement_rate: float = 0.001,
-) -> StageLoopConditioning:
     async def condition(
         *,
         state: StageState,
@@ -494,199 +346,333 @@ def _refinement_loop_condition[CaseParameters: DataModel, Result: DataModel | st
             _RefinementState,
             required=True,
         )
-        ctx.log_info(f"...refinement round {iteration}...")
-
-        # Standard termination conditions
-        if iteration >= rounds_limit:
-            ctx.log_info("...refinement round limit reached...")
+        if any(
+            (
+                node.complete_evaluation_score
+                if node.complete_evaluation_score is not None
+                else node.focused_evaluation_score
+            )
+            > quality_threshold
+            for node in refinement_state.nodes.values()
+        ):
+            # we can complete early with exceptional score
             return False
 
-        if not refinement_state.evaluation.cases:
-            ctx.log_info("...evaluation results empty...")
-            return False
+        return iteration < rounds_limit
 
-        if refinement_state.evaluation.relative_score >= quality_threshold:
-            ctx.log_info("...refinement quality threshold reached...")
-            return False
+    return Stage.loop(
+        tree_exploration,
+        condition=condition,
+    )
 
-        # Convergence detection
-        if len(refinement_state.history.elements) >= convergence_window:
-            history: Sequence[_RefinementHistoryElement] = refinement_state.history.elements[
-                -convergence_window:
-            ]
-            avg_improvement: float = sum(element.improvement for element in history) / len(history)
 
-            if abs(avg_improvement) < min_improvement_rate:
-                ctx.log_info(
-                    f"...convergence detected: avg improvement {avg_improvement:.6f} "
-                    f"< {min_improvement_rate}..."
-                )
-                return False
+async def _explore_node[
+    SuiteParameters: DataModel,
+    CaseParameters: DataModel,
+    Result: DataModel | str,
+](
+    node: _RefinementTreeNode[SuiteParameters, CaseParameters, Result],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
+    evaluation_cases: Sequence[EvaluationSuiteCase[CaseParameters]],
+    sample_ratio: float,
+    performance_drop_threshold: float,
+    guidelines: str | None,
+) -> Mapping[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters, Result]]:
+    assert not node.pruned  # nosec: B101 # skip pruned branches
+    ctx.log_info(
+        f"Exploring node {node.identifier} at"
+        f" depth {node.depth}, score: {node.focused_evaluation_score:.4f}"
+    )
 
-            ctx.log_info(
-                f"...continuing refinement: avg improvement {avg_improvement:.6f} "
-                f">= {min_improvement_rate}..."
+    # Generate exactly 2 complementary strategies
+    strategies: Sequence[tuple[str, Instruction]] = await _generate_refinement_strategies(
+        instruction=node.instruction,
+        evaluation_result=node.focused_evaluation,
+        parent_strategy=node.strategy,
+        guidelines=guidelines,
+    )
+
+    # Create and evaluate child nodes
+    focused_suite_cases: Sequence[EvaluationSuiteCase[CaseParameters]] = _select_focused_cases(
+        evaluation_result=node.focused_evaluation,
+        evaluation_cases=evaluation_cases,
+        sample_ratio=sample_ratio,
+    )
+
+    children: dict[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters, Result]] = {}
+    for strategy_name, refined_instruction in strategies:
+        # Evaluate with focused suite
+        ctx.log_info(f"Evaluating strategy '{strategy_name}'...")
+        focused_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result]
+        with ctx.updated(_instructions(instruction=refined_instruction)):
+            focused_evaluation = await evaluation_suite(*focused_suite_cases)
+
+        # Check for performance drop
+        performance_ratio = (
+            focused_evaluation.relative_score / node.focused_evaluation_score
+            if node.focused_evaluation_score > 0
+            else 0
+        )
+        pruned: bool = performance_ratio < performance_drop_threshold
+
+        # Create child node
+        child_node = _RefinementTreeNode(
+            identifier=uuid4(),
+            instruction=refined_instruction,
+            strategy=strategy_name,
+            parent_id=node.identifier,
+            depth=node.depth + 1,
+            focused_evaluation=focused_evaluation,
+            complete_evaluation=None,
+            children=(),
+            pruned=pruned,
+        )
+        children[child_node.identifier] = child_node
+
+        if pruned:
+            ctx.log_warning(
+                f"Strategy '{strategy_name}' caused {(1 - performance_ratio) * 100:.1f}% "
+                f"performance drop. Pruning this branch."
             )
 
-        return True
+        else:
+            ctx.log_info(
+                f"Created child node {child_node.identifier}: strategy={strategy_name}, "
+                f"score={child_node.focused_evaluation_score:.4f}"
+                f" ({performance_ratio:.1%} of parent)"
+            )
 
-    return condition
+    return children
 
 
-FAILURE_ANALYSIS_INSTRUCTION: str = """\
-You are an expert evaluation analyst specializing in instruction failure classification and \
-targeted improvement strategies.
+# TODO: we should split instruction refinement from strategy selection
+async def _generate_refinement_strategies[
+    SuiteParameters: DataModel,
+    CaseParameters: DataModel,
+    Result: DataModel | str,
+](
+    instruction: Instruction,
+    evaluation_result: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result],
+    parent_strategy: str | None,
+    guidelines: str | None,
+) -> Sequence[tuple[str, Instruction]]:
+    # Analyze failures
+    failure_report = evaluation_result.report(
+        include_passed=False,
+        include_details=True,
+    )
 
-<TASK>
-Analyze the provided evaluation results and classify the types of failures observed. \
-Based on your analysis, recommend specific refinement strategies that would address the \
-identified issues.
-</TASK>
+    strategy_prompt: str = f"""
+Based on the evaluation failures analysis, generate EXACTLY 2 DIFFERENT refinement strategies.
 
-<FAILURE_TYPES>
-- COMPREHENSION: The instruction is unclear, ambiguous, or difficult to understand
-- PRECISION: The instruction lacks specific details, constraints, or clear boundaries
-- COMPLETENESS: The instruction has gaps in coverage or missing information
-- EFFICIENCY: The instruction is verbose, redundant, or poorly structured
-- CONTEXT: The instruction doesn't provide adequate context or background
-- SUBJECT: The instruction doesn't describe goal or expected results correctly
-- EXAMPLES: The instruction lacks helpful examples or demonstrations
-</FAILURE_TYPES>
+Current instruction: {instruction.content}
+Parent strategy: {parent_strategy or "Initial"}
 
-<REFINEMENT_STRATEGIES>
-- CLARITY: Improve language clarity, remove ambiguity, restructure for better flow
-- PRECISION: Add specific details, constraints, measurements, and clear boundaries
-- COMPLETENESS: Fill information gaps, add missing steps or considerations
-- BREVITY: Remove redundancy, consolidate information, improve conciseness
-- CONTEXTUALIZATION: Add background information, situational context, purpose
-- EXPLANATION: Add task and expected results description, explain the subject
-- EXEMPLIFICATION: Include examples, demonstrations, or sample outputs
-</REFINEMENT_STRATEGIES>
+Generate 2 strategies that:
+1. Take CONTRASTING approaches to fixing the issues
+2. Address different aspects of the failures
+3. Are mutually exclusive in their approach
 
-<OUTPUT_FORMAT>
-Provide your analysis by wrapping its parts in xml tags in the following format:
+Examples of contrasting approaches:
+- Strategy 1: Add more specific details and examples
+- Strategy 2: Simplify and remove potentially confusing elements
 
-<FAILURE_ANALYSIS>
-[List the primary failure types observed and their evidence from the evaluation]
-</FAILURE_ANALYSIS>
+OR:
+- Strategy 1: Add explicit constraints and rules
+- Strategy 2: Make instructions more flexible and principle-based
 
-<RECOMMENDED_STRATEGIES>
-[List 2-3, comma separated specific refinement strategies that would best address\
- the identified failures]
-</RECOMMENDED_STRATEGIES>
+{f"Additional guidelines: {guidelines}" if guidelines else ""}
 
-<ANALYSIS_SUMMARY>
-[Brief summary of key issues and improvement approach]
-</ANALYSIS_SUMMARY>
-</OUTPUT_FORMAT>
+For each strategy, provide:
+<STRATEGY>
+<NAME>[Brief descriptive name]</NAME>
+<APPROACH>[One sentence explaining the approach]</APPROACH>
+<CONTENT>[The refined instruction implementing this strategy]</CONTENT>
+</STRATEGY>
 """
 
-REVIEW_INSTRUCTION: str = """\
-You are an evaluation analyst specializing in performance assessment and process optimization. Your role is to thoroughly analyze evaluation results and provide actionable improvement recommendations.
+    response = await Stage.completion(
+        f"Failure Analysis:\n{failure_report}",
+        instruction=strategy_prompt,
+    ).execute()
 
-<INSTRUCTIONS>
-You will be given evaluation results within an EVALUATION_RESULT tag that need to be analyzed. Focus on identifying performance metrics, strengths, weaknesses, and opportunities for enhancement. When the EVALUATION_RESULT tag is empty or missing, respond with "<RECOMMENDATIONS>No evaluation results provided for analysis.</RECOMMENDATIONS>".
-</INSTRUCTIONS>
+    # Parse strategies
+    strategies: list[tuple[str, Instruction]] = []
+    for strategy_element in MultimodalTagElement.parse("STRATEGY", content=response):
+        name_elem: MultimodalTagElement | None = MultimodalTagElement.parse_first(
+            "NAME", content=strategy_element.content
+        )
+        content_elem: MultimodalTagElement | None = MultimodalTagElement.parse_first(
+            "CONTENT", content=strategy_element.content
+        )
 
-<DETAILED_TASK_DESCRIPTION>
-Analyze the provided evaluation results by:
-1. Identifying and extracting key performance metrics
-2. Cataloging strengths and areas where the evaluated process/system performs well
-3. Pinpointing weaknesses, failures, or underperforming areas
-4. Detecting patterns, trends, or recurring issues across the evaluation data
-5. Assessing the overall effectiveness, efficiency, and reliability of the evaluated process/system
+        if name_elem and content_elem:
+            strategy_name: str = name_elem.content.to_str().strip()
+            refined_content: str = content_elem.content.to_str().strip()
+            refined_instruction: Instruction = instruction.updated(content=refined_content)
+            strategies.append((strategy_name, refined_instruction))
 
-Based on your analysis, formulate specific, actionable recommendations that:
-- Directly address identified weaknesses and issues
-- Build upon existing strengths
-- Optimize the effectiveness of the instruction or process being evaluated
-- Improve efficiency and reliability
-- Are practical and implementable
-- Avoids binding to concrete cases but forms general performance improvement suggestions
-</DETAILED_TASK_DESCRIPTION>
+    match len(strategies):
+        case 2:
+            return strategies
 
-<ANALYSIS_PROCESS>
-Before providing your recommendations:
-1. Thoroughly review all evaluation data and results
-2. Categorize findings into strengths, weaknesses, and neutral observations
-3. Prioritize issues based on their impact on overall performance
-4. Consider the context and purpose of the evaluated process/system
-5. Develop specific, measurable improvements for each identified issue
-6. Ensure recommendations are directly relevant to the evaluation findings
-</ANALYSIS_PROCESS>
+        case 1:
+            ctx.log_warning(f"Expected 2 strategies, got {len(strategies)}")
+            return strategies
 
-<OUTPUT_FORMAT>
-Structure your analysis as follows:
-1. Brief summary of key findings
-2. Detailed breakdown of:
-   - Performance metrics observed
-   - Identified strengths
-   - Identified weaknesses
-   - Critical issues requiring immediate attention
-3. Comprehensive recommendations addressing each weakness and opportunity for improvement
-4. Prioritization of recommendations (if applicable)
+        case 0:
+            ctx.log_warning("Failed to generate refinement strategies")
+            return strategies  # this branch will skipped
 
-Place your final improvement recommendations within a RECOMMENDATIONS tag:
-<RECOMMENDATIONS>
-[Your detailed, actionable improvement recommendations here]
-</RECOMMENDATIONS>
-</OUTPUT_FORMAT>
-"""  # noqa: E501
-MULTI_STRATEGY_REFINEMENT_INSTRUCTION: str = """\
-You are an expert instruction optimizer specializing in generating multiple targeted \
-refinement strategies. Your role is to create 2-3 different refinement candidates, each \
-using a distinct approach to address the identified issues.
+        case _:  # more than 2
+            ctx.log_warning(f"Expected 2 strategies, got {len(strategies)}")
+            return strategies[:2]
 
-<INSTRUCTIONS>
-You will receive:
-1. An instruction labeled as SUBJECT that needs refinement
-2. Analysis results showing specific failure types and recommended strategies
-3. Optional guidelines for refinement
 
-Your task is to generate 2-3 refinement candidates, each following a different strategy \
-from the recommended approaches.
+def _tree_finalization_stage[
+    SuiteParameters: DataModel,
+    CaseParameters: DataModel,
+    Result: DataModel | str,
+](
+    *,
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
+    quality_threshold: float,
+    candidates_limit: int,
+) -> Stage:
+    @stage
+    async def tree_finalization(
+        *,
+        state: StageState,
+    ) -> StageState:
+        refinement_state: _RefinementState = state.get(
+            _RefinementState,
+            required=True,
+        )
+        # Find best candidates across entire tree (except root)
+        candidates: Sequence[_RefinementTreeNode] = _find_best_candidates(
+            refinement_state=refinement_state,
+            quality_threshold=quality_threshold,
+            limit=candidates_limit,
+        )
 
-</INSTRUCTIONS>
+        if not candidates:
+            ctx.log_warning("No candidates found, keeping original instruction")
+            return state
 
-<STRATEGY_DEFINITIONS>
-- CLARITY: Focus on improving language clarity, removing ambiguity, and restructuring \
-for better flow
-- PRECISION: Emphasize adding specific details, constraints, measurements, and clear boundaries
-- COMPLETENESS: Concentrate on filling information gaps and adding missing steps or considerations
-- BREVITY: Prioritize removing redundancy, consolidating information, and improving conciseness
-- CONTEXTUALIZATION: Add background information, situational context, and purpose explanation
-- EXPLANATION: Add task and expected results description, explain the subject
-- EXEMPLIFICATION: Include examples, demonstrations, or sample outputs to aid understanding
-</STRATEGY_DEFINITIONS>
+        ctx.log_info(f"Running full evaluation on top {len(candidates)} candidates")
 
-<OUTPUT_FORMAT>
-For each refinement candidate, provide:
+        # Full evaluation of top candidates
+        best_instruction: Instruction = refinement_state.root.instruction
+        best_score: float = refinement_state.root.complete_evaluation_score or 0
+        best_node: _RefinementTreeNode = refinement_state.root
 
-<CANDIDATE>
-<STRATEGY>[Strategy name from recommended strategies]</STRATEGY>
-<REASONING>[Brief explanation of how this strategy addresses the identified issues]</REASONING>
-<CONTENT>
-[The refined instruction following this specific strategy]
-</CONTENT>
-</CANDIDATE>
+        for candidate_node in candidates:
+            ctx.log_info(
+                f"Full evaluation of node {candidate_node.identifier} "
+                f"(strategy: {candidate_node.strategy}, depth: {candidate_node.depth})"
+            )
 
-<CANDIDATE>
-<STRATEGY>[Different strategy name]</STRATEGY>
-<REASONING>[Brief explanation of approach]</REASONING>
-<CONTENT>
-[The refined instruction following this strategy]
-</CONTENT>
-</CANDIDATE>
+            complete_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result]
+            with ctx.updated(_instructions(instruction=candidate_node.instruction)):
+                complete_evaluation = await evaluation_suite()
 
-[Include more CANDIDATE tags if more strategies were recommended]
-</OUTPUT_FORMAT>
+            # Update node with full eval score
+            updated_node: _RefinementTreeNode = candidate_node.updated(
+                complete_evaluation=complete_evaluation
+            )
+            refinement_state = refinement_state.updated(
+                nodes={
+                    **refinement_state.nodes,
+                    # update node in tree
+                    updated_node.identifier: updated_node,
+                },
+            )
 
-<REQUIREMENTS>
-- Each candidate must use a different strategy approach
-- Maintain the original intent and core purpose of the instruction
-- Ensure each candidate stands alone as a complete, usable instruction
-- Focus on the specific issues identified in the failure analysis
-- Optimize for LLM system prompt usage
-{guidelines}
-</REQUIREMENTS>
-"""
+            ctx.log_info(
+                f"Full evaluation score: {complete_evaluation.relative_score:.4f} "
+                f"(focused was: {updated_node.focused_evaluation_score:.4f})"
+            )
+
+            if complete_evaluation.relative_score > best_score:
+                best_instruction = updated_node.instruction
+                best_score = complete_evaluation.relative_score
+                best_node = updated_node
+
+        # Log final statistics
+        _log_tree_statistics(
+            refinement_state=refinement_state,
+            best_node=best_node,
+        )
+
+        # Update result with best instruction and updated state
+        return state.updated(
+            refinement_state,
+            result=MultimodalContent.of(best_instruction.content),
+        )
+
+    return tree_finalization
+
+
+def _find_best_candidates(
+    *,
+    refinement_state: _RefinementState,
+    quality_threshold: float,
+    limit: int,
+) -> Sequence[_RefinementTreeNode]:
+    # Get all nodes that are not pruned
+    candidates: list[_RefinementTreeNode] = []
+    for node in refinement_state.nodes.values():
+        # skip excluded and root from candidates
+        if node.pruned or node.is_root:
+            continue
+
+        # Include if it's a leaf or has exceptional performance
+        if node.is_leaf or node.focused_evaluation_score > quality_threshold:
+            candidates.append(node)
+
+    # Sort by focused score and depth (prefer deeper nodes with same score)
+    candidates.sort(
+        key=lambda x: (x.focused_evaluation_score, x.depth),
+        reverse=True,
+    )
+
+    return candidates[:limit]
+
+
+def _log_tree_statistics(
+    *,
+    refinement_state: _RefinementState,
+    best_node: _RefinementTreeNode,
+) -> None:
+    total_nodes: int = len(refinement_state.nodes)
+    pruned_count: int = len([node for node in refinement_state.nodes.values() if node.pruned])
+    active_nodes: int = total_nodes - pruned_count
+
+    # Depth distribution
+    depth_distribution: dict[int, int] = {}
+    for node in refinement_state.nodes.values():
+        depth_distribution[node.depth] = depth_distribution.get(node.depth, 0) + 1
+
+    max_depth: int = max(depth_distribution.keys()) if depth_distribution else 0
+    theoretical_max: int = 2 ** (max_depth + 1) - 1
+    efficiency: float = active_nodes / theoretical_max if theoretical_max > 0.0 else 0.0
+
+    # Build path to best node
+    best_path: list[str] = []
+    current_id: UUID | None = best_node.identifier
+    while current_id:
+        node = refinement_state.nodes[current_id]
+        best_path.append(f"{node.strategy} (score: {node.focused_evaluation_score:.3f})")
+        current_id = node.parent_id
+
+    best_path.reverse()
+
+    ctx.log_info(
+        f"Tree statistics:\n"
+        f"- Total nodes explored: {total_nodes}\n"
+        f"- Active nodes: {active_nodes}\n"
+        f"- Pruned nodes: {pruned_count} ({pruned_count / total_nodes * 100:.1f}%)\n"
+        f"- Max depth reached: {max_depth}\n"
+        f"- Exploration efficiency: {efficiency:.1%}\n"
+        f"- Best path: {' -> '.join(best_path) if best_path else 'None'}"
+    )

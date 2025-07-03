@@ -111,12 +111,6 @@ from draive.guardrails import (
     GuardrailsQualityException,
     GuardrailsQualityVerification,
 )
-from draive.helpers import (
-    InstructionPreparationAmbiguity,
-    VolatileVectorIndex,
-    prepare_instruction,
-    refine_instruction,
-)
 from draive.instructions import (
     Instruction,
     InstructionDeclaration,
@@ -288,7 +282,6 @@ __all__ = (
     "InstructionDeclaration",
     "InstructionException",
     "InstructionMissing",
-    "InstructionPreparationAmbiguity",
     "InstructionTemplate",
     "Instructions",
     "LMMCompletion",
@@ -386,7 +379,6 @@ __all__ = (
     "Tools",
     "ValueEmbedding",
     "VectorIndex",
-    "VolatileVectorIndex",
     "agent",
     "always",
     "as_dict",
@@ -410,10 +402,8 @@ __all__ = (
     "mmr_vector_similarity_search",
     "noop",
     "not_missing",
-    "prepare_instruction",
     "process_concurrently",
     "prompt",
-    "refine_instruction",
     "resource",
     "retry",
     "setup_logging",
