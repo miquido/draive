@@ -152,7 +152,7 @@ class ContentTestCase(DataModel):
 @evaluation_suite(ContentTestCase)
 async def content_generation_suite(
     parameters: ContentTestCase,
-) -> EvaluationCaseResult[str]:
+) -> EvaluationCaseResult:
     # Generate content based on test case parameters
     content: str = await TextGeneration.generate(
         instruction=f"Write informative content about {parameters.topic}",
