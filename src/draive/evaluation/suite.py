@@ -141,7 +141,7 @@ class SuiteEvaluatorResult[SuiteParameters: DataModel, CaseParameters: DataModel
         return score / len(self.cases)
 
 
-class EvaluationCaseResult[Value](DataModel):
+class EvaluationCaseResult(DataModel):
     @classmethod
     def of(
         cls,
@@ -173,7 +173,7 @@ class EvaluationCaseResult[Value](DataModel):
         )
 
     @classmethod
-    async def evaluating(
+    async def evaluating[Value](
         cls,
         value: Value,
         /,
@@ -220,13 +220,12 @@ class EvaluationCaseResult[Value](DataModel):
 class EvaluationSuiteDefinition[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Value,
 ](Protocol):
     async def __call__(
         self,
         parameters: SuiteParameters,
         case_parameters: CaseParameters,
-    ) -> EvaluationCaseResult[Value]: ...
+    ) -> EvaluationCaseResult: ...
 
 
 class EvaluationSuiteData[SuiteParameters: DataModel, CaseParameters: DataModel](DataModel):
@@ -249,7 +248,6 @@ class EvaluationSuiteStorage[SuiteParameters: DataModel, CaseParameters: DataMod
 class EvaluationSuite[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Value,
 ]:
     __slots__ = (
         "_case_parameters",
@@ -265,15 +263,13 @@ class EvaluationSuite[
         self,
         suite_parameters: type[SuiteParameters],
         case_parameters: type[CaseParameters],
-        definition: EvaluationSuiteDefinition[SuiteParameters, CaseParameters, Value],
+        definition: EvaluationSuiteDefinition[SuiteParameters, CaseParameters],
         storage: EvaluationSuiteStorage[SuiteParameters, CaseParameters],
         execution_context: ScopeContext | None,
     ) -> None:
         self._suite_parameters: type[SuiteParameters] = suite_parameters
         self._case_parameters: type[CaseParameters] = case_parameters
-        self._definition: EvaluationSuiteDefinition[SuiteParameters, CaseParameters, Value] = (
-            definition
-        )
+        self._definition: EvaluationSuiteDefinition[SuiteParameters, CaseParameters] = definition
         self._storage: EvaluationSuiteStorage[SuiteParameters, CaseParameters] = storage
         self._execution_context: ScopeContext | None = execution_context
         self._data_cache: EvaluationSuiteData[SuiteParameters, CaseParameters] | None = None
@@ -358,7 +354,7 @@ class EvaluationSuite[
         *,
         suite_parameters: SuiteParameters,
     ) -> SuiteEvaluatorCaseResult[CaseParameters]:
-        result: EvaluationCaseResult[Value] = await self._definition(
+        result: EvaluationCaseResult = await self._definition(
             parameters=suite_parameters,
             case_parameters=case_parameters.parameters,
         )
@@ -517,8 +513,8 @@ def evaluation_suite[SuiteParameters: DataModel, CaseParameters: DataModel, Valu
     | None = None,
     execution_context: ScopeContext | None = None,
 ) -> Callable[
-    [EvaluationSuiteDefinition[SuiteParameters, CaseParameters, Value]],
-    EvaluationSuite[SuiteParameters, CaseParameters, Value],
+    [EvaluationSuiteDefinition[SuiteParameters, CaseParameters]],
+    EvaluationSuite[SuiteParameters, CaseParameters],
 ]:
     suite_parameters_type: type[SuiteParameters]
     suite_parameters_value: SuiteParameters | None
@@ -573,9 +569,9 @@ def evaluation_suite[SuiteParameters: DataModel, CaseParameters: DataModel, Valu
             suite_storage = storage
 
     def wrap(
-        definition: EvaluationSuiteDefinition[SuiteParameters, CaseParameters, Value],
-    ) -> EvaluationSuite[SuiteParameters, CaseParameters, Value]:
-        return EvaluationSuite[SuiteParameters, CaseParameters, Value](
+        definition: EvaluationSuiteDefinition[SuiteParameters, CaseParameters],
+    ) -> EvaluationSuite[SuiteParameters, CaseParameters]:
+        return EvaluationSuite[SuiteParameters, CaseParameters](
             suite_parameters=suite_parameters_type,
             case_parameters=case_parameters,
             definition=definition,

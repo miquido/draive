@@ -26,7 +26,7 @@ async def refine_instruction[
     /,
     *,
     guidelines: str | None = None,
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Value],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters],
     rounds_limit: int,
     sample_ratio: float = 0.1,
     candidates_limit: int = 3,
@@ -214,11 +214,10 @@ def _select_focused_cases[
 def _tree_initialization_stage[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Value,
 ](
     *,
     instruction: Instruction,
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Value],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters],
     sample_ratio: float,
     performance_drop_threshold: float,
     guidelines: str | None,
@@ -274,7 +273,7 @@ def _tree_exploration_stage[
     Value,
 ](
     *,
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Value],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters],
     rounds_limit: int,
     quality_threshold: float,
 ) -> Stage:
@@ -366,7 +365,7 @@ async def _explore_node[
     Value,
 ](
     node: _RefinementTreeNode[SuiteParameters, CaseParameters],
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Value],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters],
     evaluation_cases: Sequence[EvaluationSuiteCase[CaseParameters]],
     sample_ratio: float,
     performance_drop_threshold: float,
@@ -525,10 +524,9 @@ For each strategy, provide:
 def _tree_finalization_stage[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Value,
 ](
     *,
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Value],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters],
     quality_threshold: float,
     candidates_limit: int,
 ) -> Stage:
