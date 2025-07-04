@@ -20,13 +20,13 @@ __all__ = ("refine_instruction",)
 async def refine_instruction[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Result: DataModel | str,
+    Value,
 ](
     instruction: Instruction,
     /,
     *,
     guidelines: str | None = None,
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Value],
     rounds_limit: int,
     sample_ratio: float = 0.1,
     candidates_limit: int = 3,
@@ -118,18 +118,14 @@ def _instructions(
     return Instructions(fetching=instruction_fetch)
 
 
-class _RefinementTreeNode[
-    SuiteParameters: DataModel,
-    CaseParameters: DataModel,
-    Result: DataModel | str,
-](State):
+class _RefinementTreeNode[SuiteParameters: DataModel, CaseParameters: DataModel](State):
     identifier: UUID
     instruction: Instruction
     strategy: str
     parent_id: UUID | None
     depth: int
-    focused_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result]
-    complete_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result] | None
+    focused_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters]
+    complete_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters] | None
     children: Sequence[UUID]
     pruned: bool
 
@@ -156,26 +152,24 @@ class _RefinementTreeNode[
 class _RefinementState[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Result: DataModel | str,
 ](State):
     root: _RefinementTreeNode
-    nodes: Mapping[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters, Result]]
+    nodes: Mapping[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters]]
     sample_ratio: float
     performance_drop_threshold: float
     guidelines: str | None = None
     rounds_remaining: int
 
-    def leafs(self) -> Sequence[_RefinementTreeNode[SuiteParameters, CaseParameters, Result]]:
+    def leafs(self) -> Sequence[_RefinementTreeNode[SuiteParameters, CaseParameters]]:
         return [node for node in self.nodes.values() if node.is_leaf and not node.pruned]
 
 
 def _select_focused_cases[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Result: DataModel | str,
 ](
     *,
-    evaluation_result: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result],
+    evaluation_result: SuiteEvaluatorResult[SuiteParameters, CaseParameters],
     evaluation_cases: Sequence[EvaluationSuiteCase[CaseParameters]],
     sample_ratio: float,
 ) -> Sequence[EvaluationSuiteCase[CaseParameters]]:
@@ -220,11 +214,11 @@ def _select_focused_cases[
 def _tree_initialization_stage[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Result: DataModel | str,
+    Value,
 ](
     *,
     instruction: Instruction,
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Value],
     sample_ratio: float,
     performance_drop_threshold: float,
     guidelines: str | None,
@@ -237,7 +231,7 @@ def _tree_initialization_stage[
     ) -> StageState:
         ctx.log_info("...evaluating initial instruction with full suite...")
         # Make initial evaluation
-        evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result]
+        evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters]
         with ctx.updated(_instructions(instruction=instruction)):
             evaluation = await evaluation_suite()
 
@@ -259,7 +253,7 @@ def _tree_initialization_stage[
 
         # Setup initial state
         return state.updated(
-            _RefinementState[SuiteParameters, CaseParameters, Result](
+            _RefinementState[SuiteParameters, CaseParameters](
                 root=root_node,
                 nodes={root_node.identifier: root_node},
                 sample_ratio=sample_ratio,
@@ -277,10 +271,10 @@ def _tree_initialization_stage[
 def _tree_exploration_stage[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Result: DataModel | str,
+    Value,
 ](
     *,
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Value],
     rounds_limit: int,
     quality_threshold: float,
 ) -> Stage:
@@ -298,7 +292,7 @@ def _tree_exploration_stage[
         ] = await evaluation_suite.cases()
 
         node_updates: Sequence[
-            Mapping[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters, Result]]
+            Mapping[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters]]
         ] = await gather(
             *[
                 _explore_node(
@@ -313,8 +307,8 @@ def _tree_exploration_stage[
             ]
         )
 
-        updated_nodes: dict[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters, Result]] = (
-            as_dict(refinement_state.nodes)
+        updated_nodes: dict[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters]] = as_dict(
+            refinement_state.nodes
         )
         for nodes in node_updates:
             updated_nodes = {
@@ -369,15 +363,15 @@ def _tree_exploration_stage[
 async def _explore_node[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Result: DataModel | str,
+    Value,
 ](
-    node: _RefinementTreeNode[SuiteParameters, CaseParameters, Result],
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
+    node: _RefinementTreeNode[SuiteParameters, CaseParameters],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Value],
     evaluation_cases: Sequence[EvaluationSuiteCase[CaseParameters]],
     sample_ratio: float,
     performance_drop_threshold: float,
     guidelines: str | None,
-) -> Mapping[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters, Result]]:
+) -> Mapping[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters]]:
     assert not node.pruned  # nosec: B101 # skip pruned branches
     ctx.log_info(
         f"Exploring node {node.identifier} at"
@@ -399,11 +393,11 @@ async def _explore_node[
         sample_ratio=sample_ratio,
     )
 
-    children: dict[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters, Result]] = {}
+    children: dict[UUID, _RefinementTreeNode[SuiteParameters, CaseParameters]] = {}
     for strategy_name, refined_instruction in strategies:
         # Evaluate with focused suite
         ctx.log_info(f"Evaluating strategy '{strategy_name}'...")
-        focused_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result]
+        focused_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters]
         with ctx.updated(_instructions(instruction=refined_instruction)):
             focused_evaluation = await evaluation_suite(*focused_suite_cases)
 
@@ -449,10 +443,9 @@ async def _explore_node[
 async def _generate_refinement_strategies[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Result: DataModel | str,
 ](
     instruction: Instruction,
-    evaluation_result: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result],
+    evaluation_result: SuiteEvaluatorResult[SuiteParameters, CaseParameters],
     parent_strategy: str | None,
     guidelines: str | None,
 ) -> Sequence[tuple[str, Instruction]]:
@@ -532,10 +525,10 @@ For each strategy, provide:
 def _tree_finalization_stage[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Result: DataModel | str,
+    Value,
 ](
     *,
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Result],
+    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters, Value],
     quality_threshold: float,
     candidates_limit: int,
 ) -> Stage:
@@ -572,7 +565,7 @@ def _tree_finalization_stage[
                 f"(strategy: {candidate_node.strategy}, depth: {candidate_node.depth})"
             )
 
-            complete_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters, Result]
+            complete_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters]
             with ctx.updated(_instructions(instruction=candidate_node.instruction)):
                 complete_evaluation = await evaluation_suite()
 

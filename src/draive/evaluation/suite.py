@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Protocol, Self, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import ScopeContext, asynchronous, ctx
+from haiway import ScopeContext, as_list, asynchronous, ctx
 
 from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
@@ -29,12 +29,9 @@ class EvaluationSuiteCase[CaseParameters: DataModel](DataModel):
     comment: str | None = None
 
 
-class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str](DataModel):
+class SuiteEvaluatorCaseResult[CaseParameters: DataModel](DataModel):
     case: EvaluationSuiteCase[CaseParameters] = Field(
         description="Evaluated case",
-    )
-    value: Value = Field(
-        description="Evaluated value",
     )
     results: Sequence[ScenarioEvaluatorResult] = Field(
         description="Evaluation results",
@@ -71,7 +68,6 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
                 return (
                     f"<evaluation_case identifier='{self.case.identifier}'>"
                     f"\n<relative_score>{self.relative_score * 100:.2f}%</relative_score>"
-                    f"\n<evaluated_value>{self.value}</evaluated_value>"
                     # TODO: convert DataModel to xml representation when avaialble
                     f"\n<parameters>{self.case.parameters}</parameters>"
                     f"\n{report}"
@@ -99,13 +95,9 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel, Value: DataModel | str
         return score / len(self.results)
 
 
-class SuiteEvaluatorResult[
-    SuiteParameters: DataModel,
-    CaseParameters: DataModel,
-    Value: DataModel | str,
-](DataModel):
+class SuiteEvaluatorResult[SuiteParameters: DataModel, CaseParameters: DataModel](DataModel):
     parameters: SuiteParameters
-    cases: Sequence[SuiteEvaluatorCaseResult[CaseParameters, Value]]
+    cases: Sequence[SuiteEvaluatorCaseResult[CaseParameters]]
 
     @property
     def passed(self) -> bool:
@@ -149,13 +141,12 @@ class SuiteEvaluatorResult[
         return score / len(self.cases)
 
 
-class EvaluationCaseResult[Value: DataModel | str](DataModel):
+class EvaluationCaseResult[Value](DataModel):
     @classmethod
     def of(
         cls,
         results: ScenarioEvaluatorResult | EvaluatorResult,
         *_results: ScenarioEvaluatorResult | EvaluatorResult,
-        value: Value,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         free_results: list[EvaluatorResult] = []
@@ -177,7 +168,6 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
             )
 
         return cls(
-            value=value,
             results=tuple(scenario_results),
             meta=Meta.of(meta),
         )
@@ -196,13 +186,27 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
                 *[evaluator(value) for evaluator in [evaluators, *_evaluators]],
                 return_exceptions=False,
             ),
-            value=value,
             meta=Meta.of(meta),
         )
 
-    value: Value = Field(
-        description="Evaluated value",
-    )
+    @classmethod
+    def merging(
+        cls,
+        result: Self,
+        *results: Self,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        merged_evaluations: list[ScenarioEvaluatorResult] = as_list(result.results)
+        merged_meta: Meta = result.meta
+        for other in results:
+            merged_evaluations.extend(other.results)
+            merged_meta = merged_meta.merged_with(other.meta)
+
+        return cls(
+            results=merged_evaluations,
+            meta=merged_meta.merged_with(Meta.of(meta)),
+        )
+
     results: Sequence[ScenarioEvaluatorResult] = Field(
         description="Evaluation results",
     )
@@ -216,7 +220,7 @@ class EvaluationCaseResult[Value: DataModel | str](DataModel):
 class EvaluationSuiteDefinition[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Value: DataModel | str,
+    Value,
 ](Protocol):
     async def __call__(
         self,
@@ -245,7 +249,7 @@ class EvaluationSuiteStorage[SuiteParameters: DataModel, CaseParameters: DataMod
 class EvaluationSuite[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
-    Value: DataModel | str,
+    Value,
 ]:
     __slots__ = (
         "_case_parameters",
@@ -280,7 +284,7 @@ class EvaluationSuite[
         *case_parameters: EvaluationSuiteCase[CaseParameters] | CaseParameters | UUID,
         parameters: SuiteParameters | None = None,
         reload: bool = False,
-    ) -> SuiteEvaluatorResult[SuiteParameters, CaseParameters, Value]:
+    ) -> SuiteEvaluatorResult[SuiteParameters, CaseParameters]:
         if context := self._execution_context:
             async with context:
                 return await self._evaluate(
@@ -304,7 +308,7 @@ class EvaluationSuite[
         *,
         suite_parameters: SuiteParameters | None = None,
         reload: bool = False,
-    ) -> SuiteEvaluatorResult[SuiteParameters, CaseParameters, Value]:
+    ) -> SuiteEvaluatorResult[SuiteParameters, CaseParameters]:
         suite_data: EvaluationSuiteData[SuiteParameters, CaseParameters]
         async with self._lock:
             suite_data = await self._data(reload=reload)
@@ -353,15 +357,14 @@ class EvaluationSuite[
         case_parameters: EvaluationSuiteCase[CaseParameters],
         *,
         suite_parameters: SuiteParameters,
-    ) -> SuiteEvaluatorCaseResult[CaseParameters, Value]:
+    ) -> SuiteEvaluatorCaseResult[CaseParameters]:
         result: EvaluationCaseResult[Value] = await self._definition(
             parameters=suite_parameters,
             case_parameters=case_parameters.parameters,
         )
 
-        return SuiteEvaluatorCaseResult[CaseParameters, Value](
+        return SuiteEvaluatorCaseResult[CaseParameters](
             case=case_parameters,
-            value=result.value,
             results=result.results,
         )
 
@@ -502,7 +505,7 @@ class EvaluationSuite[
             await self._storage.save(self._data_cache)
 
 
-def evaluation_suite[SuiteParameters: DataModel, CaseParameters: DataModel, Value: DataModel | str](
+def evaluation_suite[SuiteParameters: DataModel, CaseParameters: DataModel, Value](
     case_parameters: type[CaseParameters],
     /,
     suite_parameters: type[SuiteParameters] | SuiteParameters,
