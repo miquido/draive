@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 from draive.generation import ModelGeneration
@@ -35,7 +35,7 @@ async def generate_case_parameters[Parameters: DataModel](
     count: int,
     examples: Iterable[Parameters],
     guidelines: str | None = None,
-) -> list[Parameters]:
+) -> Sequence[Parameters]:
     results: list[Parameters] = []
     example_pairs: list[tuple[str, Any]] = [(INPUT, example) for example in examples]
 

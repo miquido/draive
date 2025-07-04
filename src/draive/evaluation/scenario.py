@@ -2,7 +2,7 @@ from asyncio import gather
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol, Self, cast, overload, runtime_checkable
 
-from haiway import AttributePath, ScopeContext, ctx
+from haiway import AttributePath, ScopeContext, as_list, ctx
 
 from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
@@ -96,6 +96,24 @@ class EvaluationScenarioResult(DataModel):
             meta=Meta.of(meta),
         )
 
+    @classmethod
+    def merging(
+        cls,
+        result: Self,
+        *results: Self,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        merged_evaluations: list[EvaluatorResult] = as_list(result.evaluations)
+        merged_meta: Meta = result.meta
+        for other in results:
+            merged_evaluations.extend(other.evaluations)
+            merged_meta = merged_meta.merged_with(other.meta)
+
+        return cls(
+            evaluations=merged_evaluations,
+            meta=merged_meta.merged_with(Meta.of(meta)),
+        )
+
     evaluations: Sequence[EvaluatorResult] = Field(
         description="Scenario evaluation results",
     )
@@ -129,7 +147,12 @@ class ScenarioEvaluatorDefinition[Value, **Args](Protocol):
 
 
 class ScenarioEvaluator[Value, **Args]:
-    __slots__ = ("_definition", "_execution_context", "meta", "name")
+    __slots__ = (
+        "_definition",
+        "_execution_context",
+        "meta",
+        "name",
+    )
 
     def __init__(
         self,

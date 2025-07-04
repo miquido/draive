@@ -252,7 +252,7 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.74.0"
+version = "0.75.1"
 source = { editable = "." }
 dependencies = [
     { name = "haiway" },
@@ -327,8 +327,6 @@ requires-dist = [
     { name = "boto3", marker = "extra == 'cohere-bedrock'", specifier = "~=1.37" },
     { name = "cohere", marker = "extra == 'cohere'", specifier = "~=5.15" },
     { name = "cohere", marker = "extra == 'cohere-bedrock'", specifier = "~=5.13" },
-    { name = "draive", extras = ["sentencepiece"], marker = "extra == 'gemini'" },
-    { name = "draive", extras = ["sentencepiece"], marker = "extra == 'mistral'" },
     { name = "google-api-core", marker = "extra == 'gemini'", specifier = "~=2.25,<3.0" },
     { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=1.20" },
     { name = "haiway", specifier = "~=0.24.0" },
@@ -347,6 +345,8 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "~=0.26" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = "~=6.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "~=0.12" },
+    { name = "sentencepiece", marker = "extra == 'gemini'", specifier = "~=0.2" },
+    { name = "sentencepiece", marker = "extra == 'mistral'", specifier = "~=0.2" },
     { name = "sentencepiece", marker = "extra == 'sentencepiece'", specifier = "~=0.2" },
     { name = "tiktoken", marker = "extra == 'openai'", specifier = "~=0.9" },
     { name = "tokenizers", marker = "extra == 'anthropic'", specifier = "~=0.21" },
