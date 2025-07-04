@@ -48,7 +48,7 @@ from haiway import (
     throttle,
     timeout,
     traced,
-    when_missing,
+    unwrap_missing,
     without_missing,
 )
 
@@ -414,9 +414,9 @@ __all__ = (
     "timeout",
     "tool",
     "traced",
+    "unwrap_missing",
     "vector_similarity_score",
     "vector_similarity_search",
-    "when_missing",
     "without_missing",
     "workflow",
 )
