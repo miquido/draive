@@ -378,7 +378,7 @@ async def _explore_node[
     )
 
     # Generate exactly 2 complementary strategies
-    strategies: Sequence[tuple[str, Instruction]] = await _generate_refinement_strategies(
+    strategies: Sequence[tuple[str, Instruction]] = await _generate_refined_instructions(
         instruction=node.instruction,
         evaluation_result=node.focused_evaluation,
         parent_strategy=node.strategy,
@@ -438,8 +438,136 @@ async def _explore_node[
     return children
 
 
-# TODO: we should split instruction refinement from strategy selection
-async def _generate_refinement_strategies[
+async def _generate_strategy_metadata[
+    SuiteParameters: DataModel,
+    CaseParameters: DataModel,
+](
+    *,
+    evaluation_result: SuiteEvaluatorResult[SuiteParameters, CaseParameters],
+    parent_strategy: str | None,
+    guidelines: str | None,
+) -> Sequence[tuple[str, str]]:
+    """
+    Generate strategy metadata (name and approach) without instruction content.
+
+    Returns:
+        Sequence of tuples containing (name, approach) for each strategy.
+    """
+    # Analyze failures
+    failure_report = evaluation_result.report(
+        include_passed=False,
+        include_details=True,
+    )
+
+    strategy_prompt: str = f"""
+You are an expert prompt engineer providing feedback and recemmondations for instruction improvement.
+Based on the evaluation failures analysis, prepare EXACTLY 2 DIFFERENT refinement strategies.
+
+<previous_strategy>{parent_strategy or "Initial"}</previous_strategy>
+<task>
+Generate 2 instruction refinement strategies and recommendations that:
+1. Take CONTRASTING approaches to fixing the issues
+2. Address different aspects of the failures
+3. Are mutually exclusive in their approach
+</task>
+{f"\n<guidelines>\n{guidelines}</guidelines>\n" if guidelines else ""}
+<examples>
+<strategy>
+<name>Examplification</name>
+<approach>Add more specific details and examples</approach>
+</strategy>
+<strategy>
+<name>Constraning</name>
+<approach>Add explicit constraints and rules</approach>
+</strategy>
+</examples>
+<format>
+For each strategy, provide the name and approach in the following tags format:
+<strategy>
+<name>[Brief descriptive name]</name>
+<approach>[Explanation of the approach with description of recommendations]</approach>
+</strategy>
+</format>
+"""  # noqa: E501
+
+    response = await Stage.completion(
+        f"<failure_analysis>\n{failure_report}\n</failure_analysis>",
+        instruction=strategy_prompt,
+    ).execute()
+
+    # Parse strategies
+    strategies: list[tuple[str, str]] = []
+    for strategy_element in MultimodalTagElement.parse(
+        "strategy",
+        content=response,
+    ):
+        name_elem: MultimodalTagElement | None = MultimodalTagElement.parse_first(
+            "name",
+            content=strategy_element.content,
+        )
+        approach_elem: MultimodalTagElement | None = MultimodalTagElement.parse_first(
+            "approach",
+            content=strategy_element.content,
+        )
+
+        if name_elem and approach_elem:
+            strategy_name: str = name_elem.content.to_str().strip()
+            strategy_approach: str = approach_elem.content.to_str().strip()
+            strategies.append((strategy_name, strategy_approach))
+
+    return strategies
+
+
+async def _generate_instruction_content[
+    SuiteParameters: DataModel,
+    CaseParameters: DataModel,
+](
+    *,
+    current_instruction_content: str,
+    strategy_name: str,
+    strategy_approach: str,
+    evaluation_result: SuiteEvaluatorResult[SuiteParameters, CaseParameters],
+    guidelines: str | None,
+) -> str:
+    # Analyze failures
+    failure_report = evaluation_result.report(
+        include_passed=False,
+        include_details=True,
+    )
+
+    refinement_prompt: str = f"""\
+You are an expert prompt engineer refining provided instructions referred as a subject.
+Provide an updated version of the subject that implements the described strategy to address the evaluation failures.
+Strictly focus on delivering the best possible instruction content with excellent clarity and performance.
+Ensure to apply modifications by following requested strategy while keeping original instruction intent, goal and formatting style.
+
+<strategy>
+<name>
+{strategy_name}
+</name>
+<approach>
+{strategy_approach}
+</approach>
+</strategy>
+
+<subject>
+{current_instruction_content}
+</subject>
+{f"\n<guidelines>\n{guidelines}</guidelines>\n" if guidelines else ""}
+<format>
+Provide ONLY the refined instruction content, without any explanation or metadata.
+</format>
+"""  # noqa: E501
+
+    response = await Stage.completion(
+        f"<failure_analysis>\n{failure_report}\n</failure_analysis>",
+        instruction=refinement_prompt,
+    ).execute()
+
+    return response.to_str().strip()
+
+
+async def _generate_refined_instructions[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
 ](
@@ -448,77 +576,42 @@ async def _generate_refinement_strategies[
     parent_strategy: str | None,
     guidelines: str | None,
 ) -> Sequence[tuple[str, Instruction]]:
-    # Analyze failures
-    failure_report = evaluation_result.report(
-        include_passed=False,
-        include_details=True,
+    # Step 1: Generate strategy metadata
+    strategy_metadata = await _generate_strategy_metadata(
+        evaluation_result=evaluation_result,
+        parent_strategy=parent_strategy,
+        guidelines=guidelines,
     )
 
-    strategy_prompt: str = f"""
-Based on the evaluation failures analysis, generate EXACTLY 2 DIFFERENT refinement strategies.
-
-Current instruction: {instruction.content}
-Parent strategy: {parent_strategy or "Initial"}
-
-Generate 2 strategies that:
-1. Take CONTRASTING approaches to fixing the issues
-2. Address different aspects of the failures
-3. Are mutually exclusive in their approach
-
-Examples of contrasting approaches:
-- Strategy 1: Add more specific details and examples
-- Strategy 2: Simplify and remove potentially confusing elements
-
-OR:
-- Strategy 1: Add explicit constraints and rules
-- Strategy 2: Make instructions more flexible and principle-based
-
-{f"Additional guidelines: {guidelines}" if guidelines else ""}
-
-For each strategy, provide:
-<STRATEGY>
-<NAME>[Brief descriptive name]</NAME>
-<APPROACH>[One sentence explaining the approach]</APPROACH>
-<CONTENT>[The refined instruction implementing this strategy]</CONTENT>
-</STRATEGY>
-"""
-
-    response = await Stage.completion(
-        f"Failure Analysis:\n{failure_report}",
-        instruction=strategy_prompt,
-    ).execute()
-
-    # Parse strategies
-    strategies: list[tuple[str, Instruction]] = []
-    for strategy_element in MultimodalTagElement.parse("STRATEGY", content=response):
-        name_elem: MultimodalTagElement | None = MultimodalTagElement.parse_first(
-            "NAME", content=strategy_element.content
+    # Step 2: Generate instruction content for each strategy
+    refined_strategies: list[tuple[str, Instruction]] = []
+    for strategy_name, strategy_approach in strategy_metadata:
+        refined_content = await _generate_instruction_content(
+            current_instruction_content=instruction.content,
+            strategy_name=strategy_name,
+            strategy_approach=strategy_approach,
+            evaluation_result=evaluation_result,
+            guidelines=guidelines,
         )
-        content_elem: MultimodalTagElement | None = MultimodalTagElement.parse_first(
-            "CONTENT", content=strategy_element.content
-        )
+        refined_instruction = instruction.updated(content=refined_content)
+        refined_strategies.append((strategy_name, refined_instruction))
 
-        if name_elem and content_elem:
-            strategy_name: str = name_elem.content.to_str().strip()
-            refined_content: str = content_elem.content.to_str().strip()
-            refined_instruction: Instruction = instruction.updated(content=refined_content)
-            strategies.append((strategy_name, refined_instruction))
-
-    match len(strategies):
+    # Validate and return results
+    match len(refined_strategies):
         case 2:
-            return strategies
+            return refined_strategies
 
         case 1:
-            ctx.log_warning(f"Expected 2 strategies, got {len(strategies)}")
-            return strategies
+            ctx.log_warning(f"Expected 2 strategies, got {len(refined_strategies)}")
+            return refined_strategies
 
         case 0:
             ctx.log_warning("Failed to generate refinement strategies")
-            return strategies  # this branch will skipped
+            return refined_strategies  # this branch will be skipped
 
         case _:  # more than 2
-            ctx.log_warning(f"Expected 2 strategies, got {len(strategies)}")
-            return strategies[:2]
+            ctx.log_warning(f"Expected 2 strategies, got {len(refined_strategies)}")
+            return refined_strategies[:2]
 
 
 def _tree_finalization_stage[
