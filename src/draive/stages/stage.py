@@ -52,7 +52,6 @@ from draive.stages.types import (
     StageState,
 )
 from draive.tools import FunctionTool, Tool, Toolbox
-from draive.utils import Processing
 
 __all__ = (
     "Stage",
@@ -969,10 +968,10 @@ class Stage:
         /,
         *stages: Self,
         condition: StageLoopConditioning,
-        mode: Literal[
-            "pre_check",
-            "post_check",
-        ] = "post_check",
+        condition_check: Literal[
+            "before_execution",
+            "after_execution",
+        ] = "after_execution",
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
@@ -989,10 +988,10 @@ class Stage:
             A function that determines whether to continue looping. It should be
             an async function that accepts the current state and iteration number
             and returns a boolean.
-        mode: Literal["pre_check", "post_check"]
+        condition_check: Literal["before_execution", "after_execution"] = "after_execution"
             A loop mode determining the first condition check behavior.
-            "pre_check" will check the condition before executing stage
-            "post_check" will check the condition after executing stage
+            "before_execution" will check the condition before executing stage
+            "after_execution" will check the condition after executing stage
         meta: Meta | MetaValues | None = None
             Additional stage metadata including tags, description etc.
 
@@ -1006,8 +1005,8 @@ class Stage:
             *(stage for stage in stages),
         )
 
-        match mode:
-            case "pre_check":
+        match condition_check:
+            case "before_execution":
 
                 async def stage_loop(
                     *,
@@ -1026,7 +1025,7 @@ class Stage:
 
                         return current_state
 
-            case "post_check":
+            case "after_execution":
 
                 async def stage_loop(
                     *,
@@ -1357,7 +1356,7 @@ class Stage:
         *state: State,
     ) -> Self: ...
 
-    def with_ctx(
+    def with_ctx(  # noqa: C901
         self,
         state: State | None = None,
         /,
@@ -1424,7 +1423,7 @@ class Stage:
                     *,
                     state: StageState,
                 ) -> StageState:
-                    with ctx.updated(ctx_state, *states, ctx.state(Processing)):
+                    with ctx.updated(ctx_state, *states):
                         return await execution(state=state)
 
             case (ctx_state, ctx_disposables):
@@ -1433,14 +1432,24 @@ class Stage:
                     *,
                     state: StageState,
                 ) -> StageState:
-                    async with ctx_disposables:
-                        with ctx.updated(
-                            ctx_state,
-                            *states,
-                            # preserve current Processing state by replacing it
-                            ctx.state(Processing),
-                        ):
-                            return await execution(state=state)
+                    disposables_state: Iterable[State] = await ctx_disposables.prepare()
+                    result_state: StageState
+                    try:
+                        with ctx.updated(ctx_state, *disposables_state, *states):
+                            result_state = await execution(state=state)
+
+                    except BaseException as exc:
+                        await ctx_disposables.dispose(
+                            exc_type=type(exc),
+                            exc_val=exc,
+                            exc_tb=exc.__traceback__,
+                        )
+                        raise exc
+
+                    else:
+                        await ctx_disposables.dispose()
+
+                    return result_state
 
         return self.__class__(stage, meta=self.meta)
 
@@ -1938,8 +1947,6 @@ async def _lmm_completion(
                     )
 
         repetition_level += 1  # continue tracking repetetive tool calls
-
-    raise RuntimeError("LMM exceeded limit of recursive calls")
 
 
 async def _lmm_routing(

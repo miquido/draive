@@ -1,5 +1,5 @@
 from collections.abc import Callable, Coroutine
-from typing import Any, Protocol, cast, final, overload
+from typing import Any, Protocol, Self, cast, final, overload
 
 from haiway import ctx
 from haiway.utils import format_str
@@ -35,9 +35,9 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
     def __init__(
         self,
         /,
-        name: str,
-        *,
         function: Callable[Args, Coroutine[None, None, Result]],
+        *,
+        name: str,
         description: str | None,
         parameters: ParametersSpecification | None,
         availability_check: ToolAvailabilityChecking | None,
@@ -139,6 +139,31 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
                     name=name,
                 ),
             )
+
+    def updated(
+        self,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        function: Callable[Args, Coroutine[None, None, Result]] | None = None,
+        parameters: ParametersSpecification | None = None,
+        availability_check: ToolAvailabilityChecking | None = None,
+        format_result: ToolResultFormatting[Result] | None = None,
+        format_failure: ToolErrorFormatting | None = None,
+        handling: ToolHandling | None = None,
+        meta: Meta | None = None,
+    ) -> Self:
+        return self.__class__(
+            function or self._call,
+            name=name or self.name,
+            description=description or self.description,
+            parameters=parameters or self.parameters,
+            availability_check=availability_check or self._check_availability,
+            format_result=format_result or self.format_result,
+            format_failure=format_failure or self.format_failure,
+            handling=handling or self.handling,
+            meta=meta or self.meta,
+        )
 
     @property
     def available(self) -> bool:
@@ -370,10 +395,10 @@ def tool[**Args, Result](
         function: Callable[Arg, Coroutine[None, None, Result]],
     ) -> FunctionTool[Arg, Result]:
         return FunctionTool[Arg, Result](
+            function=function,
             name=name or function.__name__,
             description=description,
             parameters=None,
-            function=function,
             availability_check=availability_check,
             format_result=format_result or _default_result_format,
             format_failure=format_failure or _default_failure_result,

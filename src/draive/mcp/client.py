@@ -16,12 +16,13 @@ from mcp.types import AudioContent as MCPAudioContent
 from mcp.types import (
     BlobResourceContents,
     CallToolResult,
-    EmbeddedResource,
     ListResourcesResult,
     ReadResourceResult,
     TextResourceContents,
 )
+from mcp.types import EmbeddedResource as MCPEmbeddedResource
 from mcp.types import ImageContent as MCPImageContent
+from mcp.types import ResourceLink as MCPResourceLink
 from mcp.types import TextContent as MCPTextContent
 from pydantic import AnyUrl
 
@@ -516,8 +517,12 @@ class MCPClient:
         del self._session
 
 
-async def _convert_content(  # noqa: PLR0911
-    content: MCPTextContent | MCPImageContent | MCPAudioContent | EmbeddedResource,
+async def _convert_content(  # noqa: C901, PLR0911
+    content: MCPTextContent
+    | MCPImageContent
+    | MCPAudioContent
+    | MCPResourceLink
+    | MCPEmbeddedResource,
     /,
 ) -> MultimodalContent:
     match content:
@@ -540,7 +545,7 @@ async def _convert_content(  # noqa: PLR0911
                 )
             )
 
-        case EmbeddedResource() as resource:
+        case MCPEmbeddedResource() as resource:
             match resource.resource:
                 case TextResourceContents() as text:
                     return MultimodalContent.of(TextContent(text=text.text))
@@ -570,6 +575,9 @@ async def _convert_content(  # noqa: PLR0911
                                     media=other,
                                 )
                             )
+
+        case MCPResourceLink():
+            raise NotImplementedError("MCP resource links are not supported yet")
 
 
 def _convert_tool(

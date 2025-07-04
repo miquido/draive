@@ -109,7 +109,7 @@ def prompt[**Args](
 
 
 @overload
-def prompt[**Args](
+def prompt(
     *,
     name: str | None = None,
     description: str | None = None,

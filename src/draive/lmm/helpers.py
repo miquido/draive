@@ -50,19 +50,19 @@ def _text_output_conversion(
 def _image_output_conversion(
     content: MultimodalContent,
 ) -> MultimodalContent:
-    return MultimodalContent.of(*content.media("image"))
+    return content.images()
 
 
 def _audio_output_conversion(
     content: MultimodalContent,
 ) -> MultimodalContent:
-    return MultimodalContent.of(*content.media("audio"))
+    return content.audio()
 
 
 def _video_output_conversion(
     content: MultimodalContent,
 ) -> MultimodalContent:
-    return MultimodalContent.of(*content.media("video"))
+    return content.video()
 
 
 def _json_output_conversion(
