@@ -1,10 +1,11 @@
+import random
 from asyncio import Lock, gather
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 from typing import Protocol, Self, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import ScopeContext, as_list, asynchronous, ctx
+from haiway import ScopeContext, as_list, asynchronous, ctx, execute_concurrently
 
 from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
@@ -179,12 +180,19 @@ class EvaluationCaseResult(DataModel):
         /,
         evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
         *_evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
+        concurrent_tasks: int = 2,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
+        async def execute(
+            evaluator: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
+        ) -> ScenarioEvaluatorResult | EvaluatorResult:
+            return await evaluator(value)
+
         return cls.of(
-            *await gather(
-                *[evaluator(value) for evaluator in [evaluators, *_evaluators]],
-                return_exceptions=False,
+            *await execute_concurrently(
+                [evaluators, *_evaluators],
+                handler=execute,
+                concurrent_tasks=concurrent_tasks,
             ),
             meta=Meta.of(meta),
         )
@@ -299,7 +307,9 @@ class EvaluationSuite[
 
     async def _evaluate(
         self,
-        case_parameters: Sequence[EvaluationSuiteCase[CaseParameters] | CaseParameters | UUID],
+        case_parameters: Sequence[EvaluationSuiteCase[CaseParameters] | CaseParameters | UUID]
+        | float
+        | int,
         /,
         *,
         suite_parameters: SuiteParameters | None = None,
@@ -312,6 +322,19 @@ class EvaluationSuite[
         cases: Sequence[EvaluationSuiteCase[CaseParameters]] = []
         if not case_parameters:
             cases = suite_data.cases
+
+        elif isinstance(case_parameters, int):
+            cases = random.sample(  # nosec: B311
+                suite_data.cases,
+                min(len(suite_data.cases), case_parameters),
+            )
+
+        elif isinstance(case_parameters, float):
+            assert 0 < case_parameters <= 1  # nosec: B101
+            cases = random.sample(  # nosec: B311
+                suite_data.cases,
+                min(len(suite_data.cases), int(len(suite_data.cases) * case_parameters)),
+            )
 
         else:
             cases = []

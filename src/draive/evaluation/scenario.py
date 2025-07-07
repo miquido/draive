@@ -1,8 +1,7 @@
-from asyncio import gather
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol, Self, cast, overload, runtime_checkable
 
-from haiway import AttributePath, ScopeContext, as_list, ctx
+from haiway import AttributePath, ScopeContext, as_list, ctx, execute_concurrently
 
 from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
@@ -84,13 +83,20 @@ class EvaluationScenarioResult(DataModel):
         /,
         evaluators: PreparedEvaluator[Value],
         *_evaluators: PreparedEvaluator[Value],
+        concurrent_tasks: int = 2,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
+        async def execute(
+            evaluator: PreparedEvaluator[Value],
+        ) -> EvaluatorResult:
+            return await evaluator(value)
+
         return cls(
             evaluations=tuple(
-                await gather(
-                    *(evaluator(value) for evaluator in (evaluators, *_evaluators)),
-                    return_exceptions=False,
+                await execute_concurrently(
+                    [evaluators, *_evaluators],
+                    handler=execute,
+                    concurrent_tasks=concurrent_tasks,
                 ),
             ),
             meta=Meta.of(meta),
