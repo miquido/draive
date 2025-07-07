@@ -64,7 +64,7 @@ wheels = [
 
 [[package]]
 name = "bandit"
-version = "1.8.5"
+version = "1.8.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
@@ -72,9 +72,9 @@ dependencies = [
     { name = "rich" },
     { name = "stevedore" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4e/01/b2ce2f54db060ed7b25960892b275ad8238ca15f5a8821b09f8e7f75870d/bandit-1.8.5.tar.gz", hash = "sha256:db812e9c39b8868c0fed5278b77fffbbaba828b4891bc80e34b9c50373201cfd", size = 4237566, upload-time = "2025-06-17T01:43:36.697Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fb/b5/7eb834e213d6f73aace21938e5e90425c92e5f42abafaf8a6d5d21beed51/bandit-1.8.6.tar.gz", hash = "sha256:dbfe9c25fc6961c2078593de55fd19f2559f9e45b99f1272341f5b95dea4e56b", size = 4240271, upload-time = "2025-07-06T03:10:50.9Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/02/b0/5c8976e61944f91904d4fd33bdbe55248138bfbd1a6092753b1b0fb7abbc/bandit-1.8.5-py3-none-any.whl", hash = "sha256:cb2e57524e99e33ced48833c6cc9c12ac78ae970bb6a450a83c4b506ecc1e2f9", size = 131759, upload-time = "2025-06-17T01:43:35.045Z" },
+    { url = "https://files.pythonhosted.org/packages/48/ca/ba5f909b40ea12ec542d5d7bdd13ee31c4d65f3beed20211ef81c18fa1f3/bandit-1.8.6-py3-none-any.whl", hash = "sha256:3348e934d736fcdb68b6aa4030487097e23a501adf3e7827b63658df464dddd0", size = 133808, upload-time = "2025-07-06T03:10:49.134Z" },
 ]
 
 [[package]]
@@ -252,7 +252,7 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.75.1"
+version = "0.75.5"
 source = { editable = "." }
 dependencies = [
     { name = "haiway" },
@@ -305,6 +305,10 @@ openai = [
     { name = "openai" },
     { name = "tiktoken" },
 ]
+openai-realtime = [
+    { name = "openai", extra = ["realtime"] },
+    { name = "tiktoken" },
+]
 opentelemetry = [
     { name = "haiway", extra = ["opentelemetry"] },
     { name = "opentelemetry-api" },
@@ -329,7 +333,7 @@ requires-dist = [
     { name = "cohere", marker = "extra == 'cohere-bedrock'", specifier = "~=5.13" },
     { name = "google-api-core", marker = "extra == 'gemini'", specifier = "~=2.25,<3.0" },
     { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=1.20" },
-    { name = "haiway", specifier = "~=0.24.0" },
+    { name = "haiway", specifier = "~=0.24.2" },
     { name = "haiway", extras = ["opentelemetry"], marker = "extra == 'opentelemetry'" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = "~=1.9" },
     { name = "mistralai", marker = "extra == 'mistral'", specifier = "~=1.8" },
@@ -337,6 +341,7 @@ requires-dist = [
     { name = "ollama", marker = "extra == 'ollama'", specifier = "~=0.5" },
     { name = "openai", marker = "extra == 'openai'", specifier = "~=1.88" },
     { name = "openai", marker = "extra == 'vllm'", specifier = "~=1.88" },
+    { name = "openai", extras = ["realtime"], marker = "extra == 'openai-realtime'", specifier = "~=1.88" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'opentelemetry'" },
     { name = "opentelemetry-sdk", marker = "extra == 'opentelemetry'" },
@@ -349,10 +354,11 @@ requires-dist = [
     { name = "sentencepiece", marker = "extra == 'mistral'", specifier = "~=0.2" },
     { name = "sentencepiece", marker = "extra == 'sentencepiece'", specifier = "~=0.2" },
     { name = "tiktoken", marker = "extra == 'openai'", specifier = "~=0.9" },
+    { name = "tiktoken", marker = "extra == 'openai-realtime'", specifier = "~=0.9" },
     { name = "tokenizers", marker = "extra == 'anthropic'", specifier = "~=0.21" },
     { name = "tokenizers", marker = "extra == 'anthropic-bedrock'", specifier = "~=0.21" },
 ]
-provides-extras = ["sentencepiece", "cohere", "cohere-bedrock", "openai", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "vllm", "mcp", "opentelemetry", "dev"]
+provides-extras = ["sentencepiece", "cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "vllm", "mcp", "opentelemetry", "dev"]
 
 [[package]]
 name = "eval-type-backport"
@@ -506,11 +512,11 @@ wheels = [
 
 [[package]]
 name = "haiway"
-version = "0.24.0"
+version = "0.24.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a1/69/f073f7f5ecf10e21090d79842c2f166b20c527f7ab0c61bd1df306526574/haiway-0.24.0.tar.gz", hash = "sha256:c5f388bc62edcadb8aa09c3fad297a19d21e83d0de6db04c8b1c35a5673eb711", size = 112584, upload-time = "2025-07-04T08:00:22.496Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bf/27/a8268799598c58bcd4a5955787bfd7de503edc60a717efee33ed6629a209/haiway-0.24.2.tar.gz", hash = "sha256:afd83133fa26f9178e3dbcad9a5b255062d722bc9ee478f5ddee2e1db76c8fad", size = 119109, upload-time = "2025-07-07T16:20:30.335Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f7/f7/34f1106a3dd29497ccabafb1f3214e15e82a91a5261da0c98e072348bb09/haiway-0.24.0-py3-none-any.whl", hash = "sha256:09a22e71d735974f6c85b8d244c85b58b03bb706fd89f9ae6b8bf4336f9db6d1", size = 85965, upload-time = "2025-07-04T08:00:21.553Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/86/675ef35fcd8e01088aaba261764dc0a1f8cb6507ac911683bb21bd8dc187/haiway-0.24.2-py3-none-any.whl", hash = "sha256:abdc383e2c5e4728059d33312e40b2a1cffd5b8ecf3aa198a37428d9a6380ee8", size = 88235, upload-time = "2025-07-07T16:20:28.929Z" },
 ]
 
 [package.optional-dependencies]
@@ -843,6 +849,11 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e4/d7/e91c6a9cf71726420cddf539852ee4c29176ebb716a702d9118d0409fd8e/openai-1.93.0.tar.gz", hash = "sha256:988f31ade95e1ff0585af11cc5a64510225e4f5cd392698c675d0a9265b8e337", size = 486573, upload-time = "2025-06-27T21:21:39.421Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/64/46/a10d9df4673df56f71201d129ba1cb19eaff3366d08c8664d61a7df52e65/openai-1.93.0-py3-none-any.whl", hash = "sha256:3d746fe5498f0dd72e0d9ab706f26c91c0f646bf7459e5629af8ba7c9dbdf090", size = 755038, upload-time = "2025-06-27T21:21:37.532Z" },
+]
+
+[package.optional-dependencies]
+realtime = [
+    { name = "websockets" },
 ]
 
 [[package]]
@@ -1445,14 +1456,14 @@ wheels = [
 
 [[package]]
 name = "sse-starlette"
-version = "2.3.6"
+version = "2.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8c/f4/989bc70cb8091eda43a9034ef969b25145291f3601703b82766e5172dfed/sse_starlette-2.3.6.tar.gz", hash = "sha256:0382336f7d4ec30160cf9ca0518962905e1b69b72d6c1c995131e0a703b436e3", size = 18284, upload-time = "2025-05-30T13:34:12.914Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/3e/eae74d8d33e3262bae0a7e023bb43d8bdd27980aa3557333f4632611151f/sse_starlette-2.4.1.tar.gz", hash = "sha256:7c8a800a1ca343e9165fc06bbda45c78e4c6166320707ae30b416c42da070926", size = 18635, upload-time = "2025-07-06T09:41:33.631Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/05/78850ac6e79af5b9508f8841b0f26aa9fd329a1ba00bf65453c2d312bcc8/sse_starlette-2.3.6-py3-none-any.whl", hash = "sha256:d49a8285b182f6e2228e2609c350398b2ca2c36216c2675d875f81e93548f760", size = 10606, upload-time = "2025-05-30T13:34:11.703Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/f1/6c7eaa8187ba789a6dd6d74430307478d2a91c23a5452ab339b6fbe15a08/sse_starlette-2.4.1-py3-none-any.whl", hash = "sha256:08b77ea898ab1a13a428b2b6f73cfe6d0e607a7b4e15b9bb23e4a37b087fd39a", size = 10824, upload-time = "2025-07-06T09:41:32.321Z" },
 ]
 
 [[package]]
@@ -1564,11 +1575,11 @@ wheels = [
 
 [[package]]
 name = "typing-extensions"
-version = "4.14.0"
+version = "4.14.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d1/bc/51647cd02527e87d05cb083ccc402f93e441606ff1f01739a62c8ad09ba5/typing_extensions-4.14.0.tar.gz", hash = "sha256:8676b788e32f02ab42d9e7c61324048ae4c6d844a399eebace3d4979d75ceef4", size = 107423, upload-time = "2025-06-02T14:52:11.399Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/98/5a/da40306b885cc8c09109dc2e1abd358d5684b1425678151cdaed4731c822/typing_extensions-4.14.1.tar.gz", hash = "sha256:38b39f4aeeab64884ce9f74c94263ef78f3c22467c8724005483154c26648d36", size = 107673, upload-time = "2025-07-04T13:28:34.16Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/69/e0/552843e0d356fbb5256d21449fa957fa4eff3bbc135a74a691ee70c7c5da/typing_extensions-4.14.0-py3-none-any.whl", hash = "sha256:a1514509136dd0b477638fc68d6a91497af5076466ad0fa6c338e44e359944af", size = 43839, upload-time = "2025-06-02T14:52:10.026Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/00/d631e67a838026495268c2f6884f3711a15a9a2a96cd244fdaea53b823fb/typing_extensions-4.14.1-py3-none-any.whl", hash = "sha256:d1e1e3b58374dc93031d6eda2420a48ea44a36c2b4766a4fdeb3710755731d76", size = 43906, upload-time = "2025-07-04T13:28:32.743Z" },
 ]
 
 [[package]]
