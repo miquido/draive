@@ -1,5 +1,5 @@
 import random
-from asyncio import Lock, gather
+from asyncio import Lock
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 from typing import Protocol, Self, runtime_checkable
@@ -190,8 +190,8 @@ class EvaluationCaseResult(DataModel):
 
         return cls.of(
             *await execute_concurrently(
+                execute,
                 [evaluators, *_evaluators],
-                handler=execute,
                 concurrent_tasks=concurrent_tasks,
             ),
             meta=Meta.of(meta),
@@ -285,8 +285,13 @@ class EvaluationSuite[
 
     async def __call__(
         self,
-        *case_parameters: EvaluationSuiteCase[CaseParameters] | CaseParameters | UUID,
+        case_parameters: Sequence[EvaluationSuiteCase[CaseParameters] | CaseParameters | UUID]
+        | float
+        | int
+        | None = None,
+        /,
         parameters: SuiteParameters | None = None,
+        concurrent_cases: int = 2,
         reload: bool = False,
     ) -> SuiteEvaluatorResult[SuiteParameters, CaseParameters]:
         if context := self._execution_context:
@@ -294,6 +299,7 @@ class EvaluationSuite[
                 return await self._evaluate(
                     case_parameters,
                     suite_parameters=parameters,
+                    concurrent_cases=concurrent_cases,
                     reload=reload,
                 )
 
@@ -302,6 +308,7 @@ class EvaluationSuite[
                 return await self._evaluate(
                     case_parameters,
                     suite_parameters=parameters,
+                    concurrent_cases=concurrent_cases,
                     reload=reload,
                 )
 
@@ -309,11 +316,13 @@ class EvaluationSuite[
         self,
         case_parameters: Sequence[EvaluationSuiteCase[CaseParameters] | CaseParameters | UUID]
         | float
-        | int,
+        | int
+        | None,
         /,
         *,
-        suite_parameters: SuiteParameters | None = None,
-        reload: bool = False,
+        suite_parameters: SuiteParameters | None,
+        concurrent_cases: int,
+        reload: bool,
     ) -> SuiteEvaluatorResult[SuiteParameters, CaseParameters]:
         suite_data: EvaluationSuiteData[SuiteParameters, CaseParameters]
         async with self._lock:
@@ -357,17 +366,21 @@ class EvaluationSuite[
                         cases.append(EvaluationSuiteCase[CaseParameters](parameters=case))
 
         parameters: SuiteParameters = suite_parameters or suite_data.parameters
+
+        async def evaluate_case(
+            case: EvaluationSuiteCase[CaseParameters],
+        ) -> SuiteEvaluatorCaseResult[CaseParameters]:
+            return await self._evaluate_case(
+                case,
+                suite_parameters=parameters,
+            )
+
         return SuiteEvaluatorResult(
             parameters=parameters,
-            cases=await gather(
-                *[
-                    self._evaluate_case(
-                        case,
-                        suite_parameters=parameters,
-                    )
-                    for case in cases
-                ],
-                return_exceptions=False,
+            cases=await execute_concurrently(
+                evaluate_case,
+                cases,
+                concurrent_tasks=concurrent_cases,
             ),
         )
 
