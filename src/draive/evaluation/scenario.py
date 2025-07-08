@@ -94,8 +94,8 @@ class EvaluationScenarioResult(DataModel):
         return cls(
             evaluations=tuple(
                 await execute_concurrently(
+                    execute,
                     [evaluators, *_evaluators],
-                    handler=execute,
                     concurrent_tasks=concurrent_tasks,
                 ),
             ),
