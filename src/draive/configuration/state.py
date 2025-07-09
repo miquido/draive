@@ -22,54 +22,17 @@ class Configuration(State):
     @classmethod
     def of(
         cls,
-        config: tuple[str, DataModel]
-        | tuple[str, State]
-        | tuple[str, Mapping[str, BasicValue]]
-        | DataModel
-        | State,
-        *configs: tuple[str, DataModel]
-        | tuple[str, State]
-        | tuple[str, Mapping[str, BasicValue]]
-        | DataModel
-        | State,
+        *configs: DataModel | State,
+        **named_configs: DataModel | State,
     ) -> Self:
         storage: MutableMapping[str, Mapping[str, BasicValue]] = {}
-        for element in (config, *configs):
-            match element:
-                case Config():  # it is state although it fails to match for State
-                    storage[type(element).__name__] = element.to_mapping()
+        for element in configs:
+            assert isinstance(element, Config | State | DataModel)  # nosec: B101
+            storage[type(element).__qualname__] = element.to_mapping()
 
-                case State():
-                    storage[type(element).__name__] = element.to_mapping()
-
-                case DataModel():
-                    storage[type(element).__name__] = element.to_mapping()
-
-                case (
-                    str() as key,
-                    Config() as config,
-                ):  # it is state although it fails to match for State
-                    storage[key] = config.to_mapping()
-
-                case (
-                    str() as key,
-                    State() as state,
-                ):
-                    storage[key] = state.to_mapping()
-
-                case (
-                    str() as key,
-                    DataModel() as model,
-                ):
-                    storage[key] = model.to_mapping()
-
-                case (
-                    str() as key,
-                    mapping,
-                ):
-                    assert isinstance(mapping, Mapping)  # nosec: B101
-
-                    storage[key] = mapping
+        for key, element in named_configs.items():
+            assert isinstance(element, Config | State | DataModel)  # nosec: B101
+            storage[key] = element.to_mapping()
 
         async def load(
             identifier: str,
@@ -134,7 +97,7 @@ class Configuration(State):
         default: Config | None = None,
         required: bool = False,
     ) -> Config | None:
-        identifier: str = config.__name__ if key is None else key
+        identifier: str = config.__qualname__ if key is None else key
         loaded: Mapping[str, BasicValue] | None = await ctx.state(cls).loading(identifier)
 
         if loaded is not None:
@@ -157,7 +120,6 @@ class Config(State):
     @classmethod
     async def load(
         cls,
-        *,
         key: str | None = None,
     ) -> Self | None: ...
 
@@ -165,8 +127,8 @@ class Config(State):
     @classmethod
     async def load(
         cls,
-        *,
         key: str | None = None,
+        *,
         default: Self,
     ) -> Self: ...
 
@@ -174,16 +136,16 @@ class Config(State):
     @classmethod
     async def load(
         cls,
-        *,
         key: str | None = None,
+        *,
         required: Literal[True],
     ) -> Self: ...
 
     @classmethod
     async def load(
         cls,
-        *,
         key: str | None = None,
+        *,
         default: Self | None = None,
         required: bool = False,
     ) -> Self | None:
