@@ -554,6 +554,7 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
 
     functions: list[FunctionDeclarationDict] | None
     function_calling_mode: FunctionCallingConfigMode | None
+    allowed_function_names: list[str] | None = None
     if tools.specifications:
         functions = [
             FunctionDeclarationDict(
@@ -574,8 +575,9 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
                 functions = None  # no need to pass functions if none can be used
                 function_calling_mode = FunctionCallingConfigMode.NONE
 
-            case _:  # TODO: handle specific tool selection?
-                function_calling_mode = FunctionCallingConfigMode.AUTO
+            case specific_tool:  # handle specific tool selection
+                function_calling_mode = FunctionCallingConfigMode.ANY
+                allowed_function_names = [specific_tool["name"]]
 
     else:  # no functions
         functions = None
@@ -648,7 +650,16 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
         ],
         "system_instruction": instruction,
         "tools": [{"function_declarations": functions}] if functions else None,
-        "tool_config": {"function_calling_config": {"mode": function_calling_mode}}
+        "tool_config": {
+            "function_calling_config": {
+                "mode": function_calling_mode,
+                **(
+                    {"allowed_function_names": allowed_function_names}
+                    if allowed_function_names
+                    else {}
+                ),
+            }
+        }
         if function_calling_mode
         else None,
         # prevent google from automatically resolving function calls
