@@ -69,7 +69,7 @@ def _json_output_conversion(
     content: MultimodalContent,
 ) -> MultimodalContent:
     try:
-        return MultimodalContent.of(DataModel.from_json(content.to_str()))
+        return MultimodalContent.of(DataModel.from_json(content.text().to_str()))
 
     except ValueError as exc:
         raise LMMOutputInvalid("Failed to decode JSON output", content) from exc
@@ -82,7 +82,7 @@ def _prepare_model_output_conversion(
         content: MultimodalContent,
     ) -> MultimodalContent:
         try:
-            return MultimodalContent.of(model.from_json(content.to_str()))
+            return MultimodalContent.of(model.from_json(content.text().to_str()))
 
         except ValueError as exc:
             raise LMMOutputInvalid("Failed to decode JSON output", content) from exc
