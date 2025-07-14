@@ -51,15 +51,15 @@ class Meta(Mapping[str, MetaValue]):
         cls,
         meta: Self | MetaValues | None,
     ) -> Self:
-        match meta:
-            case None:
-                return cast(Self, META_EMPTY)
+        if meta is None:
+            return cast(Self, META_EMPTY)
 
-            case Meta():
-                return cast(Self, meta)
+        elif isinstance(meta, Meta):
+            return cast(Self, meta)
 
-            case mapping:
-                return cls({key: validated_meta_value(value) for key, value in mapping.items()})
+        else:
+            assert isinstance(meta, Mapping)  # nosec: B101
+            return cls({key: validated_meta_value(value) for key, value in meta.items()})
 
     @classmethod
     def from_mapping(
