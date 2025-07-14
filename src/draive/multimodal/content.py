@@ -1,6 +1,5 @@
 from collections.abc import Sequence
-from itertools import chain
-from typing import ClassVar, Self, final, overload
+from typing import ClassVar, Self, cast, final, overload
 
 from draive.commons import Meta, MetaValues
 from draive.multimodal.media import MediaContent, MediaData, MediaKind, MediaReference
@@ -30,25 +29,24 @@ class MultimodalContent(DataModel):
         *elements: Self | MultimodalContentConvertible,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        match elements:
-            case [MultimodalContent() as content]:
-                # if we got just a single content use it as is
-                return content  # pyright: ignore[reportReturnType]
+        if not elements:
+            return cls.empty
 
-            case elements:
-                return cls(
-                    parts=tuple(
-                        _merge_texts(
-                            *chain.from_iterable(
-                                _extract_parts(
-                                    element,
-                                    meta=Meta.of(meta),
-                                )
-                                for element in elements
-                            )
-                        )
-                    ),
+        if len(elements) == 1 and isinstance(elements[0], MultimodalContent) and meta is None:
+            return cast(Self, elements[0])
+
+        meta_obj: Meta | None = Meta.of(meta) if meta is not None else None
+
+        all_parts: list[MultimodalContentElement] = []
+        for element in elements:
+            all_parts.extend(
+                _extract_parts(
+                    element,
+                    meta=meta_obj,
                 )
+            )
+
+        return cls(parts=_merge_texts(*all_parts))
 
     parts: Sequence[MultimodalContentElement]
 
@@ -194,42 +192,41 @@ class MultimodalContent(DataModel):
         if not parts:
             return self
 
+        all_new_parts: list[MultimodalContentElement] = []
+        for part in parts:
+            all_new_parts.extend(_extract_parts(part))
+
         if len(self.parts) == 0:
             return self.__class__(
-                parts=tuple(
-                    _merge_texts(*chain.from_iterable(_extract_parts(part) for part in parts))
-                ),
+                parts=tuple(_merge_texts(*all_new_parts)),
             )
 
-        # check the last part
-        match self.parts[-1]:
-            case TextContent() as text:
-                # if it is a text append merge starting with it
-
-                return self.__class__(
-                    parts=(
-                        *self.parts[:-1],
-                        *_merge_texts(
-                            text,
-                            *chain.from_iterable(_extract_parts(part) for part in parts),
-                        ),
-                    )
+        if isinstance(self.parts[-1], TextContent):
+            return self.__class__(
+                parts=(
+                    *self.parts[:-1],
+                    *_merge_texts(self.parts[-1], *all_new_parts),
                 )
+            )
 
-            case _:
-                # otherwise just append merged items
-                return self.__class__(
-                    parts=(
-                        *self.parts,
-                        *_merge_texts(*chain.from_iterable(_extract_parts(part) for part in parts)),
-                    )
+        else:
+            return self.__class__(
+                parts=(
+                    *self.parts,
+                    *_merge_texts(*all_new_parts),
                 )
+            )
 
     def extended_by(
         self,
         *other: Self,
     ) -> Self:
-        return self.appending(*chain.from_iterable(content.parts for content in other))
+        # Extract all parts directly
+        all_other_parts: list[MultimodalContentElement] = []
+        for content in other:
+            all_other_parts.extend(content.parts)
+
+        return self.appending(*all_other_parts)
 
     def __bool__(self) -> bool:
         return bool(self.parts) and any(self.parts)
@@ -292,18 +289,6 @@ def _extract_parts(  # noqa: PLR0911
                 return (element,)
 
 
-def _as_content(
-    element: MultimodalContentConvertible,
-    /,
-) -> MultimodalContentElement:
-    match element:
-        case str() as text:
-            return TextContent(text=text)
-
-        case element:
-            return element
-
-
 def _is_media(
     element: MultimodalContentElement,
 ) -> bool:
@@ -360,34 +345,50 @@ def _merge_texts(
         return elements
 
     result: list[MultimodalContentElement] = []
-    last_text_element: TextContent | None = None
+    accumulated_texts: list[str] = []
+    current_meta: Meta | None = None
+
     for element in elements:
-        match element:
-            case TextContent() as text:
-                # do not merge texts with different metadata
-                if last_text := last_text_element:
-                    if last_text.meta == text.meta:
-                        last_text_element = TextContent(
-                            text=last_text.text + text.text,
-                            meta=text.meta,
+        if isinstance(element, TextContent):
+            if current_meta is None:
+                current_meta = element.meta
+                accumulated_texts.append(element.text)
+
+            elif current_meta == element.meta:
+                accumulated_texts.append(element.text)
+
+            else:
+                if accumulated_texts and current_meta is not None:
+                    result.append(
+                        TextContent(
+                            text="".join(accumulated_texts),
+                            meta=current_meta,
                         )
+                    )
 
-                    else:
-                        result.append(last_text)
-                        last_text_element = text
+                current_meta = element.meta
+                accumulated_texts = [element.text]
 
-                else:
-                    last_text_element = text
+        else:
+            if accumulated_texts and current_meta is not None:
+                result.append(
+                    TextContent(
+                        text="".join(accumulated_texts),
+                        meta=current_meta,
+                    )
+                )
+                accumulated_texts = []
+                current_meta = None
 
-            case other:
-                if last_text := last_text_element:
-                    result.append(last_text)
-                    last_text_element = None
+            result.append(element)
 
-                result.append(other)
-
-    if last_text := last_text_element:
-        result.append(last_text)
+    if accumulated_texts and current_meta is not None:
+        result.append(
+            TextContent(
+                text="".join(accumulated_texts),
+                meta=current_meta,
+            )
+        )
 
     return result
 
