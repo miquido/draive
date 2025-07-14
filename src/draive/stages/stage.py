@@ -1414,8 +1414,23 @@ class Stage:
                     *,
                     state: StageState,
                 ) -> StageState:
-                    async with ctx_disposables:
-                        return await execution(state=state)
+                    result_state: StageState
+                    try:
+                        with ctx.updated(*await ctx_disposables.prepare()):
+                            result_state = await execution(state=state)
+
+                    except BaseException as exc:
+                        await ctx_disposables.dispose(
+                            exc_type=type(exc),
+                            exc_val=exc,
+                            exc_tb=exc.__traceback__,
+                        )
+                        raise exc
+
+                    else:
+                        await ctx_disposables.dispose()
+
+                    return result_state
 
             case (ctx_state, None):
 
