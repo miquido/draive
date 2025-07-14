@@ -1,4 +1,4 @@
-from collections.abc import Callable, Mapping, MutableMapping, Sequence, Set
+from collections.abc import Callable, Collection, Mapping, MutableMapping, Sequence, Set
 from datetime import UTC, date, datetime, time
 from enum import Enum, IntEnum, StrEnum
 from types import EllipsisType, NoneType, UnionType
@@ -346,21 +346,18 @@ def _prepare_validator_of_sequence(
             /,
             context: ParameterValidationContext,
         ) -> Any:
-            match value:
-                case [*elements]:
-                    validated: Sequence[Any] = []
-                    for idx, element in enumerate(elements):
-                        with context.scope(f"[{idx}]"):
-                            validated.append(element_validator(element, context=context))
+            if isinstance(value, Collection) and not isinstance(value, str | bytes):
+                validated: Sequence[Any] = []
+                for idx, element in enumerate(value):
+                    with context.scope(f"[{idx}]"):
+                        validated.append(element_validator(element, context=context))
 
-                    validated = tuple(validated)
-                    verifier(validated)
-                    return validated
+                validated = tuple(validated)
+                verifier(validated)
+                return validated
 
-                case _:
-                    raise TypeError(
-                        f"'{value}' is not matching expected type of '{formatted_type}'"
-                    )
+            else:
+                raise TypeError(f"'{value}' is not matching expected type of '{formatted_type}'")
     else:
 
         def validator(
@@ -368,19 +365,16 @@ def _prepare_validator_of_sequence(
             /,
             context: ParameterValidationContext,
         ) -> Any:
-            match value:
-                case [*elements]:
-                    validated: Sequence[Any] = []
-                    for idx, element in enumerate(elements):
-                        with context.scope(f"[{idx}]"):
-                            validated.append(element_validator(element, context=context))
+            if isinstance(value, Collection) and not isinstance(value, str | bytes):
+                validated: Sequence[Any] = []
+                for idx, element in enumerate(value):
+                    with context.scope(f"[{idx}]"):
+                        validated.append(element_validator(element, context=context))
 
-                    return tuple(validated)
+                return tuple(validated)
 
-                case _:
-                    raise TypeError(
-                        f"'{value}' is not matching expected type of '{formatted_type}'"
-                    )
+            else:
+                raise TypeError(f"'{value}' is not matching expected type of '{formatted_type}'")
 
     return validator
 
@@ -410,24 +404,22 @@ def _prepare_validator_of_mapping(
             /,
             context: ParameterValidationContext,
         ) -> Any:
-            match value:
-                case {**elements}:
-                    validated: MutableMapping[Any, Any] = {}
-                    for key, element in elements.items():
-                        with context.scope(f"[{key}]"):
-                            validated[key_validator(key, context=context)] = value_validator(
-                                element, context=context
-                            )
+            if isinstance(value, Mapping):
+                validated: MutableMapping[Any, Any] = {}
+                for key, element in value.items():
+                    with context.scope(f"[{key}]"):
+                        validated[key_validator(key, context=context)] = value_validator(
+                            element, context=context
+                        )
 
-                    # TODO: FIXME: make sure dict is not mutable?
-                    # validated = MappingProxyType(validated)
-                    verifier(validated)
-                    return validated
+                # TODO: FIXME: make sure dict is not mutable?
+                # validated = MappingProxyType(validated)
+                verifier(validated)
+                return validated
 
-                case _:
-                    raise TypeError(
-                        f"'{value}' is not matching expected type of '{formatted_type}'"
-                    )
+            else:
+                raise TypeError(f"'{value}' is not matching expected type of '{formatted_type}'")
+
     else:
 
         def validator(
@@ -435,24 +427,20 @@ def _prepare_validator_of_mapping(
             /,
             context: ParameterValidationContext,
         ) -> Any:
-            match value:
-                case {**elements}:
-                    validated: MutableMapping[Any, Any] = {}
-                    for key, element in elements.items():
-                        with context.scope(f"[{key}]"):
-                            validated[key_validator(key, context=context)] = value_validator(
-                                element,
-                                context=context,
-                            )
+            if isinstance(value, Mapping):
+                validated: MutableMapping[Any, Any] = {}
+                for key, element in value.items():
+                    with context.scope(f"[{key}]"):
+                        validated[key_validator(key, context=context)] = value_validator(
+                            element, context=context
+                        )
 
-                    # TODO: FIXME: make sure dict is not mutable?
-                    # return MappingProxyType(validated)
-                    return validated
+                # TODO: FIXME: make sure dict is not mutable?
+                # validated = MappingProxyType(validated)
+                return validated
 
-                case _:
-                    raise TypeError(
-                        f"'{value}' is not matching expected type of '{formatted_type}'"
-                    )
+            else:
+                raise TypeError(f"'{value}' is not matching expected type of '{formatted_type}'")
 
     return validator
 
@@ -472,27 +460,25 @@ def _prepare_validator_of_meta(  # noqa: C901
             /,
             context: ParameterValidationContext,
         ) -> Any:
-            match value:
-                case Meta() as meta:
-                    return meta
+            if isinstance(value, Meta):
+                return value
 
-                case {**elements}:
-                    validated: MutableMapping[Any, Any] = {}
-                    for key, element in elements.items():
-                        if not isinstance(key, str):
-                            raise TypeError(f"'{key}' is not matching expected type of '{str}'")
+            elif isinstance(value, Mapping):
+                validated: MutableMapping[Any, Any] = {}
+                for key, element in value.items():
+                    if not isinstance(key, str):
+                        raise TypeError(f"'{key}' is not matching expected type of '{str}'")
 
-                        with context.scope(f"[{key}]"):
-                            validated[key] = validated_meta_value(element)
+                    with context.scope(f"[{key}]"):
+                        validated[key] = validated_meta_value(element)
 
-                    meta: Meta = Meta(validated)
-                    verifier(meta)
-                    return meta
+                meta: Meta = Meta(validated)
+                verifier(meta)
+                return meta
 
-                case _:
-                    raise TypeError(
-                        f"'{value}' is not matching expected type of '{formatted_type}'"
-                    )
+            else:
+                raise TypeError(f"'{value}' is not matching expected type of '{formatted_type}'")
+
     else:
 
         def validator(
@@ -500,27 +486,27 @@ def _prepare_validator_of_meta(  # noqa: C901
             /,
             context: ParameterValidationContext,
         ) -> Any:
-            match value:
-                case {**elements}:
-                    validated: MutableMapping[Any, Any] = {}
-                    for key, element in elements.items():
-                        if not isinstance(key, str):
-                            raise TypeError(f"'{key}' is not matching expected type of '{str}'")
+            if isinstance(value, Meta):
+                return value
 
-                        with context.scope(f"[{key}]"):
-                            validated[key] = validated_meta_value(element)
+            elif isinstance(value, Mapping):
+                validated: MutableMapping[Any, Any] = {}
+                for key, element in value.items():
+                    if not isinstance(key, str):
+                        raise TypeError(f"'{key}' is not matching expected type of '{str}'")
 
-                    return Meta(validated)
+                    with context.scope(f"[{key}]"):
+                        validated[key] = validated_meta_value(element)
 
-                case _:
-                    raise TypeError(
-                        f"'{value}' is not matching expected type of '{formatted_type}'"
-                    )
+                return Meta(validated)
+
+            else:
+                raise TypeError(f"'{value}' is not matching expected type of '{formatted_type}'")
 
     return validator
 
 
-def _prepare_validator_of_tuple(  # noqa: C901, PLR0915
+def _prepare_validator_of_tuple(  # noqa: C901
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
@@ -544,21 +530,21 @@ def _prepare_validator_of_tuple(  # noqa: C901, PLR0915
                 /,
                 context: ParameterValidationContext,
             ) -> Any:
-                match value:
-                    case [*elements]:
-                        validated: Sequence[Any] = []
-                        for idx, element in enumerate(elements):
-                            with context.scope(f"[{idx}]"):
-                                validated.append(element_validator(element, context=context))
+                if isinstance(value, Collection) and not isinstance(value, str | bytes):
+                    validated: Sequence[Any] = []
+                    for idx, element in enumerate(value):
+                        with context.scope(f"[{idx}]"):
+                            validated.append(element_validator(element, context=context))
 
-                        validated = tuple(validated)
-                        verifier(validated)
-                        return validated
+                    validated = tuple(validated)
+                    verifier(validated)
+                    return validated
 
-                    case _:
-                        raise TypeError(
-                            f"'{value}' is not matching expected type of '{formatted_type}'"
-                        )
+                else:
+                    raise TypeError(
+                        f"'{value}' is not matching expected type of '{formatted_type}'"
+                    )
+
         else:
 
             def validator(
@@ -566,19 +552,18 @@ def _prepare_validator_of_tuple(  # noqa: C901, PLR0915
                 /,
                 context: ParameterValidationContext,
             ) -> Any:
-                match value:
-                    case [*elements]:
-                        validated: Sequence[Any] = []
-                        for idx, element in enumerate(elements):
-                            with context.scope(f"[{idx}]"):
-                                validated.append(element_validator(element, context=context))
+                if isinstance(value, Collection) and not isinstance(value, str | bytes):
+                    validated: Sequence[Any] = []
+                    for idx, element in enumerate(value):
+                        with context.scope(f"[{idx}]"):
+                            validated.append(element_validator(element, context=context))
 
-                        return tuple(validated)
+                    return tuple(validated)
 
-                    case _:
-                        raise TypeError(
-                            f"'{value}' is not matching expected type of '{formatted_type}'"
-                        )
+                else:
+                    raise TypeError(
+                        f"'{value}' is not matching expected type of '{formatted_type}'"
+                    )
 
         return validator
 
@@ -601,26 +586,26 @@ def _prepare_validator_of_tuple(  # noqa: C901, PLR0915
                 /,
                 context: ParameterValidationContext,
             ) -> Any:
-                match value:
-                    case [*elements]:
-                        if len(elements) != elements_count:
-                            raise ValueError(
-                                f"'{value}' is not matching expected type of '{formatted_type}'"
-                            )
-
-                        validated: Sequence[Any] = []
-                        for idx, element in enumerate(elements):
-                            with context.scope(f"[{idx}]"):
-                                validated.append(element_validators[idx](element, context=context))
-
-                        validated = tuple(validated)
-                        verifier(validated)
-                        return validated
-
-                    case _:
-                        raise TypeError(
+                if isinstance(value, Collection) and not isinstance(value, str | bytes):
+                    if len(value) != elements_count:
+                        raise ValueError(
                             f"'{value}' is not matching expected type of '{formatted_type}'"
                         )
+
+                    validated: Sequence[Any] = []
+                    for idx, element in enumerate(value):
+                        with context.scope(f"[{idx}]"):
+                            validated.append(element_validators[idx](element, context=context))
+
+                    validated = tuple(validated)
+                    verifier(validated)
+                    return validated
+
+                else:
+                    raise TypeError(
+                        f"'{value}' is not matching expected type of '{formatted_type}'"
+                    )
+
         else:
 
             def validator(
@@ -628,24 +613,22 @@ def _prepare_validator_of_tuple(  # noqa: C901, PLR0915
                 /,
                 context: ParameterValidationContext,
             ) -> Any:
-                match value:
-                    case [*elements]:
-                        if len(elements) != elements_count:
-                            raise ValueError(
-                                f"'{value}' is not matching expected type of '{formatted_type}'"
-                            )
-
-                        validated: Sequence[Any] = []
-                        for idx, element in enumerate(elements):
-                            with context.scope(f"[{idx}]"):
-                                validated.append(element_validators[idx](element, context=context))
-
-                        return tuple(validated)
-
-                    case _:
-                        raise TypeError(
+                if isinstance(value, Collection) and not isinstance(value, str | bytes):
+                    if len(value) != elements_count:
+                        raise ValueError(
                             f"'{value}' is not matching expected type of '{formatted_type}'"
                         )
+                    validated: Sequence[Any] = []
+                    for idx, element in enumerate(value):
+                        with context.scope(f"[{idx}]"):
+                            validated.append(element_validators[idx](element, context=context))
+
+                    return tuple(validated)
+
+                else:
+                    raise TypeError(
+                        f"'{value}' is not matching expected type of '{formatted_type}'"
+                    )
 
         return validator
 
@@ -1145,12 +1128,11 @@ def _prepare_validator_of_typed_dict(  # noqa: C901
     def key_validator(
         value: Any,
     ) -> str:
-        match value:
-            case value if isinstance(value, str):
-                return value
+        if isinstance(value, str):
+            return value
 
-            case _:
-                raise TypeError(f"'{value}' is not matching expected type of 'str'")
+        else:
+            raise TypeError(f"'{value}' is not matching expected type of 'str'")
 
     formatted_type: str = str(annotation)
     values_validators: dict[str, ParameterValidation[Any]] = {
@@ -1170,30 +1152,28 @@ def _prepare_validator_of_typed_dict(  # noqa: C901
             /,
             context: ParameterValidationContext,
         ) -> Any:
-            match value:
-                case {**elements}:
-                    validated: MutableMapping[Any, Any] = {}
-                    for key, validate in values_validators.items():
-                        validated_key: str = key_validator(key)
-                        with context.scope(f"[{validated_key}]"):
-                            element: Any = elements.get(validated_key, MISSING)
-                            if element is MISSING and key not in required_values:
-                                continue  # skip missing and not required
+            if isinstance(value, Mapping):
+                validated: MutableMapping[Any, Any] = {}
+                for key, validate in values_validators.items():
+                    validated_key: str = key_validator(key)
+                    with context.scope(f"[{validated_key}]"):
+                        element: Any = value.get(validated_key, MISSING)
+                        if element is MISSING and key not in required_values:
+                            continue  # skip missing and not required
 
-                            validated[validated_key] = validate(
-                                element,
-                                context=context,
-                            )
+                        validated[validated_key] = validate(
+                            element,
+                            context=context,
+                        )
 
-                    # TODO: FIXME: make sure dict is not mutable?
-                    # validated = MappingProxyType(validated)
-                    verifier(validated)
-                    return validated
+                # TODO: FIXME: make sure dict is not mutable?
+                # validated = MappingProxyType(validated)
+                verifier(validated)
+                return validated
 
-                case _:
-                    raise TypeError(
-                        f"'{value}' is not matching expected type of '{formatted_type}'"
-                    )
+            else:
+                raise TypeError(f"'{value}' is not matching expected type of '{formatted_type}'")
+
     else:
 
         def validator(
@@ -1201,29 +1181,26 @@ def _prepare_validator_of_typed_dict(  # noqa: C901
             /,
             context: ParameterValidationContext,
         ) -> Any:
-            match value:
-                case {**elements}:
-                    validated: MutableMapping[Any, Any] = {}
-                    for key, validate in values_validators.items():
-                        validated_key: str = key_validator(key)
-                        with context.scope(f"[{validated_key}]"):
-                            element: Any = elements.get(validated_key, MISSING)
-                            if element is MISSING and key not in required_values:
-                                continue  # skip missing and not required
+            if isinstance(value, Mapping):
+                validated: MutableMapping[Any, Any] = {}
+                for key, validate in values_validators.items():
+                    validated_key: str = key_validator(key)
+                    with context.scope(f"[{validated_key}]"):
+                        element: Any = value.get(validated_key, MISSING)
+                        if element is MISSING and key not in required_values:
+                            continue  # skip missing and not required
 
-                            validated[validated_key] = validate(
-                                element,
-                                context=context,
-                            )
+                        validated[validated_key] = validate(
+                            element,
+                            context=context,
+                        )
 
-                    # TODO: FIXME: make sure dict is not mutable?
-                    # return MappingProxyType(validated)
-                    return validated
+                # TODO: FIXME: make sure dict is not mutable?
+                # validated = MappingProxyType(validated)
+                return validated
 
-                case _:
-                    raise TypeError(
-                        f"'{value}' is not matching expected type of '{formatted_type}'"
-                    )
+            else:
+                raise TypeError(f"'{value}' is not matching expected type of '{formatted_type}'")
 
     return validator
 
