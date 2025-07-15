@@ -1,4 +1,4 @@
-from asyncio import CancelledError, Task
+from asyncio import CancelledError
 from collections.abc import Sequence
 from types import TracebackType
 from typing import Any
@@ -56,9 +56,6 @@ async def realtime_conversation_preparing(  # noqa: C901
                 remember=_to_lmm_remember(memory.remember),
             )
 
-        case context:
-            session_memory = LMMMemory.constant(context)
-
     session_scope: LMMSessionScope = await RealtimeLMM.session(
         instruction=Instruction.formatted(instruction),
         memory=session_memory,
@@ -68,7 +65,6 @@ async def realtime_conversation_preparing(  # noqa: C901
 
     async def open_session() -> RealtimeConversationSession:  # noqa: C901
         session: LMMSession = await session_scope.__aenter__()
-        pending_tool_requests: dict[str, Task[None]] = {}
 
         async def handle_tool_request(
             tool_request: LMMToolRequest,
@@ -80,15 +76,18 @@ async def realtime_conversation_preparing(  # noqa: C901
                 # check if task was not cancelled before passing the result to input
                 ctx.check_cancellation()
                 # deliver the result directly to input
-                await session.write(response)
+                await session.writing(response)
 
             except CancelledError:
-                pass  # just cancelled, ignore
+                ctx.log_debug(f"...tool request ({tool_request.identifier}) handling cancelled!")
 
-            finally:
-                nonlocal pending_tool_requests
-                # update pending tools - we have delivered or ignored the result
-                del pending_tool_requests[tool_request.identifier]
+            except BaseException as exc:
+                ctx.log_error(
+                    f"...tool request ({tool_request.identifier}) handling failed!",
+                    exception=exc,
+                )
+
+            else:
                 ctx.log_debug(f"...tool request ({tool_request.identifier}) handling finished!")
 
         async def read() -> ConversationStreamElement:
@@ -125,11 +124,10 @@ async def realtime_conversation_preparing(  # noqa: C901
                         )
 
                     case LMMToolRequest() as tool_request:
-                        pending_tool_requests[tool_request.identifier] = ctx.spawn(
+                        ctx.spawn(
                             handle_tool_request,
                             tool_request,
                         )
-                        continue
 
         async def write(
             input: ConversationStreamElement,  # noqa: A002
