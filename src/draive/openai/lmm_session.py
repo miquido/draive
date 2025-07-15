@@ -118,14 +118,10 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                     connection=connection,
                 )
 
-            # track tools usage
-            pending_tool_calls: dict[str, tuple[LMMToolRequest, LMMToolResponse | None]] = {}
-
             input_audio_format: str = f"audio/{config.input_audio_format}"
             output_audio_format: str = f"audio/{config.output_audio_format}"
 
-            async def read() -> LMMSessionOutput:  # noqa: C901, PLR0911, PLR0912, PLR0915
-                nonlocal pending_tool_calls
+            async def read() -> LMMSessionOutput:  # noqa: C901, PLR0911, PLR0912
                 while True:
                     event: RealtimeServerEvent = await connection.recv()
                     match event.type:
@@ -195,21 +191,6 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                                     attributes={"lmm.model": config.model},
                                 )
 
-                            if event.response.status == "incomplete":
-                                continue  # TODO: handle incomplete if needed
-
-                            # record response in memory
-                            if event.response.output:
-                                await memory.remember(
-                                    LMMCompletion.of(
-                                        MultimodalContent.empty,
-                                        meta={
-                                            "origin_identifier": event.response.id,
-                                            "created": datetime.now().isoformat(),
-                                        },
-                                    )
-                                )
-
                             # send empty eod chunk
                             return LMMStreamChunk.of(
                                 MultimodalContent.empty,
@@ -230,7 +211,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                                     if event.item.name is None:
                                         continue  # can't use tool calls without tool name
 
-                                    request: LMMToolRequest = LMMToolRequest.of(
+                                    return LMMToolRequest.of(
                                         event.item.call_id,
                                         tool=event.item.name,
                                         arguments=json.loads(event.item.arguments)
@@ -241,14 +222,12 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                                             "created": datetime.now().isoformat(),
                                         },
                                     )
-                                    pending_tool_calls[request.identifier] = (request, None)
-                                    return request
 
                                 case "message":
-                                    if event.item.role != "assistant":
-                                        continue  # skip other events
+                                    if not event.item.content:
+                                        continue  # skip empty events
 
-                                    if event.item.content:
+                                    if event.item.role == "assistant":
                                         await memory.remember(
                                             LMMCompletion.of(
                                                 _content_to_multimodal(
@@ -261,21 +240,15 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                                                 },
                                             ),
                                         )
+                                        return LMMSessionEvent.of(
+                                            "output.completed",
+                                            meta={
+                                                "origin_identifier": event.item.id,
+                                                "created": datetime.now().isoformat(),
+                                            },
+                                        )
 
-                                    continue  # keep running
-
-                                case "function_call_output":
-                                    continue  # ignored - we are producing call results manually
-
-                        # input has beed added
-                        case "conversation.item.created":
-                            match event.item.type:
-                                # added message
-                                case "message":
-                                    if event.item.role != "user":
-                                        continue  # skip other events
-
-                                    if event.item.content:
+                                    elif event.item.role == "user":
                                         await memory.remember(
                                             LMMInput.of(
                                                 _content_to_multimodal(
@@ -288,46 +261,19 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                                                 },
                                             ),
                                         )
+                                        return LMMSessionEvent.of(
+                                            "input.completed",
+                                            meta={
+                                                "origin_identifier": event.item.id,
+                                                "created": datetime.now().isoformat(),
+                                            },
+                                        )
 
-                                    return LMMSessionEvent.of(
-                                        "input.completed",
-                                        meta={
-                                            "origin_identifier": event.item.id,
-                                            "created": datetime.now().isoformat(),
-                                        },
-                                    )
+                                    else:
+                                        continue  # skip other events
 
-                                # added function result
                                 case "function_call_output":
-                                    # check if we got all responses
-                                    if any(call[1] is None for call in pending_tool_calls.values()):
-                                        continue  # wait for all responses
-
-                                    # prepare memory
-                                    requests: list[LMMToolRequest] = []
-                                    responses: list[LMMToolResponse] = []
-                                    for request, response in pending_tool_calls.values():
-                                        assert response is not None  # nosec: B101
-                                        requests.append(request)
-                                        responses.append(response)
-
-                                    # remember requests and responses
-                                    await memory.remember(
-                                        LMMToolRequests.of(
-                                            requests,
-                                            # TODO: we are missing extra content
-                                            # added with tool calls
-                                            content=MultimodalContent.empty,
-                                        ),
-                                        LMMToolResponses.of(responses),
-                                    )
-                                    # cleanup pending tool calls
-                                    pending_tool_calls = {}
-                                    # request a response after providing all tool results
-                                    await connection.response.create()
-
-                                case "function_call":
-                                    continue  # ignored - we are not producing calls manually
+                                    continue  # ignored
 
                         case "input_audio_buffer.speech_started":
                             return LMMSessionEvent.of(
@@ -363,27 +309,18 @@ class OpenAIRealtimeLMM(OpenAIAPI):
             async def write(
                 input: LMMSessionInput,  # noqa: A002
             ) -> None:
-                match input:
-                    case LMMStreamChunk() as chunk:
-                        await _send_input_chunk(
-                            chunk,
-                            connection=connection,
-                        )
+                if isinstance(input, LMMStreamChunk):
+                    await _send_input_chunk(
+                        input,
+                        connection=connection,
+                    )
 
-                    case LMMToolResponse() as tool_response:
-                        assert pending_tool_calls.get(tool_response.identifier) is not None  # nosec: B101
-                        assert pending_tool_calls[tool_response.identifier][1] is None  # nosec: B101
-                        # TODO: consider storing single requests/responses instead of manually
-                        # managining it and storing in batches, also ensure removing unhandled
-                        # record response
-                        pending_tool_calls[tool_response.identifier] = (
-                            pending_tool_calls[tool_response.identifier][0],
-                            tool_response,
-                        )
-                        await _send_tool_response(
-                            tool_response,
-                            connection=connection,
-                        )
+                else:
+                    assert isinstance(input, LMMToolResponse)  # nosec: B101
+                    await _send_tool_response(
+                        input,
+                        connection=connection,
+                    )
 
             return LMMSession(
                 reading=read,
@@ -565,9 +502,7 @@ def _tool_result(
 
             case MetaContent():
                 # skip not supported with a log to prevent connection break
-                ctx.log_error(
-                    "OpenAI realtime function result (MetaContent) not supported! Skipping..."
-                )
+                ctx.log_error("OpenAI realtime function result (meta) not supported! Skipping...")
 
             case other:  # treat other as json text
                 response_output += other.to_json()
@@ -588,6 +523,8 @@ async def _send_tool_response(
             "output": _tool_result(response.content),
         },
     )
+    # TODO: FIXME: multi tools?
+    await connection.response.create()
 
 
 def _prepare_session_config(
