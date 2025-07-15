@@ -77,7 +77,7 @@ class BedrockGuardrais(BedrockAPI):
         guardrails_config: BedrockOutputGuardraisConfig = config or ctx.state(
             BedrockOutputGuardraisConfig
         )
-        with ctx.scope("bedrock_guardrails", guardrails_config):
+        async with ctx.scope("bedrock_guardrails", guardrails_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

@@ -79,7 +79,7 @@ class OllamaLMMGeneration(OllamaAPI):
 
         chat_config: OllamaChatConfig = config or ctx.state(OllamaChatConfig)
         tools = tools or LMMTools.none
-        with ctx.scope("ollama_lmm_completion", chat_config):
+        async with ctx.scope("ollama_lmm_completion", chat_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

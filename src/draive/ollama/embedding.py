@@ -34,7 +34,7 @@ class OllamaEmbedding(OllamaAPI):
         Create texts embedding with Ollama embedding service.
         """
         embedding_config: OllamaEmbeddingConfig = config or ctx.state(OllamaEmbeddingConfig)
-        with ctx.scope("ollama_text_embedding", embedding_config):
+        async with ctx.scope("ollama_text_embedding", embedding_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

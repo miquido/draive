@@ -36,7 +36,7 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
     decoder: ModelGeneratorDecoder | None,
     **extra: Any,
 ) -> Generated:
-    with ctx.scope("generate_model"):
+    async with ctx.scope("generate_model"):
         extended_instruction: Instruction
         match schema_injection:
             case "auto":

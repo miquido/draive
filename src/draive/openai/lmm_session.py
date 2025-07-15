@@ -1,12 +1,13 @@
 import json
 from base64 import b64decode, b64encode
 from collections.abc import Sequence
+from contextlib import AbstractAsyncContextManager
 from datetime import datetime
 from types import TracebackType
 from typing import Any, Literal
 from uuid import uuid4
 
-from haiway import MISSING, Missing, ObservabilityLevel, ScopeContext, ctx, without_missing
+from haiway import MISSING, Missing, ObservabilityLevel, ctx, without_missing
 from openai.resources.beta.realtime.realtime import (
     AsyncRealtimeConnection,
     AsyncRealtimeConnectionManager,
@@ -79,7 +80,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
             output=output,
         )
         # managing scope manually
-        scope: ScopeContext = ctx.scope("openai_realtime", config)
+        scope: AbstractAsyncContextManager[str] = ctx.scope("openai_realtime", config)
         # prepare connection
         connection_manager: AsyncRealtimeConnectionManager = self._client.beta.realtime.connect(
             model=config.model,

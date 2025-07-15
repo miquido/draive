@@ -42,7 +42,7 @@ class GeminiEmbedding(GeminiAPI):
         else:
             config_dict = None
 
-        with ctx.scope("gemini_text_embedding", embedding_config):
+        async with ctx.scope("gemini_text_embedding", embedding_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

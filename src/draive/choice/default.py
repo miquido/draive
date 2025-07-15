@@ -30,7 +30,7 @@ async def default_choice_completion(  # noqa: C901
     examples: Iterable[tuple[Multimodal, ChoiceOption]] | None,
     **extra: Any,
 ) -> ChoiceOption:
-    with ctx.scope("choice_completion"):
+    async with ctx.scope("choice_completion"):
         assert options, "Choice options cannot be empty"  # nosec: B101
         assert all(  # nosec: B101
             example[1] in options for example in examples or []

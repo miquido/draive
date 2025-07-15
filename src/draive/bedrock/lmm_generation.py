@@ -70,7 +70,7 @@ class BedrockLMMGeneration(BedrockAPI):
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
         completion_config: BedrockChatConfig = config or ctx.state(BedrockChatConfig)
         tools = tools or LMMTools.none
-        with ctx.scope("bedrock_lmm_completion", completion_config):
+        async with ctx.scope("bedrock_lmm_completion", completion_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

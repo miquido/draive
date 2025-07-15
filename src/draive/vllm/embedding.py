@@ -35,7 +35,7 @@ class VLLMEmbedding(VLLMAPI):
         Create texts embedding with VLLM embedding service.
         """
         embedding_config: VLLMEmbeddingConfig = config or ctx.state(VLLMEmbeddingConfig)
-        with ctx.scope("vllm_text_embedding", embedding_config):
+        async with ctx.scope("vllm_text_embedding", embedding_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

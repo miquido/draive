@@ -184,7 +184,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         /,
         **arguments: Any,
     ) -> MultimodalContent:
-        with ctx.scope(self.name):
+        async with ctx.scope(f"tool.{self.name}"):
             ctx.record(
                 attributes={
                     "call_id": call_id,

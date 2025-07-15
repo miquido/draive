@@ -106,7 +106,7 @@ class GeminiLMMGeneration(GeminiAPI):
         tools = tools or LMMTools.none
         generation_config: GeminiGenerationConfig = config or ctx.state(GeminiGenerationConfig)
 
-        with ctx.scope("gemini_lmm_completion", generation_config):
+        async with ctx.scope("gemini_lmm_completion", generation_config):
             request_config: GenerateContentConfigDict = _prepare_request_config(
                 instruction=instruction,
                 context=context,

@@ -88,7 +88,7 @@ class VLLMLMMGeneration(VLLMAPI):
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
         completion_config: VLLMChatConfig = config or ctx.state(VLLMChatConfig)
         tools = tools or LMMTools.none
-        with ctx.scope("vllm_lmm_completion", completion_config):
+        async with ctx.scope("vllm_lmm_completion", completion_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

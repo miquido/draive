@@ -33,7 +33,7 @@ async def generate_text(
     stream: bool,
     **extra: Any,
 ) -> AsyncIterable[str] | str:
-    with ctx.scope("generate_text"):
+    async with ctx.scope("generate_text"):
         context: list[LMMContextElement] = [
             *[
                 message

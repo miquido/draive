@@ -76,7 +76,7 @@ class PromptTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, LM
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Prompt:
-        with ctx.scope(f"prompt:{self.declaration.name}"):
+        async with ctx.scope(f"prompt:{self.declaration.name}"):
             try:
                 result = Prompt(
                     name=self.declaration.name,

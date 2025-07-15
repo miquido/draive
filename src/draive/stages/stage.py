@@ -205,7 +205,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            with ctx.scope("stage.predefined"):
+            async with ctx.scope("stage.predefined"):
                 return state.updated(
                     context=(*state.context, *context_extension),
                     result=completion_result if completion_result is not None else state.result,
@@ -256,7 +256,7 @@ class Stage:
                     *,
                     state: StageState,
                 ) -> StageState:
-                    with ctx.scope("stage.memory_recall"):
+                    async with ctx.scope("stage.memory_recall"):
                         return await memory.recall()
 
             case "merge":
@@ -265,7 +265,7 @@ class Stage:
                     *,
                     state: StageState,
                 ) -> StageState:
-                    with ctx.scope("stage.memory_recall"):
+                    async with ctx.scope("stage.memory_recall"):
                         return state.merged(await memory.recall())
 
         return cls(
@@ -304,7 +304,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            with ctx.scope("stage.memory_remember"):
+            async with ctx.scope("stage.memory_remember"):
                 await memory.remember(state)
                 return state
 
@@ -382,7 +382,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            with ctx.scope("stage.completion"):
+            async with ctx.scope("stage.completion"):
                 context, result = await _lmm_completion(
                     instruction=instruction,
                     context=(*state.context, *context_extension),
@@ -467,7 +467,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            with ctx.scope("stage.completion.prompting"):
+            async with ctx.scope("stage.completion.prompting"):
                 context, result = await _lmm_completion(
                     instruction=instruction,
                     context=(
@@ -534,7 +534,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            with ctx.scope("stage.completion.loopback"):
+            async with ctx.scope("stage.completion.loopback"):
                 if not state.context or not isinstance(state.context[-1], LMMCompletion):
                     ctx.log_warning("loopback_completion has been skipped due to invalid context")
                     return state
@@ -601,7 +601,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            with ctx.scope("stage.transform.result"):
+            async with ctx.scope("stage.transform.result"):
                 return state.updated(result=await transformation(state.result))
 
         return cls(
@@ -640,7 +640,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            with ctx.scope("stage.transform.context"):
+            async with ctx.scope("stage.transform.context"):
                 return state.updated(context=await transformation(state.context))
 
         return cls(
@@ -798,7 +798,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            with ctx.scope("stage.tool_call"):
+            async with ctx.scope("stage.tool_call"):
                 # Create tool request representing the call
                 tool_request: LMMToolRequest = LMMToolRequest.of(
                     uuid4().hex,
@@ -878,7 +878,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            with ctx.scope("stage.result_evaluation"):
+            async with ctx.scope("stage.result_evaluation"):
                 evaluation_result: ScenarioEvaluatorResult | EvaluatorResult = await evaluator(
                     state.result
                 )
@@ -937,7 +937,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            with ctx.scope("stage.context_evaluation"):
+            async with ctx.scope("stage.context_evaluation"):
                 evaluation_result: ScenarioEvaluatorResult | EvaluatorResult = await evaluator(
                     state.context
                 )
@@ -1012,12 +1012,12 @@ class Stage:
                     *,
                     state: StageState,
                 ) -> StageState:
-                    with ctx.scope("stage.loop"):
+                    async with ctx.scope("stage.loop"):
                         current_state: StageState = state
                         iteration: int = 0
 
                         while await condition(state=current_state, iteration=iteration):
-                            with ctx.scope("stage.loop.iteration"):
+                            async with ctx.scope("stage.loop.iteration"):
                                 for execution in stage_executions:
                                     current_state = await execution(state=current_state)
 
@@ -1031,12 +1031,12 @@ class Stage:
                     *,
                     state: StageState,
                 ) -> StageState:
-                    with ctx.scope("stage.loop"):
+                    async with ctx.scope("stage.loop"):
                         current_state: StageState = state
                         iteration: int = 0
 
                         while True:
-                            with ctx.scope("stage.loop.iteration"):
+                            async with ctx.scope("stage.loop.iteration"):
                                 for stage_execution in stage_executions:
                                     current_state = await stage_execution(state=current_state)
 
@@ -1136,7 +1136,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            with ctx.scope("stage.concurrent"):
+            async with ctx.scope("stage.concurrent"):
                 return await merge(
                     branches=cast(  # we are converting errors witin __call__
                         Sequence[StageState | StageException],
@@ -1246,7 +1246,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            with ctx.scope("stage.router"):
+            async with ctx.scope("stage.router"):
                 selection: str = await routing(
                     state=state,
                     options=options,
@@ -1633,7 +1633,7 @@ class Stage:
                 return await execution(state=state)
 
             except Exception as exc:
-                with ctx.scope("stage.fallback"):
+                async with ctx.scope("stage.fallback"):
                     if exc in exceptions:
                         return await fallback_execution(state=state)
 
@@ -1890,7 +1890,7 @@ class Stage:
         MultimodalContent
             The result produced by executing the Stage.
         """
-        with ctx.scope("stage.execution"):
+        async with ctx.scope("stage.execution"):
             initial_context: LMMContext
             match context:
                 case None:

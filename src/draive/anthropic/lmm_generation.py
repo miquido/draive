@@ -93,7 +93,7 @@ class AnthropicLMMGeneration(AnthropicAPI):
 
         completion_config: AnthropicConfig = config or ctx.state(AnthropicConfig)
         tools = tools or LMMTools.none
-        with ctx.scope("anthropic_lmm_completion", completion_config):
+        async with ctx.scope("anthropic_lmm_completion", completion_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={
