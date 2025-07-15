@@ -35,7 +35,7 @@ class OpenAIImageGeneration(OpenAIAPI):
         generation_config: OpenAIImageGenerationConfig = config or ctx.state(
             OpenAIImageGenerationConfig
         )
-        with ctx.scope("generate_image", generation_config):
+        async with ctx.scope("generate_image", generation_config):
             response: ImagesResponse = await self._client.images.generate(
                 model=generation_config.model,
                 n=1,

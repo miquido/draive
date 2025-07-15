@@ -3,7 +3,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID, uuid4
 
-from haiway import State, as_dict, ctx, execute_concurrently, traced
+from haiway import State, as_dict, ctx, execute_concurrently
 
 from draive.evaluation import EvaluationSuite, SuiteEvaluatorResult
 from draive.evaluation.suite import EvaluationSuiteCase
@@ -15,7 +15,6 @@ from draive.stages import Stage, StageState, stage
 __all__ = ("refine_instruction",)
 
 
-@traced
 async def refine_instruction[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,

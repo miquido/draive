@@ -67,7 +67,7 @@ async def conversation_completion(
     stream: bool = False,
     **extra: Any,
 ) -> AsyncIterator[ConversationStreamElement] | ConversationMessage:
-    with ctx.scope("conversation_completion"):
+    async with ctx.scope("conversation_completion"):
         # relying on memory recall correctness
         recalled_messages: Sequence[ConversationElement] = await memory.recall()
         await GuardrailsModeration.check_input(input.content)

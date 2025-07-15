@@ -88,7 +88,7 @@ class OpenAILMMGeneration(OpenAIAPI):
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
         tools = tools or LMMTools.none
         completion_config: OpenAIChatConfig = config or ctx.state(OpenAIChatConfig).updated(**extra)
-        with ctx.scope("openai_lmm_completion", completion_config):
+        async with ctx.scope("openai_lmm_completion", completion_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

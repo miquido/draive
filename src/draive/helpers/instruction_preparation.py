@@ -27,7 +27,7 @@ async def prepare_instruction(
     *,
     guidelines: str | None = None,
 ) -> Instruction:
-    with ctx.scope("prepare_instruction"):
+    async with ctx.scope("prepare_instruction"):
         ctx.log_info("Preparing instruction...")
 
         instruction_declaration: InstructionDeclaration

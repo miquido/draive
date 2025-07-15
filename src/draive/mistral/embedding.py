@@ -35,7 +35,7 @@ class MistralEmbedding(MistralAPI):
         """
 
         embedding_config: MistralEmbeddingConfig = config or ctx.state(MistralEmbeddingConfig)
-        with ctx.scope("mistral_text_embedding", embedding_config):
+        async with ctx.scope("mistral_text_embedding", embedding_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

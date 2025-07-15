@@ -98,7 +98,7 @@ class MistralLMMGeneration(MistralAPI):
     ) -> AsyncIterator[LMMStreamOutput] | LMMOutput:
         completion_config: MistralChatConfig = config or ctx.state(MistralChatConfig)
         tools = tools or LMMTools.none
-        with ctx.scope("mistral_lmm_completion", completion_config):
+        async with ctx.scope("mistral_lmm_completion", completion_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

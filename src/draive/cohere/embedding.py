@@ -35,7 +35,7 @@ class CohereEmbedding(CohereAPI):
         Create texts embedding with Cohere embedding service.
         """
         embedding_config: CohereTextEmbeddingConfig = config or ctx.state(CohereTextEmbeddingConfig)
-        with ctx.scope("cohere_text_embedding", embedding_config):
+        async with ctx.scope("cohere_text_embedding", embedding_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={
@@ -106,7 +106,7 @@ class CohereEmbedding(CohereAPI):
         embedding_config: CohereImageEmbeddingConfig = config or ctx.state(
             CohereImageEmbeddingConfig
         )
-        with ctx.scope("cohere_image_embedding", embedding_config):
+        async with ctx.scope("cohere_image_embedding", embedding_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

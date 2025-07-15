@@ -35,7 +35,7 @@ class OpenAIEmbedding(OpenAIAPI):
         Create texts embedding with OpenAI embedding service.
         """
         embedding_config: OpenAIEmbeddingConfig = config or ctx.state(OpenAIEmbeddingConfig)
-        with ctx.scope("openai_text_embedding", embedding_config):
+        async with ctx.scope("openai_text_embedding", embedding_config):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={
