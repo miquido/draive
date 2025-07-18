@@ -64,10 +64,10 @@ def evaluation_score_value(  # noqa: C901, PLR0911
             return value
 
         case False:
-            return 0
+            return 0.0
 
         case True:
-            return 1
+            return 1.0
 
         case "none":
             return NONE
@@ -89,6 +89,10 @@ def evaluation_score_value(  # noqa: C901, PLR0911
 
         case "max":
             return MAX
+
+        case int() as value:
+            assert 0 <= value <= 1, "Score value has to be in range from 0 to 1"  # nosec: B101
+            return float(value)
 
         case _:
             raise ValueError("Invalid evaluation score value - %s", value)
