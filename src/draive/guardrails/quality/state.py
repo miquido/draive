@@ -2,8 +2,12 @@ from typing import Any, Self
 
 from haiway import State, ctx
 
-from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
-from draive.evaluation.scenario import PreparedScenarioEvaluator, ScenarioEvaluatorResult
+from draive.evaluation import (
+    EvaluatorResult,
+    EvaluatorScenarioResult,
+    PreparedEvaluator,
+    PreparedEvaluatorScenario,
+)
 from draive.guardrails.quality.types import GuardrailsQualityException, GuardrailsQualityVerifying
 from draive.multimodal import Multimodal, MultimodalContent
 
@@ -22,31 +26,30 @@ class GuardrailsQualityVerification(State):
     @classmethod
     def of(
         cls,
-        evaluator: PreparedScenarioEvaluator | PreparedEvaluator,
+        evaluator: PreparedEvaluatorScenario | PreparedEvaluator,
     ) -> Self:
         async def verifying(
             content: MultimodalContent,
             /,
             **extra: Any,
         ) -> None:
-            result: ScenarioEvaluatorResult | EvaluatorResult = await evaluator(content)
+            result: EvaluatorScenarioResult | EvaluatorResult = await evaluator(content)
             if result.passed:
                 return  # verification passed
 
-            match result:
-                case ScenarioEvaluatorResult() as result:
-                    raise GuardrailsQualityException(
-                        reason=result.scenario,
-                        content=content,
-                        meta=result.meta,
-                    )
+            if isinstance(result, EvaluatorResult):
+                raise GuardrailsQualityException(
+                    reason=result.evaluator,
+                    content=content,
+                    meta=result.meta,
+                )
 
-                case EvaluatorResult() as result:
-                    raise GuardrailsQualityException(
-                        reason=result.evaluator,
-                        content=content,
-                        meta=result.meta,
-                    )
+            else:
+                raise GuardrailsQualityException(
+                    reason=result.scenario,
+                    content=content,
+                    meta=result.meta,
+                )
 
         return cls(verifying=verifying)
 

@@ -331,7 +331,7 @@ class Meta(Mapping[str, MetaValue]):
 
     def merged_with(
         self,
-        values: Self | MetaValues,
+        values: Self | MetaValues | None,
         /,
     ) -> Self:
         if not values:

@@ -182,7 +182,7 @@ from collections.abc import Sequence
 class CustomizedDefaultsModel(DataModel):
     default: int = 42
     field_default: int = Field(default=21)
-    field_default_factory: Sequence[str] = Field(default_factory=list)
+    field_default_factory: Sequence[str] = Field(default_factory=tuple)
 
 
 # since all fields have defaults we can initialize without arguments
@@ -378,5 +378,3 @@ combined_requirement.check(path_model_instance)
     rhs: 42
 
     True
-
-

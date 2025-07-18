@@ -1,7 +1,7 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from typing import Any, Protocol, Self, cast, overload, runtime_checkable
 
-from haiway import AttributePath, ScopeContext, as_list, ctx, execute_concurrently
+from haiway import AttributePath, State, as_list, ctx, execute_concurrently
 
 from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
@@ -9,83 +9,53 @@ from draive.parameters import DataModel, Field
 
 __all__ = (
     "EvaluationScenarioResult",
-    "ScenarioEvaluator",
-    "ScenarioEvaluatorDefinition",
-    "ScenarioEvaluatorResult",
-    "evaluation_scenario",
+    "EvaluatorScenario",
+    "EvaluatorScenarioDefinition",
+    "EvaluatorScenarioResult",
+    "evaluator_scenario",
 )
 
 
-class ScenarioEvaluatorResult(DataModel):
-    scenario: str = Field(
-        description="Name of evaluated scenario",
-    )
-    evaluations: Sequence[EvaluatorResult] = Field(
-        description="Scenario evaluation results",
-    )
-    meta: Meta = Field(
-        description="Additional evaluation metadata",
-        default=META_EMPTY,
-    )
-
-    @property
-    def passed(self) -> bool:
-        # empty evaluations is equivalent of failure
-        return len(self.evaluations) > 0 and all(case.passed for case in self.evaluations)
-
-    def report(
-        self,
-        *,
-        include_passed: bool = True,
-        include_details: bool = True,
-    ) -> str:
-        evaluations_report: str = "\n".join(
-            result.report(include_details=include_details)
-            for result in self.evaluations
-            if include_passed or not result.passed
-        )
-
-        if evaluations_report:  # nonempty report
-            if include_details:
-                return (
-                    f"<scenario name='{self.scenario}'>"
-                    f"\n<relative_score>{self.relative_score * 100:.2f}%</relative_score>"
-                    f"\n<evaluations>\n{evaluations_report}\n</evaluations>"
-                    "\n</scenario>"
-                )
-
-            else:
-                return f"Scenario {self.scenario}:\n{evaluations_report}"
-
-        elif not self.evaluations:
-            return f"Scenario {self.scenario} empty!"
-
-        else:
-            return f"Scenario {self.scenario} passed!"
-
-    @property
-    def relative_score(self) -> float:
-        if not self.evaluations:
-            return 0.0
-
-        score: float = 0.0
-        for evaluation in self.evaluations:
-            score += evaluation.relative_score
-
-        return score / len(self.evaluations)
-
-
 class EvaluationScenarioResult(DataModel):
+    """
+    Result of evaluating multiple evaluators on a value.
+
+    Contains a collection of evaluation results from running multiple
+    evaluators, along with metadata about the scenario evaluation.
+    """
+
     @classmethod
     async def evaluating[Value](
         cls,
         value: Value,
         /,
-        evaluators: PreparedEvaluator[Value],
-        *_evaluators: PreparedEvaluator[Value],
+        evaluator: PreparedEvaluator[Value],
+        *evaluators: PreparedEvaluator[Value],
         concurrent_tasks: int = 2,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
+        """
+        Create a result by evaluating multiple evaluators on a value.
+
+        Parameters
+        ----------
+        value : Value
+            The value to evaluate
+        evaluator : PreparedEvaluator[Value]
+            First evaluator to run
+        *evaluators : PreparedEvaluator[Value]
+            Additional evaluators to run
+        concurrent_tasks : int, optional
+            Maximum number of concurrent evaluation tasks, by default 2
+        meta : Meta | MetaValues | None, optional
+            Additional metadata for the result
+
+        Returns
+        -------
+        Self
+            New EvaluationScenarioResult with all evaluation results
+        """
+
         async def execute(
             evaluator: PreparedEvaluator[Value],
         ) -> EvaluatorResult:
@@ -95,7 +65,7 @@ class EvaluationScenarioResult(DataModel):
             evaluations=tuple(
                 await execute_concurrently(
                     execute,
-                    [evaluators, *_evaluators],
+                    (evaluator, *evaluators),
                     concurrent_tasks=concurrent_tasks,
                 ),
             ),
@@ -109,6 +79,23 @@ class EvaluationScenarioResult(DataModel):
         *results: Self,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
+        """
+        Merge multiple scenario results into one.
+
+        Parameters
+        ----------
+        result : Self
+            First result to merge
+        *results : Self
+            Additional results to merge
+        meta : Meta | MetaValues | None, optional
+            Additional metadata to include in merged result
+
+        Returns
+        -------
+        Self
+            New result containing all evaluations from input results
+        """
         merged_evaluations: list[EvaluatorResult] = as_list(result.evaluations)
         merged_meta: Meta = result.meta
         for other in results:
@@ -129,17 +116,148 @@ class EvaluationScenarioResult(DataModel):
     )
 
 
+class EvaluatorScenarioResult(DataModel):
+    """
+    Result of running an evaluator scenario.
+
+    Contains evaluation results from running a named scenario, including
+    pass/fail status and performance metrics across all evaluations.
+
+    Attributes
+    ----------
+    scenario : str
+        Name of the evaluated scenario
+    evaluations : Sequence[EvaluatorResult]
+        Results from all evaluators in the scenario
+    meta : Meta
+        Additional metadata for the scenario
+    """
+
+    scenario: str = Field(
+        description="Name of the evaluated scenario",
+    )
+    evaluations: Sequence[EvaluatorResult] = Field(
+        description="Scenario evaluation results",
+    )
+    meta: Meta = Field(
+        description="Additional evaluation metadata",
+        default=META_EMPTY,
+    )
+
+    @property
+    def passed(self) -> bool:
+        """
+        Check if all evaluations in the scenario passed.
+
+        Returns
+        -------
+        bool
+            True if all evaluations passed, False otherwise.
+            Empty evaluations return False.
+        """
+        # empty evaluations is equivalent of failure
+        return len(self.evaluations) > 0 and all(case.passed for case in self.evaluations)
+
+    def report(
+        self,
+        *,
+        detailed: bool = True,
+        include_passed: bool = True,
+    ) -> str:
+        """
+        Generate a human-readable report of the scenario results.
+
+        Parameters
+        ----------
+        detailed : bool, optional
+            If True, include full details in XML format. If False, return
+            brief summary, by default True
+        include_passed : bool, optional
+            If True, include passed evaluations in the report. If False,
+            only show failed evaluations, by default True
+
+        Returns
+        -------
+        str
+            Formatted report string
+        """
+        if not self.evaluations:
+            return f"{self.scenario} has no evaluations"
+
+        status: str = "passed" if self.passed else "failed"
+        results_report: str = "\n".join(
+            result.report(detailed=detailed)
+            for result in self.evaluations
+            if include_passed or not result.passed
+        )
+
+        if not detailed:
+            if results_report:
+                return f"{self.scenario}: {status} ({self.performance}%)\n{results_report}"
+
+            else:
+                return f"{self.scenario}: {status} ({self.performance}%)"
+
+        if results_report:
+            return (
+                f"<evaluator_scenario name='{self.scenario}' status='{status}'"
+                f" performance='{self.performance:.2f}%'>"
+                f"\n<evaluators>\n{results_report}\n</evaluators>"
+                "\n</evaluator_scenario>"
+            )
+
+        else:
+            return (
+                f"<evaluator_scenario name='{self.scenario}' status='{status}'"
+                f" performance='{self.performance:.2f}%'/>"
+            )
+
+    @property
+    def performance(self) -> float:
+        """
+        Calculate average performance across all evaluations.
+
+        Returns
+        -------
+        float
+            Average performance percentage (0-100) across all evaluations.
+            Returns 0.0 if no evaluations.
+        """
+        if not self.evaluations:
+            return 0.0
+
+        score: float = 0.0
+        for evaluation in self.evaluations:
+            score += evaluation.performance
+
+        return score / len(self.evaluations)
+
+
 @runtime_checkable
-class PreparedScenarioEvaluator[Value](Protocol):
+class PreparedEvaluatorScenario[Value](Protocol):
+    """
+    Protocol for evaluator scenarios with pre-configured arguments.
+
+    A prepared evaluator scenario has all arguments except the value to evaluate
+    already bound, simplifying the evaluation interface.
+    """
+
     async def __call__(
         self,
         value: Value,
         /,
-    ) -> ScenarioEvaluatorResult: ...
+    ) -> EvaluatorScenarioResult: ...
 
 
 @runtime_checkable
-class ScenarioEvaluatorDefinition[Value, **Args](Protocol):
+class EvaluatorScenarioDefinition[Value, **Args](Protocol):
+    """
+    Protocol for evaluator scenario function definitions.
+
+    Defines the interface for functions that can run multiple evaluations
+    on a value and return either a scenario result or sequence of evaluator results.
+    """
+
     @property
     def __name__(self) -> str: ...
 
@@ -149,13 +267,28 @@ class ScenarioEvaluatorDefinition[Value, **Args](Protocol):
         /,
         *args: Args.args,
         **kwargs: Args.kwargs,
-    ) -> Sequence[EvaluatorResult] | EvaluationScenarioResult: ...
+    ) -> EvaluationScenarioResult | Sequence[EvaluatorResult]: ...
 
 
-class ScenarioEvaluator[Value, **Args]:
+class EvaluatorScenario[Value, **Args]:
+    """
+    Configurable evaluator scenario for running multiple evaluations.
+
+    An EvaluatorScenario wraps a scenario function with configuration like name,
+    state, and metadata. It provides methods to transform inputs and prepare
+    scenarios with partial arguments.
+
+    Attributes
+    ----------
+    name : str
+        Identifier for the scenario
+    meta : Meta
+        Additional metadata for the scenario
+    """
+
     __slots__ = (
         "_definition",
-        "_execution_context",
+        "_state",
         "meta",
         "name",
     )
@@ -163,8 +296,8 @@ class ScenarioEvaluator[Value, **Args]:
     def __init__(
         self,
         name: str,
-        definition: ScenarioEvaluatorDefinition[Value, Args],
-        execution_context: ScopeContext | None,
+        definition: EvaluatorScenarioDefinition[Value, Args],
+        state: Collection[State],
         meta: Meta,
     ) -> None:
         assert "\n" not in name  # nosec: B101
@@ -175,17 +308,17 @@ class ScenarioEvaluator[Value, **Args]:
             "name",
             name.lower().replace(" ", "_"),
         )
-        self._definition: ScenarioEvaluatorDefinition[Value, Args]
+        self._definition: EvaluatorScenarioDefinition[Value, Args]
         object.__setattr__(
             self,
             "_definition",
             definition,
         )
-        self._execution_context: ScopeContext | None
+        self._state: Collection[State]
         object.__setattr__(
             self,
-            "_execution_context",
-            execution_context,
+            "_state",
+            state,
         )
         self.meta: Meta
         object.__setattr__(
@@ -198,10 +331,26 @@ class ScenarioEvaluator[Value, **Args]:
         self,
         *args: Args.args,
         **kwargs: Args.kwargs,
-    ) -> PreparedScenarioEvaluator[Value]:
+    ) -> PreparedEvaluatorScenario[Value]:
+        """
+        Create a prepared evaluator scenario with bound arguments.
+
+        Parameters
+        ----------
+        *args : Args.args
+            Positional arguments to bind
+        **kwargs : Args.kwargs
+            Keyword arguments to bind
+
+        Returns
+        -------
+        PreparedEvaluatorScenario[Value]
+            Scenario with pre-bound arguments
+        """
+
         async def evaluate(
             value: Value,
-        ) -> ScenarioEvaluatorResult:
+        ) -> EvaluatorScenarioResult:
             return await self(
                 value,
                 *args,
@@ -215,22 +364,51 @@ class ScenarioEvaluator[Value, **Args]:
         name: str,
         /,
     ) -> Self:
+        """
+        Create a copy with a different name.
+
+        Parameters
+        ----------
+        name : str
+            New name for the scenario
+
+        Returns
+        -------
+        Self
+            New scenario instance with updated name
+        """
         return self.__class__(
             name=name,
             definition=self._definition,
-            execution_context=self._execution_context,
+            state=self._state,
             meta=self.meta,
         )
 
-    def with_execution_context(
+    def with_state(
         self,
-        context: ScopeContext,
+        state: State,
         /,
+        *states: State,
     ) -> Self:
+        """
+        Create a copy with additional state.
+
+        Parameters
+        ----------
+        state : State
+            First state object to add
+        *states : State
+            Additional state objects to add
+
+        Returns
+        -------
+        Self
+            New scenario instance with extended state
+        """
         return self.__class__(
             name=self.name,
             definition=self._definition,
-            execution_context=context,
+            state=(*self._state, state, *states),
             meta=self.meta,
         )
 
@@ -239,10 +417,23 @@ class ScenarioEvaluator[Value, **Args]:
         meta: Meta | MetaValues,
         /,
     ) -> Self:
+        """
+        Create a copy with merged metadata.
+
+        Parameters
+        ----------
+        meta : Meta | MetaValues
+            Metadata to merge with existing metadata
+
+        Returns
+        -------
+        Self
+            New scenario instance with merged metadata
+        """
         return self.__class__(
             name=self.name,
             definition=self._definition,
-            execution_context=self._execution_context,
+            state=self._state,
             meta=self.meta.merged_with(meta),
         )
 
@@ -250,17 +441,27 @@ class ScenarioEvaluator[Value, **Args]:
         self,
         mapping: Callable[[Mapped], Value] | AttributePath[Mapped, Value] | Value,
         /,
-    ) -> "ScenarioEvaluator[Mapped, Args]":
-        mapper: Callable[[Mapped], Value]
-        match mapping:
-            case Callable() as function:  # pyright: ignore[reportUnknownVariableType]
-                mapper = function
+    ) -> "EvaluatorScenario[Mapped, Args]":
+        """
+        Transform the input value before evaluation.
 
-            case path:
-                assert isinstance(  # nosec: B101
-                    path, AttributePath
-                ), "Prepare parameter path by using Self._.path.to.property"
-                mapper = cast(AttributePath[Mapped, Value], path).__call__
+        Parameters
+        ----------
+        mapping : Callable[[Mapped], Value] | AttributePath[Mapped, Value] | Value
+            Function or attribute path to transform input values
+
+        Returns
+        -------
+        EvaluatorScenario[Mapped, Args]
+            New scenario that transforms inputs before evaluation
+        """
+        mapper: Callable[[Mapped], Value]
+        if isinstance(mapping, AttributePath):
+            mapper = cast(AttributePath[Mapped, Value], mapping)
+
+        else:
+            assert isinstance(mapping, Callable)  # nosec: B101
+            mapper = mapping
 
         async def evaluation(
             value: Mapped,
@@ -274,10 +475,10 @@ class ScenarioEvaluator[Value, **Args]:
                 **kwargs,
             )
 
-        return ScenarioEvaluator[Mapped, Args](
+        return EvaluatorScenario[Mapped, Args](
             name=self.name,
             definition=evaluation,
-            execution_context=self._execution_context,
+            state=self._state,
             meta=self.meta,
         )
 
@@ -287,33 +488,23 @@ class ScenarioEvaluator[Value, **Args]:
         /,
         *args: Args.args,
         **kwargs: Args.kwargs,
-    ) -> ScenarioEvaluatorResult:
-        result: ScenarioEvaluatorResult
-        if context := self._execution_context:
-            async with context:
-                result = await self._evaluate(
-                    value,
-                    *args,
-                    **kwargs,
-                )
-
-        else:
-            async with ctx.scope(f"evaluation.scenario.{self.name}"):
-                result = await self._evaluate(
-                    value,
-                    *args,
-                    **kwargs,
-                )
+    ) -> EvaluatorScenarioResult:
+        async with ctx.scope(f"evaluation.scenario.{self.name}", *self._state):
+            result: EvaluatorScenarioResult = await self._evaluate(
+                value,
+                *args,
+                **kwargs,
+            )
 
         ctx.record(
-            metric=f"evaluation.scenario.{result.scenario}.score",
-            value=result.relative_score,
+            metric=f"evaluation.scenario.{result.scenario}.performance",
+            value=result.performance,
             unit="%",
             attributes={
+                "evaluation.passed": result.passed,
                 "evaluation.scenario.evaluations": [
                     evaluation.evaluator for evaluation in result.evaluations
                 ],
-                "evaluation.passed": result.passed,
             },
         )
         return result
@@ -324,48 +515,43 @@ class ScenarioEvaluator[Value, **Args]:
         /,
         *args: Args.args,
         **kwargs: Args.kwargs,
-    ) -> ScenarioEvaluatorResult:
+    ) -> EvaluatorScenarioResult:
+        result: EvaluationScenarioResult | Sequence[EvaluatorResult]
         try:
-            match await self._definition(
+            result = await self._definition(
                 value,
                 *args,
                 **kwargs,
-            ):
-                case EvaluationScenarioResult() as result:
-                    meta: Meta
-                    if self.meta:
-                        if result.meta:
-                            meta = self.meta.merged_with(result.meta)
-
-                        else:
-                            meta = self.meta
-
-                    else:
-                        meta = result.meta
-
-                    return ScenarioEvaluatorResult(
-                        scenario=self.name,
-                        evaluations=result.evaluations,
-                        meta=meta,
-                    )
-
-                case [*results]:
-                    return ScenarioEvaluatorResult(
-                        scenario=self.name,
-                        evaluations=tuple(results),
-                        meta=self.meta,
-                    )
+            )
 
         except Exception as exc:
             ctx.log_error(
-                f"Scenario evaluator `{self.name}` failed, using empty fallback result",
+                f"Evaluator scenario `{self.name}` failed due to an error",
                 exception=exc,
             )
-
-            return ScenarioEvaluatorResult(
+            return EvaluatorScenarioResult(
                 scenario=self.name,
                 evaluations=(),
-                meta=self.meta.updated(exception=str(exc)),
+                meta=self.meta.merged_with(
+                    {
+                        "exception": str(type(exc)),
+                        "error": str(exc),
+                    }
+                ),
+            )
+
+        if isinstance(result, EvaluationScenarioResult):
+            return EvaluatorScenarioResult(
+                scenario=self.name,
+                evaluations=result.evaluations,
+                meta=self.meta,
+            )
+
+        else:
+            return EvaluatorScenarioResult(
+                scenario=self.name,
+                evaluations=result,
+                meta=self.meta,
             )
 
     def __setattr__(
@@ -389,45 +575,78 @@ class ScenarioEvaluator[Value, **Args]:
 
 
 @overload
-def evaluation_scenario[Value, **Args](
-    definition: ScenarioEvaluatorDefinition[Value, Args],
+def evaluator_scenario[Value, **Args](
+    definition: EvaluatorScenarioDefinition[Value, Args],
     /,
-) -> ScenarioEvaluator[Value, Args]: ...
+) -> EvaluatorScenario[Value, Args]: ...
 
 
 @overload
-def evaluation_scenario[Value, **Args](
+def evaluator_scenario[Value, **Args](
     *,
     name: str | None = None,
-    execution_context: ScopeContext | None = None,
+    state: Collection[State] = (),
     meta: Meta | MetaValues | None = None,
 ) -> Callable[
-    [ScenarioEvaluatorDefinition[Value, Args]],
-    ScenarioEvaluator[Value, Args],
+    [EvaluatorScenarioDefinition[Value, Args]],
+    EvaluatorScenario[Value, Args],
 ]: ...
 
 
-def evaluation_scenario[Value, **Args](  # pyright: ignore[reportInconsistentOverload] - this seems to be pyright false positive/error
-    definition: ScenarioEvaluatorDefinition[Value, Args] | None = None,
+def evaluator_scenario[Value, **Args](  # pyright: ignore[reportInconsistentOverload] - this seems to be pyright false positive/error
+    definition: EvaluatorScenarioDefinition[Value, Args] | None = None,
     /,
     *,
     name: str | None = None,
-    execution_context: ScopeContext | None = None,
+    state: Collection[State] = (),
     meta: Meta | MetaValues | None = None,
 ) -> (
     Callable[
-        [ScenarioEvaluatorDefinition[Value, Args]],
-        ScenarioEvaluator[Value, Args],
+        [EvaluatorScenarioDefinition[Value, Args]],
+        EvaluatorScenario[Value, Args],
     ]
-    | ScenarioEvaluator[Value, Args]
+    | EvaluatorScenario[Value, Args]
 ):
+    """
+    Create or decorate an evaluator scenario function.
+
+    Can be used as a decorator or called directly to create an EvaluatorScenario
+    from a scenario function.
+
+    Parameters
+    ----------
+    definition : EvaluatorScenarioDefinition[Value, Args] | None, optional
+        The scenario function. If None, returns a decorator
+    name : str | None, optional
+        Name for the scenario. If None, uses function's __name__
+    state : Collection[State], optional
+        State objects to include in evaluation context
+    meta : Meta | MetaValues | None, optional
+        Metadata for the scenario
+
+    Returns
+    -------
+    Callable[[EvaluatorScenarioDefinition[Value, Args]], EvaluatorScenario[Value, Args]] | EvaluatorScenario[Value, Args]
+        Either a decorator (if definition is None) or an EvaluatorScenario instance
+
+    Examples
+    --------
+    As a decorator:
+    >>> @evaluator_scenario
+    ... async def my_scenario(value: str) -> Sequence[EvaluatorResult]:
+    ...     return [await evaluator1(value), await evaluator2(value)]
+
+    Direct call:
+    >>> my_scenario = evaluator_scenario(some_function, name="custom")
+    """  # noqa: E501
+
     def wrap(
-        definition: ScenarioEvaluatorDefinition[Value, Args],
-    ) -> ScenarioEvaluator[Value, Args]:
-        return ScenarioEvaluator(
+        definition: EvaluatorScenarioDefinition[Value, Args],
+    ) -> EvaluatorScenario[Value, Args]:
+        return EvaluatorScenario(
             name=name or definition.__name__,
             definition=definition,
-            execution_context=execution_context,
+            state=state,
             meta=Meta.of(meta),
         )
 

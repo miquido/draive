@@ -17,9 +17,9 @@ from haiway import Disposable, Disposables, State, cache, ctx, retry
 from draive.commons import Meta, MetaValue, MetaValues
 from draive.evaluation import (
     EvaluatorResult,
+    EvaluatorScenarioResult,
     PreparedEvaluator,
-    PreparedScenarioEvaluator,
-    ScenarioEvaluatorResult,
+    PreparedEvaluatorScenario,
 )
 from draive.instructions import Instruction
 from draive.lmm import (
@@ -844,7 +844,7 @@ class Stage:
     @classmethod
     def result_evaluation(
         cls,
-        evaluator: PreparedScenarioEvaluator[MultimodalContent]
+        evaluator: PreparedEvaluatorScenario[MultimodalContent]
         | PreparedEvaluator[MultimodalContent],
         /,
         *,
@@ -858,7 +858,7 @@ class Stage:
 
         Parameters
         ----------
-        evaluator : PreparedScenarioEvaluator[MultimodalContent]
+        evaluator : PreparedEvaluatorScenario[MultimodalContent]
         | PreparedEvaluator[MultimodalContent]
             The evaluator or scenario evaluator to use for evaluation.
         meta: Meta | MetaValues | None = None
@@ -879,20 +879,20 @@ class Stage:
             state: StageState,
         ) -> StageState:
             async with ctx.scope("stage.result_evaluation"):
-                evaluation_result: ScenarioEvaluatorResult | EvaluatorResult = await evaluator(
+                evaluation_result: EvaluatorScenarioResult | EvaluatorResult = await evaluator(
                     state.result
                 )
 
                 if evaluation_result.passed:
                     return state  # evaluation passed, keep going
 
-                score: float = evaluation_result.relative_score
-                report: str = evaluation_result.report(include_details=__debug__)
+                performance: float = evaluation_result.performance
+                report: str = evaluation_result.report(detailed=__debug__)
                 raise StageException(
-                    f"Result evaluation failed with relative score: {score * 100:.2f}%",
+                    f"Result evaluation failed with relative score: {performance:.2f}%",
                     state=state,
                     meta={
-                        "evaluation_score": score,
+                        "evaluation_performance": performance,
                         "evaluation_report": report,
                     },
                 )
@@ -905,7 +905,7 @@ class Stage:
     @classmethod
     def context_evaluation(
         cls,
-        evaluator: PreparedScenarioEvaluator[LMMContext] | PreparedEvaluator[LMMContext],
+        evaluator: PreparedEvaluatorScenario[LMMContext] | PreparedEvaluator[LMMContext],
         /,
         *,
         meta: Meta | MetaValues | None = None,
@@ -918,7 +918,7 @@ class Stage:
 
         Parameters
         ----------
-        evaluator : PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value]
+        evaluator : PreparedEvaluatorScenario[Value] | PreparedEvaluator[Value]
             The evaluator or scenario evaluator to use for evaluation.
         meta: Meta | MetaValues | None = None
             Additional stage metadata including tags, description etc.
@@ -938,20 +938,20 @@ class Stage:
             state: StageState,
         ) -> StageState:
             async with ctx.scope("stage.context_evaluation"):
-                evaluation_result: ScenarioEvaluatorResult | EvaluatorResult = await evaluator(
+                evaluation_result: EvaluatorScenarioResult | EvaluatorResult = await evaluator(
                     state.context
                 )
 
                 if evaluation_result.passed:
                     return state  # evaluation passed, keep going
 
-                score: float = evaluation_result.relative_score
-                report: str = evaluation_result.report(include_details=__debug__)
+                performance: float = evaluation_result.performance
+                report: str = evaluation_result.report(detailed=__debug__)
                 raise StageException(
-                    f"Context evaluation failed with relative score: {score * 100:.2f}%",
+                    f"Context evaluation failed with relative score: {performance:.2f}%",
                     state=state,
                     meta={
-                        "evaluation_score": score,
+                        "evaluation_performance": performance,
                         "evaluation_report": report,
                     },
                 )

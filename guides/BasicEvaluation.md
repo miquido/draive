@@ -20,14 +20,14 @@ async def keyword_evaluator(
     found_keywords = sum(1 for keyword in required_keywords if keyword.lower() in text)
 
     if not required_keywords:
-        return EvaluationScore(
-            value=0,
+        return EvaluationScore.of(
+            0,
             comment="No keywords provided for evaluation",
         )
 
     score = found_keywords / len(required_keywords)
-    return EvaluationScore(
-        value=score,
+    return EvaluationScore.of(
+        score,
         comment=f"Found {found_keywords}/{len(required_keywords)} required keywords",
     )
 ```
@@ -101,10 +101,10 @@ print(f"Comment: {readability_result.score.comment}")
 Scenarios combine multiple evaluators to assess content from different perspectives. Here's a scenario that evaluates content quality using both groundedness and readability:
 
 ```python
-from draive.evaluation import evaluation_scenario, EvaluationScenarioResult
+from draive.evaluation import evaluator_scenario, EvaluationScenarioResult
 from draive.evaluators import conciseness_evaluator
 
-@evaluation_scenario(name="content_quality")
+@evaluator_scenario(name="content_quality")
 async def content_quality_scenario(
     content: str,
     /,
@@ -129,7 +129,7 @@ scenario_result = await content_quality_scenario(
 )
 
 print(f"Scenario passed: {scenario_result.passed}")
-print(f"Overall score: {scenario_result.relative_score:.2f}")
+print(f"Overall performance: {scenario_result.performance:.2f}%")
 
 for evaluation in scenario_result.evaluations:
     print(f"- {evaluation.evaluator}: {evaluation.score.value:.2f} ({'✓' if evaluation.passed else '✗'})")
@@ -141,7 +141,7 @@ Evaluation suites allow systematic testing across multiple test cases. Let's cre
 
 ```python
 from typing import Sequence
-from draive.evaluation import evaluation_suite, EvaluationSuiteCase
+from draive.evaluation import evaluator_suite, EvaluatorCaseResult
 from draive import TextGeneration, DataModel
 
 class ContentTestCase(DataModel):
@@ -149,22 +149,23 @@ class ContentTestCase(DataModel):
     required_keywords: Sequence[str]
     reference_material: str
 
-@evaluation_suite(ContentTestCase)
+@evaluator_suite(ContentTestCase, suite_parameters=ContentTestCase)
 async def content_generation_suite(
     parameters: ContentTestCase,
-) -> EvaluationCaseResult:
+    case_parameters: ContentTestCase,
+) -> EvaluatorCaseResult:
     # Generate content based on test case parameters
     content: str = await TextGeneration.generate(
-        instruction=f"Write informative content about {parameters.topic}",
-        input=parameters.reference_material,
+        instruction=f"Write informative content about {case_parameters.topic}",
+        input=case_parameters.reference_material,
     )
-    return await EvaluationCaseResult.evaluating(
+    return await EvaluatorCaseResult.evaluating(
         content,
         content_quality_scenario.prepared(
-            reference=parameters.reference_material,
+            reference=case_parameters.reference_material,
         ),
         keyword_evaluator.with_threshold(0.5).prepared(
-            required_keywords=parameters.required_keywords
+            required_keywords=case_parameters.required_keywords
         ),
     )
 
@@ -193,9 +194,8 @@ print(f"Cases passed: {sum(1 for case in suite_results.cases if case.passed)}/{l
 
 for case_result in suite_results.cases:
     print(f"\nCase {case_result.case.parameters.topic}:")
-    print(f"  Generated: {case_result.value[:100]}...")
     print(f"  Passed: {case_result.passed}")
-    print(f"  Score: {case_result.relative_score:.2f}")
+    print(f"  Performance: {case_result.performance:.2f}%")
 ```
 
 ## Advanced Usage
@@ -203,10 +203,8 @@ for case_result in suite_results.cases:
 You can customize evaluators with execution contexts and metadata:
 
 ```python
-# Create evaluator with custom execution context
-custom_evaluator = keyword_evaluator.with_execution_context(
-    ctx.scope("custom_evaluation")
-).with_meta({
+# Create evaluator with custom metadata
+custom_evaluator = keyword_evaluator.with_meta({
     "version": "1.0",
     "author": "evaluation_team",
 })

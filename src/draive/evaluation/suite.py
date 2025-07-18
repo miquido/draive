@@ -1,40 +1,72 @@
 import random
 from asyncio import Lock
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Collection, Iterable, Sequence
 from pathlib import Path
 from typing import Protocol, Self, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import ScopeContext, as_list, asynchronous, ctx, execute_concurrently
+from haiway import State, as_list, asynchronous, ctx, execute_concurrently
 
 from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.evaluation.generator import generate_case_parameters
-from draive.evaluation.scenario import PreparedScenarioEvaluator, ScenarioEvaluatorResult
+from draive.evaluation.scenario import EvaluatorScenarioResult, PreparedEvaluatorScenario
 from draive.parameters import DataModel, Field
 
 __all__ = (
-    "EvaluationCaseResult",
-    "EvaluationSuite",
-    "EvaluationSuiteDefinition",
-    "EvaluationSuiteStorage",
-    "SuiteEvaluatorCaseResult",
-    "SuiteEvaluatorResult",
-    "evaluation_suite",
+    "EvaluatorCaseResult",
+    "EvaluatorSuite",
+    "EvaluatorSuiteCaseResult",
+    "EvaluatorSuiteDefinition",
+    "EvaluatorSuiteResult",
+    "EvaluatorSuiteStorage",
+    "evaluator_suite",
 )
 
 
-class EvaluationSuiteCase[CaseParameters: DataModel](DataModel):
-    identifier: UUID = Field(default_factory=uuid4)
+class EvaluatorSuiteCase[CaseParameters: DataModel](DataModel):
+    """
+    Individual test case for an evaluator suite.
+
+    Represents a single test case with parameters, unique identifier,
+    and optional comment for documentation.
+
+    Attributes
+    ----------
+    identifier : str
+        Unique identifier for the test case
+    parameters : CaseParameters
+        Parameters specific to this test case
+    comment : str | None
+        Optional comment describing the test case
+    """
+
+    identifier: str = Field(default_factory=lambda: str(uuid4()))
     parameters: CaseParameters
     comment: str | None = None
 
 
-class SuiteEvaluatorCaseResult[CaseParameters: DataModel](DataModel):
-    case: EvaluationSuiteCase[CaseParameters] = Field(
+class EvaluatorSuiteCaseResult[CaseParameters: DataModel](DataModel):
+    """
+    Result of evaluating a single test case.
+
+    Contains the test case and its evaluation results, with methods to
+    check if the case passed and generate reports.
+
+    Attributes
+    ----------
+    case : EvaluatorSuiteCase[CaseParameters]
+        The test case that was evaluated
+    results : Sequence[EvaluatorScenarioResult]
+        Results from all scenario evaluations
+    meta : Meta
+        Additional metadata for the case result
+    """
+
+    case: EvaluatorSuiteCase[CaseParameters] = Field(
         description="Evaluated case",
     )
-    results: Sequence[ScenarioEvaluatorResult] = Field(
+    results: Sequence[EvaluatorScenarioResult] = Field(
         description="Evaluation results",
     )
     meta: Meta = Field(
@@ -44,61 +76,96 @@ class SuiteEvaluatorCaseResult[CaseParameters: DataModel](DataModel):
 
     @property
     def passed(self) -> bool:
+        """
+        Check if all scenario evaluations passed.
+
+        Returns
+        -------
+        bool
+            True if all scenario evaluations passed, False otherwise.
+            Empty results return False.
+        """
         # empty results is equivalent of failure
         return len(self.results) > 0 and all(result.passed for result in self.results)
 
     def report(
         self,
         *,
+        detailed: bool = True,
         include_passed: bool = True,
-        include_details: bool = True,
     ) -> str:
-        report: str = "\n".join(
-            [
-                result.report(
-                    include_passed=include_passed,
-                    include_details=include_details,
-                )
-                for result in self.results
-                if include_passed or not result.passed
-            ]
+        """
+        Generate a human-readable report of the case results.
+
+        Parameters
+        ----------
+        detailed : bool, optional
+            If True, include full details in XML format. If False, return
+            brief summary, by default True
+        include_passed : bool, optional
+            If True, include passed evaluations in the report. If False,
+            only show failed evaluations, by default True
+
+        Returns
+        -------
+        str
+            Formatted report string
+        """
+        if not self.results:
+            return f"{self.case.identifier} has no evaluations"
+
+        status: str = "passed" if self.passed else "failed"
+        results_report: str = "\n".join(
+            result.report(
+                detailed=detailed,
+                include_passed=include_passed,
+            )
+            for result in self.results
+            if include_passed or not result.passed
         )
 
-        if report:  # nonempty report
-            if include_details:
-                return (
-                    f"<evaluation_case identifier='{self.case.identifier}'>"
-                    f"\n<relative_score>{self.relative_score * 100:.2f}%</relative_score>"
-                    # TODO: convert DataModel to xml representation when avaialble
-                    f"\n<parameters>{self.case.parameters}</parameters>"
-                    f"\n{report}"
-                    "\n</evaluation_case>"
-                )
+        if not detailed:
+            if results_report:
+                return f"{self.case.identifier}: {status} ({self.performance}%)\n{results_report}"
 
             else:
-                return f"Evaluation case {self.case.identifier}:\n{report}\n---\n"
+                return f"{self.case.identifier}: {status} ({self.performance}%)"
 
-        elif not self.results:
-            return f"Evaluation case {self.case.identifier} empty!"
+        if results_report:
+            return (
+                f"<evaluator_suite case='{self.case.identifier}' status='{status}'"
+                f" performance='{self.performance:.2f}%'>"
+                f"\n<results>\n{results_report}\n</results>"
+                "\n</evaluator_suite>"
+            )
 
         else:
-            return f"Evaluation case {self.case.identifier} passed!"
+            return f"<evaluator_suite case='{self.case.identifier}' status='{status}' />"
 
     @property
-    def relative_score(self) -> float:
+    def performance(self) -> float:
+        """
+        Calculate average performance across all scenario evaluations.
+
+        Returns
+        -------
+        float
+            Average performance percentage (0-100) across all evaluations.
+            Returns 0.0 if no evaluations.
+        """
         if not self.results:
             return 0.0
 
         score: float = 0.0
         for evaluation in self.results:
-            score += evaluation.relative_score
+            score += evaluation.performance
 
         return score / len(self.results)
 
 
-class SuiteEvaluatorResult[SuiteParameters: DataModel, CaseParameters: DataModel](DataModel):
+class EvaluatorSuiteResult[SuiteParameters: DataModel, CaseParameters: DataModel](DataModel):
     parameters: SuiteParameters
-    cases: Sequence[SuiteEvaluatorCaseResult[CaseParameters]]
+    cases: Sequence[EvaluatorSuiteCaseResult[CaseParameters]]
 
     @property
     def passed(self) -> bool:
@@ -107,69 +174,79 @@ class SuiteEvaluatorResult[SuiteParameters: DataModel, CaseParameters: DataModel
     def report(
         self,
         *,
+        detailed: bool = True,
         include_passed: bool = True,
-        include_details: bool = True,
     ) -> str:
-        report: str = "\n".join(
-            [
-                result.report(
-                    include_passed=include_passed,
-                    include_details=include_details,
-                )
-                for result in self.cases
-                if include_passed or not result.passed
-            ]
+        if not self.cases:
+            return "Evaluator suite empty!"
+
+        status: str = "passed" if self.passed else "failed"
+        results_report: str = "\n---\n".join(
+            result.report(
+                detailed=detailed,
+                include_passed=include_passed,
+            )
+            for result in self.cases
+            if include_passed or not result.passed
         )
 
-        if report:  # nonempty report contains failing reports
-            return f"Evaluation suite failed:\n\n{report}"
+        if not detailed:
+            if results_report:
+                return f"Evaluator suite: {status} ({self.performance:.2f}%):\n\n{results_report}"
 
-        elif not self.cases:
-            return "Evaluation suite empty!"
+            else:
+                return f"Evaluator suite: {status} ({self.performance:.2f}%)"
+
+        if results_report:
+            return (
+                f"<evaluator_suite status='{status}'"
+                f" performance='{self.performance:.2f}%'>"
+                f"\n<results>\n{results_report}\n</results>"
+                "\n</evaluator_suite>"
+            )
 
         else:
-            return "Evaluation suite passed!"
+            return f"<evaluator_suite status='{status}' performance='{self.performance:.2f}%' />"
 
     @property
-    def relative_score(self) -> float:
+    def performance(self) -> float:
         if not self.cases:
             return 0.0
 
         score: float = 0.0
         for evaluation in self.cases:
-            score += evaluation.relative_score
+            score += evaluation.performance
 
         return score / len(self.cases)
 
 
-class EvaluationCaseResult(DataModel):
+class EvaluatorCaseResult(DataModel):
     @classmethod
     def of(
         cls,
-        results: ScenarioEvaluatorResult | EvaluatorResult,
-        *_results: ScenarioEvaluatorResult | EvaluatorResult,
+        result: EvaluatorScenarioResult | EvaluatorResult,
+        *results: EvaluatorScenarioResult | EvaluatorResult,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         free_results: list[EvaluatorResult] = []
-        scenario_results: list[ScenarioEvaluatorResult] = []
-        for result in (results, *_results):
-            match result:
-                case ScenarioEvaluatorResult() as scenario_result:
-                    scenario_results.append(scenario_result)
+        scenario_results: list[EvaluatorScenarioResult] = []
+        for element in (result, *results):
+            if isinstance(element, EvaluatorScenarioResult):
+                scenario_results.append(element)
 
-                case EvaluatorResult() as evaluator_result:
-                    free_results.append(evaluator_result)
+            else:
+                free_results.append(element)
 
         if free_results:
             scenario_results.append(
-                ScenarioEvaluatorResult(
-                    scenario="EvaluationSuite",
-                    evaluations=tuple(free_results),
+                EvaluatorScenarioResult(
+                    scenario="EvaluatorSuite",
+                    evaluations=free_results,
                 )
             )
 
         return cls(
-            results=tuple(scenario_results),
+            results=scenario_results,
             meta=Meta.of(meta),
         )
 
@@ -178,20 +255,20 @@ class EvaluationCaseResult(DataModel):
         cls,
         value: Value,
         /,
-        evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
-        *_evaluators: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
+        evaluator: PreparedEvaluatorScenario[Value] | PreparedEvaluator[Value],
+        *evaluators: PreparedEvaluatorScenario[Value] | PreparedEvaluator[Value],
         concurrent_tasks: int = 2,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         async def execute(
-            evaluator: PreparedScenarioEvaluator[Value] | PreparedEvaluator[Value],
-        ) -> ScenarioEvaluatorResult | EvaluatorResult:
+            evaluator: PreparedEvaluatorScenario[Value] | PreparedEvaluator[Value],
+        ) -> EvaluatorScenarioResult | EvaluatorResult:
             return await evaluator(value)
 
         return cls.of(
             *await execute_concurrently(
                 execute,
-                [evaluators, *_evaluators],
+                (evaluator, *evaluators),
                 concurrent_tasks=concurrent_tasks,
             ),
             meta=Meta.of(meta),
@@ -204,7 +281,7 @@ class EvaluationCaseResult(DataModel):
         *results: Self,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        merged_evaluations: list[ScenarioEvaluatorResult] = as_list(result.results)
+        merged_evaluations: list[EvaluatorScenarioResult] = as_list(result.results)
         merged_meta: Meta = result.meta
         for other in results:
             merged_evaluations.extend(other.results)
@@ -215,7 +292,7 @@ class EvaluationCaseResult(DataModel):
             meta=merged_meta.merged_with(Meta.of(meta)),
         )
 
-    results: Sequence[ScenarioEvaluatorResult] = Field(
+    results: Sequence[EvaluatorScenarioResult] = Field(
         description="Evaluation results",
     )
     meta: Meta = Field(
@@ -225,7 +302,7 @@ class EvaluationCaseResult(DataModel):
 
 
 @runtime_checkable
-class EvaluationSuiteDefinition[
+class EvaluatorSuiteDefinition[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
 ](Protocol):
@@ -233,27 +310,27 @@ class EvaluationSuiteDefinition[
         self,
         parameters: SuiteParameters,
         case_parameters: CaseParameters,
-    ) -> EvaluationCaseResult: ...
+    ) -> EvaluatorCaseResult: ...
 
 
-class EvaluationSuiteData[SuiteParameters: DataModel, CaseParameters: DataModel](DataModel):
+class EvaluatorSuiteData[SuiteParameters: DataModel, CaseParameters: DataModel](DataModel):
     parameters: SuiteParameters
-    cases: Sequence[EvaluationSuiteCase[CaseParameters]] = Field(default_factory=tuple)
+    cases: Sequence[EvaluatorSuiteCase[CaseParameters]] = ()
 
 
 @runtime_checkable
-class EvaluationSuiteStorage[SuiteParameters: DataModel, CaseParameters: DataModel](Protocol):
+class EvaluatorSuiteStorage[SuiteParameters: DataModel, CaseParameters: DataModel](Protocol):
     async def load(
         self,
-    ) -> EvaluationSuiteData[SuiteParameters, CaseParameters]: ...
+    ) -> EvaluatorSuiteData[SuiteParameters, CaseParameters]: ...
 
     async def save(
         self,
-        data: EvaluationSuiteData[SuiteParameters, CaseParameters],
+        data: EvaluatorSuiteData[SuiteParameters, CaseParameters],
     ) -> None: ...
 
 
-class EvaluationSuite[
+class EvaluatorSuite[
     SuiteParameters: DataModel,
     CaseParameters: DataModel,
 ]:
@@ -261,8 +338,8 @@ class EvaluationSuite[
         "_case_parameters",
         "_data_cache",
         "_definition",
-        "_execution_context",
         "_lock",
+        "_state",
         "_storage",
         "_suite_parameters",
     )
@@ -271,21 +348,21 @@ class EvaluationSuite[
         self,
         suite_parameters: type[SuiteParameters],
         case_parameters: type[CaseParameters],
-        definition: EvaluationSuiteDefinition[SuiteParameters, CaseParameters],
-        storage: EvaluationSuiteStorage[SuiteParameters, CaseParameters],
-        execution_context: ScopeContext | None,
+        definition: EvaluatorSuiteDefinition[SuiteParameters, CaseParameters],
+        storage: EvaluatorSuiteStorage[SuiteParameters, CaseParameters],
+        state: Collection[State],
     ) -> None:
         self._suite_parameters: type[SuiteParameters] = suite_parameters
         self._case_parameters: type[CaseParameters] = case_parameters
-        self._definition: EvaluationSuiteDefinition[SuiteParameters, CaseParameters] = definition
-        self._storage: EvaluationSuiteStorage[SuiteParameters, CaseParameters] = storage
-        self._execution_context: ScopeContext | None = execution_context
-        self._data_cache: EvaluationSuiteData[SuiteParameters, CaseParameters] | None = None
+        self._definition: EvaluatorSuiteDefinition[SuiteParameters, CaseParameters] = definition
+        self._storage: EvaluatorSuiteStorage[SuiteParameters, CaseParameters] = storage
+        self._state: Collection[State] = state
+        self._data_cache: EvaluatorSuiteData[SuiteParameters, CaseParameters] | None = None
         self._lock: Lock = Lock()
 
     async def __call__(
         self,
-        case_parameters: Sequence[EvaluationSuiteCase[CaseParameters] | CaseParameters | UUID]
+        case_parameters: Sequence[EvaluatorSuiteCase[CaseParameters] | CaseParameters | UUID]
         | float
         | int
         | None = None,
@@ -293,28 +370,18 @@ class EvaluationSuite[
         parameters: SuiteParameters | None = None,
         concurrent_cases: int = 2,
         reload: bool = False,
-    ) -> SuiteEvaluatorResult[SuiteParameters, CaseParameters]:
-        if context := self._execution_context:
-            async with context:
-                return await self._evaluate(
-                    case_parameters,
-                    suite_parameters=parameters,
-                    concurrent_cases=concurrent_cases,
-                    reload=reload,
-                )
-
-        else:
-            async with ctx.scope("evaluation.suite"):
-                return await self._evaluate(
-                    case_parameters,
-                    suite_parameters=parameters,
-                    concurrent_cases=concurrent_cases,
-                    reload=reload,
-                )
+    ) -> EvaluatorSuiteResult[SuiteParameters, CaseParameters]:
+        async with ctx.scope("evaluation.suite", *self._state):
+            return await self._evaluate(
+                case_parameters,
+                suite_parameters=parameters,
+                concurrent_cases=concurrent_cases,
+                reload=reload,
+            )
 
     async def _evaluate(
         self,
-        case_parameters: Sequence[EvaluationSuiteCase[CaseParameters] | CaseParameters | UUID]
+        case_parameters: Sequence[EvaluatorSuiteCase[CaseParameters] | CaseParameters | UUID]
         | float
         | int
         | None,
@@ -323,12 +390,12 @@ class EvaluationSuite[
         suite_parameters: SuiteParameters | None,
         concurrent_cases: int,
         reload: bool,
-    ) -> SuiteEvaluatorResult[SuiteParameters, CaseParameters]:
-        suite_data: EvaluationSuiteData[SuiteParameters, CaseParameters]
+    ) -> EvaluatorSuiteResult[SuiteParameters, CaseParameters]:
+        suite_data: EvaluatorSuiteData[SuiteParameters, CaseParameters]
         async with self._lock:
             suite_data = await self._data(reload=reload)
 
-        cases: Sequence[EvaluationSuiteCase[CaseParameters]] = []
+        cases: Sequence[EvaluatorSuiteCase[CaseParameters]] = []
         if not case_parameters:
             cases = suite_data.cases
 
@@ -359,23 +426,23 @@ class EvaluationSuite[
                         else:
                             raise ValueError(f"Evaluation case with ID {case_id} does not exists.")
 
-                    case EvaluationSuiteCase():
+                    case EvaluatorSuiteCase():
                         cases.append(case)
 
                     case _:
-                        cases.append(EvaluationSuiteCase[CaseParameters](parameters=case))
+                        cases.append(EvaluatorSuiteCase[CaseParameters](parameters=case))
 
         parameters: SuiteParameters = suite_parameters or suite_data.parameters
 
         async def evaluate_case(
-            case: EvaluationSuiteCase[CaseParameters],
-        ) -> SuiteEvaluatorCaseResult[CaseParameters]:
+            case: EvaluatorSuiteCase[CaseParameters],
+        ) -> EvaluatorSuiteCaseResult[CaseParameters]:
             return await self._evaluate_case(
                 case,
                 suite_parameters=parameters,
             )
 
-        return SuiteEvaluatorResult(
+        return EvaluatorSuiteResult(
             parameters=parameters,
             cases=await execute_concurrently(
                 evaluate_case,
@@ -386,16 +453,16 @@ class EvaluationSuite[
 
     async def _evaluate_case(
         self,
-        case_parameters: EvaluationSuiteCase[CaseParameters],
+        case_parameters: EvaluatorSuiteCase[CaseParameters],
         *,
         suite_parameters: SuiteParameters,
-    ) -> SuiteEvaluatorCaseResult[CaseParameters]:
-        result: EvaluationCaseResult = await self._definition(
+    ) -> EvaluatorSuiteCaseResult[CaseParameters]:
+        result: EvaluatorCaseResult = await self._definition(
             parameters=suite_parameters,
             case_parameters=case_parameters.parameters,
         )
 
-        return SuiteEvaluatorCaseResult[CaseParameters](
+        return EvaluatorSuiteCaseResult[CaseParameters](
             case=case_parameters,
             results=result.results,
         )
@@ -403,7 +470,7 @@ class EvaluationSuite[
     async def _data(
         self,
         reload: bool = False,
-    ) -> EvaluationSuiteData[SuiteParameters, CaseParameters]:
+    ) -> EvaluatorSuiteData[SuiteParameters, CaseParameters]:
         if reload or self._data_cache is None:
             self._data_cache = await self._storage.load()
             return self._data_cache
@@ -411,44 +478,45 @@ class EvaluationSuite[
         else:
             return self._data_cache
 
-    def with_execution_context(
+    def with_state(
         self,
-        context: ScopeContext,
+        state: State,
         /,
+        *states: State,
     ) -> Self:
         return self.__class__(
             suite_parameters=self._suite_parameters,
             case_parameters=self._case_parameters,
             definition=self._definition,
             storage=self._storage,
-            execution_context=context,
+            state=(*self._state, state, *states),
         )
 
     def with_storage(
         self,
-        storage: EvaluationSuiteStorage[SuiteParameters, CaseParameters]
-        | EvaluationSuiteData[SuiteParameters, CaseParameters]
+        storage: EvaluatorSuiteStorage[SuiteParameters, CaseParameters]
+        | EvaluatorSuiteData[SuiteParameters, CaseParameters]
         | Path
         | str,
         /,
     ) -> Self:
-        suite_storage: EvaluationSuiteStorage[SuiteParameters, CaseParameters]
+        suite_storage: EvaluatorSuiteStorage[SuiteParameters, CaseParameters]
         match storage:
             case str() as path_str:
-                suite_storage = _EvaluationSuiteFileStorage[SuiteParameters, CaseParameters](
+                suite_storage = _EvaluatorSuiteFileStorage[SuiteParameters, CaseParameters](
                     path=path_str,
-                    data_type=EvaluationSuiteData[self._suite_parameters, self._case_parameters],
+                    data_type=EvaluatorSuiteData[self._suite_parameters, self._case_parameters],
                 )
 
             case Path() as path:
-                suite_storage = _EvaluationSuiteFileStorage[SuiteParameters, CaseParameters](
+                suite_storage = _EvaluatorSuiteFileStorage[SuiteParameters, CaseParameters](
                     path=path,
-                    data_type=EvaluationSuiteData[self._suite_parameters, self._case_parameters],
+                    data_type=EvaluatorSuiteData[self._suite_parameters, self._case_parameters],
                 )
 
-            case EvaluationSuiteData() as data:
-                suite_storage = _EvaluationSuiteMemoryStorage[SuiteParameters, CaseParameters](
-                    data_type=EvaluationSuiteData[SuiteParameters, CaseParameters],
+            case EvaluatorSuiteData() as data:
+                suite_storage = _EvaluatorSuiteMemoryStorage[SuiteParameters, CaseParameters](
+                    data_type=EvaluatorSuiteData[SuiteParameters, CaseParameters],
                     parameters=data.parameters,
                     cases=data.cases,
                 )
@@ -461,13 +529,13 @@ class EvaluationSuite[
             case_parameters=self._case_parameters,
             definition=self._definition,
             storage=suite_storage,
-            execution_context=self._execution_context,
+            state=self._state,
         )
 
     async def cases(
         self,
         reload: bool = False,
-    ) -> Sequence[EvaluationSuiteCase[CaseParameters]]:
+    ) -> Sequence[EvaluatorSuiteCase[CaseParameters]]:
         async with self._lock:
             return (await self._data(reload=reload)).cases
 
@@ -478,13 +546,13 @@ class EvaluationSuite[
         comment: str | None = None,
     ) -> None:
         async with self._lock:
-            data: EvaluationSuiteData[SuiteParameters, CaseParameters] = await self._data(
+            data: EvaluatorSuiteData[SuiteParameters, CaseParameters] = await self._data(
                 reload=True
             )
             self._data_cache = data.updated(
                 cases=(
                     *data.cases,
-                    EvaluationSuiteCase[CaseParameters](
+                    EvaluatorSuiteCase[CaseParameters](
                         parameters=parameters,
                         comment=comment,
                     ),
@@ -499,14 +567,14 @@ class EvaluationSuite[
         persist: bool = False,
         guidelines: str | None = None,
         examples: Iterable[CaseParameters] | None = None,
-    ) -> Sequence[EvaluationSuiteCase[CaseParameters]]:
+    ) -> Sequence[EvaluatorSuiteCase[CaseParameters]]:
         async with self._lock:
-            current: EvaluationSuiteData[SuiteParameters, CaseParameters] = await self._data(
+            current: EvaluatorSuiteData[SuiteParameters, CaseParameters] = await self._data(
                 reload=True
             )
 
-            generated: Sequence[EvaluationSuiteCase[CaseParameters]] = [
-                EvaluationSuiteCase(parameters=parameters)
+            generated: Sequence[EvaluatorSuiteCase[CaseParameters]] = [
+                EvaluatorSuiteCase(parameters=parameters)
                 for parameters in await generate_case_parameters(
                     self._case_parameters,
                     count=count,
@@ -528,7 +596,7 @@ class EvaluationSuite[
         /,
     ) -> None:
         async with self._lock:
-            data: EvaluationSuiteData[SuiteParameters, CaseParameters] = await self._data(
+            data: EvaluatorSuiteData[SuiteParameters, CaseParameters] = await self._data(
                 reload=True
             )
             self._data_cache = data.updated(
@@ -537,20 +605,20 @@ class EvaluationSuite[
             await self._storage.save(self._data_cache)
 
 
-def evaluation_suite[SuiteParameters: DataModel, CaseParameters: DataModel, Value](
+def evaluator_suite[SuiteParameters: DataModel, CaseParameters: DataModel, Value](
     case_parameters: type[CaseParameters],
     /,
     suite_parameters: type[SuiteParameters] | SuiteParameters,
     *,
-    storage: EvaluationSuiteStorage[SuiteParameters, CaseParameters]
-    | EvaluationSuiteData[SuiteParameters, CaseParameters]
+    storage: EvaluatorSuiteStorage[SuiteParameters, CaseParameters]
+    | EvaluatorSuiteData[SuiteParameters, CaseParameters]
     | Path
     | str
     | None = None,
-    execution_context: ScopeContext | None = None,
+    state: Collection[State] = (),
 ) -> Callable[
-    [EvaluationSuiteDefinition[SuiteParameters, CaseParameters]],
-    EvaluationSuite[SuiteParameters, CaseParameters],
+    [EvaluatorSuiteDefinition[SuiteParameters, CaseParameters]],
+    EvaluatorSuite[SuiteParameters, CaseParameters],
 ]:
     suite_parameters_type: type[SuiteParameters]
     suite_parameters_value: SuiteParameters | None
@@ -562,7 +630,7 @@ def evaluation_suite[SuiteParameters: DataModel, CaseParameters: DataModel, Valu
         suite_parameters_type = type(suite_parameters)
         suite_parameters_value = suite_parameters
 
-    suite_storage: EvaluationSuiteStorage[SuiteParameters, CaseParameters]
+    suite_storage: EvaluatorSuiteStorage[SuiteParameters, CaseParameters]
     match storage:
         case None:
             if suite_parameters_value is None:
@@ -576,27 +644,27 @@ def evaluation_suite[SuiteParameters: DataModel, CaseParameters: DataModel, Valu
                         " Can't define evaluation suite without parameters and storage."
                     ) from None
 
-            suite_storage = _EvaluationSuiteMemoryStorage[SuiteParameters, CaseParameters](
-                data_type=EvaluationSuiteData[suite_parameters_type, case_parameters],
+            suite_storage = _EvaluatorSuiteMemoryStorage[SuiteParameters, CaseParameters](
+                data_type=EvaluatorSuiteData[suite_parameters_type, case_parameters],
                 parameters=suite_parameters_value,
                 cases=(),
             )
 
         case str() as path_str:
-            suite_storage = _EvaluationSuiteFileStorage[SuiteParameters, CaseParameters](
+            suite_storage = _EvaluatorSuiteFileStorage[SuiteParameters, CaseParameters](
                 path=path_str,
-                data_type=EvaluationSuiteData[suite_parameters, case_parameters],
+                data_type=EvaluatorSuiteData[suite_parameters, case_parameters],
             )
 
         case Path() as path:
-            suite_storage = _EvaluationSuiteFileStorage[SuiteParameters, CaseParameters](
+            suite_storage = _EvaluatorSuiteFileStorage[SuiteParameters, CaseParameters](
                 path=path,
-                data_type=EvaluationSuiteData[suite_parameters, case_parameters],
+                data_type=EvaluatorSuiteData[suite_parameters, case_parameters],
             )
 
-        case EvaluationSuiteData() as data:
-            suite_storage = _EvaluationSuiteMemoryStorage[SuiteParameters, CaseParameters](
-                data_type=EvaluationSuiteData[suite_parameters, case_parameters],
+        case EvaluatorSuiteData() as data:
+            suite_storage = _EvaluatorSuiteMemoryStorage[SuiteParameters, CaseParameters](
+                data_type=EvaluatorSuiteData[suite_parameters, case_parameters],
                 parameters=data.parameters,
                 cases=data.cases,
             )
@@ -605,20 +673,20 @@ def evaluation_suite[SuiteParameters: DataModel, CaseParameters: DataModel, Valu
             suite_storage = storage
 
     def wrap(
-        definition: EvaluationSuiteDefinition[SuiteParameters, CaseParameters],
-    ) -> EvaluationSuite[SuiteParameters, CaseParameters]:
-        return EvaluationSuite[SuiteParameters, CaseParameters](
+        definition: EvaluatorSuiteDefinition[SuiteParameters, CaseParameters],
+    ) -> EvaluatorSuite[SuiteParameters, CaseParameters]:
+        return EvaluatorSuite[SuiteParameters, CaseParameters](
             suite_parameters=suite_parameters_type,
             case_parameters=case_parameters,
             definition=definition,
             storage=suite_storage,
-            execution_context=execution_context,
+            state=state,
         )
 
     return wrap
 
 
-class _EvaluationSuiteMemoryStorage[SuiteParameters: DataModel, CaseParameters: DataModel]:
+class _EvaluatorSuiteMemoryStorage[SuiteParameters: DataModel, CaseParameters: DataModel]:
     __slots__ = (
         "_cases_store",
         "_data_type",
@@ -627,17 +695,17 @@ class _EvaluationSuiteMemoryStorage[SuiteParameters: DataModel, CaseParameters: 
 
     def __init__(
         self,
-        data_type: type[EvaluationSuiteData[SuiteParameters, CaseParameters]],
+        data_type: type[EvaluatorSuiteData[SuiteParameters, CaseParameters]],
         parameters: SuiteParameters,
-        cases: Sequence[EvaluationSuiteCase[CaseParameters]] | None,
+        cases: Sequence[EvaluatorSuiteCase[CaseParameters]] | None,
     ) -> None:
         self._parameters_store: SuiteParameters = parameters
-        self._cases_store: Sequence[EvaluationSuiteCase[CaseParameters]] = cases or ()
-        self._data_type: type[EvaluationSuiteData[SuiteParameters, CaseParameters]] = data_type
+        self._cases_store: Sequence[EvaluatorSuiteCase[CaseParameters]] = cases or ()
+        self._data_type: type[EvaluatorSuiteData[SuiteParameters, CaseParameters]] = data_type
 
     async def load(
         self,
-    ) -> EvaluationSuiteData[SuiteParameters, CaseParameters]:
+    ) -> EvaluatorSuiteData[SuiteParameters, CaseParameters]:
         return self._data_type(
             parameters=self._parameters_store,
             cases=self._cases_store,
@@ -645,12 +713,12 @@ class _EvaluationSuiteMemoryStorage[SuiteParameters: DataModel, CaseParameters: 
 
     async def save(
         self,
-        data: EvaluationSuiteData[SuiteParameters, CaseParameters],
+        data: EvaluatorSuiteData[SuiteParameters, CaseParameters],
     ) -> None:
         self._cases_store = data.cases
 
 
-class _EvaluationSuiteFileStorage[SuiteParameters: DataModel, CaseParameters: DataModel]:
+class _EvaluatorSuiteFileStorage[SuiteParameters: DataModel, CaseParameters: DataModel]:
     __slots__ = (
         "_data_type",
         "_path",
@@ -659,7 +727,7 @@ class _EvaluationSuiteFileStorage[SuiteParameters: DataModel, CaseParameters: Da
     def __init__(
         self,
         path: Path | str,
-        data_type: type[EvaluationSuiteData[SuiteParameters, CaseParameters]],
+        data_type: type[EvaluatorSuiteData[SuiteParameters, CaseParameters]],
     ) -> None:
         self._path: Path
         match path:
@@ -669,11 +737,11 @@ class _EvaluationSuiteFileStorage[SuiteParameters: DataModel, CaseParameters: Da
             case path:
                 self._path = path
 
-        self._data_type: type[EvaluationSuiteData[SuiteParameters, CaseParameters]] = data_type
+        self._data_type: type[EvaluatorSuiteData[SuiteParameters, CaseParameters]] = data_type
 
     async def load(
         self,
-    ) -> EvaluationSuiteData[SuiteParameters, CaseParameters]:
+    ) -> EvaluatorSuiteData[SuiteParameters, CaseParameters]:
         try:
             return await self._file_load(data_type=self._data_type)
 
@@ -687,8 +755,8 @@ class _EvaluationSuiteFileStorage[SuiteParameters: DataModel, CaseParameters: Da
     @asynchronous
     def _file_load(
         self,
-        data_type: type[EvaluationSuiteData[SuiteParameters, CaseParameters]],
-    ) -> EvaluationSuiteData[SuiteParameters, CaseParameters]:
+        data_type: type[EvaluatorSuiteData[SuiteParameters, CaseParameters]],
+    ) -> EvaluatorSuiteData[SuiteParameters, CaseParameters]:
         if self._path.exists():
             with open(self._path, mode="rb") as file:
                 return data_type.from_json(file.read())
@@ -698,14 +766,14 @@ class _EvaluationSuiteFileStorage[SuiteParameters: DataModel, CaseParameters: Da
 
     async def save(
         self,
-        data: EvaluationSuiteData[SuiteParameters, CaseParameters],
+        data: EvaluatorSuiteData[SuiteParameters, CaseParameters],
     ) -> None:
         await self._file_save(data=data)
 
     @asynchronous
     def _file_save(
         self,
-        data: EvaluationSuiteData[SuiteParameters, CaseParameters],
+        data: EvaluatorSuiteData[SuiteParameters, CaseParameters],
     ) -> None:
         with open(self._path, mode="wb+") as file:
             file.write(data.to_json(indent=2).encode("utf-8"))
