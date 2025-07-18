@@ -45,6 +45,43 @@ Draive is a Python framework (3.12+) for LLM applications built on the **Haiway*
 - Use base and abstract types like `Sequence` or `Iterable` instead of concrete
 - Use custom exceptions for specific errors
 
+### Documentation Style
+
+- Use NumPy docstring convention for all functions, classes, and methods
+- Skip module-level docstrings unless explicitly requested
+- Include sections: Parameters, Returns, Raises, Notes (if needed)
+- Example:
+
+```python
+def function_name(
+    param1: str,
+    param2: int | None = None,
+) -> bool:
+    """
+    Brief one-line description of function.
+
+    Optional longer description explaining the function's behavior,
+    use cases, or important details.
+
+    Parameters
+    ----------
+    param1 : str
+        Description of param1
+    param2 : int | None, optional
+        Description of param2, by default None
+
+    Returns
+    -------
+    bool
+        Description of return value
+
+    Raises
+    ------
+    ValueError
+        When invalid parameters are provided
+    """
+```
+
 ### Testing Guidelines
 
 - Uses pytest with async support. Tests are in `tests/` directory.

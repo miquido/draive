@@ -3,6 +3,7 @@ from typing import Final, Literal
 __all__ = (
     "EvaluationScoreValue",
     "evaluation_score_value",
+    "evaluation_score_verifier",
 )
 
 type EvaluationScoreValue = (
@@ -16,6 +17,7 @@ type EvaluationScoreValue = (
         "max",
     ]
     | float
+    | bool
 )
 
 NONE: Final[float] = 0.0
@@ -27,11 +29,46 @@ PERFECT: Final[float] = 0.9
 MAX: Final[float] = 1.0
 
 
-def evaluation_score_value(  # noqa: PLR0911
+def evaluation_score_value(  # noqa: C901, PLR0911
     value: EvaluationScoreValue,
     /,
 ) -> float:
+    """
+    Convert an evaluation score value to a normalized float.
+
+    Converts various score representations to a float between 0.0 and 1.0.
+
+    Parameters
+    ----------
+    value : EvaluationScoreValue
+        Score value to convert. Can be:
+        - Named level: "none", "poor", "fair", "good", "excellent", "perfect", "max"
+        - Float: Must be between 0.0 and 1.0
+        - Boolean: False becomes 0.0, True becomes 1.0
+
+    Returns
+    -------
+    float
+        Normalized score between 0.0 and 1.0
+
+    Raises
+    ------
+    AssertionError
+        If float value is outside [0, 1] range
+    ValueError
+        If value is not a recognized score type
+    """
     match value:
+        case float() as value:
+            assert 0 <= value <= 1, "Score value has to be in range from 0 to 1"  # nosec: B101
+            return value
+
+        case False:
+            return 0
+
+        case True:
+            return 1
+
         case "none":
             return NONE
 
@@ -53,9 +90,27 @@ def evaluation_score_value(  # noqa: PLR0911
         case "max":
             return MAX
 
-        case float() as value:
-            assert 0 <= value <= 1, "Threshold value has to be in range from 0 to 1"  # nosec: B101
-            return value
-
         case _:
             raise ValueError("Invalid evaluation score value - %s", value)
+
+
+def evaluation_score_verifier(
+    value: float,
+) -> None:
+    """
+    Verify that a score value is within valid range.
+
+    Parameters
+    ----------
+    value : float
+        Float value to verify
+
+    Raises
+    ------
+    ValueError
+        If value is not between 0 and 1 inclusive
+    """
+    if 0 <= value <= 1:
+        return  # valid
+
+    raise ValueError(f"Evaluation score has to be a value between 0 and 1, received: {value}")

@@ -5,8 +5,8 @@ from uuid import UUID, uuid4
 
 from haiway import State, as_dict, ctx, execute_concurrently
 
-from draive.evaluation import EvaluationSuite, SuiteEvaluatorResult
-from draive.evaluation.suite import EvaluationSuiteCase
+from draive.evaluation import EvaluatorSuite, EvaluatorSuiteResult
+from draive.evaluation.suite import EvaluatorSuiteCase
 from draive.instructions import Instruction, Instructions
 from draive.multimodal import MultimodalContent, MultimodalTagElement
 from draive.parameters import DataModel
@@ -23,7 +23,7 @@ async def refine_instruction[
     /,
     *,
     guidelines: str | None = None,
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters],
+    evaluation_suite: EvaluatorSuite[SuiteParameters, CaseParameters],
     rounds_limit: int,
     sample_ratio: float = 0.1,
     candidates_limit: int = 3,
@@ -125,8 +125,8 @@ class _RefinementTreeNode[SuiteParameters: DataModel, CaseParameters: DataModel]
     strategy: str
     parent_id: UUID | None
     depth: int
-    focused_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters]
-    complete_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters] | None
+    focused_evaluation: EvaluatorSuiteResult[SuiteParameters, CaseParameters]
+    complete_evaluation: EvaluatorSuiteResult[SuiteParameters, CaseParameters] | None
     children: Sequence[UUID]
     pruned: bool
 
@@ -139,15 +139,15 @@ class _RefinementTreeNode[SuiteParameters: DataModel, CaseParameters: DataModel]
         return len(self.children) == 0
 
     @property
-    def focused_evaluation_score(self) -> float:
-        return self.focused_evaluation.relative_score
+    def focused_evaluation_performance(self) -> float:
+        return self.focused_evaluation.performance
 
     @property
-    def complete_evaluation_score(self) -> float | None:
+    def complete_evaluation_performance(self) -> float | None:
         if self.complete_evaluation is None:
             return None
 
-        return self.complete_evaluation.relative_score
+        return self.complete_evaluation.performance
 
 
 class _RefinementState[
@@ -170,33 +170,33 @@ def _select_focused_cases[
     CaseParameters: DataModel,
 ](
     *,
-    evaluation_result: SuiteEvaluatorResult[SuiteParameters, CaseParameters],
-    evaluation_cases: Sequence[EvaluationSuiteCase[CaseParameters]],
+    evaluation_result: EvaluatorSuiteResult[SuiteParameters, CaseParameters],
+    evaluation_cases: Sequence[EvaluatorSuiteCase[CaseParameters]],
     sample_ratio: float,
-) -> Sequence[EvaluationSuiteCase[CaseParameters]]:
+) -> Sequence[EvaluatorSuiteCase[CaseParameters]]:
     # Get all failing cases
-    failing_cases: list[EvaluationSuiteCase[CaseParameters]] = [
+    failing_cases: Sequence[EvaluatorSuiteCase[CaseParameters]] = [
         case_result.case for case_result in evaluation_result.cases if not case_result.passed
     ]
 
     # Get passing cases and sample
-    passing_cases: list[EvaluationSuiteCase[CaseParameters]] = [
+    passing_cases: Sequence[EvaluatorSuiteCase[CaseParameters]] = [
         case_result.case for case_result in evaluation_result.cases if case_result.passed
     ]
 
     # Get other, previously excluded cases
-    additional_cases: list[EvaluationSuiteCase[CaseParameters]] = [
+    additional_cases: Sequence[EvaluatorSuiteCase[CaseParameters]] = [
         case for case in evaluation_cases if case not in evaluation_result.cases
     ]
 
     # Intelligent sampling: sample some passing cases
-    sampling_cases_pool: list[EvaluationSuiteCase[CaseParameters]] = (
+    sampling_cases_pool: Sequence[EvaluatorSuiteCase[CaseParameters]] = (
         passing_cases + additional_cases
     )
     sample_size: int = (
         max(1, int(len(sampling_cases_pool) * sample_ratio)) if sampling_cases_pool else 0
     )
-    sampling_cases: list[EvaluationSuiteCase[CaseParameters]] = (
+    sampling_cases: Sequence[EvaluatorSuiteCase[CaseParameters]] = (
         random.sample(sampling_cases_pool, min(len(sampling_cases_pool), sample_size))  # nosec: B311
         if sample_size > 0
         else []
@@ -218,7 +218,7 @@ def _tree_initialization_stage[
 ](
     *,
     instruction: Instruction,
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters],
+    evaluation_suite: EvaluatorSuite[SuiteParameters, CaseParameters],
     sample_ratio: float,
     performance_drop_threshold: float,
     guidelines: str | None,
@@ -231,11 +231,11 @@ def _tree_initialization_stage[
     ) -> StageState:
         ctx.log_info("...evaluating initial instruction with full suite...")
         # Make initial evaluation
-        evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters]
+        evaluation: EvaluatorSuiteResult[SuiteParameters, CaseParameters]
         with ctx.updated(_instructions(instruction=instruction)):
             evaluation = await evaluation_suite()
 
-        ctx.log_info(f"...initial score: {evaluation.relative_score:.4f}...")
+        ctx.log_info(f"...initial score: {evaluation.performance:.2f}...")
 
         # Create root node
         root_node = _RefinementTreeNode(
@@ -273,7 +273,7 @@ def _tree_exploration_stage[
     CaseParameters: DataModel,
 ](
     *,
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters],
+    evaluation_suite: EvaluatorSuite[SuiteParameters, CaseParameters],
     rounds_limit: int,
     quality_threshold: float,
     concurrent_nodes: int,
@@ -288,7 +288,7 @@ def _tree_exploration_stage[
             required=True,
         )
         evaluation_cases: Sequence[
-            EvaluationSuiteCase[CaseParameters]
+            EvaluatorSuiteCase[CaseParameters]
         ] = await evaluation_suite.cases()
 
         async def explore(
@@ -346,9 +346,9 @@ def _tree_exploration_stage[
         )
         if any(
             (
-                node.complete_evaluation_score
-                if node.complete_evaluation_score is not None
-                else node.focused_evaluation_score
+                node.complete_evaluation_performance
+                if node.complete_evaluation_performance is not None
+                else node.focused_evaluation_performance
             )
             > quality_threshold
             for node in refinement_state.nodes.values()
@@ -369,8 +369,8 @@ async def _explore_node[
     CaseParameters: DataModel,
 ](
     node: _RefinementTreeNode[SuiteParameters, CaseParameters],
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters],
-    evaluation_cases: Sequence[EvaluationSuiteCase[CaseParameters]],
+    evaluation_suite: EvaluatorSuite[SuiteParameters, CaseParameters],
+    evaluation_cases: Sequence[EvaluatorSuiteCase[CaseParameters]],
     sample_ratio: float,
     performance_drop_threshold: float,
     guidelines: str | None,
@@ -378,7 +378,7 @@ async def _explore_node[
     assert not node.pruned  # nosec: B101 # skip pruned branches
     ctx.log_info(
         f"Exploring node {node.identifier} at"
-        f" depth {node.depth}, score: {node.focused_evaluation_score:.4f}"
+        f" depth {node.depth}, score: {node.focused_evaluation_performance:.2f}"
     )
 
     # Generate exactly 2 complementary strategies
@@ -390,7 +390,7 @@ async def _explore_node[
     )
 
     # Create and evaluate child nodes
-    focused_suite_cases: Sequence[EvaluationSuiteCase[CaseParameters]] = _select_focused_cases(
+    focused_suite_cases: Sequence[EvaluatorSuiteCase[CaseParameters]] = _select_focused_cases(
         evaluation_result=node.focused_evaluation,
         evaluation_cases=evaluation_cases,
         sample_ratio=sample_ratio,
@@ -400,14 +400,14 @@ async def _explore_node[
     for strategy_name, refined_instruction in strategies:
         # Evaluate with focused suite
         ctx.log_info(f"Evaluating strategy '{strategy_name}'...")
-        focused_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters]
+        focused_evaluation: EvaluatorSuiteResult[SuiteParameters, CaseParameters]
         with ctx.updated(_instructions(instruction=refined_instruction)):
             focused_evaluation = await evaluation_suite(focused_suite_cases)
 
         # Check for performance drop
         performance_ratio = (
-            focused_evaluation.relative_score / node.focused_evaluation_score
-            if node.focused_evaluation_score > 0
+            focused_evaluation.performance / node.focused_evaluation_performance
+            if node.focused_evaluation_performance > 0
             else 0
         )
         pruned: bool = performance_ratio < performance_drop_threshold
@@ -435,7 +435,7 @@ async def _explore_node[
         else:
             ctx.log_info(
                 f"Created child node {child_node.identifier}: strategy={strategy_name}, "
-                f"score={child_node.focused_evaluation_score:.4f}"
+                f"score={child_node.focused_evaluation_performance:.2f}"
                 f" ({performance_ratio:.1%} of parent)"
             )
 
@@ -447,7 +447,7 @@ async def _generate_strategy_metadata[
     CaseParameters: DataModel,
 ](
     *,
-    evaluation_result: SuiteEvaluatorResult[SuiteParameters, CaseParameters],
+    evaluation_result: EvaluatorSuiteResult[SuiteParameters, CaseParameters],
     parent_strategy: str | None,
     guidelines: str | None,
 ) -> Sequence[tuple[str, str]]:
@@ -459,8 +459,8 @@ async def _generate_strategy_metadata[
     """
     # Analyze failures
     failure_report = evaluation_result.report(
+        detailed=True,
         include_passed=False,
-        include_details=True,
     )
 
     strategy_prompt: str = f"""
@@ -530,13 +530,13 @@ async def _generate_instruction_content[
     current_instruction_content: str,
     strategy_name: str,
     strategy_approach: str,
-    evaluation_result: SuiteEvaluatorResult[SuiteParameters, CaseParameters],
+    evaluation_result: EvaluatorSuiteResult[SuiteParameters, CaseParameters],
     guidelines: str | None,
 ) -> str:
     # Analyze failures
     failure_report: str = evaluation_result.report(
+        detailed=True,
         include_passed=False,
-        include_details=True,
     )
 
     refinement_prompt: str = f"""\
@@ -581,7 +581,7 @@ async def _generate_refined_instructions[
     CaseParameters: DataModel,
 ](
     instruction: Instruction,
-    evaluation_result: SuiteEvaluatorResult[SuiteParameters, CaseParameters],
+    evaluation_result: EvaluatorSuiteResult[SuiteParameters, CaseParameters],
     parent_strategy: str | None,
     guidelines: str | None,
 ) -> Sequence[tuple[str, Instruction]]:
@@ -628,7 +628,7 @@ def _tree_finalization_stage[
     CaseParameters: DataModel,
 ](
     *,
-    evaluation_suite: EvaluationSuite[SuiteParameters, CaseParameters],
+    evaluation_suite: EvaluatorSuite[SuiteParameters, CaseParameters],
     quality_threshold: float,
     candidates_limit: int,
 ) -> Stage:
@@ -656,7 +656,7 @@ def _tree_finalization_stage[
 
         # Full evaluation of top candidates
         best_instruction: Instruction = refinement_state.root.instruction
-        best_score: float = refinement_state.root.complete_evaluation_score or 0
+        best_score: float = refinement_state.root.complete_evaluation_performance or 0
         best_node: _RefinementTreeNode = refinement_state.root
 
         for candidate_node in candidates:
@@ -665,7 +665,7 @@ def _tree_finalization_stage[
                 f"(strategy: {candidate_node.strategy}, depth: {candidate_node.depth})"
             )
 
-            complete_evaluation: SuiteEvaluatorResult[SuiteParameters, CaseParameters]
+            complete_evaluation: EvaluatorSuiteResult[SuiteParameters, CaseParameters]
             with ctx.updated(_instructions(instruction=candidate_node.instruction)):
                 complete_evaluation = await evaluation_suite()
 
@@ -682,13 +682,13 @@ def _tree_finalization_stage[
             )
 
             ctx.log_info(
-                f"Full evaluation score: {complete_evaluation.relative_score:.4f} "
-                f"(focused was: {updated_node.focused_evaluation_score:.4f})"
+                f"Full evaluation score: {complete_evaluation.performance:.4f} "
+                f"(focused was: {updated_node.focused_evaluation_performance:.4f})"
             )
 
-            if complete_evaluation.relative_score > best_score:
+            if complete_evaluation.performance > best_score:
                 best_instruction = updated_node.instruction
-                best_score = complete_evaluation.relative_score
+                best_score = complete_evaluation.performance
                 best_node = updated_node
 
         # Log final statistics
@@ -723,12 +723,12 @@ def _find_best_candidates(
             continue
 
         # Include if it's a leaf or has exceptional performance
-        if node.is_leaf or node.focused_evaluation_score > quality_threshold:
+        if node.is_leaf or node.focused_evaluation_performance > quality_threshold:
             candidates.append(node)
 
     # Sort by focused score and depth (prefer deeper nodes with same score)
     candidates.sort(
-        key=lambda x: (x.focused_evaluation_score, x.depth),
+        key=lambda x: (x.focused_evaluation_performance, x.depth),
         reverse=True,
     )
 
@@ -756,7 +756,7 @@ def _log_tree_statistics(
     current_id: UUID | None = best_node.identifier
     while current_id:
         node = refinement_state.nodes[current_id]
-        best_path.append(f"{node.strategy} (score: {node.focused_evaluation_score:.3f})")
+        best_path.append(f"{node.strategy} (score: {node.focused_evaluation_performance:.3f})")
         current_id = node.parent_id
 
     best_path.reverse()
