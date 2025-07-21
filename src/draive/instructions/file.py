@@ -34,7 +34,7 @@ class InstructionsFileStorage:
         self._storage: Mapping[str, str] | None = None
         self._listing: Sequence[InstructionDeclaration] | None = None
 
-    async def listing(
+    async def fetch_list(
         self,
         **extra: Any,
     ) -> Sequence[InstructionDeclaration]:
@@ -60,7 +60,7 @@ class InstructionsFileStorage:
 
         return self._listing
 
-    async def instruction(
+    async def fetch_instruction(
         self,
         name: str,
         *,

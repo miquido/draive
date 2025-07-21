@@ -12,6 +12,11 @@ __all__ = ("InstructionsVolatileStorage",)
 
 @final
 class InstructionsVolatileStorage:
+    __slots__ = (
+        "_listing",
+        "_storage",
+    )
+
     def __init__(
         self,
         instructions: Sequence[Instruction],
@@ -23,13 +28,13 @@ class InstructionsVolatileStorage:
             instruction.declaration for instruction in instructions
         ]
 
-    async def listing(
+    async def fetch_list(
         self,
         **extra: Any,
     ) -> Sequence[InstructionDeclaration]:
         return self._listing
 
-    async def instruction(
+    async def fetch_instruction(
         self,
         name: str,
         *,
