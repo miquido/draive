@@ -92,8 +92,8 @@ class Instruction(State):
         *,
         name: str | None = None,
         description: str | None = None,
-        meta: Meta | MetaValues | None = None,
         arguments: Mapping[str, str | float | int] | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
     @overload
@@ -105,8 +105,8 @@ class Instruction(State):
         *,
         name: str | None = None,
         description: str | None = None,
-        meta: Meta | MetaValues | None = None,
         arguments: Mapping[str, str | float | int] | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self | None: ...
 
     @classmethod
@@ -117,37 +117,34 @@ class Instruction(State):
         *,
         name: str | None = None,
         description: str | None = None,
-        meta: Meta | MetaValues | None = None,
         arguments: Mapping[str, str | float | int] | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self | None:
-        match instruction:
-            case None:
-                return None
+        if instruction is None:
+            return None
 
-            case str() as content:
-                return cls(
-                    name=name or uuid4().hex,
-                    description=description,
-                    content=content,
-                    arguments=arguments if arguments is not None else {},
-                    meta=Meta.of(meta),
-                )
+        elif isinstance(instruction, str):
+            return cls(
+                name=name or uuid4().hex,
+                description=description,
+                content=instruction,
+                arguments=arguments if arguments is not None else {},
+                meta=Meta.of(meta),
+            )
 
-            case instruction:
-                if name is None and description is None and meta is None and arguments is None:
-                    return instruction  # nothing to update
+        else:
+            if name is None and description is None and meta is None and arguments is None:
+                return instruction  # nothing to update
 
-                return instruction.updated(
-                    name=name or instruction.name,
-                    description=description or instruction.description,
-                    content=instruction.content,
-                    arguments={**instruction.arguments, **arguments}
-                    if arguments is not None
-                    else instruction.arguments,
-                    meta=instruction.meta.merged_with(meta)
-                    if meta is not None
-                    else instruction.meta,
-                )
+            return instruction.updated(
+                name=name or instruction.name,
+                description=description or instruction.description,
+                content=instruction.content,
+                arguments={**instruction.arguments, **arguments}
+                if arguments is not None
+                else instruction.arguments,
+                meta=instruction.meta.merged_with(meta) if meta is not None else instruction.meta,
+            )
 
     name: str
     description: str | None = None
@@ -176,11 +173,8 @@ class Instruction(State):
                 },
             )
 
-        elif self.arguments:
-            return self.content.format_map(self.arguments)
-
         else:
-            return self.content
+            return self.content.format_map(self.arguments)
 
     def extended(
         self,

@@ -18,13 +18,13 @@ from draive.instructions.volatile import InstructionsVolatileStorage
 __all__ = ("Instructions",)
 
 
-async def _empty(
+async def _empty_list(
     **extra: Any,
 ) -> Sequence[InstructionDeclaration]:
     return ()
 
 
-async def _none(
+async def _no_instruction(
     name: str,
     /,
     *,
@@ -45,8 +45,8 @@ class Instructions(State):
         storage = InstructionsVolatileStorage((instruction, *instructions))
 
         return cls(
-            list_fetching=storage.listing,
-            fetching=storage.instruction,
+            list_fetching=storage.fetch_list,
+            fetching=storage.fetch_instruction,
         )
 
     @classmethod
@@ -57,8 +57,8 @@ class Instructions(State):
         storage = InstructionsFileStorage(path=path)
 
         return cls(
-            list_fetching=storage.listing,
-            fetching=storage.instruction,
+            list_fetching=storage.fetch_list,
+            fetching=storage.fetch_instruction,
         )
 
     @classmethod
@@ -126,26 +126,22 @@ class Instructions(State):
         elif required and default is None:
             raise InstructionMissing(f"Missing instruction: '{name}'")
 
+        elif default is None:
+            return None
+
         elif isinstance(default, str):
             return Instruction.of(
                 default,
                 name=name,
-                description=instruction.description
-                if isinstance(instruction, InstructionDeclaration)
-                else None,
-                meta=None,
                 arguments=arguments,
             )
 
-        elif default is not None:
+        else:
             return Instruction.of(
                 default,
                 arguments=arguments,
             )
 
-        else:
-            return None
-
-    list_fetching: InstructionListFetching = _empty
-    fetching: InstructionFetching = _none
+    list_fetching: InstructionListFetching = _empty_list
+    fetching: InstructionFetching = _no_instruction
     meta: Meta = META_EMPTY

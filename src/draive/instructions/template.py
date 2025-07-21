@@ -23,11 +23,11 @@ class InstructionTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, Non
     def __init__(
         self,
         /,
-        name: str,
+        function: Callable[Args, Coroutine[None, None, str]],
         *,
+        name: str,
         description: str | None,
         meta: Meta,
-        function: Callable[Args, Coroutine[None, None, str]],
     ) -> None:
         super().__init__(function)
 
@@ -104,10 +104,10 @@ def instruction[**Args](
         function: Callable[Arg, Coroutine[None, None, str]],
     ) -> InstructionTemplate[Arg]:
         return InstructionTemplate[Arg](
+            function=function,
             name=name or function.__name__,
             description=description,
             meta=Meta.of(meta),
-            function=function,
         )
 
     if function := function:
