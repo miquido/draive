@@ -209,6 +209,21 @@ class Instruction(State):
         else:  # nothing to update
             return self
 
+    def with_arguments(
+        self,
+        **arguments: str | float | int,
+    ) -> Self:
+        if not arguments:
+            return self
+
+        return self.__class__(
+            name=self.name,
+            description=self.description,
+            content=self.content,
+            arguments={**self.arguments, **arguments},
+            meta=self.meta,
+        )
+
 
 def extract_variables(
     string: str,

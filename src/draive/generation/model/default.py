@@ -48,12 +48,12 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
                 )
 
             case "full":
-                extended_instruction = instruction.updated(
+                extended_instruction = instruction.with_arguments(
                     schema=generated.json_schema(indent=2),
                 )
 
             case "simplified":
-                extended_instruction = instruction.updated(
+                extended_instruction = instruction.with_arguments(
                     schema=generated.simplified_schema(indent=2),
                 )
 
