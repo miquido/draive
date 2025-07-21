@@ -1,10 +1,11 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, final
 
+from haiway import ctx
+
 from draive.instructions.types import (
     Instruction,
     InstructionDeclaration,
-    InstructionMissing,
 )
 
 __all__ = ("InstructionsVolatileStorage",)
@@ -40,7 +41,7 @@ class InstructionsVolatileStorage:
         *,
         arguments: Mapping[str, str | float | int] | None = None,
         **extra: Any,
-    ) -> Instruction:
+    ) -> Instruction | None:
         if instruction := self._storage.get(name):
             if arguments:
                 return instruction.updated(arguments={**instruction.arguments, **arguments})
@@ -49,4 +50,5 @@ class InstructionsVolatileStorage:
                 return instruction
 
         else:
-            raise InstructionMissing(f"Instruction '{name}' is not defined")
+            ctx.log_debug(f"Instruction '{name}' is not defined")
+            return None
