@@ -4,14 +4,13 @@ from pathlib import Path
 from string import Formatter
 from typing import Any, final
 
-from haiway import asynchronous
+from haiway import asynchronous, ctx
 
 from draive.commons import Meta
 from draive.instructions.types import (
     Instruction,
     InstructionDeclaration,
     InstructionDeclarationArgument,
-    InstructionMissing,
 )
 
 __all__ = ("InstructionsFileStorage",)
@@ -66,7 +65,7 @@ class InstructionsFileStorage:
         *,
         arguments: Mapping[str, str | float | int] | None = None,
         **extra: Any,
-    ) -> Instruction:
+    ) -> Instruction | None:
         if self._storage is None:
             self._storage = await self._file_load()
 
@@ -79,7 +78,8 @@ class InstructionsFileStorage:
             )
 
         else:
-            raise InstructionMissing(f"{self._path} does not contain instruction '{name}'")
+            ctx.log_debug(f"{self._path} does not contain instruction '{name}'")
+            return None
 
     @asynchronous
     def _file_load(
