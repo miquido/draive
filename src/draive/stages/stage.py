@@ -12,9 +12,18 @@ from collections.abc import (
 from typing import Any, ClassVar, Literal, Protocol, Self, cast, final, overload
 from uuid import uuid4
 
-from haiway import Disposable, Disposables, State, cache, ctx, retry
+from haiway import (
+    Disposable,
+    Disposables,
+    Meta,
+    MetaValue,
+    MetaValues,
+    State,
+    cache,
+    ctx,
+    retry,
+)
 
-from draive.commons import Meta, MetaValue, MetaValues
 from draive.evaluation import (
     EvaluatorResult,
     EvaluatorScenarioResult,

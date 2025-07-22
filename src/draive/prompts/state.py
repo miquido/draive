@@ -1,9 +1,8 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, overload
 
-from haiway import State, ctx
+from haiway import META_EMPTY, Meta, State, ctx
 
-from draive.commons import META_EMPTY, Meta
 from draive.lmm import LMMInput
 from draive.multimodal import MultimodalContent
 from draive.prompts.types import (

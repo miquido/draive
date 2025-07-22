@@ -2,9 +2,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal, Self, final, overload
 
-from haiway import State, ctx
+from haiway import META_EMPTY, Meta, State, ctx
 
-from draive.commons import META_EMPTY, Meta
 from draive.instructions.file import InstructionsFileStorage
 from draive.instructions.types import (
     Instruction,

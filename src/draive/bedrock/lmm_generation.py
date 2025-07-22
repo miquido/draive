@@ -111,6 +111,7 @@ class BedrockLMMGeneration(BedrockAPI):
                 metric="lmm.input_tokens",
                 value=completion["usage"]["inputTokens"],
                 unit="tokens",
+                kind="counter",
                 attributes={"lmm.model": completion_config.model},
             )
             ctx.record(
@@ -118,6 +119,7 @@ class BedrockLMMGeneration(BedrockAPI):
                 metric="lmm.output_tokens",
                 value=completion["usage"]["outputTokens"],
                 unit="tokens",
+                kind="counter",
                 attributes={"lmm.model": completion_config.model},
             )
 

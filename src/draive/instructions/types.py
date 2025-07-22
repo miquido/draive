@@ -3,9 +3,8 @@ from string import Formatter
 from typing import Any, Protocol, Self, final, overload, runtime_checkable
 from uuid import uuid4
 
-from haiway import Default, State
+from haiway import META_EMPTY, Default, Meta, MetaValues, State
 
-from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.parameters import DataModel
 
 __all__ = (

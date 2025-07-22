@@ -16,9 +16,8 @@ from anthropic.types import (
 )
 from anthropic.types.redacted_thinking_block_param import RedactedThinkingBlockParam
 from anthropic.types.thinking_block_param import ThinkingBlockParam
-from haiway import Missing
+from haiway import META_EMPTY, Missing
 
-from draive.commons import META_EMPTY
 from draive.lmm import (
     LMMCompletion,
     LMMContextElement,

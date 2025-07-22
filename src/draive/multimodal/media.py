@@ -2,7 +2,8 @@ from base64 import b64decode, b64encode, urlsafe_b64encode
 from collections.abc import Sequence
 from typing import Final, Literal, Self, cast, get_args
 
-from draive.commons import META_EMPTY, Meta, MetaValues
+from haiway import META_EMPTY, Meta, MetaValues
+
 from draive.multimodal.data_field import b64_data_field
 from draive.parameters import DataModel
 

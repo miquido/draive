@@ -1,7 +1,8 @@
 from collections.abc import Sequence
 from typing import Any, Protocol, runtime_checkable
 
-from draive.commons import Meta, MetaValues
+from haiway import Meta, MetaValues
+
 from draive.multimodal import MultimodalContent
 
 __all__ = (

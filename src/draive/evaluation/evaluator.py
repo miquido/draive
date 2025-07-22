@@ -2,9 +2,8 @@ from asyncio import gather
 from collections.abc import Callable, Collection
 from typing import Any, Protocol, Self, cast, final, overload, runtime_checkable
 
-from haiway import AttributePath, State, ctx
+from haiway import META_EMPTY, AttributePath, Meta, MetaValues, State, ctx
 
-from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.evaluation.score import EvaluationScore
 from draive.evaluation.value import (
     EvaluationScoreValue,
@@ -661,6 +660,7 @@ class Evaluator[Value, **Args]:
                 metric=f"evaluator.{result.evaluator}.performance",
                 value=result.performance,
                 unit="%",
+                kind="histogram",
                 attributes={
                     "passed": result.passed,
                     "threshold": result.threshold,

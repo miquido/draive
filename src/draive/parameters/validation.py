@@ -5,14 +5,12 @@ from types import EllipsisType, NoneType, UnionType
 from typing import Any, Literal, Self, Union, is_typeddict
 from uuid import UUID
 
-from haiway import MISSING, Missing
+from haiway import MISSING, Meta, Missing
 from haiway.state.attributes import (
     AttributeAnnotation,
     _resolve_type_typeddict,
 )
 
-from draive.commons import Meta
-from draive.commons.metadata import validated_meta_value
 from draive.parameters.types import (
     ParameterValidation,
     ParameterValidationContext,
@@ -445,7 +443,7 @@ def _prepare_validator_of_mapping(
     return validator
 
 
-def _prepare_validator_of_meta(  # noqa: C901
+def _prepare_validator_of_meta(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
@@ -464,15 +462,7 @@ def _prepare_validator_of_meta(  # noqa: C901
                 return value
 
             elif isinstance(value, Mapping):
-                validated: MutableMapping[Any, Any] = {}
-                for key, element in value.items():
-                    if not isinstance(key, str):
-                        raise TypeError(f"'{key}' is not matching expected type of '{str}'")
-
-                    with context.scope(f"[{key}]"):
-                        validated[key] = validated_meta_value(element)
-
-                meta: Meta = Meta(validated)
+                meta: Meta = Meta.of(value)
                 verifier(meta)
                 return meta
 
@@ -490,15 +480,7 @@ def _prepare_validator_of_meta(  # noqa: C901
                 return value
 
             elif isinstance(value, Mapping):
-                validated: MutableMapping[Any, Any] = {}
-                for key, element in value.items():
-                    if not isinstance(key, str):
-                        raise TypeError(f"'{key}' is not matching expected type of '{str}'")
-
-                    with context.scope(f"[{key}]"):
-                        validated[key] = validated_meta_value(element)
-
-                return Meta(validated)
+                return Meta.of(value)
 
             else:
                 raise TypeError(f"'{value}' is not matching expected type of '{formatted_type}'")

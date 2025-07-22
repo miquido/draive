@@ -1,7 +1,8 @@
 from collections.abc import Callable, Coroutine
 from typing import Protocol, final, overload
 
-from draive.commons import Meta, MetaValues
+from haiway import Meta, MetaValues
+
 from draive.instructions.types import (
     Instruction,
     InstructionDeclaration,

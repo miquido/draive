@@ -1,9 +1,8 @@
 from collections.abc import Sequence
 from typing import Any, Literal, overload
 
-from haiway import State, ctx
+from haiway import META_EMPTY, Meta, State, ctx
 
-from draive.commons import META_EMPTY, Meta
 from draive.resources.types import (
     Resource,
     ResourceDeclaration,

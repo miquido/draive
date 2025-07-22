@@ -1,7 +1,8 @@
 from collections.abc import Sequence
 from typing import Any, Literal, Protocol, runtime_checkable
 
-from draive.commons import Meta
+from haiway import Meta
+
 from draive.lmm import LMMToolSpecification
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import ParametersSpecification

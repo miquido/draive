@@ -1,9 +1,8 @@
 from collections.abc import Generator, Iterator, Mapping
 from typing import Self, overload
 
-from haiway import State
+from haiway import META_EMPTY, Meta, State
 
-from draive.commons import META_EMPTY, Meta
 from draive.multimodal.content import Multimodal, MultimodalContent, MultimodalContentElement
 from draive.multimodal.text import TextContent
 from draive.parameters import DataModel

@@ -1,6 +1,7 @@
 from typing import Self
 
-from draive.commons import Meta, MetaValues
+from haiway import Meta, MetaValues
+
 from draive.multimodal.media import MediaContent
 from draive.multimodal.text import TextContent
 from draive.parameters import DataModel

@@ -179,6 +179,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                                     if usage.input_tokens is not None
                                     else 0,
                                     unit="tokens",
+                                    kind="counter",
                                     attributes={"lmm.model": config.model},
                                 )
                                 ctx.record(
@@ -188,6 +189,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                                     if usage.output_tokens is not None
                                     else 0,
                                     unit="tokens",
+                                    kind="counter",
                                     attributes={"lmm.model": config.model},
                                 )
 

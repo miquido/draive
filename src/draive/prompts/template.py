@@ -1,9 +1,8 @@
 from collections.abc import Callable, Coroutine
 from typing import Protocol, final, overload
 
-from haiway import ctx
+from haiway import Meta, MetaValues, ctx
 
-from draive.commons import Meta, MetaValues
 from draive.lmm import LMMContext
 from draive.parameters import ParametrizedFunction
 from draive.prompts.types import Prompt, PromptDeclaration, PromptDeclarationArgument

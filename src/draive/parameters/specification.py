@@ -16,10 +16,9 @@ from typing import (
 )
 from uuid import UUID
 
-from haiway import Missing
+from haiway import Meta, Missing
 from haiway.state import AttributeAnnotation
 
-from draive.commons import Meta
 from draive.parameters.types import ParameterValidation, ParameterValidationContext
 from draive.parameters.validation import ParameterValidator
 

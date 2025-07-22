@@ -1,7 +1,8 @@
 from collections.abc import Sequence
 from typing import ClassVar, Self, cast, final, overload
 
-from draive.commons import Meta, MetaValues
+from haiway import Meta, MetaValues
+
 from draive.multimodal.media import MediaContent, MediaData, MediaKind, MediaReference
 from draive.multimodal.meta import MetaContent
 from draive.multimodal.text import TextContent

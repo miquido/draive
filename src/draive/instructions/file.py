@@ -4,9 +4,8 @@ from pathlib import Path
 from string import Formatter
 from typing import Any, final
 
-from haiway import asynchronous, ctx
+from haiway import Meta, asynchronous, ctx
 
-from draive.commons import Meta
 from draive.instructions.types import (
     Instruction,
     InstructionDeclaration,

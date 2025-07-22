@@ -1,9 +1,17 @@
 from collections.abc import Callable, Collection, Sequence
 from typing import Any, Protocol, Self, cast, overload, runtime_checkable
 
-from haiway import AttributePath, State, as_list, ctx, execute_concurrently
+from haiway import (
+    META_EMPTY,
+    AttributePath,
+    Meta,
+    MetaValues,
+    State,
+    as_list,
+    ctx,
+    execute_concurrently,
+)
 
-from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.parameters import DataModel, Field
 
@@ -500,6 +508,7 @@ class EvaluatorScenario[Value, **Args]:
             metric=f"evaluation.scenario.{result.scenario}.performance",
             value=result.performance,
             unit="%",
+            kind="histogram",
             attributes={
                 "evaluation.passed": result.passed,
                 "evaluation.scenario.evaluations": [
