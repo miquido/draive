@@ -1,8 +1,7 @@
 from typing import Any, Protocol, runtime_checkable
 
-from haiway import State
+from haiway import META_EMPTY, Meta, State
 
-from draive.commons import META_EMPTY, Meta
 from draive.multimodal import MultimodalContent
 
 __all__ = (

@@ -453,6 +453,7 @@ def _record_usage_metrics(
         metric="lmm.input_tokens",
         value=usage.prompt_token_count or 0,
         unit="tokens",
+        kind="counter",
         attributes={"lmm.model": model},
     )
     ctx.record(
@@ -460,6 +461,7 @@ def _record_usage_metrics(
         metric="lmm.input_tokens.cached",
         value=usage.cached_content_token_count or 0,
         unit="tokens",
+        kind="counter",
         attributes={"lmm.model": model},
     )
     ctx.record(
@@ -467,6 +469,7 @@ def _record_usage_metrics(
         metric="lmm.output_tokens",
         value=usage.candidates_token_count or 0,
         unit="tokens",
+        kind="counter",
         attributes={"lmm.model": model},
     )
 

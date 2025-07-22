@@ -242,6 +242,7 @@ class VLLMLMMGeneration(VLLMAPI):
                 metric="lmm.input_tokens",
                 value=usage.prompt_tokens,
                 unit="tokens",
+                kind="counter",
                 attributes={"lmm.model": completion.model},
             )
             ctx.record(
@@ -249,6 +250,7 @@ class VLLMLMMGeneration(VLLMAPI):
                 metric="lmm.output_tokens",
                 value=usage.completion_tokens,
                 unit="tokens",
+                kind="counter",
                 attributes={"lmm.model": completion.model},
             )
 
@@ -382,6 +384,7 @@ class VLLMLMMGeneration(VLLMAPI):
                         metric="lmm.input_tokens",
                         value=usage.prompt_tokens,
                         unit="tokens",
+                        kind="counter",
                         attributes={"lmm.model": part.model},
                     )
                     ctx.record(
@@ -389,6 +392,7 @@ class VLLMLMMGeneration(VLLMAPI):
                         metric="lmm.output_tokens",
                         value=usage.completion_tokens,
                         unit="tokens",
+                        kind="counter",
                         attributes={"lmm.model": part.model},
                     )
 

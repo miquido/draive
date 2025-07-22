@@ -16,9 +16,8 @@ from typing import (
     runtime_checkable,
 )
 
-from haiway import Default, State, as_tuple, ctx
+from haiway import META_EMPTY, Default, Meta, MetaValues, State, as_tuple, ctx
 
-from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel, ParametersSpecification
 from draive.utils import Memory

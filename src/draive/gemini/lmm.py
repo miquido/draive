@@ -6,9 +6,8 @@ from google.genai.types import (
     Part,
     PartDict,
 )
-from haiway import as_dict
+from haiway import META_EMPTY, as_dict
 
-from draive.commons import META_EMPTY
 from draive.lmm import (
     LMMCompletion,
     LMMContextElement,

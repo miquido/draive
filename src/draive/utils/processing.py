@@ -2,9 +2,16 @@ from collections.abc import Iterable
 from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import Default, MissingState, State, ctx
+from haiway import (
+    META_EMPTY,
+    Default,
+    Meta,
+    MetaValues,
+    MissingState,
+    State,
+    ctx,
+)
 
-from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.multimodal import MultimodalContent
 from draive.multimodal.content import Multimodal
 from draive.parameters import DataModel

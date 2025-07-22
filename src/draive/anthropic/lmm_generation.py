@@ -11,7 +11,7 @@ from anthropic.types import (
     ThinkingBlock,
     ToolUseBlock,
 )
-from haiway import MISSING, ObservabilityLevel, as_list, ctx
+from haiway import META_EMPTY, MISSING, ObservabilityLevel, as_list, ctx
 
 from draive.anthropic.api import AnthropicAPI
 from draive.anthropic.config import AnthropicConfig
@@ -25,7 +25,6 @@ from draive.anthropic.lmm import (
 )
 from draive.anthropic.types import AnthropicException
 from draive.anthropic.utils import unwrap_missing
-from draive.commons import META_EMPTY
 from draive.lmm import (
     LMM,
     LMMCompletion,
@@ -179,6 +178,7 @@ class AnthropicLMMGeneration(AnthropicAPI):
                 metric="lmm.input_tokens",
                 value=completion.usage.input_tokens,
                 unit="tokens",
+                kind="counter",
                 attributes={"lmm.model": completion.model},
             )
             ctx.record(
@@ -186,6 +186,7 @@ class AnthropicLMMGeneration(AnthropicAPI):
                 metric="lmm.input_tokens.cached",
                 value=completion.usage.cache_creation_input_tokens or 0,
                 unit="tokens",
+                kind="counter",
                 attributes={"lmm.model": completion.model},
             )
             ctx.record(
@@ -193,6 +194,7 @@ class AnthropicLMMGeneration(AnthropicAPI):
                 metric="lmm.output_tokens",
                 value=completion.usage.output_tokens,
                 unit="tokens",
+                kind="counter",
                 attributes={"lmm.model": completion.model},
             )
             ctx.record(
@@ -200,6 +202,7 @@ class AnthropicLMMGeneration(AnthropicAPI):
                 metric="lmm.output_tokens.cached",
                 value=completion.usage.cache_read_input_tokens or 0,
                 unit="tokens",
+                kind="counter",
                 attributes={"lmm.model": completion.model},
             )
 

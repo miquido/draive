@@ -3,7 +3,8 @@ from collections.abc import Callable, Coroutine, Mapping, Sequence, Set
 from typing import Any, Protocol, final
 from urllib.parse import ParseResult, parse_qs, urlparse
 
-from draive.commons import Meta, MetaValues
+from haiway import Meta, MetaValues
+
 from draive.parameters import Parameter, ParametrizedFunction
 from draive.resources.types import (
     Resource,

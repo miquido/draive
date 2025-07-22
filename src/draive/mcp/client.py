@@ -8,7 +8,7 @@ from typing import Any, Literal, Self, cast, final
 from urllib.parse import ParseResult, urlparse, urlunparse
 from uuid import uuid4
 
-from haiway import as_dict, as_list, ctx
+from haiway import Meta, MetaTags, as_dict, as_list, ctx
 from mcp import ClientSession, GetPromptResult, ListToolsResult, StdioServerParameters, stdio_client
 from mcp import Tool as MCPTool
 from mcp.client.sse import sse_client
@@ -26,7 +26,6 @@ from mcp.types import ResourceLink as MCPResourceLink
 from mcp.types import TextContent as MCPTextContent
 from pydantic import AnyUrl
 
-from draive.commons import Meta, MetaTags
 from draive.lmm import LMMCompletion, LMMContextElement, LMMInput, LMMToolError
 from draive.multimodal import MediaData, MultimodalContent, TextContent
 from draive.parameters import BasicValue, DataModel, validated_specification

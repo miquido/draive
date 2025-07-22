@@ -1,9 +1,8 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, Protocol, Self, cast, final, overload, runtime_checkable
 
-from haiway import MissingState, State
+from haiway import Meta, MetaValues, MissingState, State
 
-from draive.commons import Meta, MetaValues
 from draive.lmm import LMMCompletion, LMMContext
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel

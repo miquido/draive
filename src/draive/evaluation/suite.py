@@ -5,9 +5,17 @@ from pathlib import Path
 from typing import Protocol, Self, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import State, as_list, asynchronous, ctx, execute_concurrently
+from haiway import (
+    META_EMPTY,
+    Meta,
+    MetaValues,
+    State,
+    as_list,
+    asynchronous,
+    ctx,
+    execute_concurrently,
+)
 
-from draive.commons import META_EMPTY, Meta, MetaValues
 from draive.evaluation.evaluator import EvaluatorResult, PreparedEvaluator
 from draive.evaluation.generator import generate_case_parameters
 from draive.evaluation.scenario import EvaluatorScenarioResult, PreparedEvaluatorScenario

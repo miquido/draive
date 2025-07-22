@@ -1,6 +1,7 @@
 from typing import Self
 
-from draive.commons import META_EMPTY, Meta, MetaValues
+from haiway import META_EMPTY, Meta, MetaValues
+
 from draive.parameters import DataModel
 
 __all__ = ("TextContent",)

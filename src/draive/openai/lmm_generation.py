@@ -242,6 +242,7 @@ class OpenAILMMGeneration(OpenAIAPI):
                 metric="lmm.input_tokens",
                 value=usage.prompt_tokens,
                 unit="tokens",
+                kind="counter",
                 attributes={"lmm.model": completion.model},
             )
             ctx.record(
@@ -249,6 +250,7 @@ class OpenAILMMGeneration(OpenAIAPI):
                 metric="lmm.output_tokens",
                 value=usage.completion_tokens,
                 unit="tokens",
+                kind="counter",
                 attributes={"lmm.model": completion.model},
             )
 
@@ -387,6 +389,7 @@ class OpenAILMMGeneration(OpenAIAPI):
                         metric="lmm.input_tokens",
                         value=usage.prompt_tokens,
                         unit="tokens",
+                        kind="counter",
                         attributes={"lmm.model": part.model},
                     )
                     ctx.record(
@@ -394,6 +397,7 @@ class OpenAILMMGeneration(OpenAIAPI):
                         metric="lmm.output_tokens",
                         value=usage.completion_tokens,
                         unit="tokens",
+                        kind="counter",
                         attributes={"lmm.model": part.model},
                     )
 

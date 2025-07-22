@@ -2,9 +2,8 @@ from collections.abc import Iterable, Sequence
 from typing import Any, Protocol, Self, runtime_checkable
 from uuid import uuid4
 
-from haiway import State
+from haiway import Meta, MetaValue, State
 
-from draive.commons import Meta, MetaValue
 from draive.instructions import Instruction
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.tools import Toolbox

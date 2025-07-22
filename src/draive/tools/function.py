@@ -1,10 +1,9 @@
 from collections.abc import Callable, Coroutine
 from typing import Any, Protocol, Self, cast, final, overload
 
-from haiway import ctx
+from haiway import Meta, MetaValues, ctx
 from haiway.utils import format_str
 
-from draive.commons import Meta, MetaValues
 from draive.lmm import LMMToolError, LMMToolSpecification
 from draive.multimodal import MultimodalContent, MultimodalContentConvertible
 from draive.parameters import ParameterSpecification, ParametersSpecification, ParametrizedFunction
