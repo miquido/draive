@@ -21,7 +21,7 @@ from draive.tools import Toolbox
 __all__ = ("default_choice_completion",)
 
 
-async def default_choice_completion(  # noqa: C901
+async def default_choice_completion(
     *,
     instruction: Instruction | str,
     options: Sequence[ChoiceOption],
@@ -74,53 +74,53 @@ async def default_choice_completion(  # noqa: C901
         ]
 
         formatted_instruction: LMMInstruction = Instruction.formatted(extended_instruction)
-        repetition_level: int = 0
+        tools_turn: int = 0
+        result: MultimodalContent = MultimodalContent.empty
+        result_extension: MultimodalContent = MultimodalContent.empty
         while True:
+            ctx.log_debug("...requesting completion...")
             match await LMM.completion(
                 instruction=formatted_instruction,
                 context=context,
-                tools=toolbox.available_tools(repetition_level=repetition_level),
+                tools=toolbox.available_tools(tools_turn=tools_turn),
                 output="text",
                 **extra,
             ):
                 case LMMCompletion() as completion:
-                    ctx.log_debug("Received choice results")
-                    if selection := MultimodalTagElement.parse_first(
-                        "CHOICE",
-                        content=completion.content,
-                    ):
-                        if option := options_map.get(selection.content.to_str()):
-                            return option
-
-                    raise SelectionException("Invalid or missing selection")
+                    ctx.log_debug("...received result...")
+                    result = result_extension.appending(completion.content)
+                    break  # proceed to resolving
 
                 case LMMToolRequests() as tool_requests:
-                    ctx.log_debug("Received choice tool calls")
+                    ctx.log_debug(f"...received tool requests (turn {tools_turn})...")
+                    # skip tool_requests.content - no need for extra comments
                     tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
-                    if direct_content := [
-                        response.content
-                        for response in tool_responses.responses
-                        if response.handling == "direct_result"
-                    ]:
-                        if selection := MultimodalTagElement.parse_first(
-                            "CHOICE",
-                            content=MultimodalContent.of(*direct_content),
-                        ):
-                            if option := options_map.get(selection.content.to_str()):
-                                return option
+                    if completion := tool_responses.completion(extension=result_extension):
+                        ctx.log_debug("...received tools direct result...")
+                        result = completion.content
+                        break  # proceed to resolving
 
-                        raise SelectionException("Invalid or missing selection")
+                    elif extension := tool_responses.completion_extension():
+                        ctx.log_debug("...received tools result extension...")
+                        result_extension = result_extension.appending(extension)
 
-                    else:
-                        context.extend(
-                            [
-                                tool_requests,
-                                tool_responses,
-                            ]
-                        )
+                    ctx.log_debug("...received tools responses...")
+                    context.extend((tool_requests, tool_responses))
 
-            repetition_level += 1  # continue with next recursion level
+            tools_turn += 1  # continue with next turn
+
+        ctx.log_debug("...decoding result...")
+        if selection := MultimodalTagElement.parse_first(
+            "CHOICE",
+            content=result,
+        ):
+            if option := options_map.get(selection.content.to_str()):
+                ctx.log_debug(f"...selection completed with {option.identifier}!")
+                return option
+
+        ctx.log_debug("...selection invalid!")
+        raise SelectionException("Invalid or missing selection")
 
 
 def _format_option(

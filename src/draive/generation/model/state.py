@@ -26,7 +26,7 @@ class ModelGeneration(State):
         schema_injection: Literal["auto", "full", "simplified", "skip"] = "auto",
         tools: Toolbox | Iterable[Tool] | None = None,
         examples: Iterable[tuple[Multimodal, Generated]] | None = None,
-        decoder: ModelGeneratorDecoder | None = None,
+        decoder: ModelGeneratorDecoder[Generated] | None = None,
         **extra: Any,
     ) -> Generated:
         return await ctx.state(cls).generating(

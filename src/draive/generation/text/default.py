@@ -1,8 +1,7 @@
-from asyncio import Task, gather
-from collections.abc import AsyncIterable, AsyncIterator, Iterable
+from collections.abc import AsyncIterable, Iterable
 from typing import Any
 
-from haiway import AsyncQueue, ctx
+from haiway import ctx
 
 from draive.instructions import Instruction
 from draive.lmm import (
@@ -11,10 +10,7 @@ from draive.lmm import (
     LMMContextElement,
     LMMInput,
     LMMInstruction,
-    LMMStreamChunk,
-    LMMToolRequest,
     LMMToolRequests,
-    LMMToolResponse,
     LMMToolResponses,
 )
 from draive.multimodal import MultimodalContent
@@ -30,7 +26,6 @@ async def generate_text(
     input: Prompt | MultimodalContent,  # noqa: A002
     toolbox: Toolbox,
     examples: Iterable[tuple[MultimodalContent, str]],
-    stream: bool,
     **extra: Any,
 ) -> AsyncIterable[str] | str:
     async with ctx.scope("generate_text"):
@@ -52,19 +47,11 @@ async def generate_text(
             case value:
                 context.append(LMMInput.of(value))
 
-        if stream:
-            return await _text_generation_stream(
-                instruction=instruction,
-                context=context,
-                toolbox=toolbox,
-            )
-
-        else:
-            return await _text_generation(
-                instruction=instruction,
-                context=context,
-                toolbox=toolbox,
-            )
+        return await _text_generation(
+            instruction=instruction,
+            context=context,
+            toolbox=toolbox,
+        )
 
 
 async def _text_generation(
@@ -74,114 +61,41 @@ async def _text_generation(
     **extra: Any,
 ) -> str:
     formatted_instruction: LMMInstruction | None = Instruction.formatted(instruction)
-    repetition_level: int = 0
+    tools_turn: int = 0
+    result: MultimodalContent = MultimodalContent.empty
+    result_extension: MultimodalContent = MultimodalContent.empty
     while True:
+        ctx.log_debug("...requesting completion...")
         match await LMM.completion(
             instruction=formatted_instruction,
             context=context,
-            tools=toolbox.available_tools(repetition_level=repetition_level),
+            tools=toolbox.available_tools(tools_turn=tools_turn),
             output="text",
             **extra,
         ):
             case LMMCompletion() as completion:
-                ctx.log_debug("Received text generation result")
-                return completion.content.to_str()
+                ctx.log_debug("...received result...")
+                result = result_extension.appending(completion.content)
+                break  # proceed to resolving
 
             case LMMToolRequests() as tool_requests:
-                ctx.log_debug("Received text generation tool calls")
+                ctx.log_debug(f"...received tool requests (turn {tools_turn})...")
+                # skip tool_requests.content - no need for extra comments
                 tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
-                if direct_responses := [
-                    response
-                    for response in tool_responses.responses
-                    if response.handling == "direct_result"
-                ]:
-                    return MultimodalContent.of(
-                        *[response.content for response in direct_responses]
-                    ).to_str()
+                if completion := tool_responses.completion(extension=result_extension):
+                    ctx.log_debug("...received tools direct result...")
+                    result = completion.content
+                    break  # proceed to resolving
 
-                else:
-                    context.extend(
-                        [
-                            tool_requests,
-                            tool_responses,
-                        ]
-                    )
+                elif extension := tool_responses.completion_extension():
+                    ctx.log_debug("...received tools result extension...")
+                    result_extension = result_extension.appending(extension)
 
-        repetition_level += 1  # continue with next recursion level
+                ctx.log_debug("...received tools responses...")
+                context.extend((tool_requests, tool_responses))
 
+        tools_turn += 1  # continue with next turn
 
-async def _text_generation_stream(
-    instruction: Instruction | None,
-    context: list[LMMContextElement],
-    toolbox: Toolbox,
-    **extra: Any,
-) -> AsyncIterator[str]:
-    output_queue = AsyncQueue[str]()
-
-    async def consume_lmm_output() -> None:
-        repetition_level: int = 0
-        try:
-            formatted_instruction: LMMInstruction | None = Instruction.formatted(instruction)
-            while True:
-                pending_tool_requests: list[LMMToolRequest] = []
-                pending_tool_responses: list[Task[LMMToolResponse]] = []
-                accumulated_text: str = ""
-
-                async for element in await LMM.completion(
-                    instruction=formatted_instruction,
-                    context=context,
-                    tools=toolbox.available_tools(repetition_level=repetition_level),
-                    output="text",
-                    stream=True,
-                    **extra,
-                ):
-                    match element:
-                        case LMMStreamChunk() as chunk:
-                            chunk_text: str = chunk.content.to_str()
-                            accumulated_text += chunk_text
-                            output_queue.enqueue(chunk_text)
-
-                            if chunk.eod:
-                                # end of streaming for text generation
-                                return output_queue.finish()
-
-                        case LMMToolRequest() as tool_request:
-                            # we could start processing immediately
-                            pending_tool_requests.append(tool_request)
-                            pending_tool_responses.append(ctx.spawn(toolbox.respond, tool_request))
-
-                assert pending_tool_requests  # nosec: B101
-                tool_requests: LMMToolRequests = LMMToolRequests.of(
-                    pending_tool_requests,
-                    content=MultimodalContent.of(accumulated_text) if accumulated_text else None,
-                )
-                tool_responses: LMMToolResponses = LMMToolResponses.of(
-                    await gather(*pending_tool_responses),
-                )
-                if direct_content := [
-                    response.content
-                    for response in tool_responses.responses
-                    if response.handling == "direct_result"
-                ]:
-                    response_text: str = MultimodalContent.of(*direct_content).to_str()
-                    output_queue.enqueue(response_text)
-                    return output_queue.finish()
-
-                else:
-                    context.extend(
-                        [
-                            tool_requests,
-                            tool_responses,
-                        ]
-                    )
-
-                repetition_level += 1  # continue
-
-        except BaseException as exc:
-            output_queue.finish(exception=exc)
-            raise exc
-
-    ctx.spawn(consume_lmm_output)
-
-    return output_queue
+    ctx.log_debug("...text completed!")
+    return result.to_str()

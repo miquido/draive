@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterable, Iterable
-from typing import Any, Literal, overload
+from typing import Any
 
 from haiway import State, ctx
 
@@ -14,32 +14,6 @@ __all__ = ("TextGeneration",)
 
 
 class TextGeneration(State):
-    @overload
-    @classmethod
-    async def generate(
-        cls,
-        *,
-        instruction: Instruction | str | None = None,
-        input: Prompt | Multimodal,
-        tools: Toolbox | Iterable[Tool] | None = None,
-        examples: Iterable[tuple[Multimodal, str]] | None = None,
-        stream: Literal[False] = False,
-        **extra: Any,
-    ) -> str: ...
-
-    @overload
-    @classmethod
-    async def generate(
-        cls,
-        *,
-        instruction: Instruction | str | None = None,
-        input: Prompt | Multimodal,
-        tools: Toolbox | Iterable[Tool] | None = None,
-        examples: Iterable[tuple[Multimodal, str]] | None = None,
-        stream: Literal[True],
-        **extra: Any,
-    ) -> AsyncIterable[str]: ...
-
     @classmethod
     async def generate(
         cls,
@@ -48,7 +22,6 @@ class TextGeneration(State):
         input: Prompt | Multimodal,  # noqa: A002
         tools: Toolbox | Iterable[Tool] | None = None,
         examples: Iterable[tuple[Multimodal, str]] | None = None,
-        stream: bool = False,
         **extra: Any,
     ) -> AsyncIterable[str] | str:
         return await ctx.state(cls).generation(
@@ -58,7 +31,6 @@ class TextGeneration(State):
             examples=((MultimodalContent.of(example[0]), example[1]) for example in examples)
             if examples is not None
             else (),
-            stream=stream,
             **extra,
         )
 

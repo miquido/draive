@@ -18,6 +18,5 @@ class TextGenerating(Protocol):
         input: Prompt | MultimodalContent,  # noqa: A002
         toolbox: Toolbox,
         examples: Iterable[tuple[MultimodalContent, str]],
-        stream: bool,
         **extra: Any,
     ) -> AsyncIterable[str] | str: ...

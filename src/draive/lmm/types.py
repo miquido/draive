@@ -48,7 +48,6 @@ __all__ = (
     "LMMStreamChunk",
     "LMMStreamInput",
     "LMMStreamOutput",
-    "LMMToolError",
     "LMMToolFunctionSpecification",
     "LMMToolRequest",
     "LMMToolRequests",
@@ -129,16 +128,6 @@ class LMMOutputInvalid(LMMException):
     pass
 
 
-class LMMToolError(LMMException):
-    def __init__(
-        self,
-        *args: object,
-        content: MultimodalContent,
-    ) -> None:
-        super().__init__(*args)
-        self.content: MultimodalContent = content
-
-
 class LMMInput(DataModel):
     @classmethod
     def of(
@@ -187,7 +176,7 @@ class LMMOutputDecoder(Protocol):
     ) -> MultimodalContent: ...
 
 
-LMMToolResponseHandling = Literal["error", "result", "direct_result"]
+LMMToolResponseHandling = Literal["error", "result", "completion", "extension", "detached"]
 
 
 class LMMToolResponse(DataModel):
@@ -233,6 +222,38 @@ class LMMToolResponses(DataModel):
     responses: Sequence[LMMToolResponse]
     meta: Meta = META_EMPTY
 
+    def completion(
+        self,
+        *,
+        extension: MultimodalContent | None = None,
+    ) -> LMMCompletion | None:
+        completion_parts: list[MultimodalContent] = []
+        extension_parts: list[MultimodalContent] = [extension] if extension else []
+        merged_meta: Meta = self.meta
+        for response in self.responses:
+            if response.handling == "extension":
+                extension_parts.append(response.content)
+                continue  # include extensions
+
+            if response.handling != "completion":
+                continue  # collect completion
+
+            completion_parts.append(response.content)
+            merged_meta = merged_meta.merged_with(response.meta)
+
+        if not completion_parts:
+            return None
+
+        return LMMCompletion.of(
+            MultimodalContent.of(*extension_parts, *completion_parts),
+            meta=merged_meta,
+        )
+
+    def completion_extension(self) -> MultimodalContent:
+        return MultimodalContent.of(
+            *(response.content for response in self.responses if response.handling == "extension")
+        )
+
 
 class LMMToolRequest(DataModel):
     @classmethod
@@ -269,12 +290,12 @@ class LMMToolRequests(DataModel):
     ) -> Self:
         return cls(
             requests=requests,
-            content=content,
+            content=content if content is not None else MultimodalContent.empty,
             meta=Meta.of(meta),
         )
 
     requests: Sequence[LMMToolRequest]
-    content: MultimodalContent | None = None
+    content: MultimodalContent = MultimodalContent.empty
     meta: Meta = META_EMPTY
 
 

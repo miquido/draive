@@ -24,7 +24,7 @@ from draive.tools import Toolbox
 __all__ = ("generate_model",)
 
 
-async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
+async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912, PLR0915
     generated: type[Generated],
     /,
     *,
@@ -79,58 +79,62 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912
                 context.append(LMMInput.of(value))
 
         formatted_instruction: LMMInstruction = Instruction.formatted(extended_instruction)
-        repetition_level: int = 0
+        tools_turn: int = 0
+        result: MultimodalContent = MultimodalContent.empty
+        result_extension: MultimodalContent = MultimodalContent.empty
         while True:
+            ctx.log_debug("...requesting completion...")
             match await LMM.completion(
                 instruction=formatted_instruction,
                 context=context,
-                tools=toolbox.available_tools(repetition_level=repetition_level),
+                tools=toolbox.available_tools(tools_turn=tools_turn),
                 output=generated,  # provide model specification
                 **extra,
             ):
                 case LMMCompletion() as completion:
-                    if decoder := decoder:
-                        return generated.from_mapping(decoder(completion.content))
-
-                    elif artifacts := completion.content.artifacts(generated):
-                        return cast(Generated, artifacts[0])
-
-                    else:
-                        return generated.from_json(completion.content.to_str())
+                    ctx.log_debug("...received result...")
+                    result = result_extension.appending(completion.content)
+                    break  # proceed to resolving
 
                 case LMMToolRequests() as tool_requests:
-                    context.append(tool_requests)
+                    ctx.log_debug(f"...received tool requests (turn {tools_turn})...")
+                    # skip tool_requests.content - no need for extra comments
                     tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
 
-                    if direct_responses := [
-                        response
-                        for response in tool_responses.responses
-                        if response.handling == "direct_result"
-                    ]:
-                        for response in direct_responses:
-                            if isinstance(response, generated):
-                                # return first response matching requested model
-                                return response
+                    if completion := tool_responses.completion(extension=result_extension):
+                        ctx.log_debug("...received tools direct result...")
+                        result = completion.content
+                        break  # proceed to resolving
 
-                            else:
-                                continue
+                    elif extension := tool_responses.completion_extension():
+                        ctx.log_debug("...received tools result extension...")
+                        result_extension = result_extension.appending(extension)
 
-                        direct_responses_content: MultimodalContent = MultimodalContent.of(
-                            *[response.content for response in direct_responses]
-                        )
+                    ctx.log_debug("...received tools responses...")
+                    context.extend((tool_requests, tool_responses))
 
-                        # TODO: check if this join makes any sense,
-                        # perhaps we could merge json objects instead?
-                        if decoder := decoder:
-                            return generated.from_mapping(decoder(direct_responses_content))
+            tools_turn += 1  # continue with next turn
 
-                        else:
-                            return generated.from_json(direct_responses_content.to_str())
+        try:
+            ctx.log_debug("...decoding result...")
+            if decoder := decoder:
+                ctx.log_debug("...decoded with custom decoder!")
+                return decoder(result)
 
-                    else:
-                        context.append(tool_responses)
+            elif artifacts := result.artifacts(generated):
+                ctx.log_debug("...direct artifact found!")
+                return cast(Generated, artifacts[0])
 
-            repetition_level += 1  # continue with next recursion level
+            else:
+                ctx.log_debug("...decoded from json string!")
+                return generated.from_json(result.to_str())
+
+        except Exception as exc:
+            ctx.log_error(
+                f"Failed to decode {generated.__name__} model due to an error: {type(exc)}",
+                exception=exc,
+            )
+            raise exc
 
 
 DEFAULT_INSTRUCTION_EXTENSION: str = """\

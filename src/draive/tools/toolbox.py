@@ -6,7 +6,6 @@ from haiway import META_EMPTY, Meta, MetaTags, MetaValues, State, ctx
 
 from draive.lmm.types import (
     LMMException,
-    LMMToolError,
     LMMToolRequest,
     LMMToolRequests,
     LMMToolResponse,
@@ -17,7 +16,7 @@ from draive.lmm.types import (
 )
 from draive.multimodal import MultimodalContent
 from draive.tools.state import Tools
-from draive.tools.types import Tool
+from draive.tools.types import Tool, ToolError
 
 __all__ = ("Toolbox",)
 
@@ -31,19 +30,19 @@ class Toolbox(State):
         /,
         *tools: Tool,
         suggest: Tool | str | bool | None = None,
-        repeated_calls_limit: int | None = None,
+        tool_turns_limit: int | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         tools_mapping: Mapping[str, Tool]
         suggest_call: Tool | bool
-        calls_limit: int
+        turns_limit: int
         metadata: Meta
         match tool_or_toolbox:
             case None:
                 assert suggest is None or suggest is False  # nosec: B101
                 tools_mapping = {}
                 suggest_call = False
-                calls_limit = 0
+                turns_limit = 0
                 metadata = Meta.of(meta)
 
             case Toolbox() as toolbox:
@@ -63,10 +62,8 @@ class Toolbox(State):
                         assert tool.name in tools_mapping  # nosec: B101
                         suggest_call = tool
 
-                calls_limit = (
-                    repeated_calls_limit
-                    if repeated_calls_limit is not None
-                    else toolbox.repeated_calls_limit
+                turns_limit = (
+                    tool_turns_limit if tool_turns_limit is not None else toolbox.tool_turns_limit
                 )
                 metadata = (
                     toolbox.meta.merged_with(Meta.of(meta)) if meta is not None else toolbox.meta
@@ -92,7 +89,7 @@ class Toolbox(State):
                         assert tool.name in tools_mapping  # nosec: B101
                         suggest_call = tool
 
-                calls_limit = repeated_calls_limit or 3
+                turns_limit = tool_turns_limit or 3
                 metadata = Meta.of(meta)
 
             case iterable_tools:
@@ -115,13 +112,13 @@ class Toolbox(State):
                         assert tool.name in tools_mapping  # nosec: B101
                         suggest_call = tool
 
-                calls_limit = repeated_calls_limit or 3
+                turns_limit = tool_turns_limit or 3
                 metadata = Meta.of(meta)
 
         return cls(
             tools=tools_mapping,
             suggest_call=suggest_call,
-            repeated_calls_limit=calls_limit,
+            tool_turns_limit=turns_limit,
             meta=metadata,
         )
 
@@ -131,7 +128,7 @@ class Toolbox(State):
         *,
         tools: Collection[str] | None = None,
         tags: MetaTags | None = None,
-        repeated_calls_limit: int | None = None,
+        tool_turns_limit: int | None = None,
         suggest: str | bool | None = None,
         meta: Meta | MetaValues | None = None,
         **extra: Any,
@@ -146,26 +143,26 @@ class Toolbox(State):
         return cls.of(
             *selected_tools,
             suggest=suggest,
-            repeated_calls_limit=repeated_calls_limit,
+            tool_turns_limit=tool_turns_limit,
             meta=meta,
         )
 
     tools: Mapping[str, Tool]
     suggest_call: Tool | bool
-    repeated_calls_limit: int
+    tool_turns_limit: int
     meta: Meta = META_EMPTY
 
     def available_tools(
         self,
         *,
-        repetition_level: int = 0,
+        tools_turn: int = 0,
     ) -> LMMTools:
-        if repetition_level >= self.repeated_calls_limit:
+        if tools_turn >= self.tool_turns_limit:
             # provide no tools if reached the limit
             return LMMTools.of((), selection="none")
 
         tools_selection: LMMToolSelection
-        if repetition_level != 0:
+        if tools_turn != 0:
             # require tools only for the first call, use auto otherwise
             tools_selection = "auto"
 
@@ -198,7 +195,7 @@ class Toolbox(State):
         arguments: Mapping[str, Any],
     ) -> MultimodalContent:
         if tool := self.tools.get(name):
-            return await tool.tool_call(
+            return await tool.call(
                 call_id,
                 **arguments,
             )
@@ -231,46 +228,49 @@ class Toolbox(State):
                         handling = "result"
 
                     case "direct":
-                        handling = "direct_result"
+                        handling = "completion"
+
+                    case "extend":
+                        handling = "extension"
+
+                    case "spawn":
+                        ctx.spawn(
+                            tool.call,
+                            request.identifier,
+                            **request.arguments,
+                        )
+                        return LMMToolResponse(
+                            identifier=request.identifier,
+                            tool=request.tool,
+                            content=MultimodalContent.of(f"{request.tool} tool has been called"),
+                            handling="detached",
+                        )
 
                 return LMMToolResponse(
                     identifier=request.identifier,
                     tool=request.tool,
-                    content=await tool.tool_call(  # pyright: ignore[reportPrivateUsage]
+                    content=await tool.call(
                         request.identifier,
                         **request.arguments,
                     ),
                     handling=handling,
                 )
 
-            except LMMToolError as error:  # use formatted error, blow up on other exception
-                ctx.log_error(
-                    "Tool (%s) returned an error",
-                    request.tool,
-                    exception=error,
-                )
-                handling: LMMToolResponseHandling
-                match tool.handling:
-                    case "auto":
-                        handling = "error"
-
-                    case "direct":
-                        handling = "direct_result"
-
+            except ToolError as error:  # use formatted error, blow up on other exceptions
                 return LMMToolResponse(
                     identifier=request.identifier,
                     tool=request.tool,
                     content=error.content,
-                    handling=handling,
+                    handling="error",
                 )
 
         else:
             # log error and provide fallback result to avoid blowing out the execution
-            ctx.log_error("Requested tool (%s) is not defined", request.tool)
+            ctx.log_error(f"Requested tool ({request.tool}) is not defined")
             return LMMToolResponse(
                 identifier=request.identifier,
                 tool=request.tool,
-                content=MultimodalContent.of("ERROR"),
+                content=MultimodalContent.of(f"ERROR: Undefined tool {request.tool}"),
                 handling="error",
             )
 
@@ -283,7 +283,7 @@ class Toolbox(State):
         return self.__class__.of(
             *(tool, *tools, *self.tools.values()),
             suggest=self.suggest_call,
-            repeated_calls_limit=self.repeated_calls_limit,
+            tool_turns_limit=self.tool_turns_limit,
             meta=self.meta,
         )
 
@@ -312,7 +312,7 @@ class Toolbox(State):
             return self.__class__.of(
                 *(tool for tool in self.tools.values() if tool.name in tools),
                 suggest=self.suggest_call,
-                repeated_calls_limit=self.repeated_calls_limit,
+                tool_turns_limit=self.tool_turns_limit,
                 meta=self.meta,
             )
 
@@ -320,7 +320,7 @@ class Toolbox(State):
             return self.__class__.of(
                 *(tool for tool in self.tools.values() if tool.meta.has_tags(tags)),
                 suggest=self.suggest_call,
-                repeated_calls_limit=self.repeated_calls_limit,
+                tool_turns_limit=self.tool_turns_limit,
                 meta=self.meta,
             )
 

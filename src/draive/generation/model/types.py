@@ -14,11 +14,11 @@ __all__ = (
 
 
 @runtime_checkable
-class ModelGeneratorDecoder(Protocol):
+class ModelGeneratorDecoder[Generated: DataModel](Protocol):
     def __call__(
         self,
         generated: MultimodalContent,
-    ) -> dict[str, Any]: ...
+    ) -> Generated: ...
 
 
 @runtime_checkable
@@ -33,6 +33,6 @@ class ModelGenerating(Protocol):
         schema_injection: Literal["auto", "full", "simplified", "skip"],
         toolbox: Toolbox,
         examples: Iterable[tuple[MultimodalContent, Generated]] | None,
-        decoder: ModelGeneratorDecoder | None,
+        decoder: ModelGeneratorDecoder[Generated] | None,
         **extra: Any,
     ) -> Generated: ...

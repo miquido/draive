@@ -4,24 +4,24 @@ from typing import Any, Literal, Protocol, runtime_checkable
 from haiway import Meta
 
 from draive.lmm import LMMToolSpecification
-from draive.multimodal import Multimodal, MultimodalContent
+from draive.multimodal import MultimodalContent
 from draive.parameters import ParametersSpecification
 
 __all__ = (
     "Tool",
     "ToolAvailabilityChecking",
+    "ToolError",
     "ToolErrorFormatting",
-    "ToolException",
     "ToolHandling",
     "ToolResultFormatting",
     "ToolsFetching",
 )
 
 
-ToolHandling = Literal["auto", "direct"]
+type ToolHandling = Literal["auto", "extend", "direct", "spawn"]
 
 
-class ToolException(Exception):
+class ToolError(Exception):
     def __init__(
         self,
         *args: object,
@@ -35,6 +35,7 @@ class ToolException(Exception):
 class ToolAvailabilityChecking(Protocol):
     def __call__(
         self,
+        tools_turn: int,
         meta: Meta,
     ) -> bool: ...
 
@@ -44,15 +45,15 @@ class ToolResultFormatting[Result](Protocol):
     def __call__(
         self,
         result: Result,
-    ) -> Multimodal: ...
+    ) -> MultimodalContent: ...
 
 
 @runtime_checkable
-class ToolErrorFormatting[Result](Protocol):
+class ToolErrorFormatting(Protocol):
     def __call__(
         self,
         error: Exception,
-    ) -> Multimodal: ...
+    ) -> MultimodalContent: ...
 
 
 @runtime_checkable
@@ -73,12 +74,14 @@ class Tool(Protocol):
     def meta(self) -> Meta: ...
 
     @property
-    def available(self) -> bool: ...
-
-    @property
     def handling(self) -> ToolHandling: ...
 
-    async def tool_call(
+    def available(
+        self,
+        tools_turn: int,
+    ) -> bool: ...
+
+    async def call(
         self,
         call_id: str,
         /,
