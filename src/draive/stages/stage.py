@@ -795,46 +795,79 @@ class Stage:
         >>> stage = Stage.tool_call(get_weather, location="New York")
         """
         assert not args, "Positional arguments are not supported"  # nosec: B101
-        direct_result: bool
-        match tool.handling:
-            case "auto":
-                direct_result = False
-
-            case "direct":
-                direct_result = True
 
         async def stage(
             *,
             state: StageState,
         ) -> StageState:
             async with ctx.scope("stage.tool_call"):
+                request_id: str = uuid4().hex
                 # Create tool request representing the call
                 tool_request: LMMToolRequest = LMMToolRequest.of(
-                    uuid4().hex,
+                    request_id,
                     tool=tool.name,
                     arguments=kwargs,
                 )
 
-                tool_response: LMMToolResponse
                 try:
-                    # Execute the tool directly
-                    result = await tool(*args, **kwargs)
+                    tool_response: LMMToolResponse
+                    result: MultimodalContent
+                    match tool.handling:
+                        case "auto":
+                            tool_response = LMMToolResponse.of(
+                                tool_request.identifier,
+                                tool=tool.name,
+                                content=MultimodalContent.of(
+                                    # Execute the tool directly
+                                    tool.format_result(await tool(*args, **kwargs))
+                                ),
+                                handling="result",
+                            )
+                            result = state.result  # result unchanged
 
-                    # Create tool response with the result
-                    tool_response = LMMToolResponse.of(
-                        tool_request.identifier,
-                        tool=tool.name,
-                        content=MultimodalContent.of(tool.format_result(result)),
-                        handling="direct_result" if direct_result else "result",
-                    )
+                        case "direct":
+                            tool_result: MultimodalContent = tool.format_result(
+                                await tool(*args, **kwargs)
+                            )
+                            tool_response = LMMToolResponse.of(
+                                tool_request.identifier,
+                                tool=tool.name,
+                                content=tool_result,
+                                handling="completion",
+                            )
+                            result = tool_result  # result is the tool result
+
+                        case "extend":
+                            tool_result: MultimodalContent = tool.format_result(
+                                await tool(*args, **kwargs)
+                            )
+                            tool_response = LMMToolResponse.of(
+                                tool_request.identifier,
+                                tool=tool.name,
+                                content=tool_result,
+                                handling="extension",
+                            )
+                            result = state.result.appending(tool_result)  # result extended
+
+                        case "spawn":
+                            ctx.spawn(tool, *args, **kwargs)
+                            tool_response = LMMToolResponse.of(
+                                tool_request.identifier,
+                                tool=tool.name,
+                                # placeholder for detached tool call
+                                content=MultimodalContent.of(f"{tool.name} tool has been called"),
+                                handling="detached",
+                            )
+                            result = state.result  # result unchanged
 
                 except Exception as exc:
                     tool_response = LMMToolResponse.of(
                         tool_request.identifier,
                         tool=tool.name,
-                        content=MultimodalContent.of(tool.format_failure(exc)),
-                        handling="direct_result" if direct_result else "error",
+                        content=MultimodalContent.of(tool.format_error(exc)),
+                        handling="error",
                     )
+                    result = state.result  # result unchanged
 
                 return state.updated(
                     context=(
@@ -842,7 +875,7 @@ class Stage:
                         LMMToolRequests.of((tool_request,)),
                         LMMToolResponses.of((tool_response,)),
                     ),
-                    result=tool_response.content if direct_result else state.result,
+                    result=result,
                 )
 
         return cls(
@@ -1930,47 +1963,61 @@ async def _lmm_completion(
 ) -> tuple[LMMContext, MultimodalContent]:
     current_context: LMMContext = context
     formatted_instruction: LMMInstruction | None = Instruction.formatted(instruction)
-    repetition_level: int = 0
+    tools_turn: int = 0
+    result: LMMCompletion
+    result_extension: MultimodalContent = MultimodalContent.empty
     while True:
+        ctx.log_debug("...requesting completion...")
         match await LMM.completion(
             instruction=formatted_instruction,
             context=current_context,
             output=output,
-            tools=toolbox.available_tools(repetition_level=repetition_level),
+            tools=toolbox.available_tools(tools_turn=tools_turn),
             **extra,
         ):
             case LMMCompletion() as completion:
-                return (
-                    (*current_context, completion),
-                    completion.content,
-                )
-
-            case LMMToolRequests() as tool_requests:
-                tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
-
-                if direct_results := [
-                    response.content
-                    for response in tool_responses.responses
-                    if response.handling == "direct_result"
-                ]:
-                    direct_content: MultimodalContent = MultimodalContent.of(*direct_results)
-
-                    return (
-                        (
-                            *current_context,
-                            LMMCompletion.of(direct_content),
-                        ),
-                        direct_content,
+                ctx.log_debug("...received result...")
+                if result_extension:
+                    result = completion.updated(
+                        content=result_extension.appending(completion.content)
                     )
 
                 else:
-                    current_context = (
-                        *current_context,
-                        tool_requests,
-                        tool_responses,
-                    )
+                    result = completion
 
-        repetition_level += 1  # continue tracking repetetive tool calls
+                break  # proceed to resolving
+
+            case LMMToolRequests() as tool_requests:
+                ctx.log_debug(f"...received tool requests (turn {tools_turn})...")
+                # skip tool_requests.content - no need for extra comments
+                tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
+
+                if completion := tool_responses.completion(extension=result_extension):
+                    ctx.log_debug("...received tools direct result...")
+                    result = completion
+                    break  # proceed to resolving
+
+                elif extension := tool_responses.completion_extension():
+                    ctx.log_debug("...received tools result extension...")
+                    result_extension = result_extension.appending(extension)
+
+                ctx.log_debug("...received tools responses...")
+                current_context = (
+                    *current_context,
+                    tool_requests,
+                    tool_responses,
+                )
+
+        tools_turn += 1  # continue with next turn
+
+    ctx.log_debug("...finalized result!")
+    return (
+        (
+            *current_context,
+            result,
+        ),
+        result.content,
+    )
 
 
 async def _lmm_routing(

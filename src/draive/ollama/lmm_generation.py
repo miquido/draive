@@ -144,9 +144,8 @@ class OllamaLMMGeneration(OllamaAPI):
 
             if tool_calls := completion_message.tool_calls:
                 assert tools, "Requesting tool call without tools"  # nosec: B101
-                completion_tool_calls = LMMToolRequests(
-                    content=lmm_completion.content if lmm_completion else None,
-                    requests=[
+                completion_tool_calls = LMMToolRequests.of(
+                    [
                         LMMToolRequest(
                             identifier=uuid4().hex,
                             tool=call.function.name,
@@ -156,6 +155,7 @@ class OllamaLMMGeneration(OllamaAPI):
                         )
                         for call in tool_calls
                     ],
+                    content=lmm_completion.content if lmm_completion else None,
                 )
                 ctx.record(
                     ObservabilityLevel.INFO,

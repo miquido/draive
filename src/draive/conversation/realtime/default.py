@@ -56,6 +56,7 @@ async def realtime_conversation_preparing(  # noqa: C901
                 remember=_to_lmm_remember(memory.remember),
             )
 
+    # TODO: rework RealtimeLMM interface to allow instruction and tools changes during the session
     session_scope: LMMSessionScope = await RealtimeLMM.session(
         instruction=Instruction.formatted(instruction),
         memory=session_memory,
@@ -71,15 +72,25 @@ async def realtime_conversation_preparing(  # noqa: C901
             /,
         ) -> None:
             try:
-                ctx.log_debug(f"Handling tool request ({tool_request.identifier})...")
+                ctx.log_debug(
+                    f"Handling tool ({tool_request.tool}) request ({tool_request.identifier}) ...",
+                )
                 response: LMMToolResponse = await toolbox.respond(tool_request)
+                if response.handling in ("completion", "extension"):
+                    ctx.log_warning(
+                        f"Tool handling `{response.handling}` is not supported in"
+                        " realtime conversation, using regular result handling instead"
+                    )
+
                 # check if task was not cancelled before passing the result to input
                 ctx.check_cancellation()
                 # deliver the result directly to input
                 await session.writing(response)
 
             except CancelledError:
-                ctx.log_debug(f"...tool request ({tool_request.identifier}) handling cancelled!")
+                ctx.log_debug(
+                    f"...tool request ({tool_request.identifier}) handling cancelled!",
+                )
 
             except BaseException as exc:
                 ctx.log_error(
@@ -88,12 +99,15 @@ async def realtime_conversation_preparing(  # noqa: C901
                 )
 
             else:
-                ctx.log_debug(f"...tool request ({tool_request.identifier}) handling finished!")
+                ctx.log_debug(
+                    f"...tool request ({tool_request.identifier}) handling completed!",
+                )
 
         async def read() -> ConversationStreamElement:
             while True:
                 match await session.reading():
                     case LMMStreamChunk() as chunk:
+                        ctx.log_debug("...received response chunk...")
                         return ConversationMessageChunk.model(
                             chunk.content,
                             message_identifier=chunk.meta.origin_identifier or uuid4(),
@@ -103,6 +117,7 @@ async def realtime_conversation_preparing(  # noqa: C901
                     case LMMSessionEvent() as event:
                         match event.category:
                             case "output.completed":
+                                ctx.log_debug("...received output completion event...")
                                 return ConversationMessageChunk.model(
                                     MultimodalContent.empty,
                                     message_identifier=event.meta.origin_identifier or uuid4(),
@@ -110,13 +125,15 @@ async def realtime_conversation_preparing(  # noqa: C901
                                 )
 
                             case "input.started":
+                                ctx.log_debug("...received input started event...")
                                 return ConversationEvent.of(
                                     "interrupted",
                                     meta=event.meta,
                                 )
 
-                            case _:
-                                pass  # temporary ignore of other events
+                            case other:
+                                # temporary ignore of other events
+                                ctx.log_debug(f"...received {other} event...")
 
                         return ConversationEvent.of(
                             event.category,
@@ -128,6 +145,7 @@ async def realtime_conversation_preparing(  # noqa: C901
                             handle_tool_request,
                             tool_request,
                         )
+                        continue  # keep receiving elements
 
         async def write(
             input: ConversationStreamElement,  # noqa: A002

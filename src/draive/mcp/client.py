@@ -26,12 +26,12 @@ from mcp.types import ResourceLink as MCPResourceLink
 from mcp.types import TextContent as MCPTextContent
 from pydantic import AnyUrl
 
-from draive.lmm import LMMCompletion, LMMContextElement, LMMInput, LMMToolError
+from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
 from draive.multimodal import MediaData, MultimodalContent, TextContent
 from draive.parameters import BasicValue, DataModel, validated_specification
 from draive.prompts import Prompt, PromptDeclaration, PromptDeclarationArgument, Prompts
 from draive.resources import Resource, ResourceContent, ResourceDeclaration, Resources
-from draive.tools import FunctionTool, Tool, Tools
+from draive.tools import FunctionTool, Tool, ToolError, Tools
 
 __all__ = (
     "MCPClient",
@@ -303,7 +303,7 @@ class MCPClient:
         )
 
         if result.isError:
-            raise LMMToolError(
+            raise ToolError(
                 f"Remote tool {name} failed",
                 content=content,
             )
@@ -600,9 +600,9 @@ def _convert_tool(
         description=mcp_tool.description,
         parameters=validated_specification(mcp_tool.inputSchema),
         function=remote_call,
-        availability_check=None,
+        availability=None,
         format_result=_format_tool_result,
-        format_failure=_format_tool_failure,
+        format_error=_format_tool_failure,
         handling="auto",
         meta=Meta(
             {
@@ -623,7 +623,7 @@ def _format_tool_result(
 def _format_tool_failure(
     error: Exception,
 ) -> MultimodalContent:
-    if isinstance(error, LMMToolError):
+    if isinstance(error, ToolError):
         return error.content
 
     return MultimodalContent.of("ERROR")

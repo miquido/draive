@@ -286,9 +286,8 @@ class VLLMLMMGeneration(VLLMAPI):
 
         if tool_calls := completion_message.tool_calls:
             assert tools, "Requesting tool call without tools"  # nosec: B101
-            completion_tool_calls = LMMToolRequests(
-                content=lmm_completion.content if lmm_completion else None,
-                requests=[
+            completion_tool_calls = LMMToolRequests.of(
+                [
                     LMMToolRequest(
                         identifier=call.id,
                         tool=call.function.name,
@@ -298,6 +297,7 @@ class VLLMLMMGeneration(VLLMAPI):
                     )
                     for call in tool_calls
                 ],
+                content=lmm_completion.content if lmm_completion else None,
             )
             ctx.record(
                 ObservabilityLevel.INFO,

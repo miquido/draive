@@ -51,7 +51,7 @@ async def test_toolbox_call_returns_multimodal_content():
             executions += 1
             return value
 
-        assert await compute.tool_call(
+        assert await compute.call(
             "call_id",
             value=42,
         ) == MultimodalContent.of("42")
@@ -72,7 +72,7 @@ async def test_toolbox_call_returns_custom_content():
             executions += 1
             return value
 
-        assert await compute.tool_call(
+        assert await compute.call(
             "call_id",
             value=42,
         ) == MultimodalContent.of("Value:42")

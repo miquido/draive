@@ -21,7 +21,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 license = { file = "LICENSE" }
-dependencies = ["numpy~=2.2", "haiway~=0.27.1"]
+dependencies = ["numpy~=2.2", "haiway~=0.27.2"]
 
 [project.urls]
 Homepage = "https://miquido.com"
