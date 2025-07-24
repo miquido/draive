@@ -26,6 +26,7 @@ from draive.lmm import (
 from draive.multimodal import (
     MediaData,
     MediaReference,
+    MetaContent,
     MultimodalContent,
     MultimodalContentElement,
     TextContent,
@@ -77,6 +78,12 @@ def content_element_as_content_part(
                     if not_missing(config.vision_details)
                     else "auto",
                 },
+            }
+
+        case MetaContent() as meta if meta.category == "transcript" and meta.content:
+            return {
+                "type": "text",
+                "text": meta.content.to_str(),
             }
 
         case DataModel() as data:

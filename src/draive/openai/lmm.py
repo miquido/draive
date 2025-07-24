@@ -1,11 +1,12 @@
 import json
 from collections.abc import Callable, Iterable
-from typing import Any, Literal, cast
+from typing import Any, Literal, cast, overload
 
 from haiway import Missing, not_missing
 from openai import NOT_GIVEN, NotGiven
 from openai.types.chat import (
     ChatCompletionContentPartParam,
+    ChatCompletionContentPartTextParam,
     ChatCompletionMessageParam,
     ChatCompletionToolChoiceOptionParam,
     ChatCompletionToolParam,
@@ -26,6 +27,7 @@ from draive.lmm import (
 from draive.multimodal import (
     MediaData,
     MediaReference,
+    MetaContent,
     MultimodalContent,
     MultimodalContentElement,
     TextContent,
@@ -39,9 +41,26 @@ __all__ = (
 )
 
 
+@overload
 def content_element_as_content_part(
     element: MultimodalContentElement,
     vision_details: Literal["auto", "low", "high"] | Missing,
+    text_only: Literal[True],
+) -> ChatCompletionContentPartTextParam: ...
+
+
+@overload
+def content_element_as_content_part(
+    element: MultimodalContentElement,
+    vision_details: Literal["auto", "low", "high"] | Missing,
+    text_only: Literal[False],
+) -> ChatCompletionContentPartParam: ...
+
+
+def content_element_as_content_part(  # noqa: PLR0911
+    element: MultimodalContentElement,
+    vision_details: Literal["auto", "low", "high"] | Missing,
+    text_only: bool,
 ) -> ChatCompletionContentPartParam:
     match element:
         case TextContent() as text:
@@ -51,6 +70,12 @@ def content_element_as_content_part(
             }
 
         case MediaData() as media_data:
+            if text_only:
+                return {
+                    "type": "text",
+                    "text": media_data.to_str(),
+                }
+
             if media_data.kind != "image":
                 raise ValueError("Unsupported message content", media_data)
 
@@ -65,6 +90,12 @@ def content_element_as_content_part(
             }
 
         case MediaReference() as media_reference:
+            if text_only:
+                return {
+                    "type": "text",
+                    "text": media_reference.to_str(),
+                }
+
             if media_reference.kind != "image":
                 raise ValueError("Unsupported message content", media_reference)
 
@@ -76,6 +107,12 @@ def content_element_as_content_part(
                     if not_missing(vision_details)
                     else "auto",
                 },
+            }
+
+        case MetaContent() as meta if meta.category == "transcript" and meta.content:
+            return {
+                "type": "text",
+                "text": meta.content.to_str(),
             }
 
         case DataModel() as data:
@@ -99,6 +136,7 @@ def context_element_as_messages(
                         content_element_as_content_part(
                             element=element,
                             vision_details=vision_details,
+                            text_only=False,
                         )
                         for element in input.content.parts
                     ],
@@ -109,8 +147,14 @@ def context_element_as_messages(
             return (
                 {
                     "role": "assistant",
-                    # TODO: OpenAI models generating media?
-                    "content": completion.content.to_str(),
+                    "content": [
+                        content_element_as_content_part(
+                            element=element,
+                            vision_details=vision_details,
+                            text_only=True,
+                        )
+                        for element in completion.content.parts
+                    ],
                 },
             )
 

@@ -29,11 +29,11 @@ from draive.mistral.types import MistralException
 from draive.multimodal import (
     MediaData,
     MediaReference,
+    MetaContent,
     MultimodalContent,
     MultimodalContentElement,
     TextContent,
 )
-from draive.multimodal.meta import MetaContent
 from draive.parameters import DataModel
 
 __all__ = (
@@ -134,6 +134,12 @@ def content_element_as_content_chunk(
                 "type": "image_url",
                 "image_url": {"url": media_reference.uri},
                 # TODO: there is optional "detail" argument, however undocumented
+            }
+
+        case MetaContent() as meta if meta.category == "transcript" and meta.content:
+            return {
+                "type": "text",
+                "text": meta.content.to_str(),
             }
 
         case DataModel() as data:

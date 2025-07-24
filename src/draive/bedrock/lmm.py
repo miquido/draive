@@ -14,10 +14,11 @@ from draive.lmm.types import LMMOutputSelection, LMMToolSelection
 from draive.multimodal import (
     MediaData,
     MediaReference,
+    MetaContent,
+    MultimodalContent,
     MultimodalContentElement,
     TextContent,
 )
-from draive.multimodal.content import MultimodalContent
 from draive.parameters import DataModel
 
 __all__ = (
@@ -61,6 +62,11 @@ def convert_content_element(
 
         case MediaReference() as media_reference:
             raise ValueError("Unsupported message content", media_reference)
+
+        case MetaContent() as meta if meta.category == "transcript" and meta.content:
+            return {
+                "text": meta.content.to_str(),
+            }
 
         case DataModel() as data:
             return {"text": data.to_json()}

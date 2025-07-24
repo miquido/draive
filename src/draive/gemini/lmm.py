@@ -19,10 +19,10 @@ from draive.lmm import (
 from draive.multimodal import (
     MediaData,
     MediaReference,
+    MetaContent,
     MultimodalContentElement,
     TextContent,
 )
-from draive.multimodal.meta import MetaContent
 from draive.parameters import DataModel
 
 __all__ = (
@@ -148,6 +148,11 @@ def content_element_as_part(  # noqa: PLR0911
                         "text": model.to_json(),
                         "thought": True,
                     }
+
+        case MetaContent() as meta if meta.category == "transcript" and meta.content:
+            return {
+                "text": meta.content.to_str(),
+            }
 
         case DataModel() as data:
             return {

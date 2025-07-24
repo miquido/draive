@@ -210,7 +210,7 @@ class MistralLMMGeneration(MistralAPI):
             ctx.record(
                 ObservabilityLevel.INFO,
                 metric="lmm.input_tokens",
-                value=usage.prompt_tokens,
+                value=usage.prompt_tokens or 0,
                 unit="tokens",
                 kind="counter",
                 attributes={"lmm.model": completion.model},
@@ -218,7 +218,7 @@ class MistralLMMGeneration(MistralAPI):
             ctx.record(
                 ObservabilityLevel.INFO,
                 metric="lmm.output_tokens",
-                value=usage.completion_tokens,
+                value=usage.completion_tokens or 0,
                 unit="tokens",
                 kind="counter",
                 attributes={"lmm.model": completion.model},
@@ -332,7 +332,7 @@ class MistralLMMGeneration(MistralAPI):
                         ctx.record(
                             ObservabilityLevel.INFO,
                             metric="lmm.input_tokens",
-                            value=usage.prompt_tokens,
+                            value=usage.prompt_tokens or 0,
                             unit="tokens",
                             kind="counter",
                             attributes={"lmm.model": completion_chunk.data.model},
@@ -340,7 +340,7 @@ class MistralLMMGeneration(MistralAPI):
                         ctx.record(
                             ObservabilityLevel.INFO,
                             metric="lmm.output_tokens",
-                            value=usage.completion_tokens,
+                            value=usage.completion_tokens or 0,
                             unit="tokens",
                             kind="counter",
                             attributes={"lmm.model": completion_chunk.data.model},
