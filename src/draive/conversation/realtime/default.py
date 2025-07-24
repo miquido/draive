@@ -31,7 +31,6 @@ from draive.lmm import (
     RealtimeLMM,
 )
 from draive.lmm.types import LMMCompletion, LMMInput
-from draive.multimodal import MultimodalContent
 from draive.tools import Toolbox
 from draive.utils import MEMORY_NONE, Memory, MemoryRecalling, MemoryRemembering
 
@@ -110,37 +109,23 @@ async def realtime_conversation_preparing(  # noqa: C901
                         ctx.log_debug("...received response chunk...")
                         return ConversationMessageChunk.model(
                             chunk.content,
-                            message_identifier=chunk.meta.origin_identifier or uuid4(),
+                            identifier=chunk.meta.identifier,
+                            message_identifier=chunk.meta.get_uuid(
+                                "message_identifier",
+                                default=uuid4(),
+                            ),
                             eod=chunk.eod,
                         )
 
                     case LMMSessionEvent() as event:
-                        match event.category:
-                            case "output.completed":
-                                ctx.log_debug("...received output completion event...")
-                                return ConversationMessageChunk.model(
-                                    MultimodalContent.empty,
-                                    message_identifier=event.meta.origin_identifier or uuid4(),
-                                    eod=True,  # ensure sending eod
-                                )
-
-                            case "input.started":
-                                ctx.log_debug("...received input started event...")
-                                return ConversationEvent.of(
-                                    "interrupted",
-                                    meta=event.meta,
-                                )
-
-                            case other:
-                                # temporary ignore of other events
-                                ctx.log_debug(f"...received {other} event...")
-
+                        ctx.log_debug(f"...received {event.category} event...")
                         return ConversationEvent.of(
                             event.category,
                             meta=event.meta,
                         )
 
                     case LMMToolRequest() as tool_request:
+                        ctx.log_debug(f"...received {tool_request.tool} request...")
                         ctx.spawn(
                             handle_tool_request,
                             tool_request,
@@ -150,16 +135,25 @@ async def realtime_conversation_preparing(  # noqa: C901
         async def write(
             input: ConversationStreamElement,  # noqa: A002
         ) -> None:
-            if isinstance(input, ConversationEvent):
-                return  # events do not propagate to LMM
+            if isinstance(input, ConversationMessageChunk):
+                # pass chunk to LMM
+                await session.writing(
+                    input=LMMStreamChunk.of(
+                        input.content,
+                        eod=input.eod,
+                        meta=input.meta,
+                    )
+                )
 
-            chunk: LMMStreamChunk = LMMStreamChunk.of(
-                input.content,
-                eod=input.eod,
-                meta=input.meta,
-            )
-            # pass chunk to LMM
-            await session.writing(input=chunk)
+            else:
+                assert isinstance(input, ConversationEvent)  # nosec: B101
+                # pass event to LMM
+                await session.writing(
+                    input=LMMSessionEvent.of(
+                        input.category,
+                        meta=input.meta,
+                    )
+                )
 
         return RealtimeConversationSession(
             reading=read,

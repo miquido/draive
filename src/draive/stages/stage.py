@@ -580,6 +580,72 @@ class Stage:
         )
 
     @classmethod
+    def result_completion(
+        cls,
+        *,
+        instruction: Instruction | str | None = None,
+        tools: Toolbox | Iterable[Tool] | None = None,
+        output: LMMOutputSelection = "auto",
+        meta: Meta | MetaValues | None = None,
+        **extra: Any,
+    ) -> Self:
+        """
+        Creates a Stage that takes the current result and uses it as the new input.
+
+        This Stage takes the current stage result, appends it as a new input, and executes
+        a new completion using the updated context.
+
+        Parameters
+        ----------
+        instruction : Instruction | str | None
+            Optional instruction or guidance for the LMM.
+        tools : Toolbox | Iterable[Tool] | None
+            Optional tools that the LMM can use during completion generation.
+        output : LMMOutputSelection
+            Controls the modality/type of the generated completion, default is "auto".
+        meta: Meta | MetaValues | None = None
+            Additional stage metadata including tags, description etc.
+        **extra : Any
+            Additional parameters to pass to the LMM invocation.
+
+        Returns
+        -------
+        Self
+            A new Stage instance that performs the result completion.
+
+        Raises
+        ------
+        RuntimeError
+            If the LMM exceeds the limit of recursive tool calls.
+        """
+        toolbox: Toolbox = Toolbox.of(tools)
+
+        async def stage(
+            *,
+            state: StageState,
+        ) -> StageState:
+            async with ctx.scope("stage.completion.result"):
+                context, result = await _lmm_completion(
+                    instruction=instruction,
+                    context=(
+                        *state.context,
+                        LMMInput.of(state.result),
+                    ),
+                    toolbox=toolbox,
+                    output=output,
+                    **extra,
+                )
+                return state.updated(
+                    context=context,
+                    result=result,
+                )
+
+        return cls(
+            stage,
+            meta=Meta.of(meta),
+        )
+
+    @classmethod
     def transform_result(
         cls,
         transformation: StageResultTransforming,

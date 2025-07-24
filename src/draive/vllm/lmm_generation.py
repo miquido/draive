@@ -112,7 +112,7 @@ class VLLMLMMGeneration(VLLMAPI):
                     [
                         context_element_as_messages(
                             element,
-                            config=completion_config,
+                            vision_details=completion_config.vision_details,
                         )
                         for element in context
                     ]

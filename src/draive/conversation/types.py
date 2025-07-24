@@ -63,7 +63,6 @@ class ConversationMessageChunk(DataModel):
             meta=Meta.of(meta),
         )
 
-    type: Literal["message_chunk"] = "message_chunk"
     message_identifier: UUID
     identifier: UUID = Default(factory=uuid4)
     role: Literal["user", "model"]
@@ -129,17 +128,17 @@ class ConversationMessage(DataModel):
             case LMMInput():
                 return cls.user(
                     element.content,
-                    identifier=element.meta.identifier,
-                    created=element.meta.creation,
-                    meta=element.meta.excluding("kind", "identifier", "creation"),
+                    identifier=element.meta.identifier or uuid4(),
+                    created=element.meta.created,
+                    meta=element.meta.excluding("kind", "identifier", "created"),
                 )
 
             case LMMCompletion():
                 return cls.model(
                     element.content,
-                    identifier=element.meta.identifier,
-                    created=element.meta.creation,
-                    meta=element.meta.excluding("kind", "identifier", "creation"),
+                    identifier=element.meta.identifier or uuid4(),
+                    created=element.meta.created,
+                    meta=element.meta.excluding("kind", "identifier", "created"),
                 )
 
     @classmethod
@@ -192,8 +191,8 @@ class ConversationMessage(DataModel):
                     meta=self.meta.updated(
                         # using predefined meta keys
                         kind="message",
-                        identifier=self.identifier.hex,
-                        creation=self.created.isoformat(),
+                        identifier=str(self.identifier),
+                        created=self.created.isoformat(),
                     ),
                 )
 
@@ -203,8 +202,8 @@ class ConversationMessage(DataModel):
                     meta=self.meta.updated(
                         # using predefined meta keys
                         kind="message",
-                        identifier=self.identifier.hex,
-                        creation=self.created.isoformat(),
+                        identifier=str(self.identifier),
+                        created=self.created.isoformat(),
                     ),
                 )
 
@@ -233,8 +232,8 @@ class ConversationEvent(DataModel):
         cls,
         category: str,
         *,
-        content: Multimodal | None = None,
         identifier: UUID | None = None,
+        content: Multimodal | None = None,
         created: datetime | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:

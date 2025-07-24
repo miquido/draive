@@ -1,11 +1,12 @@
 import json
-from collections.abc import Callable, Iterable
-from typing import Any, Literal, cast
+from collections.abc import Callable, Generator, Iterable, Sequence
+from typing import Any, Literal, cast, overload
 
-from haiway import not_missing
+from haiway import Missing, not_missing
 from openai import NOT_GIVEN, NotGiven
 from openai.types.chat import (
     ChatCompletionContentPartParam,
+    ChatCompletionContentPartTextParam,
     ChatCompletionMessageParam,
     ChatCompletionToolChoiceOptionParam,
     ChatCompletionToolParam,
@@ -26,83 +27,130 @@ from draive.lmm import (
 from draive.multimodal import (
     MediaData,
     MediaReference,
+    MetaContent,
     MultimodalContent,
     MultimodalContentElement,
     TextContent,
 )
 from draive.parameters import DataModel
-from draive.vllm.config import VLLMChatConfig
 
 __all__ = (
-    "content_element_as_content_part",
+    "content_parts",
     "context_element_as_messages",
     "tools_as_tool_config",
 )
 
 
-def content_element_as_content_part(
-    element: MultimodalContentElement,
-    config: VLLMChatConfig,
-) -> ChatCompletionContentPartParam:
-    match element:
-        case TextContent() as text:
-            return {
+@overload
+def content_parts(
+    content: Sequence[MultimodalContentElement],
+    /,
+    *,
+    vision_details: Literal["auto", "low", "high"] | Missing,
+    text_only: Literal[True],
+) -> Generator[ChatCompletionContentPartTextParam]: ...
+
+
+@overload
+def content_parts(
+    content: Sequence[MultimodalContentElement],
+    /,
+    *,
+    vision_details: Literal["auto", "low", "high"] | Missing,
+    text_only: Literal[False],
+) -> Generator[ChatCompletionContentPartParam]: ...
+
+
+def content_parts(  # noqa: C901, PLR0912
+    content: Sequence[MultimodalContentElement],
+    /,
+    *,
+    vision_details: Literal["auto", "low", "high"] | Missing,
+    text_only: bool,
+) -> Generator[ChatCompletionContentPartParam]:
+    for element in content:
+        if isinstance(element, TextContent):
+            yield {
                 "type": "text",
-                "text": text.text,
+                "text": element.text,
             }
 
-        case MediaData() as media_data:
-            if media_data.kind != "image":
-                raise ValueError("Unsupported message content", media_data)
+        elif isinstance(element, MediaData):
+            if element.kind != "image":
+                raise ValueError("Unsupported message content", element)
 
-            return {
-                "type": "image_url",
-                "image_url": {
-                    "url": media_data.to_data_uri(safe_encoding=False),
-                    "detail": cast(Literal["auto", "low", "high"], config.vision_details)
-                    if not_missing(config.vision_details)
-                    else "auto",
-                },
-            }
+            if text_only:
+                yield {
+                    "type": "text",
+                    "text": element.to_str(),
+                }
 
-        case MediaReference() as media_reference:
-            if media_reference.kind != "image":
-                raise ValueError("Unsupported message content", media_reference)
+            else:
+                yield {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": element.to_data_uri(safe_encoding=False),
+                        "detail": cast(Literal["auto", "low", "high"], vision_details)
+                        if not_missing(vision_details)
+                        else "auto",
+                    },
+                }
 
-            return {
-                "type": "image_url",
-                "image_url": {
-                    "url": media_reference.uri,
-                    "detail": cast(Literal["auto", "low", "high"], config.vision_details)
-                    if not_missing(config.vision_details)
-                    else "auto",
-                },
-            }
+        elif isinstance(element, MediaReference):
+            if element.kind != "image":
+                raise ValueError("Unsupported message content", element)
 
-        case DataModel() as data:
-            return {
+            if text_only:
+                yield {
+                    "type": "text",
+                    "text": element.to_str(),
+                }
+
+            else:
+                yield {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": element.uri,
+                        "detail": cast(Literal["auto", "low", "high"], vision_details)
+                        if not_missing(vision_details)
+                        else "auto",
+                    },
+                }
+
+        elif isinstance(element, MetaContent):
+            if element.category == "transcript" and element.content:
+                yield {
+                    "type": "text",
+                    "text": element.content.to_str(),
+                }
+
+            else:
+                continue  # skip other meta
+
+        else:  # DataModel
+            yield {
                 "type": "text",
-                "text": data.to_json(),
+                "text": element.to_json(),
             }
 
 
 def context_element_as_messages(
     element: LMMContextElement,
     /,
-    config: VLLMChatConfig,
+    vision_details: Literal["auto", "low", "high"] | Missing,
 ) -> Iterable[ChatCompletionMessageParam]:
     match element:
         case LMMInput() as input:
             return (
                 {
                     "role": "user",
-                    "content": [
-                        content_element_as_content_part(
-                            element=element,
-                            config=config,
+                    "content": list(
+                        content_parts(
+                            input.content.parts,
+                            vision_details=vision_details,
+                            text_only=False,
                         )
-                        for element in input.content.parts
-                    ],
+                    ),
                 },
             )
 
@@ -110,8 +158,13 @@ def context_element_as_messages(
             return (
                 {
                     "role": "assistant",
-                    # TODO: models generating media?
-                    "content": completion.content.to_str(),
+                    "content": list(
+                        content_parts(
+                            completion.content.parts,
+                            vision_details=vision_details,
+                            text_only=True,
+                        )
+                    ),
                 },
             )
 
@@ -138,7 +191,13 @@ def context_element_as_messages(
                 {
                     "role": "tool",
                     "tool_call_id": response.identifier,
-                    "content": response.content.to_str(),
+                    "content": list(
+                        content_parts(
+                            response.content.parts,
+                            vision_details=vision_details,
+                            text_only=True,
+                        )
+                    ),
                 }
                 for response in tool_responses.responses
             )
@@ -168,7 +227,6 @@ def output_as_response_declaration(
                 {"type": "json_object"},
                 _auto_output_conversion,
             )
-            return ({"type": "json_object"}, _json_output_conversion)
 
         case "image":
             raise NotImplementedError("image output is not supported by VLLM client")

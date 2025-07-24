@@ -17,8 +17,8 @@ from draive.anthropic.api import AnthropicAPI
 from draive.anthropic.config import AnthropicConfig
 from draive.anthropic.lmm import (
     content_block_as_content_element,
+    content_elements,
     context_element_as_message,
-    convert_content_element,
     output_as_response_declaration,
     thinking_budget_as_config,
     tools_as_tool_config,
@@ -122,9 +122,7 @@ class AnthropicLMMGeneration(AnthropicAPI):
                 messages.append(
                     {
                         "role": "assistant",
-                        "content": [
-                            convert_content_element(element) for element in response_prefill.parts
-                        ],
+                        "content": content_elements(response_prefill.parts),
                     }
                 )
 

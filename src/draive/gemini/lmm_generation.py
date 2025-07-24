@@ -114,9 +114,9 @@ class GeminiLMMGeneration(GeminiAPI):
                 output=output,
                 config=generation_config,
             )
-            request_content: ContentListUnionDict = list(
-                chain.from_iterable([context_element_as_content(element) for element in context])
-            )
+            request_content: ContentListUnionDict = [
+                context_element_as_content(element) for element in context
+            ]
             output_decoder: LMMOutputDecoder = lmm_output_decoder(output)
 
             if stream:

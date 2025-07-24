@@ -40,7 +40,7 @@ from draive.mistral.api import MistralAPI
 from draive.mistral.config import MistralChatConfig
 from draive.mistral.lmm import (
     content_chunk_as_content_element,
-    content_element_as_content_chunk,
+    content_chunks,
     context_element_as_messages,
     output_as_response_declaration,
     tools_as_tool_config,
@@ -124,10 +124,7 @@ class MistralLMMGeneration(MistralAPI):
                 messages.append(
                     {
                         "role": "assistant",
-                        "content": [
-                            content_element_as_content_chunk(element)
-                            for element in MultimodalContent.of(prefill).parts
-                        ],
+                        "content": list(content_chunks(MultimodalContent.of(prefill).parts)),
                         "prefix": True,
                     }
                 )
@@ -210,7 +207,7 @@ class MistralLMMGeneration(MistralAPI):
             ctx.record(
                 ObservabilityLevel.INFO,
                 metric="lmm.input_tokens",
-                value=usage.prompt_tokens,
+                value=usage.prompt_tokens or 0,
                 unit="tokens",
                 kind="counter",
                 attributes={"lmm.model": completion.model},
@@ -218,7 +215,7 @@ class MistralLMMGeneration(MistralAPI):
             ctx.record(
                 ObservabilityLevel.INFO,
                 metric="lmm.output_tokens",
-                value=usage.completion_tokens,
+                value=usage.completion_tokens or 0,
                 unit="tokens",
                 kind="counter",
                 attributes={"lmm.model": completion.model},
@@ -332,7 +329,7 @@ class MistralLMMGeneration(MistralAPI):
                         ctx.record(
                             ObservabilityLevel.INFO,
                             metric="lmm.input_tokens",
-                            value=usage.prompt_tokens,
+                            value=usage.prompt_tokens or 0,
                             unit="tokens",
                             kind="counter",
                             attributes={"lmm.model": completion_chunk.data.model},
@@ -340,7 +337,7 @@ class MistralLMMGeneration(MistralAPI):
                         ctx.record(
                             ObservabilityLevel.INFO,
                             metric="lmm.output_tokens",
-                            value=usage.completion_tokens,
+                            value=usage.completion_tokens or 0,
                             unit="tokens",
                             kind="counter",
                             attributes={"lmm.model": completion_chunk.data.model},
