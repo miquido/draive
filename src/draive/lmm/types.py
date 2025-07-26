@@ -176,7 +176,7 @@ class LMMOutputDecoder(Protocol):
     ) -> MultimodalContent: ...
 
 
-LMMToolResponseHandling = Literal["error", "result", "completion", "extension", "detached"]
+LMMToolResponseHandling = Literal["result", "error", "completion", "extension", "detached"]
 
 
 class LMMToolResponse(DataModel):

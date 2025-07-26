@@ -223,6 +223,12 @@ def convert_content_element(  # noqa: C901, PLR0911, PLR0912
                         "data": model.to_json(),
                     }
 
+        case MetaContent() as meta if meta.category == "transcript" and meta.content:
+            return {
+                "type": "text",
+                "text": meta.content.to_str(),
+            }
+
         case DataModel() as data:
             return {
                 "type": "text",

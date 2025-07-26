@@ -81,3 +81,4 @@ pip-selfcheck.json
 .vscode/
 .idea/
 local_cache/
+.zed/
