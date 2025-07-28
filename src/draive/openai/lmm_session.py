@@ -1,13 +1,13 @@
 import json
+from asyncio import TaskGroup
 from base64 import b64decode, b64encode
-from collections.abc import Collection, MutableSet, Sequence
+from collections.abc import MutableMapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime
 from types import TracebackType
 from typing import Any, Literal
 from uuid import uuid4
 
-from haiway import MISSING, Missing, ObservabilityLevel, ctx, without_missing
 from openai.resources.beta.realtime.realtime import (
     AsyncRealtimeConnection,
     AsyncRealtimeConnectionManager,
@@ -19,6 +19,7 @@ from openai.types.beta.realtime import (
 )
 from openai.types.beta.realtime.session_update_event_param import Session, SessionTool
 
+from draive import MISSING, Meta, Missing, ObservabilityLevel, ctx, without_missing
 from draive.lmm import (
     LMMCompletion,
     LMMContext,
@@ -80,10 +81,17 @@ class OpenAIRealtimeLMM(OpenAIAPI):
             output=output,
         )
         # managing scope manually
-        scope: AbstractAsyncContextManager[str] = ctx.scope("openai_realtime", config)
+        scope: AbstractAsyncContextManager[str] = ctx.scope(
+            "openai_realtime",
+            config,
+            task_group=TaskGroup(),  # use local task group
+        )
         # prepare connection
         connection_manager: AsyncRealtimeConnectionManager = self._client.beta.realtime.connect(
             model=config.model,
+            websocket_connection_options={
+                "max_size": None,  # explicitly define no size limit
+            },
         )
         # prepare output audio format
         output_audio_type: str = f"audio/{config.output_audio_format}"
@@ -111,14 +119,14 @@ class OpenAIRealtimeLMM(OpenAIAPI):
             await connection.session.update(session=session_config)
 
             # initialize context
+            current_items: MutableMapping[str, Meta] = {}
             context: LMMContext = await memory.recall()
             if context:
                 await _send_context(
                     context,
+                    current_items=current_items,
                     connection=connection,
                 )
-
-            current_items: MutableSet[str] = set()
 
             input_audio_format: str = f"audio/{config.input_audio_format}"
             output_audio_format: str = f"audio/{config.output_audio_format}"
@@ -128,60 +136,80 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                 while True:
                     event: RealtimeServerEvent = await connection.recv()
                     match event.type:
-                        # received response audio chunk
                         case "response.audio.delta":
+                            # send the audio chunk
                             return LMMStreamChunk.of(
                                 MediaData.of(
                                     b64decode(event.delta),
                                     media=output_audio_type,
                                 ),
-                                meta={  # using predefined meta keys
-                                    "identifier": event.item_id,
-                                    "origin_identifier": event.response_id,
-                                    "chunk_identifier": event.event_id,
+                                meta={
+                                    "identifier": event.event_id,
+                                    "message_identifier": event.item_id,
                                     "created": datetime.now().isoformat(),
                                 },
                             )
 
-                        # response audio completed
                         case "response.audio.done":
+                            # send the audio end event
                             return LMMSessionEvent.of(
                                 "output.audio.completed",
-                                meta={  # using predefined meta keys
-                                    "identifier": event.item_id,
-                                    "origin_identifier": event.response_id,
-                                    "chunk_identifier": event.event_id,
+                                meta={
+                                    "identifier": event.event_id,
+                                    "message_identifier": event.item_id,
                                     "created": datetime.now().isoformat(),
                                 },
                             )
 
-                        # received response text chunk
                         case "response.text.delta":
+                            # send the text chunk
                             return LMMStreamChunk.of(
                                 TextContent.of(event.delta),
-                                meta={  # using predefined meta keys
-                                    "identifier": event.item_id,
-                                    "origin_identifier": event.response_id,
-                                    "chunk_identifier": event.event_id,
+                                meta={
+                                    "identifier": event.event_id,
+                                    "message_identifier": event.item_id,
                                     "created": datetime.now().isoformat(),
                                 },
                             )
 
-                        # response text completed
                         case "response.text.done":
+                            # send the text end event
                             return LMMSessionEvent.of(
                                 "output.text.completed",
-                                meta={  # using predefined meta keys
-                                    "identifier": event.item_id,
-                                    "origin_identifier": event.response_id,
-                                    "chunk_identifier": event.event_id,
+                                meta={
+                                    "identifier": event.event_id,
+                                    "message_identifier": event.item_id,
                                     "created": datetime.now().isoformat(),
                                 },
                             )
 
-                        # response completed
+                        case "response.audio_transcript.delta":
+                            # send the text chunk
+                            return LMMStreamChunk.of(
+                                MetaContent.of(
+                                    "transcript",
+                                    content=TextContent.of(event.delta),
+                                ),
+                                meta={
+                                    "identifier": event.event_id,
+                                    "message_identifier": event.item_id,
+                                    "created": datetime.now().isoformat(),
+                                },
+                            )
+
+                        case "response.audio_transcript.done":
+                            # send the transcript end event
+                            return LMMSessionEvent.of(
+                                "output.transcript.completed",
+                                meta={
+                                    "identifier": event.event_id,
+                                    "message_identifier": event.item_id,
+                                    "created": datetime.now().isoformat(),
+                                },
+                            )
+
                         case "response.done":
-                            # record token usage if able
+                            # record token usage if able - it should appear within this event
                             if usage := event.response.usage:
                                 ctx.record(
                                     ObservabilityLevel.INFO,
@@ -204,21 +232,11 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                                     attributes={"lmm.model": config.model},
                                 )
 
-                            # send empty eod chunk
-                            return LMMStreamChunk.of(
-                                MultimodalContent.empty,
-                                eod=True,
-                                meta={  # using predefined meta keys
-                                    # TODO: FIXME: item id?
-                                    "origin_identifier": event.response.id,
-                                    "chunk_identifier": event.event_id,
-                                    "created": datetime.now().isoformat(),
-                                },
-                            )
+                            continue  # keep going, nothing to send here
 
                         case "response.output_item.done":
                             match event.item.type:
-                                # tool call received
+                                # received tool call
                                 case "function_call":
                                     if event.item.call_id is None:
                                         continue  # can't use tool calls without call id
@@ -233,110 +251,126 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                                         if event.item.arguments
                                         else None,
                                         meta={  # using predefined meta keys
-                                            "identifier": event.item.id,
-                                            "origin_identifier": event.response_id,
                                             "created": datetime.now().isoformat(),
                                         },
                                     )
 
                                 case "message":
-                                    if not event.item.content:
-                                        continue  # skip empty events
+                                    if event.item.id is None:
+                                        continue  # can't use messages without item id
 
                                     if event.item.role != "assistant":
                                         continue  # skip other events
 
+                                    # send empty eod chunk - ends the response
+                                    return LMMStreamChunk.of(
+                                        MultimodalContent.empty,
+                                        eod=True,
+                                        meta={
+                                            "identifier": event.event_id,
+                                            "message_identifier": event.item.id,
+                                            "created": datetime.now().isoformat(),
+                                        },
+                                    )
+
+                                case "function_call_output":
+                                    continue  # ignored for now
+
+                        case "input_audio_buffer.speech_started":
+                            # send event that VAD detected input speach
+                            return LMMSessionEvent.of(
+                                "input.audio.started",
+                                meta={
+                                    "identifier": event.event_id,
+                                    "message_identifier": event.item_id,
+                                    "created": datetime.now().isoformat(),
+                                },
+                            )
+
+                        case "input_audio_buffer.committed":
+                            # send event that input speech has ended
+                            return LMMSessionEvent.of(
+                                "input.audio.completed",
+                                meta={
+                                    "identifier": event.event_id,
+                                    "message_identifier": event.item_id,
+                                    "created": datetime.now().isoformat(),
+                                },
+                            )
+
+                        case "conversation.item.created":
+                            if event.item.id is None:
+                                continue  # can't use items without item id
+
+                            if event.item.role == "system":
+                                continue  # skip system messages
+
+                            if event.item.id in current_items:
+                                continue  # we are already handling it
+
+                            if event.item.role == "user":
+                                current_items[event.item.id] = Meta.of(
+                                    {  # using predefined meta keys
+                                        "identifier": event.item.id,
+                                        "created": datetime.now().isoformat(),
+                                    }
+                                )
+
+                                if config.transcribe_model:
+                                    continue  # wait for transcript to complete first
+
+                            elif event.item.role == "assistant":
+                                current_items[event.item.id] = Meta.of(
+                                    {  # using predefined meta keys
+                                        "identifier": event.item.id,
+                                        "created": datetime.now().isoformat(),
+                                    }
+                                )
+
+                            # request the full item to be stored in the memory
+                            await connection.conversation.item.retrieve(item_id=event.item.id)
+
+                        case "conversation.item.input_audio_transcription.completed":
+                            await connection.conversation.item.retrieve(item_id=event.item_id)
+
+                        case "conversation.item.retrieved":
+                            if event.item.id is None:
+                                continue  # can't use items without item id
+
+                            if not event.item.type == "message":
+                                continue  # handle only messages
+
+                            # Only record completed items, otherwise request once more
+                            if event.item.status != "completed":
+                                await connection.conversation.item.retrieve(item_id=event.item.id)
+                                continue  # retry getting completed event
+
+                            assert event.item.content  # nosec: B101
+                            match event.item.role:
+                                case "user":
+                                    await memory.remember(
+                                        LMMInput.of(
+                                            _content_to_multimodal(
+                                                event.item.content,
+                                                audio_format=input_audio_format,
+                                            ),
+                                            meta=current_items[event.item.id],
+                                        ),
+                                    )
+
+                                case "assistant":
                                     await memory.remember(
                                         LMMCompletion.of(
                                             _content_to_multimodal(
                                                 event.item.content,
                                                 audio_format=output_audio_format,
                                             ),
-                                            meta={  # using predefined meta keys
-                                                "identifier": event.item.id,
-                                                "origin_identifier": event.response_id,
-                                                "created": datetime.now().isoformat(),
-                                            },
+                                            meta=current_items[event.item.id],
                                         ),
                                     )
-                                    return LMMSessionEvent.of(
-                                        "output.completed",
-                                        meta={  # using predefined meta keys
-                                            "identifier": event.item.id,
-                                            "origin_identifier": event.response_id,
-                                            "created": datetime.now().isoformat(),
-                                        },
-                                    )
 
-                                case "function_call_output":
-                                    continue  # ignored
-
-                        case "input_audio_buffer.speech_started":
-                            return LMMSessionEvent.of(
-                                "input.audio.started",
-                                meta={  # using predefined meta keys
-                                    "identifier": event.item_id,
-                                    "created": datetime.now().isoformat(),
-                                },
-                            )
-
-                        case "input_audio_buffer.committed":
-                            return LMMSessionEvent.of(
-                                "input.audio.completed",
-                                meta={  # using predefined meta keys
-                                    "identifier": event.item_id,
-                                    "created": datetime.now().isoformat(),
-                                },
-                            )
-
-                        case "conversation.item.created":
-                            assert event.item.id  # nosec: B101
-                            current_items.add(event.item.id)
-
-                            if not event.item.content:
-                                continue  # skip empty events
-
-                            if event.item.role != "user":
-                                continue  # skip other events
-
-                            if config.transcribe_model:
-                                await connection.conversation.item.retrieve(item_id=event.item.id)
-
-                            else:
-                                await memory.remember(
-                                    LMMCompletion.of(
-                                        _content_to_multimodal(
-                                            event.item.content,
-                                            audio_format=input_audio_format,
-                                        ),
-                                        meta={  # using predefined meta keys
-                                            "identifier": event.item.id,
-                                            "created": datetime.now().isoformat(),
-                                        },
-                                    ),
-                                )
-
-                        case "conversation.item.retrieved":
-                            if not event.item.content:
-                                continue  # skip empty events
-
-                            if event.item.role != "user":
-                                continue  # skip other events
-
-                            # we only request it for transcript
-                            assert config.transcribe_model  # nosec: B101
-                            await memory.remember(
-                                LMMCompletion.of(
-                                    _content_to_multimodal(
-                                        event.item.content,
-                                        audio_format=input_audio_format,
-                                    ),
-                                    meta={  # using predefined meta keys
-                                        "identifier": event.item.id,
-                                        "created": datetime.now().isoformat(),
-                                    },
-                                ),
-                            )
+                                case _:
+                                    continue  # skip other
 
                         case "error":
                             raise OpenAIException(
@@ -372,7 +406,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                                 current_items=current_items,
                                 connection=connection,
                             )
-                            current_items = set()
+                            current_items = {}
 
                         case other:
                             ctx.log_debug(f"Received unsupported input event: {other}")
@@ -433,7 +467,10 @@ async def _send_input_chunk(
                 "type": "message",
                 "role": "user",
                 "status": "completed" if chunk.eod else "incomplete",
-                "content": _item_content_parts(chunk.content),
+                "content": _item_content_parts(
+                    chunk.content,
+                    input_content=True,
+                ),
             },
         )
 
@@ -442,29 +479,40 @@ async def _send_context(
     context: LMMContext,
     /,
     *,
+    current_items: MutableMapping[str, Meta],
     connection: AsyncRealtimeConnection,
 ) -> None:
     for element in context:
         match element:
             case LMMInput() as input_element:
+                identifier: str = (input_element.meta.identifier or uuid4()).hex
+                current_items[identifier] = input_element.meta
                 await connection.conversation.item.create(
                     item={
-                        "id": (input_element.meta.identifier or uuid4()).hex,
+                        "id": identifier,
                         "type": "message",
                         "status": "completed",
                         "role": "user",
-                        "content": _item_content_parts(input_element.content),
+                        "content": _item_content_parts(
+                            input_element.content.without_media(),  # media cannot be recreated
+                            input_content=True,
+                        ),
                     },
                 )
 
             case LMMCompletion() as completion_element:
+                identifier: str = (completion_element.meta.identifier or uuid4()).hex
+                current_items[identifier] = completion_element.meta
                 await connection.conversation.item.create(
                     item={
-                        "id": (completion_element.meta.identifier or uuid4()).hex,
+                        "id": identifier,
                         "type": "message",
                         "status": "completed",
                         "role": "assistant",
-                        "content": _item_content_parts(completion_element.content),
+                        "content": _item_content_parts(
+                            completion_element.content.without_media(),  # media cannot be recreated
+                            input_content=False,
+                        ),
                     },
                 )
 
@@ -494,13 +542,14 @@ async def _send_context(
 async def _reset_context(
     context: LMMContext,
     /,
-    current_items: Collection[str],
+    current_items: MutableMapping[str, Meta],
     *,
     connection: AsyncRealtimeConnection,
 ) -> None:
-    for item_id in current_items:
+    for item_id in current_items.keys():
         try:
             await connection.conversation.item.delete(item_id=item_id)
+            del current_items[item_id]
 
         except Exception as exc:
             ctx.log_error(
@@ -510,12 +559,14 @@ async def _reset_context(
 
     await _send_context(
         context,
+        current_items=current_items,
         connection=connection,
     )
 
 
 def _item_content_parts(
     content: MultimodalContent,
+    input_content: bool,
 ) -> list[ConversationItemContentParam]:
     content_parts: list[ConversationItemContentParam] = []
     for part in content.parts:
@@ -523,17 +574,17 @@ def _item_content_parts(
             case TextContent() as text:
                 content_parts.append(
                     {
-                        "type": "input_text",
+                        "type": "input_text" if input_content else "text",
                         "text": text.text,
                     }
                 )
 
             case MediaData() as media:
-                match media.media:
+                match media.kind:
                     case "audio":
                         content_parts.append(
                             {
-                                "type": "input_audio",
+                                "type": "input_audio" if input_content else "audio",
                                 "audio": b64encode(media.data).decode(),
                             }
                         )
@@ -550,14 +601,25 @@ def _item_content_parts(
                 # skip not supported with a log to prevent connection break
                 ctx.log_error("OpenAI realtime input (MediaReference) not supported! Skipping...")
 
-            case MetaContent():
-                # skip not supported with a log to prevent connection break
-                ctx.log_warning("OpenAI realtime input (MetaContent) not supported! Skipping...")
+            case MetaContent() as meta:
+                if meta.category == "transcript" and meta.content:
+                    content_parts.append(
+                        {
+                            "type": "input_text" if input_content else "text",
+                            "text": meta.content.to_str(),
+                        }
+                    )
+
+                else:
+                    # skip not supported with a log to prevent connection break
+                    ctx.log_warning(
+                        "OpenAI realtime input (MetaContent) not supported! Skipping..."
+                    )
 
             case other:  # treat other as json text
                 content_parts.append(
                     {
-                        "type": "input_text",
+                        "type": "input_text" if input_content else "text",
                         "text": other.to_json(),
                     }
                 )
@@ -667,12 +729,14 @@ def _prepare_session_config(
             "modalities": modalities,
             "input_audio_format": config.input_audio_format,
             "output_audio_format": config.output_audio_format,
-            "turn_detection": {
-                "create_response": True,
-                "eagerness": config.vad_eagerness,
-                "interrupt_response": True,
-                "type": config.vad_type,
-            }
+            "turn_detection": without_missing(
+                {
+                    "create_response": True,
+                    "eagerness": config.vad_eagerness,
+                    "interrupt_response": True,
+                    "type": config.vad_type,
+                }
+            )
             if config.vad_type is not MISSING
             else MISSING,
             "voice": config.voice,
@@ -712,6 +776,11 @@ def _content_to_multimodal(
             )
 
         if part.transcript:
-            parts.append(MetaContent.of("transcript", content=TextContent.of(part.transcript)))
+            parts.append(
+                MetaContent.of(
+                    "transcript",
+                    content=TextContent.of(part.transcript),
+                ),
+            )
 
     return MultimodalContent.of(*parts)

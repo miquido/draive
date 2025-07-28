@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Generator, Iterable, Sequence
 from typing import Any, Literal, cast
 
 from draive.bedrock.models import ChatMessage, ChatMessageContent, ChatTool
@@ -14,32 +14,32 @@ from draive.lmm.types import LMMOutputSelection, LMMToolSelection
 from draive.multimodal import (
     MediaData,
     MediaReference,
+    MetaContent,
+    MultimodalContent,
     MultimodalContentElement,
     TextContent,
 )
-from draive.multimodal.content import MultimodalContent
 from draive.parameters import DataModel
 
 __all__ = (
-    "convert_content_element",
     "convert_context_element",
     "convert_tool",
 )
 
 
-def convert_content_element(
-    element: MultimodalContentElement,
-) -> ChatMessageContent:
-    match element:
-        case TextContent() as text:
-            return {"text": text.text}
+def convert_content(  # noqa: C901, PLR0912
+    elements: Sequence[MultimodalContentElement],
+) -> Generator[ChatMessageContent]:
+    for element in elements:
+        if isinstance(element, TextContent):
+            yield {"text": element.text}
 
-        case MediaData() as media_data:
-            if media_data.kind != "image":
-                raise ValueError("Unsupported message content", media_data)
+        elif isinstance(element, MediaData):
+            if element.kind != "image":
+                raise ValueError("Unsupported message content", element)
 
             image_format: Literal["png", "jpeg", "gif"]
-            match media_data.media:
+            match element.media:
                 case "image/png":
                     image_format = "png"
 
@@ -50,20 +50,29 @@ def convert_content_element(
                     image_format = "gif"
 
                 case _:
-                    raise ValueError("Unsupported message content", media_data)
+                    raise ValueError("Unsupported message content", element)
 
-            return {
+            yield {
                 "image": {
                     "format": image_format,
-                    "source": {"bytes": media_data.data},
+                    "source": {"bytes": element.data},
                 }
             }
 
-        case MediaReference() as media_reference:
-            raise ValueError("Unsupported message content", media_reference)
+        elif isinstance(element, MediaReference):
+            raise ValueError("Unsupported message content", element)
 
-        case DataModel() as data:
-            return {"text": data.to_json()}
+        elif isinstance(element, MetaContent):
+            if element.category == "transcript" and element.content:
+                yield {
+                    "text": element.content.to_str(),
+                }
+
+            else:
+                continue  # skip other meta
+
+        else:
+            yield {"text": element.to_json()}
 
 
 def convert_context_element(
@@ -73,13 +82,13 @@ def convert_context_element(
         case LMMInput() as input:
             return ChatMessage(
                 role="user",
-                content=[convert_content_element(part) for part in input.content.parts],
+                content=list(convert_content(input.content.parts)),
             )
 
         case LMMCompletion() as completion:
             return ChatMessage(
                 role="assistant",
-                content=[convert_content_element(part) for part in completion.content.parts],
+                content=list(convert_content(completion.content.parts)),
             )
 
         case LMMToolRequests() as requests:
@@ -104,10 +113,7 @@ def convert_context_element(
                     {
                         "toolResult": {
                             "toolUseId": response.identifier,
-                            "content": [
-                                cast(Any, convert_content_element(part))
-                                for part in response.content.parts
-                            ],
+                            "content": cast(Any, list(convert_content(response.content.parts))),
                             "status": "error" if response.handling == "error" else "success",
                         },
                     }

@@ -1,5 +1,5 @@
 import json
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Generator, Iterable, Sequence
 from typing import Any, cast
 
 from haiway import as_dict
@@ -29,16 +29,16 @@ from draive.mistral.types import MistralException
 from draive.multimodal import (
     MediaData,
     MediaReference,
+    MetaContent,
     MultimodalContent,
     MultimodalContentElement,
     TextContent,
 )
-from draive.multimodal.meta import MetaContent
 from draive.parameters import DataModel
 
 __all__ = (
     "content_chunk_as_content_element",
-    "content_element_as_content_chunk",
+    "content_chunks",
     "context_element_as_messages",
     "output_as_response_declaration",
     "tool_specification_as_tool",
@@ -55,9 +55,7 @@ def context_element_as_messages(
             return (
                 {
                     "role": "user",
-                    "content": [
-                        content_element_as_content_chunk(element) for element in input.content.parts
-                    ],
+                    "content": list(content_chunks(input.content.parts)),
                 },
             )
 
@@ -65,10 +63,7 @@ def context_element_as_messages(
             return (
                 {
                     "role": "assistant",
-                    "content": [
-                        content_element_as_content_chunk(element)
-                        for element in completion.content.parts
-                    ],
+                    "content": list(content_chunks(completion.content.parts)),
                 },
             )
 
@@ -96,50 +91,57 @@ def context_element_as_messages(
                     "role": "tool",
                     "tool_call_id": response.identifier,
                     "name": response.tool,
-                    "content": [
-                        content_element_as_content_chunk(element)
-                        for element in response.content.parts
-                    ],
+                    "content": list(content_chunks(response.content.parts)),
                 }
                 for response in tool_responses.responses
             )
 
 
-def content_element_as_content_chunk(
-    element: MultimodalContentElement,
+def content_chunks(
+    elements: Sequence[MultimodalContentElement],
     /,
-) -> ContentChunkTypedDict:
-    match element:
-        case TextContent() as text:
-            return {
+) -> Generator[ContentChunkTypedDict]:
+    for element in elements:
+        if isinstance(element, TextContent):
+            yield {
                 "type": "text",
-                "text": text.text,
+                "text": element.text,
             }
 
-        case MediaData() as media_data:
-            if media_data.kind != "image":
-                raise ValueError("Unsupported media content", media_data)
+        elif isinstance(element, MediaData):
+            if element.kind != "image":
+                raise ValueError("Unsupported media content", element)
 
-            return {
+            yield {
                 "type": "image_url",
-                "image_url": {"url": media_data.to_data_uri(safe_encoding=False)},
+                "image_url": {"url": element.to_data_uri(safe_encoding=False)},
                 # TODO: there is optional "detail" argument, however undocumented
             }
 
-        case MediaReference() as media_reference:
-            if media_reference.kind != "image":
-                raise ValueError("Unsupported media content", media_reference)
+        elif isinstance(element, MediaReference):
+            if element.kind != "image":
+                raise ValueError("Unsupported media content", element)
 
-            return {
+            yield {
                 "type": "image_url",
-                "image_url": {"url": media_reference.uri},
+                "image_url": {"url": element.uri},
                 # TODO: there is optional "detail" argument, however undocumented
             }
 
-        case DataModel() as data:
-            return {
+        elif isinstance(element, MetaContent):
+            if element.category == "transcript" and element.content:
+                yield {
+                    "type": "text",
+                    "text": element.content.to_str(),
+                }
+
+            else:
+                continue  # skip other meta
+
+        else:
+            yield {
                 "type": "text",
-                "text": data.to_json(),
+                "text": element.to_json(),
             }
 
 

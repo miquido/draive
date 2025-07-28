@@ -1,5 +1,5 @@
 from base64 import b64encode
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Generator, Iterable, Sequence
 from typing import Any, cast
 
 from anthropic import NOT_GIVEN, NotGiven
@@ -41,8 +41,8 @@ from draive.parameters import DataModel
 
 __all__ = (
     "content_block_as_content_element",
+    "content_elements",
     "context_element_as_message",
-    "convert_content_element",
     "thinking_budget_as_config",
     "tools_as_tool_config",
 )
@@ -53,9 +53,9 @@ def context_element_as_message(  # noqa: C901
 ) -> MessageParam:
     match element:
         case LMMInput() as input:
-            message_content = [
-                convert_content_element(element=element) for element in input.content.parts
-            ]
+            message_content: list[
+                TextBlockParam | ImageBlockParam | ThinkingBlockParam | RedactedThinkingBlockParam
+            ] = list(content_elements(input.content.parts))
 
             if input.meta.get("cache") == "ephemeral":
                 for message in reversed(message_content):
@@ -71,9 +71,10 @@ def context_element_as_message(  # noqa: C901
             }
 
         case LMMCompletion() as completion:
-            message_content = [
-                convert_content_element(element=element) for element in completion.content.parts
-            ]
+            message_content: list[
+                TextBlockParam | ImageBlockParam | ThinkingBlockParam | RedactedThinkingBlockParam
+            ] = list(content_elements(completion.content.parts))
+
             if completion.meta.get("cache") == "ephemeral":
                 for message in reversed(message_content):
                     if message["type"] in ("text", "image"):
@@ -92,10 +93,7 @@ def context_element_as_message(  # noqa: C901
                 return {
                     "role": "assistant",
                     "content": [
-                        *[
-                            convert_content_element(element=element)
-                            for element in tool_requests.content.parts
-                        ],
+                        *content_elements(tool_requests.content.parts),
                         *[
                             {
                                 "id": request.identifier,
@@ -130,103 +128,78 @@ def context_element_as_message(  # noqa: C901
                         "tool_use_id": response.identifier,
                         "type": "tool_result",
                         "is_error": response.handling == "error",
-                        "content": [
-                            cast(  # there will be no thinking within tool results
-                                TextBlockParam | ImageBlockParam,
-                                convert_content_element(element=part),
-                            )
-                            for part in response.content.parts
-                        ],
+                        "content": cast(  # there will be no thinking within tool results
+                            Iterable[TextBlockParam | ImageBlockParam],
+                            content_elements(response.content.parts),
+                        ),
                     }
                     for response in tool_responses.responses
                 ],
             }
 
 
-def convert_content_element(  # noqa: C901, PLR0911, PLR0912
-    element: MultimodalContentElement,
-) -> TextBlockParam | ImageBlockParam | ThinkingBlockParam | RedactedThinkingBlockParam:
-    match element:
-        case TextContent() as text:
-            return {
+def content_elements(  # noqa: C901
+    elements: Sequence[MultimodalContentElement],
+) -> Generator[TextBlockParam | ImageBlockParam | ThinkingBlockParam | RedactedThinkingBlockParam]:
+    for element in elements:
+        if isinstance(element, TextContent):
+            yield {
                 "type": "text",
-                "text": text.text,
+                "text": element.text,
             }
 
-        case MediaData() as media_data:
-            if media_data.kind != "image":
-                raise ValueError("Unsupported message content", media_data)
+        elif isinstance(element, MediaData):
+            if element.kind != "image":
+                raise ValueError("Unsupported message content", element)
 
-            return {
+            yield {
                 "type": "image",
                 "source": {
                     "type": "base64",
-                    "media_type": cast(Any, media_data.media),
-                    "data": b64encode(media_data.data).decode(),
+                    "media_type": cast(Any, element.media),
+                    "data": b64encode(element.data).decode(),
                 },
             }
 
-        case MediaReference() as media_reference:
-            if media_reference.kind != "image":
-                raise ValueError("Unsupported message content", media_reference)
+        elif isinstance(element, MediaReference):
+            if element.kind != "image":
+                raise ValueError("Unsupported message content", element)
 
-            return {
+            yield {
                 "type": "image",
                 "source": {
                     "type": "url",
-                    "url": media_reference.uri,
+                    "url": element.uri,
                 },
             }
 
-        case MetaContent() as meta if meta.category == "thinking":
-            match meta.content:
-                case None:
-                    return {
-                        "type": "thinking",
-                        "thinking": "",
-                        "signature": str(meta.meta.get("signature", "")),
-                    }
+        elif isinstance(element, MetaContent):
+            if element.category == "thinking":
+                yield {
+                    "type": "thinking",
+                    "thinking": element.content.to_str() if element.content else "",
+                    "signature": element.meta.get_str("signature", default=""),
+                }
 
-                case TextContent() as text:
-                    return {
-                        "type": "thinking",
-                        "thinking": text.text,
-                        "signature": str(meta.meta.get("signature", "")),
-                    }
+            elif element.category == "redacted_thinking":
+                yield {
+                    "type": "redacted_thinking",
+                    "data": element.content.to_str() if element.content else "",
+                }
 
-                # we are not expecting media in thinking, treating it as json
-                case DataModel() as model:
-                    return {
-                        "type": "thinking",
-                        "thinking": model.to_json(),
-                        "signature": str(meta.meta.get("signature", "")),
-                    }
+            elif element.category == "transcript" and element.content:
+                yield {
+                    "type": "text",
+                    "text": element.content.to_str(),
+                }
 
-        case MetaContent() as meta if meta.category == "redacted_thinking":
-            match meta.content:
-                case None:
-                    return {
-                        "type": "redacted_thinking",
-                        "data": "",
-                    }
+            else:
+                continue  # skip other meta
 
-                case TextContent() as text:
-                    return {
-                        "type": "redacted_thinking",
-                        "data": text.text,
-                    }
-
-                # we are not expecting media in thinking, treating it as json
-                case DataModel() as model:
-                    return {
-                        "type": "redacted_thinking",
-                        "data": model.to_json(),
-                    }
-
-        case DataModel() as data:
-            return {
+        else:
+            yield {
                 "type": "text",
-                "text": data.to_json(),
+                "text": element.to_json(),
             }
 
 
