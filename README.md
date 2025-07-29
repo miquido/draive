@@ -1,7 +1,9 @@
 # 🏎️ draive 🏁
 
+[![PyPI](https://img.shields.io/pypi/v/draive)](https://pypi.org/project/draive/)
 ![Python Version](https://img.shields.io/badge/Python-3.12+-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
+[![Docs](https://img.shields.io/badge/Documentation-yellow)](https://miquido.github.io/draive/)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/miquido/draive?utm_source=oss&utm_medium=github&utm_campaign=miquido%2Fdraive&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 🏎️ An all-in-one, flexible Python library for building powerful LLM workflows and AI apps. 🏎️
@@ -12,15 +14,11 @@ If you've ever felt like you’re stitching together glue code and hoping for th
 
 ## 🚀 Quick start
 
-Dive straight into the code and learn how to use draive with our interactive [guides](https://github.com/miquido/draive/tree/main/guides).
-For quick solutions to common problems, explore our [cookbooks](https://github.com/miquido/draive/tree/main/cookbooks).
-
 Here’s what a simple Draive setup looks like:
 
 ```python
 from draive import ctx, TextGeneration, tool
 from draive.openai import OpenAI, OpenAIChatConfig
-
 
 @tool # simply annotate a function as a tool
 async def current_time(location: str) -> str:
@@ -29,7 +27,7 @@ async def current_time(location: str) -> str:
 async with  ctx.scope( # create execution context
     "example", # give it a name
     OpenAIChatConfig(model="gpt-4o-mini"), # prepare configuration
-    disposables=[OpenAI()], # define resources and service clients available
+    disposables=(OpenAI(),), # define resources and service clients available
 ):
     result: str = await TextGeneration.generate( # choose a right generation abstraction
         instruction="You are a helpful assistant", # provide clear instructions
@@ -40,6 +38,8 @@ async with  ctx.scope( # create execution context
     print(result) # to finally get the result!
     # output: The current time in Kraków is 9:53:22.
 ```
+
+Read the [Draive Documentation](https://miquido.github.io/draive/) for all required knowledge.
 
 For full examples, head over to the [Draive Examples](https://github.com/miquido/draive-examples) repository.
 

@@ -1,0 +1,370 @@
+/* Miquido Brand Colors and Custom Styling */
+
+:root {
+  /* Miquido Purple Colors */
+  --mq-purple-primary: #6B46C1;
+  --mq-purple-secondary: #7C3AED;
+  --mq-purple-light: #A78BFA;
+  --mq-purple-dark: #553C9A;
+  --mq-gradient: linear-gradient(135deg, #6B46C1, #7C3AED);
+  
+  /* Dark theme adjustments */
+  --md-primary-fg-color: var(--mq-purple-primary);
+  --md-primary-fg-color--light: var(--mq-purple-light);
+  --md-primary-fg-color--dark: var(--mq-purple-dark);
+  --md-accent-fg-color: var(--mq-purple-secondary);
+}
+
+/* Custom header gradient */
+.md-header {
+  background: var(--mq-gradient) !important;
+  box-shadow: 0 2px 8px rgba(107, 70, 193, 0.2);
+}
+
+/* Navigation tabs styling */
+.md-tabs {
+  background: rgba(107, 70, 193, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.md-tabs__link--active {
+  color: var(--mq-purple-light);
+  border-bottom: 2px solid var(--mq-purple-light);
+}
+
+/* Code blocks with purple accent */
+.highlight pre {
+  border-left: 4px solid var(--mq-purple-primary);
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Enhanced Python syntax highlighting - Ayu Mirage theme */
+.language-python .highlight {
+  background: #212733;
+}
+
+/* Ayu Mirage Python syntax colors */
+.language-python .k,  /* keywords like def, class, async, await */
+.language-python .kn { /* import, from */
+  color: #FFA759 !important;
+  font-weight: 500;
+}
+
+.language-python .nd { /* decorators like @runtime_checkable */
+  color: #FFA759 !important;
+  font-weight: 500;
+}
+
+.language-python .nc { /* class names */
+  color: #FFD580 !important;
+}
+
+.language-python .nf { /* function names */
+  color: #FFD580 !important;
+}
+
+.language-python .s,
+.language-python .s1,
+.language-python .s2 { /* strings */
+  color: #BAE67E !important;
+}
+
+.language-python .c1 { /* comments */
+  color: #5C6773 !important;
+  font-style: italic;
+}
+
+.language-python .mi,  /* integers */
+.language-python .mf { /* floats */
+  color: #D4BFFF !important;
+}
+
+.language-python .bp,  /* builtins like True, False, None */
+.language-python .kc { /* constants */
+  color: #D4BFFF !important;
+}
+
+.language-python .nb { /* builtin functions */
+  color: #73C0FD !important;
+}
+
+.language-python .nn { /* module names */
+  color: #CBCCC6 !important;
+}
+
+.language-python .o { /* operators */
+  color: #F29E74 !important;
+}
+
+.language-python .p { /* punctuation */
+  color: #CBCCC6 !important;
+}
+
+.language-python .n { /* names/variables */
+  color: #CBCCC6 !important;
+}
+
+/* Light theme - keep similar but adjusted */
+[data-md-color-scheme="default"] .language-python .k,
+[data-md-color-scheme="default"] .language-python .kn,
+[data-md-color-scheme="default"] .language-python .nd {
+  color: #E6B450 !important;
+}
+
+[data-md-color-scheme="default"] .language-python .nc,
+[data-md-color-scheme="default"] .language-python .nf {
+  color: #D4951E !important;
+}
+
+[data-md-color-scheme="default"] .language-python .s,
+[data-md-color-scheme="default"] .language-python .s1,
+[data-md-color-scheme="default"] .language-python .s2 {
+  color: #86B300 !important;
+}
+
+[data-md-color-scheme="default"] .language-python .c1 {
+  color: #787B80 !important;
+}
+
+[data-md-color-scheme="default"] .language-python .mi,
+[data-md-color-scheme="default"] .language-python .mf,
+[data-md-color-scheme="default"] .language-python .bp,
+[data-md-color-scheme="default"] .language-python .kc {
+  color: #A37ACC !important;
+}
+
+[data-md-color-scheme="default"] .language-python .nb {
+  color: #399EE6 !important;
+}
+
+[data-md-color-scheme="default"] .language-python .highlight {
+  background: #FAFAFA;
+}
+
+/* Dark theme - Ayu Mirage colors */
+[data-md-color-scheme="slate"] .language-python .k,
+[data-md-color-scheme="slate"] .language-python .kn,
+[data-md-color-scheme="slate"] .language-python .nd {
+  color: #FFA759 !important;
+}
+
+[data-md-color-scheme="slate"] .language-python .nc,
+[data-md-color-scheme="slate"] .language-python .nf {
+  color: #FFD580 !important;
+}
+
+[data-md-color-scheme="slate"] .language-python .s,
+[data-md-color-scheme="slate"] .language-python .s1,
+[data-md-color-scheme="slate"] .language-python .s2 {
+  color: #BAE67E !important;
+}
+
+[data-md-color-scheme="slate"] .language-python .c1 {
+  color: #5C6773 !important;
+}
+
+[data-md-color-scheme="slate"] .language-python .mi,
+[data-md-color-scheme="slate"] .language-python .mf,
+[data-md-color-scheme="slate"] .language-python .bp,
+[data-md-color-scheme="slate"] .language-python .kc {
+  color: #D4BFFF !important;
+}
+
+[data-md-color-scheme="slate"] .language-python .nb {
+  color: #73C0FD !important;
+}
+
+[data-md-color-scheme="slate"] .language-python .nn {
+  color: #CBCCC6 !important;
+}
+
+[data-md-color-scheme="slate"] .language-python .o {
+  color: #F29E74 !important;
+}
+
+[data-md-color-scheme="slate"] .language-python .p,
+[data-md-color-scheme="slate"] .language-python .n {
+  color: #CBCCC6 !important;
+}
+
+[data-md-color-scheme="slate"] .language-python .highlight {
+  background: #212733;
+}
+
+/* Code block backgrounds */
+[data-md-color-scheme="slate"] .highlight pre {
+  background-color: #212733 !important;
+}
+
+[data-md-color-scheme="default"] .highlight pre {
+  background-color: #FAFAFA !important;
+}
+
+/* Admonitions with purple theme */
+.md-typeset .admonition.note,
+.md-typeset .admonition.info {
+  border-color: var(--mq-purple-primary);
+}
+
+.md-typeset .admonition.note .admonition-title,
+.md-typeset .admonition.info .admonition-title {
+  background-color: rgba(107, 70, 193, 0.1);
+  border-color: var(--mq-purple-primary);
+}
+
+/* Custom button styling */
+.md-button {
+  border: 2px solid var(--mq-purple-primary);
+  color: var(--mq-purple-primary);
+  transition: all 0.3s ease;
+}
+
+.md-button--primary {
+  background: var(--mq-gradient);
+  border-color: var(--mq-purple-primary);
+  color: white;
+}
+
+.md-button:hover {
+  background: var(--mq-gradient);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(107, 70, 193, 0.3);
+}
+
+/* Search highlighting */
+.md-search-result__article--document .md-search-result__title {
+  color: var(--mq-purple-primary);
+}
+
+/* Table of contents active item */
+.md-nav__link--active {
+  color: var(--mq-purple-primary);
+}
+
+/* Footer styling */
+.md-footer {
+  background: linear-gradient(135deg, #1e1e1e, #2a2a2a);
+}
+
+/* Custom hero section for homepage */
+.hero-banner {
+  background: var(--mq-gradient);
+  color: white;
+  padding: 3rem 2rem;
+  text-align: center;
+  margin: -1.5rem -1.5rem 2rem -1.5rem;
+  border-radius: 0 0 1rem 1rem;
+}
+
+.hero-banner h1 {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.hero-banner p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Feature cards */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.feature-card {
+  background: rgba(107, 70, 193, 0.05);
+  border: 1px solid rgba(107, 70, 193, 0.2);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(107, 70, 193, 0.15);
+}
+
+.feature-card h3 {
+  color: var(--mq-purple-primary);
+  margin-bottom: 0.5rem;
+}
+
+/* API reference styling */
+.doc-heading {
+  border-bottom: 2px solid var(--mq-purple-primary);
+  padding-bottom: 0.5rem;
+}
+
+/* Inline code with purple accent */
+.md-typeset code {
+  background-color: rgba(107, 70, 193, 0.1);
+  color: var(--mq-purple-dark);
+  border: 1px solid rgba(107, 70, 193, 0.2);
+}
+
+/* Dark theme specific adjustments */
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #0f0f0f;
+  --md-default-fg-color: #e0e0e0;
+}
+
+[data-md-color-scheme="slate"] .md-typeset code {
+  background-color: rgba(107, 70, 193, 0.2);
+  color: var(--mq-purple-light);
+}
+
+[data-md-color-scheme="slate"] .hero-banner {
+  box-shadow: 0 4px 20px rgba(107, 70, 193, 0.3);
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 768px) {
+  .hero-banner h1 {
+    font-size: 2rem;
+  }
+  
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Animation for page transitions */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.md-content {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(107, 70, 193, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--mq-purple-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mq-purple-secondary);
+}
