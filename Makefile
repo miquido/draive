@@ -13,7 +13,7 @@ ifndef UV_VERSION
 	UV_VERSION := 0.8.0
 endif
 
-.PHONY: uv_check venv sync update format lint test release
+.PHONY: uv_check venv sync update format lint test docs docs-server release
 
 # Check installed UV version and install if needed
 uv_check:
@@ -81,6 +81,17 @@ lint:
 # Run tests suite.
 test:
 	@python -B -m pytest -v --cov=$(SOURCES_PATH) --rootdir=$(TESTS_PATH)
+
+# Build and serve documentation locally
+docs-server:
+	@echo '# Starting documentation server...'
+	@mkdocs serve --dev-addr 127.0.0.1:8000
+
+# Build documentation for production
+docs:
+	@echo '# Building documentation...'
+	@mkdocs build --clean
+	@echo '...documentation built in site/ directory!'
 
 release: lint test
 	@echo '# Preparing release...'

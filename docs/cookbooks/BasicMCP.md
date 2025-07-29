@@ -6,7 +6,6 @@ For this example we've created a directory in our home folder and its structure 
 ```
 checkmeout/
     .. file1
-    .. file10
     .. file2
     .. file3
 ```

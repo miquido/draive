@@ -1,0 +1,102 @@
+site_name: Draive
+site_description: All-in-one Python framework for building powerful LLM workflows and AI applications
+site_url: https://miquido.github.io/draive/
+repo_url: https://github.com/miquido/draive
+repo_name: miquido/draive
+
+theme:
+  name: material
+  logo: logo.png
+  palette:
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+  features:
+    - content.code.annotate
+    - content.code.copy
+    - content.footnote.tooltips
+    - content.tabs.link
+    - content.tooltips
+    - navigation.indexes
+    - navigation.instant
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - search.highlight
+    - search.share
+    - toc.follow
+
+  icon:
+    repo: fontawesome/brands/github
+
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/miquido/draive
+    - icon: fontawesome/solid/globe
+      link: https://miquido.com
+
+copyright: Copyright &copy; 2025 Miquido
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+plugins:
+  - search:
+      lang: en
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - getting-started/index.md
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - First Steps: getting-started/first-steps.md
+  - Guides:
+      - Basic Usage: guides/BasicUsage.md
+      - Basic Tools Use: guides/BasicToolsUse.md
+      - Basic Conversation: guides/BasicConversation.md
+      - Basic Model Generation: guides/BasicModelGeneration.md
+      - Basic Evaluation: guides/BasicEvaluation.md
+      - Basic Stage Usage: guides/BasicStageUsage.md
+      - Advanced State: guides/AdvancedState.md
+      - Basics: guides/Basics.md
+  - Cookbooks:
+      - Basic RAG: cookbooks/BasicRAG.md
+      - Basic MCP: cookbooks/BasicMCP.md
+      - Basic Data Extraction: cookbooks/BasicDataExtraction.md

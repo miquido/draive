@@ -58,7 +58,7 @@ from draive.openai import OpenAIChatConfig, OpenAI
 async with ctx.scope(
     "data_extraction",
     # define used LMM to be OpenAI within the context
-    OpenAIChatConfig(model="gpt-4o-mini")
+    OpenAIChatConfig(model="gpt-4o-mini"),
     disposables=(OpenAI(),),
 ):
     result: PersonalData = await ModelGeneration.generate(
@@ -66,7 +66,7 @@ async with ctx.scope(
         PersonalData,
         # provide additional instructions
         # note that the data structure will be automatically explained to LLM
-        instruction="Please extract information from the given input",
+        instruction="Extract information from the given input",
         # we will provide the document as an input
         input=document,
     )
@@ -90,14 +90,14 @@ from draive import ctx, ModelGeneration
 async with ctx.scope(
     "customized_extraction",
     # define used LMM to be OpenAI within the context
-    OpenAIChatConfig(model="gpt-4o-mini")
+    OpenAIChatConfig(model="gpt-4o-mini"),
     disposables=(OpenAI(),),
 ):
     result: PersonalData = await ModelGeneration.generate(
         PersonalData,
         instruction=(
             # provide extended instructions and take full control over the prompt
-            "Please extract information from the given input."
+            "Extract information from the given input."
             " Put it into the JSON according to the following description:\n"
             "{schema}"  # 'schema' is the name of the format argument used to fill in the schema
         ),

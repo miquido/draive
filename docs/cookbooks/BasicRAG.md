@@ -14,7 +14,7 @@ load_env() # load .env variables
 We are going to use a the same text about John Doe as we did in [Basic Data Extraction](./BasicDataExtraction.md) as our input. After assigning it to a variable we will prepare it for embedding by splitting the original text to smaller chunks. This allows to fit the data into limited context windows and to additionally filter out unnecessary information. We are going to use a basic splitter looking for paragraphs structure defined by multiple subsequent newlines in the text. Chunks will be put into a structured envelope which allows to store additional information such as a full text of the document or additional metadata.
 
 ```python
-from draive import DataModel, count_text_tokens, ctx, split_text
+from draive import DataModel, Tokenization, ctx, split_text
 from draive.openai import OpenAI
 
 # document is a short text about John Doe
@@ -45,7 +45,7 @@ async with ctx.scope(
             separators=("\n\n", " "),
             part_size=64,
             part_overlap_size=16,
-            count_size=count_text_tokens,
+            count_size=Tokenization.count_tokens,
         )
     ]
 
@@ -87,10 +87,11 @@ When we have prepared the data, we can now use a vector index to make it searcha
 from collections.abc import Sequence
 
 from draive import VectorIndex
+from draive.helpers import VolatileVectorIndex
 from draive.openai import OpenAIEmbeddingConfig, OpenAI
 
 # prepare vector index
-vector_index: VectorIndex = VectorIndex.volatile()
+vector_index = VolatileVectorIndex()
 async with ctx.scope(
     "indexing",
     # use vector index
@@ -104,7 +105,7 @@ async with ctx.scope(
         DocumentChunk,
         values=document_chunks,
         # define what value will be embedded for each chunk
-        indexed_value=DocumentChunk._.content,
+        attribute=DocumentChunk._.content,
     )
 ```
 
