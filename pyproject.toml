@@ -51,6 +51,7 @@ opentelemetry = [
   "opentelemetry-sdk",
   "opentelemetry-exporter-otlp-proto-grpc",
 ]
+httpx = ["haiway[httpx]", "httpx"]
 dev = [
   "bandit~=1.8",
   "pyright~=1.1",
