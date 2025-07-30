@@ -1453,7 +1453,7 @@ class Stage:
         self,
         /,
         *,
-        disposables: Disposables | Iterable[Disposable],
+        disposables: Disposables | Collection[Disposable],
     ) -> Self: ...
 
     @overload
@@ -1469,7 +1469,7 @@ class Stage:
         state: State | None = None,
         /,
         *states: State,
-        disposables: Disposables | Iterable[Disposable] | None = None,
+        disposables: Disposables | Collection[Disposable] | None = None,
     ) -> Self:
         """
         Creates a copy of this Stage with the specified state context applied.
@@ -1488,7 +1488,7 @@ class Stage:
             Optional additional `State` objects to include in the state context.
             Only applicable when `state_context` is a `State`.
 
-        disposables: Disposables | Iterable[Disposable] | None
+        disposables: Disposables | Collection[Disposable] | None
             Optional Disposables which will be used for execution of this stage.
             State produced by disposables will be used within the context state.
 
@@ -1500,15 +1500,14 @@ class Stage:
         execution: StageExecution = self._execution
 
         resolved_disposables: Disposables | None
-        match disposables:
-            case None:
-                resolved_disposables = None
+        if disposables is None:
+            resolved_disposables = None
 
-            case Disposables() as disposables:
-                resolved_disposables = disposables
+        elif isinstance(disposables, Disposables):
+            resolved_disposables = disposables
 
-            case iterable:
-                resolved_disposables = Disposables(*iterable)
+        else:
+            resolved_disposables = Disposables(disposables)
 
         match (state, resolved_disposables):
             case (None, None):

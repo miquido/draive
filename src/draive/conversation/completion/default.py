@@ -1,20 +1,18 @@
 from asyncio import Task, wait
 from asyncio.tasks import FIRST_COMPLETED
-from collections.abc import AsyncIterator, MutableSet, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, MutableSet, Sequence
 from datetime import UTC, datetime
 from typing import Any, Literal, overload
 from uuid import UUID, uuid4
 
-from haiway import AsyncQueue, ctx
+from haiway import ctx
 
 from draive.conversation.completion.types import ConversationMemory, ConversationMessage
 from draive.conversation.types import (
     ConversationElement,
-    ConversationEvent,
     ConversationMessageChunk,
     ConversationStreamElement,
 )
-from draive.guardrails import GuardrailsModeration
 from draive.instructions import Instruction
 from draive.lmm import (
     LMM,
@@ -29,7 +27,6 @@ from draive.lmm import (
 )
 from draive.multimodal import MultimodalContent
 from draive.tools import Toolbox
-from draive.utils import Processing, ProcessingEvent
 
 __all__ = ("conversation_completion",)
 
@@ -70,7 +67,6 @@ async def conversation_completion(
     async with ctx.scope("conversation_completion"):
         # relying on memory recall correctness
         recalled_messages: Sequence[ConversationElement] = await memory.recall()
-        await GuardrailsModeration.check_input(input.content)
         context: list[LMMContextElement] = [
             *(
                 message.to_lmm_context()
@@ -172,161 +168,125 @@ async def _conversation_completion_stream(  # noqa: C901, PLR0915
     toolbox: Toolbox,
     **extra: Any,
 ) -> AsyncIterator[ConversationStreamElement]:
-    output_queue = AsyncQueue[ConversationStreamElement]()
     # completion message identifier to match chunks and events
     message_identifier: UUID = uuid4()
 
-    async def report_event(
-        event: ProcessingEvent,
-        /,
-    ) -> None:
-        output_queue.enqueue(
-            ConversationEvent.of(
-                event.name,
-                identifier=event.identifier,
-                content=event.content,
-                meta=event.meta,
-            )
-        )
-
-    with ctx.updated(ctx.state(Processing).updated(event_reporting=report_event)):
-
-        async def consume_lmm_output() -> None:  # noqa: C901, PLR0912, PLR0915
-            tools_turn: int = 0
-            try:
-                formatted_instruction: LMMInstruction | None = Instruction.formatted(instruction)
-                result: MultimodalContent = MultimodalContent.empty
-                while True:
-                    pending_tool_requests: list[LMMToolRequest] = []
-                    pending_tool_responses: MutableSet[Task[LMMToolResponse]] = set()
-                    accumulated_content: MultimodalContent = MultimodalContent.empty
-                    ctx.log_debug("...requesting completion...")
-                    async for element in await LMM.completion(
-                        instruction=formatted_instruction,
-                        context=context,
-                        tools=toolbox.available_tools(tools_turn=tools_turn),
-                        output="text",
-                        stream=True,
-                        **extra,
-                    ):
-                        match element:
-                            case LMMStreamChunk() as chunk:
-                                ctx.log_debug("...received result chunk...")
-                                # we are ending the stream when all tool results are provided
-                                # and a chunk is marked as final, final mark before all tool
-                                # calls are resolved typically means that there will be no more
-                                # tool related content, also models may produce content and tools
-                                if chunk.eod and not pending_tool_requests:
-                                    result = result.appending(
-                                        accumulated_content.appending(chunk.content)
-                                    )
-                                    output_queue.enqueue(
-                                        ConversationMessageChunk.model(
-                                            message_identifier=message_identifier,
-                                            content=chunk.content,
-                                            eod=True,
-                                        )
-                                    )
-                                    output_queue.finish()
-                                    break  # proceed to finalization (outer loop)
-
-                                elif chunk.content:  # skip empty chunks
-                                    accumulated_content = accumulated_content.appending(
-                                        chunk.content
-                                    )
-                                    output_queue.enqueue(
-                                        ConversationMessageChunk.model(
-                                            message_identifier=message_identifier,
-                                            content=chunk.content,
-                                            eod=False,
-                                        )
-                                    )
-
-                            case LMMToolRequest() as tool_request:
-                                ctx.log_debug(f"...received tool requests (turn {tools_turn})...")
-                                pending_tool_requests.append(tool_request)
-                                # start processing immediately
-                                pending_tool_responses.add(ctx.spawn(toolbox.respond, tool_request))
-
-                    if not pending_tool_responses or not pending_tool_requests:
-                        break  # proceed to finalization
-
-                    tool_requests: LMMToolRequests = LMMToolRequests.of(
-                        pending_tool_requests,
-                        content=accumulated_content,
-                    )
-
-                    tools_completion: bool = False
-                    responses: list[LMMToolResponse] = []
-                    while pending_tool_responses:
-                        completed, pending_tool_responses = await wait(
-                            pending_tool_responses,
-                            return_when=FIRST_COMPLETED,
-                        )
-                        for response in completed:
-                            tool_response: LMMToolResponse = response.result()
-                            if tool_response.handling == "completion":
-                                ctx.log_debug("...received tools direct result...")
-                                output_queue.enqueue(
-                                    ConversationMessageChunk.model(
-                                        message_identifier=message_identifier,
-                                        content=tool_response.content,
-                                        eod=False,
-                                    )
-                                )
-                                tools_completion = True
-                                result = result.appending(tool_response.content)
-
-                            elif tool_response.handling == "extension":
-                                ctx.log_debug("...received tools result extension...")
-                                output_queue.enqueue(
-                                    ConversationMessageChunk.model(
-                                        message_identifier=message_identifier,
-                                        content=tool_response.content,
-                                        eod=False,
-                                    )
-                                )
-                                responses.append(tool_response)
-                                result = result.appending(tool_response.content)
-
-                            else:
-                                responses.append(tool_response)
-
-                    if tools_completion:
-                        output_queue.enqueue(  # send empty end of data part
-                            ConversationMessageChunk.model(
+    async def consume_lmm_output() -> AsyncGenerator[ConversationStreamElement]:  # noqa: C901, PLR0912, PLR0915
+        tools_turn: int = 0
+        formatted_instruction: LMMInstruction | None = Instruction.formatted(instruction)
+        result: MultimodalContent = MultimodalContent.empty
+        while True:
+            pending_tool_requests: list[LMMToolRequest] = []
+            pending_tool_responses: MutableSet[Task[LMMToolResponse]] = set()
+            accumulated_content: MultimodalContent = MultimodalContent.empty
+            ctx.log_debug("...requesting completion...")
+            async for element in await LMM.completion(
+                instruction=formatted_instruction,
+                context=context,
+                tools=toolbox.available_tools(tools_turn=tools_turn),
+                output="text",
+                stream=True,
+                **extra,
+            ):
+                match element:
+                    case LMMStreamChunk() as chunk:
+                        ctx.log_debug("...received result chunk...")
+                        # we are ending the stream when all tool results are provided
+                        # and a chunk is marked as final, final mark before all tool
+                        # calls are resolved typically means that there will be no more
+                        # tool related content, also models may produce content and tools
+                        if chunk.eod and not pending_tool_requests:
+                            result = result.appending(accumulated_content.appending(chunk.content))
+                            yield ConversationMessageChunk.model(
                                 message_identifier=message_identifier,
-                                content=MultimodalContent.empty,
+                                content=chunk.content,
                                 eod=True,
                             )
-                        )
-                        output_queue.finish()
-                        break  # proceed to finalization
 
-                    ctx.log_debug("...received tools responses...")
-                    tool_responses: LMMToolResponses = LMMToolResponses.of(responses)
-                    context.extend((tool_requests, tool_responses))
+                            break  # proceed to finalization (outer loop)
 
-                    tools_turn += 1  # continue with next turn
+                        elif chunk.content:  # skip empty chunks
+                            accumulated_content = accumulated_content.appending(chunk.content)
+                            yield ConversationMessageChunk.model(
+                                message_identifier=message_identifier,
+                                content=chunk.content,
+                                eod=False,
+                            )
 
-            except BaseException as exc:
-                output_queue.finish(exception=exc)
-                raise exc
+                    case LMMToolRequest() as tool_request:
+                        ctx.log_debug(f"...received tool requests (turn {tools_turn})...")
+                        pending_tool_requests.append(tool_request)
+                        # start processing immediately
+                        pending_tool_responses.add(ctx.spawn(toolbox.respond, tool_request))
 
-            assert output_queue.is_finished  # nosec: B101
+            if not pending_tool_responses or not pending_tool_requests:
+                break  # proceed to finalization
 
-            ctx.log_debug("...finalizing message...")
-            response_message: ConversationMessage = ConversationMessage.model(
-                created=datetime.now(UTC),
-                identifier=message_identifier,
-                content=result,
+            tool_requests: LMMToolRequests = LMMToolRequests.of(
+                pending_tool_requests,
+                content=accumulated_content,
             )
 
-            ctx.log_debug("...remembering...")
-            await memory.remember(input, response_message)
+            tools_completion: bool = False
+            responses: list[LMMToolResponse] = []
+            while pending_tool_responses:
+                completed, pending_tool_responses = await wait(
+                    pending_tool_responses,
+                    return_when=FIRST_COMPLETED,
+                )
+                for response in completed:
+                    tool_response: LMMToolResponse = response.result()
+                    if tool_response.handling == "completion":
+                        ctx.log_debug("...received tools direct result...")
+                        yield ConversationMessageChunk.model(
+                            message_identifier=message_identifier,
+                            content=tool_response.content,
+                            eod=False,
+                        )
 
-            ctx.log_debug("... response message finished!")
+                        tools_completion = True
+                        result = result.appending(tool_response.content)
 
-        ctx.spawn(consume_lmm_output)
+                    elif tool_response.handling == "extension":
+                        ctx.log_debug("...received tools result extension...")
+                        yield ConversationMessageChunk.model(
+                            message_identifier=message_identifier,
+                            content=tool_response.content,
+                            eod=False,
+                        )
 
-        return output_queue
+                        responses.append(tool_response)
+                        result = result.appending(tool_response.content)
+
+                    else:
+                        responses.append(tool_response)
+
+            if tools_completion:
+                # send empty end of data part
+                yield ConversationMessageChunk.model(
+                    message_identifier=message_identifier,
+                    content=MultimodalContent.empty,
+                    eod=True,
+                )
+
+                break  # proceed to finalization
+
+            ctx.log_debug("...received tools responses...")
+            tool_responses: LMMToolResponses = LMMToolResponses.of(responses)
+            context.extend((tool_requests, tool_responses))
+
+            tools_turn += 1  # continue with next turn
+
+        ctx.log_debug("...finalizing message...")
+        response_message: ConversationMessage = ConversationMessage.model(
+            created=datetime.now(UTC),
+            identifier=message_identifier,
+            content=result,
+        )
+
+        ctx.log_debug("...remembering...")
+        await memory.remember(input, response_message)
+
+        ctx.log_debug("... response message finished!")
+
+    return consume_lmm_output()

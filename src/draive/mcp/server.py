@@ -1,5 +1,5 @@
 from base64 import urlsafe_b64encode
-from collections.abc import AsyncGenerator, Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Collection, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from typing import Any, final
 from uuid import uuid4
@@ -43,18 +43,17 @@ class MCPServer:
         resources: Iterable[ResourceTemplate | Resource] | None = None,
         prompts: Iterable[PromptTemplate[Any] | Prompt] | None = None,
         tools: Toolbox | Iterable[Tool] | None = None,
-        disposables: Disposables | Iterable[Disposable] | None = None,
+        disposables: Disposables | Collection[Disposable] | None = None,
     ) -> None:
         disposable: Disposables
-        match disposables:
-            case None:
-                disposable = Disposables()
+        if disposables is None:
+            disposable = Disposables(())
 
-            case Disposables() as prepared:
-                disposable = prepared
+        elif isinstance(disposables, Disposables):
+            disposable = disposables
 
-            case other:
-                disposable = Disposables(*other)
+        else:
+            disposable = Disposables(disposables)
 
         @asynccontextmanager
         async def lifspan(server: Server) -> AsyncGenerator[Iterable[State]]:
