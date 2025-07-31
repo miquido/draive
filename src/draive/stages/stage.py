@@ -1741,7 +1741,7 @@ class Stage:
 
             except Exception as exc:
                 async with ctx.scope("stage.fallback"):
-                    if exc in exceptions:
+                    if type(exc) in exceptions:
                         return await fallback_execution(state=state)
 
                     else:

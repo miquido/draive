@@ -133,7 +133,7 @@ async def realtime_conversation_preparing(  # noqa: C901
                         return ConversationEvent.of(
                             category="tool.call",
                             meta={
-                                "identifier": tool_request.identifier,
+                                "call_id": tool_request.identifier,
                                 "tool": tool_request.tool,
                             },
                         )
