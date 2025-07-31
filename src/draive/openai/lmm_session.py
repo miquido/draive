@@ -118,6 +118,24 @@ class OpenAIRealtimeLMM(OpenAIAPI):
 
             # initialize context
             current_items: MutableMapping[str, Meta] = {}
+
+            def message_identifier(item_id: str) -> str:
+                nonlocal current_items
+
+                if meta := current_items.get(item_id):
+                    if identifier := meta.get_str("identifier"):
+                        return identifier
+
+                message_identifier: str = str(uuid4())
+                current_items[item_id] = Meta.of(
+                    {
+                        "identifier": message_identifier,
+                        "created": datetime.now().isoformat(),
+                        "item_id": item_id,
+                    }
+                )
+                return message_identifier
+
             context: LMMContext = await memory.recall()
             if context:
                 await _send_context(
@@ -142,8 +160,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                                     media=output_audio_type,
                                 ),
                                 meta={
-                                    "identifier": event.event_id,
-                                    "message_identifier": event.item_id,
+                                    "message_identifier": message_identifier(event.item_id),
                                     "created": datetime.now().isoformat(),
                                 },
                             )
@@ -153,8 +170,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                             return LMMSessionEvent.of(
                                 "output.audio.completed",
                                 meta={
-                                    "identifier": event.event_id,
-                                    "message_identifier": event.item_id,
+                                    "message_identifier": message_identifier(event.item_id),
                                     "created": datetime.now().isoformat(),
                                 },
                             )
@@ -164,8 +180,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                             return LMMStreamChunk.of(
                                 TextContent.of(event.delta),
                                 meta={
-                                    "identifier": event.event_id,
-                                    "message_identifier": event.item_id,
+                                    "message_identifier": message_identifier(event.item_id),
                                     "created": datetime.now().isoformat(),
                                 },
                             )
@@ -175,8 +190,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                             return LMMSessionEvent.of(
                                 "output.text.completed",
                                 meta={
-                                    "identifier": event.event_id,
-                                    "message_identifier": event.item_id,
+                                    "message_identifier": message_identifier(event.item_id),
                                     "created": datetime.now().isoformat(),
                                 },
                             )
@@ -189,8 +203,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                                     content=TextContent.of(event.delta),
                                 ),
                                 meta={
-                                    "identifier": event.event_id,
-                                    "message_identifier": event.item_id,
+                                    "message_identifier": message_identifier(event.item_id),
                                     "created": datetime.now().isoformat(),
                                 },
                             )
@@ -200,8 +213,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                             return LMMSessionEvent.of(
                                 "output.transcript.completed",
                                 meta={
-                                    "identifier": event.event_id,
-                                    "message_identifier": event.item_id,
+                                    "message_identifier": message_identifier(event.item_id),
                                     "created": datetime.now().isoformat(),
                                 },
                             )
@@ -265,8 +277,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                                         MultimodalContent.empty,
                                         eod=True,
                                         meta={
-                                            "identifier": event.event_id,
-                                            "message_identifier": event.item.id,
+                                            "message_identifier": message_identifier(event.item.id),
                                             "created": datetime.now().isoformat(),
                                         },
                                     )
@@ -279,8 +290,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                             return LMMSessionEvent.of(
                                 "input.audio.started",
                                 meta={
-                                    "identifier": event.event_id,
-                                    "message_identifier": event.item_id,
+                                    "message_identifier": message_identifier(event.item_id),
                                     "created": datetime.now().isoformat(),
                                 },
                             )
@@ -290,8 +300,7 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                             return LMMSessionEvent.of(
                                 "input.audio.completed",
                                 meta={
-                                    "identifier": event.event_id,
-                                    "message_identifier": event.item_id,
+                                    "message_identifier": message_identifier(event.item_id),
                                     "created": datetime.now().isoformat(),
                                 },
                             )
@@ -309,7 +318,8 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                             if event.item.role == "user":
                                 current_items[event.item.id] = Meta.of(
                                     {  # using predefined meta keys
-                                        "identifier": event.item.id,
+                                        "item_id": event.item.id,
+                                        "identifier": str(uuid4()),
                                         "created": datetime.now().isoformat(),
                                     }
                                 )
@@ -320,7 +330,8 @@ class OpenAIRealtimeLMM(OpenAIAPI):
                             elif event.item.role == "assistant":
                                 current_items[event.item.id] = Meta.of(
                                     {  # using predefined meta keys
-                                        "identifier": event.item.id,
+                                        "item_id": event.item.id,
+                                        "identifier": str(uuid4()),
                                         "created": datetime.now().isoformat(),
                                     }
                                 )

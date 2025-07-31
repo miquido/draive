@@ -124,22 +124,22 @@ class ConversationMessage(DataModel):
         element: LMMInput | LMMCompletion,
         /,
     ) -> Self:
-        match element:
-            case LMMInput():
-                return cls.user(
-                    element.content,
-                    identifier=element.meta.identifier or uuid4(),
-                    created=element.meta.created,
-                    meta=element.meta.excluding("kind", "identifier", "created"),
-                )
+        if isinstance(element, LMMCompletion):
+            return cls.model(
+                element.content,
+                identifier=element.meta.identifier or uuid4(),
+                created=element.meta.created,
+                meta=element.meta.excluding("kind", "identifier", "created"),
+            )
 
-            case LMMCompletion():
-                return cls.model(
-                    element.content,
-                    identifier=element.meta.identifier or uuid4(),
-                    created=element.meta.created,
-                    meta=element.meta.excluding("kind", "identifier", "created"),
-                )
+        else:
+            assert isinstance(element, LMMInput)  # nosec: B101
+            return cls.user(
+                element.content,
+                identifier=element.meta.identifier or uuid4(),
+                created=element.meta.created,
+                meta=element.meta.excluding("kind", "identifier", "created"),
+            )
 
     @classmethod
     def user(
