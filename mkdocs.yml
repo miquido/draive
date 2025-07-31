@@ -95,6 +95,7 @@ nav:
       - Basic Evaluation: guides/BasicEvaluation.md
       - Basic Stage Usage: guides/BasicStageUsage.md
       - Advanced State: guides/AdvancedState.md
+      - Multimodal Content: guides/MultimodalContent.md
       - Basics: guides/Basics.md
   - Cookbooks:
       - Basic RAG: cookbooks/BasicRAG.md

@@ -1,5 +1,4 @@
 import json
-from asyncio import TaskGroup
 from base64 import b64decode, b64encode
 from collections.abc import MutableMapping, Sequence
 from contextlib import AbstractAsyncContextManager
@@ -84,7 +83,6 @@ class OpenAIRealtimeLMM(OpenAIAPI):
         scope: AbstractAsyncContextManager[str] = ctx.scope(
             "openai_realtime",
             config,
-            task_group=TaskGroup(),  # use local task group
         )
         # prepare connection
         connection_manager: AsyncRealtimeConnectionManager = self._client.beta.realtime.connect(
