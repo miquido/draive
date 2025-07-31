@@ -10,6 +10,7 @@ from haiway import ctx
 from draive.conversation.completion.types import ConversationMemory, ConversationMessage
 from draive.conversation.types import (
     ConversationElement,
+    ConversationEvent,
     ConversationMessageChunk,
     ConversationStreamElement,
 )
@@ -218,6 +219,14 @@ async def _conversation_completion_stream(  # noqa: C901, PLR0915
                         pending_tool_requests.append(tool_request)
                         # start processing immediately
                         pending_tool_responses.add(ctx.spawn(toolbox.respond, tool_request))
+                        yield ConversationEvent.of(
+                            category="tool.call",
+                            meta={
+                                "identifier": tool_request.identifier,
+                                "tool": tool_request.tool,
+                                "status": "started",
+                            },
+                        )
 
             if not pending_tool_responses or not pending_tool_requests:
                 break  # proceed to finalization
@@ -236,6 +245,16 @@ async def _conversation_completion_stream(  # noqa: C901, PLR0915
                 )
                 for response in completed:
                     tool_response: LMMToolResponse = response.result()
+                    yield ConversationEvent.of(
+                        category="tool.call",
+                        meta={
+                            "identifier": tool_response.identifier,
+                            "tool": tool_response.tool,
+                            "status": "completed",
+                            "handling": tool_response.handling,
+                        },
+                    )
+
                     if tool_response.handling == "completion":
                         ctx.log_debug("...received tools direct result...")
                         yield ConversationMessageChunk.model(

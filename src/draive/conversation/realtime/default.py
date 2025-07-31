@@ -130,7 +130,13 @@ async def realtime_conversation_preparing(  # noqa: C901
                             handle_tool_request,
                             tool_request,
                         )
-                        continue  # keep receiving elements
+                        return ConversationEvent.of(
+                            category="tool.call",
+                            meta={
+                                "identifier": tool_request.identifier,
+                                "tool": tool_request.tool,
+                            },
+                        )
 
         async def write(
             input: ConversationStreamElement,  # noqa: A002
