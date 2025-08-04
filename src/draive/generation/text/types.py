@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Iterable
+from collections.abc import Iterable
 from typing import Any, Protocol, runtime_checkable
 
 from draive.instructions import Instruction
@@ -19,4 +19,4 @@ class TextGenerating(Protocol):
         toolbox: Toolbox,
         examples: Iterable[tuple[MultimodalContent, str]],
         **extra: Any,
-    ) -> AsyncIterable[str] | str: ...
+    ) -> str: ...
