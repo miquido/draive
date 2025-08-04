@@ -41,10 +41,9 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912, PLR0915
         match schema_injection:
             case "auto":
                 extended_instruction = instruction.extended(
-                    DEFAULT_INSTRUCTION_EXTENSION.format(
-                        schema=generated.simplified_schema(indent=2),
-                    ),
+                    DEFAULT_INSTRUCTION_EXTENSION,
                     joiner="\n\n",
+                    schema=generated.simplified_schema(indent=2),
                 )
 
             case "full":
@@ -78,7 +77,7 @@ async def generate_model[Generated: DataModel](  # noqa: C901, PLR0912, PLR0915
             case value:
                 context.append(LMMInput.of(value))
 
-        formatted_instruction: LMMInstruction = Instruction.formatted(extended_instruction)
+        formatted_instruction: LMMInstruction = extended_instruction.format()
         tools_turn: int = 0
         result: MultimodalContent = MultimodalContent.empty
         result_extension: MultimodalContent = MultimodalContent.empty
