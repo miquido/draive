@@ -313,7 +313,7 @@ async def test_model_generation_json_parsing_error():
         return LMMCompletion.of("This is not valid JSON at all")
 
     async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
-        with raises(KeyError):  # Should raise instruction formatting error
+        with raises(ValueError):  # Should raise JSON parsing error
             await ModelGeneration.generate(
                 Person,
                 instruction="Generate a person",
