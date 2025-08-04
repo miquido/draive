@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Iterable
+from collections.abc import Iterable
 from typing import Any
 
 from haiway import State, ctx
@@ -23,7 +23,7 @@ class TextGeneration(State):
         tools: Toolbox | Iterable[Tool] | None = None,
         examples: Iterable[tuple[Multimodal, str]] | None = None,
         **extra: Any,
-    ) -> AsyncIterable[str] | str:
+    ) -> str:
         return await ctx.state(cls).generation(
             instruction=Instruction.of(instruction),
             input=input if isinstance(input, Prompt) else MultimodalContent.of(input),

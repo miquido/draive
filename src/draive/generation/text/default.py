@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Iterable
+from collections.abc import Iterable
 from typing import Any
 
 from haiway import ctx
@@ -27,7 +27,7 @@ async def generate_text(
     toolbox: Toolbox,
     examples: Iterable[tuple[MultimodalContent, str]],
     **extra: Any,
-) -> AsyncIterable[str] | str:
+) -> str:
     async with ctx.scope("generate_text"):
         context: list[LMMContextElement] = [
             *[
