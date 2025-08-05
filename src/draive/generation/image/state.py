@@ -18,7 +18,7 @@ class ImageGeneration(State):
         input: Multimodal | None = None,  # noqa: A002
         **extra: Any,
     ) -> MediaContent:
-        return await ctx.state(ImageGeneration).generate(
+        return await ctx.state(cls).generate(
             instruction=instruction,
             input=input,
             **extra,

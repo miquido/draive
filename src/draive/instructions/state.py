@@ -115,7 +115,7 @@ class Instructions(State):
     ) -> Instruction | None:
         name: str = instruction if isinstance(instruction, str) else instruction.name
 
-        if fetched := await ctx.state(Instructions).fetching(
+        if fetched := await ctx.state(cls).fetching(
             name,
             arguments=arguments,
             **extra,
