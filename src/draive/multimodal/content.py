@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import ClassVar, Self, cast, final, overload
 
-from haiway import Meta, MetaValues
+from haiway import Meta, MetaValue, MetaValues
 
 from draive.multimodal.media import MediaContent, MediaData, MediaKind, MediaReference
 from draive.multimodal.meta import MetaContent
@@ -228,6 +228,44 @@ class MultimodalContent(DataModel):
             all_other_parts.extend(content.parts)
 
         return self.appending(*all_other_parts)
+
+    def matching_meta(
+        self,
+        **values: MetaValue,
+    ) -> Self:
+        """
+        Filter content parts by matching metadata key-value pairs.
+
+        Parameters
+        ----------
+        **values : MetaValue
+            Metadata key-value pairs to match. Only parts whose metadata
+            contains all specified key-value pairs will be included.
+
+        Returns
+        -------
+        Self
+            A new MultimodalContent instance containing only parts with
+            matching metadata. Returns self if no filter values provided.
+
+        Notes
+        -----
+        Only TextContent, MediaContent, and MetaContent parts are filtered.
+        DataModel artifacts are excluded from the result as those do not
+        contain metadata explicitly.
+        """
+
+        if not values:
+            return self
+
+        return self.__class__(
+            parts=tuple(
+                part
+                for part in self.parts
+                if isinstance(part, TextContent | MediaContent | MetaContent)
+                and all(part.meta.get(key) == value for key, value in values.items())
+            )
+        )
 
     def __bool__(self) -> bool:
         return bool(self.parts) and any(self.parts)
