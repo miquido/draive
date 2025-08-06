@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import ClassVar, Self, cast, final, overload
 
-from haiway import Meta, MetaValue, MetaValues
+from haiway import MISSING, Meta, MetaValue, MetaValues, Missing
 
 from draive.multimodal.media import MediaContent, MediaData, MediaKind, MediaReference
 from draive.multimodal.meta import MetaContent
@@ -255,7 +255,7 @@ class MultimodalContent(DataModel):
         contain metadata explicitly.
         """
 
-        if not values:
+        if not values or not self.parts:
             return self
 
         return self.__class__(
@@ -266,6 +266,80 @@ class MultimodalContent(DataModel):
                 and all(part.meta.get(key) == value for key, value in values.items())
             )
         )
+
+    def split_by_meta(
+        self,
+        *,
+        key: str,
+    ) -> Sequence[Self]:
+        """
+        Split content into separate instances based on different values of a metadata key.
+
+        Groups consecutive parts that have the same value for the specified metadata key
+        into separate MultimodalContent instances, preserving original order.
+
+        Parameters
+        ----------
+        key : str
+            The metadata key to split on
+
+        Returns
+        -------
+        Sequence[Self]
+            A sequence of MultimodalContent instances, each containing parts with
+            the same metadata value for the specified key. Parts without the key
+            or DataModel artifacts are grouped separately.
+
+        Notes
+        -----
+        - Preserves the original order of parts
+        - Groups consecutive parts with the same metadata value
+        - Parts without metadata or the specified key are treated as having None value
+        - DataModel artifacts are included but treated as having None metadata value
+        - Empty groups are not included in the result
+        """
+        if not self.parts:
+            return ()
+
+        result: list[Self] = []
+        current_group: list[MultimodalContentElement] = []
+        current_value: MetaValue | Missing = MISSING
+
+        for part in self.parts:
+            # Get metadata value for this part
+            part_value: MetaValue | None
+            if isinstance(part, TextContent | MediaContent | MetaContent):
+                part_value = part.meta.get(key)
+
+            else:
+                part_value = None  # DataModel artifacts have no meta
+
+            # If this is the first part or value changed, start new group
+            if current_value != part_value:
+                # Save current group if it has parts
+                if current_group:
+                    result.append(
+                        self.__class__(
+                            parts=tuple(current_group),
+                        )
+                    )
+
+                # Start new group
+                current_group = [part]
+                current_value = part_value
+
+            else:  # Same value, add to current group
+                current_group.append(part)
+
+        # Add final group if it has parts
+        if current_group:
+            result.append(
+                self.__class__(
+                    parts=tuple(current_group),
+                )
+            )
+
+        return tuple(result)
 
     def __bool__(self) -> bool:
         return bool(self.parts) and any(self.parts)
