@@ -1,5 +1,7 @@
 from typing import Any, Self
 
+from haiway import META_EMPTY, Meta, MetaValues
+
 from draive.evaluation.value import (
     EvaluationScoreValue,
     evaluation_score_value,
@@ -31,8 +33,7 @@ class EvaluationScore(DataModel):
         cls,
         score: EvaluationScoreValue,
         /,
-        *,
-        comment: str | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
         Create an EvaluationScore from a score value.
@@ -41,8 +42,8 @@ class EvaluationScore(DataModel):
         ----------
         score : EvaluationScoreValue
             Score value as float, bool, or named level
-        comment : str | None, optional
-            Explanation of the score
+        meta: Meta | MetaValues | None = None
+            Metadata about the score
 
         Returns
         -------
@@ -51,16 +52,16 @@ class EvaluationScore(DataModel):
         """
         return cls(
             value=evaluation_score_value(score),
-            comment=comment,
+            meta=Meta.of(meta),
         )
 
     value: float = Field(
         description="Score value, between 0 (failure) and 1 (success)",
         verifier=evaluation_score_verifier,
     )
-    comment: str | None = Field(
-        description="Explanation of the score",
-        default=None,
+    meta: Meta = Field(
+        description="Metadata about the score",
+        default=META_EMPTY,
     )
 
     def __eq__(self, other: Any) -> bool:
@@ -208,6 +209,6 @@ class EvaluationScore(DataModel):
         Returns
         -------
         int
-            Hash of the value and comment tuple
+            Hash of the value and metadata
         """
-        return hash((self.value, self.comment))
+        return hash((self.value, self.meta))

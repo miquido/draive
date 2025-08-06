@@ -7,7 +7,6 @@ from draive.evaluation.evaluator import (
 )
 from draive.evaluation.generator import generate_case_parameters
 from draive.evaluation.scenario import (
-    EvaluationScenarioResult,
     EvaluatorScenario,
     EvaluatorScenarioDefinition,
     EvaluatorScenarioResult,
@@ -16,23 +15,21 @@ from draive.evaluation.scenario import (
 )
 from draive.evaluation.score import EvaluationScore
 from draive.evaluation.suite import (
-    EvaluatorCaseResult,
     EvaluatorSuite,
     EvaluatorSuiteCase,
     EvaluatorSuiteCaseResult,
+    EvaluatorSuiteCasesStorage,
     EvaluatorSuiteDefinition,
     EvaluatorSuiteResult,
-    EvaluatorSuiteStorage,
+    PreparedEvaluatorSuite,
     evaluator_suite,
 )
 from draive.evaluation.value import EvaluationScoreValue
 
 __all__ = (
-    "EvaluationScenarioResult",
     "EvaluationScore",
     "EvaluationScoreValue",
     "Evaluator",
-    "EvaluatorCaseResult",
     "EvaluatorDefinition",
     "EvaluatorResult",
     "EvaluatorScenario",
@@ -41,9 +38,9 @@ __all__ = (
     "EvaluatorSuite",
     "EvaluatorSuiteCase",
     "EvaluatorSuiteCaseResult",
+    "EvaluatorSuiteCasesStorage",
     "EvaluatorSuiteDefinition",
     "EvaluatorSuiteResult",
-    "EvaluatorSuiteStorage",
     "PreparedEvaluator",
     "PreparedEvaluatorScenario",
     "evaluator",

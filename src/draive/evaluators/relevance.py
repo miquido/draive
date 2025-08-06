@@ -53,15 +53,15 @@ async def relevance_evaluator(
     guidelines: str | None = None,
 ) -> EvaluationScore:
     if not evaluated:
-        return EvaluationScore(
-            value=0,
-            comment="Input was empty!",
+        return EvaluationScore.of(
+            0.0,
+            meta={"comment": "Input was empty!"},
         )
 
     if not reference:
-        return EvaluationScore(
-            value=0,
-            comment="Reference was empty!",
+        return EvaluationScore.of(
+            0.0,
+            meta={"comment": "Reference was empty!"},
         )
 
     completion: MultimodalContent = await Stage.completion(
@@ -85,7 +85,7 @@ async def relevance_evaluator(
     ):
         return EvaluationScore.of(
             cast(EvaluationScoreValue, result.content.to_str()),
-            comment=completion.to_str(),
+            meta={"comment": completion.to_str()},
         )
 
     else:

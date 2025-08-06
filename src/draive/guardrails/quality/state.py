@@ -41,14 +41,20 @@ class GuardrailsQualityVerification(State):
                 raise GuardrailsQualityException(
                     reason=result.evaluator,
                     content=content,
-                    meta=result.meta,
+                    meta={
+                        "performance": result.performance,
+                        "report": result.report(detailed=True),
+                    },
                 )
 
             else:
                 raise GuardrailsQualityException(
                     reason=result.scenario,
                     content=content,
-                    meta=result.meta,
+                    meta={
+                        "performance": result.performance,
+                        "report": result.report(detailed=True),
+                    },
                 )
 
         return cls(verifying=verifying)

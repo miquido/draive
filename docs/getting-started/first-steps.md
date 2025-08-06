@@ -541,19 +541,19 @@ async with ctx.scope("app", disposables=(OpenAI(),)):
 
 Now that you understand Draive's core concepts:
 
-1. Explore the [Guides](/guides) for specific use cases:
-   - [Basic Usage](/guides/BasicUsage.md)
-   - [Basic Tools Use](/guides/BasicToolsUse.md)
-   - [Basic Conversation](/guides/BasicConversation.md)
-   - [Basic Evaluation](/guides/BasicEvaluation.md)
+1. Explore the Guides for specific use cases:
+   - [Basic Usage](../guides/BasicUsage.md)
+   - [Basic Tools Use](../guides/BasicToolsUse.md)
+   - [Basic Conversation](../guides/BasicConversation.md)
+   - [Basic Evaluation](../guides/BasicEvaluation.md)
 
-2. Check out [Cookbooks](/cookbooks) for complete examples:
-   - [Basic RAG](/cookbooks/BasicRAG.md)
-   - [Basic MCP](/cookbooks/BasicMCP.md)
-   - [Basic Data Extraction](/cookbooks/BasicDataExtraction.md)
+2. Check out Cookbooks for complete examples:
+   - [Basic RAG](../cookbooks/BasicRAG.md)
+   - [Basic MCP](../cookbooks/BasicMCP.md)
+   - [Basic Data Extraction](../cookbooks/BasicDataExtraction.md)
 
 3. Learn about advanced topics:
-   - [Advanced State](/guides/AdvancedState.md)
-   - [Basic Stage Usage](/guides/BasicStageUsage.md)
+   - [Advanced State](../guides/AdvancedState.md)
+   - [Basic Stage Usage](../guides/BasicStageUsage.md)
 
 Remember: Draive is designed for clarity and composability. Start simple, test often, and gradually add complexity as needed.
