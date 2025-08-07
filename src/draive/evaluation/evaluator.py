@@ -129,7 +129,7 @@ class EvaluatorResult(DataModel):
             return f"{self.evaluator}: {status} ({self.performance:.2f}%)"
 
         meta: list[str] = []
-        for key, value in self.meta:
+        for key, value in self.meta.items():
             meta.append(f"<{key}>{value}</{key}>")
 
         return (
