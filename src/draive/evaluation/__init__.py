@@ -1,3 +1,4 @@
+from draive.evaluation.evaluation import evaluate
 from draive.evaluation.evaluator import (
     Evaluator,
     EvaluatorDefinition,
@@ -43,6 +44,8 @@ __all__ = (
     "EvaluatorSuiteResult",
     "PreparedEvaluator",
     "PreparedEvaluatorScenario",
+    "PreparedEvaluatorSuite",
+    "evaluate",
     "evaluator",
     "evaluator_scenario",
     "evaluator_suite",

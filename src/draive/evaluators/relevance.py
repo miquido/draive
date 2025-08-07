@@ -26,7 +26,7 @@ The EVALUATED content should include only important information from the REFEREN
 <RATING>
 Assign a relevance score using exact name of one of the following values:
 - "poor" is very low relevance, the content contains mostly irrelevant or redundant information.
-- "fair" is low coverage, the content includes some important points but has\
+- "fair" is low relevance, the content includes some important points but has\
  significant irrelevant parts.
 - "good" is moderate relevance, the content covers most important points but includes\
  some unnecessary information.
@@ -38,7 +38,7 @@ Use the "none" value for content that cannot be rated at all.
 </RATING>
 
 <FORMAT>
-The final result containing only the numerical score value HAVE to be put inside a `RESULT`\
+The final result containing only the rating value, HAVE to be put inside a `RESULT`\
  xml tag within the result i.e. `<RESULT>good</RESULT>`.
 </FORMAT>
 """
@@ -89,4 +89,4 @@ async def relevance_evaluator(
         )
 
     else:
-        raise ValueError("Invalid evaluator result:\n%s", completion)
+        raise ValueError(f"Invalid evaluator result:\n{completion}")

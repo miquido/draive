@@ -91,7 +91,8 @@ result2 = await strict_length_check("Response 2...")
 Scenarios group multiple evaluators for comprehensive testing:
 
 ```python
-from draive import evaluator_scenario, EvaluatorResult
+from collections.abc import Sequence
+from draive.evaluation import evaluate, evaluator_scenario, EvaluatorResult
 
 @evaluator_scenario(name="quality_checks")
 async def evaluate_response_quality(
@@ -99,44 +100,51 @@ async def evaluate_response_quality(
     context: str
 ) -> Sequence[EvaluatorResult]:
     """Run multiple quality checks on a response."""
-    return [
-        await check_response_length(value),
-        await check_sentiment(value),
-        await check_relevance(value, context),
-        await check_grammar(value)
-    ]
+    return await evaluate(
+        value,
+        check_response_length.prepared(),
+        check_sentiment.prepared(),
+        check_relevance.prepared(context=context),
+        check_grammar.prepared(),
+    )
 
-# Run the scenario
-scenario_result = await evaluate_response_quality(
+# Run the evaluation
+evaluation_results = await evaluate_response_quality(
     response="The model's response...",
     context="Original question context"
 )
 
-print(f"Scenario passed: {scenario_result.passed}")
-print(f"Overall performance: {scenario_result.performance:.1f}%")
-print(scenario_result.report(detailed=True))
+# Process results
+all_passed = all(result.passed for result in evaluation_results)
+avg_performance = sum(result.performance for result in evaluation_results) / len(evaluation_results)
+
+print(f"All evaluations passed: {all_passed}")
+print(f"Average performance: {avg_performance:.1f}%")
+
+for result in evaluation_results:
+    print(f"- {result.evaluator}: {result.score.value} ({'✓' if result.passed else '✗'})")
 ```
 
 ### Concurrent Evaluator Execution
 
-For better performance, run evaluators concurrently using `concurrently` helper:
+For better performance, run evaluators concurrently using the `evaluate` helper:
 
 ```python
-from draive import evaluator_scenario, EvaluatorResult, concurrently
+from draive.evaluation import evaluate
 
-@evaluator_scenario(name="parallel_quality_checks")
 async def evaluate_response_quality_parallel(
     value: str,
     context: str
 ) -> Sequence[EvaluatorResult]:
     """Run multiple quality checks concurrently for better performance."""
 
-    # Execute all evaluators concurrently
-    return await concurrently(
-        check_response_length(value),
-        check_sentiment(value),
-        check_relevance(value, context),
-        check_grammar(value),
+    # Execute all evaluators concurrently using the evaluate helper
+    return await evaluate(
+        value,
+        check_response_length.prepared(),
+        check_sentiment.prepared(),
+        check_relevance.prepared(context=context),
+        check_grammar.prepared(),
         concurrent_tasks=2  # Run up to 2 evaluators in parallel
     )
 ```
@@ -290,29 +298,39 @@ async def strict_evaluator(value: str) -> float:
 
 ### 1. Threshold Selection
 
-Choose appropriate thresholds based on criticality using named levels for clarity:
+Choose appropriate thresholds based on criticality and business impact:
 
 ```python
-# Critical features - highest threshold
-@evaluator(name="safety_check", threshold="perfect")  # 0.9
-async def check_safety(content: str) -> float: ...
+from draive.evaluators import *
 
-# Important features - high threshold
-@evaluator(name="quality_check", threshold="excellent")  # 0.7
-async def check_quality(content: str) -> float: ...
+# Critical features - highest threshold (perfect = 0.9)
+safety_check = safety_evaluator.with_threshold("perfect")
+consistency_check = consistency_evaluator.with_threshold("perfect")
+forbidden_check = forbidden_keywords_evaluator.with_threshold("perfect")
 
-# Nice-to-have features - moderate threshold
-@evaluator(name="style_check", threshold="good")  # 0.5
-async def check_style(content: str) -> float: ...
+# Important features - high threshold (excellent = 0.7)
+helpfulness_check = helpfulness_evaluator.with_threshold("excellent")
+factual_accuracy_check = factual_accuracy_evaluator.with_threshold("excellent")
+tone_style_check = tone_style_evaluator.with_threshold("excellent")
 
-# Experimental features - lower threshold
-@evaluator(name="experimental_check", threshold="fair")  # 0.3
-async def check_experimental(content: str) -> float: ...
+# Quality features - moderate threshold (good = 0.5)
+completeness_check = completeness_evaluator.with_threshold("good")
+creativity_check = creativity_evaluator.with_threshold("good")
+readability_check = readability_evaluator.with_threshold("good")
 
-# Only use numeric thresholds for fine-tuning
-@evaluator(name="precise_check", threshold=0.85)  # When you need exact control
-async def check_precise(content: str) -> float: ...
+# Flexible features - lower threshold (fair = 0.3)
+similarity_check = similarity_evaluator.with_threshold("fair")
+keyword_check = required_keywords_evaluator.with_threshold("fair")
+
+# Custom precise thresholds when needed
+precise_check = factual_accuracy_evaluator.with_threshold(0.85)  # Between excellent (0.7) and perfect (0.9)
 ```
+
+**Threshold Guidelines by Use Case:**
+- **Safety & Compliance**: Always use "perfect" - no tolerance for violations
+- **Core Quality**: Use "excellent" - high standards for user-facing content
+- **Feature Quality**: Use "good" - balanced standards allowing some flexibility
+- **Experimental/Optional**: Use "fair" - minimum acceptable standards
 
 ### 2. Meaningful Metadata
 

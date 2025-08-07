@@ -94,6 +94,7 @@ nav:
       - Basic Model Generation: guides/BasicModelGeneration.md
       - Basic Evaluation: guides/BasicEvaluation.md
       - Comprehensive Evaluation: guides/ComprehensiveEvaluation.md
+      - Evaluator Catalog: guides/EvaluatorCatalog.md
       - Basic Stage Usage: guides/BasicStageUsage.md
       - Advanced State: guides/AdvancedState.md
       - Multimodal Content: guides/MultimodalContent.md
