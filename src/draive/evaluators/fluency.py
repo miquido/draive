@@ -41,20 +41,20 @@ The final result containing only the numerical score value HAVE to be put inside
 
 @evaluator(name="fluency")
 async def fluency_evaluator(
-    content: Multimodal,
+    evaluated: Multimodal,
     /,
     guidelines: str | None = None,
 ) -> EvaluationScore:
-    if not content:
-        return EvaluationScore(
-            value=0,
-            comment="Input was empty!",
+    if not evaluated:
+        return EvaluationScore.of(
+            0.0,
+            meta={"comment": "Input was empty!"},
         )
 
     completion: MultimodalContent = await Stage.completion(
         MultimodalContent.of(
             "<CONTENT>",
-            content,
+            evaluated,
             "</CONTENT>",
         ),
         instruction=INSTRUCTION.format(
@@ -70,7 +70,7 @@ async def fluency_evaluator(
     ):
         return EvaluationScore.of(
             cast(EvaluationScoreValue, result.content.to_str()),
-            comment=completion.to_str(),
+            meta={"comment": completion.to_str()},
         )
 
     else:

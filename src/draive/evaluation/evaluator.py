@@ -1,8 +1,9 @@
+import re
 from asyncio import gather
 from collections.abc import Callable, Collection
-from typing import Any, Protocol, Self, cast, final, overload, runtime_checkable
+from typing import Protocol, Self, cast, overload, runtime_checkable
 
-from haiway import META_EMPTY, AttributePath, Meta, MetaValues, State, ctx
+from haiway import META_EMPTY, AttributePath, Immutable, Meta, MetaValues, State, ctx
 
 from draive.evaluation.score import EvaluationScore
 from draive.evaluation.value import (
@@ -21,56 +22,6 @@ __all__ = (
 )
 
 
-class EvaluationResult(DataModel):
-    """
-    Result of an evaluation containing score and metadata.
-
-    Wraps an EvaluationScore with additional metadata about the evaluation.
-    """
-
-    @classmethod
-    def of(
-        cls,
-        score: EvaluationScore | EvaluationScoreValue,
-        /,
-        meta: Meta | MetaValues | None = None,
-    ) -> Self:
-        """
-        Create an EvaluationResult from a score value.
-
-        Parameters
-        ----------
-        score : EvaluationScore | EvaluationScoreValue
-            The evaluation score, either as an EvaluationScore object or a raw value
-        meta : Meta | MetaValues | None, optional
-            Additional metadata for the evaluation
-
-        Returns
-        -------
-        Self
-            New EvaluationResult instance
-        """
-        evaluation_score: EvaluationScore
-        if isinstance(score, EvaluationScore):
-            evaluation_score = score
-
-        else:
-            evaluation_score = EvaluationScore.of(score)
-
-        return cls(
-            score=evaluation_score,
-            meta=Meta.of(meta),
-        )
-
-    score: EvaluationScore = Field(
-        description="Evaluation score",
-    )
-    meta: Meta = Field(
-        description="Additional evaluation metadata",
-        default=META_EMPTY,
-    )
-
-
 class EvaluatorResult(DataModel):
     """
     Result from running an evaluator on a value.
@@ -86,7 +37,7 @@ class EvaluatorResult(DataModel):
         evaluator: str,
         /,
         *,
-        score: EvaluationResult | EvaluationScore | EvaluationScoreValue,
+        score: EvaluationScore | EvaluationScoreValue,
         threshold: EvaluationScoreValue,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
@@ -109,18 +60,14 @@ class EvaluatorResult(DataModel):
         Self
             New EvaluatorResult instance
         """
-        evaluation_score: EvaluationScore
+        evaluation_score: EvaluationScoreValue
         evaluation_meta: Meta
-        if isinstance(score, EvaluationResult):
-            evaluation_score = score.score
+        if isinstance(score, EvaluationScore):
+            evaluation_score = score.value
             evaluation_meta = score.meta.merged_with(meta)
 
-        elif isinstance(score, EvaluationScore):
-            evaluation_score = score
-            evaluation_meta = Meta.of(meta)
-
         else:
-            evaluation_score = EvaluationScore.of(score)
+            evaluation_score = evaluation_score_value(score)
             evaluation_meta = Meta.of(meta)
 
         return cls(
@@ -133,8 +80,9 @@ class EvaluatorResult(DataModel):
     evaluator: str = Field(
         description="Name of the evaluator",
     )
-    score: EvaluationScore = Field(
-        description="Evaluation score",
+    score: float = Field(
+        description="Evaluation score value",
+        verifier=evaluation_score_verifier,
     )
     threshold: float = Field(
         description="Score threshold required to pass evaluation, "
@@ -156,7 +104,7 @@ class EvaluatorResult(DataModel):
         bool
             True if score value meets or exceeds threshold
         """
-        return self.score.value >= self.threshold
+        return self.score >= self.threshold
 
     def report(
         self,
@@ -180,14 +128,16 @@ class EvaluatorResult(DataModel):
         if not detailed:
             return f"{self.evaluator}: {status} ({self.performance:.2f}%)"
 
-        comment: str = f"'{self.score.comment}'" if self.score.comment else "N/A"
+        meta: list[str] = []
+        for key, value in self.meta:
+            meta.append(f"<{key}>{value}</{key}>")
 
         return (
             f"<evaluator name='{self.evaluator}' status='{status}'"
             f" performance='{self.performance:.2f}%'>"
-            f"\n<score>{self.score.value:.3f}</score>"
+            f"\n<score>{self.score:.3f}</score>"
             f"\n<threshold>{self.threshold:.3f}</threshold>"
-            f"\n<comment>{comment}</comment>"
+            f"\n<meta>\n{'\n'.join(meta)}\n</meta>"
             "\n</evaluator>"
         )
 
@@ -199,12 +149,12 @@ class EvaluatorResult(DataModel):
         Returns
         -------
         float
-            Performance percentage (0-100), calculated as min(100, score/threshold * 100)
+            Performance percentage, may go above 100% if score is higher than threshold
         """
         if self.threshold <= 0:
-            return 1.0 * 100.0
+            return self.score * 100.0
 
-        return min(1.0, self.score.value / self.threshold) * 100.0
+        return (self.score / self.threshold) * 100.0
 
     def __gt__(
         self,
@@ -279,7 +229,7 @@ class EvaluatorDefinition[Value, **Args](Protocol):
         /,
         *args: Args.args,
         **kwargs: Args.kwargs,
-    ) -> EvaluationResult | EvaluationScore | EvaluationScoreValue: ...
+    ) -> EvaluationScore | EvaluationScoreValue: ...
 
 
 @runtime_checkable
@@ -298,14 +248,16 @@ class PreparedEvaluator[Value](Protocol):
     ) -> EvaluatorResult: ...
 
 
-@final
-class Evaluator[Value, **Args]:
+class Evaluator[Value, **Args](Immutable):
     """
     Configurable evaluator for assessing values against criteria.
 
     An Evaluator wraps an evaluation function with configuration like name,
     threshold, state, and metadata. It provides methods to compose evaluators,
     transform inputs, and prepare evaluators with partial arguments.
+
+    The evaluation uses "evaluator.evaluator_name" context where evaluator_name is actual name of
+    the evaluator to execute evaluation.
 
     Attributes
     ----------
@@ -345,7 +297,7 @@ class Evaluator[Value, **Args]:
             # Placeholder for the lowest result
             lowest: EvaluatorResult = EvaluatorResult(
                 evaluator="lowest",
-                score=EvaluationScore(value=1),
+                score=1.0,
                 threshold=0,
                 meta=META_EMPTY,
             )
@@ -389,7 +341,7 @@ class Evaluator[Value, **Args]:
             # Placeholder for the highest result
             highest: EvaluatorResult = EvaluatorResult(
                 evaluator="highest",
-                score=EvaluationScore(value=0),
+                score=0.0,
                 threshold=1,
                 meta=META_EMPTY,
             )
@@ -405,13 +357,11 @@ class Evaluator[Value, **Args]:
 
         return evaluate
 
-    __slots__ = (
-        "_definition",
-        "_state",
-        "meta",
-        "name",
-        "threshold",
-    )
+    name: str
+    threshold: float
+    meta: Meta
+    _definition: EvaluatorDefinition[Value, Args]
+    _state: Collection[State]
 
     def __init__(
         self,
@@ -423,34 +373,31 @@ class Evaluator[Value, **Args]:
     ) -> None:
         assert (  # nosec: B101
             threshold is None or 0 <= threshold <= 1
-        ), "Evaluation threshold has to be between 0 and 1"
-        assert "\n" not in name  # nosec: B101
+        ), "Evaluator threshold has to be a value between 0 and 1"
+        assert re.match(  # nosec: B101
+            r"^[a-z][a-z0-9_]*$", name.lower()
+        ), "Evaluator name should follow snake case rules"
 
-        self._definition: EvaluatorDefinition[Value, Args]
         object.__setattr__(
             self,
             "_definition",
             definition,
         )
-        self.name: str
         object.__setattr__(
             self,
             "name",
             name.lower().replace(" ", "_"),
         )
-        self.threshold: float
         object.__setattr__(
             self,
             "threshold",
-            1 if threshold is None else threshold,
+            1.0 if threshold is None else threshold,
         )
-        self._state: Collection[State]
         object.__setattr__(
             self,
             "_state",
             state,
         )
-        self.meta: Meta
         object.__setattr__(
             self,
             "meta",
@@ -627,7 +574,7 @@ class Evaluator[Value, **Args]:
             /,
             *args: Args.args,
             **kwargs: Args.kwargs,
-        ) -> EvaluationResult | EvaluationScore | EvaluationScoreValue:
+        ) -> EvaluationScore | EvaluationScoreValue:
             return await self._definition(
                 mapper(value),
                 *args,
@@ -664,8 +611,8 @@ class Evaluator[Value, **Args]:
                 attributes={
                     "passed": result.passed,
                     "threshold": result.threshold,
-                    "score": result.score.value,
-                    "score.comment": result.score.comment,
+                    "score": result.score,
+                    "comment": result.meta.get_str("comment", default="N/A"),
                 },
             )
             return result
@@ -677,7 +624,7 @@ class Evaluator[Value, **Args]:
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> EvaluatorResult:
-        result: EvaluationResult | EvaluationScore | EvaluationScoreValue
+        result: EvaluationScore | EvaluationScoreValue
         try:
             result = await self._definition(
                 value,
@@ -690,12 +637,10 @@ class Evaluator[Value, **Args]:
                 f"Evaluator `{self.name}` failed due to an error",
                 exception=exc,
             )
-            result = EvaluationResult.of(
-                EvaluationScore.of(
-                    False,
-                    comment="Error",
-                ),
+            result = EvaluationScore.of(
+                0.0,
                 meta={
+                    "comment": "Failed due to the evaluator issue",
                     "exception": str(type(exc)),
                     "error": str(exc),
                 },
@@ -706,25 +651,6 @@ class Evaluator[Value, **Args]:
             score=result,
             threshold=self.threshold,
             meta=self.meta,
-        )
-
-    def __setattr__(
-        self,
-        name: str,
-        value: Any,
-    ) -> Any:
-        raise AttributeError(
-            f"Can't modify immutable {self.__class__.__qualname__},"
-            f" attribute - '{name}' cannot be modified"
-        )
-
-    def __delattr__(
-        self,
-        name: str,
-    ) -> None:
-        raise AttributeError(
-            f"Can't modify immutable {self.__class__.__qualname__},"
-            f" attribute - '{name}' cannot be deleted"
         )
 
 
@@ -789,13 +715,9 @@ def evaluator[Value, **Args](
 
     Examples
     --------
-    As a decorator:
     >>> @evaluator(threshold=0.8)
     ... async def my_evaluator(value: str) -> float:
     ...     return 0.9 if len(value) > 10 else 0.5
-
-    Direct call:
-    >>> my_evaluator = evaluator(some_function, name="custom", threshold=0.7)
     """
 
     def wrap(
