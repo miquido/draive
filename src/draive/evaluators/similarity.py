@@ -40,7 +40,7 @@ Use the "none" value for content that cannot be rated at all.
 </RATING>
 
 <FORMAT>
-The final result containing only the numerical score value HAVE to be put inside a `RESULT` \
+The final result containing only the rating value, HAVE to be put inside a `RESULT` \
 xml tag within the result i.e. `<RESULT>good</RESULT>`.
 </FORMAT>
 """
@@ -91,7 +91,7 @@ async def similarity_evaluator(
         )
 
     else:
-        raise ValueError("Invalid evaluator result:\n%s", completion)
+        raise ValueError(f"Invalid evaluator result:\n{completion}")
 
 
 @evaluator(name="text_vector_similarity")
