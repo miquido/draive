@@ -287,8 +287,8 @@ def _tree_exploration_stage[Parameters: DataModel](
         )
 
         async def explore(
-            node: _RefinementTreeNode[Parameters],
-        ) -> Mapping[UUID, _RefinementTreeNode[Parameters]]:
+            node: _RefinementTreeNode,
+        ) -> Mapping[UUID, _RefinementTreeNode]:
             return await _explore_node(
                 node=node,
                 evaluator_suite=evaluator_suite,
@@ -298,15 +298,13 @@ def _tree_exploration_stage[Parameters: DataModel](
                 guidelines=refinement_state.guidelines,
             )
 
-        node_updates: Sequence[
-            Mapping[UUID, _RefinementTreeNode[Parameters]]
-        ] = await execute_concurrently(
+        node_updates: Sequence[Mapping[UUID, _RefinementTreeNode]] = await execute_concurrently(
             explore,
             refinement_state.leafs(),
             concurrent_tasks=concurrent_nodes,
         )
 
-        updated_nodes: dict[UUID, _RefinementTreeNode[Parameters]] = as_dict(refinement_state.nodes)
+        updated_nodes: dict[UUID, _RefinementTreeNode] = as_dict(refinement_state.nodes)
         for nodes in node_updates:
             updated_nodes = {
                 **updated_nodes,
@@ -358,13 +356,13 @@ def _tree_exploration_stage[Parameters: DataModel](
 
 
 async def _explore_node[Parameters: DataModel](
-    node: _RefinementTreeNode[Parameters],
+    node: _RefinementTreeNode,
     evaluator_suite: PreparedEvaluatorSuite[Parameters],
     evaluator_cases: Sequence[EvaluatorSuiteCase[Parameters]],
     sample_ratio: float,
     performance_drop_threshold: float,
     guidelines: str | None,
-) -> Mapping[UUID, _RefinementTreeNode[Parameters]]:
+) -> Mapping[UUID, _RefinementTreeNode]:
     assert not node.pruned  # nosec: B101 # skip pruned branches
     ctx.log_info(
         f"Exploring node {node.identifier} at"
@@ -386,7 +384,7 @@ async def _explore_node[Parameters: DataModel](
         sample_ratio=sample_ratio,
     )
 
-    children: dict[UUID, _RefinementTreeNode[Parameters]] = {}
+    children: dict[UUID, _RefinementTreeNode] = {}
     for strategy_name, refined_instruction in strategies:
         # Evaluate with focused suite
         ctx.log_info(f"Evaluating strategy '{strategy_name}'...")
