@@ -253,7 +253,7 @@ def _tree_initialization_stage[Parameters: DataModel](
 
         # Setup initial state
         return state.updated(
-            _RefinementState[Parameters](
+            _RefinementState(
                 root=root_node,
                 nodes={root_node.identifier: root_node},
                 sample_ratio=sample_ratio,
