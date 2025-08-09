@@ -1,37 +1,30 @@
 from collections.abc import Collection, Iterable
 from types import TracebackType
-from typing import Literal, final
+from typing import final
 
 from haiway import State
 
+from draive.embedding import TextEmbedding
+from draive.generation import ImageGeneration
+from draive.guardrails import GuardrailsModeration
+from draive.models import GenerativeModel, RealtimeGenerativeModel
 from draive.openai.api import OpenAIAPI
 from draive.openai.embedding import OpenAIEmbedding
 from draive.openai.guardrails import OpenAIContentModereation
 from draive.openai.images import OpenAIImageGeneration
-from draive.openai.lmm_generation import OpenAILMMGeneration
-from draive.openai.lmm_session import OpenAIRealtimeLMM
-from draive.openai.tokenization import OpenAITokenization
+from draive.openai.realtime import OpenAIRealtime
+from draive.openai.responses import OpenAIResponses
 
 __all__ = ("OpenAI",)
 
 
-type Features = Literal[
-    "lmm",
-    "lmm_session",
-    "text_embedding",
-    "image_generation",
-    "content_guardrails",
-]
-
-
 @final
 class OpenAI(
-    OpenAILMMGeneration,
-    OpenAIRealtimeLMM,
+    OpenAIResponses,
+    OpenAIRealtime,
     OpenAIEmbedding,
     OpenAIImageGeneration,
     OpenAIContentModereation,
-    OpenAITokenization,
     OpenAIAPI,
 ):
     """
@@ -48,7 +41,7 @@ class OpenAI(
         azure_api_endpoint: str | None = None,
         azure_api_version: str | None = None,
         azure_deployment: str | None = None,
-        features: Collection[Features] | None = None,
+        features: Collection[type[State]] | None = None,
     ) -> None:
         super().__init__(
             base_url=base_url,
@@ -59,16 +52,16 @@ class OpenAI(
             azure_deployment=azure_deployment,
         )
 
-        self._features: frozenset[Features] = (
+        self._features: frozenset[type[State]] = (
             frozenset(features)
             if features is not None
             else frozenset(
                 (
-                    "lmm",
-                    "lmm_session",
-                    "text_embedding",
-                    "image_generation",
-                    "content_guardrails",
+                    GenerativeModel,
+                    RealtimeGenerativeModel,
+                    TextEmbedding,
+                    ImageGeneration,
+                    GuardrailsModeration,
                 )
             )
         )
@@ -76,19 +69,19 @@ class OpenAI(
     async def __aenter__(self) -> Iterable[State]:
         await self._initialize_client()
         state: list[State] = []
-        if "lmm" in self._features:
-            state.append(self.lmm())
+        if GenerativeModel in self._features:
+            state.append(self.generative_model())
 
-        if "lmm_session" in self._features:
-            state.append(self.lmm_session())
+        if RealtimeGenerativeModel in self._features:
+            state.append(self.realtime_generative_model())
 
-        if "text_embedding" in self._features:
+        if TextEmbedding in self._features:
             state.append(self.text_embedding())
 
-        if "image_generation" in self._features:
+        if ImageGeneration in self._features:
             state.append(self.image_generation())
 
-        if "content_guardrails" in self._features:
+        if GuardrailsModeration in self._features:
             state.append(self.content_guardrails())
 
         return state

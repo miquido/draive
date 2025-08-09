@@ -1,19 +1,21 @@
 from collections.abc import Collection, Iterable
 from types import TracebackType
-from typing import Literal, final
+from typing import final
 
 from haiway import State
 
+from draive.embedding import TextEmbedding
+from draive.models import GenerativeModel
 from draive.ollama.api import OllamaAPI
+from draive.ollama.chat import OllamaChat
 from draive.ollama.embedding import OllamaEmbedding
-from draive.ollama.lmm_generation import OllamaLMMGeneration
 
 __all__ = ("Ollama",)
 
 
 @final
 class Ollama(
-    OllamaLMMGeneration,
+    OllamaChat,
     OllamaEmbedding,
     OllamaAPI,
 ):
@@ -26,21 +28,24 @@ class Ollama(
     def __init__(
         self,
         server_url: str | None = None,
-        features: Collection[Literal["lmm", "text_embedding"]] | None = None,
+        features: Collection[type[GenerativeModel | TextEmbedding]] | None = None,
     ) -> None:
         super().__init__(server_url=server_url)
 
-        self._features: frozenset[Literal["lmm", "text_embedding"]] = (
-            frozenset(features) if features is not None else frozenset(("lmm", "text_embedding"))
+        self._features: frozenset[type[State]] = (
+            frozenset(features)
+            if features is not None
+            else frozenset((GenerativeModel, TextEmbedding))
         )
 
     async def __aenter__(self) -> Iterable[State]:
         await self._initialize_client()
         state: list[State] = []
-        if "lmm" in self._features:
-            state.append(self.lmm())
 
-        if "text_embedding" in self._features:
+        if GenerativeModel in self._features:
+            state.append(self.generative_model())
+
+        if TextEmbedding in self._features:
             state.append(self.text_embedding())
 
         return state

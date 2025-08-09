@@ -5,17 +5,19 @@ from uuid import uuid4
 from pytest import mark, raises
 
 from draive import (
-    LMM,
-    LMMCompletion,
-    LMMContextElement,
-    LMMToolRequest,
+    GenerativeModel,
     MultimodalContent,
     Toolbox,
     ctx,
     tool,
 )
 from draive.generation.model import ModelGeneration
-from draive.lmm import LMMToolRequests
+from draive.models import (
+    ModelContextElement,
+    ModelOutput,
+    ModelToolRequest,
+    ModelToolsDeclaration,
+)
 from draive.parameters import DataModel
 
 
@@ -66,26 +68,28 @@ async def test_model_generation_simple():
     """Test basic model generation with simple data model."""
     tracker = MockLMMTracker()
 
-    async def mock_completion(
+    async def mock_generating(
         *,
-        instruction: str | None = None,
-        context: Sequence[LMMContextElement],
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
         output: Any = None,
+        stream: bool = False,
         **extra: Any,
-    ) -> LMMCompletion:
+    ) -> ModelOutput:
         tracker.call_count += 1
         tracker.last_context = context
-        tracker.last_instruction = instruction
+        tracker.last_instruction = instructions
         tracker.last_output = output
 
         # Return valid JSON for Person model
         json_response = '{"name": "John Doe", "age": 30, "email": "john@example.com"}'
-        return LMMCompletion.of(json_response)
+        return ModelOutput.of(MultimodalContent.of(json_response))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         result = await ModelGeneration.generate(
             Person,
-            instruction="Generate a person with the given details",
+            instructions="Generate a person with the given details",
             input="Create a 30-year-old software engineer named John Doe",
             schema_injection="skip",
         )
@@ -95,7 +99,8 @@ async def test_model_generation_simple():
         assert result.age == 30
         assert result.email == "john@example.com"
         assert tracker.call_count == 1
-        assert tracker.last_output == Person
+        # Without a custom decoder, the output target is the generated class
+        assert tracker.last_output is Person
 
 
 @mark.asyncio
@@ -103,23 +108,27 @@ async def test_model_generation_with_schema_injection_full():
     """Test model generation with full schema injection."""
     tracker = MockLMMTracker()
 
-    async def mock_completion(
+    async def mock_generating(
         *,
-        instruction: str | None = None,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: Any = None,
+        stream: bool = False,
         **extra: Any,
-    ) -> LMMCompletion:
-        tracker.last_instruction = instruction
+    ) -> ModelOutput:
+        tracker.last_instruction = instructions
         # With full schema injection, instruction should be processed differently
         # Let's just verify the instruction was received and contains our base instruction
-        assert "generate a product" in instruction.lower()
+        assert "generate a product" in instructions.lower()
 
         json_response = '{"name": "Test Product", "price": 99.99, "category": "Electronics"}'
-        return LMMCompletion.of(json_response)
+        return ModelOutput.of(MultimodalContent.of(json_response))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         result = await ModelGeneration.generate(
             Product,
-            instruction="Generate a product",
+            instructions="Generate a product",
             input="Create an electronics product",
             schema_injection="full",
         )
@@ -136,19 +145,23 @@ async def test_model_generation_with_schema_injection_simplified():
     """Test model generation with simplified schema injection."""
     tracker = MockLMMTracker()
 
-    async def mock_completion(
+    async def mock_generating(
         *,
-        instruction: str | None = None,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: Any = None,
+        stream: bool = False,
         **extra: Any,
-    ) -> LMMCompletion:
-        tracker.last_instruction = instruction
+    ) -> ModelOutput:
+        tracker.last_instruction = instructions
         json_response = '{"name": "Simple Product", "price": 19.99, "category": "Books"}'
-        return LMMCompletion.of(json_response)
+        return ModelOutput.of(MultimodalContent.of(json_response))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         result = await ModelGeneration.generate(
             Product,
-            instruction="Generate a product",
+            instructions="Generate a product",
             input="Create a book product",
             schema_injection="simplified",
         )
@@ -162,22 +175,26 @@ async def test_model_generation_with_schema_injection_skip():
     """Test model generation with schema injection skipped."""
     tracker = MockLMMTracker()
 
-    async def mock_completion(
+    async def mock_generating(
         *,
-        instruction: str | None = None,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: Any = None,
+        stream: bool = False,
         **extra: Any,
-    ) -> LMMCompletion:
-        tracker.last_instruction = instruction
+    ) -> ModelOutput:
+        tracker.last_instruction = instructions
         # Instruction should not contain schema when skipped
-        assert "FORMAT" not in instruction and "SCHEMA" not in instruction
+        assert "FORMAT" not in instructions and "SCHEMA" not in instructions
 
         json_response = '{"name": "No Schema Product", "price": 5.99, "category": "Other"}'
-        return LMMCompletion.of(json_response)
+        return ModelOutput.of(MultimodalContent.of(json_response))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         result = await ModelGeneration.generate(
             Product,
-            instruction="Generate a product",
+            instructions="Generate a product",
             input="Create any product",
             schema_injection="skip",
         )
@@ -201,27 +218,35 @@ async def test_model_generation_with_tools():
             "in_stock": True,
         }
 
-    tool_request = LMMToolRequest(
-        identifier=str(uuid4()),
+    tool_request = ModelToolRequest.of(
+        str(uuid4()),
         tool="get_product_info",
         arguments={"product_id": "123"},
     )
 
-    async def mock_completion(**kwargs) -> LMMCompletion | LMMToolRequests:
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: Any = None,
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
         nonlocal call_count
         call_count += 1
         if call_count == 1:
             # First call requests tool usage
-            return LMMToolRequests.of([tool_request])
+            return ModelOutput.of(tool_request)
         else:
             # After tool response, return final result
             json_response = '{"name": "Product 123", "price": 29.99, "category": "Tools"}'
-            return LMMCompletion.of(json_response)
+            return ModelOutput.of(MultimodalContent.of(json_response))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         result = await ModelGeneration.generate(
             Product,
-            instruction="Generate a product using available tools",
+            instructions="Generate a product using available tools",
             input="Get product information for ID 123",
             tools=[get_product_info],
             schema_injection="skip",
@@ -239,27 +264,31 @@ async def test_model_generation_with_examples():
     """Test model generation with examples."""
     tracker = MockLMMTracker()
 
-    async def mock_completion(
+    async def mock_generating(
         *,
-        context: Sequence[LMMContextElement],
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: Any = None,
+        stream: bool = False,
         **extra: Any,
-    ) -> LMMCompletion:
+    ) -> ModelOutput:
         tracker.last_context = context
         # Context should include examples (input + completion pairs)
         assert len(context) >= 3  # 2 examples + 1 input
 
         json_response = '{"name": "Generated Person", "age": 25}'
-        return LMMCompletion.of(json_response)
+        return ModelOutput.of(MultimodalContent.of(json_response))
 
     examples = [
         ("Create a young person", Person(name="Alice", age=22)),
         ("Create an older person", Person(name="Bob", age=45, email="bob@test.com")),
     ]
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         result = await ModelGeneration.generate(
             Person,
-            instruction="Generate a person",
+            instructions="Generate a person",
             input="Create a person aged 25",
             examples=examples,
             schema_injection="skip",
@@ -285,14 +314,22 @@ async def test_model_generation_with_custom_decoder():
         else:
             return Person.from_json(text)
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: Any = None,
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
         # Return custom format instead of JSON
-        return LMMCompletion.of("CUSTOM:Jane Doe|28|jane@example.com")
+        return ModelOutput.of(MultimodalContent.of("CUSTOM:Jane Doe|28|jane@example.com"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         result = await ModelGeneration.generate(
             Person,
-            instruction="Generate a person",
+            instructions="Generate a person",
             input="Create a custom format person",
             decoder=custom_decoder,
             schema_injection="skip",
@@ -308,15 +345,23 @@ async def test_model_generation_with_custom_decoder():
 async def test_model_generation_json_parsing_error():
     """Test model generation handles JSON parsing errors."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: Any = None,
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
         # Return invalid JSON
-        return LMMCompletion.of("This is not valid JSON at all")
+        return ModelOutput.of(MultimodalContent.of("This is not valid JSON at all"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         with raises(ValueError):  # Should raise JSON parsing error
             await ModelGeneration.generate(
                 Person,
-                instruction="Generate a person",
+                instructions="Generate a person",
                 input="Create a person",
             )
 
@@ -325,17 +370,25 @@ async def test_model_generation_json_parsing_error():
 async def test_model_generation_complex_model():
     """Test model generation with complex nested data model."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: Any = None,
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
         json_response = """{
             "title": "Complex Example",
             "items": ["item1", "item2", "item3"]
         }"""
-        return LMMCompletion.of(json_response)
+        return ModelOutput.of(MultimodalContent.of(json_response))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         result = await ModelGeneration.generate(
             ComplexModel,
-            instruction="Generate a complex model",
+            instructions="Generate a complex model",
             input="Create a complex data structure",
             schema_injection="skip",
         )
@@ -360,20 +413,24 @@ async def test_model_generation_with_toolbox():
 
     toolbox = Toolbox.of(tool1, tool2)
 
-    async def mock_completion(
+    async def mock_generating(
         *,
-        tools=None,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: Any = None,
+        stream: bool = False,
         **kwargs,
-    ) -> LMMCompletion:
+    ) -> ModelOutput:
         # Verify tools were passed
-        assert tools is not None
+        assert tools is not None and bool(tools)
         json_response = '{"name": "Toolbox Product", "price": 15.99, "category": "Test"}'
-        return LMMCompletion.of(json_response)
+        return ModelOutput.of(MultimodalContent.of(json_response))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         result = await ModelGeneration.generate(
             Product,
-            instruction="Generate a product",
+            instructions="Generate a product",
             input="Create a product using toolbox",
             schema_injection="skip",
             tools=toolbox,
@@ -387,31 +444,29 @@ async def test_model_generation_with_toolbox():
 async def test_model_generation_instruction_types():
     """Test model generation with different instruction types."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: Any = None,
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
         json_response = '{"name": "Instruction Test", "age": 35}'
-        return LMMCompletion.of(json_response)
+        return ModelOutput.of(MultimodalContent.of(json_response))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         # Test with string instruction
         result = await ModelGeneration.generate(
             Person,
-            instruction="Generate a person",
+            instructions="Generate a person",
             input="Create a person",
             schema_injection="skip",
         )
         assert isinstance(result, Person)
 
-        # Test with Instruction object
-        from draive import Instruction
-
-        instruction_obj = Instruction.of("Generate a person with proper formatting")
-        result = await ModelGeneration.generate(
-            Person,
-            instruction=instruction_obj,
-            input="Create a person",
-            schema_injection="skip",
-        )
-        assert isinstance(result, Person)
+        # Skipping separate Instruction object case in new API
 
 
 @mark.asyncio
@@ -424,26 +479,33 @@ async def test_model_generation_tool_error_handling():
         """A tool that always fails."""
         raise ValueError("Tool error!")
 
-    tool_request = LMMToolRequest(
-        identifier=str(uuid4()),
-        tool="failing_tool",
-        arguments={},
-    )
-
-    async def mock_completion(**kwargs) -> LMMCompletion | LMMToolRequests:
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: Any = None,
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            return LMMToolRequests.of([tool_request])
+            return ModelOutput.of(
+                ModelToolRequest.of(
+                    str(uuid4()),
+                    tool="failing_tool",
+                )
+            )
         else:
             # After seeing the tool error, provide a response
             json_response = '{"name": "Error Recovery", "age": 0}'
-            return LMMCompletion.of(json_response)
+            return ModelOutput.of(MultimodalContent.of(json_response))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         result = await ModelGeneration.generate(
             Person,
-            instruction="Generate a person",
+            instructions="Generate a person",
             input="Use the failing tool",
             tools=[failing_tool],
             schema_injection="skip",
@@ -458,14 +520,22 @@ async def test_model_generation_tool_error_handling():
 async def test_model_generation_empty_examples():
     """Test model generation with empty examples list."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: Any = None,
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
         json_response = '{"name": "No Examples", "age": 40}'
-        return LMMCompletion.of(json_response)
+        return ModelOutput.of(MultimodalContent.of(json_response))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         result = await ModelGeneration.generate(
             Person,
-            instruction="Generate a person",
+            instructions="Generate a person",
             input="Create a person without examples",
             examples=[],  # Empty examples
             schema_injection="skip",
@@ -479,15 +549,23 @@ async def test_model_generation_empty_examples():
 async def test_model_generation_multimodal_input():
     """Test model generation with different input types."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: Any = None,
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
         json_response = '{"name": "Multimodal Test", "age": 33}'
-        return LMMCompletion.of(json_response)
+        return ModelOutput.of(MultimodalContent.of(json_response))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), ModelGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), ModelGeneration()):
         # Test with string input
         result = await ModelGeneration.generate(
             Person,
-            instruction="Generate a person",
+            instructions="Generate a person",
             input="Simple string input",
             schema_injection="skip",
         )
@@ -496,7 +574,7 @@ async def test_model_generation_multimodal_input():
         # Test with MultimodalContent input
         result = await ModelGeneration.generate(
             Person,
-            instruction="Generate a person",
+            instructions="Generate a person",
             input=MultimodalContent.of("Multimodal content input"),
             schema_injection="skip",
         )

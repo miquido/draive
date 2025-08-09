@@ -1,16 +1,13 @@
-from collections.abc import Sequence
 from typing import Literal, TypedDict
 
-from haiway import MISSING, Missing
-
-from draive.configuration import Config
+from haiway import MISSING, Configuration, Missing
 
 __all__ = (
-    "OpenAIChatConfig",
     "OpenAIEmbeddingConfig",
     "OpenAIImageGenerationConfig",
     "OpenAIModerationConfig",
     "OpenAIRealtimeConfig",
+    "OpenAIResponsesConfig",
 )
 
 
@@ -19,22 +16,22 @@ class AudioResponseFormat(TypedDict):
     voice: Literal["ash", "ballad", "coral", "sage", "verse"]
 
 
-class OpenAIChatConfig(Config):
-    model: str
-    temperature: float = 1.0
-    top_p: float | Missing = MISSING
-    frequency_penalty: float | Missing = MISSING
-    max_tokens: int | Missing = MISSING
-    seed: int | Missing = MISSING
-    audio_response_format: AudioResponseFormat | Missing = MISSING
-    vision_details: Literal["auto", "low", "high"] | Missing = MISSING
-    parallel_tool_calls: bool | Missing = MISSING
-    timeout: float | Missing = MISSING
-    stop_sequences: Sequence[str] | Missing = MISSING
+class OpenAIResponsesConfig(Configuration):
+    model: Literal["gpt-5", "gpt-5-mini", "gpt-5-nano"] | str
+    temperature: float | Missing = MISSING
+    vision_details: Literal["auto", "low", "high"] = "auto"
+    verbosity: Literal["low", "medium", "high"] | Missing = MISSING
+    reasoning: Literal["minimal", "low", "medium", "high"] | Missing = MISSING
+    reasoning_summary: Literal["auto", "concise", "detailed"] = "auto"
+    parallel_tool_calls: bool = True
+    truncation: Literal["auto", "disabled"] = "auto"
+    max_output_tokens: int | None = None
+    safety_identifier: str | None = None
+    service_tier: Literal["auto", "default", "flex", "scale", "priority"] = "auto"
 
 
-class OpenAIRealtimeConfig(Config):
-    model: str
+class OpenAIRealtimeConfig(Configuration):
+    model: Literal["gpt-realtime"] | str = "gpt-realtime"
     input_audio_format: Literal["pcm16", "g711_ulaw", "g711_alaw"] = "pcm16"
     output_audio_format: Literal["pcm16", "g711_ulaw", "g711_alaw"] = "pcm16"
     input_audio_noise_reduction: Literal["near_field", "far_field"] | Missing = MISSING
@@ -44,24 +41,24 @@ class OpenAIRealtimeConfig(Config):
     transcribe_model: str | Missing = MISSING
 
 
-class OpenAIEmbeddingConfig(Config):
-    model: str
+class OpenAIEmbeddingConfig(Configuration):
+    model: Literal["text-embedding-3-large", "text-embedding-3-small"] | str = (
+        "text-embedding-3-small"
+    )
     dimensions: int | Missing = MISSING
     batch_size: int = 128
-    timeout: float | Missing = MISSING
 
 
-class OpenAIImageGenerationConfig(Config):
-    model: str
+class OpenAIImageGenerationConfig(Configuration):
+    model: Literal["gpt-image-1"] | str = "gpt-image-1"
     result: Literal["url", "b64_json"]
     quality: Literal["standard", "hd"] = "standard"
     size: Literal["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"] = "1024x1024"
     style: Literal["vivid", "natural"] = "vivid"
-    timeout: float | Missing = MISSING
 
 
-class OpenAIModerationConfig(Config):
-    model: str = "omni-moderation-latest"
+class OpenAIModerationConfig(Configuration):
+    model: Literal["omni-moderation-latest"] | str = "omni-moderation-latest"
     timeout: float | Missing = MISSING
     harassment_threshold: float | Missing = MISSING
     harassment_threatening_threshold: float | Missing = MISSING

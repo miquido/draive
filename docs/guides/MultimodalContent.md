@@ -190,11 +190,11 @@ text_repr = str(content)
 
 ```python
 from draive import ctx, TextGeneration, MultimodalContent, MediaData
-from draive.openai import OpenAI, OpenAIChatConfig
+from draive.openai import OpenAI, OpenAIResponsesConfig
 
 async with ctx.scope(
     "image_analysis",
-    OpenAIChatConfig(model="gpt-4o"),
+    OpenAIResponsesConfig(model="gpt-4o"),
     disposables=(OpenAI(),),
 ):
     # Create multimodal content with image
@@ -208,7 +208,7 @@ async with ctx.scope(
     
     # Generate analysis
     analysis = await TextGeneration.generate(
-        instruction="Describe what you see in the image",
+        instructions="Describe what you see in the image",
         input=content
     )
     
@@ -268,7 +268,7 @@ MultimodalContent seamlessly integrates with various LLM providers that support 
 ```python
 from collections.abc import Sequence
 from draive import ModelGeneration
-from draive.openai import OpenAI, OpenAIChatConfig
+from draive.openai import OpenAI, OpenAIResponsesConfig
 
 class ImageDescription(DataModel):
     description: str
@@ -276,12 +276,12 @@ class ImageDescription(DataModel):
 
 async with ctx.scope(
     "multimodal_generation",
-    OpenAIChatConfig(model="gpt-4o"),
+    OpenAIResponsesConfig(model="gpt-4o"),
     disposables=(OpenAI(),),
 ):
     result = await ModelGeneration.generate(
         ImageDescription,
-        instruction="Analyze the image and extract key information",
+        instructions="Analyze the image and extract key information",
         input=multimodal_content
     )
 ```

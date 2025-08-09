@@ -1,6 +1,6 @@
 from typing import Literal
 
-from draive.configuration import Config
+from haiway import Configuration
 
 __all__ = (
     "CohereImageEmbeddingConfig",
@@ -8,7 +8,7 @@ __all__ = (
 )
 
 
-class CohereTextEmbeddingConfig(Config):
+class CohereTextEmbeddingConfig(Configuration):
     model: str
     purpose: Literal[
         "search_query",
@@ -19,6 +19,6 @@ class CohereTextEmbeddingConfig(Config):
     batch_size: int = 128
 
 
-class CohereImageEmbeddingConfig(Config):
+class CohereImageEmbeddingConfig(Configuration):
     model: str
     batch_size: int = 16

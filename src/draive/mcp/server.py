@@ -9,11 +9,8 @@ from haiway import Disposable, Disposables, State, as_dict, ctx
 from mcp.server import NotificationOptions, Server
 from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.shared.message import SessionMessage
-from mcp.types import EmbeddedResource, GetPromptResult
+from mcp.types import EmbeddedResource
 from mcp.types import ImageContent as MCPImageContent
-from mcp.types import Prompt as MCPPrompt
-from mcp.types import PromptArgument as MCPPromptArgument
-from mcp.types import PromptMessage as MCPPromptMessage
 from mcp.types import Resource as MCPResource
 from mcp.types import ResourceTemplate as MCPResourceTemplate
 from mcp.types import TextContent as MCPTextContent
@@ -21,11 +18,9 @@ from mcp.types import Tool as MCPTool
 from pydantic import AnyUrl
 from starlette.types import ASGIApp
 
-from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
+from draive.models import Tool, Toolbox
 from draive.multimodal import MediaData, MediaReference, MultimodalContent, TextContent
-from draive.prompts import Prompt, PromptTemplate
 from draive.resources import Resource, ResourceContent, ResourceTemplate
-from draive.tools import Tool, Toolbox
 
 __all__ = ("MCPServer",)
 
@@ -41,7 +36,6 @@ class MCPServer:
         version: str | None = None,
         instructions: str | None = None,
         resources: Iterable[ResourceTemplate | Resource] | None = None,
-        prompts: Iterable[PromptTemplate[Any] | Prompt] | None = None,
         tools: Toolbox | Iterable[Tool] | None = None,
         disposables: Disposables | Collection[Disposable] | None = None,
     ) -> None:
@@ -74,16 +68,13 @@ class MCPServer:
         if resources is not None:
             self._expose_resources(resources)
 
-        if prompts is not None:
-            self._expose_prompts(prompts)
-
         if tools is not None:
             self._expose_tools(tools)
 
     async def run_stdio(
         self,
         notification_options: NotificationOptions | None = None,
-        experimental_capabilities: dict[str, dict[str, Any]] | None = None,
+        experimental_capabilities: Mapping[str, dict[str, Any]] | None = None,
     ) -> None:
         from mcp.server.stdio import stdio_server
 
@@ -92,13 +83,13 @@ class MCPServer:
                 read_stream=streams[0],
                 write_stream=streams[1],
                 notification_options=notification_options,
-                experimental_capabilities=experimental_capabilities,
+                experimental_capabilities=as_dict(experimental_capabilities),
             )
 
     def prepare_asgi(
         self,
         notification_options: NotificationOptions | None = None,
-        experimental_capabilities: dict[str, dict[str, Any]] | None = None,
+        experimental_capabilities: Mapping[str, dict[str, Any]] | None = None,
     ) -> ASGIApp:
         from mcp.server.sse import SseServerTransport
         from starlette.applications import Starlette
@@ -112,7 +103,7 @@ class MCPServer:
                     read_stream=streams[0],
                     write_stream=streams[1],
                     notification_options=notification_options,
-                    experimental_capabilities=experimental_capabilities,
+                    experimental_capabilities=as_dict(experimental_capabilities),
                 )
 
         return Starlette(
@@ -242,80 +233,6 @@ class MCPServer:
 
                 return _resource_content(resource)
 
-    def _expose_prompts(
-        self,
-        prompts: Iterable[PromptTemplate[Any] | Prompt],
-        /,
-    ) -> None:
-        prompt_declarations: list[MCPPrompt] = []
-        available_prompts: dict[str, PromptTemplate[Any] | Prompt] = {}
-        for prompt in prompts:
-            match prompt:
-                case Prompt():
-                    prompt_declarations.append(
-                        MCPPrompt(
-                            name=prompt.name,
-                            arguments=None,
-                            description=prompt.description,
-                        )
-                    )
-                    available_prompts[prompt.name] = prompt
-
-                case PromptTemplate():
-                    prompt_declarations.append(
-                        MCPPrompt(
-                            name=prompt.declaration.name,
-                            arguments=[
-                                MCPPromptArgument(
-                                    name=argument.name,
-                                    description=argument.specification.get("description"),
-                                    required=argument.required,
-                                )
-                                for argument in prompt.declaration.arguments
-                            ],
-                            description=prompt.declaration.description,
-                        )
-                    )
-                    available_prompts[prompt.declaration.name] = prompt
-
-        @self._server.list_prompts()
-        async def list_prompts() -> list[MCPPrompt]:  # pyright: ignore[reportUnusedFunction]
-            async with ctx.scope(
-                "list_prompts",
-                *self._server.request_context.lifespan_context,
-            ):
-                return prompt_declarations
-
-        @self._server.get_prompt()
-        async def get_prompt(  # pyright: ignore[reportUnusedFunction]
-            name: str,
-            arguments: Mapping[str, Any] | None,
-        ) -> GetPromptResult:
-            async with ctx.scope(
-                "get_prompt",
-                *self._server.request_context.lifespan_context,
-            ):
-                match available_prompts.get(name):
-                    case None:
-                        raise ValueError(f"Prompt '{name}' is not defined")
-
-                    case Prompt() as direct_prompt:
-                        return GetPromptResult(
-                            description=direct_prompt.description,
-                            messages=[
-                                _convert_message(element) for element in direct_prompt.content
-                            ],
-                        )
-
-                    case PromptTemplate() as dynamic_prompt:
-                        resolved_prompt: Prompt = await dynamic_prompt.resolve(arguments or {})
-                        return GetPromptResult(
-                            description=resolved_prompt.description,
-                            messages=[
-                                _convert_message(element) for element in resolved_prompt.content
-                            ],
-                        )
-
     def _expose_tools(
         self,
         tools: Toolbox | Iterable[Tool],
@@ -385,59 +302,6 @@ def _resource_content(
         case [*contents]:  # is it intended use of nested resource contents?
             for content in contents:
                 yield from _resource_content(content)
-
-
-def _convert_message(
-    element: LMMContextElement,
-    /,
-) -> MCPPromptMessage:
-    match element:
-        case LMMInput():
-            match _convert_multimodal_content(element.content):
-                case [content]:
-                    return MCPPromptMessage(
-                        role="user",
-                        content=content,
-                    )
-                case []:
-                    return MCPPromptMessage(
-                        role="user",
-                        # convert empty content to empty text to prevent errors
-                        content=MCPTextContent(
-                            type="text",
-                            text="",
-                        ),
-                    )
-
-                case [*_]:
-                    raise NotImplementedError(
-                        f"Unsuppoprted MCP prompt element content: {element.content}!"
-                    )
-
-        case LMMCompletion():
-            match _convert_multimodal_content(element.content):
-                case [content]:
-                    return MCPPromptMessage(
-                        role="assistant",
-                        content=content,
-                    )
-                case []:
-                    return MCPPromptMessage(
-                        role="assistant",
-                        # convert empty content to empty text to prevent errors
-                        content=MCPTextContent(
-                            type="text",
-                            text="",
-                        ),
-                    )
-
-                case [*_]:
-                    raise NotImplementedError(
-                        f"Unsuppoprted MCP prompt element content: {element.content}!"
-                    )
-
-        case _:
-            raise NotImplementedError(f"Unsuppoprted MCP prompt context element: {type(element)}!")
 
 
 def _convert_multimodal_content(

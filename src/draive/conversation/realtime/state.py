@@ -1,16 +1,24 @@
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
 from typing import Any, final
 
-from haiway import State, as_tuple, ctx
+from haiway import State, ctx
 
 from draive.conversation.realtime.default import realtime_conversation_preparing
 from draive.conversation.realtime.types import (
     RealtimeConversationPreparing,
     RealtimeConversationSessionScope,
 )
-from draive.conversation.types import ConversationMemory, ConversationMessage
-from draive.instructions import Instruction
-from draive.tools import Tool, Toolbox
+from draive.conversation.types import ConversationMessage
+from draive.models import (
+    ModelInput,
+    ModelMemory,
+    ModelMemoryRecall,
+    ModelOutput,
+    ModelSessionOutputSelection,
+    ResolveableInstructions,
+    Tool,
+    Toolbox,
+)
 from draive.utils import Memory
 
 __all__ = ("RealtimeConversation",)
@@ -18,33 +26,62 @@ __all__ = ("RealtimeConversation",)
 
 @final
 class RealtimeConversation(State):
+    """Helper for preparing realtime conversation sessions.
+
+    Normalizes tools and memory into model context and delegates to the configured
+    realtime preparation implementation.
+    """
+
     @classmethod
     async def prepare(
         cls,
         *,
-        instruction: Instruction | None = None,
-        memory: ConversationMemory | Iterable[ConversationMessage] | None = None,
-        tools: Toolbox | Iterable[Tool] | None = None,
+        instructions: ResolveableInstructions = "",
+        tools: Toolbox | Iterable[Tool] = (),
+        memory: ModelMemory | Iterable[ConversationMessage] = (),
+        output: ModelSessionOutputSelection = "auto",
         **extra: Any,
     ) -> RealtimeConversationSessionScope:
+        """Prepare a realtime conversation session scope.
+
+        Parameters
+        ----------
+        instructions : ResolveableInstructions, optional
+            Instructions to steer the session.
+        tools : Toolbox | Iterable[Tool], optional
+            Tools to expose within the session.
+        memory : ModelMemory | Iterable[ConversationMessage], optional
+            Initial memory; an iterable is converted to model context.
+        output : ModelSessionOutputSelection, optional
+            Desired session output selection policy.
+        **extra : Any
+            Provider-specific kwargs forwarded to the preparation implementation.
+        """
         conversation: RealtimeConversation = ctx.state(cls)
 
-        # prepare memory
-        conversation_memory: ConversationMemory | None
-        match memory:
-            case None:
-                conversation_memory = None
+        conversation_memory: ModelMemory
+        if isinstance(memory, Memory):
+            conversation_memory = memory
 
-            case Memory() as memory:
-                conversation_memory = memory
+        else:
 
-            case memory_messages:
-                conversation_memory = ConversationMemory.constant(as_tuple(memory_messages))
+            def model_context_elements() -> Generator[ModelInput | ModelOutput]:
+                for message in memory:
+                    if message.role == "user":
+                        yield ModelInput.of(message.content)
+
+                    else:
+                        yield ModelOutput.of(message.content)
+
+            conversation_memory = ModelMemory.constant(
+                ModelMemoryRecall.of(*model_context_elements())
+            )
 
         return await conversation.preparing(
-            instruction=Instruction.of(instruction),
-            memory=conversation_memory,
+            instructions=instructions,
             toolbox=Toolbox.of(tools),
+            memory=conversation_memory,
+            output=output,
             **extra,
         )
 

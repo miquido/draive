@@ -11,10 +11,10 @@ load_env() # load .env variables
 
 ## Data preparation
 
-We are going to use a the same text about John Doe as we did in [Basic Data Extraction](./BasicDataExtraction.md) as our input. After assigning it to a variable we will prepare it for embedding by splitting the original text to smaller chunks. This allows to fit the data into limited context windows and to additionally filter out unnecessary information. We are going to use a basic splitter looking for paragraphs structure defined by multiple subsequent newlines in the text. Chunks will be put into a structured envelope which allows to store additional information such as a full text of the document or additional metadata.
+We are going to use the same text about John Doe as we did in [Basic Data Extraction](./BasicDataExtraction.md) as our input. After assigning it to a variable, we will prepare it for embedding by splitting the original text into smaller chunks. This allows us to fit the data into limited context windows and filter out unnecessary information. We’ll use a basic splitter that looks for paragraph structure defined by multiple subsequent newlines in the text. Chunks will be put into a structured envelope that allows storing additional information such as the full document text or extra metadata.
 
 ```python
-from draive import DataModel, Tokenization, ctx, split_text
+from draive import DataModel, ctx, split_text
 from draive.openai import OpenAI
 
 # document is a short text about John Doe
@@ -29,11 +29,7 @@ class DocumentChunk(DataModel):
 
 # prepare data chunks
 document_chunks: list[DocumentChunk]
-async with ctx.scope(
-    "basic_rag",
-    # define tokenizer for this context
-    await OpenAI().tokenizer("gpt-3.5-turbo"),
-):
+async with ctx.scope("basic_rag"):
     document_chunks = [
         DocumentChunk(
             full_document=document,
@@ -45,7 +41,7 @@ async with ctx.scope(
             separators=("\n\n", " "),
             part_size=64,
             part_overlap_size=16,
-            count_size=Tokenization.count_tokens,
+            count_size=len,
         )
     ]
 
@@ -115,8 +111,10 @@ Now we have everything set up to do our search. Instead of searching directly, w
 
 
 ```python
-from draive import Toolbox, TextGeneration, tool
-from draive.openai import OpenAIChatConfig, OpenAI
+from collections.abc import Sequence
+
+from draive import Toolbox, TextGeneration, tool, VectorIndex
+from draive.openai import OpenAIResponsesConfig, OpenAI, OpenAIEmbeddingConfig
 
 
 @tool(name="search") # prepare a simple tool for searching the index
@@ -135,13 +133,13 @@ async with ctx.scope(
     # use our vector index
     vector_index,
     # define used dependencies and services
-    OpenAIChatConfig(model="gpt-4o-mini"),
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
     OpenAIEmbeddingConfig(model="text-embedding-3-small"),
     disposables=(OpenAI(),),
 ):
-    # use the tool to augment LLM generation by suitable document parts
+    # use the tool to augment generation by suitable document parts
     result: str = await TextGeneration.generate(
-        instruction="Answer the questions based on provided data",
+        instructions="Answer the questions based on provided data",
         input="Where is John Doe living?",
         # suggest the tool to ensure its usage
         tools=Toolbox.of(index_search_tool, suggest=index_search_tool),

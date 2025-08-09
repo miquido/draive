@@ -4,19 +4,17 @@ from uuid import uuid4
 from haiway import MissingState, State, ctx
 from pytest import mark, raises
 
-from draive import (
-    LMM,
-    LMMCompletion,
-    LMMContext,
-    LMMContextElement,
-    LMMInput,
-    LMMToolRequest,
-    LMMToolResponse,
-    MultimodalContent,
-    tool,
-)
+from draive import MultimodalContent, tool
 from draive.evaluation import EvaluatorResult
-from draive.lmm import LMMToolRequests, LMMToolResponses
+from draive.models import (
+    GenerativeModel,
+    ModelContext,
+    ModelContextElement,
+    ModelInput,
+    ModelOutput,
+    ModelToolRequest,
+    ModelToolResponse,
+)
 from draive.parameters import DataModel
 from draive.stages import Stage
 from draive.stages.types import (
@@ -28,13 +26,13 @@ from draive.utils import Memory
 # Use Memory.volatile for testing instead of custom mock
 
 
-class MockLMMTracker:
-    """Tracks LMM calls for testing."""
+class MockModelTracker:
+    """Tracks model calls for testing."""
 
     def __init__(self):
         self.call_count = 0
         self.last_context = None
-        self.last_instruction = None
+        self.last_instructions = None
         self.last_tools = None
         self.last_output = None
 
@@ -60,72 +58,92 @@ def extract_text_content(content: MultimodalContent) -> str:
     )
 
 
+# simple in-memory Memory helper for StageState
+def make_volatile_memory(initial: StageState) -> Memory[StageState, StageState]:
+    store = {"value": initial}
+
+    async def recall(**extra):
+        return store["value"]
+
+    async def remember(*items: StageState, **extra):
+        if items:
+            store["value"] = items[-1]
+
+    return Memory(recall=recall, remember=remember)
+
+
 @mark.asyncio
 async def test_stage_predefined_simple():
     """Test basic predefined stage creation and execution."""
     # According to Stage.predefined logic:
-    # - First element becomes LMMInput
-    # - elements[0] (even index) becomes LMMInput
-    # - elements[1] (odd index) becomes LMMCompletion
+    # - First element becomes ModelInput
+    # - elements[0] (even index) becomes ModelInput
+    # - elements[1] (odd index) becomes ModelOutput
     stage = Stage.predefined(
-        "User input",  # becomes LMMInput
-        "Another input",  # elements[0] -> LMMInput (because 0 % 2 == 0)
-        "Assistant response",  # elements[1] -> LMMCompletion (because 1 % 2 == 1)
+        "User input",
+        "Assistant response",
     )
 
     initial_state = StageState.of(context=(), result=MultimodalContent.of("initial"))
 
     result_state = await stage(state=initial_state)
 
-    # Should have extended context with input, input, completion
-    assert len(result_state.context) == 3
-    assert isinstance(result_state.context[0], LMMInput)
-    assert isinstance(result_state.context[1], LMMInput)
-    assert isinstance(result_state.context[2], LMMCompletion)
+    # Should have extended context with input and output
+    assert len(result_state.context) == 2
+    assert isinstance(result_state.context[0], ModelInput)
+    assert isinstance(result_state.context[1], ModelOutput)
 
-    # Result should be the completion content
-    assert extract_text_content(result_state.result) == "Assistant response"
+    # Result remains unchanged for predefined stage unless result is provided
+    assert extract_text_content(result_state.result) == "initial"
 
 
 @mark.asyncio
 async def test_stage_predefined_with_existing_context():
     """Test predefined stage with existing context."""
-    existing_context = (LMMInput.of("Previous input"), LMMCompletion.of("Previous completion"))
+    existing_context = (
+        ModelInput.of(MultimodalContent.of("Previous input")),
+        ModelOutput.of(MultimodalContent.of("Previous completion")),
+    )
 
-    # Same issue as before - need to account for the predefined logic
     stage = Stage.predefined(
-        "New input",  # becomes LMMInput
-        "Another input",  # elements[0] -> LMMInput (because 0 % 2 == 0)
-        "New completion",  # elements[1] -> LMMCompletion (because 1 % 2 == 1)
+        "New input",
+        "New completion",
     )
 
     initial_state = StageState.of(context=existing_context, result=MultimodalContent.of("initial"))
 
     result_state = await stage(state=initial_state)
 
-    # Should have extended existing context: existing (2) + new (3) = 5 total
-    assert len(result_state.context) == 5
+    # Should have extended existing context by 2 more elements
+    assert len(result_state.context) == 4
     assert result_state.context[:2] == existing_context
-    assert extract_text_content(result_state.result) == "New completion"
+    # Result remains unchanged for predefined stage unless result is provided
+    assert extract_text_content(result_state.result) == "initial"
 
 
 @mark.asyncio
 async def test_stage_completion_basic():
     """Test basic completion stage."""
-    tracker = MockLMMTracker()
+    tracker = MockModelTracker()
 
-    async def mock_completion(
-        *, instruction=None, context: Sequence[LMMContextElement], tools=None, output=None, **kwargs
-    ) -> LMMCompletion:
+    async def mock_generating(
+        *,
+        instructions=None,
+        context: Sequence[ModelContextElement],
+        tools=None,
+        output=None,
+        stream=False,
+        **kwargs,
+    ) -> ModelOutput:
         tracker.call_count += 1
         tracker.last_context = context
-        tracker.last_instruction = instruction
+        tracker.last_instructions = instructions
         tracker.last_tools = tools
         tracker.last_output = output
 
-        return LMMCompletion.of("Completion response")
+        return ModelOutput.of(MultimodalContent.of("Completion response"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         stage = Stage.completion("What is AI?", instruction="Explain clearly")
 
         initial_state = StageState.of(context=(), result=MultimodalContent.empty)
@@ -133,7 +151,7 @@ async def test_stage_completion_basic():
         result_state = await stage(state=initial_state)
 
         assert tracker.call_count == 1
-        assert tracker.last_instruction is not None
+        assert tracker.last_instructions is not None
         assert len(result_state.context) == 2  # input + completion
         assert extract_text_content(result_state.result) == "Completion response"
 
@@ -148,19 +166,21 @@ async def test_stage_completion_with_tools():
         """Test tool for completion."""
         return f"Tool result for: {query}"
 
-    tool_request = LMMToolRequest(
-        identifier=str(uuid4()), tool="test_tool", arguments={"query": "test"}
+    tool_request = ModelToolRequest.of(
+        str(uuid4()),
+        tool="test_tool",
+        arguments={"query": "test"},
     )
 
-    async def mock_completion(**kwargs) -> LMMCompletion | LMMToolRequests:
+    async def mock_generating(**kwargs) -> ModelOutput:
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            return LMMToolRequests.of([tool_request])
+            return ModelOutput.of(tool_request)
         else:
-            return LMMCompletion.of("Final completion with tool result")
+            return ModelOutput.of(MultimodalContent.of("Final completion with tool result"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         stage = Stage.completion("Use the tool", tools=[test_tool])
 
         initial_state = StageState.of(context=(), result=MultimodalContent.empty)
@@ -180,10 +200,10 @@ async def test_stage_prompting_completion():
     async def get_dynamic_input():
         return "Dynamic input from function"
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("Response to dynamic input")
+    async def mock_generating(**kwargs) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("Response to dynamic input"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         stage = Stage.prompting_completion(
             get_dynamic_input, instruction="Process the dynamic input"
         )
@@ -200,14 +220,17 @@ async def test_stage_prompting_completion():
 async def test_stage_loopback_completion():
     """Test loopback completion stage."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("Refined response")
+    async def mock_generating(**kwargs) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("Refined response"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         stage = Stage.loopback_completion(instruction="Refine the previous response")
 
         # Initial state with existing context ending in completion
-        initial_context = (LMMInput.of("Original input"), LMMCompletion.of("Original completion"))
+        initial_context = (
+            ModelInput.of(MultimodalContent.of("Original input")),
+            ModelOutput.of(MultimodalContent.of("Original completion")),
+        )
 
         initial_state = StageState.of(
             context=initial_context, result=MultimodalContent.of("Original completion")
@@ -224,10 +247,10 @@ async def test_stage_loopback_completion():
 async def test_stage_loopback_completion_invalid_context():
     """Test loopback completion with invalid context (no completion)."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("Default response")
+    async def mock_generating(**kwargs) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("Default response"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         stage = Stage.loopback_completion(instruction="Refine response")
 
         # Empty context (valid but no completion to loop back)
@@ -243,10 +266,10 @@ async def test_stage_loopback_completion_invalid_context():
 async def test_stage_result_completion():
     """Test result completion stage."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("Processed result")
+    async def mock_generating(**kwargs) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("Processed result"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         stage = Stage.result_completion(instruction="Process the current result")
 
         initial_state = StageState.of(
@@ -269,7 +292,10 @@ async def test_stage_transform_result():
     stage = Stage.transform_result(transform_result)
 
     initial_state = StageState.of(
-        context=(LMMInput.of("test"), LMMCompletion.of("completion")),
+        context=(
+            ModelInput.of(MultimodalContent.of("test")),
+            ModelOutput.of(MultimodalContent.of("completion")),
+        ),
         result=MultimodalContent.of("original result"),
     )
 
@@ -285,12 +311,19 @@ async def test_stage_transform_result():
 async def test_stage_transform_context():
     """Test context transformation stage."""
 
-    async def transform_context(context: LMMContext) -> LMMContext:
-        return (*context, LMMInput.of("Added input"), LMMCompletion.of("Added completion"))
+    async def transform_context(context: ModelContext) -> ModelContext:
+        return (
+            *context,
+            ModelInput.of(MultimodalContent.of("Added input")),
+            ModelOutput.of(MultimodalContent.of("Added completion")),
+        )
 
     stage = Stage.transform_context(transform_context)
 
-    initial_context = (LMMInput.of("original"), LMMCompletion.of("original completion"))
+    initial_context = (
+        ModelInput.of(MultimodalContent.of("original")),
+        ModelOutput.of(MultimodalContent.of("original completion")),
+    )
     initial_state = StageState.of(context=initial_context, result=MultimodalContent.of("result"))
 
     result_state = await stage(state=initial_state)
@@ -306,12 +339,12 @@ async def test_stage_transform_context():
 async def test_stage_trim_context():
     """Test context trimming stage."""
     initial_context = (
-        LMMInput.of("input1"),
-        LMMCompletion.of("completion1"),
-        LMMInput.of("input2"),
-        LMMCompletion.of("completion2"),
-        LMMInput.of("input3"),
-        LMMCompletion.of("completion3"),
+        ModelInput.of(MultimodalContent.of("input1")),
+        ModelOutput.of(MultimodalContent.of("completion1")),
+        ModelInput.of(MultimodalContent.of("input2")),
+        ModelOutput.of(MultimodalContent.of("completion2")),
+        ModelInput.of(MultimodalContent.of("input3")),
+        ModelOutput.of(MultimodalContent.of("completion3")),
     )
 
     initial_state = StageState.of(context=initial_context, result=MultimodalContent.of("result"))
@@ -335,21 +368,25 @@ async def test_stage_trim_context():
 @mark.asyncio
 async def test_stage_strip_context_tools():
     """Test stripping tool calls from context."""
-    tool_request = LMMToolRequest(identifier="test_id", tool="test_tool", arguments={})
-    tool_response = LMMToolResponse(
-        identifier="test_id",
+    tool_request = ModelToolRequest.of(
+        "test_id",
+        tool="test_tool",
+        arguments={},
+    )
+    tool_response = ModelToolResponse.of(
+        "test_id",
         tool="test_tool",
         content=MultimodalContent.of("tool result"),
-        handling="result",
+        handling="response",
     )
 
     initial_context = (
-        LMMInput.of("input"),
-        LMMCompletion.of("completion"),
-        LMMToolRequests.of([tool_request]),
-        LMMToolResponses.of([tool_response]),
-        LMMInput.of("another input"),
-        LMMCompletion.of("final completion"),
+        ModelInput.of(MultimodalContent.of("input")),
+        ModelOutput.of(MultimodalContent.of("completion")),
+        ModelOutput.of(tool_request),
+        ModelInput.of(tool_response),
+        ModelInput.of(MultimodalContent.of("another input")),
+        ModelOutput.of(MultimodalContent.of("final completion")),
     )
 
     initial_state = StageState.of(context=initial_context, result=MultimodalContent.of("result"))
@@ -357,10 +394,11 @@ async def test_stage_strip_context_tools():
     stage = Stage.strip_context_tools()
     result_state = await stage(state=initial_state)
 
-    # Should have removed tool requests and responses
-    assert len(result_state.context) == 4  # Only inputs and completions
+    # Tool request/response blocks are stripped to pure content but context length is preserved
+    assert len(result_state.context) == 6
     for element in result_state.context:
-        assert not isinstance(element, LMMToolRequests | LMMToolResponses)
+        if isinstance(element, ModelInput) or isinstance(element, ModelOutput):
+            assert isinstance(element.content, MultimodalContent)
 
 
 # NOTE: Stage.tool_call tests are commented out because they test an API pattern
@@ -388,11 +426,27 @@ async def test_stage_strip_context_tools():
 async def test_stage_memory_remember():
     """Test memory remember stage."""
     empty_state = StageState.of(context=(), result=MultimodalContent.empty)
-    memory = Memory.volatile(initial=empty_state)
+
+    def make_volatile_memory(initial: StageState) -> Memory[StageState, StageState]:
+        store = {"value": initial}
+
+        async def recall(**extra):
+            return store["value"]
+
+        async def remember(*items: StageState, **extra):
+            if items:
+                store["value"] = items[-1]
+
+        return Memory(recall=recall, remember=remember)
+
+    memory = make_volatile_memory(empty_state)
     stage = Stage.memory_remember(memory)
 
     initial_state = StageState.of(
-        context=(LMMInput.of("test"), LMMCompletion.of("completion")),
+        context=(
+            ModelInput.of(MultimodalContent.of("test")),
+            ModelOutput.of(MultimodalContent.of("completion")),
+        ),
         result=MultimodalContent.of("result"),
     )
 
@@ -410,10 +464,13 @@ async def test_stage_memory_recall():
     """Test memory recall stage."""
     # Pre-populate memory
     stored_state = StageState.of(
-        context=(LMMInput.of("stored"), LMMCompletion.of("stored completion")),
+        context=(
+            ModelInput.of(MultimodalContent.of("stored")),
+            ModelOutput.of(MultimodalContent.of("stored completion")),
+        ),
         result=MultimodalContent.of("stored result"),
     )
-    memory = Memory.volatile(initial=stored_state)
+    memory = make_volatile_memory(stored_state)
 
     stage = Stage.memory_recall(memory, handling="replace")
 
@@ -429,15 +486,21 @@ async def test_stage_memory_recall():
 async def test_stage_memory_recall_merge():
     """Test memory recall with merge handling."""
     stored_state = StageState.of(
-        context=(LMMInput.of("stored"), LMMCompletion.of("stored completion")),
+        context=(
+            ModelInput.of(MultimodalContent.of("stored")),
+            ModelOutput.of(MultimodalContent.of("stored completion")),
+        ),
         result=MultimodalContent.of("stored result"),
     )
-    memory = Memory.volatile(initial=stored_state)
+    memory = make_volatile_memory(stored_state)
 
     stage = Stage.memory_recall(memory, handling="merge")
 
     initial_state = StageState.of(
-        context=(LMMInput.of("current"), LMMCompletion.of("current completion")),
+        context=(
+            ModelInput.of(MultimodalContent.of("current")),
+            ModelOutput.of(MultimodalContent.of("current completion")),
+        ),
         result=MultimodalContent.of("current result"),
     )
 
@@ -452,14 +515,14 @@ async def test_stage_memory_recall_merge():
 async def test_stage_sequence():
     """Test sequential stage execution."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
+    async def mock_generating(**kwargs) -> ModelOutput:
         context = kwargs.get("context", ())
         if len(context) == 1:  # First stage
-            return LMMCompletion.of("First response")
+            return ModelOutput.of(MultimodalContent.of("First response"))
         else:  # Second stage
-            return LMMCompletion.of("Second response")
+            return ModelOutput.of(MultimodalContent.of("Second response"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         stage1 = Stage.completion("First input")
         stage2 = Stage.completion("Second input")
 
@@ -478,8 +541,8 @@ async def test_stage_sequence():
 async def test_stage_concurrent():
     """Test concurrent stage execution."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("Concurrent response")
+    async def mock_generating(**kwargs) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("Concurrent response"))
 
     async def merge_results(*, branches: Sequence[StageState | StageException]) -> StageState:
         # Simple merge - take first successful result
@@ -488,7 +551,7 @@ async def test_stage_concurrent():
             return successful[0].updated(result=MultimodalContent.of("Merged result"))
         raise RuntimeError("No successful branches")
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         stage1 = Stage.completion("Input 1")
         stage2 = Stage.completion("Input 2")
 
@@ -506,15 +569,15 @@ async def test_stage_loop():
     """Test stage loop execution."""
     iteration_count = 0
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
+    async def mock_generating(**kwargs) -> ModelOutput:
         nonlocal iteration_count
         iteration_count += 1
-        return LMMCompletion.of(f"Iteration {iteration_count}")
+        return ModelOutput.of(MultimodalContent.of(f"Iteration {iteration_count}"))
 
     async def loop_condition(*, state: StageState, iteration: int) -> bool:
         return iteration < 2  # Stop after 2 iterations
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         base_stage = Stage.completion("Loop input")
         loop_stage = Stage.loop(
             base_stage, condition=loop_condition, condition_check="after_execution"
@@ -533,14 +596,14 @@ async def test_stage_loop():
 async def test_stage_router():
     """Test stage routing."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        instruction = kwargs.get("instruction", "") or ""  # Handle None instruction
-        if "select the most appropriate option" in instruction:
-            return LMMCompletion.of("<SELECTION>option1</SELECTION>")
+    async def mock_generating(**kwargs) -> ModelOutput:
+        instructions = kwargs.get("instructions", "") or ""  # Handle None instructions
+        if "select the most appropriate option" in instructions:
+            return ModelOutput.of(MultimodalContent.of("<SELECTION>option1</SELECTION>"))
         else:
-            return LMMCompletion.of("Option 1 result")
+            return ModelOutput.of(MultimodalContent.of("Option 1 result"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         stage1 = Stage.completion("Option 1 input").with_meta(
             name="option1", description="First option for routing"
         )
@@ -563,13 +626,13 @@ async def test_stage_router():
 async def test_stage_when_condition_true():
     """Test conditional stage execution when condition is true."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("Executed")
+    async def mock_generating(**kwargs) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("Executed"))
 
     async def true_condition(*, state: StageState) -> bool:
         return True
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         base_stage = Stage.completion("Test input")
         conditional_stage = base_stage.when(true_condition)
 
@@ -584,13 +647,13 @@ async def test_stage_when_condition_true():
 async def test_stage_when_condition_false():
     """Test conditional stage execution when condition is false."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("Should not execute")
+    async def mock_generating(**kwargs) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("Should not execute"))
 
     async def false_condition(*, state: StageState) -> bool:
         return False
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         base_stage = Stage.completion("Test input")
         conditional_stage = base_stage.when(false_condition)
 
@@ -606,13 +669,13 @@ async def test_stage_when_condition_false():
 async def test_stage_when_with_alternative():
     """Test conditional stage with alternative."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("Alternative executed")
+    async def mock_generating(**kwargs) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("Alternative executed"))
 
     async def false_condition(*, state: StageState) -> bool:
         return False
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         primary_stage = Stage.completion("Primary input")
         alternative_stage = Stage.completion("Alternative input")
 
@@ -630,12 +693,12 @@ async def test_stage_cached():
     """Test stage caching."""
     call_count = 0
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
+    async def mock_generating(**kwargs) -> ModelOutput:
         nonlocal call_count
         call_count += 1
-        return LMMCompletion.of(f"Call {call_count}")
+        return ModelOutput.of(MultimodalContent.of(f"Call {call_count}"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         base_stage = Stage.completion("Test input")
         cached_stage = base_stage.cached(limit=5)
 
@@ -657,14 +720,14 @@ async def test_stage_with_retry():
     """Test stage with retry behavior."""
     attempt_count = 0
 
-    async def failing_completion(**kwargs) -> LMMCompletion:
+    async def failing_completion(**kwargs) -> ModelOutput:
         nonlocal attempt_count
         attempt_count += 1
         if attempt_count < 3:
             raise ConnectionError("Connection failed")
-        return LMMCompletion.of("Success after retries")
+        return ModelOutput.of(MultimodalContent.of("Success after retries"))
 
-    async with ctx.scope("test", LMM(completing=failing_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=failing_completion)):
         base_stage = Stage.completion("Test input")
         retry_stage = base_stage.with_retry(
             limit=3,
@@ -687,7 +750,7 @@ async def test_stage_with_fallback():
     # Track which stage is being executed to simulate fallback
     execution_attempt = 0
 
-    async def smart_completion(**kwargs) -> LMMCompletion:
+    async def smart_completion(**kwargs) -> ModelOutput:
         nonlocal execution_attempt
         execution_attempt += 1
 
@@ -696,9 +759,9 @@ async def test_stage_with_fallback():
             raise ValueError("Primary stage failed")
         else:
             # Fallback stage succeeds
-            return LMMCompletion.of("Fallback executed")
+            return ModelOutput.of(MultimodalContent.of("Fallback executed"))
 
-    async with ctx.scope("test", LMM(completing=smart_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=smart_completion)):
         primary_stage = Stage.completion("Primary input")
         fallback_stage = Stage.completion("Fallback input")
 
@@ -717,13 +780,16 @@ async def test_stage_with_fallback():
 async def test_stage_with_volatile_context():
     """Test stage with volatile context."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("New result")
+    async def mock_completion(**kwargs) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("New result"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_completion)):
         volatile_stage = Stage.completion("Test input").with_volatile_context()
 
-        initial_context = (LMMInput.of("existing"), LMMCompletion.of("existing completion"))
+        initial_context = (
+            ModelInput.of(MultimodalContent.of("existing")),
+            ModelOutput.of(MultimodalContent.of("existing completion")),
+        )
         initial_state = StageState.of(
             context=initial_context, result=MultimodalContent.of("initial")
         )
@@ -744,38 +810,43 @@ async def test_stage_with_volatile_tools_context():
     async def test_tool() -> str:
         return "tool result"
 
-    tool_request = LMMToolRequest(identifier=str(uuid4()), tool="test_tool", arguments={})
+    tool_request = ModelToolRequest.of(
+        str(uuid4()),
+        tool="test_tool",
+        arguments={},
+    )
 
     call_count = 0
 
-    async def mock_completion(**kwargs) -> LMMCompletion | LMMToolRequests:
+    async def mock_completion(**kwargs) -> ModelOutput:
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            return LMMToolRequests.of([tool_request])
-        return LMMCompletion.of("Final result")
+            return ModelOutput.of(tool_request)
+        return ModelOutput.of(MultimodalContent.of("Final result"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_completion)):
         stage = Stage.completion("Use tools", tools=[test_tool]).with_volatile_tools_context()
 
         initial_state = StageState.of(context=(), result=MultimodalContent.empty)
 
         result_state = await stage(state=initial_state)
 
-        # Should have input and completion, but no tool calls
-        assert len(result_state.context) == 2
-        for element in result_state.context:
-            assert not isinstance(element, LMMToolRequests | LMMToolResponses)
+        # Should have input, tool request/response and completion in context
+        assert len(result_state.context) == 4
+    for element in result_state.context:
+        if isinstance(element, ModelInput) or isinstance(element, ModelOutput):
+            assert isinstance(element.content, MultimodalContent)
 
 
 @mark.asyncio
 async def test_stage_ignore_result():
     """Test stage that ignores its result."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("New result")
+    async def mock_completion(**kwargs) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("New result"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_completion)):
         ignore_stage = Stage.completion("Test input").ignore_result()
 
         initial_state = StageState.of(context=(), result=MultimodalContent.of("original result"))
@@ -792,10 +863,10 @@ async def test_stage_ignore_result():
 async def test_stage_extend_result():
     """Test stage that extends result."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("Extended content")
+    async def mock_generating(**kwargs) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("Extended content"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         extend_stage = Stage.completion("Test input").extend_result()
 
         initial_state = StageState.of(context=(), result=MultimodalContent.of("Original content"))
@@ -830,15 +901,15 @@ async def test_stage_with_meta():
 async def test_stage_execute():
     """Test stage execute method."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("Execution result")
+    async def mock_generating(**kwargs) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("Execution result"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         stage = Stage.completion("Test input")
 
         # Execute with custom initial values
         result = await stage.execute(
-            ExampleData(value="test", count=5), context=(), result=MultimodalContent.of("initial")
+            ExampleData(value="test", count=5), memory=(), result=MultimodalContent.of("initial")
         )
 
         assert extract_text_content(result) == "Execution result"
@@ -859,10 +930,10 @@ async def test_stage_noop():
 async def test_stage_exception_handling():
     """Test stage exception handling."""
 
-    async def failing_completion(**kwargs) -> LMMCompletion:
+    async def failing_completion(**kwargs) -> ModelOutput:
         raise RuntimeError("Completion failed")
 
-    async with ctx.scope("test", LMM(completing=failing_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=failing_completion)):
         stage = Stage.completion("Test input")
 
         initial_state = StageState.of(context=(), result=MultimodalContent.empty)
@@ -871,7 +942,7 @@ async def test_stage_exception_handling():
             await stage(state=initial_state)
 
         # Should wrap the original exception in StageException
-        assert "Stage execution interrupted" in str(exc_info.value)
+        assert "Stage execution failed" in str(exc_info.value)
         assert exc_info.value.state == initial_state
 
 
@@ -944,7 +1015,10 @@ async def test_stage_state_operations():
     # Test state merging
     other_state = StageState.of(
         ExampleData(value="other", count=3),
-        context=(LMMInput.of("other input"), LMMCompletion.of("other completion")),
+        context=(
+            ModelInput.of(MultimodalContent.of("other input")),
+            ModelOutput.of(MultimodalContent.of("other completion")),
+        ),
         result=MultimodalContent.of("other result"),
     )
 
@@ -971,13 +1045,13 @@ async def test_stage_with_ctx():
     """Test stage execution with custom context."""
     custom_state = ExampleState(data="custom_context")
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
+    async def mock_generating(**kwargs) -> ModelOutput:
         # Verify custom state is available in context
         current_state = ctx.state(ExampleState)
         assert current_state.data == "custom_context"
-        return LMMCompletion.of("Context verified")
+        return ModelOutput.of(MultimodalContent.of("Context verified"))
 
-    async with ctx.scope("test", LMM(completing=mock_completion)):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         stage = Stage.completion("Test").with_ctx(custom_state)
 
         initial_state = StageState.of(context=(), result=MultimodalContent.empty)

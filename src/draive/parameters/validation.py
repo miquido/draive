@@ -5,17 +5,14 @@ from types import EllipsisType, NoneType, UnionType
 from typing import Any, Literal, Self, Union, is_typeddict
 from uuid import UUID
 
-from haiway import MISSING, Meta, Missing
+from haiway import MISSING, Meta, Missing, ValidationContext
 from haiway.state.attributes import (
     AttributeAnnotation,
     _resolve_type_typeddict,
 )
+from haiway.state.validation import Validator
 
-from draive.parameters.types import (
-    ParameterValidation,
-    ParameterValidationContext,
-    ParameterVerification,
-)
+from draive.parameters.types import ParameterVerification
 
 __all__ = ("ParameterValidator",)
 
@@ -26,7 +23,7 @@ class ParameterValidator[Type]:
         cls,
         typed_dict: type[Dict],
         /,
-    ) -> ParameterValidation[Dict]:
+    ) -> Validator[Dict]:
         if not is_typeddict(typed_dict):
             raise ValueError("Type has to be a TypedDict")
 
@@ -49,8 +46,8 @@ class ParameterValidator[Type]:
         /,
         *,
         verifier: ParameterVerification[Any] | None,
-        recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-    ) -> ParameterValidation[Any]:
+        recursion_guard: MutableMapping[str, Validator[Any]],
+    ) -> Validator[Any]:
         if isinstance(annotation.origin, NotImplementedError | RuntimeError):
             raise annotation.origin  # raise an error if origin was not properly resolved
 
@@ -96,22 +93,19 @@ class ParameterValidator[Type]:
     def __init__(
         self,
         annotation: AttributeAnnotation,
-        validation: ParameterValidation[Type] | Missing,
+        validation: Validator[Type] | Missing,
     ) -> None:
         self.annotation: AttributeAnnotation = annotation
-        self.validation: ParameterValidation[Type] | Missing = validation
+        self.validation: Validator[Type] | Missing = validation
 
     def __call__(
         self,
         value: Any,
         /,
-        *,
-        context: ParameterValidationContext,
     ) -> Any:
         assert self.validation is not MISSING  # nosec: B101
         return self.validation(  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
             value,
-            context=context,
         )
 
 
@@ -119,12 +113,11 @@ def _prepare_validator_of_any(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     def validator(
         value: Any,
         /,
-        context: ParameterValidationContext,
     ) -> Any:
         return value  # any is always valid
 
@@ -135,14 +128,13 @@ def _prepare_validator_of_none(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     if verifier := verifier:
 
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if value is None:
                 verifier(value)
@@ -156,7 +148,6 @@ def _prepare_validator_of_none(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if value is None:
                 return value
@@ -171,14 +162,13 @@ def _prepare_validator_of_missing(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     if verifier := verifier:
 
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if value is MISSING:
                 verifier(value)
@@ -191,7 +181,6 @@ def _prepare_validator_of_missing(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if value is MISSING:
                 return value
@@ -206,8 +195,8 @@ def _prepare_validator_of_literal(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     elements: Sequence[Any] = annotation.arguments
     formatted_type: str = str(annotation)
 
@@ -216,7 +205,6 @@ def _prepare_validator_of_literal(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if value in elements:
                 verifier(value)
@@ -230,7 +218,6 @@ def _prepare_validator_of_literal(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if value in elements:
                 return value
@@ -245,8 +232,8 @@ def _prepare_validator_of_enum(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     elements: Sequence[Any] = list(annotation.origin)
     formatted_type: str = str(annotation)
 
@@ -255,7 +242,6 @@ def _prepare_validator_of_enum(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if value in elements:
                 verifier(value)
@@ -269,7 +255,6 @@ def _prepare_validator_of_enum(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if value in elements:
                 return value
@@ -284,8 +269,8 @@ def _prepare_validator_of_type(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     validated_type: type[Any] = annotation.origin
     formatted_type: str = str(annotation)
 
@@ -294,7 +279,6 @@ def _prepare_validator_of_type(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             match value:
                 case value if isinstance(value, validated_type):
@@ -310,7 +294,6 @@ def _prepare_validator_of_type(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             match value:
                 case value if isinstance(value, validated_type):
@@ -328,9 +311,9 @@ def _prepare_validator_of_sequence(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
-    element_validator: ParameterValidation[Any] = ParameterValidator.of(
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
+    element_validator: Validator[Any] = ParameterValidator.of(
         annotation.arguments[0],
         verifier=None,
         recursion_guard=recursion_guard,
@@ -342,13 +325,12 @@ def _prepare_validator_of_sequence(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, Collection) and not isinstance(value, str | bytes):
                 validated: Sequence[Any] = []
                 for idx, element in enumerate(value):
-                    with context.scope(f"[{idx}]"):
-                        validated.append(element_validator(element, context=context))
+                    with ValidationContext.scope(f"[{idx}]"):
+                        validated.append(element_validator(element))
 
                 validated = tuple(validated)
                 verifier(validated)
@@ -361,13 +343,12 @@ def _prepare_validator_of_sequence(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, Collection) and not isinstance(value, str | bytes):
                 validated: Sequence[Any] = []
                 for idx, element in enumerate(value):
-                    with context.scope(f"[{idx}]"):
-                        validated.append(element_validator(element, context=context))
+                    with ValidationContext.scope(f"[{idx}]"):
+                        validated.append(element_validator(element))
 
                 return tuple(validated)
 
@@ -381,14 +362,14 @@ def _prepare_validator_of_mapping(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
-    key_validator: ParameterValidation[Any] = ParameterValidator.of(
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
+    key_validator: Validator[Any] = ParameterValidator.of(
         annotation.arguments[0],
         verifier=None,
         recursion_guard=recursion_guard,
     )
-    value_validator: ParameterValidation[Any] = ParameterValidator.of(
+    value_validator: Validator[Any] = ParameterValidator.of(
         annotation.arguments[1],
         verifier=None,
         recursion_guard=recursion_guard,
@@ -400,15 +381,12 @@ def _prepare_validator_of_mapping(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, Mapping):
                 validated: MutableMapping[Any, Any] = {}
                 for key, element in value.items():
-                    with context.scope(f"[{key}]"):
-                        validated[key_validator(key, context=context)] = value_validator(
-                            element, context=context
-                        )
+                    with ValidationContext.scope(f"[{key}]"):
+                        validated[key_validator(key)] = value_validator(element)
 
                 # TODO: FIXME: make sure dict is not mutable?
                 # validated = MappingProxyType(validated)
@@ -423,15 +401,12 @@ def _prepare_validator_of_mapping(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, Mapping):
                 validated: MutableMapping[Any, Any] = {}
                 for key, element in value.items():
-                    with context.scope(f"[{key}]"):
-                        validated[key_validator(key, context=context)] = value_validator(
-                            element, context=context
-                        )
+                    with ValidationContext.scope(f"[{key}]"):
+                        validated[key_validator(key)] = value_validator(element)
 
                 # TODO: FIXME: make sure dict is not mutable?
                 # validated = MappingProxyType(validated)
@@ -447,8 +422,8 @@ def _prepare_validator_of_meta(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     formatted_type: str = str(annotation)
 
     if verifier := verifier:
@@ -456,7 +431,6 @@ def _prepare_validator_of_meta(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, Meta):
                 return value
@@ -474,7 +448,6 @@ def _prepare_validator_of_meta(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, Meta):
                 return value
@@ -492,13 +465,13 @@ def _prepare_validator_of_tuple(  # noqa: C901
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     if (
         annotation.arguments[-1].origin == Ellipsis
         or annotation.arguments[-1].origin == EllipsisType
     ):
-        element_validator: ParameterValidation[Any] = ParameterValidator.of(
+        element_validator: Validator[Any] = ParameterValidator.of(
             annotation.arguments[0],
             verifier=None,
             recursion_guard=recursion_guard,
@@ -510,13 +483,12 @@ def _prepare_validator_of_tuple(  # noqa: C901
             def validator(
                 value: Any,
                 /,
-                context: ParameterValidationContext,
             ) -> Any:
                 if isinstance(value, Collection) and not isinstance(value, str | bytes):
                     validated: Sequence[Any] = []
                     for idx, element in enumerate(value):
-                        with context.scope(f"[{idx}]"):
-                            validated.append(element_validator(element, context=context))
+                        with ValidationContext.scope(f"[{idx}]"):
+                            validated.append(element_validator(element))
 
                     validated = tuple(validated)
                     verifier(validated)
@@ -532,13 +504,12 @@ def _prepare_validator_of_tuple(  # noqa: C901
             def validator(
                 value: Any,
                 /,
-                context: ParameterValidationContext,
             ) -> Any:
                 if isinstance(value, Collection) and not isinstance(value, str | bytes):
                     validated: Sequence[Any] = []
                     for idx, element in enumerate(value):
-                        with context.scope(f"[{idx}]"):
-                            validated.append(element_validator(element, context=context))
+                        with ValidationContext.scope(f"[{idx}]"):
+                            validated.append(element_validator(element))
 
                     return tuple(validated)
 
@@ -550,7 +521,7 @@ def _prepare_validator_of_tuple(  # noqa: C901
         return validator
 
     else:
-        element_validators: list[ParameterValidation[Any]] = [
+        element_validators: list[Validator[Any]] = [
             ParameterValidator.of(
                 alternative,
                 verifier=None,
@@ -566,7 +537,6 @@ def _prepare_validator_of_tuple(  # noqa: C901
             def validator(
                 value: Any,
                 /,
-                context: ParameterValidationContext,
             ) -> Any:
                 if isinstance(value, Collection) and not isinstance(value, str | bytes):
                     if len(value) != elements_count:
@@ -576,8 +546,8 @@ def _prepare_validator_of_tuple(  # noqa: C901
 
                     validated: Sequence[Any] = []
                     for idx, element in enumerate(value):
-                        with context.scope(f"[{idx}]"):
-                            validated.append(element_validators[idx](element, context=context))
+                        with ValidationContext.scope(f"[{idx}]"):
+                            validated.append(element_validators[idx](element))
 
                     validated = tuple(validated)
                     verifier(validated)
@@ -593,7 +563,6 @@ def _prepare_validator_of_tuple(  # noqa: C901
             def validator(
                 value: Any,
                 /,
-                context: ParameterValidationContext,
             ) -> Any:
                 if isinstance(value, Collection) and not isinstance(value, str | bytes):
                     if len(value) != elements_count:
@@ -602,8 +571,8 @@ def _prepare_validator_of_tuple(  # noqa: C901
                         )
                     validated: Sequence[Any] = []
                     for idx, element in enumerate(value):
-                        with context.scope(f"[{idx}]"):
-                            validated.append(element_validators[idx](element, context=context))
+                        with ValidationContext.scope(f"[{idx}]"):
+                            validated.append(element_validators[idx](element))
 
                     return tuple(validated)
 
@@ -619,9 +588,9 @@ def _prepare_validator_of_union(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
-    validators: list[ParameterValidation[Any]] = [
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
+    validators: list[Validator[Any]] = [
         ParameterValidator.of(
             alternative,
             verifier=None,
@@ -636,12 +605,11 @@ def _prepare_validator_of_union(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             errors: list[Exception] = []
             for validator in validators:
                 try:
-                    validated = validator(value, context=context)
+                    validated = validator(value)
                     verifier(validated)
                     return validated
 
@@ -657,12 +625,11 @@ def _prepare_validator_of_union(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             errors: list[Exception] = []
             for validator in validators:
                 try:
-                    return validator(value, context=context)
+                    return validator(value)
 
                 except Exception as exc:
                     errors.append(exc)
@@ -679,14 +646,13 @@ def _prepare_validator_of_float(  # noqa: C901
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     if verifier := verifier:
 
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             match value:
                 case float():
@@ -719,7 +685,6 @@ def _prepare_validator_of_float(  # noqa: C901
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             match value:
                 case float():
@@ -747,14 +712,13 @@ def _prepare_validator_of_int(  # noqa: C901
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     if verifier := verifier:
 
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             match value:
                 case int():
@@ -790,7 +754,6 @@ def _prepare_validator_of_int(  # noqa: C901
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             match value:
                 case int():
@@ -822,14 +785,13 @@ def _prepare_validator_of_bool(  # noqa: C901
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     if verifier := verifier:
 
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             match value:
                 case bool():
@@ -863,7 +825,6 @@ def _prepare_validator_of_bool(  # noqa: C901
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             match value:
                 case bool():
@@ -896,14 +857,13 @@ def _prepare_validator_of_uuid(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     if verifier := verifier:
 
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, UUID):
                 verifier(value)
@@ -925,7 +885,6 @@ def _prepare_validator_of_uuid(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, UUID):
                 return value
@@ -946,14 +905,13 @@ def _prepare_validator_of_datetime(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     if verifier := verifier:
 
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, datetime):
                 verifier(value)
@@ -978,7 +936,6 @@ def _prepare_validator_of_datetime(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, datetime):
                 return value
@@ -1001,14 +958,13 @@ def _prepare_validator_of_date(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     if verifier := verifier:
 
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, date):
                 verifier(value)
@@ -1030,7 +986,6 @@ def _prepare_validator_of_date(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, date):
                 return value
@@ -1050,14 +1005,13 @@ def _prepare_validator_of_time(
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     if verifier := verifier:
 
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, datetime):
                 verifier(value)
@@ -1082,7 +1036,6 @@ def _prepare_validator_of_time(
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, datetime):
                 return value
@@ -1105,8 +1058,8 @@ def _prepare_validator_of_typed_dict(  # noqa: C901
     annotation: AttributeAnnotation,
     /,
     verifier: ParameterVerification[Any] | None,
-    recursion_guard: MutableMapping[str, ParameterValidation[Any]],
-) -> ParameterValidation[Any]:
+    recursion_guard: MutableMapping[str, Validator[Any]],
+) -> Validator[Any]:
     def key_validator(
         value: Any,
     ) -> str:
@@ -1117,7 +1070,7 @@ def _prepare_validator_of_typed_dict(  # noqa: C901
             raise TypeError(f"'{value}' is not matching expected type of 'str'")
 
     formatted_type: str = str(annotation)
-    values_validators: dict[str, ParameterValidation[Any]] = {
+    values_validators: dict[str, Validator[Any]] = {
         key: ParameterValidator.of(
             element,
             verifier=None,
@@ -1132,21 +1085,17 @@ def _prepare_validator_of_typed_dict(  # noqa: C901
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, Mapping):
                 validated: MutableMapping[Any, Any] = {}
                 for key, validate in values_validators.items():
                     validated_key: str = key_validator(key)
-                    with context.scope(f"[{validated_key}]"):
+                    with ValidationContext.scope(f"[{validated_key}]"):
                         element: Any = value.get(validated_key, MISSING)
                         if element is MISSING and key not in required_values:
                             continue  # skip missing and not required
 
-                        validated[validated_key] = validate(
-                            element,
-                            context=context,
-                        )
+                        validated[validated_key] = validate(element)
 
                 # TODO: FIXME: make sure dict is not mutable?
                 # validated = MappingProxyType(validated)
@@ -1161,21 +1110,17 @@ def _prepare_validator_of_typed_dict(  # noqa: C901
         def validator(
             value: Any,
             /,
-            context: ParameterValidationContext,
         ) -> Any:
             if isinstance(value, Mapping):
                 validated: MutableMapping[Any, Any] = {}
                 for key, validate in values_validators.items():
                     validated_key: str = key_validator(key)
-                    with context.scope(f"[{validated_key}]"):
+                    with ValidationContext.scope(f"[{validated_key}]"):
                         element: Any = value.get(validated_key, MISSING)
                         if element is MISSING and key not in required_values:
                             continue  # skip missing and not required
 
-                        validated[validated_key] = validate(
-                            element,
-                            context=context,
-                        )
+                        validated[validated_key] = validate(element)
 
                 # TODO: FIXME: make sure dict is not mutable?
                 # validated = MappingProxyType(validated)
@@ -1193,9 +1138,9 @@ VALIDATORS: Mapping[
         [
             AttributeAnnotation,
             ParameterVerification[Any] | None,
-            MutableMapping[str, ParameterValidation[Any]],
+            MutableMapping[str, Validator[Any]],
         ],
-        ParameterValidation[Any],
+        Validator[Any],
     ],
 ] = {
     Any: _prepare_validator_of_any,

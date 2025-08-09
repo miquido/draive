@@ -1,16 +1,12 @@
 from collections.abc import Mapping, MutableMapping
 from typing import Any, Self, cast, final
 
-from haiway import MISSING, DefaultValue, Missing
+from haiway import MISSING, DefaultValue, Missing, ValidationContext
 from haiway.state import AttributeAnnotation
+from haiway.state.validation import Validator
 
 from draive.parameters.specification import ParameterSpecification, parameter_specification
-from draive.parameters.types import (
-    ParameterConversion,
-    ParameterValidation,
-    ParameterValidationContext,
-    ParameterVerification,
-)
+from draive.parameters.types import ParameterConversion, ParameterVerification
 from draive.parameters.validation import ParameterValidator
 
 __all__ = ("Parameter",)
@@ -28,7 +24,7 @@ class Parameter[Type]:
         alias: str | None,
         description: str | Missing,
         default: DefaultValue[Type],
-        validator: ParameterValidation[Type] | Missing,
+        validator: Validator[Type] | Missing,
         verifier: ParameterVerification[Type] | Missing,
         converter: ParameterConversion[Type] | Missing,
         specification: ParameterSpecification | Missing,
@@ -50,7 +46,7 @@ class Parameter[Type]:
                 recursion_guard={},  # TODO: add enclosing type Self?
             )
             if validator is MISSING
-            else cast(ParameterValidation[Type], validator),
+            else cast(Validator[Type], validator),
             converter=converter,
             specification=parameter_specification(
                 annotation,
@@ -68,7 +64,7 @@ class Parameter[Type]:
         description: str | None,
         alias: str | None,
         default: DefaultValue[Type],
-        validator: ParameterValidation[Type],
+        validator: Validator[Type],
         converter: ParameterConversion[Type] | Missing,
         specification: ParameterSpecification,
         required: bool,
@@ -77,7 +73,7 @@ class Parameter[Type]:
         self.description: str | None = description
         self.alias: str | None = alias
         self.default: DefaultValue[Type] = default
-        self.validator: ParameterValidation[Any] = validator
+        self.validator: Validator[Any] = validator
         self.converter: ParameterConversion[Type] | None = (
             None if converter is MISSING else cast(ParameterConversion[Type], converter)
         )
@@ -135,13 +131,11 @@ class Parameter[Type]:
         self,
         value: Any,
         /,
-        context: ParameterValidationContext,
     ) -> Any:
-        with context.scope(f".{self.name}"):
+        with ValidationContext.scope(f".{self.name}"):
             try:
                 return self.validator(
                     value if value is not MISSING else self.default(),
-                    context=context,
                 )
 
             except Exception as exc:

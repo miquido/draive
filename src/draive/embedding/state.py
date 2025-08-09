@@ -1,7 +1,7 @@
 from collections.abc import Callable, Sequence
 from typing import Any, cast, overload
 
-from haiway import AttributePath, State, ctx
+from haiway import AttributePath, State, statemethod
 
 from draive.embedding.types import Embedded, ValueEmbedding
 from draive.parameters import DataModel
@@ -23,9 +23,25 @@ class TextEmbedding(State):
     ) -> Embedded[str]: ...
 
     @overload
+    async def embed(
+        self,
+        content: str,
+        /,
+        **extra: Any,
+    ) -> Embedded[str]: ...
+
+    @overload
     @classmethod
     async def embed(
         cls,
+        content: Sequence[str],
+        /,
+        **extra: Any,
+    ) -> Sequence[Embedded[str]]: ...
+
+    @overload
+    async def embed(
+        self,
         content: Sequence[str],
         /,
         **extra: Any,
@@ -42,6 +58,15 @@ class TextEmbedding(State):
     ) -> Embedded[Value]: ...
 
     @overload
+    async def embed[Value: DataModel | State](
+        self,
+        content: Value,
+        /,
+        attribute: Callable[[Value], str] | AttributePath[Value, str] | str,
+        **extra: Any,
+    ) -> Embedded[Value]: ...
+
+    @overload
     @classmethod
     async def embed[Value: DataModel | State](
         cls,
@@ -51,9 +76,18 @@ class TextEmbedding(State):
         **extra: Any,
     ) -> Sequence[Embedded[Value]]: ...
 
-    @classmethod
+    @overload
+    async def embed[Value: DataModel | State](
+        self,
+        content: Sequence[Value],
+        /,
+        attribute: Callable[[Value], str] | AttributePath[Value, str] | str,
+        **extra: Any,
+    ) -> Sequence[Embedded[Value]]: ...
+
+    @statemethod
     async def embed[Value: DataModel | State | str](
-        cls,
+        self,
         content: Sequence[Value] | Sequence[str] | Value | str,
         /,
         attribute: Callable[[Value], str] | AttributePath[Value, str] | str | None = None,
@@ -75,7 +109,7 @@ class TextEmbedding(State):
 
         match content:
             case [*elements]:
-                return await ctx.state(cls).embedding(
+                return await self.embedding(
                     elements,
                     attribute=str_selector,
                     **extra,
@@ -83,7 +117,7 @@ class TextEmbedding(State):
 
             case element:
                 return (
-                    await ctx.state(cls).embedding(
+                    await self.embedding(
                         [element],
                         attribute=str_selector,
                         **extra,
@@ -104,9 +138,25 @@ class ImageEmbedding(State):
     ) -> Embedded[bytes]: ...
 
     @overload
+    async def embed(
+        self,
+        content: bytes,
+        /,
+        **extra: Any,
+    ) -> Embedded[bytes]: ...
+
+    @overload
     @classmethod
     async def embed(
         cls,
+        content: Sequence[bytes],
+        /,
+        **extra: Any,
+    ) -> Sequence[Embedded[bytes]]: ...
+
+    @overload
+    async def embed(
+        self,
         content: Sequence[bytes],
         /,
         **extra: Any,
@@ -123,6 +173,15 @@ class ImageEmbedding(State):
     ) -> Embedded[Value]: ...
 
     @overload
+    async def embed[Value: DataModel | State](
+        self,
+        content: Value,
+        /,
+        attribute: Callable[[Value], bytes] | AttributePath[Value, bytes] | bytes,
+        **extra: Any,
+    ) -> Embedded[Value]: ...
+
+    @overload
     @classmethod
     async def embed[Value: DataModel | State](
         cls,
@@ -132,9 +191,18 @@ class ImageEmbedding(State):
         **extra: Any,
     ) -> Sequence[Embedded[Value]]: ...
 
-    @classmethod
+    @overload
+    async def embed[Value: DataModel | State](
+        self,
+        content: Sequence[Value],
+        /,
+        attribute: Callable[[Value], bytes] | AttributePath[Value, bytes] | bytes,
+        **extra: Any,
+    ) -> Sequence[Embedded[Value]]: ...
+
+    @statemethod
     async def embed[Value: DataModel | State | bytes](
-        cls,
+        self,
         content: Sequence[Value] | Sequence[bytes] | Value | bytes,
         /,
         attribute: Callable[[Value], bytes] | AttributePath[Value, bytes] | bytes | None = None,
@@ -156,7 +224,7 @@ class ImageEmbedding(State):
 
         match content:
             case [*elements]:
-                return await ctx.state(cls).embedding(
+                return await self.embedding(
                     elements,
                     attribute=bytes_selector,
                     **extra,
@@ -164,7 +232,7 @@ class ImageEmbedding(State):
 
             case element:
                 return (
-                    await ctx.state(cls).embedding(
+                    await self.embedding(
                         [element],
                         attribute=bytes_selector,
                         **extra,

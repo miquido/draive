@@ -5,17 +5,19 @@ from uuid import uuid4
 from pytest import mark
 
 from draive import (
-    LMM,
-    LMMCompletion,
-    LMMContextElement,
-    LMMToolRequest,
+    GenerativeModel,
     MultimodalContent,
     Toolbox,
     ctx,
     tool,
 )
 from draive.generation.text import TextGeneration
-from draive.lmm import LMMToolRequests
+from draive.models import (
+    ModelContextElement,
+    ModelOutput,
+    ModelToolRequest,
+    ModelToolsDeclaration,
+)
 
 
 class MockLMMTracker:
@@ -46,23 +48,25 @@ async def test_text_generation_simple():
     """Test basic text generation."""
     tracker = MockLMMTracker()
 
-    async def mock_completion(
+    async def mock_generating(
         *,
-        instruction: str | None = None,
-        context: Sequence[LMMContextElement],
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
         output: str = "text",
+        stream: bool = False,
         **extra: Any,
-    ) -> LMMCompletion:
+    ) -> ModelOutput:
         tracker.call_count += 1
         tracker.last_context = context
-        tracker.last_instruction = instruction
+        tracker.last_instruction = instructions
         tracker.last_output = output
 
-        return LMMCompletion.of("This is a generated text response.")
+        return ModelOutput.of(MultimodalContent.of("This is a generated text response."))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         result = await TextGeneration.generate(
-            instruction="Generate a text response",
+            instructions="Generate a text response",
             input="Create some text about AI",
         )
 
@@ -77,16 +81,20 @@ async def test_text_generation_without_instruction():
     """Test text generation without explicit instruction."""
     tracker = MockLMMTracker()
 
-    async def mock_completion(
+    async def mock_generating(
         *,
-        instruction: str | None = None,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
         **extra: Any,
-    ) -> LMMCompletion:
-        tracker.last_instruction = instruction
-        assert instruction is None
-        return LMMCompletion.of("Generated without specific instruction.")
+    ) -> ModelOutput:
+        tracker.last_instruction = instructions
+        assert instructions == ""
+        return ModelOutput.of(MultimodalContent.of("Generated without specific instruction."))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         result = await TextGeneration.generate(
             input="Generate some text",
         )
@@ -104,27 +112,37 @@ async def test_text_generation_with_tools():
         """Get weather information for a city."""
         return f"The weather in {city} is sunny and 25°C."
 
-    tool_request = LMMToolRequest(
-        identifier=str(uuid4()),
+    tool_request = ModelToolRequest.of(
+        str(uuid4()),
         tool="get_weather",
         arguments={"city": "Paris"},
     )
 
-    async def mock_completion(**kwargs) -> LMMCompletion | LMMToolRequests:
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
         nonlocal call_count
         call_count += 1
         if call_count == 1:
             # First call requests tool usage
-            return LMMToolRequests.of([tool_request])
+            return ModelOutput.of(tool_request)
         else:
             # After tool response, return final result
-            return LMMCompletion.of(
-                "Based on the weather data, it's a beautiful sunny day in Paris with 25°C."
+            return ModelOutput.of(
+                MultimodalContent.of(
+                    "Based on the weather data, it's a beautiful sunny day in Paris with 25°C."
+                )
             )
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         result = await TextGeneration.generate(
-            instruction="Generate weather report",
+            instructions="Generate weather report",
             input="Tell me about the weather in Paris",
             tools=[get_weather],
         )
@@ -140,24 +158,30 @@ async def test_text_generation_with_examples():
     """Test text generation with examples."""
     tracker = MockLMMTracker()
 
-    async def mock_completion(
+    async def mock_generating(
         *,
-        context: Sequence[LMMContextElement],
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
         **extra: Any,
-    ) -> LMMCompletion:
+    ) -> ModelOutput:
         tracker.last_context = context
         # Context should include examples (input + completion pairs)
         assert len(context) >= 5  # 2 examples (4 messages) + 1 input
-        return LMMCompletion.of("Generated text following the examples pattern.")
+        return ModelOutput.of(
+            MultimodalContent.of("Generated text following the examples pattern.")
+        )
 
     examples = [
         ("Write about cats", "Cats are independent and graceful animals."),
         ("Write about dogs", "Dogs are loyal and friendly companions."),
     ]
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         result = await TextGeneration.generate(
-            instruction="Generate descriptive text",
+            instructions="Generate descriptive text",
             input="Write about birds",
             examples=examples,
         )
@@ -180,18 +204,22 @@ async def test_text_generation_with_toolbox():
 
     toolbox = Toolbox.of(tool1, tool2)
 
-    async def mock_completion(
+    async def mock_generating(
         *,
-        tools=None,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
         **kwargs,
-    ) -> LMMCompletion:
+    ) -> ModelOutput:
         # Verify tools were passed
-        assert tools is not None
-        return LMMCompletion.of("Generated text using available tools.")
+        assert tools is not None and bool(tools)
+        return ModelOutput.of(MultimodalContent.of("Generated text using available tools."))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         result = await TextGeneration.generate(
-            instruction="Generate text",
+            instructions="Generate text",
             input="Create text using toolbox",
             tools=toolbox,
         )
@@ -204,13 +232,21 @@ async def test_text_generation_with_toolbox():
 async def test_text_generation_multimodal_input():
     """Test text generation with different input types."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("Generated text from multimodal input.")
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("Generated text from multimodal input."))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         # Test with string input
         result = await TextGeneration.generate(
-            instruction="Generate text",
+            instructions="Generate text",
             input="Simple string input",
         )
         assert isinstance(result, str)
@@ -218,7 +254,7 @@ async def test_text_generation_multimodal_input():
 
         # Test with MultimodalContent input
         result = await TextGeneration.generate(
-            instruction="Generate text",
+            instructions="Generate text",
             input=MultimodalContent.of("Multimodal content input"),
         )
         assert isinstance(result, str)
@@ -229,27 +265,26 @@ async def test_text_generation_multimodal_input():
 async def test_text_generation_instruction_types():
     """Test text generation with different instruction types."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("Generated with instruction object.")
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("Generated with instruction object."))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         # Test with string instruction
         result = await TextGeneration.generate(
-            instruction="Generate text with string instruction",
+            instructions="Generate text with string instruction",
             input="Create some text",
         )
         assert isinstance(result, str)
 
-        # Test with Instruction object
-        from draive import Instruction
-
-        instruction_obj = Instruction.of("Generate text with instruction object")
-        result = await TextGeneration.generate(
-            instruction=instruction_obj,
-            input="Create some text",
-        )
-        assert isinstance(result, str)
-        assert result == "Generated with instruction object."
+        # Skipping separate Instruction object case in new API
 
 
 @mark.asyncio
@@ -262,26 +297,35 @@ async def test_text_generation_tool_error_handling():
         """A tool that always fails."""
         raise ValueError("Tool error!")
 
-    tool_request = LMMToolRequest(
-        identifier=str(uuid4()),
-        tool="failing_tool",
-        arguments={},
-    )
-
-    async def mock_completion(**kwargs) -> LMMCompletion | LMMToolRequests:
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            return LMMToolRequests.of([tool_request])
+            return ModelOutput.of(
+                ModelToolRequest.of(
+                    str(uuid4()),
+                    tool="failing_tool",
+                )
+            )
         else:
             # After seeing the tool error, provide a response
-            return LMMCompletion.of(
-                "I encountered an error with the tool, but here's a fallback response."
+            return ModelOutput.of(
+                MultimodalContent.of(
+                    "I encountered an error with the tool, but here's a fallback response."
+                )
             )
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         result = await TextGeneration.generate(
-            instruction="Generate text",
+            instructions="Generate text",
             input="Use the failing tool",
             tools=[failing_tool],
         )
@@ -295,12 +339,20 @@ async def test_text_generation_tool_error_handling():
 async def test_text_generation_empty_examples():
     """Test text generation with empty examples list."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("Generated without examples.")
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of("Generated without examples."))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         result = await TextGeneration.generate(
-            instruction="Generate text",
+            instructions="Generate text",
             input="Create text without examples",
             examples=[],  # Empty examples
         )
@@ -313,12 +365,20 @@ async def test_text_generation_empty_examples():
 async def test_text_generation_empty_response():
     """Test text generation handles empty responses."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of("")
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of(""))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         result = await TextGeneration.generate(
-            instruction="Generate text",
+            instructions="Generate text",
             input="Return empty response",
         )
 
@@ -335,12 +395,20 @@ async def test_text_generation_long_response():
     The response includes various types of information and maintains coherence
     throughout the entire generated text."""
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of(long_text)
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of(long_text))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         result = await TextGeneration.generate(
-            instruction="Generate a long text response",
+            instructions="Generate a long text response",
             input="Create extended content about text generation",
         )
 
@@ -355,13 +423,17 @@ async def test_text_generation_complex_instruction():
     """Test text generation with complex multi-part instruction."""
     tracker = MockLMMTracker()
 
-    async def mock_completion(
+    async def mock_generating(
         *,
-        instruction: str | None = None,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
         **kwargs,
-    ) -> LMMCompletion:
-        tracker.last_instruction = instruction
-        return LMMCompletion.of("Generated following complex instructions.")
+    ) -> ModelOutput:
+        tracker.last_instruction = instructions
+        return ModelOutput.of(MultimodalContent.of("Generated following complex instructions."))
 
     complex_instruction = """
     Generate a text response that:
@@ -371,9 +443,9 @@ async def test_text_generation_complex_instruction():
     4. Provides actionable insights
     """
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         result = await TextGeneration.generate(
-            instruction=complex_instruction,
+            instructions=complex_instruction,
             input="Create professional analysis text",
         )
 
@@ -389,12 +461,20 @@ async def test_text_generation_special_characters():
 
     special_text = "Generated text with special chars: @#$%^&*()[]{}|\\:;\"'<>,.?/~`"
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of(special_text)
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of(special_text))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         result = await TextGeneration.generate(
-            instruction="Generate text with special characters",
+            instructions="Generate text with special characters",
             input="Include various symbols",
         )
 
@@ -409,12 +489,20 @@ async def test_text_generation_unicode_content():
 
     unicode_text = "Generated text with Unicode: 你好 世界 🌍 ñáéíóú àèìòù äëïöü ß"
 
-    async def mock_completion(**kwargs) -> LMMCompletion:
-        return LMMCompletion.of(unicode_text)
+    async def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
+        **extra: Any,
+    ) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of(unicode_text))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         result = await TextGeneration.generate(
-            instruction="Generate text with Unicode characters",
+            instructions="Generate text with Unicode characters",
             input="Include international characters",
         )
 
@@ -430,19 +518,23 @@ async def test_text_generation_context_preservation():
     """Test that context is properly passed to LMM."""
     tracker = MockLMMTracker()
 
-    async def mock_completion(
+    async def mock_generating(
         *,
-        context: Sequence[LMMContextElement],
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[ModelContextElement],
+        output: str = "text",
+        stream: bool = False,
         **extra: Any,
-    ) -> LMMCompletion:
+    ) -> ModelOutput:
         tracker.last_context = context
         # Should have at least the input context
         assert len(context) >= 1
-        return LMMCompletion.of("Context preserved correctly.")
+        return ModelOutput.of(MultimodalContent.of("Context preserved correctly."))
 
-    async with ctx.scope("test", LMM(completing=mock_completion), TextGeneration()):
+    async with ctx.scope("test", GenerativeModel(generating=mock_generating), TextGeneration()):
         result = await TextGeneration.generate(
-            instruction="Generate text",
+            instructions="Generate text",
             input="Test context preservation",
         )
 

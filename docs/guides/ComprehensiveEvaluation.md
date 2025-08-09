@@ -301,7 +301,21 @@ async def strict_evaluator(value: str) -> float:
 Choose appropriate thresholds based on criticality and business impact:
 
 ```python
-from draive.evaluators import *
+from draive.evaluators import (
+    coherence_evaluator,
+    completeness_evaluator,
+    consistency_evaluator,
+    creativity_evaluator,
+    factual_accuracy_evaluator,
+    forbidden_keywords_evaluator,
+    groundedness_evaluator,
+    helpfulness_evaluator,
+    readability_evaluator,
+    required_keywords_evaluator,
+    safety_evaluator,
+    similarity_evaluator,
+    tone_style_evaluator,
+)
 
 # Critical features - highest threshold (perfect = 0.9)
 safety_check = safety_evaluator.with_threshold("perfect")

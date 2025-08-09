@@ -1,260 +1,161 @@
-from collections.abc import Iterable, Sequence
-from datetime import datetime
-from typing import Literal, Self
+from datetime import UTC, datetime
+from typing import Literal, Self, final
 from uuid import UUID, uuid4
 
-from haiway import META_EMPTY, Default, Meta, MetaValues
+from haiway import Meta, MetaValues
 
-from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel
-from draive.utils import Memory
 
 __all__ = (
-    "ConversationElement",
-    "ConversationEvent",
-    "ConversationMemory",
+    "ConversationInputChunk",
     "ConversationMessage",
-    "ConversationMessageChunk",
-    "ConversationStreamElement",
+    "ConversationOutputChunk",
 )
 
 
-class ConversationMessageChunk(DataModel):
-    @classmethod
-    def user(
-        cls,
-        content: Multimodal,
-        *,
-        message_identifier: UUID,
-        identifier: UUID | None = None,
-        created: datetime | None = None,
-        meta: Meta | MetaValues | None = None,
-        eod: bool = False,
-    ) -> Self:
-        return cls(
-            message_identifier=message_identifier,
-            identifier=identifier if identifier is not None else uuid4(),
-            role="user",
-            created=created if created is not None else datetime.now(),
-            content=MultimodalContent.of(content),
-            eod=eod,
-            meta=Meta.of(meta),
-        )
+@final
+class ConversationInputChunk(DataModel):
+    """Streaming input chunk for a conversation session.
 
-    @classmethod
-    def model(
-        cls,
-        content: Multimodal,
-        *,
-        message_identifier: UUID,
-        identifier: UUID | None = None,
-        created: datetime | None = None,
-        meta: Meta | MetaValues | None = None,
-        eod: bool = False,
-    ) -> Self:
-        return cls(
-            message_identifier=message_identifier,
-            identifier=identifier if identifier is not None else uuid4(),
-            role="model",
-            created=created if created is not None else datetime.now(),
-            content=MultimodalContent.of(content),
-            eod=eod,
-            meta=Meta.of(meta),
-        )
+    Attributes
+    ----------
+    created : datetime
+        Timestamp when the chunk was created (UTC).
+    content : MultimodalContent
+        Incremental multimodal content payload.
+    eod : bool
+        End-of-data marker for the current input stream.
+    """
 
-    message_identifier: UUID
-    identifier: UUID = Default(factory=uuid4)
-    role: Literal["user", "model"]
-    created: datetime = Default(factory=datetime.now)
-    content: MultimodalContent
-    eod: bool = False
-    meta: Meta = META_EMPTY
-
-    def __bool__(self) -> bool:
-        return bool(self.content)
-
-
-class ConversationMessage(DataModel):
-    @classmethod
-    def from_chunks(
-        cls,
-        chunks: Iterable[ConversationMessageChunk],
-        /,
-    ) -> Sequence[Self]:
-        messages: list[Self] = []
-        current: Self | None = None
-        for chunk in chunks:  # assuming correct order
-            if current is None:
-                current = cls(
-                    identifier=chunk.message_identifier,
-                    role=chunk.role,
-                    created=chunk.created,
-                    content=chunk.content,
-                    meta=chunk.meta,
-                )
-
-            elif current.role == chunk.role:
-                assert current.created < chunk.created  # nosec: B101
-                assert current.identifier == chunk.message_identifier  # nosec: B101
-
-                current = current.with_chunk(chunk, merge_meta=True)
-
-            else:
-                messages.append(current)
-                current = cls(
-                    role=chunk.role,
-                    created=chunk.created,
-                    content=chunk.content,
-                    meta=chunk.meta,
-                )
-
-            if chunk.eod:
-                messages.append(current)
-                current = None
-
-        if current is not None:
-            messages.append(current)
-
-        return messages
-
-    @classmethod
-    def from_lmm_context(
-        cls,
-        element: LMMInput | LMMCompletion,
-        /,
-    ) -> Self:
-        if isinstance(element, LMMCompletion):
-            return cls.model(
-                element.content,
-                identifier=element.meta.identifier or uuid4(),
-                created=element.meta.created,
-                meta=element.meta.excluding("kind", "identifier", "created"),
-            )
-
-        else:
-            assert isinstance(element, LMMInput)  # nosec: B101
-            return cls.user(
-                element.content,
-                identifier=element.meta.identifier or uuid4(),
-                created=element.meta.created,
-                meta=element.meta.excluding("kind", "identifier", "created"),
-            )
-
-    @classmethod
-    def user(
-        cls,
-        content: Multimodal,
-        *,
-        identifier: UUID | None = None,
-        created: datetime | None = None,
-        meta: Meta | MetaValues | None = None,
-    ) -> Self:
-        return cls(
-            identifier=identifier if identifier is not None else uuid4(),
-            role="user",
-            created=created if created is not None else datetime.now(),
-            content=MultimodalContent.of(content),
-            meta=Meta.of(meta),
-        )
-
-    @classmethod
-    def model(
-        cls,
-        content: Multimodal,
-        *,
-        identifier: UUID | None = None,
-        created: datetime | None = None,
-        meta: Meta | MetaValues | None = None,
-    ) -> Self:
-        return cls(
-            identifier=identifier if identifier is not None else uuid4(),
-            role="model",
-            created=created if created is not None else datetime.now(),
-            content=MultimodalContent.of(content),
-            meta=Meta.of(meta),
-        )
-
-    identifier: UUID = Default(factory=uuid4)
-    role: Literal["user", "model"]
-    created: datetime = Default(factory=datetime.now)
-    content: MultimodalContent
-    meta: Meta = META_EMPTY
-
-    def to_lmm_context(
-        self,
-    ) -> LMMContextElement:
-        match self.role:
-            case "user":
-                return LMMInput.of(
-                    self.content,
-                    meta=self.meta.updated(
-                        # using predefined meta keys
-                        kind="message",
-                        identifier=str(self.identifier),
-                        created=self.created.isoformat(),
-                    ),
-                )
-
-            case "model":
-                return LMMCompletion.of(
-                    self.content,
-                    meta=self.meta.updated(
-                        # using predefined meta keys
-                        kind="message",
-                        identifier=str(self.identifier),
-                        created=self.created.isoformat(),
-                    ),
-                )
-
-    def __bool__(self) -> bool:
-        return bool(self.content)
-
-    def with_chunk(
-        self,
-        chunk: ConversationMessageChunk,
-        /,
-        merge_meta: bool = False,
-    ) -> Self:
-        assert self.identifier == chunk.message_identifier  # nosec: B101
-        return self.__class__(
-            identifier=self.identifier,
-            role=self.role,
-            created=self.created,
-            content=self.content.appending(chunk.content),
-            meta=self.meta.merged_with(chunk.meta) if merge_meta else self.meta,
-        )
-
-
-class ConversationEvent(DataModel):
     @classmethod
     def of(
         cls,
-        category: str,
+        content: Multimodal,
+        *,
+        eod: bool = False,
+    ) -> Self:
+        """Create a conversation input chunk from content.
+
+        Parameters
+        ----------
+        content : Multimodal
+            One or more multimodal elements.
+        eod : bool, optional
+            Marks the end of the input stream.
+        """
+        return cls(
+            created=datetime.now(UTC),
+            content=MultimodalContent.of(content),
+            eod=eod,
+        )
+
+    created: datetime
+    content: MultimodalContent
+    eod: bool
+
+    def __bool__(self) -> bool:
+        """Return ``True`` when any content is present."""
+        return bool(self.content)
+
+
+@final
+class ConversationOutputChunk(DataModel):
+    """Streaming output chunk produced during a conversation session.
+
+    Attributes
+    ----------
+    created : datetime
+        Timestamp when the chunk was created (UTC).
+    content : MultimodalContent
+        Incremental multimodal content payload.
+    eod : bool
+        End-of-data marker for the current output stream.
+    """
+
+    @classmethod
+    def of(
+        cls,
+        content: Multimodal,
+        *,
+        eod: bool = False,
+    ) -> Self:
+        """Create a conversation output chunk from content."""
+        return cls(
+            created=datetime.now(UTC),
+            content=MultimodalContent.of(content),
+            eod=eod,
+        )
+
+    created: datetime
+    content: MultimodalContent
+    eod: bool
+
+    def __bool__(self) -> bool:
+        """Return ``True`` when any content is present."""
+        return bool(self.content)
+
+
+@final
+class ConversationMessage(DataModel):
+    """Represents a single user or model message with multimodal content.
+
+    Attributes
+    ----------
+    identifier : UUID
+        Unique message identifier.
+    role : {"user", "model"}
+        Message author.
+    created : datetime
+        Creation timestamp (UTC).
+    content : MultimodalContent
+        Message content.
+    meta : Meta
+        Additional metadata.
+    """
+
+    @classmethod
+    def user(
+        cls,
+        content: Multimodal,
         *,
         identifier: UUID | None = None,
-        content: Multimodal | None = None,
         created: datetime | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
+        """Create a user-authored message."""
         return cls(
             identifier=identifier if identifier is not None else uuid4(),
-            category=category,
-            created=created if created is not None else datetime.now(),
-            content=MultimodalContent.of(content)
-            if content is not None
-            else MultimodalContent.empty,
+            role="user",
+            created=created if created is not None else datetime.now(UTC),
+            content=MultimodalContent.of(content),
             meta=Meta.of(meta),
         )
 
-    identifier: UUID = Default(factory=uuid4)
-    category: str
-    created: datetime = Default(factory=datetime.now)
-    content: MultimodalContent = MultimodalContent.empty
-    meta: Meta = META_EMPTY
+    @classmethod
+    def model(
+        cls,
+        content: Multimodal,
+        *,
+        identifier: UUID | None = None,
+        created: datetime | None = None,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        """Create a model-authored message."""
+        return cls(
+            identifier=identifier if identifier is not None else uuid4(),
+            role="model",
+            created=created if created is not None else datetime.now(UTC),
+            content=MultimodalContent.of(content),
+            meta=Meta.of(meta),
+        )
 
+    identifier: UUID
+    role: Literal["user", "model"]
+    created: datetime
+    content: MultimodalContent
+    meta: Meta
 
-ConversationElement = ConversationMessage | ConversationEvent
-ConversationStreamElement = ConversationMessageChunk | ConversationEvent
-
-ConversationMemory = Memory[Sequence[ConversationMessage], ConversationMessage]
+    def __bool__(self) -> bool:
+        """Return ``True`` when message has any content."""
+        return bool(self.content)

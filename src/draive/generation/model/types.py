@@ -1,20 +1,18 @@
 from collections.abc import Iterable
 from typing import Any, Literal, Protocol, runtime_checkable
 
-from draive.instructions import Instruction
+from draive.models import ResolveableInstructions, Toolbox
 from draive.multimodal import MultimodalContent
 from draive.parameters import DataModel
-from draive.prompts import Prompt
-from draive.tools import Toolbox
 
 __all__ = (
     "ModelGenerating",
-    "ModelGeneratorDecoder",
+    "ModelGenerationDecoder",
 )
 
 
 @runtime_checkable
-class ModelGeneratorDecoder[Generated: DataModel](Protocol):
+class ModelGenerationDecoder[Generated: DataModel](Protocol):
     def __call__(
         self,
         generated: MultimodalContent,
@@ -28,11 +26,11 @@ class ModelGenerating(Protocol):
         generated: type[Generated],
         /,
         *,
-        instruction: Instruction,
-        input: Prompt | MultimodalContent,  # noqa: A002
-        schema_injection: Literal["auto", "full", "simplified", "skip"],
+        instructions: ResolveableInstructions,
+        input: MultimodalContent,  # noqa: A002
+        schema_injection: Literal["full", "simplified", "skip"],
         toolbox: Toolbox,
-        examples: Iterable[tuple[MultimodalContent, Generated]] | None,
-        decoder: ModelGeneratorDecoder[Generated] | None,
+        examples: Iterable[tuple[MultimodalContent, Generated]],
+        decoder: ModelGenerationDecoder[Generated] | None,
         **extra: Any,
     ) -> Generated: ...

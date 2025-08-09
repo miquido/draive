@@ -1,27 +1,47 @@
-from typing import Any
+from typing import Any, overload
 
-from haiway import State, ctx
+from haiway import State, statemethod
 
-from draive.generation.image.typing import ImageGenerating
-from draive.instructions import Instruction
-from draive.multimodal import MediaContent, Multimodal
+from draive.generation.image.default import generate_image
+from draive.generation.image.types import ImageGenerating
+from draive.models import ResolveableInstructions
+from draive.multimodal import MediaContent, Multimodal, MultimodalContent
 
 __all__ = ("ImageGeneration",)
 
 
 class ImageGeneration(State):
+    @overload
     @classmethod
     async def generate(
         cls,
         *,
-        instruction: Instruction | str,
-        input: Multimodal | None = None,  # noqa: A002
+        instructions: ResolveableInstructions = "",
+        input: Multimodal,
+        **extra: Any,
+    ) -> MediaContent: ...
+
+    @overload
+    async def generate(
+        self,
+        *,
+        instructions: ResolveableInstructions = "",
+        input: Multimodal,
+        **extra: Any,
+    ) -> MediaContent: ...
+
+    @statemethod
+    async def generate(
+        self,
+        *,
+        instructions: ResolveableInstructions = "",
+        input: Multimodal,  # noqa: A002
         **extra: Any,
     ) -> MediaContent:
-        return await ctx.state(cls).generate(
-            instruction=instruction,
-            input=input,
+        return await self.generating(
+            instructions=instructions,
+            input=MultimodalContent.of(input),
             **extra,
         )
 
-    generating: ImageGenerating
+    generating: ImageGenerating = generate_image

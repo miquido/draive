@@ -16,9 +16,6 @@ __all__ = ("OllamaEmbedding",)
 
 class OllamaEmbedding(OllamaAPI):
     def text_embedding(self) -> TextEmbedding:
-        """
-        Prepare TextEmbedding implementation using Ollama service.
-        """
         return TextEmbedding(embedding=self.create_texts_embedding)
 
     async def create_texts_embedding[Value: DataModel | State](
@@ -30,11 +27,8 @@ class OllamaEmbedding(OllamaAPI):
         config: OllamaEmbeddingConfig | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
-        """
-        Create texts embedding with Ollama embedding service.
-        """
         embedding_config: OllamaEmbeddingConfig = config or ctx.state(OllamaEmbeddingConfig)
-        async with ctx.scope("ollama_text_embedding", embedding_config):
+        async with ctx.scope("ollama_text_embedding"):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

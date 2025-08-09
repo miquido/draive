@@ -16,12 +16,12 @@ class MetaContent(DataModel):
         category: str,
         /,
         *,
-        content: TextContent | MediaContent | DataModel | None = None,
+        content: TextContent | MediaContent | DataModel | str | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
             category=category,
-            content=content,
+            content=TextContent(text=content) if isinstance(content, str) else content,
             meta=Meta.of(meta),
         )
 

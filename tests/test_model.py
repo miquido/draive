@@ -10,13 +10,13 @@ from pytest import raises
 
 from draive import (
     MISSING,
-    ConversationMessage,
     DataModel,
     Field,
     Missing,
     MultimodalContent,
-    ParameterValidationError,
+    ValidationError,
 )
+from draive.conversation import ConversationMessage
 from draive.multimodal import MediaData, MediaReference
 
 
@@ -259,9 +259,8 @@ def test_basic_decoding() -> None:
     assert BasicsModel.from_json(basic_model_json) == basic_model_instance
 
 
-basic_conversation_message_instance: ConversationMessage = ConversationMessage(
+basic_conversation_message_instance: ConversationMessage = ConversationMessage.model(
     identifier=UUID("f6da0a47556744cdb8334d263020907f"),
-    role="model",
     created=datetime.fromisoformat("2025-06-03T18:15:58.985599"),
     content=MultimodalContent.of("string"),
 )
@@ -282,9 +281,8 @@ basic_conversation_message_json: str = """\
 }\
 """
 
-media_url_conversation_message_instance: ConversationMessage = ConversationMessage(
+media_url_conversation_message_instance: ConversationMessage = ConversationMessage.model(
     identifier=UUID("f6da0a47556744cdb8334d263020907f"),
-    role="model",
     created=datetime.fromisoformat("2025-06-03T18:15:58.985599"),
     content=MultimodalContent.of(MediaReference.of("https://miquido.com/image", media="image/png")),
 )
@@ -306,9 +304,8 @@ media_url_conversation_message_json: str = """\
 }\
 """
 
-media_data_conversation_message_instance: ConversationMessage = ConversationMessage(
+media_data_conversation_message_instance: ConversationMessage = ConversationMessage.model(
     identifier=UUID("f6da0a47556744cdb8334d263020907f"),
-    role="model",
     created=datetime.fromisoformat("2025-06-03T18:15:58.985599"),
     content=MultimodalContent.of(MediaData.of(b"image_data", media="image/png")),
 )
@@ -412,13 +409,13 @@ def test_generic_subtypes_validation() -> None:
     assert isinstance(Generic[str](nested=NestedGeneric(value="ok")), Generic[str])
     assert isinstance(Generic(nested=NestedGeneric(value="ok")), Generic[str])
 
-    with raises(ParameterValidationError):
+    with raises(ValidationError):
         _ = Generic[int](nested=NestedGeneric[str](value="ok"))
 
-    with raises(ParameterValidationError):
+    with raises(ValidationError):
         _ = Container(generic=Generic(nested=NestedGeneric(value=42)))
 
-    with raises(ParameterValidationError):
+    with raises(ValidationError):
         _ = Container(generic=Generic[int](nested=NestedGeneric[str](value="ok")))
 
     # not raises

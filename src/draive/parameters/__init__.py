@@ -4,23 +4,23 @@ from draive.parameters.parameter import Parameter
 from draive.parameters.specification import (
     ParameterSpecification,
     ParametersSpecification,
+    ToolParametersSpecification,
     validated_specification,
+    validated_tool_specification,
 )
-from draive.parameters.types import BasicValue, ParameterValidationContext, ParameterValidationError
 from draive.parameters.validation import ParameterValidator, ParameterVerification
 
 __all__ = (
     "Argument",
-    "BasicValue",
     "DataModel",
     "Field",
     "Parameter",
     "ParameterSpecification",
-    "ParameterValidationContext",
-    "ParameterValidationError",
     "ParameterValidator",
     "ParameterVerification",
     "ParametersSpecification",
     "ParametrizedFunction",
+    "ToolParametersSpecification",
     "validated_specification",
+    "validated_tool_specification",
 )

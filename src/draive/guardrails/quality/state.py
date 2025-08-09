@@ -1,6 +1,6 @@
-from typing import Any, Self
+from typing import Any, Self, overload
 
-from haiway import State, ctx
+from haiway import State, statemethod
 
 from draive.evaluation import (
     EvaluatorResult,
@@ -59,13 +59,33 @@ class GuardrailsQualityVerification(State):
 
         return cls(verifying=verifying)
 
+    @overload
     @classmethod
     async def verify(
         cls,
         content: Multimodal,
         /,
         **extra: Any,
+    ) -> None: ...
+
+    @overload
+    async def verify(
+        self,
+        content: Multimodal,
+        /,
+        **extra: Any,
+    ) -> None: ...
+
+    @statemethod
+    async def verify(
+        self,
+        content: Multimodal,
+        /,
+        **extra: Any,
     ) -> None:
-        await ctx.state(cls).verifying(MultimodalContent.of(content))
+        await self.verifying(
+            MultimodalContent.of(content),
+            **extra,
+        )
 
     verifying: GuardrailsQualityVerifying = _no_verification

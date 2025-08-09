@@ -48,25 +48,25 @@ class PersonalData(DataModel):
 
 ## Extraction
 
-Since we are going to generate a structured output we will use the `generate_model` function which automatically decodes the result of LLM call into a python object. We have to prepare the execution context, provide an instruction, source document and specify the data model and we can expect extracted data to be available. Keep in mind that depending on the task it might be beneficial to prepare a specific instruction and/or specify more details about the model itself.
+Since we are going to generate a structured output we will use the `ModelGeneration.generate` helper which automatically decodes the result of a model call into a python object. We have to prepare the execution context, provide instructions, the source document and specify the data model, and we can expect extracted data to be available. Keep in mind that depending on the task it might be beneficial to prepare a specific instruction and/or specify more details about the model itself.
 
 
 ```python
 from draive import ctx, ModelGeneration
-from draive.openai import OpenAIChatConfig, OpenAI
+from draive.openai import OpenAIResponsesConfig, OpenAI
 
 async with ctx.scope(
     "data_extraction",
-    # define used LMM to be OpenAI within the context
-    OpenAIChatConfig(model="gpt-4o-mini"),
+    # initialize OpenAI client within the context
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
     disposables=(OpenAI(),),
 ):
     result: PersonalData = await ModelGeneration.generate(
         # define model to generate
         PersonalData,
         # provide additional instructions
-        # note that the data structure will be automatically explained to LLM
-        instruction="Extract information from the given input",
+        # note that the data structure will be automatically explained to the model
+        instructions="Extract information from the given input",
         # we will provide the document as an input
         input=document,
     )
@@ -89,13 +89,13 @@ from draive import ctx, ModelGeneration
 
 async with ctx.scope(
     "customized_extraction",
-    # define used LMM to be OpenAI within the context
-    OpenAIChatConfig(model="gpt-4o-mini"),
+    # initialize OpenAI client within the context
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
     disposables=(OpenAI(),),
 ):
     result: PersonalData = await ModelGeneration.generate(
         PersonalData,
-        instruction=(
+        instructions=(
             # provide extended instructions and take full control over the prompt
             "Extract information from the given input."
             " Put it into the JSON according to the following description:\n"

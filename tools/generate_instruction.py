@@ -60,13 +60,12 @@ directly as system prompts or task descriptions.
 import argparse
 import asyncio
 import sys
-from uuid import uuid4
 
-from draive import InstructionDeclaration, ctx, load_env, setup_logging
+from draive import ctx, load_env, setup_logging
 from draive.anthropic import Anthropic, AnthropicConfig
-from draive.gemini import Gemini, GeminiGenerationConfig
-from draive.helpers import prepare_instruction
-from draive.openai import OpenAI, OpenAIChatConfig
+from draive.gemini import Gemini, GeminiConfig
+from draive.helpers import prepare_instructions
+from draive.openai import OpenAI, OpenAIResponsesConfig
 
 
 async def generate_with_provider(
@@ -74,15 +73,6 @@ async def generate_with_provider(
     description: str,
     model: str | None = None,
 ) -> str:
-    """Generate instruction using specified provider."""
-
-    # Create instruction declaration with random name
-    instruction_declaration = InstructionDeclaration(
-        name=f"instruction_{uuid4().hex[:8]}",
-        description=description,
-        arguments=(),
-    )
-
     # Configure provider context
     if provider.lower() == "anthropic":
         model_name = model or "claude-sonnet-4-20250514"
@@ -91,28 +81,28 @@ async def generate_with_provider(
             AnthropicConfig(model=model_name),
             disposables=(Anthropic(),),
         ):
-            instruction = await prepare_instruction(instruction_declaration)
-            return instruction.content
+            instructions = await prepare_instructions(description)
+            return instructions
 
     elif provider.lower() == "openai":
         model_name = model or "o3"
         async with ctx.scope(
             "generate_instruction",
-            OpenAIChatConfig(model=model_name),
+            OpenAIResponsesConfig(model=model_name),
             disposables=(OpenAI(),),
         ):
-            instruction = await prepare_instruction(instruction_declaration)
-            return instruction.content
+            instructions = await prepare_instructions(description)
+            return instructions
 
     elif provider.lower() == "gemini":
         model_name = model or "gemini-2.5-pro"
         async with ctx.scope(
             "generate_instruction",
-            GeminiGenerationConfig(model=model_name),
+            GeminiConfig(model=model_name),
             disposables=(Gemini(),),
         ):
-            instruction = await prepare_instruction(instruction_declaration)
-            return instruction.content
+            instructions = await prepare_instructions(description)
+            return instructions
 
     else:
         raise ValueError(f"Unsupported provider: {provider}")

@@ -20,8 +20,9 @@ from typing import (
 from uuid import UUID
 from weakref import WeakValueDictionary
 
-from haiway import MISSING, AttributePath, DefaultValue, Missing, not_missing
+from haiway import MISSING, AttributePath, DefaultValue, Missing, ValidationContext, not_missing
 from haiway.state import AttributeAnnotation, attribute_annotations
+from haiway.state.validation import Validator
 
 from draive.parameters.parameter import Parameter
 from draive.parameters.schema import json_schema, simplified_schema
@@ -29,12 +30,7 @@ from draive.parameters.specification import (
     ParameterSpecification,
     ParametersSpecification,
 )
-from draive.parameters.types import (
-    ParameterConversion,
-    ParameterValidation,
-    ParameterValidationContext,
-    ParameterVerification,
-)
+from draive.parameters.types import ParameterConversion, ParameterVerification
 
 __all__ = (
     "DataModel",
@@ -48,7 +44,7 @@ def Field[Value](
     aliased: str | None = None,
     description: str | Missing = MISSING,
     default: Value | Missing = MISSING,
-    validator: ParameterValidation[Value] | Missing = MISSING,
+    validator: Validator[Value] | Missing = MISSING,
     converter: ParameterConversion[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
@@ -60,7 +56,7 @@ def Field[Value](
     aliased: str | None = None,
     description: str | Missing = MISSING,
     default_factory: Callable[[], Value] | Missing = MISSING,
-    validator: ParameterValidation[Value] | Missing = MISSING,
+    validator: Validator[Value] | Missing = MISSING,
     converter: ParameterConversion[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
@@ -90,20 +86,33 @@ def Field[Value](
 ) -> Value: ...
 
 
+@overload
+def Field[Value](
+    *,
+    aliased: str | None = None,
+    description: str | Missing = MISSING,
+    default_env: str | Missing = MISSING,
+    verifier: ParameterVerification[Value] | Missing = MISSING,
+    converter: ParameterConversion[Value] | Missing = MISSING,
+    specification: ParameterSpecification | Missing = MISSING,
+) -> Value: ...
+
+
 def Field[Value](
     *,
     aliased: str | None = None,
     description: str | Missing = MISSING,
     default: Value | Missing = MISSING,
     default_factory: Callable[[], Value] | Missing = MISSING,
-    validator: ParameterValidation[Value] | Missing = MISSING,
+    default_env: str | Missing = MISSING,
+    validator: Validator[Value] | Missing = MISSING,
     verifier: ParameterVerification[Value] | Missing = MISSING,
     converter: ParameterConversion[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
 ) -> Value:  # it is actually a DataField, but type checker has to be fooled
     assert (  # nosec: B101
-        default is MISSING or default_factory is MISSING
-    ), "Can't specify both default value and factory"
+        default is MISSING or default_factory is MISSING or default_env is MISSING
+    ), "Can't specify default value, factory and default_env"
     assert (  # nosec: B101
         description is MISSING or specification is MISSING
     ), "Can't specify both description and specification"
@@ -118,6 +127,7 @@ def Field[Value](
             description=description,
             default_value=default,
             default_factory=default_factory,
+            default_env=default_env,
             validator=validator,
             verifier=verifier,
             converter=converter,
@@ -134,7 +144,8 @@ class DataField:
         description: str | Missing,
         default_value: Any | Missing,
         default_factory: Callable[[], Any] | Missing,
-        validator: ParameterValidation[Any] | Missing,
+        default_env: str | Missing,
+        validator: Validator[Any] | Missing,
         verifier: ParameterVerification[Any] | Missing,
         converter: ParameterConversion[Any] | Missing,
         specification: ParameterSpecification | Missing,
@@ -143,7 +154,8 @@ class DataField:
         self.description: str | Missing = description
         self.default_value: Any | Missing = default_value
         self.default_factory: Callable[[], Any] | Missing = default_factory
-        self.validator: ParameterValidation[Any] | Missing = validator
+        self.default_env: str | Missing = default_env
+        self.validator: Validator[Any] | Missing = validator
         self.verifier: ParameterVerification[Any] | Missing = verifier
         self.converter: ParameterConversion[Any] | Missing = converter
         self.specification: ParameterSpecification | Missing = specification
@@ -166,6 +178,7 @@ def _resolve_field(
                 default=DefaultValue(
                     data_field.default_value,
                     factory=data_field.default_factory,
+                    env=data_field.default_env,
                 ),
                 validator=data_field.validator,
                 verifier=data_field.verifier,
@@ -459,29 +472,41 @@ class DataModel(metaclass=DataModelMeta):
                 )
 
         else:
-            with ParameterValidationContext().scope(self.__class__.__qualname__) as context:
-                for name, parameter in self.__PARAMETERS__.items():
+            for name, parameter in self.__PARAMETERS__.items():
+                with ValidationContext.scope(f".{name}"):
                     object.__setattr__(
                         self,  # pyright: ignore[reportUnknownArgumentType]
                         name,
-                        parameter.validated(
-                            parameter.find(kwargs),
-                            context=context,
-                        ),
+                        parameter.validated(parameter.find(kwargs)),
                     )
+
+    @classmethod
+    def instance_validator(
+        cls,
+        value: Any,
+        /,
+    ) -> Self:
+        match value:
+            case valid if isinstance(valid, cls):
+                return valid
+
+            case {**values}:
+                return cls(**values)
+
+            case _:
+                raise TypeError(f"Expected '{cls.__name__}', received '{type(value).__name__}'")
 
     @classmethod
     def model_validator(
         cls,
         *,
         verifier: ParameterVerification[Self] | None,
-    ) -> ParameterValidation[Self]:
+    ) -> Validator[Self]:
         if verifier := verifier:
 
             def validator(
                 value: Any,
                 /,
-                context: ParameterValidationContext,
             ) -> Self:
                 match value:
                     case validated if isinstance(validated, cls):
@@ -497,26 +522,11 @@ class DataModel(metaclass=DataModelMeta):
                         raise TypeError(
                             f"Expected '{cls.__name__}', received '{type(value).__name__}'"
                         )
+
+            return validator
+
         else:
-
-            def validator(
-                value: Any,
-                /,
-                context: ParameterValidationContext,
-            ) -> Self:
-                match value:
-                    case valid if isinstance(valid, cls):
-                        return valid
-
-                    case {**values}:
-                        return cls(**values)
-
-                    case _:
-                        raise TypeError(
-                            f"Expected '{cls.__name__}', received '{type(value).__name__}'"
-                        )
-
-        return validator
+            return cls.instance_validator
 
     @classmethod
     def from_mapping(
@@ -539,18 +549,6 @@ class DataModel(metaclass=DataModelMeta):
             converter=None,
         )
 
-    def updating[Value](
-        self,
-        path: AttributePath[Self, Value] | Value,
-        /,
-        value: Value,
-    ) -> Self:
-        assert isinstance(  # nosec: B101
-            path, AttributePath
-        ), "Prepare parameter path by using Self._.path.to.property or explicitly"
-
-        return cast(AttributePath[Self, Value], path)(self, updated=value)
-
     def updated(
         self,
         **kwargs: Any,
@@ -564,35 +562,34 @@ class DataModel(metaclass=DataModelMeta):
         if not parameters or parameters.keys().isdisjoint(self.__PARAMETERS__.keys()):
             return self  # do not make a copy when nothing will be updated
 
-        with ParameterValidationContext().scope(self.__class__.__qualname__) as context:
-            updated: Self = self.__new__(self.__class__)
-            for parameter in self.__PARAMETERS__.values():
-                validated_value: Any
-                if parameter.name in parameters:
+        updated: Self = self.__new__(self.__class__)
+        for parameter in self.__PARAMETERS__.values():
+            validated_value: Any
+            if parameter.name in parameters:
+                with ValidationContext.scope(f".{parameter.name}"):
                     validated_value = parameter.validated(
                         parameters[parameter.name],
-                        context=context,
                     )
 
-                elif parameter.alias and parameter.alias in parameters:
+            elif parameter.alias and parameter.alias in parameters:
+                with ValidationContext.scope(f".{parameter.alias}"):
                     validated_value = parameter.validated(
                         parameters[parameter.alias],
-                        context=context,
                     )
 
-                else:  # no need to validate again when reusing current value
-                    validated_value = object.__getattribute__(
-                        self,
-                        parameter.name,
-                    )
-
-                object.__setattr__(
-                    updated,
+            else:  # no need to validate again when reusing current value
+                validated_value = object.__getattribute__(
+                    self,
                     parameter.name,
-                    validated_value,
                 )
 
-            return updated
+            object.__setattr__(
+                updated,
+                parameter.name,
+                validated_value,
+            )
+
+        return updated
 
     def __str__(self) -> str:
         return _data_str(self, aliased=True, converter=None).strip()

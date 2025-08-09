@@ -17,9 +17,6 @@ __all__ = ("CohereEmbedding",)
 
 class CohereEmbedding(CohereAPI):
     def text_embedding(self) -> TextEmbedding:
-        """
-        Prepare TextEmbedding implementation using Cohere service.
-        """
         return TextEmbedding(embedding=self.create_texts_embedding)
 
     async def create_texts_embedding[Value: DataModel | State](
@@ -31,11 +28,8 @@ class CohereEmbedding(CohereAPI):
         config: CohereTextEmbeddingConfig | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
-        """
-        Create texts embedding with Cohere embedding service.
-        """
         embedding_config: CohereTextEmbeddingConfig = config or ctx.state(CohereTextEmbeddingConfig)
-        async with ctx.scope("cohere_text_embedding", embedding_config):
+        async with ctx.scope("cohere_text_embedding"):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={
@@ -86,9 +80,6 @@ class CohereEmbedding(CohereAPI):
             )
 
     def image_embedding(self) -> ImageEmbedding:
-        """
-        Prepare ImageEmbedding implementation using Cohere service.
-        """
         return ImageEmbedding(embedding=self.create_images_embedding)
 
     async def create_images_embedding[Value: DataModel | State](
@@ -100,13 +91,10 @@ class CohereEmbedding(CohereAPI):
         config: CohereImageEmbeddingConfig | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[bytes]]:
-        """
-        Create image embedding with Cohere embedding service.
-        """
         embedding_config: CohereImageEmbeddingConfig = config or ctx.state(
             CohereImageEmbeddingConfig
         )
-        async with ctx.scope("cohere_image_embedding", embedding_config):
+        async with ctx.scope("cohere_image_embedding"):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

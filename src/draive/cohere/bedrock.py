@@ -31,7 +31,6 @@ class AsyncAwsClientV2(AsyncClientV2):
         self,
         *,
         aws_region: str | None = None,
-        timeout: float | None = None,
         service: typing.Literal["bedrock"] | typing.Literal["sagemaker"],
     ):
         AsyncClientV2.__init__(
@@ -39,14 +38,12 @@ class AsyncAwsClientV2(AsyncClientV2):
             base_url="https://api.cohere.com",  # this url is unused for BedrockClient
             environment=ClientEnvironment.PRODUCTION,
             client_name="n/a",
-            timeout=timeout,
             api_key="n/a",
             httpx_client=httpx.AsyncClient(
                 event_hooks=get_event_hooks(
                     service=service,
                     aws_region=aws_region,
                 ),
-                timeout=timeout,
             ),
         )
 
@@ -56,13 +53,11 @@ class AsyncBedrockClientV2(AsyncAwsClientV2):
         self,
         *,
         aws_region: str | None = None,
-        timeout: float | None = None,
     ):
         AsyncAwsClientV2.__init__(
             self,
             service="bedrock",
             aws_region=aws_region,
-            timeout=timeout,
         )
 
 

@@ -1,6 +1,6 @@
-from typing import Any
+from typing import Any, overload
 
-from haiway import State, ctx
+from haiway import State, statemethod
 
 from draive.guardrails.moderation.types import (
     GuardrailsInputModerationException,
@@ -22,15 +22,35 @@ async def _no_moderation(
 
 
 class GuardrailsModeration(State):
+    @overload
     @classmethod
     async def check_input(
         cls,
         content: Multimodal,
         /,
         **extra: Any,
+    ) -> None: ...
+
+    @overload
+    async def check_input(
+        self,
+        content: Multimodal,
+        /,
+        **extra: Any,
+    ) -> None: ...
+
+    @statemethod
+    async def check_input(
+        self,
+        content: Multimodal,
+        /,
+        **extra: Any,
     ) -> None:
         try:
-            await ctx.state(cls).input_checking(MultimodalContent.of(content))
+            await self.input_checking(
+                MultimodalContent.of(content),
+                **extra,
+            )
 
         except GuardrailsModerationException as exc:
             raise GuardrailsInputModerationException(
@@ -40,15 +60,35 @@ class GuardrailsModeration(State):
                 replacement=exc.replacement,
             ) from exc
 
+    @overload
     @classmethod
     async def check_output(
         cls,
         content: Multimodal,
         /,
         **extra: Any,
+    ) -> None: ...
+
+    @overload
+    async def check_output(
+        self,
+        content: Multimodal,
+        /,
+        **extra: Any,
+    ) -> None: ...
+
+    @statemethod
+    async def check_output(
+        self,
+        content: Multimodal,
+        /,
+        **extra: Any,
     ) -> None:
         try:
-            await ctx.state(cls).output_checking(MultimodalContent.of(content))
+            await self.output_checking(
+                MultimodalContent.of(content),
+                **extra,
+            )
 
         except GuardrailsModerationException as exc:
             raise GuardrailsOutputModerationException(

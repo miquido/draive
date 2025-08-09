@@ -5,15 +5,15 @@ from inspect import signature
 from types import EllipsisType
 from typing import Any, ClassVar, cast, final, get_type_hints, overload
 
-from haiway import MISSING, DefaultValue, Missing
+from haiway import MISSING, DefaultValue, Missing, ValidationContext
 from haiway.state import AttributeAnnotation
 from haiway.state.attributes import resolve_attribute_annotation
+from haiway.state.validation import Validator
 from haiway.utils import mimic_function
 
 from draive.parameters.parameter import Parameter
 from draive.parameters.specification import ParameterSpecification
-from draive.parameters.types import ParameterValidation, ParameterVerification
-from draive.parameters.validation import ParameterValidationContext
+from draive.parameters.types import ParameterVerification
 
 __all__ = (
     "Argument",
@@ -27,7 +27,7 @@ def Argument[Value](
     aliased: str | None = None,
     description: str | Missing = MISSING,
     default: Value | Missing = MISSING,
-    validator: ParameterValidation[Value] | Missing = MISSING,
+    validator: Validator[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
 
@@ -38,7 +38,7 @@ def Argument[Value](
     aliased: str | None = None,
     description: str | Missing = MISSING,
     default_factory: Callable[[], Value] | Missing = MISSING,
-    validator: ParameterValidation[Value] | Missing = MISSING,
+    validator: Validator[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
 ) -> Value: ...
 
@@ -65,19 +65,31 @@ def Argument[Value](
 ) -> Value: ...
 
 
+@overload
+def Argument[Value](
+    *,
+    aliased: str | None = None,
+    description: str | Missing = MISSING,
+    default_env: str | Missing = MISSING,
+    verifier: ParameterVerification[Value] | Missing = MISSING,
+    specification: ParameterSpecification | Missing = MISSING,
+) -> Value: ...
+
+
 def Argument[Value](
     *,
     aliased: str | None = None,
     description: str | Missing = MISSING,
     default: Value | Missing = MISSING,
     default_factory: Callable[[], Value] | Missing = MISSING,
-    validator: ParameterValidation[Value] | Missing = MISSING,
+    default_env: str | Missing = MISSING,
+    validator: Validator[Value] | Missing = MISSING,
     verifier: ParameterVerification[Value] | Missing = MISSING,
     specification: ParameterSpecification | Missing = MISSING,
 ) -> Value:  # it is actually a FunctionArgument, but type checker has to be fooled
     assert (  # nosec: B101
-        default is MISSING or default_factory is MISSING
-    ), "Can't specify both default value and factory"
+        default is MISSING or default_factory is MISSING or default_env is MISSING
+    ), "Can't specify default value, factory and env"
     assert (  # nosec: B101
         description is MISSING or specification is MISSING
     ), "Can't specify both description and specification"
@@ -92,6 +104,7 @@ def Argument[Value](
             description=description,
             default=default,
             default_factory=default_factory,
+            default_env=default_env,
             validator=validator,
             verifier=verifier,
             specification=specification,
@@ -107,7 +120,8 @@ class FunctionArgument:
         description: str | Missing,
         default: Any | Missing,
         default_factory: Callable[[], Any] | Missing,
-        validator: ParameterValidation[Any] | Missing,
+        default_env: str | Missing,
+        validator: Validator[Any] | Missing,
         verifier: ParameterVerification[Any] | Missing,
         specification: ParameterSpecification | Missing,
     ) -> None:
@@ -115,7 +129,8 @@ class FunctionArgument:
         self.description: str | Missing = description
         self.default: Any | Missing = default
         self.default_factory: Callable[[], Any] | Missing = default_factory
-        self.validator: ParameterValidation[Any] | Missing = validator
+        self.default_env: str | Missing = default_env
+        self.validator: Validator[Any] | Missing = validator
         self.verifier: ParameterVerification[Any] | Missing = verifier
         self.specification: ParameterSpecification | Missing = specification
 
@@ -207,29 +222,28 @@ class ParametrizedFunction[**Args, Result]:
         **kwargs: Any,
     ) -> dict[str, Any]:
         # TODO: add support for positional arguments
-        with ParameterValidationContext().scope(self.__class__.__qualname__) as context:
-            validated: dict[str, Any] = {}
-            if self._variadic_keyword_parameters is None:
-                for parameter in self._parameters.values():
+        validated: dict[str, Any] = {}
+        if self._variadic_keyword_parameters is None:
+            for parameter in self._parameters.values():
+                with ValidationContext.scope(f".{parameter.name}"):
                     validated[parameter.name] = parameter.validated(
                         parameter.find(kwargs),
-                        context=context,
                     )
 
-            else:
-                for parameter in self._parameters.values():
+        else:
+            for parameter in self._parameters.values():
+                with ValidationContext.scope(f".{parameter.name}"):
                     validated[parameter.name] = parameter.validated(
                         parameter.pick(kwargs),
-                        context=context,
                     )
 
-                for key, value in kwargs.items():
+            for key, value in kwargs.items():
+                with ValidationContext.scope(f".{key}"):
                     validated[key] = self._variadic_keyword_parameters.validated(
                         value,
-                        context=context,
                     )
 
-            return validated
+        return validated
 
     def __call__(
         self,
@@ -290,6 +304,7 @@ def _resolve_argument(
                 default=DefaultValue(
                     argument.default,
                     factory=argument.default_factory,
+                    env=argument.default_env,
                 ),
                 validator=argument.validator,
                 verifier=argument.verifier,

@@ -167,7 +167,7 @@ class UserProfile(DataModel):
 class LLMConfig(Config):
     model: str
     temperature: float = 0.7
-    max_tokens: int | None = None
+    max_output_tokens: int | None = None
 
 # DataModel serialization capabilities
 profile = UserProfile(name="Alice", age=30)
@@ -1572,7 +1572,7 @@ async with ctx.scope(
 - **Concurrent evaluation**: Use `concurrent_tasks` parameter for performance
 
 ### 7. Error Handling Rules
-- **Specific exceptions**: Handle `LMMException`, `ParameterValidationError`, `EvaluationError`
+- **Specific exceptions**: Handle `LMMException`, `ValidatorError`, `EvaluationError`
 - **Context logging**: Use `ctx.log_error()`, `ctx.log_info()` for structured logging
 - **Graceful degradation**: Implement fallbacks for LLM failures
 

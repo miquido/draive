@@ -3,10 +3,7 @@ from typing import Any
 
 from haiway import MISSING, Missing, not_missing
 
-from draive.parameters import (
-    Field,
-    ParameterValidationContext,
-)
+from draive.parameters import Field
 
 __all__ = ("b64_data_field",)
 
@@ -31,7 +28,6 @@ def b64_data_field(
 
 def _b64_validator(
     value: Any,
-    context: ParameterValidationContext,
 ) -> bytes:
     match value:
         case bytes() as data:

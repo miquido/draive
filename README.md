@@ -18,7 +18,7 @@ Here’s what a simple Draive setup looks like:
 
 ```python
 from draive import ctx, TextGeneration, tool
-from draive.openai import OpenAI, OpenAIChatConfig
+from draive.openai import OpenAI, OpenAIResponsesConfig
 
 @tool # simply annotate a function as a tool
 async def current_time(location: str) -> str:
@@ -26,11 +26,11 @@ async def current_time(location: str) -> str:
 
 async with  ctx.scope( # create execution context
     "example", # give it a name
-    OpenAIChatConfig(model="gpt-4o-mini"), # prepare configuration
+    OpenAIResponsesConfig(model="gpt-4o-mini"), # prepare configuration
     disposables=(OpenAI(),), # define resources and service clients available
 ):
     result: str = await TextGeneration.generate( # choose a right generation abstraction
-        instruction="You are a helpful assistant", # provide clear instructions
+        instructions="You are a helpful assistant", # provide clear instructions
         input="What is the time in Kraków?", # give it some input (including multimodal)
         tools=[current_time], # and select any tools you like
     )

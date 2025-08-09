@@ -66,7 +66,7 @@ async def test_toolbox_call_returns_custom_content():
         def custom_format(result: int) -> str:
             return f"Value:{result}"
 
-        @tool(format_result=custom_format)
+        @tool(result_formatting=custom_format)
         async def compute(value: int) -> int:
             nonlocal executions
             executions += 1

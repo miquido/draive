@@ -7,7 +7,7 @@ __all__ = ("unwrap_missing",)
 
 
 @overload
-def unwrap_missing[Value, Default](
+def unwrap_missing[Value](
     value: Value | Missing,
     /,
     default: Value,
@@ -15,7 +15,7 @@ def unwrap_missing[Value, Default](
 
 
 @overload
-def unwrap_missing[Value, Default](
+def unwrap_missing[Value](
     value: Value | Missing,
     /,
     default: Value | None = None,
@@ -23,7 +23,7 @@ def unwrap_missing[Value, Default](
 
 
 @overload
-def unwrap_missing[Value, Default, Result](
+def unwrap_missing[Value, Result](
     value: Value | Missing,
     /,
     default: Value,
@@ -33,7 +33,7 @@ def unwrap_missing[Value, Default, Result](
 
 
 @overload
-def unwrap_missing[Value, Default, Result](
+def unwrap_missing[Value, Result](
     value: Value | Missing,
     /,
     default: Value | None = None,
@@ -42,7 +42,7 @@ def unwrap_missing[Value, Default, Result](
 ) -> Result | None: ...
 
 
-def unwrap_missing[Value, Default, Result](
+def unwrap_missing[Value, Result](
     value: Value | Missing,
     /,
     default: Result | Value | None = None,

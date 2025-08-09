@@ -1,4 +1,3 @@
-from asyncio import gather
 from collections.abc import (
     Callable,
     Collection,
@@ -9,7 +8,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
-from typing import Any, ClassVar, Literal, Protocol, Self, cast, final, overload
+from typing import Any, ClassVar, Literal, Self, cast, final, overload
 from uuid import uuid4
 
 from haiway import (
@@ -20,6 +19,7 @@ from haiway import (
     MetaValues,
     State,
     cache,
+    concurrently,
     ctx,
     retry,
 )
@@ -30,25 +30,29 @@ from draive.evaluation import (
     PreparedEvaluator,
     PreparedEvaluatorScenario,
 )
-from draive.instructions import Instruction
-from draive.lmm import (
-    LMM,
-    LMMCompletion,
-    LMMContext,
-    LMMContextElement,
-    LMMInput,
-    LMMInstruction,
-    LMMOutputSelection,
-    LMMToolRequest,
-    LMMToolRequests,
-    LMMToolResponse,
-    LMMToolResponses,
+from draive.models import (
+    FunctionTool,
+    GenerativeModel,
+    InstructionsRepository,
+    ModelContext,
+    ModelContextElement,
+    ModelInput,
+    ModelMemory,
+    ModelMemoryRecall,
+    ModelOutput,
+    ModelOutputSelection,
+    ModelToolRequest,
+    ModelToolResponse,
+    ResolveableInstructions,
+    Tool,
+    Toolbox,
 )
-from draive.multimodal import Multimodal, MultimodalContent
-from draive.multimodal.tags import MultimodalTagElement
+from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
 from draive.parameters import DataModel
-from draive.prompts import Prompt
 from draive.stages.types import (
+    StageCacheKeyMaking,
+    StageCacheReading,
+    StageCacheWriting,
     StageConditioning,
     StageContextTransforming,
     StageException,
@@ -60,7 +64,7 @@ from draive.stages.types import (
     StageRouting,
     StageState,
 )
-from draive.tools import FunctionTool, Tool, Toolbox
+from draive.utils.memory import Memory
 
 __all__ = (
     "Stage",
@@ -68,41 +72,12 @@ __all__ = (
 )
 
 
-class MakeCacheKey[Key](Protocol):
-    """Protocol for generating cache keys from stage state."""
-
-    def __call__(
-        self,
-        *,
-        state: StageState,
-    ) -> Key: ...
-
-
-class ReadCache[Key](Protocol):
-    """Protocol for reading cached stage states."""
-
-    async def __call__(
-        self,
-        key: Key,
-    ) -> StageState | None: ...
-
-
-class WriteCache[Key](Protocol):
-    """Protocol for writing stage states to cache."""
-
-    async def __call__(
-        self,
-        key: Key,
-        value: StageState,
-    ) -> None: ...
-
-
 @final
 class Stage:
     """
-    A Stage represents a unit of processing within an LMM pipeline.
+    A Stage represents a unit of processing within a model pipeline.
 
-    Stages are immutable execution units that process LMM context and produce results.
+    Stages are immutable execution units that process model context and produce results.
     They can be composed, cached, retried, and conditionally executed to build complex
     AI processing workflows.
 
@@ -112,7 +87,7 @@ class Stage:
     - Context and result transformation capabilities
     - Support for concurrent and sequential execution
     - Memory integration for conversation state
-    - Tool integration for LMM completion stages
+    - Tool integration for model completion stages
     """
 
     noop: ClassVar[Self]  # defined after the class
@@ -124,9 +99,9 @@ class Stage:
     @classmethod
     def predefined(
         cls,
-        element: LMMContextElement,
+        element: ModelContextElement,
         /,
-        *elements: LMMContextElement,
+        *elements: ModelContextElement,
         meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
@@ -134,7 +109,7 @@ class Stage:
     @classmethod
     def predefined(
         cls,
-        element: Prompt | Multimodal,
+        element: Multimodal,
         /,
         *elements: Multimodal,
         meta: Meta | MetaValues | None = None,
@@ -143,26 +118,29 @@ class Stage:
     @classmethod
     def predefined(
         cls,
-        element: Prompt | LMMContextElement | Multimodal,
+        element: ModelContextElement | Multimodal,
         /,
-        *elements: LMMContextElement | Multimodal,
+        *elements: ModelContextElement | Multimodal,
+        result: Multimodal | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
-        Creates a Stage that inserts predefined elements into the context.
+        Insert predefined elements into the context.
 
-        This Stage adds the specified elements to the LMM context and
-        sets the result to the last provided completion value. It's useful for
-        injecting static content into a processing pipeline.
-        Content of a last LMMCompletion in the context will be used as stage result.
-        Note that context should always end with LMMCompletion as the result.
+        This stage appends the provided elements to the model context. It does not
+        modify the current result unless an explicit `result` is provided.
+        This is useful for injecting static content (inputs/outputs/tool messages)
+        into a processing pipeline.
 
         Parameters
         ----------
-        element : Prompt | LMMContextElement | Multimodal
+        element : ModelContextElement | Multimodal
             The first element to add to the context.
-        *elements : LMMContextElement | Multimodal
+        *elements : ModelContextElement | Multimodal
             Additional elements to add to the context.
+        result : Multimodal | None, default None
+            Optional stage result to set explicitly. If None, the current result
+            remains unchanged.
         meta: Meta | MetaValues | None = None
             Additional stage metadata including tags, description etc.
 
@@ -179,36 +157,22 @@ class Stage:
         ... )
         """
 
-        context: list[LMMContextElement]
-        match element:
-            case context_element if isinstance(context_element, LMMContextElement):
-                context = [context_element]
+        context: list[ModelContextElement]
+        if isinstance(element, ModelContextElement):
+            context = [element]
 
-            case Prompt() as prompt:
-                context = [*prompt.content]
+        else:
+            context = [ModelInput.of(MultimodalContent.of(element))]
 
-            case content:
-                context = [LMMInput.of(MultimodalContent.of(content))]
-
-        for idx, value in enumerate(elements):
-            if isinstance(value, LMMContextElement):
+        for value in elements:
+            if isinstance(value, ModelContextElement):
                 context.append(value)
 
-            elif idx % 2 == 0:
-                context.append(LMMInput.of(MultimodalContent.of(value)))
+            elif isinstance(context[-1], ModelInput):
+                context.append(ModelOutput.of(MultimodalContent.of(value)))
 
             else:
-                context.append(LMMCompletion.of(MultimodalContent.of(value)))
-
-        context_extension: LMMContext = tuple(context)
-        completion_result: MultimodalContent | None = next(
-            (
-                item.content
-                for item in reversed(context_extension)
-                if isinstance(item, LMMCompletion)
-            ),
-            None,
-        )
+                context.append(ModelInput.of(MultimodalContent.of(value)))
 
         async def stage(
             *,
@@ -216,8 +180,8 @@ class Stage:
         ) -> StageState:
             async with ctx.scope("stage.predefined"):
                 return state.updated(
-                    context=(*state.context, *context_extension),
-                    result=completion_result if completion_result is not None else state.result,
+                    context=(*state.context, *context),
+                    result=result if result is not None else state.result,
                 )
 
         return cls(
@@ -235,19 +199,19 @@ class Stage:
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
-        Creates a Stage that recalls context from memory.
+        Recall a previously stored stage state from memory.
 
-        This Stage retrieves context from the provided memory and either replaces
-        the current context or extends it, depending on the specified mode.
+        This stage retrieves a `StageState` from the provided memory and either
+        replaces the current state or merges with it, depending on `handling`.
 
         Parameters
         ----------
-        memory : Memory[LMMContext, Any]
-            The memory instance from which to recall the LMM context.
+        memory : StageMemory
+            Memory from which to recall a `StageState`.
         handling : Literal["replace", "merge"]
-            Determines how the recalled context is used:
-            - "replace": Completely replaces the current context with the recalled one.
-            - "merge": Merges the recalled context with the current one.
+            Determines how the recalled state is applied:
+            - "replace": Use the recalled state as-is.
+            - "merge": Merge the recalled state with the current state.
             Default is "replace".
         meta: Meta | MetaValues | None = None
             Additional stage metadata including tags, description etc.
@@ -291,15 +255,15 @@ class Stage:
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
-        Creates a Stage that stores the current context in memory.
+        Store the current stage state in memory.
 
-        This Stage saves the current LMM context to the provided memory instance
+        This stage saves the current `StageState` to the provided memory instance
         without modifying the context or result.
 
         Parameters
         ----------
-        memory : Memory[Any, LMMContext]
-            The memory instance in which to store the current LMM context.
+        memory : StageMemory
+            Memory in which to store the current `StageState`.
         meta: Meta | MetaValues | None = None
             Additional stage metadata including tags, description etc.
 
@@ -325,50 +289,49 @@ class Stage:
     @classmethod
     def completion(
         cls,
-        input: Prompt | Multimodal,  # noqa: A002
+        input: Multimodal,  # noqa: A002
         /,
         *,
-        instruction: Instruction | str | None = None,
-        tools: Toolbox | Iterable[Tool] | None = None,
-        output: LMMOutputSelection = "auto",
+        instruction: ResolveableInstructions = "",
+        tools: Toolbox | Iterable[Tool] = (),
+        output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
         **extra: Any,
     ) -> Self:
         """
-        Creates a Stage that generates a completion using an LMM.
+        Generate a completion for provided input appended to the current context.
 
-        This Stage uses the current LMM context along with the provided input to
+        This stage uses the current model context along with the provided input to
         generate a new completion. Both the input and the generated completion are
         added to the context, and the completion becomes the new result value.
 
-        The Stage can utilize tools when specified, which may be invoked by the LMM
-        during completion generation. Tool calls and their results are automatically
-        managed and included in the context.
+        When tools are provided, the underlying model may invoke them; tool calls
+        and their results are managed and included in the context.
 
         Parameters
         ----------
-        input : Prompt | Multimodal
-            The input content to provide to the LMM, either as a Prompt or Multimodal.
-        instruction : Instruction | str | None
-            Optional instruction or guidance for the LMM.
-        tools : Toolbox | Iterable[Tool] | None
-            Optional tools that the LMM can use during completion generation.
-        output : LMMOutputSelection
+        input : Multimodal
+            Input content to provide to the model.
+        instruction : ResolveableInstructions
+            Instruction(s) or guidance for the model.
+        tools : Toolbox | Iterable[Tool]
+            Tools that the model can use during completion generation.
+        output : ModelOutputSelection
             Controls the modality/type of the generated completion, default is "auto".
         meta: Meta | MetaValues | None = None
             Additional stage metadata including tags, description etc.
         **extra : Any
-            Additional parameters to pass to the LMM invocation.
+            Additional parameters to pass to the model invocation.
 
         Returns
         -------
         Self
-            A new Stage instance that generates a completion using the LMM.
+            A new Stage instance that generates a completion using the model.
 
         Raises
         ------
         RuntimeError
-            If the LMM exceeds the limit of recursive tool calls.
+            If the model exceeds the limit of recursive tool calls.
 
         Examples
         --------
@@ -377,13 +340,7 @@ class Stage:
         ...     tools=[calculator]
         ... )
         """
-        context_extension: LMMContext
-        match input:
-            case Prompt() as prompt:
-                context_extension = prompt.content
-
-            case input_content:
-                context_extension = (LMMInput.of(MultimodalContent.of(input_content)),)
+        context_extension: ModelContext = (ModelInput.of(MultimodalContent.of(input)),)
 
         toolbox: Toolbox = Toolbox.of(tools)
 
@@ -392,16 +349,23 @@ class Stage:
             state: StageState,
         ) -> StageState:
             async with ctx.scope("stage.completion"):
-                context, result = await _lmm_completion(
-                    instruction=instruction,
-                    context=(*state.context, *context_extension),
+                context: list[ModelContextElement] = [
+                    *state.context,
+                    *context_extension,
+                ]
+                # Run loop and merge content parts into a single MultimodalContent
+                result: ModelOutput = await GenerativeModel.loop(
+                    instructions=await InstructionsRepository.resolve(instruction),
                     toolbox=toolbox,
+                    context=context,
                     output=output,
                     **extra,
                 )
+
                 return state.updated(
-                    context=context,
-                    result=result,
+                    context=context,  # GenerativeModel.loop updates the context
+                    # Discard reasoning from the stage result; it remains in context
+                    result=result.content,
                 )
 
         return cls(
@@ -415,39 +379,37 @@ class Stage:
         input: Callable[[], Coroutine[None, None, Multimodal]],  # noqa: A002
         /,
         *,
-        instruction: Instruction | str | None = None,
-        tools: Toolbox | Iterable[Tool] | None = None,
-        output: LMMOutputSelection = "auto",
+        instruction: ResolveableInstructions = "",
+        tools: Toolbox | Iterable[Tool] = (),
+        output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
         **extra: Any,
     ) -> Self:
         """
-        Creates a Stage that generates a completion using an LMM after prompting for input.
+        Generate a completion after asynchronously obtaining the input.
 
-        This Stage awaits the result of an asynchronous function to obtain input content,
-        then uses this input along with the current LMM context to generate a completion.
+        This stage awaits an async function to obtain input content, then uses this
+        input along with the current model context to generate a completion.
         The obtained input and the generated completion are added to the context, and
         the completion becomes the new result value.
 
-        Similar to the `completion` method, this Stage can utilize tools that may be
-        invoked by the LMM during completion generation, with tool calls and their
-        results managed automatically.
+        As with `completion`, tools may be invoked during generation; tool calls and
+        their results are managed automatically.
 
         Parameters
         ----------
         input : Callable[[], Coroutine[None, None, Multimodal]]
-            An async function that returns the input content to provide to the LMM.
-            This function will be awaited during stage execution.
-        instruction : Instruction | str | None
-            Optional instruction or guidance for the LMM.
-        tools : Toolbox | Iterable[Tool] | None
-            Optional tools that the LMM can use during completion generation.
-        output : LMMOutputSelection
+            Async function returning input content to provide to the model.
+        instruction : ResolveableInstructions
+            Instruction(s) or guidance for the model.
+        tools : Toolbox | Iterable[Tool]
+            Tools that the model can use during completion generation.
+        output : ModelOutputSelection
             Controls the modality/type of the generated completion, default is "auto".
         meta: Meta | MetaValues | None = None
             Additional stage metadata including tags, description etc.
         **extra : Any
-            Additional parameters to pass to the LMM invocation.
+            Additional parameters to pass to the model invocation.
 
         Returns
         -------
@@ -457,7 +419,7 @@ class Stage:
         Raises
         ------
         RuntimeError
-            If the LMM exceeds the limit of recursive tool calls.
+            If the model exceeds the limit of recursive tool calls.
 
         Examples
         --------
@@ -477,19 +439,23 @@ class Stage:
             state: StageState,
         ) -> StageState:
             async with ctx.scope("stage.completion.prompting"):
-                context, result = await _lmm_completion(
-                    instruction=instruction,
-                    context=(
-                        *state.context,
-                        LMMInput.of(MultimodalContent.of(await input())),
-                    ),
+                context: list[ModelContextElement] = [
+                    *state.context,
+                    ModelInput.of(MultimodalContent.of(await input())),
+                ]
+                ctx.log_debug("prompting completion input provided")
+                result: ModelOutput = await GenerativeModel.loop(
+                    instructions=await InstructionsRepository.resolve(instruction),
                     toolbox=toolbox,
+                    context=context,
                     output=output,
                     **extra,
                 )
+
                 return state.updated(
-                    context=context,
-                    result=result,
+                    context=context,  # GenerativeModel.loop updates the context
+                    # Discard reasoning from the stage result; it remains in context
+                    result=result.content,
                 )
 
         return cls(
@@ -501,31 +467,31 @@ class Stage:
     def loopback_completion(
         cls,
         *,
-        instruction: Instruction | str | None = None,
-        tools: Toolbox | Iterable[Tool] | None = None,
-        output: LMMOutputSelection = "auto",
+        instruction: ResolveableInstructions = "",
+        tools: Toolbox | Iterable[Tool] = (),
+        output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
         **extra: Any,
     ) -> Self:
         """
-        Creates a Stage that takes the last completion and uses it as the new input.
+        Take the last completion and use it as the new input.
 
-        This Stage takes the last LMMContext completion, replaces the last input with it,
+        This stage takes the last ModelOutput completion, replaces the last input with it,
         and executes a new completion using that input. It's useful for iterative refinement
         of outputs where each completion builds upon the previous one.
 
         Parameters
         ----------
-        instruction : Instruction | str | None
-            Optional instruction or guidance for the LMM.
-        tools : Toolbox | Iterable[Tool] | None
-            Optional tools that the LMM can use during completion generation.
-        output : LMMOutputSelection
+        instruction : ResolveableInstructions
+            Instruction(s) or guidance for the model.
+        tools : Toolbox | Iterable[Tool]
+            Tools that the model can use during completion generation.
+        output : ModelOutputSelection
             Controls the modality/type of the generated completion, default is "auto".
         meta: Meta | MetaValues | None = None
             Additional stage metadata including tags, description etc.
         **extra : Any
-            Additional parameters to pass to the LMM invocation.
+            Additional parameters to pass to the model invocation.
 
         Returns
         -------
@@ -535,7 +501,7 @@ class Stage:
         Raises
         ------
         RuntimeError
-            If the LMM exceeds the limit of recursive tool calls.
+            If the model exceeds the limit of recursive tool calls.
         """
         toolbox: Toolbox = Toolbox.of(tools)
 
@@ -544,34 +510,45 @@ class Stage:
             state: StageState,
         ) -> StageState:
             async with ctx.scope("stage.completion.loopback"):
-                if not state.context or not isinstance(state.context[-1], LMMCompletion):
+                if not state.context or not isinstance(state.context[-1], ModelOutput):
                     ctx.log_warning("loopback_completion has been skipped due to invalid context")
                     return state
 
-                # Find the index of the last LMMInput in the context
-                last_input_idx: int = len(state.context)
-                for idx, element in enumerate(reversed(state.context)):
-                    if isinstance(element, LMMInput):
-                        last_input_idx = len(state.context) - idx - 1
+                context: list[ModelContextElement] = list(state.context)
+
+                # Find the index of the last ModelInput in the context
+                last_input_idx: int | None = None
+                for idx in range(len(context) - 2, -1, -1):
+                    if isinstance(context[idx], ModelInput):
+                        last_input_idx = idx
                         break
 
-                else:
-                    # using whole context as is
-                    ctx.log_warning("loopback_completion could not find an LMMInput in the context")
+                if last_input_idx is None:
+                    ctx.log_warning(
+                        "loopback_completion could not find a ModelInput in the context"
+                    )
+                    return state
 
-                context, result = await _lmm_completion(
-                    instruction=instruction,
-                    context=(
-                        *state.context[:last_input_idx],
-                        LMMInput.of(state.context[-1].content),
-                    ),
+                # Use last output content as new input
+                last_output = state.context[-1]
+                assert isinstance(last_output, ModelOutput)  # nosec: B101
+                last_output_content: MultimodalContent = last_output.content
+                context = [
+                    *context[:last_input_idx],
+                    ModelInput.of(last_output_content, meta={"loopback": True}),
+                ]
+                result: ModelOutput = await GenerativeModel.loop(
+                    instructions=await InstructionsRepository.resolve(instruction),
                     toolbox=toolbox,
+                    context=context,
                     output=output,
                     **extra,
                 )
+
                 return state.updated(
-                    context=context,
-                    result=result,
+                    context=context,  # GenerativeModel.loop updates the context
+                    # Discard reasoning from the stage result; it remains in context
+                    result=result.content,
                 )
 
         return cls(
@@ -583,30 +560,30 @@ class Stage:
     def result_completion(
         cls,
         *,
-        instruction: Instruction | str | None = None,
-        tools: Toolbox | Iterable[Tool] | None = None,
-        output: LMMOutputSelection = "auto",
+        instruction: ResolveableInstructions = "",
+        tools: Toolbox | Iterable[Tool] = (),
+        output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
         **extra: Any,
     ) -> Self:
         """
-        Creates a Stage that takes the current result and uses it as the new input.
+        Use the current result as the next input and generate a completion.
 
-        This Stage takes the current stage result, appends it as a new input, and executes
+        This stage takes the current stage result, appends it as a new input, and executes
         a new completion using the updated context.
 
         Parameters
         ----------
-        instruction : Instruction | str | None
-            Optional instruction or guidance for the LMM.
-        tools : Toolbox | Iterable[Tool] | None
-            Optional tools that the LMM can use during completion generation.
-        output : LMMOutputSelection
+        instruction : ResolveableInstructions
+            Instruction(s) or guidance for the model.
+        tools : Toolbox | Iterable[Tool]
+            Tools that the model can use during completion generation.
+        output : ModelOutputSelection
             Controls the modality/type of the generated completion, default is "auto".
         meta: Meta | MetaValues | None = None
             Additional stage metadata including tags, description etc.
         **extra : Any
-            Additional parameters to pass to the LMM invocation.
+            Additional parameters to pass to the model invocation.
 
         Returns
         -------
@@ -616,7 +593,7 @@ class Stage:
         Raises
         ------
         RuntimeError
-            If the LMM exceeds the limit of recursive tool calls.
+            If the model exceeds the limit of recursive tool calls.
         """
         toolbox: Toolbox = Toolbox.of(tools)
 
@@ -625,19 +602,22 @@ class Stage:
             state: StageState,
         ) -> StageState:
             async with ctx.scope("stage.completion.result"):
-                context, result = await _lmm_completion(
-                    instruction=instruction,
-                    context=(
-                        *state.context,
-                        LMMInput.of(state.result),
-                    ),
+                context: list[ModelContextElement] = [
+                    *state.context,
+                    ModelInput.of(state.result),
+                ]
+                result: ModelOutput = await GenerativeModel.loop(
+                    instructions=await InstructionsRepository.resolve(instruction),
                     toolbox=toolbox,
+                    context=context,
                     output=output,
                     **extra,
                 )
+
                 return state.updated(
-                    context=context,
-                    result=result,
+                    context=context,  # GenerativeModel.loop updates the context
+                    # Discard reasoning from the stage result; it remains in context
+                    result=result.content,
                 )
 
         return cls(
@@ -654,10 +634,10 @@ class Stage:
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
-        Creates a Stage that transforms the current result without altering the context.
+        Transform the current result without altering the context.
 
-        This Stage applies a transformation function to the current result to produce a new
-        result value, while keeping the LMMContext unchanged.
+        This stage applies a transformation function to the current result to produce a new
+        result value, while keeping the `ModelContext` unchanged.
 
         Parameters
         ----------
@@ -693,10 +673,10 @@ class Stage:
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
-        Creates a Stage that transforms the current context without altering the result.
+        Transform the current context without altering the result.
 
-        This Stage applies a transformation function to the current LMMContext to produce a new
-        context, while keeping the result unchanged.
+        This stage applies a transformation function to the current `ModelContext` to produce a
+        new context, while keeping the result unchanged.
 
         Parameters
         ----------
@@ -731,9 +711,9 @@ class Stage:
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
-        Creates a Stage that trims the current context to a specified limit.
+        Trim the current context to a specified limit.
 
-        This Stage reduces the size of the LMMContext by applying a slice or index limit,
+        This stage reduces the size of the `ModelContext` by applying a slice or index limit,
         or by clearing it entirely if no limit is specified.
 
         Parameters
@@ -788,7 +768,7 @@ class Stage:
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
-        Creates a Stage that trims the current context by removing tool calls.
+        Trim the current context by removing tool calls.
 
         Parameters
         ----------
@@ -806,11 +786,7 @@ class Stage:
             state: StageState,
         ) -> StageState:
             return state.updated(
-                context=tuple(
-                    element
-                    for element in state.context
-                    if not isinstance(element, LMMToolRequests | LMMToolResponses)
-                ),
+                context=[element.updated(blocks=(element.content,)) for element in state.context]
             )
 
         return cls(
@@ -821,16 +797,16 @@ class Stage:
     @classmethod
     def tool_call[**Args, Result](
         cls,
-        tool: FunctionTool[Args, Result],
+        _tool: FunctionTool[Args, Result],
         /,
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Self:
         """
-        Creates a Stage that executes a tool and adds its result to the context.
+        Execute a tool and add its result to the context.
 
-        This Stage calls the provided tool with the given arguments and adds
-        the tool call to the LMM context as proper tool request/response pairs.
+        This stage calls the provided tool with the given arguments and adds
+        the tool call to the model context as proper tool request/response pairs.
         This makes the tool interaction visible in the context for subsequent stages.
 
         Warning:
@@ -840,7 +816,7 @@ class Stage:
 
         Parameters
         ----------
-        tool : FunctionTool[Args, Result]
+        _tool : FunctionTool[Args, Result]
             The tool to execute.
         *args : Args.args
             Positional arguments to pass to the tool.
@@ -869,84 +845,87 @@ class Stage:
             async with ctx.scope("stage.tool_call"):
                 request_id: str = uuid4().hex
                 # Create tool request representing the call
-                tool_request: LMMToolRequest = LMMToolRequest.of(
+                tool_request: ModelToolRequest = ModelToolRequest.of(
                     request_id,
-                    tool=tool.name,
+                    tool=_tool.name,
                     arguments=kwargs,
                 )
 
                 try:
-                    tool_response: LMMToolResponse
+                    tool_response: ModelToolResponse
                     result: MultimodalContent
-                    match tool.handling:
-                        case "auto":
-                            tool_response = LMMToolResponse.of(
-                                tool_request.identifier,
-                                tool=tool.name,
-                                content=MultimodalContent.of(
-                                    # Execute the tool directly
-                                    tool.format_result(await tool(*args, **kwargs))
-                                ),
-                                handling="result",
-                            )
-                            result = state.result  # result unchanged
+                    if _tool.handling == "detached":
+                        ctx.spawn(_tool.call, request_id, **kwargs)
+                        tool_response = ModelToolResponse.of(
+                            tool_request.identifier,
+                            tool=_tool.name,
+                            content=MultimodalContent.of(
+                                f"{_tool.name} tool execution has been requested"
+                            ),
+                            handling="detached",
+                        )
+                        result = state.result
 
-                        case "direct":
-                            tool_result: MultimodalContent = tool.format_result(
-                                await tool(*args, **kwargs)
-                            )
-                            tool_response = LMMToolResponse.of(
-                                tool_request.identifier,
-                                tool=tool.name,
-                                content=tool_result,
-                                handling="completion",
-                            )
-                            result = tool_result  # result is the tool result
+                    else:
+                        tool_result: MultimodalContent = await _tool.call(request_id, **kwargs)
+                        match _tool.handling:
+                            case "response":
+                                tool_response = ModelToolResponse.of(
+                                    tool_request.identifier,
+                                    tool=_tool.name,
+                                    content=tool_result,
+                                    handling="response",
+                                )
+                                result = state.result
 
-                        case "extend":
-                            tool_result: MultimodalContent = tool.format_result(
-                                await tool(*args, **kwargs)
-                            )
-                            tool_response = LMMToolResponse.of(
-                                tool_request.identifier,
-                                tool=tool.name,
-                                content=tool_result,
-                                handling="extension",
-                            )
-                            result = state.result.appending(tool_result)  # result extended
+                            case "output":
+                                tool_response = ModelToolResponse.of(
+                                    tool_request.identifier,
+                                    tool=_tool.name,
+                                    content=tool_result,
+                                    handling="output",
+                                )
+                                result = tool_result
 
-                        case "spawn":
-                            ctx.spawn(tool, *args, **kwargs)
-                            tool_response = LMMToolResponse.of(
-                                tool_request.identifier,
-                                tool=tool.name,
-                                # placeholder for detached tool call
-                                content=MultimodalContent.of(f"{tool.name} tool has been called"),
-                                handling="detached",
-                            )
-                            result = state.result  # result unchanged
+                            case "output_extension":
+                                tool_response = ModelToolResponse.of(
+                                    tool_request.identifier,
+                                    tool=_tool.name,
+                                    content=tool_result,
+                                    handling="output_extension",
+                                )
+                                result = state.result.appending(tool_result)
+
+                            case _:
+                                tool_response = ModelToolResponse.of(
+                                    tool_request.identifier,
+                                    tool=_tool.name,
+                                    content=tool_result,
+                                    handling="response",
+                                )
+                                result = state.result
 
                 except Exception as exc:
-                    tool_response = LMMToolResponse.of(
+                    tool_response = ModelToolResponse.of(
                         tool_request.identifier,
-                        tool=tool.name,
-                        content=MultimodalContent.of(tool.format_error(exc)),
+                        tool=_tool.name,
+                        content=MultimodalContent.of(_tool.format_error(exc)),
                         handling="error",
                     )
-                    result = state.result  # result unchanged
+                    result = state.result
 
                 return state.updated(
                     context=(
                         *state.context,
-                        LMMToolRequests.of((tool_request,)),
-                        LMMToolResponses.of((tool_response,)),
+                        ModelOutput.of(tool_request),
+                        ModelInput.of(tool_response),
                     ),
                     result=result,
                 )
 
         return cls(
             stage,
-            meta=Meta.of({"tool_call": tool.name}),
+            meta=Meta.of({"tool_call": _tool.name}),
         )
 
     @classmethod
@@ -959,9 +938,9 @@ class Stage:
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
-        Creates a Stage that evaluates the current result using an evaluator.
+        Evaluate the current result using an evaluator.
 
-        This Stage takes the current stage result and runs it through the provided
+        This stage takes the current stage result and runs it through the provided
         evaluator or scenario evaluator. The stage raises StageException when evaluation fails.
 
         Parameters
@@ -1013,15 +992,15 @@ class Stage:
     @classmethod
     def context_evaluation(
         cls,
-        evaluator: PreparedEvaluatorScenario[LMMContext] | PreparedEvaluator[LMMContext],
+        evaluator: PreparedEvaluatorScenario[ModelContext] | PreparedEvaluator[ModelContext],
         /,
         *,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
-        Creates a Stage that evaluates the current context using an evaluator.
+        Evaluate the current context using an evaluator.
 
-        This Stage takes the current LMM context and runs it through the provided
+        This stage takes the current model context and runs it through the provided
         evaluator or scenario evaluator. The stage raises StageException when evaluation fails.
 
         Parameters
@@ -1083,7 +1062,7 @@ class Stage:
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
-        Creates a Stage that executes another Stage in a loop while a condition is met.
+        Execute one or more stages in a loop while a condition is met.
 
         This Stage repeatedly executes the provided Stage as long as the condition
         function returns True when applied to the current context and result.
@@ -1167,7 +1146,7 @@ class Stage:
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
-        Creates a Stage that executes multiple Stages in sequence.
+        Execute multiple stages in sequence.
 
         This Stage chains the execution of the provided Stages, where each Stage
         receives the context and result produced by the previous Stage.
@@ -1211,10 +1190,11 @@ class Stage:
         /,
         *stages: Self,
         merge: StageMerging,
+        concurrent_tasks: int = 2,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
-        Creates a Stage that executes multiple Stages concurrently.
+        Execute multiple stages concurrently and merge their results.
 
         This Stage runs all provided Stages in parallel using the same initial
         context and result, then combines their results using the specified
@@ -1230,6 +1210,8 @@ class Stage:
             A function that merges the results from all concurrent Stage executions.
             It should be an async function that accepts a sequence of (context, result)
             tuples and returns a single (context, result) tuple.
+        concurrent_tasks: int = 2
+            Number of concurrently running tasks.
         meta: Meta | MetaValues | None = None
             Additional stage metadata including tags, description etc.
 
@@ -1248,8 +1230,9 @@ class Stage:
                 return await merge(
                     branches=cast(  # we are converting errors witin __call__
                         Sequence[StageState | StageException],
-                        await gather(
-                            *[execution(state=state) for execution in stage_executions],
+                        await concurrently(
+                            (execution(state=state) for execution in stage_executions),
+                            concurrent_tasks=concurrent_tasks,
                             return_exceptions=True,
                         ),
                     )
@@ -1270,7 +1253,7 @@ class Stage:
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
-        Creates a Stage that routes execution to one of several stages based on a routing function.
+        Route execution to one of several stages based on a routing function.
 
         This Stage uses a routing function to select which of the provided stages to execute
         based on the current context and result. Each stage is identified by its metadata name
@@ -1348,7 +1331,7 @@ class Stage:
             routes[key] = route._execution
             options[key] = route.meta
 
-        routing = routing if routing is not None else _lmm_routing
+        routing = routing if routing is not None else _model_routing
 
         async def router_stage(
             *,
@@ -1366,8 +1349,7 @@ class Stage:
 
             else:
                 raise RuntimeError(
-                    "Stage.router selection invalid"
-                    f" - missing selection ({selection}) in available options"
+                    f"Stage.router selection invalid - selection ({selection}) is not available"
                 )
 
         return cls(
@@ -1406,7 +1388,7 @@ class Stage:
         **values: MetaValue,
     ) -> Self:
         """
-        Creates a copy of this Stage with updated metadata.
+        Update metadata for this stage.
 
         This method allows you to add or update metadata fields for the Stage,
         such as name, description, tags, and other custom metadata values.
@@ -1472,7 +1454,7 @@ class Stage:
         disposables: Disposables | Collection[Disposable] | None = None,
     ) -> Self:
         """
-        Creates a copy of this Stage with the specified state context applied.
+        Apply the specified state context to this stage.
 
         The returned Stage will execute within the provided state context,
         which affects what contextual state is available.
@@ -1573,7 +1555,10 @@ class Stage:
 
                     return result_state
 
-        return self.__class__(stage, meta=self.meta)
+        return self.__class__(
+            stage,
+            meta=self.meta,
+        )
 
     @overload
     def cached[Key: Hashable](
@@ -1581,16 +1566,16 @@ class Stage:
         *,
         limit: int | None = None,
         expiration: float | None = None,
-        make_key: MakeCacheKey[Key] | None = None,
+        make_key: StageCacheKeyMaking[Key] | None = None,
     ) -> Self: ...
 
     @overload
     def cached[Key](
         self,
         *,
-        make_key: MakeCacheKey[Key],
-        read: ReadCache[Key],
-        write: WriteCache[Key],
+        make_key: StageCacheKeyMaking[Key],
+        read: StageCacheReading[Key],
+        write: StageCacheWriting[Key],
     ) -> Self: ...
 
     def cached[Key](
@@ -1598,12 +1583,12 @@ class Stage:
         *,
         limit: int | None = None,
         expiration: float | None = None,
-        make_key: MakeCacheKey[Key] | None = None,
-        read: ReadCache[Key] | None = None,
-        write: WriteCache[Key] | None = None,
+        make_key: StageCacheKeyMaking[Key] | None = None,
+        read: StageCacheReading[Key] | None = None,
+        write: StageCacheWriting[Key] | None = None,
     ) -> Self:
         """
-        Creates a copy of this Stage with caching enabled.
+        Enable caching for this stage.
 
         The returned Stage will provide the same context and result as the last execution
         if cache keys match.
@@ -1619,14 +1604,14 @@ class Stage:
         expiration : float | None
             Time in seconds after which cache entries expire. If None, entries never
             expire. Ignored when using custom read and write.
-        make_key : MakeCacheKey[Key] | None
+        make_key : StageCacheKeyMaking[Key] | None
             Custom function to generate cache keys from execution inputs. The function
             should accept context and result parameters and return a hashable value
             uniquely identifying the inputs.
-        read : ReadCache[Key] | None
+        read : StageCacheReading[Key] | None
             Custom function to retrieve cached values. Must be provided together with
             `write` and `make_key`.
-        write : WriteCache[Key] | None
+        write : StageCacheWriting[Key] | None
             Custom function to store values in cache. Must be provided together with
             `read` and `make_key`.
 
@@ -1668,7 +1653,7 @@ class Stage:
         catching: set[type[Exception]] | tuple[type[Exception], ...] | type[Exception] = Exception,
     ) -> Self:
         """
-        Creates a copy of this Stage with retry behavior added.
+        Add retry behavior to this stage.
 
         The returned Stage will re-execute its processing function if it raises
         any of the exceptions specified in `catching`, up to `limit` times.
@@ -1708,7 +1693,7 @@ class Stage:
         catching: set[type[Exception]] | tuple[type[Exception], ...] | type[Exception] = Exception,
     ) -> Self:
         """
-        Creates a copy of this Stage with fallback behavior added.
+        Add fallback behavior to this stage.
 
         The returned Stage will execute fallback stage if it raises
         any of the exceptions specified in `catching`.
@@ -1744,22 +1729,21 @@ class Stage:
                     if type(exc) in exceptions:
                         return await fallback_execution(state=state)
 
-                    else:
-                        raise exc
+                raise exc
 
         return self.__class__(stage, meta=self.meta)
 
     def with_volatile_context(self) -> Self:
         """
-        Creates a copy of this Stage that discards context changes.
+        Discard any context changes produced by this stage.
 
-        The returned Stage will execute normally but will revert any changes
-        made to the LMM context when completed, keeping only the result changes.
+        The returned stage executes normally but reverts any changes made to the
+        model context when completed, keeping only the result changes.
 
         Returns
         -------
         Stage
-            A new Stage instance that discards context changes.
+            A new stage instance that discards context changes.
         """
         execution: StageExecution = self._execution
 
@@ -1770,22 +1754,24 @@ class Stage:
             processed_state: StageState = await execution(state=state)
             return processed_state.updated(context=state.context)
 
-        return self.__class__(stage, meta=self.meta)
+        return self.__class__(
+            stage,
+            meta=self.meta,
+        )
 
     def with_volatile_tools_context(self) -> Self:
         """
-        Creates a copy of this Stage that discards tool calls added by this stage.
+        Discard any tool calls added by this stage.
 
-        The returned Stage will execute normally, but upon completion, it will
-        remove any LMMToolRequests and LMMToolResponses elements that were added
-        to the context during the execution of this specific stage. When produced
-        and a previous contexts share a common prefix with tools usage it won't be
-        removed from the result context.
+        The returned stage executes normally, but upon completion, it removes any
+        tool request/response blocks added to the context during this stage's
+        execution. If previously existing tool usage is part of the common prefix
+        with the prior context, it is preserved.
 
         Returns
         -------
         Stage
-            A new Stage instance that makes tool-related context elements volatile.
+            A new stage instance that makes tool-related context elements volatile.
         """
         execution: StageExecution = self._execution
 
@@ -1795,7 +1781,7 @@ class Stage:
         ) -> StageState:
             processed_state: StageState = await execution(state=state)
 
-            common_prefix: LMMContext = tuple(
+            common_prefix: ModelContext = tuple(
                 current
                 for previous, current in zip(
                     state.context,
@@ -1804,18 +1790,20 @@ class Stage:
                 )
                 if current == previous
             )
-            striped_suffix: LMMContext = tuple(
-                element
-                for element in processed_state.context[len(common_prefix) :]
-                if not isinstance(element, LMMToolRequests | LMMToolResponses)
-            )
+            suffix: ModelContext = processed_state.context[len(common_prefix) :]
 
             return state.updated(
-                context=(*common_prefix, *striped_suffix),
+                context=(
+                    *common_prefix,
+                    *(element.updated(blocks=(element.content,)) for element in suffix),
+                ),
                 result=processed_state.result,
             )
 
-        return self.__class__(stage, meta=self.meta)
+        return self.__class__(
+            stage,
+            meta=self.meta,
+        )
 
     def when(
         self,
@@ -1825,30 +1813,29 @@ class Stage:
         alternative: Self | None = None,
     ) -> Self:
         """
-        Creates a Stage that conditionally executes based on a predicate.
+        Conditionally execute this stage based on a predicate.
 
-        This method returns a new Stage that will only execute the current Stage
-        if the specified condition is met. If the condition is not met and an
-        alternative Stage is provided, that alternative will be executed instead.
+        This returns a new stage that executes the current stage only if the
+        specified condition is met. If the condition is not met and an
+        alternative stage is provided, that alternative is executed instead.
 
         Parameters
         ----------
-        condition : StageCondition | bool
-            A boolean value or function that determines whether this Stage executes.
-            If a function is provided, it will be called with the current context and result.
+        condition : StageConditioning | bool
+            A boolean value or async predicate that determines whether this stage executes.
         alternative : Stage | None
-            Optional Stage to execute when the condition is not met.
+            Optional stage to execute when the condition is not met.
 
         Returns
         -------
         Stage
-            A new Stage instance that applies conditional execution logic.
+            A new stage instance that applies conditional execution logic.
 
         Examples
         --------
         >>> # Execute stage only when result contains specific text
-        >>> async def has_error(context: LMMContext, result: MultimodalContent):
-        ...     return "error" in result.as_string()
+        >>> async def has_error(context, result):
+        ...     return "error" in result.to_str()
         >>>
         >>> error_handling = my_stage.when(has_error)
         >>>
@@ -1891,14 +1878,17 @@ class Stage:
                     else:
                         return state
 
-        return self.__class__(stage, meta=self.meta)
+        return self.__class__(
+            stage,
+            meta=self.meta,
+        )
 
     def ignore_result(self) -> Self:
         """
-        Creates a copy of this Stage that ignores its produced result.
+        Ignore the result produced by this stage and preserve the incoming result.
 
-        The returned Stage will execute normally but will retain the original
-        result value rather than replacing it with the result of execution.
+        The returned stage executes normally but retains the original result
+        value rather than replacing it with the produced result.
 
         Returns
         -------
@@ -1914,19 +1904,22 @@ class Stage:
             processed_state: StageState = await execution(state=state)
             return processed_state.updated(result=state.result)  # preserve current result
 
-        return self.__class__(stage, meta=self.meta)
+        return self.__class__(
+            stage,
+            meta=self.meta,
+        )
 
     def extend_result(self) -> Self:
         """
-        Creates a copy of this Stage that extends the current result.
+        Extend the current result by appending the result produced by this stage.
 
-        The returned Stage will execute normally but will append its result
-        to the current result rather than replacing it.
+        The returned stage executes normally but appends its result to the
+        current result rather than replacing it.
 
         Returns
         -------
         Stage
-            A new Stage instance that extends rather than replaces the result.
+            A new stage instance that extends rather than replaces the result.
         """
         execution: StageExecution = self._execution
 
@@ -1939,7 +1932,10 @@ class Stage:
                 result=state.result.appending(processed_state.result),
             )
 
-        return self.__class__(stage, meta=self.meta)
+        return self.__class__(
+            stage,
+            meta=self.meta,
+        )
 
     def __setattr__(
         self,
@@ -1965,47 +1961,51 @@ class Stage:
         except StageException as exc:
             raise exc
 
-        except BaseException as exc:
+        except Exception as exc:
             raise StageException(
-                f"Stage execution interrupted: {exc}",
+                f"Stage execution failed: {exc}",
                 state=state,
             ) from exc
 
     async def execute(
         self,
         *state: DataModel | State,
-        context: LMMContext | None = None,
-        result: MultimodalContent | None = None,
+        memory: ModelMemory | ModelContext = (),
+        result: MultimodalContent = MultimodalContent.empty,
     ) -> MultimodalContent:
         """
-        Executes this Stage with the provided initial values.
+        Execute this stage with the provided initial state/context and return the result.
 
-        This method runs the Stage's processing function with the specified
-        initial context, result, and state, and returns the produced result.
+        This method runs the stage's processing function with the specified
+        initial context (provided directly or recalled from `memory`), result,
+        and additional state, then returns the produced result. When a
+        `Memory` is provided, any newly produced context elements will be
+        remembered after execution.
 
         Parameters
         ----------
         *state : DataModel | State
-            The initial state models to use.
-        context : LMMContext | None
-            The initial LMM context to use, or None to use an empty context.
-        result : MultimodalContent | None
-            The initial result value to use, or None to use an empty result.
+            Initial state models to use for execution.
+        memory : ModelMemory | ModelContext
+            Either a concrete `ModelContext` to start with, or a `ModelMemory`
+            from which the initial context will be recalled and to which any
+            newly produced context will be persisted.
+        result : MultimodalContent
+            Initial result value to use (defaults to empty).
 
         Returns
         -------
         MultimodalContent
-            The result produced by executing the Stage.
+            The result produced by executing the stage.
         """
         async with ctx.scope("stage.execution"):
-            initial_context: LMMContext
-            match context:
-                case None:
-                    initial_context = ()
+            initial_context: ModelContext
+            if isinstance(memory, Memory):
+                recalled: ModelMemoryRecall = await memory.recall()
+                initial_context = recalled.context
 
-                case context:
-                    assert not context or isinstance(context[-1], LMMCompletion)  # nosec: B101
-                    initial_context = context
+            else:
+                initial_context = memory
 
             result_state: StageState = await self(
                 state=StageState.of(
@@ -2015,77 +2015,26 @@ class Stage:
                 )
             )
 
+            if isinstance(memory, Memory):
+                # Persist only newly produced context elements to the model memory
+                # (compute the suffix after the common prefix with the recalled context)
+                common_prefix: ModelContext = tuple(
+                    current
+                    for previous, current in zip(
+                        initial_context,
+                        result_state.context,
+                        strict=False,
+                    )
+                    if current == previous
+                )
+                suffix: ModelContext = result_state.context[len(common_prefix) :]
+                if suffix:
+                    await memory.remember(*suffix)
+
             return result_state.result
 
 
-async def _lmm_completion(
-    *,
-    instruction: Instruction | str | None,
-    context: LMMContext,
-    toolbox: Toolbox,
-    output: LMMOutputSelection,
-    **extra: Any,
-) -> tuple[LMMContext, MultimodalContent]:
-    current_context: LMMContext = context
-    formatted_instruction: LMMInstruction | None = Instruction.formatted(instruction)
-    tools_turn: int = 0
-    result: LMMCompletion
-    result_extension: MultimodalContent = MultimodalContent.empty
-    while True:
-        ctx.log_debug("...requesting completion...")
-        match await LMM.completion(
-            instruction=formatted_instruction,
-            context=current_context,
-            output=output,
-            tools=toolbox.available_tools(tools_turn=tools_turn),
-            **extra,
-        ):
-            case LMMCompletion() as completion:
-                ctx.log_debug("...received result...")
-                if result_extension:
-                    result = completion.updated(
-                        content=result_extension.appending(completion.content)
-                    )
-
-                else:
-                    result = completion
-
-                break  # proceed to resolving
-
-            case LMMToolRequests() as tool_requests:
-                ctx.log_debug(f"...received tool requests (turn {tools_turn})...")
-                # skip tool_requests.content - no need for extra comments
-                tool_responses: LMMToolResponses = await toolbox.respond_all(tool_requests)
-
-                if completion := tool_responses.completion(extension=result_extension):
-                    ctx.log_debug("...received tools direct result...")
-                    result = completion
-                    break  # proceed to resolving
-
-                elif extension := tool_responses.completion_extension():
-                    ctx.log_debug("...received tools result extension...")
-                    result_extension = result_extension.appending(extension)
-
-                ctx.log_debug("...received tools responses...")
-                current_context = (
-                    *current_context,
-                    tool_requests,
-                    tool_responses,
-                )
-
-        tools_turn += 1  # continue with next turn
-
-    ctx.log_debug("...finalized result!")
-    return (
-        (
-            *current_context,
-            result,
-        ),
-        result.content,
-    )
-
-
-async def _lmm_routing(
+async def _model_routing(
     *,
     state: StageState,
     options: Mapping[str, Meta],
@@ -2095,7 +2044,7 @@ async def _lmm_routing(
     )
 
     instruction: str = (
-        "Based on the conversation context and current result,"  # nosec: B608 - false positive
+        "Based on the provided context and the current result,"  # nosec: B608 - false positive
         " select the most appropriate option from the following:"
         f"\n\n{options_text}"
         "\n\nRespond with with the exact option name within SELECTION xml tag"
@@ -2103,39 +2052,36 @@ async def _lmm_routing(
     )
 
     # Create routing context with the current result as input
-    routing_context: LMMContext = (
+    routing_context: list[ModelContextElement] = [
         *state.context,
-        LMMInput.of(
+        ModelInput.of(
             MultimodalContent.of(
                 "<RESULT>",
                 state.result,
                 "</RESULT>",
             )
         ),
-    )
+    ]
 
-    selection: str
-    match await LMM.completion(
-        instruction=instruction,
+    result: ModelOutput = await GenerativeModel.loop(
+        instructions=await InstructionsRepository.resolve(instruction),
         context=routing_context,
         output="text",
-    ):
-        case LMMCompletion() as completion:
-            if selection_tag := MultimodalTagElement.parse_first(
-                "SELECTION",
-                content=completion.content,
-            ):
-                selection = selection_tag.content.to_str().strip().lower()
+    )
 
-            else:
-                selection = "__INVALID_SELECTION__"
-
-        case other:
-            raise RuntimeError(f"LMM routing failed: unexpected result {type(other)}")
+    selection_tag = MultimodalTagElement.parse_first(
+        "SELECTION",
+        content=result.content,
+    )
+    selection: str = (
+        selection_tag.content.to_str().strip().lower()
+        if selection_tag is not None
+        else "__INVALID_SELECTION__"
+    )
 
     if selection not in options:
         raise ValueError(
-            f"LMM routing failed: invalid selection '{selection}'. "
+            f"Model routing failed: invalid selection '{selection}'. "
             f"Available options: {list(options.keys())}"
         )
 
@@ -2162,6 +2108,25 @@ def stage(
     *,
     meta: Meta | MetaValues | None = None,
 ) -> Callable[[StageExecution], Stage] | Stage:
+    """Convert an async execution function into a ``Stage``.
+
+    Can be used as a decorator or called directly. When used as a decorator without
+    arguments, it wraps the function into a ``Stage`` with default metadata. When
+    called, it returns a decorator that applies the provided metadata.
+
+    Parameters
+    ----------
+    execution : StageExecution | None
+        Execution function to wrap. When ``None``, returns a decorator.
+    meta : Meta | Mapping[str, Any] | None, optional
+        Metadata to attach to the created stage (e.g., name, description, tags).
+
+    Returns
+    -------
+    Callable[[StageExecution], Stage] | Stage
+        A decorator when ``execution`` is ``None``; otherwise, the constructed ``Stage``.
+    """
+
     def wrap(execution: StageExecution) -> Stage:
         return Stage(execution, meta=Meta.of(meta))
 

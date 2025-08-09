@@ -1,43 +1,70 @@
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import Any, Literal, overload
 
-from haiway import State, ctx
+from haiway import State, statemethod
 
 from draive.generation.model.default import generate_model
-from draive.generation.model.types import ModelGenerating, ModelGeneratorDecoder
-from draive.instructions import Instruction
+from draive.generation.model.types import ModelGenerating, ModelGenerationDecoder
+from draive.models import ResolveableInstructions, Tool, Toolbox
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel
-from draive.prompts import Prompt
-from draive.tools import Tool, Toolbox
 
 __all__ = ("ModelGeneration",)
 
 
 class ModelGeneration(State):
+    @overload
     @classmethod
     async def generate[Generated: DataModel](
         cls,
         generated: type[Generated],
         /,
         *,
-        instruction: Instruction | str,
-        input: Prompt | Multimodal,  # noqa: A002
-        schema_injection: Literal["auto", "full", "simplified", "skip"] = "auto",
-        tools: Toolbox | Iterable[Tool] | None = None,
-        examples: Iterable[tuple[Multimodal, Generated]] | None = None,
-        decoder: ModelGeneratorDecoder[Generated] | None = None,
+        instructions: ResolveableInstructions = "",
+        input: Multimodal,
+        schema_injection: Literal["full", "simplified", "skip"] = "skip",
+        tools: Toolbox | Iterable[Tool] = (),
+        examples: Iterable[tuple[Multimodal, Generated]] = (),
+        decoder: ModelGenerationDecoder[Generated] | None = None,
+        **extra: Any,
+    ) -> Generated: ...
+
+    @overload
+    async def generate[Generated: DataModel](
+        self,
+        generated: type[Generated],
+        /,
+        *,
+        instructions: ResolveableInstructions = "",
+        input: Multimodal,
+        schema_injection: Literal["full", "simplified", "skip"] = "skip",
+        tools: Toolbox | Iterable[Tool] = (),
+        examples: Iterable[tuple[Multimodal, Generated]] = (),
+        decoder: ModelGenerationDecoder[Generated] | None = None,
+        **extra: Any,
+    ) -> Generated: ...
+
+    @statemethod
+    async def generate[Generated: DataModel](
+        self,
+        generated: type[Generated],
+        /,
+        *,
+        instructions: ResolveableInstructions = "",
+        input: Multimodal,  # noqa: A002
+        schema_injection: Literal["full", "simplified", "skip"] = "skip",
+        tools: Toolbox | Iterable[Tool] = (),
+        examples: Iterable[tuple[Multimodal, Generated]] = (),
+        decoder: ModelGenerationDecoder[Generated] | None = None,
         **extra: Any,
     ) -> Generated:
-        return await ctx.state(cls).generating(
+        return await self.generating(
             generated,
-            instruction=Instruction.of(instruction),
+            instructions=instructions,
             schema_injection=schema_injection,
-            input=input if isinstance(input, Prompt) else MultimodalContent.of(input),
+            input=MultimodalContent.of(input),
             toolbox=Toolbox.of(tools),
-            examples=((MultimodalContent.of(example[0]), example[1]) for example in examples)
-            if examples is not None
-            else (),
+            examples=((MultimodalContent.of(ex_in), ex_out) for ex_in, ex_out in examples),
             decoder=decoder,
             **extra,
         )

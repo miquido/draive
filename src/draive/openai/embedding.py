@@ -17,9 +17,6 @@ __all__ = ("OpenAIEmbedding",)
 
 class OpenAIEmbedding(OpenAIAPI):
     def text_embedding(self) -> TextEmbedding:
-        """
-        Prepare TextEmbedding implementation using OpenAI service.
-        """
         return TextEmbedding(embedding=self.create_texts_embedding)
 
     async def create_texts_embedding[Value: DataModel | State](
@@ -31,11 +28,8 @@ class OpenAIEmbedding(OpenAIAPI):
         config: OpenAIEmbeddingConfig | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
-        """
-        Create texts embedding with OpenAI embedding service.
-        """
         embedding_config: OpenAIEmbeddingConfig = config or ctx.state(OpenAIEmbeddingConfig)
-        async with ctx.scope("openai_text_embedding", embedding_config):
+        async with ctx.scope("openai_text_embedding"):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={
@@ -60,7 +54,6 @@ class OpenAIEmbedding(OpenAIAPI):
                         model=embedding_config.model,
                         dimensions=unwrap_missing(embedding_config.dimensions),
                         encoding_format="float",
-                        timeout=unwrap_missing(embedding_config.timeout),
                     )
                     for index in range(0, len(attributes), embedding_config.batch_size)
                 ]

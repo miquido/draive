@@ -112,8 +112,6 @@ class ResourceContent(State):
                     blob=other.to_json().encode(),
                 )
 
-        return cls()
-
     mime_type: str
     blob: bytes
 

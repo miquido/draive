@@ -7,11 +7,11 @@ from draive.bedrock.config import BedrockInputGuardraisConfig, BedrockOutputGuar
 from draive.guardrails import GuardrailsModeration, GuardrailsModerationException
 from draive.multimodal import MediaData, Multimodal, MultimodalContent, TextContent
 
-__all__ = ("BedrockGuardrais",)
+__all__ = ("BedrockGuardrails",)
 
 
-class BedrockGuardrais(BedrockAPI):
-    def content_guardrails(self) -> GuardrailsModeration:
+class BedrockGuardrails(BedrockAPI):
+    def guardrails_moderation(self) -> GuardrailsModeration:
         return GuardrailsModeration(
             input_checking=self.content_input_verification,
             output_checking=self.content_output_verification,
@@ -27,7 +27,7 @@ class BedrockGuardrais(BedrockAPI):
     ) -> None:
         guardrails_config: BedrockInputGuardraisConfig = config or ctx.state(
             BedrockInputGuardraisConfig
-        ).updated(**extra)
+        )
 
         content = MultimodalContent.of(content)
         await self._content_input_verification(
@@ -77,7 +77,7 @@ class BedrockGuardrais(BedrockAPI):
         guardrails_config: BedrockOutputGuardraisConfig = config or ctx.state(
             BedrockOutputGuardraisConfig
         )
-        async with ctx.scope("bedrock_guardrails", guardrails_config):
+        async with ctx.scope("bedrock_guardrails"):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

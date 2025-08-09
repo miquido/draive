@@ -1,11 +1,10 @@
 from collections.abc import Sequence
 from typing import cast
 
-from draive.embedding import Embedded, ImageEmbedding, TextEmbedding
+from draive.embedding import Embedded, ImageEmbedding, TextEmbedding, vector_similarity_score
 from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
 from draive.multimodal.media import MediaData
-from draive.similarity.score import vector_similarity_score
 from draive.stages import Stage
 
 __all__ = (
@@ -31,17 +30,17 @@ Evaluated metric is similarity - the degree of semantic similarity between the R
 </EVALUATION_CRITERIA>
 {guidelines}
 <RATING>
-Assign a similarity score using exact name of one of the following values:
-- "poor" is very low similarity, the content is completely unrelated in meaning.
-- "good" is moderate similarity, the content share some common themes or ideas.
-- "perfect" is very high similarity, the content is very close in meaning\
- or convey the same information.
+Assign a similarity score using the exact name of one of the following values:
+- "poor" is very low similarity; the content is completely unrelated in meaning.
+- "good" is moderate similarity; the content shares some common themes or ideas.
+- "perfect" is very high similarity; the content is very close in meaning\
+ or conveys the same information.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 
 <FORMAT>
-The final result containing only the rating value, HAVE to be put inside a `RESULT` \
-xml tag within the result i.e. `<RESULT>good</RESULT>`.
+The final result, containing only the rating value, MUST be placed inside a\
+ `RESULT` XML tag, e.g., `<RESULT>good</RESULT>`.
 </FORMAT>
 """
 

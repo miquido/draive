@@ -23,18 +23,18 @@ Let's start with the simplest example - generating text with an LLM:
 ```python
 import asyncio
 from draive import ctx, TextGeneration
-from draive.openai import OpenAI, OpenAIChatConfig
+from draive.openai import OpenAI, OpenAIResponsesConfig
 
 async def main():
     # Create a context with OpenAI configuration
     async with ctx.scope(
         "quickstart",  # Context name
-        OpenAIChatConfig(model="gpt-4o-mini"),  # Model configuration
+        OpenAIResponsesConfig(model="gpt-4o-mini"),  # Model configuration
         disposables=(OpenAI(),),  # Initialize OpenAI client
     ):
         # Generate text using the LLM
         result = await TextGeneration.generate(
-            instruction="You are a helpful assistant",
+            instructions="You are a helpful assistant",
             input="What is the capital of France?",
         )
 
@@ -90,10 +90,10 @@ async def assistant_with_tools():
     async with ctx.scope(
         "assistant",
         disposables=(OpenAI(),),
-        OpenAIChatConfig(model="gpt-4o-mini"),
+        OpenAIResponsesConfig(model="gpt-4o-mini"),
     ):
         result = await TextGeneration.generate(
-            instruction="You are a helpful assistant with access to tools",
+            instructions="You are a helpful assistant with access to tools",
             input="What time is it now? Also, what is 25 * 4?",
             tools=[get_current_time, calculate],  # Provide tools
         )
@@ -120,12 +120,12 @@ class PersonInfo(DataModel):
 async def extract_person_info():
     async with ctx.scope(
         "extraction",
-        OpenAIChatConfig(model="gpt-4o-mini"),
+        OpenAIResponsesConfig(model="gpt-4o-mini"),
         disposables=(OpenAI(),),
     ):
         person = await ModelGeneration.generate(
             PersonInfo,
-            instruction="Extract person information from the text",
+            instructions="Extract person information from the text",
             input="""
             John Smith is a 32-year-old software engineer living in Seattle.
             He specializes in Python, machine learning, and cloud architecture.
@@ -143,17 +143,17 @@ async def extract_person_info():
 Switch between different AI providers easily:
 
 ```python
-from draive.anthropic import Anthropic, AnthropicChatConfig
-from draive.gemini import Gemini, GeminiChatConfig
+from draive.anthropic import Anthropic, AnthropicConfig
+from draive.gemini import Gemini, GeminiConfig
 
 # Using Anthropic Claude
 async with ctx.scope(
     "claude-app",
-    AnthropicChatConfig(model="claude-3-haiku"),
+    AnthropicConfig(model="claude-3-5-haiku-20241022"),
     disposables=(Anthropic(),),
 ):
     result = await TextGeneration.generate(
-        instruction="You are Claude, a helpful AI assistant",
+        instructions="You are Claude, a helpful AI assistant",
         input="Tell me a short joke",
     )
     print("Claude:", result)
@@ -161,11 +161,11 @@ async with ctx.scope(
 # Using Google Gemini
 async with ctx.scope(
     "gemini-app",
-    GeminiChatConfig(model="gemini-2.5-flash"),
+    GeminiConfig(model="gemini-2.5-flash"),
     disposables=(Gemini(),),
 ):
     result = await TextGeneration.generate(
-        instruction="You are Gemini, a helpful AI assistant",
+        instructions="You are Gemini, a helpful AI assistant",
         input="Tell me a short joke",
     )
     print("Gemini:", result)
@@ -181,11 +181,11 @@ from draive import Conversation, ConversationMessage
 async def chat_example():
     async with ctx.scope(
         "chat",
-        OpenAIChatConfig(model="gpt-4o-mini"),
+        OpenAIResponsesConfig(model="gpt-4o-mini"),
         disposables=(OpenAI(),),
     ):
         response = await Conversation.completion(
-            instruction="You are a helpful math tutor",
+            instructions="You are a helpful math tutor",
             input="What is calculus?",
             memory=[
                 ConversationMessage.user("Hi!"),

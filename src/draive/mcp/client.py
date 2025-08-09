@@ -4,12 +4,12 @@ from collections.abc import AsyncGenerator, Callable, Collection, Coroutine, Map
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from itertools import chain
 from types import TracebackType
-from typing import Any, Literal, Self, cast, final
+from typing import Any, Self, cast, final
 from urllib.parse import ParseResult, urlparse, urlunparse
 from uuid import uuid4
 
-from haiway import Meta, MetaTags, as_dict, as_list, ctx
-from mcp import ClientSession, GetPromptResult, ListToolsResult, StdioServerParameters, stdio_client
+from haiway import BasicValue, Meta, MetaTags, as_dict, as_list, ctx
+from mcp import ClientSession, ListToolsResult, StdioServerParameters, stdio_client
 from mcp import Tool as MCPTool
 from mcp.client.sse import sse_client
 from mcp.types import AudioContent as MCPAudioContent
@@ -26,12 +26,10 @@ from mcp.types import ResourceLink as MCPResourceLink
 from mcp.types import TextContent as MCPTextContent
 from pydantic import AnyUrl
 
-from draive.lmm import LMMCompletion, LMMContextElement, LMMInput
+from draive.models import FunctionTool, Tool, ToolError, ToolsProvider
 from draive.multimodal import MediaData, MultimodalContent, TextContent
-from draive.parameters import BasicValue, DataModel, validated_specification
-from draive.prompts import Prompt, PromptDeclaration, PromptDeclarationArgument, Prompts
+from draive.parameters import DataModel, validated_tool_specification
 from draive.resources import Resource, ResourceContent, ResourceDeclaration, Resources
-from draive.tools import FunctionTool, Tool, ToolError, Tools
 
 __all__ = (
     "MCPClient",
@@ -49,7 +47,7 @@ class MCPClient:
         command: str,
         args: Sequence[str] | None = None,
         env: Mapping[str, str] | None = None,
-        features: Collection[Literal["resources", "prompts", "tools"]] | None = None,
+        features: Collection[type[Resources] | type[ToolsProvider]] | None = None,
         tags: MetaTags | None = None,
     ) -> Self:
         @asynccontextmanager
@@ -67,7 +65,7 @@ class MCPClient:
         return cls(
             identifier or uuid4().hex,
             session_manager=mcp_stdio_session(),
-            features=features if features is not None else {"resources", "prompts", "tools"},
+            features=features if features is not None else (Resources, ToolsProvider),
             tags=tags if tags is not None else (),
         )
 
@@ -80,7 +78,7 @@ class MCPClient:
         headers: Mapping[str, Any] | None = None,
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
-        features: Collection[Literal["resources", "prompts", "tools"]] | None = None,
+        features: Collection[type[Resources] | type[ToolsProvider]] | None = None,
         tags: MetaTags | None = None,
     ) -> Self:
         @asynccontextmanager
@@ -97,7 +95,7 @@ class MCPClient:
         return cls(
             identifier or uuid4().hex,
             session_manager=mcp_sse_session(),
-            features=features if features is not None else {"resources", "prompts", "tools"},
+            features=features if features is not None else (Resources, ToolsProvider),
             tags=tags if tags is not None else (),
         )
 
@@ -114,13 +112,13 @@ class MCPClient:
         identifier: str,
         *,
         session_manager: AbstractAsyncContextManager[ClientSession],
-        features: Collection[Literal["resources", "prompts", "tools"]],
+        features: Collection[type[Resources] | type[ToolsProvider]],
         tags: MetaTags,
     ) -> None:
         self.identifier: str = identifier
         self._session_manager: AbstractAsyncContextManager[ClientSession] = session_manager
         self._session: ClientSession
-        self._features: Collection[Literal["resources", "prompts", "tools"]] = features
+        self._features: Collection[type[Resources] | type[ToolsProvider]] = features
         self.tags: MetaTags = tags
 
     async def resources_list(
@@ -191,88 +189,6 @@ class MCPClient:
     ) -> None:
         raise NotImplementedError("Resource uploading is not supported by MCP servers")
 
-    async def prompts_list(
-        self,
-        **extra: Any,
-    ) -> Sequence[PromptDeclaration]:
-        assert hasattr(  # nosec: B101
-            self,
-            "_session",
-        ), "MCPClient has to be initialized through async context entering"
-
-        # TODO: in theory there are some extra elements like pagination
-        # we are not supporting it as for now (how to pass cursor anyways?)
-        return tuple(
-            PromptDeclaration(
-                name=self._with_prompt_name_identifier(prompt.name),
-                description=prompt.description,
-                arguments=tuple(
-                    PromptDeclarationArgument(
-                        name=argument.name,
-                        specification={
-                            "type": "string",
-                        }
-                        if argument.description is None
-                        else {
-                            "type": "string",
-                            "description": argument.description,
-                        },
-                        required=argument.required if argument.required is not None else True,
-                    )
-                    for argument in prompt.arguments
-                )
-                if prompt.arguments
-                else (),
-                meta=Meta(
-                    {
-                        "mcp_server": self.identifier,
-                        "tags": self.tags,
-                    }
-                ),
-            )
-            for prompt in (await self._session.list_prompts()).prompts
-        )
-
-    async def prompt_fetch(
-        self,
-        name: str,
-        *,
-        arguments: Mapping[str, str] | None,
-        **extra: Any,
-    ) -> Prompt:
-        assert hasattr(  # nosec: B101
-            self, "_session"
-        ), "MCPClient has to be initialized through async context entering"
-
-        fetched_prompt: GetPromptResult = await self._session.get_prompt(
-            name=self._without_prompt_name_identifier(name),
-            arguments=as_dict(arguments) if arguments is not None else None,
-        )
-
-        prompt_context: list[LMMContextElement] = []
-        for element in fetched_prompt.messages:
-            match element.role:
-                case "user":
-                    prompt_context.append(LMMInput.of(await _convert_content(element.content)))
-
-                case "assistant":
-                    prompt_context.append(LMMCompletion.of(await _convert_content(element.content)))
-
-                case _:
-                    raise ValueError(f"Unsupported prompt element role: {element.role}")
-
-        return Prompt(
-            name=name,
-            description=fetched_prompt.description,
-            content=prompt_context,
-            meta=Meta(
-                {
-                    "mcp_server": self.identifier,
-                    "tags": self.tags,
-                }
-            ),
-        )
-
     async def tools_fetch(
         self,
         **extra: Any,
@@ -310,35 +226,11 @@ class MCPClient:
 
         return content
 
-    def _with_prompt_name_identifier(
-        self,
-        name: str,
-        /,
-    ) -> str:
-        """Add server identifier to prompt name."""
-
-        return f"{self.identifier}|{name}"
-
-    def _without_prompt_name_identifier(
-        self,
-        name: str,
-        /,
-    ) -> str:
-        """Remove server identifier from prompt name."""
-
-        match name.split("|", 1):
-            case [identifier, reminder] if identifier == self.identifier:
-                return reminder
-
-            case _:
-                return name
-
     def _with_uri_identifier(
         self,
         uri: str,
         /,
     ) -> str:
-        """Add server identifier to URI."""
         if not uri:
             return uri
 
@@ -378,7 +270,6 @@ class MCPClient:
         uri: str,
         /,
     ) -> str:
-        """Remove server identifier from URI."""
         if not uri:
             return uri
 
@@ -454,12 +345,12 @@ class MCPClient:
                     ),
                 )
 
-    async def __aenter__(self) -> Sequence[Resources | Prompts | Tools]:
+    async def __aenter__(self) -> Sequence[Resources | ToolsProvider]:
         self._session = await self._session_manager.__aenter__()
         await self._session.initialize()
 
-        features: list[Resources | Prompts | Tools] = []
-        if "resources" in self._features:
+        features: list[Resources | ToolsProvider] = []
+        if Resources in self._features:
             features.append(
                 Resources(
                     list_fetching=self.resources_list,
@@ -474,23 +365,10 @@ class MCPClient:
                 )
             )
 
-        if "prompts" in self._features:
+        if ToolsProvider in self._features:
             features.append(
-                Prompts(
-                    list_fetching=self.prompts_list,
-                    fetching=self.prompt_fetch,
-                    meta=Meta(
-                        {
-                            "mcp_server": self.identifier,
-                            "tags": self.tags,
-                        }
-                    ),
-                )
-            )
-        if "tools" in self._features:
-            features.append(
-                Tools(
-                    fetching=self.tools_fetch,
+                ToolsProvider(
+                    loading=self.tools_fetch,
                     meta=Meta(
                         {
                             "mcp_server": self.identifier,
@@ -553,7 +431,7 @@ async def _convert_content(  # noqa: C901, PLR0911
                     match blob.mimeType:
                         case None:
                             raise NotImplementedError(
-                                "Unsuppoprted MCP prompt message element - missing mime!"
+                                "Unsupported embedded resource - missing mime!"
                             )
 
                         case "text/plain":
@@ -598,12 +476,17 @@ def _convert_tool(
     return FunctionTool(
         name=name,
         description=mcp_tool.description,
-        parameters=validated_specification(mcp_tool.inputSchema),
+        parameters=validated_tool_specification(
+            {
+                **mcp_tool.inputSchema,
+                "additionalProperties": False,
+            }
+        ),
         function=remote_call,
-        availability=None,
-        format_result=_format_tool_result,
-        format_error=_format_tool_failure,
-        handling="auto",
+        availability=_available,
+        result_formatting=_format_tool_result,
+        error_formatting=_format_tool_failure,
+        handling="response",
         meta=Meta(
             {
                 "mcp_server": source,
@@ -611,6 +494,13 @@ def _convert_tool(
             }
         ),
     )
+
+
+def _available(
+    tools_turn: int,
+    meta: Meta,
+) -> bool:
+    return True
 
 
 def _format_tool_result(
@@ -645,8 +535,7 @@ class MCPClients:
     ) -> None:
         self._clients: Mapping[str, MCPClient] = {c.identifier: c for c in [client, *clients]}
         self._resources: Mapping[str, Resources]
-        self._prompts: Mapping[str, Prompts]
-        self._tools: Mapping[str, Tools]
+        self._tools: Mapping[str, ToolsProvider]
 
     async def resources_list(
         self,
@@ -711,57 +600,6 @@ class MCPClients:
             case _:
                 return None
 
-    async def prompts_list(
-        self,
-        *,
-        mcp_server: str | None = None,
-        **extra: Any,
-    ) -> Sequence[PromptDeclaration]:
-        if mcp_server is None:
-            return tuple(
-                chain.from_iterable(
-                    await gather(*[client.fetch_list(**extra) for client in self._prompts.values()])
-                )
-            )
-
-        elif prompts := self._prompts.get(mcp_server):
-            return await prompts.fetch_list(**extra)
-
-        else:
-            return ()
-
-    async def prompt_fetch(
-        self,
-        name: str,
-        *,
-        arguments: Mapping[str, str] | None,
-        **extra: Any,
-    ) -> Prompt | None:
-        if client_identifier := self._client_identifier_for_prompt_name(name):
-            return await self._prompts[client_identifier].fetch(
-                name,
-                arguments=arguments,
-            )
-
-        else:
-            ctx.log_warning(f"Requested prompt ({name}) from unknown source")
-            return None
-
-    def _client_identifier_for_prompt_name(
-        self,
-        name: str,
-        /,
-    ) -> str | None:
-        if not name:
-            return None
-
-        match name.split("|", 1):
-            case [identifier, _]:
-                return identifier
-
-            case _:
-                return None
-
     async def tools_fetch(
         self,
         *,
@@ -771,18 +609,18 @@ class MCPClients:
         if mcp_server is None:
             return tuple(
                 chain.from_iterable(
-                    await gather(*[client.fetch(**extra) for client in self._tools.values()])
+                    await gather(*[client.loading(**extra) for client in self._tools.values()])
                 )
             )
 
         elif tools := self._tools.get(mcp_server):
-            return await tools.fetch(**extra)
+            return await tools.loading(**extra)
 
         else:
             return ()
 
-    async def __aenter__(self) -> Sequence[Resources | Prompts | Tools]:
-        features: Sequence[Sequence[Resources | Prompts | Tools]] = await gather(
+    async def __aenter__(self) -> Sequence[Resources | ToolsProvider]:
+        features: Sequence[Sequence[Resources | ToolsProvider]] = await gather(
             *[client.__aenter__() for client in self._clients.values()]
         )
 
@@ -792,17 +630,13 @@ class MCPClients:
 
         for states in features:
             for state in states:
-                match state:
-                    case Resources() as resources:
-                        self._resources[cast(str, resources.meta["mcp_server"])] = resources
+                if isinstance(state, Resources):
+                    self._resources[cast(str, state.meta["mcp_server"])] = state
 
-                    case Prompts() as prompts:
-                        self._prompts[cast(str, prompts.meta["mcp_server"])] = prompts
+                if isinstance(state, ToolsProvider):
+                    self._tools[cast(str, state.meta["mcp_server"])] = state
 
-                    case Tools() as tools:
-                        self._tools[cast(str, tools.meta["mcp_server"])] = tools
-
-        inherited_features: list[Resources | Prompts | Tools] = []
+        inherited_features: list[Resources | ToolsProvider] = []
         if self._resources:
             inherited_features.append(
                 Resources(
@@ -813,19 +647,10 @@ class MCPClients:
                 )
             )
 
-        if self._prompts:
-            inherited_features.append(
-                Prompts(
-                    list_fetching=self.prompts_list,
-                    fetching=self.prompt_fetch,
-                    meta=Meta({"mcp_server": "mcp_aggregate"}),
-                )
-            )
-
         if self._tools:
             inherited_features.append(
-                Tools(
-                    fetching=self.tools_fetch,
+                ToolsProvider(
+                    loading=self.tools_fetch,
                     meta=Meta({"mcp_server": "mcp_aggregate"}),
                 )
             )

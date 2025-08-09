@@ -1,0 +1,609 @@
+import json
+from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable, Mapping
+from typing import Any, Literal, cast, overload
+from uuid import uuid4
+
+from haiway import META_EMPTY, ObservabilityLevel, as_list, ctx, unwrap_missing
+from mistralai import ToolTypedDict
+from mistralai.models import (
+    AssistantMessage,
+    ChatCompletionChoice,
+    ChatCompletionRequestToolChoiceTypedDict,
+    ChatCompletionResponse,
+    CompletionEvent,
+    CompletionResponseStreamChoice,
+    DeltaMessage,
+    MessagesTypedDict,
+    ResponseFormatTypedDict,
+    ToolCall,
+)
+from mistralai.utils.eventstreaming import EventStreamAsync
+
+from draive.mistral.api import MistralAPI
+from draive.mistral.config import MistralChatConfig
+from draive.mistral.utils import unwrap_missing_to_none, unwrap_missing_to_unset
+from draive.models import (
+    GenerativeModel,
+    ModelContext,
+    ModelInput,
+    ModelInstructions,
+    ModelOutput,
+    ModelOutputFailed,
+    ModelOutputLimit,
+    ModelOutputSelection,
+    ModelReasoning,
+    ModelStreamOutput,
+    ModelToolRequest,
+    ModelToolsDeclaration,
+    ModelToolSpecification,
+    ModelToolsSelection,
+)
+from draive.multimodal import (
+    MediaData,
+    MediaReference,
+    Multimodal,
+    MultimodalContent,
+    MultimodalContentElement,
+    TextContent,
+)
+from draive.parameters import DataModel
+
+__all__ = ("MistralCompletions",)
+
+
+class MistralCompletions(MistralAPI):
+    def generative_model(self) -> GenerativeModel:
+        return GenerativeModel(generating=self.completion)
+
+    @overload
+    def completion(
+        self,
+        *,
+        instructions: ModelInstructions,
+        tools: ModelToolsDeclaration,
+        context: ModelContext,
+        output: ModelOutputSelection,
+        stream: Literal[False] = False,
+        config: MistralChatConfig | None = None,
+        prefill: Multimodal | None = None,
+        **extra: Any,
+    ) -> Coroutine[None, None, ModelOutput]: ...
+
+    @overload
+    def completion(
+        self,
+        *,
+        instructions: ModelInstructions,
+        tools: ModelToolsDeclaration,
+        context: ModelContext,
+        output: ModelOutputSelection,
+        stream: Literal[True],
+        config: MistralChatConfig | None = None,
+        prefill: Multimodal | None = None,
+        **extra: Any,
+    ) -> AsyncGenerator[ModelStreamOutput]: ...
+
+    def completion(
+        self,
+        *,
+        instructions: ModelInstructions,
+        tools: ModelToolsDeclaration,
+        context: ModelContext,
+        output: ModelOutputSelection,
+        stream: bool = False,
+        config: MistralChatConfig | None = None,
+        prefill: Multimodal | None = None,
+        **extra: Any,
+    ) -> AsyncGenerator[ModelStreamOutput] | Coroutine[None, None, ModelOutput]:
+        if stream:
+            return self._completion_stream(
+                instructions=instructions,
+                tools=tools,
+                context=context,
+                output=output,
+                config=config or ctx.state(MistralChatConfig),
+                prefill=prefill,
+                **extra,
+            )
+
+        return self._completion(
+            instructions=instructions,
+            tools=tools,
+            context=context,
+            output=output,
+            config=config or ctx.state(MistralChatConfig),
+            prefill=prefill,
+        )
+
+    async def _completion_stream(  # noqa: C901, PLR0912
+        self,
+        *,
+        instructions: ModelInstructions,
+        tools: ModelToolsDeclaration,
+        context: ModelContext,
+        output: ModelOutputSelection,
+        config: MistralChatConfig,
+        prefill: Multimodal | None,
+        **extra: Any,
+    ) -> AsyncGenerator[ModelStreamOutput]:
+        messages: list[MessagesTypedDict] = _build_messages(
+            context=context,
+            instructions=instructions,
+            prefill=prefill,
+        )
+        response_format = _response_format(output)
+        tool_choice, tools_list = _tools_as_tool_config(
+            tools.specifications,
+            tool_selection=tools.selection,
+        )
+
+        stream: EventStreamAsync[CompletionEvent] = await self._client.chat.stream_async(
+            model=config.model,
+            messages=messages,
+            temperature=config.temperature,
+            top_p=unwrap_missing_to_none(config.top_p),
+            max_tokens=unwrap_missing_to_unset(config.max_output_tokens),
+            stop=as_list(unwrap_missing_to_none(config.stop_sequences)),
+            random_seed=unwrap_missing_to_unset(config.seed),
+            response_format=response_format,
+            tools=tools_list,
+            tool_choice=tool_choice,
+            stream=True,
+        )
+
+        # Accumulate tool_calls from parts
+        accumulated_tool_calls: list[ToolCall] = []
+
+        async for event in stream:
+            if usage := event.data.usage:
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    metric="lmm.input_tokens",
+                    value=usage.prompt_tokens or 0,
+                    unit="tokens",
+                    kind="counter",
+                    attributes={"lmm.model": event.data.model},
+                )
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    metric="lmm.output_tokens",
+                    value=usage.completion_tokens or 0,
+                    unit="tokens",
+                    kind="counter",
+                    attributes={"lmm.model": event.data.model},
+                )
+
+            elif not event.data.choices:  # allow empty with usage data
+                raise ModelOutputFailed(
+                    provider="mistral",
+                    model=config.model,
+                    reason="Invalid completion: missing delta choices",
+                )
+
+            completion_choice: CompletionResponseStreamChoice = event.data.choices[0]
+
+            completion_delta: DeltaMessage = completion_choice.delta
+            if content := completion_delta.content:
+                for part in content:
+                    yield content_chunk_as_content_element(part)
+
+            if tool_calls := completion_delta.tool_calls:
+                if not accumulated_tool_calls:
+                    accumulated_tool_calls = sorted(
+                        tool_calls,
+                        key=lambda call: call.index or 0,
+                    )
+
+                else:
+                    for tool_call in tool_calls:
+                        assert tool_call.index, "Can't identify function call without index"  # nosec: B101
+
+                        # "null" is a dafault value...
+                        if tool_call.id and tool_call.id != "null":
+                            accumulated_tool_calls[tool_call.index].id = tool_call.id
+
+                        if tool_call.function.name:
+                            accumulated_tool_calls[
+                                tool_call.index
+                            ].function.name += tool_call.function.name
+
+                        if isinstance(tool_call.function.arguments, str):
+                            assert isinstance(  # nosec: B101
+                                accumulated_tool_calls[tool_call.index].function.arguments,
+                                str,
+                            )
+                            accumulated_tool_calls[  # pyright: ignore[reportOperatorIssue]
+                                tool_call.index
+                            ].function.arguments += tool_call.function.arguments
+
+                        else:
+                            assert isinstance(  # nosec: B101
+                                accumulated_tool_calls[tool_call.index].function.arguments,
+                                dict,
+                            )
+                            accumulated_tool_calls[tool_call.index].function.arguments = {
+                                **cast(
+                                    dict,
+                                    accumulated_tool_calls[tool_call.index].function.arguments,
+                                ),
+                                **tool_call.function.arguments,
+                            }
+
+            if completion_choice.finish_reason == "error":
+                raise ModelOutputFailed(
+                    provider="mistral",
+                    model=config.model,
+                    reason=completion_choice.finish_reason,
+                )
+
+            if completion_choice.finish_reason in ("length", "model_length"):
+                raise ModelOutputLimit(
+                    provider="mistral",
+                    model=config.model,
+                    max_output_tokens=unwrap_missing(config.max_output_tokens, default=0),
+                    content=(),  # already streamed
+                )
+
+            # finally send tool calls if any
+            for call in accumulated_tool_calls:
+                if not call.function:
+                    continue  # skip partial calls
+
+                if not call.function.name:
+                    continue  # skip calls with missing names
+
+                yield ModelToolRequest(
+                    identifier=call.id or uuid4().hex,
+                    tool=call.function.name,
+                    arguments=(
+                        json.loads(call.function.arguments)
+                        if isinstance(call.function.arguments, str)
+                        else call.function.arguments
+                    ),
+                    meta=META_EMPTY,
+                )
+
+    async def _completion(
+        self,
+        *,
+        instructions: ModelInstructions,
+        tools: ModelToolsDeclaration,
+        context: ModelContext,
+        output: ModelOutputSelection,
+        config: MistralChatConfig,
+        prefill: Multimodal | None,
+    ) -> ModelOutput:
+        async with ctx.scope("model.completion"):
+            ctx.record(
+                ObservabilityLevel.INFO,
+                attributes={
+                    "model.provider": "mistral",
+                    "model.name": config.model,
+                    "model.instructions": instructions,
+                    "model.tools": [tool["name"] for tool in tools.specifications],
+                    "model.tool_selection": tools.selection,
+                    "model.context": [element.to_str() for element in context],
+                    "model.temperature": config.temperature,
+                    "model.max_output_tokens": config.max_output_tokens,
+                    "model.output": str(output),
+                },
+            )
+
+            messages: list[MessagesTypedDict] = _build_messages(
+                context=context,
+                instructions=instructions,
+                prefill=prefill,
+            )
+
+            response_format = _response_format(output)
+            tool_choice, tools_list = _tools_as_tool_config(
+                tools.specifications,
+                tool_selection=tools.selection,
+            )
+
+            completion: ChatCompletionResponse = await self._client.chat.complete_async(
+                model=config.model,
+                messages=messages,
+                temperature=config.temperature,
+                top_p=unwrap_missing_to_none(config.top_p),
+                max_tokens=unwrap_missing_to_unset(config.max_output_tokens),
+                stop=as_list(unwrap_missing_to_none(config.stop_sequences)),
+                random_seed=unwrap_missing_to_unset(config.seed),
+                response_format=response_format,
+                tools=tools_list,
+                tool_choice=tool_choice,
+                stream=False,
+            )
+
+            _record_usage_metrics(completion)
+
+            if not completion.choices:
+                raise ModelOutputFailed(
+                    provider="mistral",
+                    model=config.model,
+                    reason="Invalid completion: missing choices",
+                )
+
+            choice: ChatCompletionChoice = completion.choices[0]
+
+            if choice.finish_reason == "error":
+                raise ModelOutputFailed(
+                    provider="mistral",
+                    model=config.model,
+                    reason=choice.finish_reason,
+                )
+
+            if choice.finish_reason in ("length", "model_length"):
+                raise ModelOutputLimit(
+                    provider="mistral",
+                    model=config.model,
+                    max_output_tokens=unwrap_missing(config.max_output_tokens, default=0),
+                    content=tuple(_message_to_blocks(choice.message)),
+                )
+
+            return ModelOutput.of(
+                *_message_to_blocks(choice.message),
+                meta={
+                    "identifier": completion.id,
+                    "model": config.model,
+                    "finish_reason": choice.finish_reason,
+                },
+            )
+
+
+def _context_messages(
+    context: ModelContext,
+) -> Iterable[MessagesTypedDict]:
+    for element in context:
+        if isinstance(element, ModelInput):
+            user_content = element.content
+            yield cast(
+                MessagesTypedDict,
+                {
+                    "role": "user",
+                    "content": list(_content_chunks(user_content.parts)),
+                },
+            )
+
+        elif isinstance(element, ModelOutput):
+            for block in element.blocks:
+                if isinstance(block, MultimodalContent):
+                    yield cast(
+                        MessagesTypedDict,
+                        {
+                            "role": "assistant",
+                            "content": list(_content_chunks(block.parts)),
+                        },
+                    )
+
+                elif isinstance(block, ModelReasoning):
+                    continue  # skip reasoning
+
+                else:
+                    assert isinstance(block, ModelToolRequest)  # nosec: B101
+                    yield cast(
+                        MessagesTypedDict,
+                        {
+                            "role": "assistant",
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": block.identifier,
+                                    "function": {
+                                        "name": block.tool,
+                                        "arguments": json.dumps(dict(block.arguments)),
+                                    },
+                                }
+                            ],
+                        },
+                    )
+
+        else:
+            raise TypeError(f"Unsupported model context element: {type(element).__name__}")
+
+
+def _build_messages(
+    *,
+    instructions: ModelInstructions,
+    context: ModelContext,
+    prefill: Multimodal | None,
+) -> list[MessagesTypedDict]:
+    messages: list[MessagesTypedDict]
+    if instructions:
+        messages = [
+            {
+                "role": "system",
+                "content": instructions,
+            },
+            *_context_messages(context),
+        ]
+
+    else:
+        messages = list(_context_messages(context))
+
+    if prefill is not None:
+        messages.append(
+            cast(
+                MessagesTypedDict,
+                {
+                    "role": "assistant",
+                    "content": list(_content_chunks(MultimodalContent.of(prefill).parts)),
+                },
+            )
+        )
+
+    return messages
+
+
+def _content_chunks(
+    parts: Iterable[MultimodalContentElement],
+) -> Iterable[dict[str, Any]]:
+    for element in parts:
+        match element:
+            case TextContent() as text:
+                yield {
+                    "type": "text",
+                    "text": text.text,
+                }
+
+            case MediaReference() as ref if ref.kind == "image":
+                yield {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": ref.uri,
+                    },
+                }
+
+            case MediaData() as data if data.kind == "image":
+                yield {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": data.to_data_uri(safe_encoding=False),
+                    },
+                }
+
+            case other:
+                yield {
+                    "type": "text",
+                    "text": other.to_json(),
+                }
+
+
+def content_chunk_as_content_element(
+    chunk: Any,
+) -> MultimodalContentElement:
+    # Handle dict-like chunks first (what we emit on requests and many SDKs return)
+    if isinstance(chunk, Mapping):
+        ctype = cast(str | None, chunk.get("type"))
+        if ctype == "text":
+            text = cast(str | None, chunk.get("text"))
+            if text:
+                return TextContent(text=text)
+
+        if ctype == "image_url":
+            image = cast(Mapping[str, Any] | None, chunk.get("image_url")) or {}
+            url = cast(str | None, image.get("url")) or ""
+            if url:
+                return MediaReference.of(url, media="image/*")
+
+    # Fallback: stringify any unknown typed object deterministically
+    return TextContent(text=json.dumps(chunk, default=str))
+
+
+def _record_usage_metrics(completion: ChatCompletionResponse) -> None:
+    if usage := completion.usage:
+        ctx.record(
+            ObservabilityLevel.INFO,
+            metric="model.input_tokens",
+            value=usage.prompt_tokens or 0,
+            unit="tokens",
+            kind="counter",
+            attributes={"model.provider": "mistral", "model.name": completion.model},
+        )
+        ctx.record(
+            ObservabilityLevel.INFO,
+            metric="model.output_tokens",
+            value=usage.completion_tokens or 0,
+            unit="tokens",
+            kind="counter",
+            attributes={"model.provider": "mistral", "model.name": completion.model},
+        )
+
+
+def _message_to_blocks(
+    message: AssistantMessage,
+) -> Generator[MultimodalContent | ModelToolRequest]:
+    if content := message.content:
+        if isinstance(content, str):
+            yield MultimodalContent.of(TextContent(text=content))
+
+        else:
+            yield MultimodalContent.of(
+                *(content_chunk_as_content_element(chunk) for chunk in content)
+            )
+
+    if tool_calls := message.tool_calls:
+        for call in tool_calls:
+            yield ModelToolRequest(
+                identifier=call.id or "",
+                tool=call.function.name,
+                arguments=(
+                    json.loads(call.function.arguments)
+                    if isinstance(call.function.arguments, str)
+                    else call.function.arguments
+                ),
+                meta=META_EMPTY,
+            )
+
+
+def _tool_specification_as_tool(
+    tool: ModelToolSpecification,
+) -> ToolTypedDict:
+    # Mistral requires a valid JSON schema object for parameters; provide a minimal placeholder
+    return {
+        "type": "function",
+        "function": {
+            "name": tool["name"],
+            "description": tool["description"] or "",
+            "parameters": cast(dict[str, Any], tool["parameters"])
+            or {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+        },
+    }
+
+
+def _tools_as_tool_config(
+    tools: Iterable[ModelToolSpecification] | None,
+    /,
+    *,
+    tool_selection: ModelToolsSelection,
+) -> tuple[ChatCompletionRequestToolChoiceTypedDict, list[ToolTypedDict]]:
+    tools_list: list[ToolTypedDict] = [_tool_specification_as_tool(tool) for tool in (tools or [])]
+    if not tools_list:
+        return ("none", tools_list)
+
+    if tool_selection == "auto":
+        return ("auto", tools_list)
+
+    if tool_selection == "none":
+        return ("none", [])
+
+    if tool_selection == "required":
+        return ("any", tools_list)
+
+    return (
+        {
+            "type": "function",
+            "function": {
+                "name": tool_selection,
+            },
+        },
+        tools_list,
+    )
+
+
+def _response_format(
+    output: ModelOutputSelection,
+) -> ResponseFormatTypedDict | None:
+    if output == "json":
+        return cast(ResponseFormatTypedDict, {"type": "json_object"})
+
+    if isinstance(output, type):
+        # Structured output with DataModel schema
+
+        if issubclass(output, DataModel):
+            return cast(
+                ResponseFormatTypedDict,
+                {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": output.__name__,
+                        "schema": output.__PARAMETERS_SPECIFICATION__,
+                    },
+                },
+            )
+
+    return None

@@ -11,7 +11,7 @@ async def text_completion(text: str) -> str:
     # TextGeneration.generate is a simple interface for generating text
     return await TextGeneration.generate(
         # We have to provide instructions / system prompt to instruct the model
-        instruction="Prepare the simplest completion of a given text",
+        instructions="Prepare the simplest completion of a given text",
         # input is provided separately
         input=text,
     )
@@ -26,17 +26,17 @@ from draive import load_env
 load_env()  # load .env variables
 ```
 
-When we have .env loaded we can prepare a context scope with OpenAI client and use our function. The lowest-level interface is called LMM. Draive supports multi-model solutions out of the box. Using the `openai_lmm` result as the current scope state selects this provider for our completions.
+When we have .env loaded we can prepare a context scope with the OpenAI client and use our function. The low-level model interface is the GenerativeModel. Draive supports multi-model solutions out of the box. Selecting the OpenAI client and configuration in the context chooses this provider for our generations.
 
 
 ```python
 from draive import ctx
-from draive.openai import OpenAIChatConfig, OpenAI
+from draive.openai import OpenAIResponsesConfig, OpenAI
 
 async with ctx.scope(  # prepare new context
     "basics",
-    disposables=(OpenAI(),),  # set currently used LMM to OpenAI
-    OpenAIChatConfig(model="gpt-4o-mini"), # select used model
+    disposables=(OpenAI(),),  # initialize OpenAI client
+    OpenAIResponsesConfig(model="gpt-4o-mini"), # select used model
 ):
     result: str = await text_completion(
         text="Roses are red...",
@@ -50,17 +50,17 @@ async with ctx.scope(  # prepare new context
     And so are you.
 
 
-As we now know how to setup OpenAI as out LLM provider. We can start customizing it more by providing GPT model configuration.
+As we now know how to set up OpenAI as our model provider, we can start customizing it further by providing model configuration.
 
 
 ```python
-from draive.openai import OpenAIChatConfig
+from draive.openai import OpenAIResponsesConfig
 
 async with ctx.scope(  # prepare the new context
     "basics",
     disposables=(OpenAI(),),
     # define GPT model configuration as a context scope state
-    OpenAIChatConfig(
+    OpenAIResponsesConfig(
         model="gpt-3.5-turbo",
         temperature=0.4,
     ),
@@ -76,7 +76,7 @@ async with ctx.scope(  # prepare the new context
     with ctx.updated(
         # we are updating the current context value instead of making a new one
         # this allows to preserve other elements of the configuration
-        ctx.state(OpenAIChatConfig).updated(
+        ctx.state(OpenAIResponsesConfig).updated(
             model="gpt-4o",
         ),
     ):
@@ -91,7 +91,7 @@ async with ctx.scope(  # prepare the new context
     # when using TextGeneration.generate method directly
     # here we are using gpt-3.5-turbo with temperature of 0.7
     result = await TextGeneration.generate(
-        instruction="Prepare simplest completion of given text",
+        instructions="Prepare simplest completion of given text",
         input="Roses are red...",
         temperature=0.7,
     )
@@ -120,7 +120,7 @@ setup_logging("basics")  # setup logger
 async with ctx.scope(  # prepare the context and see the execution metrics report
     "basics",
     disposables=(OpenAI(),),
-    OpenAIChatConfig(  # define GPT model configuration
+    OpenAIResponsesConfig(  # define model configuration for OpenAI Responses API
         model="gpt-3.5-turbo",
         temperature=0.4,
     ),
@@ -131,7 +131,7 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
     )
 
     with ctx.updated(
-        ctx.state(OpenAIChatConfig).updated(
+        ctx.state(OpenAIResponsesConfig).updated(
             model="gpt-4o",
         ),
     ):
@@ -148,7 +148,7 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
     |
     |  ⎡ @generate_text [872ecd2b612e4fcbb19f4d6aa674e22d](0.63s):
     |  |
-    |  |  ⎡ @openai_lmm_invocation [db5e56df44d2478ca1fcac959c29bdd3](0.63s):
+    |  |  ⎡ @model.completion [db5e56df44d2478ca1fcac959c29bdd3](0.63s):
     |  |  |  ⎡ •ArgumentsTrace:
     |  |  |  |  ├ kwargs:
     |  |  |  |  |  [instruction]: "Prepare the simplest completion of a given text"
@@ -161,7 +161,7 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
     |  |  |  |  |  [tool_selection]: "auto"
     |  |  |  |  |  [output]: "text"
     |  |  |  ⌊
-    |  |  |  ⎡ •OpenAIChatConfig:
+    |  |  |  ⎡ •OpenAIResponsesConfig:
     |  |  |  |  ├ model: "gpt-3.5-turbo"
     |  |  |  |  ├ temperature: 0.4
     |  |  |  ⌊
@@ -184,7 +184,7 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
     |
     |  ⎡ @generate_text [38c8e1bd88a4444681f1bd2e61bce296](0.76s):
     |  |
-    |  |  ⎡ @openai_lmm_invocation [f63a2825efa6406f8019635aa9892b2e](0.76s):
+    |  |  ⎡ @model.completion [f63a2825efa6406f8019635aa9892b2e](0.76s):
     |  |  |  ⎡ •ArgumentsTrace:
     |  |  |  |  ├ kwargs:
     |  |  |  |  |  [instruction]: "Prepare the simplest completion of a given text"
@@ -197,7 +197,7 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
     |  |  |  |  |  [tool_selection]: "auto"
     |  |  |  |  |  [output]: "text"
     |  |  |  ⌊
-    |  |  |  ⎡ •OpenAIChatConfig:
+    |  |  |  ⎡ •OpenAIResponsesConfig:
     |  |  |  |  ├ model: "gpt-4o"
     |  |  |  |  ├ temperature: 0.4
     |  |  |  ⌊
