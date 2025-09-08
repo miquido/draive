@@ -1,14 +1,11 @@
 from collections.abc import Sequence
 from typing import Literal
 
-from haiway import MISSING, Missing
-
-from draive.configuration import Config
+from haiway import MISSING, Configuration, Missing
 
 __all__ = (
+    "GeminiConfig",
     "GeminiEmbeddingConfig",
-    "GeminiGenerationConfig",
-    "GeminiLiveConfig",
     "GeminiSafetyConfig",
     "GeminiSafetyThreshold",
 )
@@ -16,7 +13,7 @@ __all__ = (
 GeminiSafetyThreshold = Literal["off", "none", "high", "medium", "low"]
 
 
-class GeminiSafetyConfig(Config):
+class GeminiSafetyConfig(Configuration):
     # gemini safety is really bad and often triggers false positive so disabling by default
     harm_category_hate_speech_threshold: GeminiSafetyThreshold = "off"
     harm_category_harassment_threshold: GeminiSafetyThreshold = "off"
@@ -25,12 +22,12 @@ class GeminiSafetyConfig(Config):
     harm_category_dangerous_content_threshold: GeminiSafetyThreshold = "off"
 
 
-class GeminiGenerationConfig(Config):
+class GeminiConfig(Configuration):
     model: str
     temperature: float = 1.0
     top_p: float | Missing = MISSING
     top_k: int | Missing = MISSING
-    max_tokens: int | Missing = MISSING
+    max_output_tokens: int | Missing = MISSING
     seed: int | Missing = MISSING
     stop_sequences: Sequence[str] | Missing = MISSING
     speech_voice_name: str | Missing = MISSING
@@ -39,19 +36,7 @@ class GeminiGenerationConfig(Config):
     safety: GeminiSafetyConfig | Missing = MISSING
 
 
-class GeminiLiveConfig(Config):
-    model: str
-    temperature: float = 1.0
-    top_p: float | Missing = MISSING
-    top_k: int | Missing = MISSING
-    max_tokens: int | Missing = MISSING
-    seed: int | Missing = MISSING
-    stop_sequences: Sequence[str] | Missing = MISSING
-    speech_voice_name: str | Missing = MISSING
-    media_resolution: Literal["low", "medium", "high"] | Missing = MISSING
-
-
-class GeminiEmbeddingConfig(Config):
+class GeminiEmbeddingConfig(Configuration):
     model: str
     dimensions: int | Missing = MISSING
     batch_size: int = 128

@@ -134,22 +134,22 @@ Generate text using LLMs with the `TextGeneration` interface:
 
 ```python
 from draive import TextGeneration, Toolbox, ctx
-from draive.openai import OpenAI, OpenAIChatConfig
+from draive.openai import OpenAI, OpenAIResponsesConfig
 
 async with ctx.scope(
     "generation",
     disposables=(OpenAI(),),
-    OpenAIChatConfig(model="gpt-4o-mini"),
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
 ):
     # Basic text generation
     result = await TextGeneration.generate(
-        instruction="You are a helpful assistant",
+        instructions="You are a helpful assistant",
         input="Explain quantum computing",
     )
 
     # Generation with tools
     result_with_tools = await TextGeneration.generate(
-        instruction="You are a helpful shopping assistant",
+        instructions="You are a helpful shopping assistant",
         input="Find me electronics under $100",
         tools=Toolbox.of(
             search_products,
@@ -164,16 +164,16 @@ Build conversations using the `Conversation` interface:
 
 ```python
 from draive import Conversation, ConversationMessage, ctx
-from draive.openai import OpenAI, OpenAIChatConfig
+from draive.openai import OpenAI, OpenAIResponsesConfig
 
 async with ctx.scope(
     "chat",
     disposables=(OpenAI(),),
-    OpenAIChatConfig(model="gpt-4o-mini"),
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
 ):
     # Single completion
     response = await Conversation.completion(
-        instruction="You are a helpful assistant",
+        instructions="You are a helpful assistant",
         input="Tell me about machine learning",
         tools=[search_products],  # Available tools
     )
@@ -201,7 +201,7 @@ async def analyze_image(image_path: Path):
     )
 
     result = await TextGeneration.generate(
-        instruction="You are an image analysis expert",
+        instructions="You are an image analysis expert",
         input=content,
     )
     return result
@@ -228,8 +228,8 @@ class CodeReview(DataModel):
 
 async def review_code(code: str) -> CodeReview:
     return await ModelGeneration.generate(
-        model=CodeReview,
-        instruction="You are an expert code reviewer",
+        CodeReview,
+        instructions="You are an expert code reviewer",
         input=f"Review this code:\n```python\n{code}\n```",
     )
 ```
@@ -239,7 +239,7 @@ async def review_code(code: str) -> CodeReview:
 Build RAG applications using vector indexing:
 
 ```python
-from draive import split_text, Tokenization, ctx, VectorIndex
+from draive import split_text, ctx, VectorIndex
 from draive.helpers import VolatileVectorIndex
 from draive.openai import OpenAI, OpenAIEmbeddingConfig
 from collections.abc import Sequence
@@ -267,7 +267,7 @@ async def setup_rag_system(document: str):
                 separators=("\n\n", " "),
                 part_size=64,
                 part_overlap_size=16,
-                count_size=Tokenization.count_tokens,
+                count_size=len,
             )
         ]
 
@@ -278,7 +278,7 @@ async def setup_rag_system(document: str):
             attribute=DocumentChunk._.content,  # Use AttributePath
         )
 
-        return vector_index
+        return ctx.state(VectorIndex)
 
 @tool(name="search_documents")
 async def search_documents(query: str) -> str:
@@ -298,11 +298,11 @@ Integrate with MCP servers for extended capabilities:
 ```python
 from draive import Conversation, Toolbox, ctx
 from draive.mcp import MCPClient
-from draive.openai import OpenAI, OpenAIChatConfig
+from draive.openai import OpenAI, OpenAIResponsesConfig
 
 async with ctx.scope(
     "mcp_integration",
-    OpenAIChatConfig(model="gpt-4o-mini"),
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
     disposables=(
         OpenAI(),
         MCPClient.stdio(
@@ -317,7 +317,7 @@ async with ctx.scope(
 ):
     # Use MCP tools automatically
     response = await Conversation.completion(
-        instruction="You can access files using available tools",
+        instructions="You can access files using available tools",
         input="What files are in the directory?",
         tools=await Toolbox.fetched(),  # Fetches MCP tools
     )
@@ -389,7 +389,7 @@ async def stream_example():
     async with ctx.scope("stream", disposables=(OpenAI(),)):
         # Stream text generation using Conversation.completion
         stream = await Conversation.completion(
-            instruction="Tell a story",
+            instructions="Tell a story",
             input="Once upon a time...",
             stream=True,
         )
@@ -412,7 +412,7 @@ from draive import ToolError, GenerationError
 async def robust_generation():
     try:
         result = await TextGeneration.generate(
-            instruction="You are helpful",
+            instructions="You are helpful",
             input="Calculate the square root of -1",
             tools=[calculate],
         )
@@ -444,7 +444,7 @@ async def observable_operation():
         ctx.record({"operation": "start"})
 
         result = await TextGeneration.generate(
-            instruction="You are helpful",
+            instructions="You are helpful",
             input="Hello!",
         )
 

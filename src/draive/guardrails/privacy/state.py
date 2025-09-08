@@ -1,6 +1,6 @@
-from typing import Any
+from typing import Any, overload
 
-from haiway import State, ctx
+from haiway import State, statemethod
 
 from draive.guardrails.privacy.types import (
     GuardrailsAnonymizedContent,
@@ -12,13 +12,33 @@ __all__ = ("GuardrailsAnonymization",)
 
 
 class GuardrailsAnonymization(State):
+    @overload
     @classmethod
     async def anonymize(
         cls,
         content: Multimodal,
         /,
         **extra: Any,
+    ) -> GuardrailsAnonymizedContent: ...
+
+    @overload
+    async def anonymize(
+        self,
+        content: Multimodal,
+        /,
+        **extra: Any,
+    ) -> GuardrailsAnonymizedContent: ...
+
+    @statemethod
+    async def anonymize(
+        self,
+        content: Multimodal,
+        /,
+        **extra: Any,
     ) -> GuardrailsAnonymizedContent:
-        return await ctx.state(cls).anonymizing(MultimodalContent.of(content))
+        return await self.anonymizing(
+            MultimodalContent.of(content),
+            **extra,
+        )
 
     anonymizing: GuardrailsContentAnonymizing

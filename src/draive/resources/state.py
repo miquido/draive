@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Any, Literal, overload
 
-from haiway import META_EMPTY, Meta, State, ctx
+from haiway import META_EMPTY, Meta, State, statemethod
 
 from draive.resources.types import (
     Resource,
@@ -16,12 +16,25 @@ __all__ = ("Resources",)
 
 
 class Resources(State):
+    @overload
     @classmethod
     async def fetch_list(
         cls,
         **extra: Any,
+    ) -> Sequence[ResourceDeclaration]: ...
+
+    @overload
+    async def fetch_list(
+        self,
+        **extra: Any,
+    ) -> Sequence[ResourceDeclaration]: ...
+
+    @statemethod
+    async def fetch_list(
+        self,
+        **extra: Any,
     ) -> Sequence[ResourceDeclaration]:
-        return await ctx.state(cls).list_fetching(**extra)
+        return await self.list_fetching(**extra)
 
     @overload
     @classmethod
@@ -32,9 +45,25 @@ class Resources(State):
     ) -> Resource | None: ...
 
     @overload
+    async def fetch(
+        self,
+        resource: ResourceDeclaration | str,
+        /,
+    ) -> Resource | None: ...
+
+    @overload
     @classmethod
     async def fetch(
         cls,
+        resource: ResourceDeclaration | str,
+        /,
+        *,
+        default: Resource,
+    ) -> Resource: ...
+
+    @overload
+    async def fetch(
+        self,
         resource: ResourceDeclaration | str,
         /,
         *,
@@ -51,9 +80,18 @@ class Resources(State):
         required: Literal[True],
     ) -> Resource: ...
 
-    @classmethod
+    @overload
     async def fetch(
-        cls,
+        self,
+        resource: ResourceDeclaration | str,
+        /,
+        *,
+        required: Literal[True],
+    ) -> Resource: ...
+
+    @statemethod
+    async def fetch(
+        self,
         resource: ResourceDeclaration | str,
         /,
         *,
@@ -62,7 +100,7 @@ class Resources(State):
     ) -> Resource | None:
         uri: str = resource if isinstance(resource, str) else resource.uri
 
-        if fetched := await ctx.state(cls).fetching(uri):
+        if fetched := await self.fetching(uri):
             return fetched
 
         elif required and default is None:
@@ -71,14 +109,31 @@ class Resources(State):
         else:
             return default
 
+    @overload
     @classmethod
     async def upload(
         cls,
         resource: Resource,
         /,
         **extra: Any,
+    ) -> None: ...
+
+    @overload
+    async def upload(
+        self,
+        resource: Resource,
+        /,
+        **extra: Any,
+    ) -> None: ...
+
+    @statemethod
+    async def upload(
+        self,
+        resource: Resource,
+        /,
+        **extra: Any,
     ) -> None:
-        return await ctx.state(cls).uploading(resource, **extra)
+        return await self.uploading(resource, **extra)
 
     list_fetching: ResourceListFetching
     fetching: ResourceFetching

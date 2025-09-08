@@ -36,13 +36,13 @@ Using this evaluator is straightforward:
 
 ```python
 from draive import ctx, load_env
-from draive.openai import OpenAI, OpenAIChatConfig
+from draive.openai import OpenAI, OpenAIResponsesConfig
 
 load_env()
 
 async with ctx.scope(
     "evaluation_example",
-    OpenAIChatConfig(model="gpt-4o-mini"),
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
     disposables=(OpenAI(),),
 ):
     content = "AI and machine learning are transforming technology"
@@ -312,7 +312,7 @@ Evaluation suites allow systematic testing across multiple test cases. Let's cre
 
 ```python
 from typing import Sequence
-from draive.evaluation import evaluator_suite, EvaluatorCaseResult
+from draive.evaluation import evaluator_suite, evaluate, EvaluatorResult, EvaluatorSuiteCase
 from draive import TextGeneration, DataModel
 
 class ContentTestCase(DataModel):
@@ -320,37 +320,41 @@ class ContentTestCase(DataModel):
     required_keywords: Sequence[str]
     reference_material: str
 
-@evaluator_suite(ContentTestCase, suite_parameters=ContentTestCase)
+@evaluator_suite(ContentTestCase)
 async def content_generation_suite(
     parameters: ContentTestCase,
-    case_parameters: ContentTestCase,
-) -> EvaluatorCaseResult:
+) -> Sequence[EvaluatorResult]:
     # Generate content based on test case parameters
     content: str = await TextGeneration.generate(
-        instruction=f"Write informative content about {case_parameters.topic}",
-        input=case_parameters.reference_material,
+        instructions=f"Write informative content about {parameters.topic}",
+        input=parameters.reference_material,
     )
-    return await EvaluatorCaseResult.evaluating(
+    return await evaluate(
         content,
         content_quality_scenario.prepared(
-            reference=case_parameters.reference_material,
+            reference=parameters.reference_material,
         ),
         keyword_evaluator.with_threshold(0.5).prepared(
-            required_keywords=case_parameters.required_keywords
+            required_keywords=parameters.required_keywords
         ),
     )
 
 # Define test cases
+
 test_cases = [
-    ContentTestCase(
-        topic="climate change",
-        required_keywords=["temperature", "emissions", "global"],
-        reference_material="Global temperatures have risen 1.1°C since pre-industrial times",
+    EvaluatorSuiteCase(
+        parameters=ContentTestCase(
+            topic="climate change",
+            required_keywords=["temperature", "emissions", "global"],
+            reference_material="Global temperatures have risen 1.1°C since pre-industrial times",
+        )
     ),
-    ContentTestCase(
-        topic="renewable energy",
-        required_keywords=["solar", "sustainable", "energy"],
-        reference_material="Solar and wind power are leading renewable energy sources",
+    EvaluatorSuiteCase(
+        parameters=ContentTestCase(
+            topic="renewable energy",
+            required_keywords=["solar", "sustainable", "energy"],
+            reference_material="Solar and wind power are leading renewable energy sources",
+        )
     ),
 ]
 
@@ -361,10 +365,10 @@ suite = content_generation_suite.with_storage(test_cases)
 suite_results = await suite()
 
 print(f"Suite passed: {suite_results.passed}")
-print(f"Cases passed: {sum(1 for case in suite_results.cases if case.passed)}/{len(suite_results.cases)}")
+print(f"Cases passed: {sum(1 for case in suite_results.results if case.passed)}/{len(suite_results.results)}")
 
-for case_result in suite_results.cases:
-    print(f"\nCase {case_result.case.parameters.topic}:")
+for case_result in suite_results.results:
+    print(f"\nCase {case_result.case_identifier}:")
     print(f"  Passed: {case_result.passed}")
     print(f"  Performance: {case_result.performance:.2f}%")
 ```
@@ -381,6 +385,8 @@ custom_evaluator = keyword_evaluator.with_meta({
 })
 
 # Combine evaluators using logical operations
+from draive.evaluation import Evaluator
+
 best_evaluator = Evaluator.highest(
     conciseness_evaluator.prepared(reference=reference_text),
     readability_evaluator.prepared(),

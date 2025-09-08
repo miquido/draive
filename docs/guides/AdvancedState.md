@@ -219,7 +219,7 @@ When automatically generated validation is not suitable for your specific case y
 ```python
 from typing import Any
 
-from draive import ParameterValidationContext, ParameterValidationError
+from draive import ValidatorContext, ValidatorError
 
 
 def validator(
@@ -229,13 +229,13 @@ def validator(
     *,
     # validator has also the current validation context which contains additional information
     # i.e. what field actually is validated, it is very useful for preparing diagnostics information
-    context: ParameterValidationContext,
+    context: ValidatorContext,
 ) -> int:
     if isinstance(value, int):
         return value
 
     else:
-        raise ParameterValidationError(f"Expected int but received {type(value)}")
+        raise ValidatorError(f"Expected int but received {type(value)}")
 
 
 class ValidatedModel(DataModel):

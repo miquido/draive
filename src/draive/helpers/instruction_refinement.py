@@ -3,25 +3,26 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID, uuid4
 
-from haiway import State, as_dict, ctx, execute_concurrently
+from haiway import Meta, State, as_dict, ctx, execute_concurrently
 
 from draive.evaluation import (
     EvaluatorSuiteCase,
     EvaluatorSuiteResult,
     PreparedEvaluatorSuite,
 )
-from draive.instructions import Instruction, Instructions
+from draive.models import Instructions, InstructionsRepository, ModelInstructions
 from draive.multimodal import MultimodalContent, MultimodalTagElement
 from draive.parameters import DataModel
 from draive.stages import Stage, StageState, stage
 
-__all__ = ("refine_instruction",)
+__all__ = ("refine_instructions",)
 
 
-async def refine_instruction[Parameters: DataModel](
-    instruction: Instruction,
+async def refine_instructions[Parameters: DataModel](
+    instructions: Instructions,
     /,
     *,
+    instructions_content: ModelInstructions | None = None,
     guidelines: str | None = None,
     evaluator_suite: PreparedEvaluatorSuite[Parameters],
     evaluator_cases: Sequence[EvaluatorSuiteCase[Parameters]],
@@ -31,17 +32,17 @@ async def refine_instruction[Parameters: DataModel](
     performance_drop_threshold: float = 0.5,
     quality_threshold: float = 0.99,
     concurrent_nodes: int = 1,
-) -> Instruction:
+) -> ModelInstructions:
     """
-    Refine instruction using binary tree exploration with performance pruning.
+    Refine instructions using binary tree exploration with performance pruning.
 
     Each node generates exactly 2 complementary strategies.
     Branches are pruned if performance drops below threshold.
 
     Args:
-        instruction: The instruction to refine
+        instructions: The instructions to refine
         guidelines: Optional guidelines for refinement
-        evaluator_suite: Suite to evaluate instruction performance
+        evaluator_suite: Suite to evaluate instructions performance
         rounds_limit: Maximum depth of refinement tree
         sample_ratio: Fraction of passing cases to include in focused evaluation
         candidates_limit: Number of top candidates to fully evaluate
@@ -67,7 +68,8 @@ async def refine_instruction[Parameters: DataModel](
 
     result: MultimodalContent = await Stage.sequence(
         _tree_initialization_stage(
-            instruction=instruction,
+            instructions=instructions,
+            instructions_content=instructions_content,
             evaluator_suite=evaluator_suite,
             sample_ratio=sample_ratio,
             performance_drop_threshold=performance_drop_threshold,
@@ -88,43 +90,14 @@ async def refine_instruction[Parameters: DataModel](
         ),
     ).execute()
 
-    ctx.log_info("...instruction refinement finished!")
-    return instruction.updated(content=result.to_str())
-
-
-def _instructions(
-    *,
-    instruction: Instruction,
-) -> Instructions:
-    instructions: Instructions = ctx.state(Instructions)
-
-    async def instruction_fetch(
-        name: str,
-        /,
-        *,
-        arguments: Mapping[str, str | float | int] | None = None,
-        **extra: Any,
-    ) -> Instruction | None:
-        if name == instruction.name:
-            if arguments:
-                return instruction.updated(arguments={**instruction.arguments, **arguments})
-
-            else:
-                return instruction
-
-        else:  # preserve other prompts unchanged
-            return await instructions.fetch(
-                name,
-                arguments=arguments,
-                **extra,
-            )
-
-    return Instructions(fetching=instruction_fetch)
+    ctx.log_info("...instructions refinement finished!")
+    return result.to_str()
 
 
 class _RefinementTreeNode(State):
     identifier: UUID
-    instruction: Instruction
+    instructions: Instructions
+    instructions_content: ModelInstructions
     strategy: str
     parent_id: UUID | None
     depth: int
@@ -151,6 +124,32 @@ class _RefinementTreeNode(State):
             return None
 
         return self.complete_evaluation.performance
+
+    @property
+    def patched_instructions_repository(self) -> InstructionsRepository:
+        repository: InstructionsRepository = ctx.state(InstructionsRepository)
+
+        async def instructions_loading(
+            name: str,
+            meta: Meta,
+            **extra: Any,
+        ) -> str | None:
+            # use updated instructions if able
+            if name == self.instructions.name:
+                return self.instructions_content
+
+            else:  # otherwise preserve unchanged instructions
+                return await repository.loading(
+                    name=name,
+                    meta=meta,
+                    **extra,
+                )
+
+        return InstructionsRepository(
+            listing=repository.listing,  # keep current listing
+            loading=instructions_loading,  # replace loading
+            # do not allow modifications - use default noop implementation
+        )
 
 
 class _RefinementState(State):
@@ -217,7 +216,8 @@ def _select_focused_cases[Parameters: DataModel](
 
 def _tree_initialization_stage[Parameters: DataModel](
     *,
-    instruction: Instruction,
+    instructions: Instructions,
+    instructions_content: ModelInstructions | None,
     evaluator_suite: PreparedEvaluatorSuite[Parameters],
     sample_ratio: float,
     performance_drop_threshold: float,
@@ -229,18 +229,24 @@ def _tree_initialization_stage[Parameters: DataModel](
         *,
         state: StageState,
     ) -> StageState:
-        ctx.log_info("...evaluating initial instruction with full suite...")
-        # Make initial evaluation
-        evaluation: EvaluatorSuiteResult
-        with ctx.updated(_instructions(instruction=instruction)):
-            evaluation = await evaluator_suite()
+        ctx.log_info("...evaluating initial instructions with full suite...")
+        # Make initial evaluation using current instructions
+        evaluation: EvaluatorSuiteResult = await evaluator_suite()
 
         ctx.log_info(f"...initial score: {evaluation.performance:.2f}...")
+
+        content: ModelInstructions
+        if instructions_content is None:
+            content = await InstructionsRepository.load(instructions)
+
+        else:
+            content = instructions_content
 
         # Create root node
         root_node = _RefinementTreeNode(
             identifier=uuid4(),
-            instruction=instruction,
+            instructions=instructions,
+            instructions_content=content,
             strategy="initial",
             parent_id=None,
             depth=0,
@@ -261,8 +267,8 @@ def _tree_initialization_stage[Parameters: DataModel](
                 guidelines=guidelines,
                 rounds_remaining=rounds_limit,
             ),
-            # set the result to be initial instruction
-            result=MultimodalContent.of(instruction.content),
+            # set the result to be initial instruction content
+            result=MultimodalContent.of(content),
         )
 
     return tree_initialization
@@ -370,8 +376,8 @@ async def _explore_node[Parameters: DataModel](
     )
 
     # Generate exactly 2 complementary strategies
-    strategies: Sequence[tuple[str, Instruction]] = await _generate_refined_instructions(
-        instruction=node.instruction,
+    strategies: Sequence[tuple[str, ModelInstructions]] = await _generate_refined_instructions(
+        current_content=node.instructions_content,
         evaluation_result=node.focused_evaluation,
         parent_strategy=node.strategy,
         guidelines=guidelines,
@@ -385,11 +391,29 @@ async def _explore_node[Parameters: DataModel](
     )
 
     children: dict[UUID, _RefinementTreeNode] = {}
-    for strategy_name, refined_instruction in strategies:
+    for strategy_name, refined_instructions in strategies:
+        # Create child node
+        child_node = _RefinementTreeNode(
+            identifier=uuid4(),
+            instructions=node.instructions,
+            instructions_content=refined_instructions,
+            strategy=strategy_name,
+            parent_id=node.identifier,
+            depth=node.depth + 1,
+            # initialize with placeholder
+            focused_evaluation=EvaluatorSuiteResult(
+                suite="placeholder",
+                results=(),
+            ),
+            complete_evaluation=None,
+            children=(),
+            pruned=False,
+        )
+
         # Evaluate with focused suite
         ctx.log_info(f"Evaluating strategy '{strategy_name}'...")
         focused_evaluation: EvaluatorSuiteResult
-        with ctx.updated(_instructions(instruction=refined_instruction)):
+        with ctx.updated(child_node.patched_instructions_repository):
             focused_evaluation = await evaluator_suite(focused_suite_cases)
 
         # Check for performance drop
@@ -400,19 +424,11 @@ async def _explore_node[Parameters: DataModel](
         )
         pruned: bool = performance_ratio < performance_drop_threshold
 
-        # Create child node
-        child_node = _RefinementTreeNode(
-            identifier=uuid4(),
-            instruction=refined_instruction,
-            strategy=strategy_name,
-            parent_id=node.identifier,
-            depth=node.depth + 1,
+        # update node with evaluation data
+        children[child_node.identifier] = child_node.updated(
             focused_evaluation=focused_evaluation,
-            complete_evaluation=None,
-            children=(),
             pruned=pruned,
         )
-        children[child_node.identifier] = child_node
 
         if pruned:
             ctx.log_warning(
@@ -423,7 +439,7 @@ async def _explore_node[Parameters: DataModel](
         else:
             ctx.log_info(
                 f"Created child node {child_node.identifier}: strategy={strategy_name}, "
-                f"score={child_node.focused_evaluation_performance:.2f}"
+                f"score={focused_evaluation.performance:.2f}"
                 f" ({performance_ratio:.1%} of parent)"
             )
 
@@ -437,7 +453,7 @@ async def _generate_strategy_metadata(
     guidelines: str | None,
 ) -> Sequence[tuple[str, str]]:
     """
-    Generate strategy metadata (name and approach) without instruction content.
+    Generate strategy metadata (name and approach) without instructions content.
 
     Returns:
         Sequence of tuples containing (name, approach) for each strategy.
@@ -449,12 +465,12 @@ async def _generate_strategy_metadata(
     )
 
     strategy_prompt: str = f"""
-You are an expert prompt engineer providing feedback and recemmondations for instruction improvement.
+You are an expert prompt engineer providing feedback and recemmondations for instructions improvement.
 Based on the evaluation failures analysis, prepare EXACTLY 2 DIFFERENT refinement strategies.
 
 <previous_strategy>{parent_strategy or "Initial"}</previous_strategy>
 <task>
-Generate 2 instruction refinement strategies and recommendations that:
+Generate 2 instructions refinement strategies and recommendations that:
 1. Take CONTRASTING approaches to fixing the issues
 2. Address different aspects of the failures
 3. Are mutually exclusive in their approach
@@ -507,14 +523,14 @@ For each strategy, provide the name and approach in the following tags format:
     return strategies
 
 
-async def _generate_instruction_content(
+async def _generate_instructions(
     *,
-    current_instruction_content: str,
+    current_content: ModelInstructions,
     strategy_name: str,
     strategy_approach: str,
     evaluation_result: EvaluatorSuiteResult,
     guidelines: str | None,
-) -> str:
+) -> ModelInstructions:
     # Analyze failures
     failure_report: str = evaluation_result.report(
         detailed=True,
@@ -524,8 +540,8 @@ async def _generate_instruction_content(
     refinement_prompt: str = f"""\
 You are an expert prompt engineer refining provided instructions referred as a subject.
 Provide an updated version of the subject that implements the described strategy to address the evaluation failures.
-Strictly focus on delivering the best possible instruction content with excellent clarity and performance.
-Ensure to apply modifications by following requested strategy while keeping original instruction intent, goal and formatting style.
+Strictly focus on delivering the best possible instructions content with excellent clarity and performance.
+Ensure to apply modifications by following requested strategy while keeping original instructions intent, goal and formatting style.
 
 <strategy>
 <name>
@@ -537,15 +553,15 @@ Ensure to apply modifications by following requested strategy while keeping orig
 </strategy>
 
 <subject>
-{current_instruction_content}
+{current_content}
 </subject>
 {f"\n<guidelines>\n{guidelines}</guidelines>\n" if guidelines else ""}
 <format>
-Provide ONLY the refined instruction content, without any explanation or metadata.
+Provide ONLY the refined instructions content, without any explanation or metadata.
 </format>
 """  # noqa: E501
 
-    ctx.log_info(f"Generating updated instruction using {strategy_name}:\n\n{strategy_approach}")
+    ctx.log_info(f"Generating updated instructions using {strategy_name}:\n\n{strategy_approach}")
     response: MultimodalContent = await Stage.completion(
         f"<failure_analysis>\n{failure_report}\n</failure_analysis>",
         instruction=refinement_prompt,
@@ -553,17 +569,19 @@ Provide ONLY the refined instruction content, without any explanation or metadat
 
     updated_instruction: str = response.to_str().strip()
 
-    ctx.log_info(f"Prepared updated instruction using {strategy_name}:\n\n{updated_instruction}")
+    ctx.log_info(f"Prepared updated instructions using {strategy_name}")
+    ctx.log_info(f"Updated instruction for {strategy_name}: {updated_instruction}")
 
     return updated_instruction
 
 
 async def _generate_refined_instructions(
-    instruction: Instruction,
+    *,
+    current_content: ModelInstructions,
     evaluation_result: EvaluatorSuiteResult,
     parent_strategy: str | None,
     guidelines: str | None,
-) -> Sequence[tuple[str, Instruction]]:
+) -> Sequence[tuple[str, ModelInstructions]]:
     # Step 1: Generate strategy metadata
     strategy_metadata: Sequence[tuple[str, str]] = await _generate_strategy_metadata(
         evaluation_result=evaluation_result,
@@ -571,18 +589,17 @@ async def _generate_refined_instructions(
         guidelines=guidelines,
     )
 
-    # Step 2: Generate instruction content for each strategy
-    refined_strategies: list[tuple[str, Instruction]] = []
+    # Step 2: Generate instructions content for each strategy
+    refined_strategies: list[tuple[str, ModelInstructions]] = []
     for strategy_name, strategy_approach in strategy_metadata:
-        refined_content = await _generate_instruction_content(
-            current_instruction_content=instruction.content,
+        refined_instructions = await _generate_instructions(
+            current_content=current_content,
             strategy_name=strategy_name,
             strategy_approach=strategy_approach,
             evaluation_result=evaluation_result,
             guidelines=guidelines,
         )
-        refined_instruction: Instruction = instruction.updated(content=refined_content)
-        refined_strategies.append((strategy_name, refined_instruction))
+        refined_strategies.append((strategy_name, refined_instructions))
 
     # Validate and return results
     match len(refined_strategies):
@@ -631,7 +648,7 @@ def _tree_finalization_stage[Parameters: DataModel](
         ctx.log_info(f"Running full evaluation on top {len(candidates)} candidates")
 
         # Full evaluation of top candidates
-        best_instruction: Instruction = refinement_state.root.instruction
+        best_instructions: ModelInstructions = refinement_state.root.instructions_content
         best_score: float = refinement_state.root.complete_evaluation_performance or 0
         best_node: _RefinementTreeNode = refinement_state.root
 
@@ -642,7 +659,7 @@ def _tree_finalization_stage[Parameters: DataModel](
             )
 
             complete_evaluation: EvaluatorSuiteResult
-            with ctx.updated(_instructions(instruction=candidate_node.instruction)):
+            with ctx.updated(candidate_node.patched_instructions_repository):
                 complete_evaluation = await evaluator_suite()
 
             # Update node with full eval score
@@ -663,7 +680,7 @@ def _tree_finalization_stage[Parameters: DataModel](
             )
 
             if complete_evaluation.performance > best_score:
-                best_instruction = updated_node.instruction
+                best_instructions = updated_node.instructions_content
                 best_score = complete_evaluation.performance
                 best_node = updated_node
 
@@ -673,11 +690,11 @@ def _tree_finalization_stage[Parameters: DataModel](
             best_node=best_node,
         )
 
-        # Update result with best instruction and updated state
+        # Update result with best instructions and updated state
         return state.updated(
             refinement_state,
             result=MultimodalContent.of(
-                best_instruction.content,
+                best_instructions,
                 meta={"score": best_score},
             ),
         )

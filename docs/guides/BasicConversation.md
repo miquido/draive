@@ -26,18 +26,18 @@ async def utc_datetime() -> str:
 
 ```python
 from draive import ConversationMessage, Conversation, ctx
-from draive.openai import OpenAIChatConfig, OpenAI
+from draive.openai import OpenAIResponsesConfig, OpenAI
 
 # initialize dependencies and configuration
 async with ctx.scope(
     "basics",
-    OpenAIChatConfig(model="gpt-3.5-turbo-0125"),  # configure OpenAI model
-    disposables=(OpenAI(),),  # specify OpenAI as the LMM resource
+    OpenAIResponsesConfig(model="gpt-3.5-turbo-0125"),  # configure OpenAI model
+    disposables=(OpenAI(),),  # initialize OpenAI client
 ):
     # request conversation completion
     response: ConversationMessage = await Conversation.completion(
         # provide a prompt instruction
-        instruction="You are a helpful assistant.",
+        instructions="You are a helpful assistant.",
         # add user input
         input="Hi! What is the time now?",
         # define tools available to the model

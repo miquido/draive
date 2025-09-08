@@ -1,12 +1,12 @@
 # Basic Stage Usage
 
-Stages are the core processing pipeline units in draive that provide a composable, type-safe way to build complex LMM workflows. A Stage represents a transformation that processes an LMM context and multimodal content, allowing precise control over data flow in your applications.
+Stages are the core processing pipeline units in draive that provide a composable, type-safe way to build complex generative model workflows. A Stage represents a transformation that processes a model context and multimodal content, allowing precise control over data flow in your applications.
 
 ## Core Concepts
 
 ### What is a Stage?
 
-A Stage is an **immutable unit of work** that encapsulates transformations within an LMM context. Each stage:
+A Stage is an **immutable unit of work** that encapsulates transformations within a model context. Each stage:
 
 - Receives `StageState` containing context and result
 - Performs processing or transformation
@@ -48,7 +48,7 @@ structured_stage = Stage.completion(
 )
 ```
 
-Each completion stage will extend the context with input, generated output, and tools used. LMMOutput will be also used as the result of this stage.
+Each completion stage will extend the context with input, generated output, and tools used. ModelOutput will be also used as the result of this stage.
 
 ### 2. Predefined Content
 
@@ -62,7 +62,7 @@ static_stage = Stage.predefined(
 )
 ```
 
-Predefined stage will extend the context with provided elements. When elements are not explicitly declared as a concrete LMMContext types, each odd element will become LMMInput and each even element will become LMMCompletion in the result context. Make sure to have equal number of inputs and outputs in the result context. Last LMMOutput will be used as the result of this stage.
+Predefined stage will extend the context with provided elements. When elements are not explicitly declared as concrete model-context types, each odd element becomes ModelInput and each even element becomes ModelOutput in the result context. Make sure to have an equal number of inputs and outputs in the result context. The last ModelOutput will be used as the result of this stage.
 
 ### 3. Prompting Completion
 
@@ -107,7 +107,7 @@ Result transformation does not change the context.
 ```python
 # Transform only the context
 transform_context_stage = Stage.transform_context(
-    lambda context: context + (LMMInput.of("Additional context"),...)
+    lambda context: context + (ModelInput.of("Additional context"), ...)
 )
 ```
 Context transformation does not change the result. Make sure to have equal number of inputs and outputs in the result context.
@@ -240,7 +240,7 @@ conditional_stage = Stage.completion(
     "Prepare some analysis..."
 ).when(
     condition=needs_analysis,
-    alternative=Stage.completion("Do somethin else...")
+    alternative=Stage.completion("Do something else...")
 )
 ```
 
@@ -315,10 +315,10 @@ traced_stage = Stage.completion(
 Stages can work with memory for context persistence:
 
 ```python
-from draive.helpers import VolatileMemory
+from draive.utils import Memory
 
-# Create memory instance
-memory: Memory[LMMContext, LMMContext] = VolatileMemory(initial=())
+# Create memory instance with constant initial value
+memory: Memory[ModelContext, ModelContext] = Memory.constant(())
 
 # Stage that remembers context
 remember_stage = Stage.memory_remember(memory)
@@ -444,7 +444,7 @@ Here's a comprehensive example combining multiple concepts:
 
 ```python
 from draive import ctx, Stage, MultimodalContent, StageState, tool
-from draive.openai import OpenAI, OpenAIChatConfig
+from draive.openai import OpenAI, OpenAIResponsesConfig
 from collections.abc import Sequence
 from draive.stages.types import StageException
 
@@ -456,7 +456,7 @@ async def word_count(text: str) -> int:
 async def process_document(document: str):
     async with ctx.scope(
         "document_processor",
-        OpenAIChatConfig(model="gpt-4o"),
+        OpenAIResponsesConfig(model="gpt-4o"),
         disposables=(OpenAI(),),
     ):
         # Create processing pipeline

@@ -1,37 +1,56 @@
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, overload
 
-from haiway import State, ctx
+from haiway import State, statemethod
 
 from draive.generation.text.default import generate_text
 from draive.generation.text.types import TextGenerating
-from draive.instructions import Instruction
+from draive.models import ResolveableInstructions, Tool, Toolbox
 from draive.multimodal import Multimodal, MultimodalContent
-from draive.prompts import Prompt
-from draive.tools import Tool, Toolbox
 
 __all__ = ("TextGeneration",)
 
 
 class TextGeneration(State):
+    @overload
     @classmethod
     async def generate(
         cls,
         *,
-        instruction: Instruction | str | None = None,
-        input: Prompt | Multimodal,  # noqa: A002
-        tools: Toolbox | Iterable[Tool] | None = None,
-        examples: Iterable[tuple[Multimodal, str]] | None = None,
+        instructions: ResolveableInstructions = "",
+        input: Multimodal,
+        tools: Toolbox | Iterable[Tool] = (),
+        examples: Iterable[tuple[Multimodal, str]] = (),
+        **extra: Any,
+    ) -> str: ...
+
+    @overload
+    async def generate(
+        self,
+        *,
+        instructions: ResolveableInstructions = "",
+        input: Multimodal,
+        tools: Toolbox | Iterable[Tool] = (),
+        examples: Iterable[tuple[Multimodal, str]] = (),
+        **extra: Any,
+    ) -> str: ...
+
+    @statemethod
+    async def generate(
+        self,
+        *,
+        instructions: ResolveableInstructions = "",
+        input: Multimodal,  # noqa: A002
+        tools: Toolbox | Iterable[Tool] = (),
+        examples: Iterable[tuple[Multimodal, str]] = (),
         **extra: Any,
     ) -> str:
-        return await ctx.state(cls).generation(
-            instruction=Instruction.of(instruction),
-            input=input if isinstance(input, Prompt) else MultimodalContent.of(input),
+        return await self.generating(
+            instructions=instructions,
+            input=MultimodalContent.of(input),
             toolbox=Toolbox.of(tools),
-            examples=((MultimodalContent.of(example[0]), example[1]) for example in examples)
-            if examples is not None
-            else (),
+            examples=((MultimodalContent.of(ex_in), ex_out) for ex_in, ex_out in examples),
             **extra,
         )
 
-    generation: TextGenerating = generate_text
+    generating: TextGenerating = generate_text

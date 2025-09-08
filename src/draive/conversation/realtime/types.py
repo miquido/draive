@@ -1,12 +1,11 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from types import TracebackType
 from typing import Any, Protocol, Self, runtime_checkable
 
 from haiway import State, ctx
 
-from draive.conversation.types import ConversationMemory, ConversationStreamElement
-from draive.instructions import Instruction
-from draive.tools import Toolbox
+from draive.conversation.types import ConversationInputChunk, ConversationOutputChunk
+from draive.models import ModelMemory, ResolveableInstructions, Toolbox
 
 __all__ = (
     "RealtimeConversationPreparing",
@@ -21,24 +20,32 @@ __all__ = (
 
 @runtime_checkable
 class RealtimeConversationSessionReading(Protocol):
-    async def __call__(self) -> ConversationStreamElement: ...
+    """Callable that reads the next output chunk from the realtime session."""
+
+    async def __call__(self) -> ConversationOutputChunk: ...
 
 
 @runtime_checkable
 class RealtimeConversationSessionWriting(Protocol):
+    """Callable that writes an input chunk to the realtime session."""
+
     async def __call__(
         self,
-        input: ConversationStreamElement,  # noqa: A002
+        input: ConversationInputChunk,  # noqa: A002
     ) -> None: ...
 
 
 class RealtimeConversationSession(State):
+    """Static helpers for interacting with the active realtime conversation session."""
+
     @classmethod
-    async def read(cls) -> ConversationStreamElement:
+    async def read(cls) -> ConversationOutputChunk:
+        """Read a single ``ConversationOutputChunk`` from the session."""
         return await ctx.state(cls).reading()
 
     @classmethod
-    async def reader(cls) -> AsyncIterator[ConversationStreamElement]:
+    async def reader(cls) -> AsyncGenerator[ConversationOutputChunk]:
+        """Async iterator continuously yielding session output chunks until error."""
         session: Self = ctx.state(cls)
         while True:  # breaks on exception
             yield await session.reading()
@@ -46,18 +53,20 @@ class RealtimeConversationSession(State):
     @classmethod
     async def write(
         cls,
-        input: ConversationStreamElement,  # noqa: A002
+        input: ConversationInputChunk,  # noqa: A002
     ) -> None:
+        """Write a single input chunk into the session."""
         return await ctx.state(cls).writing(input=input)
 
     @classmethod
     async def writer(
         cls,
-        input: AsyncIterator[ConversationStreamElement],  # noqa: A002
+        input: AsyncIterator[ConversationInputChunk],  # noqa: A002
     ) -> None:
+        """Consume an async iterator and write its chunks to the session."""
         session: Self = ctx.state(cls)
-        while True:  # breaks on exception
-            await session.writing(input=await anext(input))
+        async for chunk in input:
+            await session.writing(input=chunk)
 
     reading: RealtimeConversationSessionReading
     writing: RealtimeConversationSessionWriting
@@ -65,11 +74,15 @@ class RealtimeConversationSession(State):
 
 @runtime_checkable
 class RealtimeConversationSessionOpening(Protocol):
+    """Callable that opens a realtime conversation session."""
+
     async def __call__(self) -> RealtimeConversationSession: ...
 
 
 @runtime_checkable
 class RealtimeConversationSessionClosing(Protocol):
+    """Callable that closes a realtime conversation session."""
+
     async def __call__(
         self,
         exc_type: type[BaseException] | None,
@@ -79,10 +92,13 @@ class RealtimeConversationSessionClosing(Protocol):
 
 
 class RealtimeConversationSessionScope(State):
+    """Async context manager that opens and closes a realtime session."""
+
     opening: RealtimeConversationSessionOpening
     closing: RealtimeConversationSessionClosing
 
     async def __aenter__(self) -> RealtimeConversationSession:
+        """Open and return the underlying ``RealtimeConversationSession``."""
         return await self.opening()
 
     async def __aexit__(
@@ -91,6 +107,7 @@ class RealtimeConversationSessionScope(State):
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
+        """Close the session, forwarding exceptions to the closing hook."""
         await self.closing(
             exc_type=exc_type,
             exc_val=exc_val,
@@ -100,11 +117,13 @@ class RealtimeConversationSessionScope(State):
 
 @runtime_checkable
 class RealtimeConversationPreparing(Protocol):
+    """Callable that prepares and returns a realtime conversation session scope."""
+
     async def __call__(
         self,
         *,
-        instruction: Instruction | None,
-        memory: ConversationMemory | None,
+        instructions: ResolveableInstructions,
         toolbox: Toolbox,
+        memory: ModelMemory,
         **extra: Any,
     ) -> RealtimeConversationSessionScope: ...

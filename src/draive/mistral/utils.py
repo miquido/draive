@@ -10,7 +10,7 @@ __all__ = (
 )
 
 
-def unwrap_missing_to_none[Value, Default](
+def unwrap_missing_to_none[Value](
     value: Value | Missing,
     /,
 ) -> Value | None:
@@ -20,7 +20,7 @@ def unwrap_missing_to_none[Value, Default](
         return cast(Value, value)
 
 
-def unwrap_missing_to_unset[Value, Default](
+def unwrap_missing_to_unset[Value](
     value: Value | Missing,
     /,
 ) -> Value | Unset:

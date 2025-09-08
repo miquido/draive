@@ -5,17 +5,15 @@ from openai.types.image import Image
 from openai.types.images_response import ImagesResponse
 
 from draive.generation import ImageGeneration
-from draive.instructions import Instruction
+from draive.models import InstructionsRepository, ResolveableInstructions
 from draive.multimodal import (
     MediaContent,
     MediaData,
     MediaReference,
-    Multimodal,
+    MultimodalContent,
 )
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIImageGenerationConfig
-from draive.openai.types import OpenAIException
-from draive.openai.utils import unwrap_missing
 
 __all__ = ("OpenAIImageGeneration",)
 
@@ -27,28 +25,27 @@ class OpenAIImageGeneration(OpenAIAPI):
     async def generate_image(
         self,
         *,
-        instruction: Instruction | str,
-        input: Multimodal | None,  # noqa: A002
+        instructions: ResolveableInstructions,
+        input: MultimodalContent,  # noqa: A002
         config: OpenAIImageGenerationConfig | None = None,
         **extra: Any,
     ) -> MediaContent:
         generation_config: OpenAIImageGenerationConfig = config or ctx.state(
             OpenAIImageGenerationConfig
         )
-        async with ctx.scope("generate_image", generation_config):
+        async with ctx.scope("generate_image"):
             response: ImagesResponse = await self._client.images.generate(
                 model=generation_config.model,
                 n=1,
-                prompt=Instruction.formatted(instruction),
+                prompt=await InstructionsRepository.resolve(instructions),
                 quality=generation_config.quality,
                 size=generation_config.size,
                 style=generation_config.style,
-                timeout=unwrap_missing(generation_config.timeout),
                 response_format=generation_config.result,
             )
 
             if response.data is None:
-                raise OpenAIException("Invalid OpenAI response - missing image content")
+                raise ValueError("Invalid OpenAI response - missing image content")
 
             image: Image = response.data[0]
             if url := image.url:
@@ -64,4 +61,4 @@ class OpenAIImageGeneration(OpenAIAPI):
                 )
 
             else:
-                raise OpenAIException("Invalid OpenAI response - missing image content")
+                raise ValueError("Invalid OpenAI response - missing image content")

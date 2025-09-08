@@ -17,7 +17,7 @@ def exhaustive_splitting_expected_result() -> str:
 
 @pytest.fixture
 def exhaustive_overlap_splitting_expected_result() -> str:
-    with open("tests/data/exhaustive_overlap_splitting copy.txt") as file:
+    with open("tests/data/exhaustive_overlap_splitting.txt") as file:
         return file.read()
 
 

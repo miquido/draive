@@ -1,16 +1,12 @@
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any, Protocol, final, overload, runtime_checkable
 
-from haiway import AttributePath, AttributeRequirement, State, ctx
+from haiway import AttributePath, AttributeRequirement, State, statemethod
 
 from draive.multimodal import MediaContent, TextContent
 from draive.parameters import DataModel
 
-__all__ = (
-    "VectorIndex",
-    "VectorIndexing",
-    "VectorSearching",
-)
+__all__ = ("VectorIndex",)
 
 
 @runtime_checkable
@@ -38,12 +34,12 @@ class VectorSearching(Protocol):
         requirements: AttributeRequirement[Model] | None,
         limit: int | None,
         **extra: Any,
-    ) -> Iterable[Model]: ...
+    ) -> Sequence[Model]: ...
 
 
 @runtime_checkable
 class VectorDeleting(Protocol):
-    async def __call__[Model: DataModel, Value: MediaContent | TextContent | str](
+    async def __call__[Model: DataModel](
         self,
         model: type[Model],
         /,
@@ -55,6 +51,7 @@ class VectorDeleting(Protocol):
 
 @final
 class VectorIndex(State):
+    @overload
     @classmethod
     async def index[Model: DataModel, Value: MediaContent | TextContent | str](
         cls,
@@ -64,8 +61,30 @@ class VectorIndex(State):
         attribute: Callable[[Model], Value] | AttributePath[Model, Value] | Value,
         values: Iterable[Model],
         **extra: Any,
+    ) -> None: ...
+
+    @overload
+    async def index[Model: DataModel, Value: MediaContent | TextContent | str](
+        self,
+        model: type[Model],
+        /,
+        *,
+        attribute: Callable[[Model], Value] | AttributePath[Model, Value] | Value,
+        values: Iterable[Model],
+        **extra: Any,
+    ) -> None: ...
+
+    @statemethod
+    async def index[Model: DataModel, Value: MediaContent | TextContent | str](
+        self,
+        model: type[Model],
+        /,
+        *,
+        attribute: Callable[[Model], Value] | AttributePath[Model, Value] | Value,
+        values: Iterable[Model],
+        **extra: Any,
     ) -> None:
-        return await ctx.state(cls).indexing(
+        return await self.indexing(
             model,
             attribute=attribute,
             values=values,
@@ -82,7 +101,18 @@ class VectorIndex(State):
         requirements: AttributeRequirement[Model] | None = None,
         limit: int | None = None,
         **extra: Any,
-    ) -> Iterable[Model]: ...
+    ) -> Sequence[Model]: ...
+
+    @overload
+    async def search[Model: DataModel](
+        self,
+        model: type[Model],
+        /,
+        *,
+        requirements: AttributeRequirement[Model] | None = None,
+        limit: int | None = None,
+        **extra: Any,
+    ) -> Sequence[Model]: ...
 
     @overload
     @classmethod
@@ -96,11 +126,24 @@ class VectorIndex(State):
         requirements: AttributeRequirement[Model] | None = None,
         limit: int | None = None,
         **extra: Any,
-    ) -> Iterable[Model]: ...
+    ) -> Sequence[Model]: ...
 
-    @classmethod
+    @overload
     async def search[Model: DataModel](
-        cls,
+        self,
+        model: type[Model],
+        /,
+        *,
+        query: Sequence[float] | MediaContent | TextContent | str,
+        score_threshold: float | None = None,
+        requirements: AttributeRequirement[Model] | None = None,
+        limit: int | None = None,
+        **extra: Any,
+    ) -> Sequence[Model]: ...
+
+    @statemethod
+    async def search[Model: DataModel](
+        self,
         model: type[Model],
         /,
         *,
@@ -109,8 +152,8 @@ class VectorIndex(State):
         requirements: AttributeRequirement[Model] | None = None,
         limit: int | None = None,
         **extra: Any,
-    ) -> Iterable[Model]:
-        return await ctx.state(cls).searching(
+    ) -> Sequence[Model]:
+        return await self.searching(
             model,
             query=query,
             score_threshold=score_threshold,
@@ -119,6 +162,7 @@ class VectorIndex(State):
             **extra,
         )
 
+    @overload
     @classmethod
     async def delete[Model: DataModel](
         cls,
@@ -127,8 +171,28 @@ class VectorIndex(State):
         *,
         requirements: AttributeRequirement[Model] | None = None,
         **extra: Any,
+    ) -> None: ...
+
+    @overload
+    async def delete[Model: DataModel](
+        self,
+        model: type[Model],
+        /,
+        *,
+        requirements: AttributeRequirement[Model] | None = None,
+        **extra: Any,
+    ) -> None: ...
+
+    @statemethod
+    async def delete[Model: DataModel](
+        self,
+        model: type[Model],
+        /,
+        *,
+        requirements: AttributeRequirement[Model] | None = None,
+        **extra: Any,
     ) -> None:
-        return await ctx.state(cls).deleting(
+        return await self.deleting(
             model,
             requirements=requirements,
             **extra,

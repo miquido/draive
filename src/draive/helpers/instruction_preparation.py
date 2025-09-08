@@ -1,13 +1,14 @@
+from typing import Final
+
 from haiway import ctx
 
-from draive.instructions import Instruction, InstructionDeclaration
-from draive.multimodal import MultimodalContent
-from draive.multimodal.tags import MultimodalTagElement
+from draive.models import InstructionsDeclaration, ModelInstructions
+from draive.multimodal import MultimodalContent, MultimodalTagElement
 from draive.stages import Stage
 
 __all__ = (
     "InstructionPreparationAmbiguity",
-    "prepare_instruction",
+    "prepare_instructions",
 )
 
 
@@ -21,19 +22,19 @@ class InstructionPreparationAmbiguity(Exception):
         self.questions: str = questions
 
 
-async def prepare_instruction(
-    instruction: InstructionDeclaration | str,
+async def prepare_instructions(
+    instruction: InstructionsDeclaration | str,
     /,
     *,
     guidelines: str | None = None,
-) -> Instruction:
+) -> ModelInstructions:
     async with ctx.scope("prepare_instruction"):
         ctx.log_info("Preparing instruction...")
 
-        instruction_declaration: InstructionDeclaration
+        instruction_declaration: InstructionsDeclaration
         match instruction:
             case str() as description:
-                instruction_declaration = InstructionDeclaration(
+                instruction_declaration = InstructionsDeclaration(
                     name="instruction",
                     description=description,
                     arguments=(),
@@ -52,11 +53,7 @@ async def prepare_instruction(
 
         if parsed := MultimodalTagElement.parse_first("RESULT_INSTRUCTION", content=result):
             ctx.log_info("...instruction preparation finished!")
-            return Instruction.of(
-                parsed.content.to_str(),
-                name=instruction_declaration.name,
-                description=instruction_declaration.description,
-            )
+            return parsed.content.to_str()
 
         elif parsed := MultimodalTagElement.parse_first("QUESTIONS", content=result):
             ctx.log_error("...instruction preparation requires clarification!")
@@ -64,11 +61,11 @@ async def prepare_instruction(
 
         else:
             ctx.log_error("...instruction preparation failed!")
-            raise ValueError("Failed to prepare instruction", result)
+            raise ValueError(f"Failed to prepare instruction: {result.to_str()}")
 
 
 def _format_variables(
-    instruction: InstructionDeclaration,
+    instruction: InstructionsDeclaration,
 ) -> str:
     if not instruction.arguments:
         return "<TASK_VARIABLES>N/A</TASK_VARIABLES>"
@@ -85,7 +82,7 @@ def _format_variables(
     return f"<TASK_VARIABLES>\n{arguments}\n</TASK_VARIABLES>"
 
 
-PREPARE_INSTRUCTION: str = """\
+PREPARE_INSTRUCTION: Final[str] = """\
 You are an expert prompt engineer preparing system instructions for LLMs. Your goal is to create detailed, actionable instructions for completing the described task without any ambiguities.
 You should maintain a clear and concise style, ensuring that the instructions are easy to understand and follow.
 
@@ -147,7 +144,7 @@ Output formatting
 
 Make use of variables
 - available variables will be resolved to actual content within the instruction, e.g. {{time}} will be replaced with the actual time
-- use placeholders for variables in appropriate spots, refering to them by their names (e.g., `{{variable}}`)
+- use placeholders for variables in appropriate spots, referring to them by their names (e.g., `{{variable}}`)
 - wrap variable placeholders in tags or " when required to ensure proper formatting and structure (e.g., `<variable>{{variable}}<variable>`)
 - do not add any variables which were not listed as available
 
@@ -184,10 +181,10 @@ Don't follow any other topics than requested, answer "It is not relevant to the 
 </EXAMPLE>
 <EXAMPLE>
 user: <USER_TASK>Summarize the content using only sentence equivalents. Make it short.<VARIABLES>N/A</VARIABLES></USER_TASK>
-assistant: User task is to summarize some the provided content. There are two main restrictions:
+assistant: The user task is to summarize some of the provided content. There are two main restrictions:
 - using only sentence equivalents
 - providing short response
-I need to prepare a detailed instruction based on that requirements.
+I need to prepare a detailed instruction based on those requirements.
 
 <RESULT_INSTRUCTION>
 You are a summarization bot preparing short summaries of provided content.

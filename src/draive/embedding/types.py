@@ -1,7 +1,7 @@
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol, runtime_checkable
 
-from haiway import State
+from haiway import META_EMPTY, Meta, State
 
 from draive.parameters import DataModel
 
@@ -14,27 +14,11 @@ __all__ = (
 class Embedded[Value: DataModel | State | str | bytes](State):
     value: Value
     vector: Sequence[float]
+    meta: Meta = META_EMPTY
 
 
 @runtime_checkable
 class ValueEmbedding[Value: DataModel | State | str | bytes, Data: str | bytes](Protocol):
-    # @overload
-    # async def __call__(
-    #     self,
-    #     values: Sequence[Data],
-    #     /,
-    #     **extra: Any,
-    # ) -> Sequence[Embedded[Data]]: ...
-
-    # @overload
-    # async def __call__(
-    #     self,
-    #     values: Sequence[Value],
-    #     /,
-    #     attribute: Callable[[Value], Data],
-    #     **extra: Any,
-    # ) -> Sequence[Embedded[Value]]: ...
-
     async def __call__(
         self,
         values: Sequence[Value] | Sequence[Data],

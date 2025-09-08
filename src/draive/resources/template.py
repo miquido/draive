@@ -162,15 +162,15 @@ class ResourceTemplate[**Args](
 
     def _extract_path_template(self) -> str:
         if "://" in self.declaration.uri_template:
-            remainder = self.declaration.uri_template.split("://", 1)[1]
+            reminder = self.declaration.uri_template.split("://", 1)[1]
             # Find where the netloc ends (first occurrence of {, /, ?, or #)
-            netloc_end = len(remainder)
+            netloc_end = len(reminder)
             for char in ["/", "{", "?", "#"]:
-                pos = remainder.find(char)
+                pos = reminder.find(char)
                 if pos != -1 and pos < netloc_end:
                     netloc_end = pos
 
-            return remainder[netloc_end:]
+            return reminder[netloc_end:]
 
         else:
             return self.declaration.uri_template

@@ -16,9 +16,6 @@ __all__ = ("GeminiEmbedding",)
 
 class GeminiEmbedding(GeminiAPI):
     def text_embedding(self) -> TextEmbedding:
-        """
-        Prepare TextEmbedding implementation using Gemini services.
-        """
         return TextEmbedding(embedding=self.create_texts_embedding)
 
     async def create_texts_embedding[Value: DataModel | State](
@@ -30,19 +27,9 @@ class GeminiEmbedding(GeminiAPI):
         config: GeminiEmbeddingConfig | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
-        """
-        Create texts embedding with Gemini embedding service.
-        """
-
         embedding_config: GeminiEmbeddingConfig = config or ctx.state(GeminiEmbeddingConfig)
-        config_dict: EmbedContentConfigDict | None
-        if not_missing(embedding_config.dimensions):
-            config_dict = {"output_dimensionality": embedding_config.dimensions}
 
-        else:
-            config_dict = None
-
-        async with ctx.scope("gemini_text_embedding", embedding_config):
+        async with ctx.scope("gemini_text_embedding"):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={
@@ -59,6 +46,13 @@ class GeminiEmbedding(GeminiAPI):
                 attributes = [attribute(cast(Value, value)) for value in values]
 
             assert all(isinstance(element, str) for element in attributes)  # nosec: B101
+
+            config_dict: EmbedContentConfigDict | None
+            if not_missing(embedding_config.dimensions):
+                config_dict = {"output_dimensionality": embedding_config.dimensions}
+
+            else:
+                config_dict = None
 
             responses: list[EmbedContentResponse] = await gather(
                 *[

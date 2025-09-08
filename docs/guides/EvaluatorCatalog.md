@@ -530,7 +530,15 @@ print(f"Partial keyword score: {partial_result.score.value}")  # Output: 0.75 (3
 ```python
 from collections.abc import Sequence
 from draive.evaluation import evaluate, evaluator_scenario, EvaluatorResult
-from draive.evaluators import *
+from draive.evaluators import (
+    creativity_evaluator,
+    factual_accuracy_evaluator,
+    fluency_evaluator,
+    readability_evaluator,
+    required_keywords_evaluator,
+    safety_evaluator,
+    tone_style_evaluator,
+)
 
 @evaluator_scenario(name="marketing_content_quality")
 async def evaluate_marketing_content(

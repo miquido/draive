@@ -24,13 +24,12 @@ class CohereAPI:
         base_url: str | None = None,
         api_key: str | None = None,
         aws_region: str | None = None,
-        timeout: float = 60.0,
     ) -> None:
         self._provider: Literal["cohere", "bedrock"] = provider
         self._base_url: str | None = base_url or getenv_str("COHERE_SERVER_URL")
         self._api_key: str | None = api_key or getenv_str("COHERE_API_KEY")
         self._aws_region: str | None = aws_region or getenv_str("AWS_BEDROCK_REGION")
-        self._timeout: float = timeout
+
         self._client: AsyncClientV2 = self._prepare_client()
 
     def _prepare_client(self) -> AsyncClientV2:
@@ -39,7 +38,6 @@ class CohereAPI:
                 return AsyncClientV2(
                     api_key=self._api_key,
                     base_url=self._base_url,
-                    timeout=self._timeout,
                 )
 
             case "bedrock":

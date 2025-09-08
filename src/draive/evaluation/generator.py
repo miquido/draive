@@ -43,7 +43,7 @@ async def generate_case_parameters[Parameters: DataModel](
         results.append(
             await ModelGeneration.generate(
                 parameters,
-                instruction=INSTRUCTION.format(
+                instructions=INSTRUCTION.format(
                     guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
                     if guidelines is not None
                     else ""

@@ -4,12 +4,10 @@ from draive.bedrock.config import (
     BedrockInputGuardraisConfig,
     BedrockOutputGuardraisConfig,
 )
-from draive.bedrock.types import BedrockException
 
 __all__ = (
     "Bedrock",
     "BedrockChatConfig",
-    "BedrockException",
     "BedrockInputGuardraisConfig",
     "BedrockOutputGuardraisConfig",
 )

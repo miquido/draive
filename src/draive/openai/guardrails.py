@@ -25,7 +25,7 @@ class OpenAIContentModereation(OpenAIAPI):
         **extra: Any,
     ) -> None:
         moderation_config: OpenAIModerationConfig = config or ctx.state(OpenAIModerationConfig)
-        async with ctx.scope("openai_moderation", moderation_config):
+        async with ctx.scope("openai_moderation"):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

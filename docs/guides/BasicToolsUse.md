@@ -43,18 +43,18 @@ We will use the OpenAI GPT model since it natively supports tool use. Make sure 
 
 ```python
 from draive import TextGeneration, load_env
-from draive.openai import OpenAIChatConfig, OpenAI
+from draive.openai import OpenAIResponsesConfig, OpenAI
 
 load_env()
 
 async with ctx.scope(
     "basics",
-    # define used LMM to be OpenAI within the context
-    OpenAIChatConfig(model="gpt-4o-mini"),
+    # initialize OpenAI client within the context
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
     disposables=(OpenAI(),),
 ):
     result: str = await TextGeneration.generate(
-        instruction="You are a helpful assistant",
+        instructions="You are a helpful assistant",
         input="What is the time in New York?",
         tools=[current_time], # or `Toolbox(current_time)`
     )
@@ -132,12 +132,12 @@ from draive import Toolbox
 
 async with ctx.scope(
     "basics",
-    # define used LMM to be OpenAI within the context
-    OpenAIChatConfig(model="gpt-4o-mini"),
+    # initialize OpenAI client within the context
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
     disposables=(OpenAI(),),
 ):
     result: str = await TextGeneration.generate(
-        instruction="You are a funny assistant",
+        instructions="You are a funny assistant",
         input="What is the funny thing about LLMs?",
         tools=Toolbox.of(
             # we can define any number of tools within a toolbox
@@ -170,13 +170,13 @@ setup_logging("basics")
 
 async with ctx.scope(
     "basics",
-    # define used LMM to be OpenAI within the context
-    OpenAIChatConfig(model="gpt-4o-mini"),
+    # initialize OpenAI client within the context
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
     disposables=(OpenAI(),),
     observability=LoggerObservability(),
 ):
     result: str = await TextGeneration.generate(
-        instruction="You are a funny assistant",
+        instructions="You are a funny assistant",
         input="What is the funny thing about LLMs?",
         # we will now be able to see what tools were used
         # and check the details about its execution
@@ -202,7 +202,7 @@ async with ctx.scope(
     |
     |  ⎡ @generate_text [484bad5216bf4a2db28dad924f5d0de9](3.82s):
     |  |
-    |  |  ⎡ @openai_lmm_invocation [aea1a47734504cc38267ea31a42aa31e](1.04s):
+    |  |  ⎡ @model.completion [aea1a47734504cc38267ea31a42aa31e](1.04s):
     |  |  |  ⎡ •ArgumentsTrace:
     |  |  |  |  ├ kwargs:
     |  |  |  |  |  [instruction]: "You are a funny assistant"
@@ -258,7 +258,7 @@ async with ctx.scope(
     |  |  |  |  |  |  |  |  |  |  [description]: "Topic of a fact to find"
     |  |  |  |  |  [output]: "text"
     |  |  |  ⌊
-    |  |  |  ⎡ •OpenAIChatConfig:
+    |  |  |  ⎡ •OpenAIResponsesConfig:
     |  |  |  |  ├ model: "gpt-4o-mini"
     |  |  |  |  ├ temperature: 1.0
     |  |  |  ⌊
@@ -292,7 +292,7 @@ async with ctx.scope(
     |  |  |  ⌊
     |  |  ⌊
     |  |
-    |  |  ⎡ @openai_lmm_invocation [1f0d7b3c69aa40bca7eb48fbd36ca4d6](2.78s):
+    |  |  ⎡ @model.completion [1f0d7b3c69aa40bca7eb48fbd36ca4d6](2.78s):
     |  |  |  ⎡ •ArgumentsTrace:
     |  |  |  |  ├ kwargs:
     |  |  |  |  |  [instruction]: "You are a funny assistant"
@@ -340,7 +340,7 @@ async with ctx.scope(
     |  |  |  |  |  |  |  |  |  |  [description]: "Topic of a fact to find"
     |  |  |  |  |  [output]: "text"
     |  |  |  ⌊
-    |  |  |  ⎡ •OpenAIChatConfig:
+    |  |  |  ⎡ •OpenAIResponsesConfig:
     |  |  |  |  ├ model: "gpt-4o-mini"
     |  |  |  |  ├ temperature: 1.0
     |  |  |  ⌊

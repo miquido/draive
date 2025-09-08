@@ -18,15 +18,17 @@ from uuid import UUID
 
 from haiway import Meta, Missing
 from haiway.state import AttributeAnnotation
+from haiway.state.validation import Validator
 
-from draive.parameters.types import ParameterValidation, ParameterValidationContext
 from draive.parameters.validation import ParameterValidator
 
 __all__ = (
     "ParameterSpecification",
     "ParametersSpecification",
+    "ToolParametersSpecification",
     "parameter_specification",
     "validated_specification",
+    "validated_tool_specification",
 )
 
 
@@ -125,6 +127,9 @@ class ParameterObjectSpecification(TypedDict, total=False):
     title: NotRequired[str]
     description: NotRequired[str]
     required: NotRequired[Sequence[str]]
+    # When False, keys outside of "properties" are disallowed. Many provider tool schemas
+    # require this to be False to prevent arbitrary arguments.
+    additionalProperties: NotRequired[Literal[False]]
 
 
 @final
@@ -169,15 +174,42 @@ def validated_specification(
     specification: dict[str, Any],
     /,
 ) -> ParameterObjectSpecification:
-    with ParameterValidationContext().scope("specification") as validation_context:
-        return _specification_validation(
-            specification,
-            context=validation_context,
-        )
+    return _specification_validation(
+        specification,
+    )
 
 
-_specification_validation: Final[ParameterValidation[ParameterObjectSpecification]] = (
+_specification_validation: Final[Validator[ParameterObjectSpecification]] = (
     ParameterValidator.of_typed_dict(ParameterObjectSpecification)
+)
+
+
+@final
+class ToolParametersSpecification(TypedDict, total=False):
+    """Strict object schema used for tool parameters.
+
+    Requires ``additionalProperties: False`` so providers cannot accept unspecified args.
+    """
+
+    type: Required[Literal["object"]]
+    properties: Required[Mapping[str, ParameterSpecification]]
+    title: NotRequired[str]
+    description: NotRequired[str]
+    required: NotRequired[Sequence[str]]
+    additionalProperties: Required[Literal[False]]
+
+
+def validated_tool_specification(
+    specification: dict[str, Any],
+    /,
+) -> ToolParametersSpecification:
+    return _tool_specification_validation(
+        specification,
+    )
+
+
+_tool_specification_validation: Final[Validator[ToolParametersSpecification]] = (
+    ParameterValidator.of_typed_dict(ToolParametersSpecification)
 )
 
 

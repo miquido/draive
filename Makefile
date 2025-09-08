@@ -10,7 +10,7 @@ TESTS_PATH := tests
 -include .env
 
 ifndef UV_VERSION
-	UV_VERSION := 0.8.0
+	UV_VERSION := 0.8.14
 endif
 
 .PHONY: uv_check venv sync update format lint test docs docs-server release
@@ -22,7 +22,7 @@ uv_check:
 	# Install if not present
 	@if ! command -v uv > /dev/null; then \
 		echo '...installing uv...'; \
-		curl -LsSf https://github.com/astral-sh/uv/releases/download/$(UV_VERSION)/uv-installer.sh | sh; \
+		curl -fLsS https://astral.sh/uv/install.sh | sh -s -- --version $(UV_VERSION); \
 		if [ $$? -ne 0 ]; then \
 			echo "...installing uv failed!"; \
 			exit 1; \
@@ -34,7 +34,7 @@ uv_check:
 		CURRENT_VERSION=$$(uv --version | head -n1 | cut -d" " -f2); \
 		if [ "$$(printf "%s\n%s" "$(UV_VERSION)" "$$CURRENT_VERSION" | sort -V | head -n1)" != "$(UV_VERSION)" ]; then \
 			echo '...updating uv...'; \
-			curl -LsSf https://github.com/astral-sh/uv/releases/download/$(UV_VERSION)/uv-installer.sh | sh; \
+			curl -fLsS https://astral.sh/uv/install.sh | sh -s -- --version $(UV_VERSION); \
 			if [ $$? -ne 0 ]; then \
 				echo "...updating uv failed!"; \
 				exit 1; \

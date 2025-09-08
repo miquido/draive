@@ -1,19 +1,15 @@
 from draive.gemini.client import Gemini
 from draive.gemini.config import (
+    GeminiConfig,
     GeminiEmbeddingConfig,
-    GeminiGenerationConfig,
-    GeminiLiveConfig,
     GeminiSafetyConfig,
     GeminiSafetyThreshold,
 )
-from draive.gemini.types import GeminiException
 
 __all__ = (
     "Gemini",
+    "GeminiConfig",
     "GeminiEmbeddingConfig",
-    "GeminiException",
-    "GeminiGenerationConfig",
-    "GeminiLiveConfig",
     "GeminiSafetyConfig",
     "GeminiSafetyThreshold",
 )

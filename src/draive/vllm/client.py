@@ -1,19 +1,21 @@
 from collections.abc import Collection, Iterable, Mapping
 from types import TracebackType
-from typing import Any, Literal, final
+from typing import Any, final
 
 from haiway import State
 
+from draive.embedding import TextEmbedding
+from draive.models import GenerativeModel
 from draive.vllm.api import VLLMAPI
 from draive.vllm.embedding import VLLMEmbedding
-from draive.vllm.lmm_generation import VLLMLMMGeneration
+from draive.vllm.messages import VLLMMessages
 
 __all__ = ("VLLM",)
 
 
 @final
 class VLLM(
-    VLLMLMMGeneration,
+    VLLMMessages,
     VLLMEmbedding,
     VLLMAPI,
 ):
@@ -27,7 +29,7 @@ class VLLM(
         self,
         base_url: str | None = None,
         default_headers: Mapping[str, str] | None = None,
-        features: Collection[Literal["lmm", "text_embedding"]] | None = None,
+        features: Collection[type[State]] | None = None,
         **extra: Any,
     ) -> None:
         super().__init__(
@@ -35,17 +37,19 @@ class VLLM(
             default_headers=default_headers,
             **extra,
         )
-        self._features: frozenset[Literal["lmm", "text_embedding"]] = (
-            frozenset(features) if features is not None else frozenset(("lmm", "text_embedding"))
+        self._features: frozenset[type[State]] = (
+            frozenset(features)
+            if features is not None
+            else frozenset((GenerativeModel, TextEmbedding))
         )
 
     async def __aenter__(self) -> Iterable[State]:
         await self._initialize_client()
         state: list[State] = []
-        if "lmm" in self._features:
-            state.append(self.lmm())
+        if GenerativeModel in self._features:
+            state.append(self.generative_model())
 
-        if "text_embedding" in self._features:
+        if TextEmbedding in self._features:
             state.append(self.text_embedding())
 
         return state

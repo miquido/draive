@@ -16,9 +16,6 @@ __all__ = ("MistralEmbedding",)
 
 class MistralEmbedding(MistralAPI):
     def text_embedding(self) -> TextEmbedding:
-        """
-        Prepare TextEmbedding implementation using Mistral service.
-        """
         return TextEmbedding(embedding=self.create_texts_embedding)
 
     async def create_texts_embedding[Value: DataModel | State](
@@ -30,12 +27,8 @@ class MistralEmbedding(MistralAPI):
         config: MistralEmbeddingConfig | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
-        """
-        Create texts embedding with Mistral embedding service.
-        """
-
         embedding_config: MistralEmbeddingConfig = config or ctx.state(MistralEmbeddingConfig)
-        async with ctx.scope("mistral_text_embedding", embedding_config):
+        async with ctx.scope("mistral_text_embedding"):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={

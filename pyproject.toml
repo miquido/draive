@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.83.3"
+version = "0.84.0"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
@@ -21,29 +21,24 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 license = { file = "LICENSE" }
-dependencies = ["numpy~=2.2", "haiway~=0.30.2"]
+dependencies = ["numpy~=2.2", "haiway~=0.31.3"]
 
 [project.urls]
 Homepage = "https://miquido.com"
 Repository = "https://github.com/miquido/draive.git"
 
 [project.optional-dependencies]
-sentencepiece = ["sentencepiece~=0.2"]
-cohere = ["cohere~=5.15"]
-cohere_bedrock = ["cohere~=5.13", "boto3~=1.37"]
-openai = ["openai~=1.88", "tiktoken~=0.9"]
-openai_realtime = ["openai[realtime]~=1.88", "tiktoken~=0.9"]
-anthropic = ["anthropic~=0.54", "tokenizers~=0.21"]
-anthropic_bedrock = ["anthropic[bedrock]~=0.54", "tokenizers~=0.21"]
-mistral = ["sentencepiece~=0.2", "mistralai~=1.8"]
-gemini = [
-  "sentencepiece~=0.2",
-  "google-genai~=1.20",
-  "google-api-core~=2.25,<3.0",
-]
+cohere = ["cohere~=5.17"]
+cohere_bedrock = ["cohere~=5.17", "boto3~=1.40"]
+openai = ["openai~=1.104"]
+openai_realtime = ["openai[realtime]~=1.104"]
+anthropic = ["anthropic~=0.64"]
+anthropic_bedrock = ["anthropic[bedrock]~=0.64"]
+mistral = ["mistralai~=1.9"]
+gemini = ["google-genai~=1.30", "google-api-core"]
 ollama = ["ollama~=0.5"]
-bedrock = ["boto3~=1.38"]
-vllm = ["openai~=1.88"]
+bedrock = ["boto3~=1.40"]
+vllm = ["openai~=1.104"]
 mcp = ["mcp~=1.9"]
 opentelemetry = [
   "haiway[opentelemetry]",
@@ -93,5 +88,29 @@ useLibraryCodeForTypes = true
 diagnosticMode = "workspace"
 typeCheckingMode = "strict"
 
-[tool.hatch.metadata]
-allow-direct-references = true
+[tool.uv-build]
+packages = [{ include = "draive", from = "src" }]
+
+[tool.uv-build.sdist]
+exclude = [
+  "site",
+  "docs",
+  "tests",
+  ".github",
+  "stubs",
+  "config",
+  "llms.txt",
+  ".vscode",
+  ".claude",
+  ".codex",
+  ".zed",
+  ".venv",
+  "**/.DS_Store",
+  "**/__pycache__",
+  ".ruff_cache",
+  ".pytest_cache",
+  ".mypy_cache",
+]
+
+[tool.uv-build.wheel]
+exclude = ["**/.DS_Store", "**/__pycache__", "**/*.pyc"]

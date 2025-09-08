@@ -3,12 +3,15 @@ from typing import Any, Literal, Protocol, Self, cast, final, overload, runtime_
 
 from haiway import Meta, MetaValues, MissingState, State
 
-from draive.lmm import LMMCompletion, LMMContext
+from draive.models import ModelContext, ModelOutput
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel
 from draive.utils import Memory
 
 __all__ = (
+    "StageCacheKeyMaking",
+    "StageCacheReading",
+    "StageCacheWriting",
     "StageConditioning",
     "StageContextTransforming",
     "StageException",
@@ -29,11 +32,11 @@ class StageState:
     Immutable state container for stage execution.
 
     StageState encapsulates the complete execution state of a stage, including
-    the LMM context, current result, and any associated state models. It provides
+    the model context, current result, and any associated state models. It provides
     methods for creating new states with updated values while maintaining immutability.
 
     The state includes:
-    - context: The LMM conversation context (input/output pairs, tool calls, etc.)
+    - context: The model conversation context (input/output pairs, tool calls, etc.)
     - result: The current multimodal result content
     - state: Dictionary of state models indexed by their types
     """
@@ -42,7 +45,7 @@ class StageState:
     def of(
         cls,
         *state: DataModel | State,
-        context: LMMContext,
+        context: ModelContext,
         result: Multimodal | None = None,
     ) -> Self:
         """
@@ -52,8 +55,8 @@ class StageState:
         ----------
         *state : DataModel | State
             State models to include in the stage state.
-        context : LMMContext
-            The LMM conversation context.
+        context : ModelContext
+            The model context.
         result : Multimodal | None
             The result content, or None for empty content.
 
@@ -77,7 +80,7 @@ class StageState:
     def __init__(
         self,
         *,
-        context: LMMContext,
+        context: ModelContext,
         result: MultimodalContent,
         state: Mapping[type[DataModel] | type[State], DataModel | State],
     ) -> None:
@@ -86,16 +89,16 @@ class StageState:
 
         Parameters
         ----------
-        context : LMMContext
-            The LMM conversation context.
+        context : ModelContext
+            The model context.
         result : MultimodalContent
             The current result content.
         state : Mapping[type[DataModel] | type[State], DataModel | State]
             Dictionary mapping state types to their instances.
         """
 
-        assert not context or isinstance(context[-1], LMMCompletion)  # nosec: B101
-        self.context: LMMContext
+        assert not context or isinstance(context[-1], ModelOutput)  # nosec: B101
+        self.context: ModelContext
         object.__setattr__(
             self,
             "context",
@@ -119,7 +122,6 @@ class StageState:
         name: str,
         value: Any,
     ) -> Any:
-        """Prevent attribute modification to maintain immutability."""
         raise AttributeError(
             f"Can't modify immutable {self.__class__.__qualname__},"
             f" attribute - '{name}' cannot be modified"
@@ -129,7 +131,6 @@ class StageState:
         self,
         name: str,
     ) -> None:
-        """Prevent attribute deletion to maintain immutability."""
         raise AttributeError(
             f"Can't modify immutable {self.__class__.__qualname__},"
             f" attribute - '{name}' cannot be deleted"
@@ -207,7 +208,7 @@ class StageState:
     def updated(
         self,
         *state: DataModel | State,
-        context: LMMContext | None = None,
+        context: ModelContext | None = None,
         result: Multimodal | None = None,
     ) -> Self:
         """
@@ -220,7 +221,7 @@ class StageState:
         ----------
         *state : DataModel | State
             State models to add or update.
-        context : LMMContext | None
+        context : ModelContext | None
             New context to use, or None to preserve current context.
         result : Multimodal | None
             New result to use, or None to preserve current result.
@@ -293,8 +294,8 @@ class StageException(Exception):
         state : StageState
             The stage state at the time the exception occurred.
 
-        meta : Meta | None = None
-            Additional exception metadata
+        meta : Meta | MetaValues | None
+            Additional exception metadata.
 
         """
         super().__init__(*args)
@@ -400,18 +401,18 @@ class StageStateAccessing(Protocol):
 @runtime_checkable
 class StageContextTransforming(Protocol):
     """
-    Protocol for LMM context transformation functions.
+    Protocol for model context transformation functions.
 
-    Defines functions that can transform an LMM context into a new context.
-    Used by Stage.transform_context() to modify conversation context while
+    Defines functions that can transform a `ModelContext` into a new context.
+    Used by `Stage.transform_context()` to modify conversation context while
     preserving the result.
     """
 
     async def __call__(
         self,
-        context: LMMContext,
-    ) -> LMMContext:
-        """Transform an LMM context into a new context."""
+        context: ModelContext,
+    ) -> ModelContext:
+        """Transform a `ModelContext` into a new context."""
         ...
 
 
@@ -454,4 +455,32 @@ class StageRouting(Protocol):
 
 
 type StageMemory = Memory[StageState, StageState]
-"""Type alias for memory that stores and retrieves StageState objects."""
+
+
+class StageCacheKeyMaking[Key](Protocol):
+    """Callable that constructs a cache key for a given stage state."""
+
+    def __call__(
+        self,
+        *,
+        state: StageState,
+    ) -> Key: ...
+
+
+class StageCacheReading[Key](Protocol):
+    """Async callable that retrieves a cached state for the given key."""
+
+    async def __call__(
+        self,
+        key: Key,
+    ) -> StageState | None: ...
+
+
+class StageCacheWriting[Key](Protocol):
+    """Async callable that stores a stage state for the given key."""
+
+    async def __call__(
+        self,
+        key: Key,
+        value: StageState,
+    ) -> None: ...

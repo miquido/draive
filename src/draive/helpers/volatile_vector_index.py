@@ -2,12 +2,17 @@ from asyncio import Lock
 from collections.abc import Callable, Iterable, MutableMapping, MutableSequence, Sequence
 from typing import Any, cast
 
-from haiway import AttributePath, AttributeRequirement
+from haiway import AttributePath, AttributeRequirement, as_tuple
 
-from draive.embedding import Embedded, ImageEmbedding, TextEmbedding
+from draive.embedding import (
+    Embedded,
+    ImageEmbedding,
+    TextEmbedding,
+    mmr_vector_similarity_search,
+    vector_similarity_search,
+)
 from draive.multimodal import MediaContent, MediaData, MediaReference, TextContent
 from draive.parameters import DataModel
-from draive.similarity import mmr_vector_similarity_search, vector_similarity_search
 from draive.utils import VectorIndex
 
 __all__ = ("VolatileVectorIndex",)
@@ -25,6 +30,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
         values: Iterable[Model],
         **extra: Any,
     ) -> None:
+        values_sequence: Sequence[Model] = as_tuple(values)
         async with lock:
             value_selector: Callable[[Model], Value]
             match attribute:
@@ -38,7 +44,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                     value_selector = cast(AttributePath[Model, Value], path).__call__
 
             selected_values: list[str | bytes] = []
-            for value in values:
+            for value in values_sequence:
                 match value_selector(value):
                     case str() as text:
                         selected_values.append(text)
@@ -77,7 +83,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                     vector=embedded.vector,
                 )
                 for value, embedded in zip(
-                    values,
+                    values_sequence,
                     embedded_values,
                     strict=True,
                 )
@@ -98,92 +104,94 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
         requirements: AttributeRequirement[Model] | None = None,
         limit: int | None = None,
         **extra: Any,
-    ) -> Iterable[Model]:
+    ) -> Sequence[Model]:
         assert query is not None or (query is None and score_threshold is None)  # nosec: B101
+        stored: Sequence[Embedded[Model]] | None
         async with lock:
-            stored: Sequence[Embedded[Model]] | None = storage.get(model)
-            if not stored:
-                return []
+            stored = storage.get(model)
 
-            filtered: Sequence[Embedded[Model]]
-            if requirements:
-                filtered = [
-                    element
-                    for element in stored
-                    if requirements.check(
-                        element.value,
-                        raise_exception=False,
-                    )
-                ]
+        if not stored:
+            return []
 
-            else:
-                filtered = stored
-
-            if not filtered:
-                return []
-
-            query_vector: Sequence[float]
-            match query:
-                case None:
-                    if limit:
-                        return [embedded.value for embedded in filtered[:limit]]
-
-                    else:
-                        return [embedded.value for embedded in filtered]
-
-                case str() as text:
-                    embedded_text: Embedded[str] = await TextEmbedding.embed(
-                        text,
-                        **extra,
-                    )
-                    query_vector = embedded_text.vector
-
-                case TextContent() as text_content:
-                    embedded_text: Embedded[str] = await TextEmbedding.embed(
-                        text_content.text,
-                        **extra,
-                    )
-                    query_vector = embedded_text.vector
-
-                case MediaData() as media_data:
-                    if media_data.kind != "image":
-                        raise ValueError(f"{media_data.kind} embedding is not supported")
-
-                    embedded_image: Embedded[bytes] = await ImageEmbedding.embed(
-                        media_data.data,
-                        **extra,
-                    )
-                    query_vector = embedded_image.vector
-
-                case MediaReference():
-                    raise ValueError("Media references are not supported")
-
-                case vector:
-                    query_vector = vector
-
-            matching: Sequence[Embedded[Model]] = [
-                filtered[index]
-                for index in vector_similarity_search(
-                    query_vector=query_vector,
-                    values_vectors=[element.vector for element in filtered],
-                    score_threshold=score_threshold,
-                    limit=limit * 8  # feed MMR with more results
-                    if limit is not None
-                    else None,
+        filtered: Sequence[Embedded[Model]]
+        if requirements:
+            filtered = [
+                element
+                for element in stored
+                if requirements.check(
+                    element.value,
+                    raise_exception=False,
                 )
             ]
 
-            if not matching:
-                return []
+        else:
+            filtered = stored
 
-            return [
-                matching[index].value
-                for index in mmr_vector_similarity_search(
-                    query_vector=query_vector,
-                    values_vectors=[element.vector for element in matching],
-                    limit=limit,
+        if not filtered:
+            return []
+
+        query_vector: Sequence[float]
+        match query:
+            case None:
+                if limit:
+                    return [embedded.value for embedded in filtered[:limit]]
+
+                else:
+                    return [embedded.value for embedded in filtered]
+
+            case str() as text:
+                embedded_text: Embedded[str] = await TextEmbedding.embed(
+                    text,
+                    **extra,
                 )
-            ]
+                query_vector = embedded_text.vector
+
+            case TextContent() as text_content:
+                embedded_text: Embedded[str] = await TextEmbedding.embed(
+                    text_content.text,
+                    **extra,
+                )
+                query_vector = embedded_text.vector
+
+            case MediaData() as media_data:
+                if media_data.kind != "image":
+                    raise ValueError(f"{media_data.kind} embedding is not supported")
+
+                embedded_image: Embedded[bytes] = await ImageEmbedding.embed(
+                    media_data.data,
+                    **extra,
+                )
+                query_vector = embedded_image.vector
+
+            case MediaReference():
+                raise ValueError("Media references are not supported")
+
+            case vector:
+                query_vector = vector
+
+        matching: Sequence[Embedded[Model]] = [
+            filtered[index]
+            for index in vector_similarity_search(
+                query_vector=query_vector,
+                values_vectors=[element.vector for element in filtered],
+                score_threshold=score_threshold,
+                limit=limit * 8  # feed MMR with more results
+                if limit is not None
+                else None,
+            )
+        ]
+
+        if not matching:
+            return []
+
+        return [
+            matching[index].value
+            for index in mmr_vector_similarity_search(
+                query_vector=query_vector,
+                values_vectors=[element.vector for element in matching],
+                limit=limit,
+            )
+        ]
 
     async def delete[Model: DataModel](
         model: type[Model],

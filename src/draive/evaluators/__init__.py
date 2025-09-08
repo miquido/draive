@@ -4,6 +4,7 @@ from draive.evaluators.conciseness import conciseness_evaluator
 from draive.evaluators.consistency import consistency_evaluator
 from draive.evaluators.coverage import coverage_evaluator
 from draive.evaluators.creativity import creativity_evaluator
+from draive.evaluators.expectations import expectations_evaluator
 from draive.evaluators.factual_accuracy import factual_accuracy_evaluator
 from draive.evaluators.fluency import fluency_evaluator
 from draive.evaluators.groundedness import groundedness_evaluator
@@ -27,6 +28,7 @@ __all__ = (
     "consistency_evaluator",
     "coverage_evaluator",
     "creativity_evaluator",
+    "expectations_evaluator",
     "factual_accuracy_evaluator",
     "fluency_evaluator",
     "forbidden_keywords_evaluator",

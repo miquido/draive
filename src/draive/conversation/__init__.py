@@ -1,22 +1,16 @@
 from draive.conversation.completion import Conversation
 from draive.conversation.realtime import RealtimeConversation, RealtimeConversationSession
 from draive.conversation.types import (
-    ConversationElement,
-    ConversationEvent,
-    ConversationMemory,
+    ConversationInputChunk,
     ConversationMessage,
-    ConversationMessageChunk,
-    ConversationStreamElement,
+    ConversationOutputChunk,
 )
 
 __all__ = (
     "Conversation",
-    "ConversationElement",
-    "ConversationEvent",
-    "ConversationMemory",
+    "ConversationInputChunk",
     "ConversationMessage",
-    "ConversationMessageChunk",
-    "ConversationStreamElement",
+    "ConversationOutputChunk",
     "RealtimeConversation",
     "RealtimeConversationSession",
 )

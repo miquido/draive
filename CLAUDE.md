@@ -132,7 +132,7 @@ class UserConfig(Config):
 
 # Serializable counterpart of State
 class UserModel(DataModel):
-    # Field allows customizing DataModel fields with various options 
+    # Field allows customizing DataModel fields with various options
     id: UUID = Field(default_factory=uuid4, aliased="user_id")
     name: str
 

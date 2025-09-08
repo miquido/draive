@@ -1,25 +1,22 @@
 from collections.abc import Collection, Iterable
 from types import TracebackType
-from typing import Literal, final
+from typing import final
 
 from haiway import State
 
 from draive.bedrock.api import BedrockAPI
-from draive.bedrock.guardrails import BedrockGuardrais
-from draive.bedrock.lmm_generation import BedrockLMMGeneration
+from draive.bedrock.converse import BedrockConverse
+from draive.bedrock.guardrails import BedrockGuardrails
+from draive.guardrails import GuardrailsModeration
+from draive.models import GenerativeModel
 
 __all__ = ("Bedrock",)
-
-type Features = Literal[
-    "lmm",
-    "content_guardrails",
-]
 
 
 @final
 class Bedrock(
-    BedrockLMMGeneration,
-    BedrockGuardrais,
+    BedrockConverse,
+    BedrockGuardrails,
     BedrockAPI,
 ):
     __slots__ = ("_features",)
@@ -27,29 +24,24 @@ class Bedrock(
     def __init__(
         self,
         *,
-        features: Collection[Features] | None = None,
+        features: Collection[type[GenerativeModel | GuardrailsModeration]] | None = None,
         aws_region: str | None = None,
     ) -> None:
         super().__init__(aws_region=aws_region)
-        self._features: frozenset[Features] = (
+        self._features: frozenset[type[State]] = (
             frozenset(features)
             if features is not None
-            else frozenset(
-                (
-                    "lmm",
-                    "content_guardrails",
-                )
-            )
+            else frozenset((GenerativeModel, GuardrailsModeration))
         )
 
     async def __aenter__(self) -> Iterable[State]:
         await self._initialize_client()
         state: list[State] = []
-        if "lmm" in self._features:
-            state.append(self.lmm())
+        if GenerativeModel in self._features:
+            state.append(self.generative_model())
 
-        if "content_guardrails" in self._features:
-            state.append(self.content_guardrails())
+        if GuardrailsModeration in self._features:
+            state.append(self.guardrails_moderation())
 
         return state
 
