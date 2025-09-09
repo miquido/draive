@@ -21,7 +21,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 license = { file = "LICENSE" }
-dependencies = ["numpy~=2.2", "haiway~=0.31.3"]
+dependencies = ["numpy~=2.2", "haiway~=0.31.4"]
 
 [project.urls]
 Homepage = "https://miquido.com"
@@ -53,7 +53,7 @@ dev = [
   "pytest~=8.3",
   "pytest-asyncio~=0.26",
   "pytest-cov~=6.1",
-  "ruff~=0.12",
+  "ruff~=0.13",
 ]
 docs = ["mkdocs~=1.6", "mkdocs-material~=9.5", "mkdocstrings[python]~=0.27"]
 

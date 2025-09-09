@@ -1,24 +1,12 @@
 # Evaluator Catalog: Complete Guide to Available Evaluators
 
-This comprehensive guide covers all predefined evaluators in the Draive framework, organized by category with practical examples and real-world usage patterns.
-
-## Overview
-
-Draive provides 20 predefined evaluators covering all major dimensions of LLM evaluation:
 
 - **Quality Evaluators**: Assess content structure, style, and linguistic quality
-- **Reference-Based Evaluators**: Compare generated content against reference material  
+- **Reference-Based Evaluators**: Compare generated content against reference material
 - **User-Focused Evaluators**: Measure how well content serves user needs
 - **Safety & Content Evaluators**: Detect harmful content and verify factual accuracy
 - **Similarity Evaluators**: Measure semantic and vector-based similarity
 - **Utility Evaluators**: Rule-based checks for specific requirements
-
-All evaluators return scores using a consistent 5-point scale: `poor` (0.1), `fair` (0.3), `good` (0.5), `excellent` (0.7), `perfect` (0.9), with `none` (0.0) for unevaluable content.
-
-## Quality Evaluators
-
-### Coherence Evaluator
-**Purpose**: Evaluates logical flow and structural organization of content.
 
 ```python
 from draive.evaluators import coherence_evaluator
@@ -35,11 +23,6 @@ result = await coherence_evaluator(
 print(f"Coherence: {result.score.value}")  # Output: "excellent"
 ```
 
-**Best for**: Evaluating reports, explanations, structured content where logical organization matters.
-
-### Conciseness Evaluator
-**Purpose**: Measures brevity while maintaining completeness of information.
-
 ```python
 from draive.evaluators import conciseness_evaluator
 
@@ -50,14 +33,9 @@ concise_text = "Python is a popular programming language"
 verbose_result = await conciseness_evaluator(verbose_text, reference=reference_text)
 concise_result = await conciseness_evaluator(concise_text, reference=reference_text)
 
-print(f"Verbose: {verbose_result.score.value}")   # Output: "fair" 
+print(f"Verbose: {verbose_result.score.value}")   # Output: "fair"
 print(f"Concise: {concise_result.score.value}")   # Output: "excellent"
 ```
-
-**Best for**: Executive summaries, product descriptions, social media content where brevity is valued.
-
-### Fluency Evaluator
-**Purpose**: Assesses grammar, spelling, punctuation, and natural language flow.
 
 ```python
 from draive.evaluators import fluency_evaluator
@@ -72,11 +50,6 @@ print(f"Poor fluency: {poor_result.score.value}")   # Output: "poor"
 print(f"Good fluency: {good_result.score.value}")   # Output: "perfect"
 ```
 
-**Best for**: All content types as a basic quality check, especially user-facing text.
-
-### Readability Evaluator  
-**Purpose**: Evaluates ease of understanding and accessibility of content.
-
 ```python
 from draive.evaluators import readability_evaluator
 
@@ -90,20 +63,13 @@ print(f"Complex: {complex_result.score.value}")   # Output: "poor"
 print(f"Simple: {simple_result.score.value}")     # Output: "excellent"
 ```
 
-**Best for**: Educational content, documentation, public-facing materials targeting broad audiences.
-
-## Reference-Based Evaluators
-
-### Coverage Evaluator
-**Purpose**: Ensures generated content includes all key points from reference material.
-
 ```python
 from draive.evaluators import coverage_evaluator
 
 reference = """
 Key features of renewable energy:
 1. Sustainable and environmentally friendly
-2. Reduces carbon emissions significantly  
+2. Reduces carbon emissions significantly
 3. Lower long-term operational costs
 4. Energy independence from fossil fuels
 """
@@ -117,11 +83,6 @@ full_result = await coverage_evaluator(full_coverage, reference=reference)
 print(f"Partial: {partial_result.score.value}")  # Output: "fair"
 print(f"Full: {full_result.score.value}")        # Output: "excellent"
 ```
-
-**Best for**: Summarization tasks, report generation, ensuring comprehensive information transfer.
-
-### Consistency Evaluator
-**Purpose**: Checks factual alignment and consistency with reference content.
 
 ```python
 from draive.evaluators import consistency_evaluator
@@ -137,11 +98,6 @@ inconsistent_result = await consistency_evaluator(inconsistent_text, reference=r
 print(f"Consistent: {consistent_result.score.value}")    # Output: "perfect"
 print(f"Inconsistent: {inconsistent_result.score.value}") # Output: "poor"
 ```
-
-**Best for**: Fact-checking, ensuring generated content aligns with source material, preventing hallucinations.
-
-### Groundedness Evaluator
-**Purpose**: Verifies content is anchored in and traceable to source material.
 
 ```python
 from draive.evaluators import groundedness_evaluator
@@ -164,11 +120,6 @@ ungrounded_result = await groundedness_evaluator.with_threshold("excellent")(ung
 print(f"Grounded: {grounded_result.score.value} ({'✓' if grounded_result.passed else '✗'})")    # Output: "excellent ✓"
 print(f"Ungrounded: {ungrounded_result.score.value} ({'✓' if ungrounded_result.passed else '✗'})") # Output: "poor ✗"
 ```
-
-**Best for**: Scientific content, legal documents, journalism, any content requiring citation and source attribution.
-
-### Relevance Evaluator
-**Purpose**: Measures selection of important information while avoiding redundancy.
 
 ```python
 from draive.evaluators import relevance_evaluator
@@ -193,11 +144,6 @@ print(f"Relevant: {relevant_result.score.value}")    # Output: "excellent"
 print(f"Irrelevant: {irrelevant_result.score.value}") # Output: "poor"
 ```
 
-**Best for**: Product descriptions, feature highlights, content curation where focus is important.
-
-### Truthfulness Evaluator
-**Purpose**: Evaluates factual correctness against reference material.
-
 ```python
 from draive.evaluators import truthfulness_evaluator
 
@@ -212,13 +158,6 @@ false_result = await truthfulness_evaluator(false_text, reference=reference)
 print(f"Truthful: {truthful_result.score.value}")  # Output: "perfect"
 print(f"False: {false_result.score.value}")        # Output: "poor"
 ```
-
-**Best for**: Educational content, scientific explanations, fact verification against known sources.
-
-## User-Focused Evaluators
-
-### Helpfulness Evaluator
-**Purpose**: Assesses how effectively content addresses user needs and questions.
 
 ```python
 from draive.evaluators import helpfulness_evaluator
@@ -245,11 +184,6 @@ print(f"Helpful: {helpful_result.score.value} ({'✓' if helpful_result.passed e
 print(f"Unhelpful: {unhelpful_result.score.value} ({'✓' if unhelpful_result.passed else '✗'})") # Output: "fair ✗"
 ```
 
-**Best for**: Customer support responses, FAQ answers, instructional content, chatbot responses.
-
-### Completeness Evaluator
-**Purpose**: Ensures all aspects of a user query are fully addressed.
-
 ```python
 from draive.evaluators import completeness_evaluator
 
@@ -263,7 +197,7 @@ System Requirements:
 
 Pricing:
 - Basic plan: $19/month
-- Professional: $49/month  
+- Professional: $49/month
 - Enterprise: Custom pricing
 
 Supported Platforms:
@@ -281,11 +215,6 @@ print(f"Complete: {complete_result.score.value}")    # Output: "excellent"
 print(f"Incomplete: {incomplete_result.score.value}") # Output: "fair"
 ```
 
-**Best for**: Multi-part questions, complex inquiries, ensuring comprehensive responses.
-
-### Expectations Evaluator
-**Purpose**: Measures fulfillment of specific defined criteria or expectations.
-
 ```python
 from draive.evaluators import expectations_evaluator
 
@@ -301,40 +230,17 @@ Blog post requirements:
 content = """
 # Effective Remote Work Strategies
 
-Working remotely has become the norm for many professionals. Here's how to make it work for you.
-
-## Introduction
-The shift to remote work presents unique challenges and opportunities...
-
-## 3 Key Tips for Success
-1. Create a dedicated workspace...
-2. Establish clear boundaries...  
-3. Invest in reliable technology...
-
-## Real-World Example
-Sarah, a marketing manager, transformed her spare room into a productive office space...
-
-## Conclusion
-Remote work success depends on intentional planning and consistent habits...
-
 [Word count: 950 words]
 """
 
 result = await expectations_evaluator.with_threshold("excellent")(
-    content, 
+    content,
     expectations=expectations,
     guidelines="Evaluate each requirement separately and provide specific feedback"
 )
 
 print(f"Expectations met: {result.score.value} ({'✓' if result.passed else '✗'})")  # Output: "excellent ✓"
 ```
-
-**Best for**: Content creation guidelines, project requirements, quality assurance checklists.
-
-## Safety & Content Evaluators
-
-### Safety Evaluator
-**Purpose**: Detects harmful, dangerous, or inappropriate content.
 
 ```python
 from draive.evaluators import safety_evaluator
@@ -354,11 +260,6 @@ print(f"Safe content: {safe_result.score.value} ({'✓' if safe_result.passed el
 print(f"Unsafe content: {unsafe_result.score.value} ({'✓' if unsafe_result.passed else '✗'})") # Output: "poor ✗"
 ```
 
-**Best for**: Content moderation, user-generated content, ensuring platform safety guidelines compliance.
-
-### Factual Accuracy Evaluator
-**Purpose**: Verifies factual correctness using general knowledge (no reference required).
-
 ```python
 from draive.evaluators import factual_accuracy_evaluator
 
@@ -372,11 +273,6 @@ inaccurate_result = await factual_accuracy_evaluator(inaccurate_content)
 print(f"Factual: {factual_result.score.value}")     # Output: "perfect"
 print(f"Inaccurate: {inaccurate_result.score.value}") # Output: "poor"
 ```
-
-**Best for**: Educational content, general knowledge verification, fact-checking without specific sources.
-
-### Tone/Style Evaluator
-**Purpose**: Evaluates alignment with expected tone and writing style.
 
 ```python
 from draive.evaluators import tone_style_evaluator
@@ -407,11 +303,6 @@ print(f"Appropriate tone: {appropriate_result.score.value}")   # Output: "excell
 print(f"Inappropriate tone: {inappropriate_result.score.value}") # Output: "fair"
 ```
 
-**Best for**: Brand voice consistency, customer communications, content matching specific style guides.
-
-### Creativity Evaluator
-**Purpose**: Measures originality, novelty, and innovative thinking.
-
 ```python
 from draive.evaluators import creativity_evaluator
 
@@ -431,13 +322,6 @@ print(f"Generic: {generic_result.score.value}")   # Output: "poor"
 print(f"Creative: {creative_result.score.value}")  # Output: "excellent"
 ```
 
-**Best for**: Marketing copy, creative writing, brainstorming content, innovative problem-solving explanations.
-
-## Similarity Evaluators
-
-### Semantic Similarity Evaluator
-**Purpose**: Measures semantic similarity between two pieces of content using LLM evaluation.
-
 ```python
 from draive.evaluators import similarity_evaluator
 
@@ -453,11 +337,6 @@ print(f"Similar content: {similar_result.score.value}")     # Output: "perfect"
 print(f"Dissimilar content: {dissimilar_result.score.value}") # Output: "poor"
 ```
 
-**Best for**: Duplicate detection, paraphrasing evaluation, content matching.
-
-### Vector Similarity Evaluators
-**Purpose**: Calculate mathematical similarity using embedding vectors.
-
 ```python
 from draive.evaluators import text_vector_similarity_evaluator, image_vector_similarity_evaluator
 
@@ -471,20 +350,13 @@ print(f"Text similarity: {text_similarity:.3f}")  # Output: 0.842
 # Image vector similarity (requires image data)
 with open("image1.jpg", "rb") as f:
     image1_data = f.read()
-    
+
 with open("image2.jpg", "rb") as f:
     image2_data = f.read()
 
 image_similarity = await image_vector_similarity_evaluator(image2_data, reference=image1_data)
 print(f"Image similarity: {image_similarity:.3f}")  # Output: 0.756
 ```
-
-**Best for**: Recommendation systems, content deduplication, similarity search, clustering.
-
-## Utility Evaluators
-
-### Keyword Evaluators
-**Purpose**: Rule-based checking for required or forbidden keywords.
 
 ```python
 from draive.evaluators import required_keywords_evaluator, forbidden_keywords_evaluator
@@ -498,7 +370,7 @@ required_result = await required_keywords_evaluator(
     require_all=True  # All keywords must be present
 )
 
-# Check for forbidden keywords  
+# Check for forbidden keywords
 forbidden_result = await forbidden_keywords_evaluator(
     content,
     keywords=["hack", "exploit", "unauthorized"],
@@ -522,13 +394,6 @@ partial_result = await required_keywords_evaluator(
 print(f"Partial keyword score: {partial_result.score.value}")  # Output: 0.75 (3 out of 4 keywords)
 ```
 
-**Best for**: Content compliance, SEO requirements, content filtering, policy enforcement.
-
-## Real-World Evaluation Scenarios
-
-### Content Marketing Evaluation
-```python
-from collections.abc import Sequence
 from draive.evaluation import evaluate, evaluator_scenario, EvaluatorResult
 from draive.evaluators import (
     creativity_evaluator,
@@ -547,18 +412,18 @@ async def evaluate_marketing_content(
     target_keywords: list[str]
 ) -> Sequence[EvaluatorResult]:
     """Comprehensive marketing content evaluation."""
-    
+
     return await evaluate(
         content,
         # Quality checks
         fluency_evaluator.prepared(),
         readability_evaluator.prepared(),
         creativity_evaluator.prepared(),
-        
+
         # Brand compliance
         tone_style_evaluator.prepared(expected_tone_style=brand_guidelines),
         required_keywords_evaluator.prepared(keywords=target_keywords, require_all=False),
-        
+
         # Safety and accuracy
         safety_evaluator.prepared(),
         factual_accuracy_evaluator.prepared(),
@@ -583,68 +448,51 @@ result = await evaluate_marketing_content(
 
 print(f"Marketing content passed: {result.passed}")
 for eval_result in result.evaluations:
-    print(f"- {eval_result.evaluator}: {eval_result.score.value}")
-```
 
-### Customer Support Response Evaluation
-```python
-@evaluator_scenario(name="support_response_quality")
 async def evaluate_support_response(
     response: str,
     customer_query: str,
     company_policy: str
 ) -> Sequence[EvaluatorResult]:
     """Evaluate customer support response quality."""
-    
+
     return await evaluate(
         response,
         # User focus
         helpfulness_evaluator.prepared(user_query=customer_query),
         completeness_evaluator.prepared(user_query=customer_query),
-        
+
         # Quality and safety
         fluency_evaluator.prepared(),
         safety_evaluator.prepared(),
-        
+
         # Policy compliance
         consistency_evaluator.prepared(reference=company_policy),
         tone_style_evaluator.prepared(expected_tone_style="Professional, empathetic, solution-focused"),
         concurrent_tasks=2
-    )
-```
 
-### Academic Content Evaluation
-```python
-@evaluator_scenario(name="academic_content_review")
 async def evaluate_academic_content(
     content: str,
     source_material: str,
     academic_standards: str
 ) -> Sequence[EvaluatorResult]:
     """Evaluate academic content against standards."""
-    
+
     return await evaluate(
         content,
         # Accuracy and grounding
         factual_accuracy_evaluator.prepared(),
         groundedness_evaluator.prepared(reference=source_material),
         consistency_evaluator.prepared(reference=source_material),
-        
+
         # Academic quality
         coherence_evaluator.prepared(reference=source_material),
         coverage_evaluator.prepared(reference=source_material),
-        
+
         # Standards compliance
         expectations_evaluator.prepared(expectations=academic_standards),
         concurrent_tasks=3
-    )
-```
 
-## Best Practices
-
-### 1. Choose Appropriate Evaluators and Thresholds
-
-```python
 # For user-facing content - prioritize user experience and safety
 user_focused_evaluators = [
     helpfulness_evaluator.with_threshold("excellent"),  # High bar for user satisfaction
@@ -666,12 +514,7 @@ creative_evaluators = [
     creativity_evaluator.with_threshold("good"),        # Moderate - allow variety
     tone_style_evaluator.with_threshold("excellent"),   # High - brand consistency
     fluency_evaluator.with_threshold("excellent")       # High - basic quality requirement
-]
-```
 
-### 2. Threshold Selection Strategy
-
-Choose thresholds based on business impact and user consequences:
 
 ```python
 # PERFECT (0.9) - Zero tolerance areas
@@ -679,7 +522,7 @@ safety_evaluator.with_threshold("perfect")              # User safety
 forbidden_keywords_evaluator.with_threshold("perfect")  # Compliance
 consistency_evaluator.with_threshold("perfect")         # No contradictions
 
-# EXCELLENT (0.7) - High quality requirements  
+# EXCELLENT (0.7) - High quality requirements
 helpfulness_evaluator.with_threshold("excellent")       # User satisfaction
 factual_accuracy_evaluator.with_threshold("excellent")  # Information quality
 tone_style_evaluator.with_threshold("excellent")        # Brand consistency
@@ -691,12 +534,7 @@ readability_evaluator.with_threshold("good")            # Accessible but flexibl
 
 # FAIR (0.3) - Minimum acceptable standards
 similarity_evaluator.with_threshold("fair")             # Loose matching
-required_keywords_evaluator.with_threshold("fair")      # Flexible keyword matching
-```
 
-### 3. Use Concurrent Evaluation for Performance
-```python
-from draive.evaluation import evaluate
 
 # Run independent evaluators concurrently
 results = await evaluate(
@@ -706,12 +544,7 @@ results = await evaluate(
     creativity_evaluator.prepared(),
     fluency_evaluator.prepared(),
     concurrent_tasks=2  # Limit concurrent tasks to avoid rate limits
-)
-```
 
-### 4. Provide Context with Guidelines
-```python
-# Specific evaluation context improves accuracy
 result = await tone_style_evaluator(
     content,
     expected_tone_style=expected_style,
@@ -722,12 +555,7 @@ result = await tone_style_evaluator(
     - Consistency with brand voice
     - Professional yet approachable tone
     """
-)
-```
 
-## Summary
-
-The Draive evaluator catalog provides comprehensive coverage for evaluating LLM outputs across all major dimensions:
 
 - **20 specialized evaluators** covering quality, safety, user needs, and content requirements
 - **Consistent 5-point scoring** with meaningful categorical levels

@@ -1,10 +1,5 @@
 # Basics of draive
 
-Draive is a framework for building high-quality applications utilizing LLMs. It provides a set of tools allowing to easily manage data flows, dependencies, and state propagation across the application. Draive is suitable for building servers, workers, and local solutions including CLI and GUI based. The core principles of the framework are strongly connected to functional programming and structured concurrency concepts. All of the draive code is fully typed as strictly as possible making as much use of the static analysis as possible. This means that numerous potential issues can be caught before running the code. It is strongly recommended to use strict, full-type linting if possible. Before you dive deeply into the code you should familiarize yourself with the basics.
-
-## Defining state
-
-Let's start by defining a state that can be used within the application. The state can be an LLM configuration, details of the current user, etc. We have two base classes available in draive: `State` and `DataModel` both have a similar basic behavior. The difference is that the `DataModel` is meant to be serializable and have an associated schema description, while the `State` does not. This distinction allows us to propagate non serializable data i.e. functions when using the `State`. Let's define a simple state:
 
 
 ```python
@@ -103,11 +98,6 @@ print(f"JSON Schema:\n{BasicModel.json_schema(indent=2)}")
     }
 
 
-For more details about `State` and `DataModel` please see the [AdvancedState](./AdvancedState.md)
-
-## Propagating state
-We have defined our application state, now it is time to learn how to propagate it through the application. Draive comes with the `ctx` helper for managing the contextual state and dependencies propagation. Most of the draive functions require to be called inside a context scope. Each meaningful operation execution should be wrapped into a separate, new context. Let's define one now:
-
 
 ```python
 from draive import ctx
@@ -175,12 +165,7 @@ async with ctx.scope("basics", basic_state):
     Updated:
     BasicState(identifier: updated, value: 42)
     Final:
-    BasicState(identifier: basic, value: 42)
 
-
-## Logs and metrics
-
-Each context scope comes with an additional hidden feature - metrics. Each new context scope creates a new associated metrics scope as well. Metrics allow gathering of diagnostic information about program execution. Each scope gains an unique identifier and can have an additional label that allows to easily find associated information in the logs. Speaking about the logs - those are covered by the context scope as well! You can use `ctx` to log information with additional metadata included. Finally, you can define custom metrics and nested stages, and define how all of the metrics will be consumed. Let's have a look:
 
 
 ```python

@@ -6,14 +6,10 @@ from openai.types.images_response import ImagesResponse
 
 from draive.generation import ImageGeneration
 from draive.models import InstructionsRepository, ResolveableInstructions
-from draive.multimodal import (
-    MediaContent,
-    MediaData,
-    MediaReference,
-    MultimodalContent,
-)
+from draive.multimodal import MultimodalContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIImageGenerationConfig
+from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("OpenAIImageGeneration",)
 
@@ -29,7 +25,7 @@ class OpenAIImageGeneration(OpenAIAPI):
         input: MultimodalContent,  # noqa: A002
         config: OpenAIImageGenerationConfig | None = None,
         **extra: Any,
-    ) -> MediaContent:
+    ) -> ResourceContent | ResourceReference:
         generation_config: OpenAIImageGenerationConfig = config or ctx.state(
             OpenAIImageGenerationConfig
         )
@@ -49,15 +45,15 @@ class OpenAIImageGeneration(OpenAIAPI):
 
             image: Image = response.data[0]
             if url := image.url:
-                return MediaReference.of(
+                return ResourceReference.of(
                     url,
-                    media="image/png",
+                    mime_type="image/png",
                 )
 
             elif b64data := image.b64_json:
-                return MediaData.of(
+                return ResourceContent.of(
                     b64data,
-                    media="image/png",
+                    mime_type="image/png",
                 )
 
             else:

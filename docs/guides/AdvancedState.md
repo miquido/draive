@@ -1,10 +1,5 @@
 # Advanced state
 
-Draive provides a dedicated base class for defining application inner state (`State`) and serializable models (`DataModel`). While basic usage is quite straight forward, it hides a lot of customization and features to explore when needed. `State` and `DataModel` share some of the functionalities but have distinct bases and distinct purposes. This notebook focuses on `DataModel`, `State` functionalities are limited to simple validation and immutability.
-
-## Dict conversion
-
-First interesting feature not visible at a glance is an ability to convert `DataModel` from and to a dictionary populated with basic values (dict, list, str, int, float, bool or None).
 
 
 ```python
@@ -24,12 +19,7 @@ print(dict_converted_from_dict)
 ```
 
     name: converted
-    value: 42
 
-
-## Mutations
-
-Both `State` and `DataModel` are immutable by default. Attempting to change any of its fields value will result in both linting and runtime errors. The only valid method to apply a mutation is through a copy. There is a dedicated method to perform a mutating copy operation:
 
 
 ```python
@@ -58,12 +48,7 @@ print("final", final)
     updated identifier: post
     value: 42
     final identifier: pre
-    value: 21
 
-
-## JSON conversion
-
-Each `DataModel` can be serialized using JSON format. Current implementation uses an intermediate step of conversion from/to a dict using the methods described above.
 
 
 ```python
@@ -82,12 +67,7 @@ print(json_converted_from_json)
 ```
 
     name: converted
-    value: 42
 
-
-## Model schema
-
-Each `DataModel` has an associated schema which is generated using type annotations of the class fields. Models have an ability to generate a JSON-schema compatible description:
 
 
 ```python
@@ -122,15 +102,6 @@ print(BasicModel.simplified_schema(indent=2))
     }
 
 
-Field schema can be altered by using per field customization if needed.
-
-## Field customization
-
-Each field defined within the `DataModel` class can be customized by using a dedicated default value called `Field`. It allows to change the field validation, serialization or other elements.
-
-### Alias and description
-
-Fields can have aliases which can be useful for serialization. Both regular and aliased names are available to instantiate an object. When generating the specification, aliases are always used instead of regular field names. Besides the alias, each field can also have a description which is also included in the schema:
 
 
 ```python
@@ -167,12 +138,7 @@ print(f"Simplified schema:\n{CustomizedSchemaModel.simplified_schema(indent=2)}"
     {
       "described": "integer(Field description)",
       "field_alias": "string"
-    }
 
-
-### Default values
-
-Fields can have regular default values instead of a dedicated `Field` default. When using `Field` you can still provide a default value and you can also define default value factory instead. When default value is not defined through the `Field` the `Field` itself does not serve a role of a default value.
 
 
 ```python
@@ -191,12 +157,7 @@ print(CustomizedDefaultsModel())
 
     default: 42
     field_default: 21
-    field_default_factory:
 
-
-### Verification
-
-Each field is automatically validated based on its type annotation. However if a field is required to have any additional validation you can provide an appropriate function to execute in addition to regular validation.
 
 
 ```python
@@ -208,12 +169,7 @@ def verifier(value: int) -> None:
 
 
 class VerifiedModel(DataModel):
-    value: int = Field(verifier=verifier)
-```
 
-### Validation
-
-When automatically generated validation is not suitable for your specific case you can override it to provide custom validation function for each field. When that happens you are taking the full responsibility of ensuring proper value is used for a given field. You can't specify both validator and verifier at the same time, add any verification required to your validator when needed.
 
 
 ```python
@@ -239,12 +195,7 @@ def validator(
 
 
 class ValidatedModel(DataModel):
-    value: int = Field(validator=validator)
-```
 
-### Schema specification
-
-Similarly to validation, field schema specification is also automatically generated and can also be replaced with a custom schema specification for any given field.
 
 
 ```python
@@ -266,12 +217,7 @@ print(CustomizedSpecificationModel.json_schema(indent=2))
       "required": [
         "value"
       ]
-    }
 
-
-### Conversion
-
-The last element which can be specified for a field is a function converting field value to the basic type. It is used for the dict conversion or serialization of data. You can fully customize what will be the representation of the field when converting the object to dict or json. Make sure that validating (deserializing) the result back will not cause any issues. You should also ensure proper schema update if needed.
 
 
 ```python
@@ -286,12 +232,7 @@ class CustomizedConversionModel(DataModel):
 print(CustomizedConversionModel(value="integer?"))
 ```
 
-    value: 8
 
-
-## Property paths
-
-AttributePath is an additional advanced feature of `DataModel` (also `State`). AttributePath is an object that points to a given element inside the model/state object and can be used to retrieve it when needed. To create an attribute path, you can use the special type property `_`.
 
 
 ```python

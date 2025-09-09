@@ -1,23 +1,9 @@
 # Basic Stage Usage
 
-Stages are the core processing pipeline units in draive that provide a composable, type-safe way to build complex generative model workflows. A Stage represents a transformation that processes a model context and multimodal content, allowing precise control over data flow in your applications.
-
-## Core Concepts
-
-### What is a Stage?
-
-A Stage is an **immutable unit of work** that encapsulates transformations within a model context. Each stage:
 
 - Receives `StageState` containing context and result
 - Performs processing or transformation
-- Returns updated `StageState`
-- Can be chained, looped, run concurrently, or conditionally executed
 
-## Essential Stage Methods
-
-### 1. Completion Stages
-
-Generate LLM completions with optional tools and output formatting:
 
 ```python
 # Basic completion
@@ -48,11 +34,6 @@ structured_stage = Stage.completion(
 )
 ```
 
-Each completion stage will extend the context with input, generated output, and tools used. ModelOutput will be also used as the result of this stage.
-
-### 2. Predefined Content
-
-Insert static content into the pipeline:
 
 ```python
 # Add predefined elements
@@ -62,11 +43,6 @@ static_stage = Stage.predefined(
 )
 ```
 
-Predefined stage will extend the context with provided elements. When elements are not explicitly declared as concrete model-context types, each odd element becomes ModelInput and each even element becomes ModelOutput in the result context. Make sure to have an equal number of inputs and outputs in the result context. The last ModelOutput will be used as the result of this stage.
-
-### 3. Prompting Completion
-
-Generate completions with dynamic input:
 
 ```python
 async def get_user_query():
@@ -77,24 +53,14 @@ prompting_stage = Stage.prompting_completion(
     get_user_query,
     instruction="Answer the user's question",
     tools=[weather_tool]
-)
-```
 
-### 4. Loopback Completion
-
-Use the last completion as new input for iterative refinement:
 
 ```python
 # This takes the last completion and feeds it back as input
 refinement_stage = Stage.loopback_completion(
     instruction="Improve and refine the previous response",
     tools=[research_tool]
-)
-```
 
-### 5. Context and Result Transformations
-
-Modify context or result without full reprocessing:
 
 ```python
 # Transform only the result
@@ -109,14 +75,7 @@ Result transformation does not change the context.
 transform_context_stage = Stage.transform_context(
     lambda context: context + (ModelInput.of("Additional context"), ...)
 )
-```
-Context transformation does not change the result. Make sure to have equal number of inputs and outputs in the result context.
 
-## Stage Composition
-
-### Looping
-
-Execute stages repeatedly while a condition is met:
 
 ```python
 async def should_continue(
@@ -131,12 +90,7 @@ loop_stage = Stage.loop(
     Stage.completion("Refine the analysis further"),
     condition=should_continue,
     mode="post_check"  # Check condition after each execution
-)
-```
 
-### Sequential Execution
-
-Chain stages to run one after another:
 
 ```python
 # Create individual stages
@@ -161,12 +115,7 @@ pipeline = Stage.sequence(
 )
 
 # Execute the entire pipeline
-result = await pipeline.execute()
-```
 
-### Routing
-
-Route execution to different stages based on conditions:
 
 ```python
 # Create stages with metadata for routing
@@ -182,7 +131,7 @@ summary_stage = Stage.completion(
     "Create a brief summary",
     instruction="Summarize the key points"
 ).with_meta(
-    name="quick_summary", 
+    name="quick_summary",
     description="Creates a quick summary of the data"
 )
 
@@ -192,12 +141,7 @@ router_stage = Stage.router(
     summary_stage,
     # Optional: custom routing function
     # routing=custom_routing_function
-)
-```
 
-### Concurrent Execution
-
-Run stages in parallel and merge results:
 
 ```python
 async def merge_results(
@@ -205,28 +149,23 @@ async def merge_results(
 ) -> StageState:
     # Custom logic to merge multiple stage results
     successful_states = [
-        state for state in branches 
+        state for state in branches
         if isinstance(state, StageState)
     ]
-    
+
     # Combine all results
     combined_content = MultimodalContent.of(
         *[state.result for state in successful_states]
     )
-    
+
     return successful_states[0].updated(result=combined_content)
 
 concurrent_stage = Stage.concurrent(
     Stage.completion("Analyze aspect A"),
-    Stage.completion("Analyze aspect B"), 
+    Stage.completion("Analyze aspect B"),
     Stage.completion("Analyze aspect C"),
     merge=merge_results
-)
-```
 
-### Conditional Execution
-
-Execute stages based on conditions:
 
 ```python
 async def needs_analysis(
@@ -241,14 +180,7 @@ conditional_stage = Stage.completion(
 ).when(
     condition=needs_analysis,
     alternative=Stage.completion("Do something else...")
-)
-```
 
-## Stage Metadata and Behavior
-
-### Adding Metadata
-
-Stages can have descriptive metadata which can be added when defining a stage:
 
 ```python
 documented_stage = Stage.completion(
@@ -270,12 +202,7 @@ documented_stage = Stage.completion(
     name="query_processor",
     description="Processes and analyzes user query",
     tags=("processing", "nlp")
-)
-```
 
-### Caching
-
-Add caching to avoid recomputing expensive operations:
 
 ```python
 cached_stage = Stage.completion(
@@ -283,12 +210,7 @@ cached_stage = Stage.completion(
 ).cached(
     limit=10,  # Cache up to 10 results
     expiration=3600  # Cache expires after 1 hour
-)
-```
 
-### Retry Logic
-
-Add resilience with automatic retries:
 
 ```python
 resilient_stage = Stage.completion(
@@ -297,22 +219,12 @@ resilient_stage = Stage.completion(
     limit=3,  # Retry up to 3 times
     delay=1.0,  # Wait 1 second between retries
     catching=Exception  # Retry on any exception
-)
-```
 
-### Tracing
-
-Enable execution tracing for debugging:
 
 ```python
 traced_stage = Stage.completion(
     "Debug this complex operation"
-).traced(label="debug_operation")
-```
 
-## Memory Integration
-
-Stages can work with memory for context persistence:
 
 ```python
 from draive.utils import Memory
@@ -324,14 +236,7 @@ memory: Memory[ModelContext, ModelContext] = Memory.constant(())
 remember_stage = Stage.memory_remember(memory)
 
 # Stage that recalls previous context
-recall_stage = Stage.memory_recall(memory, handling="merge")
-```
 
-## Error Handling
-
-### Fallback Stages
-
-Provide alternative processing on errors:
 
 ```python
 primary_stage = Stage.completion(
@@ -345,12 +250,7 @@ fallback_stage = Stage.completion(
 robust_stage = primary_stage.with_fallback(
     fallback_stage,
     catching=ConnectionError  # Fall back on connection errors
-)
-```
 
-### Context Trimming
-
-Manage context size to avoid token limits:
 
 ```python
 # Create a sequence that first trims context, then processes
@@ -363,12 +263,7 @@ trimmed_stage = Stage.sequence(
 clean_stage = Stage.sequence(
     Stage.completion("Process with tools", tools=[some_tool]),
     Stage.strip_context_tools()  # Remove tool calls from context
-)
-```
 
-### Volatile Context Management
-
-Control what changes persist in the context:
 
 ```python
 # Stage that discards context changes but keeps result
@@ -380,12 +275,7 @@ volatile_stage = Stage.completion(
 volatile_tools_stage = Stage.completion(
     "Use tools but don't keep tool calls in context",
     tools=[some_tool]
-).with_volatile_tools_context()
-```
 
-### Result Manipulation
-
-Control how stage results are handled:
 
 ```python
 # Stage that ignores its result and keeps the previous one
@@ -396,14 +286,7 @@ ignored_stage = Stage.completion(
 # Stage that extends the current result instead of replacing it
 extending_stage = Stage.completion(
     "Add more information"
-).extend_result()
-```
 
-## Advanced Patterns
-
-### Method Chaining
-
-You can combine multiple behaviors fluently:
 
 ```python
 comprehensive_stage = (
@@ -413,12 +296,7 @@ comprehensive_stage = (
     .with_retry(limit=2)
     .traced(label="data_processing")
     .when(lambda *, state: len(state.result.as_string()) > 10)
-)
-```
 
-### Custom Stage Functions
-
-Stages can be also created fully customized by using the `stage` decorator:
 
 ```python
 from draive import stage
@@ -435,12 +313,7 @@ async def custom_processor(
     return state.updated(result=processed_result)
 
 # Use the custom stage as regular stage
-custom_stage: Stage = custom_processor
-```
 
-## Complete Example
-
-Here's a comprehensive example combining multiple concepts:
 
 ```python
 from draive import ctx, Stage, MultimodalContent, StageState, tool

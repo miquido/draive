@@ -78,6 +78,7 @@ def test_validation() -> None:
                     "type": "integer",
                 }
             },
+            "additionalProperties": False,
         },
         {  # dict
             "type": "object",

@@ -27,9 +27,9 @@ from mcp.types import TextContent as MCPTextContent
 from pydantic import AnyUrl
 
 from draive.models import FunctionTool, Tool, ToolError, ToolsProvider
-from draive.multimodal import MediaData, MultimodalContent, TextContent
+from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 from draive.parameters import DataModel, validated_tool_specification
-from draive.resources import Resource, ResourceContent, ResourceDeclaration, Resources
+from draive.resources import ResourceContent, ResourceReference, ResourcesRepository
 
 __all__ = (
     "MCPClient",
@@ -47,7 +47,7 @@ class MCPClient:
         command: str,
         args: Sequence[str] | None = None,
         env: Mapping[str, str] | None = None,
-        features: Collection[type[Resources] | type[ToolsProvider]] | None = None,
+        features: Collection[type[ResourcesRepository] | type[ToolsProvider]] | None = None,
         tags: MetaTags | None = None,
     ) -> Self:
         @asynccontextmanager
@@ -65,7 +65,7 @@ class MCPClient:
         return cls(
             identifier or uuid4().hex,
             session_manager=mcp_stdio_session(),
-            features=features if features is not None else (Resources, ToolsProvider),
+            features=features if features is not None else (ResourcesRepository, ToolsProvider),
             tags=tags if tags is not None else (),
         )
 
@@ -78,7 +78,7 @@ class MCPClient:
         headers: Mapping[str, Any] | None = None,
         timeout: float = 5,
         sse_read_timeout: float = 60 * 5,
-        features: Collection[type[Resources] | type[ToolsProvider]] | None = None,
+        features: Collection[type[ResourcesRepository] | type[ToolsProvider]] | None = None,
         tags: MetaTags | None = None,
     ) -> Self:
         @asynccontextmanager
@@ -95,7 +95,7 @@ class MCPClient:
         return cls(
             identifier or uuid4().hex,
             session_manager=mcp_sse_session(),
-            features=features if features is not None else (Resources, ToolsProvider),
+            features=features if features is not None else (ResourcesRepository, ToolsProvider),
             tags=tags if tags is not None else (),
         )
 
@@ -112,19 +112,19 @@ class MCPClient:
         identifier: str,
         *,
         session_manager: AbstractAsyncContextManager[ClientSession],
-        features: Collection[type[Resources] | type[ToolsProvider]],
+        features: Collection[type[ResourcesRepository] | type[ToolsProvider]],
         tags: MetaTags,
     ) -> None:
         self.identifier: str = identifier
         self._session_manager: AbstractAsyncContextManager[ClientSession] = session_manager
         self._session: ClientSession
-        self._features: Collection[type[Resources] | type[ToolsProvider]] = features
+        self._features: Collection[type[ResourcesRepository] | type[ToolsProvider]] = features
         self.tags: MetaTags = tags
 
     async def resources_list(
         self,
         **extra: Any,
-    ) -> Sequence[ResourceDeclaration]:
+    ) -> Sequence[ResourceReference]:
         assert hasattr(  # nosec: B101
             self,
             "_session",
@@ -135,15 +135,15 @@ class MCPClient:
         result: ListResourcesResult = await self._session.list_resources()
 
         return [
-            ResourceDeclaration(
+            ResourceReference(
                 uri=self._with_uri_identifier(resource.uri.unicode_string()),
-                name=resource.name,
-                description=resource.description,
                 mime_type=resource.mimeType,
                 meta=Meta(
                     {
                         "mcp_server": self.identifier,
                         "tags": self.tags,
+                        "name": resource.name,
+                        "description": resource.description,
                     }
                 ),
             )
@@ -154,40 +154,51 @@ class MCPClient:
         self,
         uri: str,
         **extra: Any,
-    ) -> Resource | None:
+    ) -> Collection[ResourceReference] | ResourceContent | None:
         assert hasattr(  # nosec: B101
             self,
             "_session",
         ), "MCPClient has to be initialized through async context entering"
+
         result: ReadResourceResult = await self._session.read_resource(
             uri=AnyUrl(self._without_uri_identifier(uri))
         )
 
-        match [self._convert_resource_content(element) for element in result.contents]:
+        match result.contents:
             case [resource]:
                 # if there is only a single element return it directly
-                return resource
+                return self._convert_resource_content(resource)
 
             case [*resources]:
-                return Resource(
-                    uri=uri,
-                    name="resources",
-                    description=None,
-                    content=resources,
-                    meta=Meta(
-                        {
-                            "mcp_server": self.identifier,
-                            "tags": self.tags,
-                        }
-                    ),
-                )
+                # otherwise convert to references ignoring content
+                return [
+                    ResourceReference(
+                        uri=resource.uri.unicode_string(),
+                        mime_type=resource.mimeType,
+                        meta=Meta(
+                            {
+                                "mcp_server": self.identifier,
+                                "tags": self.tags,
+                            }
+                        ),
+                    )
+                    for resource in resources
+                ]
 
     async def resource_upload(
         self,
-        resource: Resource,
+        uri: str,
+        content: ResourceContent,
+        **extra: Any,
+    ) -> Meta:
+        raise NotImplementedError("Resource uploading is not supported by MCP servers")
+
+    async def resource_delete(
+        self,
+        uri: str,
         **extra: Any,
     ) -> None:
-        raise NotImplementedError("Resource uploading is not supported by MCP servers")
+        raise NotImplementedError("Resource deleting is not supported by MCP servers")
 
     async def tools_fetch(
         self,
@@ -255,7 +266,7 @@ class MCPClient:
             return urlunparse(
                 (
                     # default to mcp scheme if empty
-                    parsed.scheme or "mcpclient",
+                    parsed.scheme or "mcp",
                     # use identifier as domain/netloc
                     self.identifier,
                     path,
@@ -280,7 +291,7 @@ class MCPClient:
         if parsed.netloc == self.identifier:
             return urlunparse(
                 (
-                    parsed.scheme if parsed.scheme != "mcpclient" else "",
+                    parsed.scheme if parsed.scheme != "mcp" else "",
                     "",
                     parsed.path,
                     parsed.params,
@@ -309,17 +320,12 @@ class MCPClient:
         self,
         resource: TextResourceContents | BlobResourceContents,
         /,
-    ) -> Resource:
+    ) -> ResourceContent:
         match resource:
             case TextResourceContents() as text_resource:
-                return Resource(
-                    uri=self._with_uri_identifier(resource.uri.unicode_string()),
-                    name="resource",
-                    description=None,
-                    content=ResourceContent(
-                        blob=text_resource.text.encode(),
-                        mime_type=text_resource.mimeType or "text/plain",
-                    ),
+                return ResourceContent(
+                    data=urlsafe_b64decode(text_resource.text.encode()).decode(),
+                    mime_type=text_resource.mimeType or "text/plain",
                     meta=Meta(
                         {
                             "mcp_server": self.identifier,
@@ -329,14 +335,9 @@ class MCPClient:
                 )
 
             case BlobResourceContents() as blob_resource:
-                return Resource(
-                    uri=self._with_uri_identifier(resource.uri.unicode_string()),
-                    name="resource",
-                    description=None,
-                    content=ResourceContent(
-                        blob=urlsafe_b64decode(blob_resource.blob),
-                        mime_type=blob_resource.mimeType or "application/octet-stream",
-                    ),
+                return ResourceContent(
+                    data=blob_resource.blob,
+                    mime_type=blob_resource.mimeType or "application/octet-stream",
                     meta=Meta(
                         {
                             "mcp_server": self.identifier,
@@ -345,17 +346,18 @@ class MCPClient:
                     ),
                 )
 
-    async def __aenter__(self) -> Sequence[Resources | ToolsProvider]:
+    async def __aenter__(self) -> Sequence[ResourcesRepository | ToolsProvider]:
         self._session = await self._session_manager.__aenter__()
         await self._session.initialize()
 
-        features: list[Resources | ToolsProvider] = []
-        if Resources in self._features:
+        features: list[ResourcesRepository | ToolsProvider] = []
+        if ResourcesRepository in self._features:
             features.append(
-                Resources(
+                ResourcesRepository(
                     list_fetching=self.resources_list,
                     fetching=self.resource_fetch,
                     uploading=self.resource_upload,
+                    deleting=self.resource_delete,
                     meta=Meta(
                         {
                             "mcp_server": self.identifier,
@@ -408,17 +410,17 @@ async def _convert_content(  # noqa: C901, PLR0911
 
         case MCPImageContent() as image:
             return MultimodalContent.of(
-                MediaData.of(
+                ResourceContent.of(
                     urlsafe_b64decode(image.data),
-                    media=image.mimeType,
+                    mime_type=image.mimeType,
                 )
             )
 
         case MCPAudioContent() as audio:
             return MultimodalContent.of(
-                MediaData.of(
+                ResourceContent.of(
                     urlsafe_b64decode(audio.data),
-                    media=audio.mimeType,
+                    mime_type=audio.mimeType,
                 )
             )
 
@@ -441,15 +443,17 @@ async def _convert_content(  # noqa: C901, PLR0911
 
                         case "application/json":
                             return MultimodalContent.of(
-                                DataModel.from_json(urlsafe_b64decode(blob.blob).decode())
+                                ArtifactContent.of(
+                                    DataModel.from_json(urlsafe_b64decode(blob.blob).decode())
+                                )
                             )
 
                         case other:
                             # try to match supported media or raise an exception
                             return MultimodalContent.of(
-                                MediaData.of(
+                                ResourceContent.of(
                                     urlsafe_b64decode(blob.blob),
-                                    media=other,
+                                    mime_type=other,
                                 )
                             )
 
@@ -534,7 +538,7 @@ class MCPClients:
         *clients: MCPClient,
     ) -> None:
         self._clients: Mapping[str, MCPClient] = {c.identifier: c for c in [client, *clients]}
-        self._resources: Mapping[str, Resources]
+        self._resources: Mapping[str, ResourcesRepository]
         self._tools: Mapping[str, ToolsProvider]
 
     async def resources_list(
@@ -542,7 +546,7 @@ class MCPClients:
         *,
         mcp_server: str | None = None,
         **extra: Any,
-    ) -> Sequence[ResourceDeclaration]:
+    ) -> Sequence[ResourceReference]:
         if mcp_server is None:
             return tuple(
                 chain.from_iterable(
@@ -562,9 +566,9 @@ class MCPClients:
         self,
         uri: str,
         **extra: Any,
-    ) -> Resource | None:
+    ) -> Collection[ResourceReference] | ResourceContent | None:
         if client_identifier := self._client_identifier_for_uri(uri):
-            return await self._resources[client_identifier].fetch(uri)
+            return await self._resources[client_identifier].fetching(uri)
 
         else:
             ctx.log_warning(f"Requested resource ({uri}) from unknown source")
@@ -572,10 +576,18 @@ class MCPClients:
 
     async def resource_upload(
         self,
-        resource: Resource,
+        uri: str,
+        content: ResourceContent,
+        **extra: Any,
+    ) -> Meta:
+        raise NotImplementedError("Resource uploading is not supported by MCP servers")
+
+    async def resource_delete(
+        self,
+        uri: str,
         **extra: Any,
     ) -> None:
-        raise NotImplementedError("Resource uploading is not supported by MCP servers")
+        raise NotImplementedError("Resource deleting is not supported by MCP servers")
 
     def _client_identifier_for_uri(
         self,
@@ -619,8 +631,8 @@ class MCPClients:
         else:
             return ()
 
-    async def __aenter__(self) -> Sequence[Resources | ToolsProvider]:
-        features: Sequence[Sequence[Resources | ToolsProvider]] = await gather(
+    async def __aenter__(self) -> Sequence[ResourcesRepository | ToolsProvider]:
+        features: Sequence[Sequence[ResourcesRepository | ToolsProvider]] = await gather(
             *[client.__aenter__() for client in self._clients.values()]
         )
 
@@ -630,19 +642,20 @@ class MCPClients:
 
         for states in features:
             for state in states:
-                if isinstance(state, Resources):
+                if isinstance(state, ResourcesRepository):
                     self._resources[cast(str, state.meta["mcp_server"])] = state
 
                 if isinstance(state, ToolsProvider):
                     self._tools[cast(str, state.meta["mcp_server"])] = state
 
-        inherited_features: list[Resources | ToolsProvider] = []
+        inherited_features: list[ResourcesRepository | ToolsProvider] = []
         if self._resources:
             inherited_features.append(
-                Resources(
+                ResourcesRepository(
                     list_fetching=self.resources_list,
                     fetching=self.resource_fetch,
                     uploading=self.resource_upload,
+                    deleting=self.resource_delete,
                     meta=Meta({"mcp_server": "mcp_aggregate"}),
                 )
             )

@@ -1,55 +1,129 @@
-from collections.abc import Sequence
-from typing import Any, Protocol, Self, overload, runtime_checkable
+from base64 import urlsafe_b64decode, urlsafe_b64encode
+from collections.abc import Collection, Sequence
+from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
 
 from haiway import META_EMPTY, Meta, MetaValues, State
 
-from draive.multimodal import (
-    MediaData,
-    MediaReference,
-    MultimodalContent,
-    MultimodalContentElement,
-    TextContent,
-)
 from draive.parameters import DataModel
 
 __all__ = (
+    "MimeType",
     "Resource",
     "ResourceContent",
-    "ResourceDeclaration",
-    "ResourceException",
+    "ResourceCorrupted",
+    "ResourceDeleting",
     "ResourceFetching",
     "ResourceListFetching",
     "ResourceMissing",
-    "ResourceTemplateDeclaration",
+    "ResourceReference",
+    "ResourceReferenceTemplate",
     "ResourceUploading",
 )
 
 
-class ResourceException(Exception):
-    pass
+class ResourceMissing(Exception):
+    """Raised when a resource cannot be found."""
+
+    __slots__ = ("uri",)
+
+    def __init__(
+        self,
+        *,
+        uri: str,
+    ) -> None:
+        super().__init__(f"Missing resource - {uri}")
+        self.uri: str = uri or ""
 
 
-class ResourceMissing(ResourceException):
-    pass
+class ResourceCorrupted(Exception):
+    """Raised when a resource cannot be resolved correctly."""
+
+    __slots__ = ("uri",)
+
+    def __init__(
+        self,
+        *,
+        uri: str,
+    ) -> None:
+        super().__init__(f"Corrupted resource - {uri}")
+        self.uri: str = uri or ""
 
 
-class ResourceDeclaration(DataModel):
+MimeType = (
+    Literal[
+        "image/jpeg",
+        "image/png",
+        "image/bmp",
+        "image/gif",
+        "audio/aac",
+        "audio/mpeg",
+        "audio/ogg",
+        "audio/wav",
+        "audio/pcm16",
+        "video/mp4",
+        "video/mpeg",
+        "video/ogg",
+        "application/octet-stream",
+        "application/json",
+        "text/plain",
+    ]
+    | str
+)
+
+
+class ResourceReference(DataModel):
+    @classmethod
+    def of(
+        cls,
+        /,
+        uri: str,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        mime_type: MimeType | None = None,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        return cls(
+            uri=uri,
+            mime_type=mime_type,
+            meta=Meta.of(meta).updated(
+                name=name,
+                description=description,
+            ),
+        )
+
     uri: str
-    mime_type: str | None
-    name: str
-    description: str | None = None
+    mime_type: MimeType | None = None
     meta: Meta = META_EMPTY
 
 
-class ResourceTemplateDeclaration(DataModel):
-    uri_template: str
-    mime_type: str | None
-    name: str
-    description: str | None = None
+class ResourceReferenceTemplate(DataModel):
+    @classmethod
+    def of(
+        cls,
+        /,
+        template_uri: str,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        mime_type: MimeType | None = None,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        return cls(
+            template_uri=template_uri,
+            mime_type=mime_type,
+            meta=Meta.of(meta).updated(
+                name=name,
+                description=description,
+            ),
+        )
+
+    template_uri: str
+    mime_type: MimeType | None = None
     meta: Meta = META_EMPTY
 
 
-class ResourceContent(State):
+class ResourceContent(DataModel):
     @overload
     @classmethod
     def of(
@@ -57,78 +131,85 @@ class ResourceContent(State):
         content: bytes,
         /,
         *,
-        mime_type: str,
+        mime_type: MimeType,
+        meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
     @overload
     @classmethod
     def of(
         cls,
-        content: MultimodalContentElement | str,
+        content: str,
         /,
         *,
-        mime_type: str | None = None,
+        mime_type: MimeType,
+        meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
     @classmethod
     def of(
         cls,
-        content: MultimodalContentElement | str | bytes,
+        content: str | bytes,
         /,
         *,
-        mime_type: str | None = None,
+        mime_type: MimeType | None = None,
+        meta: Meta | MetaValues | None = None,
     ) -> Self:
-        match content:
-            case str() as text:
-                return cls(
-                    mime_type=mime_type or "text/plain",
-                    blob=text.encode(),
-                )
+        if isinstance(content, str):
+            # Treat plain strings as text content; encode safely to base64
+            encoded_content: str = urlsafe_b64encode(content.encode("utf-8")).decode("utf-8")
 
-            case bytes() as data:
-                return cls(
-                    mime_type=mime_type or "application/octet-stream",
-                    blob=data,
-                )
+            return cls(
+                data=encoded_content,
+                mime_type=mime_type if mime_type is not None else "text/plain",
+                meta=Meta.of(meta),
+            )
 
-            case TextContent() as text_content:
-                return cls(
-                    mime_type=mime_type or "text/plain",
-                    blob=text_content.text.encode(),
-                )
+        else:
+            assert isinstance(content, bytes)  # nosec: B101
 
-            case MediaData() as media_data:
-                return cls(
-                    mime_type=mime_type or media_data.media,
-                    blob=media_data.data,
-                )
+            return cls(
+                data=urlsafe_b64encode(content).decode("utf-8"),
+                mime_type=mime_type if mime_type is not None else "application/octet-stream",
+                meta=Meta.of(meta),
+            )
 
-            case MediaReference():
-                raise ValueError("Resource can't use a media reference")
-
-            case other:
-                return cls(
-                    mime_type=mime_type or "application/json",
-                    blob=other.to_json().encode(),
-                )
-
+    data: str  # base64 encoded
     mime_type: str
-    blob: bytes
+    meta: Meta = META_EMPTY
 
-    def to_multimodal(self) -> MultimodalContentElement:
-        match self.mime_type:
-            case "text/plain":
-                return TextContent(text=self.blob.decode())
+    def to_str(
+        self,
+        *,
+        include_data: bool = False,
+    ) -> str:
+        kind: str
+        if self.mime_type.startswith("image"):
+            kind = "image"
 
-            case "application/json":
-                return DataModel.from_json(self.blob.decode())
+        elif self.mime_type.startswith("audio"):
+            kind = "audio"
 
-            case other:
-                # try to match supported media
-                return MediaData.of(
-                    self.blob,
-                    media=other,
-                )
+        elif self.mime_type.startswith("video"):
+            kind = "video"
+
+        else:
+            kind = ""
+
+        if include_data:
+            return f"![{kind}]({self.to_data_uri()})"
+
+        else:
+            return f"![{kind}](REDACTED)"
+
+    def to_bytes(self) -> bytes:
+        return urlsafe_b64decode(self.data)
+
+    def to_data_uri(self) -> str:
+        return f"data:{self.mime_type};base64,{self.data}"
+
+    def __bool__(self) -> bool:
+        return len(self.data) > 0
 
 
 class Resource(State):
@@ -142,7 +223,7 @@ class Resource(State):
         uri: str,
         name: str | None = None,
         description: str | None = None,
-        mime_type: str,
+        mime_type: MimeType | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
@@ -150,94 +231,86 @@ class Resource(State):
     @classmethod
     def of(
         cls,
-        content: MultimodalContentElement | str,
+        content: str,
         /,
         *,
         uri: str,
         name: str | None = None,
         description: str | None = None,
-        mime_type: str | None = None,
+        mime_type: MimeType | None = None,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self: ...
+
+    @overload
+    @classmethod
+    def of(
+        cls,
+        content: ResourceContent,
+        /,
+        *,
+        uri: str,
+        name: str | None = None,
+        description: str | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
     @classmethod
     def of(
         cls,
-        content: MultimodalContentElement | str | bytes,
+        content: Collection[ResourceReference] | ResourceContent | str | bytes,
         /,
         *,
         uri: str,
         name: str | None = None,
         description: str | None = None,
-        mime_type: str | None = None,
+        mime_type: MimeType | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        resource_content: ResourceContent
-        resource_meta: Meta
-        match content:
-            case str() as text:
-                resource_content = ResourceContent(
-                    mime_type=mime_type or "text/plain",
-                    blob=text.encode(),
-                )
-                resource_meta = Meta.of(meta)
+        resource_content: Collection[ResourceReference] | ResourceContent
+        if isinstance(content, bytes):
+            resource_content = ResourceContent.of(
+                content,
+                mime_type=mime_type if mime_type is not None else "application/octet-stream",
+            )
 
-            case bytes() as data:
-                resource_content = ResourceContent(
-                    mime_type=mime_type or "application/octet-stream",
-                    blob=data,
-                )
-                resource_meta = Meta.of(meta)
+        elif isinstance(content, str):
+            resource_content = ResourceContent.of(
+                content,  # assuming base64
+                mime_type=mime_type if mime_type is not None else "application/octet-stream",
+            )
 
-            case TextContent() as text_content:
-                resource_content = ResourceContent(
-                    mime_type=mime_type or "text/plain",
-                    blob=text_content.text.encode(),
-                )
-                resource_meta = (
-                    text_content.meta.merged_with(meta) if meta is not None else text_content.meta
-                )
-
-            case MediaData() as media_data:
-                resource_content = ResourceContent(
-                    mime_type=mime_type or media_data.media,
-                    blob=media_data.data,
-                )
-                resource_meta = (
-                    media_data.meta.merged_with(meta) if meta is not None else media_data.meta
-                )
-
-            case MediaReference():
-                raise ValueError("Resource can't use a media reference")
-
-            case other:
-                resource_content = ResourceContent(
-                    mime_type=mime_type or "application/json",
-                    blob=other.to_json().encode(),
-                )
-                resource_meta = Meta.of(meta)
+        else:
+            assert isinstance(content, Collection | ResourceContent)  # nosec: B101
+            resource_content = content
 
         return cls(
             uri=uri,
-            name=name or uri,
-            description=description,
             content=resource_content,
-            meta=resource_meta,
+            meta=Meta.of(meta).updated(
+                name=name,
+                description=description,
+            ),
         )
 
     uri: str
-    name: str
-    description: str | None
-    content: Sequence[Self] | ResourceContent
+    content: Collection[ResourceReference] | ResourceContent
     meta: Meta = META_EMPTY
 
-    def to_multimodal(self) -> MultimodalContent:
-        match self.content:
-            case ResourceContent() as content:
-                return MultimodalContent.of(content.to_multimodal())
+    @property
+    def reference(self) -> ResourceReference:
+        if isinstance(self.content, ResourceContent):
+            return ResourceReference(
+                uri=self.uri,
+                mime_type=self.content.mime_type,
+                meta=self.meta,
+            )
 
-            case content:
-                return MultimodalContent.of(*[element.to_multimodal() for element in content])
+        else:
+            return ResourceReference(
+                uri=self.uri,
+                mime_type=None,
+                meta=self.meta,
+            )
 
 
 @runtime_checkable
@@ -245,7 +318,8 @@ class ResourceFetching(Protocol):
     async def __call__(
         self,
         uri: str,
-    ) -> Resource | None: ...
+        **extra: Any,
+    ) -> Collection[ResourceReference] | ResourceContent | None: ...
 
 
 @runtime_checkable
@@ -253,13 +327,23 @@ class ResourceListFetching(Protocol):
     async def __call__(
         self,
         **extra: Any,
-    ) -> Sequence[ResourceDeclaration]: ...
+    ) -> Sequence[ResourceReference]: ...
 
 
 @runtime_checkable
 class ResourceUploading(Protocol):
     async def __call__(
         self,
-        resource: Resource,
+        uri: str,
+        content: ResourceContent,
+        **extra: Any,
+    ) -> Meta: ...
+
+
+@runtime_checkable
+class ResourceDeleting(Protocol):
+    async def __call__(
+        self,
+        uri: str,
         **extra: Any,
     ) -> None: ...

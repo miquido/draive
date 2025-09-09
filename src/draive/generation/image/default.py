@@ -9,7 +9,8 @@ from draive.models import (
     ModelOutput,
     ResolveableInstructions,
 )
-from draive.multimodal import MediaContent, MultimodalContent
+from draive.multimodal import MultimodalContent
+from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("generate_image",)
 
@@ -19,7 +20,7 @@ async def generate_image(
     instructions: ResolveableInstructions,
     input: MultimodalContent,  # noqa: A002
     **extra: Any,
-) -> MediaContent:
+) -> ResourceContent | ResourceReference:
     async with ctx.scope("generate_image"):
         result: ModelOutput = await GenerativeModel.completion(
             instructions=await InstructionsRepository.resolve(instructions),
@@ -28,7 +29,7 @@ async def generate_image(
             **extra,
         )
 
-        for image in result.content.media("image"):
+        for image in result.content.images():
             return image
 
         raise ValueError("Failed to generate a valid image")

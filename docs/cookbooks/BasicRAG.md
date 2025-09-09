@@ -6,12 +6,7 @@ RAG is a technique of adding additional information to the LLM context, to achie
 ```python
 from draive import load_env
 
-load_env() # load .env variables
-```
 
-## Data preparation
-
-We are going to use the same text about John Doe as we did in [Basic Data Extraction](./BasicDataExtraction.md) as our input. After assigning it to a variable, we will prepare it for embedding by splitting the original text into smaller chunks. This allows us to fit the data into limited context windows and filter out unnecessary information. We’ll use a basic splitter that looks for paragraph structure defined by multiple subsequent newlines in the text. Chunks will be put into a structured envelope that allows storing additional information such as the full document text or extra metadata.
 
 ```python
 from draive import DataModel, ctx, split_text
@@ -71,12 +66,7 @@ print("\n---\n".join(chunk.content for chunk in document_chunks))
     ---
     As John reflects on his journey from a small farm in Texas to the vibrant city of Vancouver, he feels a sense of pride and accomplishment. He knows that his seven-year-old self would be proud of the life he has built in the country that captured his imagination all those years ago. With a smile on his
     ---
-    that captured his imagination all those years ago. With a smile on his face, John looks forward to the future and all the adventures that Vancouver has in store for him.
 
-
-## Data indexing
-
-When we have prepared the data, we can now use a vector index to make it searchable. We are going to use in-memory, volatile vector index which can be useful for a quick search. Preparing the index requires defining the text embedding method. In this example we are going to use OpenAI embedding solution. After defining all required parameters and providers we can prepare the index using our data. In order to ensure proper data embedding it is required to specify what value will be used to prepare the vector. In this case we specify the chunk content to be used.
 
 
 ```python
@@ -102,12 +92,7 @@ async with ctx.scope(
         values=document_chunks,
         # define what value will be embedded for each chunk
         attribute=DocumentChunk._.content,
-    )
-```
 
-## Searching the index
-
-Now we have everything set up to do our search. Instead of searching directly, we are going to leverage the ability of LLMs to call tools. We have to define a search tool for that task, which will use our index to deliver the results. LLM will make use of this tool to look for the answer based on the search result.
 
 
 ```python

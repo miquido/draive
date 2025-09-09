@@ -1,20 +1,8 @@
 # Comprehensive Evaluation Framework
 
-The Draive evaluation framework provides a systematic approach to evaluating AI model outputs, workflows, and applications. It offers multiple levels of evaluation from individual checks to comprehensive test suites with automated case generation.
-
-## Overview
-
-The evaluation framework consists of three main components:
 
 1. **Evaluators** - Individual evaluation functions with configurable thresholds
-2. **Scenarios** - Groups of evaluators for comprehensive testing
-3. **Suites** - Test suite management with case generation and storage
 
-## Core Concepts
-
-### Evaluation Scores
-
-All evaluations produce normalized scores between 0 and 1:
 
 ```python
 from draive import EvaluationScore
@@ -25,21 +13,9 @@ score2 = EvaluationScore.of("good")  # Named levels
 score3 = EvaluationScore.of(True)  # Boolean (1.0 for True, 0.0 for False)
 
 # Named score levels - prefer these over numeric values for better readability
-# "none" = 0.0, "poor" = 0.1, "fair" = 0.3 "good" = 0.5, "excellent" = 0.7, "perfect" = 0.9, "max" = 1.0
-```
 
-### Performance Metrics
-
-Performance is calculated as `(score / threshold) * 100%`:
 - Values can exceed 100% when score > threshold
-- Aggregate calculations cap individual performances at 100% for consistency
-- Normalized with up to 100% for aggregation
 
-## Creating Evaluators
-
-### Basic Evaluator
-
-```python
 from draive import evaluator, EvaluationScore
 
 @evaluator(name="length_check") # custom name, default is function name
@@ -53,12 +29,7 @@ async def check_response_length(value: str, min_length: int = 100) -> float:
 # Use the evaluator
 result = await check_response_length("This is a test response...")
 print(f"Passed: {result.passed}")  # True if score >= "excellent" (0.7)
-print(f"Performance: {result.performance:.1f}%")
-```
 
-### Evaluator with Metadata
-
-```python
 @evaluator(threshold="good") # custom threshold, default is 1 (max)
 async def check_sentiment(value: str) -> EvaluationScore:
     """Evaluate text sentiment using an LLM."""
@@ -70,12 +41,7 @@ async def check_sentiment(value: str) -> EvaluationScore:
             "sentiment": "positive" if sentiment_score > 0.5 else "negative",
             "confidence": 0.95
         }
-    )
-```
 
-### Prepared Evaluators
-
-Pre-bind arguments for reusable configurations:
 
 ```python
 # Create a prepared evaluator with fixed parameters
@@ -83,12 +49,7 @@ strict_length_check = check_response_length.prepared(min_length=200)
 
 # Use it multiple times
 result1 = await strict_length_check("Response 1...")
-result2 = await strict_length_check("Response 2...")
-```
 
-## Evaluator Scenarios
-
-Scenarios group multiple evaluators for comprehensive testing:
 
 ```python
 from collections.abc import Sequence
@@ -122,12 +83,7 @@ print(f"All evaluations passed: {all_passed}")
 print(f"Average performance: {avg_performance:.1f}%")
 
 for result in evaluation_results:
-    print(f"- {result.evaluator}: {result.score.value} ({'✓' if result.passed else '✗'})")
-```
 
-### Concurrent Evaluator Execution
-
-For better performance, run evaluators concurrently using the `evaluate` helper:
 
 ```python
 from draive.evaluation import evaluate
@@ -149,15 +105,6 @@ async def evaluate_response_quality_parallel(
     )
 ```
 
-**Tip**: Concurrent execution is especially beneficial when evaluators make network calls (e.g., to LLMs) or perform I/O operations. The `concurrent_tasks` parameter controls the maximum number of evaluators running simultaneously.
-
-## Evaluation Suites
-
-Suites provide comprehensive test management with storage and case generation:
-
-### Creating a Suite
-
-```python
 from draive import evaluator_suite, DataModel
 from pathlib import Path
 
@@ -184,12 +131,7 @@ async def qa_test_suite(
         await check_response_length(answer, parameters.min_length),
         await check_topic_coverage(answer, parameters.expected_topics),
         await check_factual_accuracy(answer, parameters.question)
-    ]
-```
 
-### Managing Test Cases
-
-```python
 # Add test cases manually
 await qa_test_suite.add_case(
     QATestCase(
@@ -217,12 +159,7 @@ all_cases = await qa_test_suite.cases()
 print(f"Total cases: {len(all_cases)}")
 
 # Remove a case
-await qa_test_suite.remove_case("case-id-123")
-```
 
-### Running Suite Evaluations
-
-```python
 # Run all test cases
 full_results = await qa_test_suite()
 
@@ -241,14 +178,7 @@ print(
         detailed=True,
         include_passed=False  # Show only failures
     )
-)
-```
 
-## Advanced Features
-
-### Composition and Transformation
-
-```python
 # Compose evaluators - return lowest/highest score
 conservative_eval = Evaluator.lowest(
     evaluator1.prepared(),
@@ -269,12 +199,7 @@ field_evaluator = my_evaluator.contra_map(MyModel._.attribute.path)
 # Apply custom transformation
 transformed = my_evaluator.contra_map(
     lambda data: data["response"].strip().lower()
-)
-```
 
-### State Management
-
-Include additional state in evaluation context:
 
 ```python
 from draive import State
@@ -291,14 +216,7 @@ async def strict_evaluator(value: str) -> float:
     config = ctx.state(EvaluationConfig)
     if config.strict_mode:
         # Apply stricter evaluation logic
-        ...
-```
 
-## Best Practices
-
-### 1. Threshold Selection
-
-Choose appropriate thresholds based on criticality and business impact:
 
 ```python
 from draive.evaluators import (
@@ -343,12 +261,7 @@ precise_check = factual_accuracy_evaluator.with_threshold(0.85)  # Between excel
 **Threshold Guidelines by Use Case:**
 - **Safety & Compliance**: Always use "perfect" - no tolerance for violations
 - **Core Quality**: Use "excellent" - high standards for user-facing content
-- **Feature Quality**: Use "good" - balanced standards allowing some flexibility
-- **Experimental/Optional**: Use "fair" - minimum acceptable standards
 
-### 2. Meaningful Metadata
-
-Include context in evaluation results:
 
 ```python
 @evaluator
@@ -363,12 +276,7 @@ async def evaluate_with_context(response: str) -> EvaluationScore:
             "evaluation_model": "gpt-4",
             "confidence": 0.85
         }
-    )
-```
 
-### 3. Effective Case Generation
-
-Provide good examples for LLM-based generation:
 
 ```python
 # Define diverse, high-quality examples
@@ -396,12 +304,7 @@ cases = await suite.generate_cases(
     - Edge cases and error conditions
     - Performance boundaries
     """
-)
-```
 
-## Summary
-
-The Draive evaluation framework provides:
 
 - **Flexible scoring** with normalized values and named levels
 - **Composable evaluators** with thresholds and metadata

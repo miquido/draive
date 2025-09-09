@@ -1,10 +1,5 @@
 # Basic tools use
 
-Various LLM use cases can utilize function/tool calls to extend LLM capabilities. Draive comes with a dedicated solution to prepare tools and control its execution.
-
-## Tool definition
-
-Let's start by defining a simple tool. Tool is usually a function which is explained to LLM and can be requested to be used. Tools can require generation of arguments and have to return some value. Tools defined within draive are python async function annotated with `tool` wrapper.
 
 
 ```python
@@ -14,12 +9,7 @@ from draive import tool
 @tool # simply annotate function as a tool, tools can have arguments using basic types
 async def current_time(location: str) -> str:
     # return result of tool execution, we are using fake time here
-    return f"Time in {location} is 9:53:22"
-```
 
-## Tool use
-
-After defining a tool, we can use it in multiple scenarios to extend LLM capabilities. All tool arguments are validated when calling. It includes type check and any additional validation if defined. You can still use it as a regular function, although, all tools have to be executed within draive context scope.
 
 
 ```python
@@ -62,12 +52,7 @@ async with ctx.scope(
     print(result)
 ```
 
-    The current time in New York is 9:53 AM.
 
-
-## Tool details
-
-Tools can be customized and extended in various ways depending on use case. First of all we can customize tool arguments and help LLM to better understand how to use given tool.
 
 
 ```python
@@ -119,12 +104,7 @@ We can customize tools even more using additional parameters like custom result 
     availability_check=lambda: True
 )
 async def customized_more() -> str:
-    return "to be changed"
-```
 
-## Toolbox
-
-We have already mentioned the Toolbox which allows us to specify some additional details regarding the tools execution like the tool calls limit or a tool suggestion. Here is how it looks like:
 
 
 ```python
@@ -154,12 +134,7 @@ async with ctx.scope(
     print(result)
 ```
 
-    The funny thing about large language models (LLMs) is that they can generate text that sounds incredibly smart, yet they often confuse "there," "their," and "they're" like it's a game! It's like having a genius friend who also thinks a duck is a variety of potato. Who knew AI could be so amusing?
 
-
-## Metrics
-
-All of the tool usage is automatically traced within scope metrics. We can see the details about their execution when using a logger:
 
 
 ```python

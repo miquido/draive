@@ -3,108 +3,136 @@ from typing import Any, Literal, overload
 
 from haiway import META_EMPTY, Meta, State, statemethod
 
+from draive.resources.http import (
+    http_resource_deleting,
+    http_resource_fetching,
+    http_resource_list_fetching,
+    http_resource_uploading,
+)
 from draive.resources.types import (
     Resource,
-    ResourceDeclaration,
+    ResourceContent,
+    ResourceCorrupted,
+    ResourceDeleting,
     ResourceFetching,
     ResourceListFetching,
     ResourceMissing,
+    ResourceReference,
     ResourceUploading,
 )
 
-__all__ = ("Resources",)
+__all__ = ("ResourcesRepository",)
 
 
-class Resources(State):
+class ResourcesRepository(State):
     @overload
     @classmethod
     async def fetch_list(
         cls,
         **extra: Any,
-    ) -> Sequence[ResourceDeclaration]: ...
+    ) -> Sequence[ResourceReference]: ...
 
     @overload
     async def fetch_list(
         self,
         **extra: Any,
-    ) -> Sequence[ResourceDeclaration]: ...
+    ) -> Sequence[ResourceReference]: ...
 
     @statemethod
     async def fetch_list(
         self,
         **extra: Any,
-    ) -> Sequence[ResourceDeclaration]:
+    ) -> Sequence[ResourceReference]:
         return await self.list_fetching(**extra)
 
     @overload
     @classmethod
     async def fetch(
         cls,
-        resource: ResourceDeclaration | str,
+        resource: ResourceReference | str,
         /,
+        **extra: Any,
     ) -> Resource | None: ...
 
     @overload
     async def fetch(
         self,
-        resource: ResourceDeclaration | str,
+        resource: ResourceReference | str,
         /,
+        **extra: Any,
     ) -> Resource | None: ...
 
     @overload
     @classmethod
     async def fetch(
         cls,
-        resource: ResourceDeclaration | str,
+        resource: ResourceReference | str,
         /,
         *,
         default: Resource,
+        **extra: Any,
     ) -> Resource: ...
 
     @overload
     async def fetch(
         self,
-        resource: ResourceDeclaration | str,
+        resource: ResourceReference | str,
         /,
         *,
         default: Resource,
+        **extra: Any,
     ) -> Resource: ...
 
     @overload
     @classmethod
     async def fetch(
         cls,
-        resource: ResourceDeclaration | str,
+        resource: ResourceReference | str,
         /,
         *,
         required: Literal[True],
+        **extra: Any,
     ) -> Resource: ...
 
     @overload
     async def fetch(
         self,
-        resource: ResourceDeclaration | str,
+        resource: ResourceReference | str,
         /,
         *,
         required: Literal[True],
+        **extra: Any,
     ) -> Resource: ...
 
     @statemethod
     async def fetch(
         self,
-        resource: ResourceDeclaration | str,
+        resource: ResourceReference | str,
         /,
         *,
         default: Resource | None = None,
         required: bool = True,
+        **extra: Any,
     ) -> Resource | None:
-        uri: str = resource if isinstance(resource, str) else resource.uri
+        uri: str
+        meta: Meta
+        if isinstance(resource, str):
+            uri = resource
+            meta = META_EMPTY
 
-        if fetched := await self.fetching(uri):
-            return fetched
+        else:
+            uri = resource.uri
+            meta = resource.meta
+
+        if content := await self.fetching(uri, **extra):
+            return Resource(
+                uri=uri,
+                content=content,
+                meta=meta,
+            )
 
         elif required and default is None:
-            raise ResourceMissing(f"Missing resource: '{uri}'")
+            raise ResourceMissing(uri=uri)
 
         else:
             return default
@@ -132,10 +160,31 @@ class Resources(State):
         resource: Resource,
         /,
         **extra: Any,
-    ) -> None:
-        return await self.uploading(resource, **extra)
+    ) -> Meta:
+        if isinstance(resource.content, ResourceContent):
+            return await self.uploading(
+                resource.uri,
+                resource.content,
+                **extra,
+            )
 
-    list_fetching: ResourceListFetching
-    fetching: ResourceFetching
-    uploading: ResourceUploading
+        else:  # can't upload resource with references
+            raise ResourceCorrupted(uri=resource.uri)
+
+    @statemethod
+    async def delete(
+        self,
+        resource: Resource,
+        /,
+        **extra: Any,
+    ) -> None:
+        return await self.deleting(
+            resource.uri,
+            **extra,
+        )
+
+    list_fetching: ResourceListFetching = http_resource_list_fetching
+    fetching: ResourceFetching = http_resource_fetching
+    uploading: ResourceUploading = http_resource_uploading
+    deleting: ResourceDeleting = http_resource_deleting
     meta: Meta = META_EMPTY

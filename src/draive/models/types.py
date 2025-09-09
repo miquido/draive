@@ -22,7 +22,7 @@ from typing import (
 
 from haiway import META_EMPTY, Meta, MetaValues, State, ctx
 
-from draive.multimodal import MetaContent, Multimodal, MultimodalContent, MultimodalContentElement
+from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, MultimodalContentPart
 from draive.parameters import DataModel, ToolParametersSpecification
 from draive.utils import Memory
 
@@ -589,22 +589,21 @@ class ModelOutput(State):
         """\
         Return the multimodal content blocks merged into one and including reasoning as MetaContent
         """
-        blocks: list[MultimodalContent] = []
+        parts: list[MultimodalContentPart] = []
         for block in self.blocks:
             if isinstance(block, MultimodalContent):
-                blocks.append(block)
+                parts.extend(block.parts)
 
             elif isinstance(block, ModelReasoning):
-                blocks.append(
-                    MultimodalContent.of(
-                        MetaContent.of(
-                            "reasoning",
-                            content=block.content.to_str(),
-                        )
+                parts.append(
+                    ArtifactContent.of(
+                        block,
+                        category="reasoning",
+                        hidden=True,
                     )
                 )
 
-        return MultimodalContent.of(*blocks)
+        return MultimodalContent.of(*parts)
 
     @property
     def reasoning(self) -> Sequence[ModelReasoning]:
@@ -621,7 +620,7 @@ class ModelOutput(State):
         return bool(self.blocks)
 
 
-ModelStreamOutput = MultimodalContentElement | ModelReasoning | ModelToolRequest
+ModelStreamOutput = MultimodalContentPart | ModelReasoning | ModelToolRequest
 """Individual chunks that can be streamed as model output."""
 
 

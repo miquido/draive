@@ -18,7 +18,6 @@ class VLLMChatConfig(Configuration):
     seed: int | Missing = MISSING
     vision_details: Literal["auto", "low", "high"] | Missing = MISSING
     parallel_tool_calls: bool | Missing = MISSING
-    timeout: float | Missing = MISSING
     stop_sequences: Sequence[str] | Missing = MISSING
 
 
@@ -26,4 +25,3 @@ class VLLMEmbeddingConfig(Configuration):
     model: str
     dimensions: int | Missing = MISSING
     batch_size: int = 128
-    timeout: float | Missing = MISSING

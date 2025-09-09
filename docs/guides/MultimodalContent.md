@@ -1,69 +1,43 @@
 # Multimodal Content
 
-Draive provides comprehensive support for multimodal content through the `MultimodalContent` class and related types. This allows you to seamlessly work with text, images, audio, video, and other media types in your LLM applications.
-
-## Core Components
-
-The multimodal system consists of several key components:
-
-### MultimodalContent
-
-The main container for multimodal data that can hold various content elements:
 
 ```python
-from draive import MultimodalContent, TextContent, MediaData
+from draive import MultimodalContent, TextContent, ResourceContent
 
 # Create multimodal content from various sources
 content = MultimodalContent.of(
     "Here's an image:",
-    MediaData.of(
-        data=image_bytes,
-        media="image/jpeg"
-    ),
+    ResourceContent.of(image_bytes, mime_type="image/jpeg"),
     "And some additional text."
-)
-```
 
-### Content Elements
 
-The framework supports these content element types:
-
-- **TextContent**: Plain text with optional metadata
-- **MediaContent**: Images, audio, video (data or references)
-- **MetaContent**: Categorized content with metadata
-- **DataModel**: Any structured data model
+- Text: `TextContent` — plain text with optional metadata
+- Resources: `ResourceContent` (embedded data) and `ResourceReference` (by URI)
+- Artifacts: `ArtifactContent` — typed, structured data with category and metadata
+- Tags: `MultimodalTag` — lightweight, XML-like tags wrapping content
 
 ```python
-from draive import TextContent, MediaData, MediaReference, MetaContent
+from draive import TextContent, ArtifactContent, DataModel, ResourceContent, ResourceReference
 
 # Text content
 text = TextContent.of("Hello world!")
 
-# Media data (embedded)
-image_data = MediaData.of(
-    image_bytes,
-    media="image/png"
-)
+# Resource data (embedded)
+image_data = ResourceContent.of(image_bytes, mime_type="image/png")
 
-# Media reference (URL)
-image_ref = MediaReference.of(
+# Resource reference (URL)
+image_ref = ResourceReference.of(
     "https://example.com/image.jpg",
-    media="image/jpeg"
+    mime_type="image/jpeg",
 )
 
-# Meta content with categorization
-meta = MetaContent.of(
-    "transcription",
-    content=TextContent.of("Text...")
-)
-```
+# Artifact content (structured data)
+class UserProfile(DataModel):
+    name: str
+    age: int
 
-## Working with Multimodal Content
 
-### Creating Content
-
-```python
-from draive import MultimodalContent
+from draive import MultimodalContent, TextContent
 
 # From string
 content = MultimodalContent.of("Simple text")
@@ -72,48 +46,30 @@ content = MultimodalContent.of("Simple text")
 content = MultimodalContent.of(
     "Description:",
     image_data,
-    "Additional context"
+    "Additional context",
 )
 
-# With metadata
-from haiway import Meta
+# Add metadata to specific parts
+text_with_meta = TextContent.of("Labeled text", meta={"source": "user"})
 
-content = MultimodalContent.of(
-    "Content with metadata",
-    meta=Meta.of({"source": "user", "timestamp": "2024-01-01"})
-)
-```
+# Check for resource presence
+if content.contains_resources:
+    print("Content contains resources")
 
-### Filtering and Accessing Content
+# Get all resources or specific types
+all_resources = content.resources()
+images = content.images()
+audio_files = content.audio()
+videos = content.video()
 
-```python
-# Check for media presence
-if content.has_media:
-    print("Content contains media")
+# Access text parts
+texts = content.texts()  # Sequence[TextContent]
 
-# Get all media
-all_media = content.media()
+# Remove resources
 
-# Get specific media types
-images = content.media("image")
-audio_files = content.media("audio")
-
-# Filter content by type
-text_only = content.text()
-images_only = content.images()
-audio_only = content.audio()
-video_only = content.video()
-
-# Remove media
-text_content = content.without_media()
-```
-
-### Working with Artifacts
-
-Artifacts are structured data models embedded in multimodal content. Any instance of DataModel which is not any of predefined content types is treated as artifact:
 
 ```python
-from draive import DataModel
+from draive import DataModel, ArtifactContent
 
 class UserProfile(DataModel):
     name: str
@@ -122,74 +78,67 @@ class UserProfile(DataModel):
 # Content with artifacts
 content = MultimodalContent.of(
     "User information:",
-    UserProfile(name="John", age=30)
+    ArtifactContent.of(UserProfile(name="John", age=30), category="profile"),
 )
 
-# Check for artifacts
-if content.has_artifacts:
-    # Get all artifacts
-    all_artifacts = content.artifacts()
-    
-    # Get specific artifact type
-    profiles = content.artifacts(UserProfile)
+# Get all artifacts
+all_artifacts = content.artifacts()
+
+# Get specific artifact type
+profiles = content.artifacts(UserProfile)
 
 # Remove artifacts
 clean_content = content.without_artifacts()
 ```
 
-When an artifact is presented to LLM it is converted to its json representation automatically.
-
-### Meta Content Operations
 
 ```python
-# Get meta content
-meta_items = content.meta()
+from draive import TextContent
+from draive import MultimodalTag
 
-# Get by category
-instructions = content.meta(category="instruction")
+# Filter parts by exact metadata match
+filtered = content.matching_meta(source="user", language="en")
 
-# Remove meta content
-clean_content = content.without_meta()
-```
+# Split into groups where a meta key changes
+groups = content.split_by_meta(key="section")
 
-## Content Manipulation
+# Tagging: wrap content in a lightweight XML-like tag
+title_tag = MultimodalTag.of(
+    TextContent.of("Q1 Sales Report"),
+    name="title",
+    meta={"lang": "en"},
+)
+document = MultimodalContent.of(
+    title_tag,
+    "Summary: Sales increased by 15%",
+)
 
-### Appending Content
+# Find tags
+first_title = document.tag("title")
+all_titles = document.tags("title")
 
-```python
+# Replace a tag with generated content (keep inner content)
+updated = document.replacing_tag(
+    "title",
+    MultimodalContent.of("Updated Title"),
+    strip_tags=True,
+
 # Append new content
 extended = content.appending(
     "Additional text",
-    new_image_data
+    image_ref,
 )
 
 # Extend with other multimodal content
 other_content = MultimodalContent.of("More content")
-combined = content.extended_by(other_content)
-```
 
-### String Conversion
+# Convert entire content to string
+text_repr = content.to_str()  # Resource parts render as placeholders
 
-```python
-# Convert to string
-text_repr = content.to_str()
+# Obtain data URIs for embedded resources explicitly (ResourceContent only)
+from draive import ResourceContent
 
-# With custom joiner between parts
-text_repr = content.to_str(joiner=" | ")
-
-# Include media data URIs
-text_with_data = content.to_str(include_data=True)
-
-# Direct string conversion
-text_repr = str(content)
-```
-
-## Practical Examples
-
-### Image Analysis
-
-```python
-from draive import ctx, TextGeneration, MultimodalContent, MediaData
+from draive import ctx, TextGeneration, MultimodalContent, ResourceContent
 from draive.openai import OpenAI, OpenAIResponsesConfig
 
 async with ctx.scope(
@@ -200,74 +149,49 @@ async with ctx.scope(
     # Create multimodal content with image
     content = MultimodalContent.of(
         "Analyze this image:",
-        MediaData.of(
-            data=image_bytes,
-            media="image/jpeg"
-        )
+        ResourceContent.of(image_bytes, mime_type="image/jpeg"),
     )
-    
+
     # Generate analysis
     analysis = await TextGeneration.generate(
         instructions="Describe what you see in the image",
         input=content
     )
-    
-    print(analysis)
-```
 
-### Document Processing
 
-```python
 # Process document with mixed content
+from draive import MultimodalTag
+
 document = MultimodalContent.of(
     "Document Analysis Report",
-    MetaContent.of("title", content=TextContent.of("Q1 Sales Report")),
+    MultimodalTag.of(TextContent.of("Q1 Sales Report"), name="title"),
     "Summary: Sales increased by 15%",
     chart_image,
     "Detailed breakdown:",
-    table_data_model
+    profile_artifact,
 )
 
 # Extract different content types
-title = document.meta(category="title")
-text_content = document.text()
+title_tag = document.tag("title")
+texts = document.texts()
 charts = document.images()
-data_models = document.artifacts()
-```
 
-### Content Validation
+# Check content characteristics
+if content.contains_resources:
+    print("Content contains resources")
 
-```python
-# Check content types
-if content.is_media("image"):
-    print("Content is image-only")
+if content.contains_artifacts:
+    print("Content contains artifacts")
 
-if content.is_artifact():
-    print("Content contains only artifacts")
+if len(content.images()) > 0:
 
-if content.is_meta():
-    print("Content is meta-only")
-
-# Boolean check for non-empty content
-if content:
-    print("Content is not empty")
-```
-
-## Best Practices
-
-1. **Use appropriate media types**: Always specify correct MIME types for media content
-2. **Leverage metadata**: Use Meta objects to add context and categorization
+2. **Leverage metadata**: Use part-level metadata to add context and categorization
 3. **Filter efficiently**: Use built-in filtering methods rather than manual iteration
-4. **Handle empty content**: Always check if content exists before processing
-5. **Optimize media handling**: Use references for large media files when possible
 
-## Integration with LLM Providers
-
-MultimodalContent seamlessly integrates with various LLM providers that support multimodal input:
 
 ```python
 from collections.abc import Sequence
-from draive import ModelGeneration
+from draive import ctx, ModelGeneration, DataModel
 from draive.openai import OpenAI, OpenAIResponsesConfig
 
 class ImageDescription(DataModel):

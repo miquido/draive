@@ -72,6 +72,7 @@ json_schema: str = """\
         "value",
         "other_value"
       ],
+      "additionalProperties": false,
       "description": "alternative"
     }
   },
@@ -83,7 +84,8 @@ json_schema: str = """\
     "list_value",
     "optional_value",
     "nested_value"
-  ]
+  ],
+  "additionalProperties": false
 }\
 """
 

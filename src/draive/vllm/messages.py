@@ -34,12 +34,12 @@ from draive.models import (
     ModelToolsSelection,
 )
 from draive.multimodal import (
-    MediaData,
-    MediaReference,
+    ArtifactContent,
     MultimodalContent,
-    MultimodalContentElement,
+    MultimodalContentPart,
     TextContent,
 )
+from draive.resources import ResourceContent, ResourceReference
 from draive.vllm.api import VLLMAPI
 from draive.vllm.config import VLLMChatConfig
 from draive.vllm.utils import unwrap_missing
@@ -202,7 +202,6 @@ class VLLMMessages(VLLMAPI):
                     stop=as_list(cast(Iterable[str], config.stop_sequences))
                     if config.stop_sequences is not MISSING
                     else NOT_GIVEN,
-                    timeout=unwrap_missing(config.timeout),
                     stream=False,
                 )
 
@@ -348,7 +347,6 @@ class VLLMMessages(VLLMAPI):
                 stop=as_list(cast(Iterable[str], config.stop_sequences))
                 if config.stop_sequences is not MISSING
                 else NOT_GIVEN,
-                timeout=unwrap_missing(config.timeout),
                 stream=True,
             )
         except OpenAIRateLimitError as exc:
@@ -522,8 +520,8 @@ def _context_messages(
 
 
 # Inline helper formerly in draive.vllm.lmm
-def content_parts(
-    parts: Iterable[MultimodalContentElement],
+def content_parts(  # noqa: C901
+    parts: Iterable[MultimodalContentPart],
     /,
     *,
     vision_details: Literal["auto", "low", "high"] | Any,
@@ -537,28 +535,54 @@ def content_parts(
                     "text": text.text,
                 }
 
-            case MediaReference() as ref if not text_only and ref.kind == "image":
+            case ResourceReference() as reference:
+                if text_only:
+                    continue  # skip with text only
+
+                if reference.mime_type is not None and not reference.mime_type.startswith("image"):
+                    raise ValueError(
+                        f"Unsupported message content mime type: {reference.mime_type}"
+                    )
+
                 yield {
                     "type": "image_url",
                     "image_url": {
-                        "url": ref.uri,
+                        "url": reference.uri,
                     },
                     "detail": vision_details,
                 }
 
-            case MediaData() as data if not text_only and data.kind == "image":
+            case ResourceContent() as data:
+                if text_only:
+                    continue  # skip with text only
+
+                if not data.mime_type.startswith("image"):
+                    raise ValueError(f"Unsupported message content mime type: {data.mime_type}")
+
                 yield {
                     "type": "image_url",
                     "image_url": {
-                        "url": data.to_data_uri(safe_encoding=False),
+                        "url": data.to_data_uri(),
                     },
                     "detail": vision_details,
+                }
+
+            case ArtifactContent() as artifact:
+                if artifact.hidden or text_only:
+                    continue
+
+                yield {
+                    "type": "text",
+                    "text": artifact.artifact.to_str(),
                 }
 
             case other:
+                if text_only:
+                    continue  # skip with text only
+
                 yield {
                     "type": "text",
-                    "text": other.to_json(),
+                    "text": other.to_str(),
                 }
 
 

@@ -78,7 +78,7 @@ async def generate_model[Generated: DataModel](
 
             elif artifacts := result.content.artifacts(generated):
                 ctx.log_debug("...direct artifact found!")
-                return cast(Generated, artifacts[0])
+                return cast(Generated, artifacts[0].artifact)
 
             else:  # fallback to default decoding
                 ctx.log_debug("...decoding result...")

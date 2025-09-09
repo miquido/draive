@@ -18,7 +18,7 @@ from draive.models import (
     Toolbox,
 )
 from draive.models.types import ModelToolRequest
-from draive.multimodal import MetaContent
+from draive.multimodal import ArtifactContent
 
 __all__ = ("conversation_completion",)
 
@@ -151,13 +151,14 @@ async def _conversation_completion_stream(
             **extra,
         ):
             if isinstance(chunk, ModelReasoning):
-                for part in chunk.content.parts:
-                    yield ConversationOutputChunk.of(
-                        MetaContent.of(
-                            "reasoning",
-                            content=part,
-                        )
+                # Wrap reasoning as an artifact to stream alongside content
+                yield ConversationOutputChunk.of(
+                    ArtifactContent.of(
+                        chunk,
+                        category="reasoning",
+                        hidden=True,
                     )
+                )
 
             else:
                 assert not isinstance(chunk, ModelToolRequest)  # nosec: B101

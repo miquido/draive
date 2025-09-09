@@ -86,7 +86,7 @@ async def test_resolve_from_uri_with_parameters():
     resource_result = await get_user.resolve_from_uri("https://api.example.com/users/123")
 
     assert resource_result.uri == "https://api.example.com/users/123"
-    assert resource_result.name == "get_user"
+    assert resource_result.meta.name == "get_user"
     assert isinstance(resource_result.content, ResourceContent)
 
 
@@ -99,7 +99,7 @@ async def test_resolve_from_uri_no_parameters():
     resource_result = await get_status.resolve_from_uri("https://api.example.com/status")
 
     assert resource_result.uri == "https://api.example.com/status"
-    assert resource_result.name == "get_status"
+    assert resource_result.meta.name == "get_status"
     assert isinstance(resource_result.content, ResourceContent)
 
 
@@ -114,7 +114,7 @@ async def test_resolve_from_uri_complex_template():
     )
 
     assert resource_result.uri == "https://api.example.com/octocat/hello-world/issues/42"
-    assert resource_result.name == "get_issue"
+    assert resource_result.meta.name == "get_issue"
     assert isinstance(resource_result.content, ResourceContent)
 
 
@@ -129,7 +129,7 @@ async def test_resolve_from_uri_with_query_params():
     )
 
     assert resource_result.uri == "https://api.example.com/search?q=python&limit=20"
-    assert resource_result.name == "search"
+    assert resource_result.meta.name == "search"
     assert isinstance(resource_result.content, ResourceContent)
 
 
@@ -142,7 +142,7 @@ async def test_resolve_from_uri_with_missing_default_params():
     resource_result = await search.resolve_from_uri("https://api.example.com/search?q=python")
 
     assert resource_result.uri == "https://api.example.com/search?q=python"
-    assert resource_result.name == "search"
+    assert resource_result.meta.name == "search"
     assert isinstance(resource_result.content, ResourceContent)
 
 

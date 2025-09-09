@@ -3,7 +3,7 @@ from typing import Final
 from haiway import ctx
 
 from draive.models import InstructionsDeclaration, ModelInstructions
-from draive.multimodal import MultimodalContent, MultimodalTagElement
+from draive.multimodal import MultimodalContent
 from draive.stages import Stage
 
 __all__ = (
@@ -51,17 +51,17 @@ async def prepare_instructions(
             ),
         ).execute()
 
-        if parsed := MultimodalTagElement.parse_first("RESULT_INSTRUCTION", content=result):
-            ctx.log_info("...instruction preparation finished!")
-            return parsed.content.to_str()
+    if parsed := result.tag("RESULT_INSTRUCTION"):
+        ctx.log_info("...instruction preparation finished!")
+        return parsed.content.to_str()
 
-        elif parsed := MultimodalTagElement.parse_first("QUESTIONS", content=result):
-            ctx.log_error("...instruction preparation requires clarification!")
-            raise InstructionPreparationAmbiguity(questions=parsed.content.to_str())
+    elif parsed := result.tag("QUESTIONS"):
+        ctx.log_error("...instruction preparation requires clarification!")
+        raise InstructionPreparationAmbiguity(questions=parsed.content.to_str())
 
-        else:
-            ctx.log_error("...instruction preparation failed!")
-            raise ValueError(f"Failed to prepare instruction: {result.to_str()}")
+    else:
+        ctx.log_error("...instruction preparation failed!")
+        raise ValueError(f"Failed to prepare instruction: {result.to_str()}")
 
 
 def _format_variables(

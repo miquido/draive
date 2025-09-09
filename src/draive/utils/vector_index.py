@@ -3,15 +3,16 @@ from typing import Any, Protocol, final, overload, runtime_checkable
 
 from haiway import AttributePath, AttributeRequirement, State, statemethod
 
-from draive.multimodal import MediaContent, TextContent
+from draive.multimodal import TextContent
 from draive.parameters import DataModel
+from draive.resources import ResourceContent
 
 __all__ = ("VectorIndex",)
 
 
 @runtime_checkable
 class VectorIndexing(Protocol):
-    async def __call__[Model: DataModel, Value: MediaContent | TextContent | str](
+    async def __call__[Model: DataModel, Value: ResourceContent | TextContent | str](
         self,
         model: type[Model],
         /,
@@ -29,7 +30,7 @@ class VectorSearching(Protocol):
         model: type[Model],
         /,
         *,
-        query: Sequence[float] | MediaContent | TextContent | str | None,
+        query: Sequence[float] | ResourceContent | TextContent | str | None,
         score_threshold: float | None,
         requirements: AttributeRequirement[Model] | None,
         limit: int | None,
@@ -53,7 +54,7 @@ class VectorDeleting(Protocol):
 class VectorIndex(State):
     @overload
     @classmethod
-    async def index[Model: DataModel, Value: MediaContent | TextContent | str](
+    async def index[Model: DataModel, Value: ResourceContent | TextContent | str](
         cls,
         model: type[Model],
         /,
@@ -64,7 +65,7 @@ class VectorIndex(State):
     ) -> None: ...
 
     @overload
-    async def index[Model: DataModel, Value: MediaContent | TextContent | str](
+    async def index[Model: DataModel, Value: ResourceContent | TextContent | str](
         self,
         model: type[Model],
         /,
@@ -75,7 +76,7 @@ class VectorIndex(State):
     ) -> None: ...
 
     @statemethod
-    async def index[Model: DataModel, Value: MediaContent | TextContent | str](
+    async def index[Model: DataModel, Value: ResourceContent | TextContent | str](
         self,
         model: type[Model],
         /,
@@ -121,7 +122,7 @@ class VectorIndex(State):
         model: type[Model],
         /,
         *,
-        query: Sequence[float] | MediaContent | TextContent | str,
+        query: Sequence[float] | ResourceContent | TextContent | str,
         score_threshold: float | None = None,
         requirements: AttributeRequirement[Model] | None = None,
         limit: int | None = None,
@@ -134,7 +135,7 @@ class VectorIndex(State):
         model: type[Model],
         /,
         *,
-        query: Sequence[float] | MediaContent | TextContent | str,
+        query: Sequence[float] | ResourceContent | TextContent | str,
         score_threshold: float | None = None,
         requirements: AttributeRequirement[Model] | None = None,
         limit: int | None = None,
@@ -147,7 +148,7 @@ class VectorIndex(State):
         model: type[Model],
         /,
         *,
-        query: Sequence[float] | MediaContent | TextContent | str | None = None,
+        query: Sequence[float] | ResourceContent | TextContent | str | None = None,
         score_threshold: float | None = None,
         requirements: AttributeRequirement[Model] | None = None,
         limit: int | None = None,

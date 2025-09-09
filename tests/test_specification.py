@@ -129,6 +129,7 @@ def test_basic_specification() -> None:
             "list_value",
             "dict_value",
         ],
+        "additionalProperties": False,
     }
     assert TestModel.__PARAMETERS_SPECIFICATION__ == specification
 
@@ -146,6 +147,7 @@ def test_parametrized_specification() -> None:
             },
         },
         "required": ["param"],
+        "additionalProperties": False,
     }
     assert TestModel[str].__PARAMETERS_SPECIFICATION__ == {
         "type": "object",
@@ -153,6 +155,7 @@ def test_parametrized_specification() -> None:
             "param": {"type": "string"},
         },
         "required": ["param"],
+        "additionalProperties": False,
     }
     assert TestModel[int].__PARAMETERS_SPECIFICATION__ == {
         "type": "object",
@@ -160,6 +163,7 @@ def test_parametrized_specification() -> None:
             "param": {"type": "integer"},
         },
         "required": ["param"],
+        "additionalProperties": False,
     }
     assert TestModel[str] == TestModel[str]
     assert TestModel[int] == TestModel[int]
@@ -188,9 +192,11 @@ def test_nested_parametrized_specification() -> None:
                     },
                 },
                 "required": ["param"],
+                "additionalProperties": False,
             },
         },
         "required": ["param"],
+        "additionalProperties": False,
     }
     assert TestModel[TestModelNested[str]].__PARAMETERS_SPECIFICATION__ == {
         "type": "object",
@@ -206,12 +212,15 @@ def test_nested_parametrized_specification() -> None:
                             },
                         },
                         "required": ["param"],
+                        "additionalProperties": False,
                     }
                 },
                 "required": ["param"],
+                "additionalProperties": False,
             }
         },
         "required": ["param"],
+        "additionalProperties": False,
     }
     assert TestModel[TestModelNested[int]].__PARAMETERS_SPECIFICATION__ == {
         "type": "object",
@@ -227,12 +236,15 @@ def test_nested_parametrized_specification() -> None:
                             },
                         },
                         "required": ["param"],
+                        "additionalProperties": False,
                     }
                 },
                 "required": ["param"],
+                "additionalProperties": False,
             }
         },
         "required": ["param"],
+        "additionalProperties": False,
     }
     assert TestModel[TestModelNested[str]] == TestModel[TestModelNested[str]]
     assert TestModel[TestModelNested[int]] == TestModel[TestModelNested[int]]

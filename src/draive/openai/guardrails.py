@@ -4,15 +4,15 @@ from haiway import ObservabilityLevel, ctx, not_missing
 from openai.types import ModerationCreateResponse, ModerationMultiModalInputParam
 
 from draive.guardrails import GuardrailsModeration, GuardrailsModerationException
-from draive.multimodal import MediaData, MediaReference, Multimodal, MultimodalContent, TextContent
+from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIModerationConfig
-from draive.openai.utils import unwrap_missing
+from draive.resources import ResourceContent, ResourceReference
 
-__all__ = ("OpenAIContentModereation",)
+__all__ = ("OpenAIContentModeration",)
 
 
-class OpenAIContentModereation(OpenAIAPI):
+class OpenAIContentModeration(OpenAIAPI):
     def content_guardrails(self) -> GuardrailsModeration:
         return GuardrailsModeration(input_checking=self.content_verification)
 
@@ -45,40 +45,68 @@ class OpenAIContentModereation(OpenAIAPI):
                             }
                         )
 
-                    case MediaData() as media_data:
-                        moderated_content.append(
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": media_data.to_data_uri(safe_encoding=False),
-                                },
-                            }
-                        )
+                    case ResourceContent() as media:
+                        if media.mime_type.startswith("image"):
+                            moderated_content.append(
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": media.to_data_uri(),
+                                    },
+                                }
+                            )
+                        else:
+                            ctx.log_warning(
+                                f"OpenAI moderation: unsupported media {media.mime_type}; "
+                                "verifying as text."
+                            )
+                            moderated_content.append(
+                                {
+                                    "type": "text",
+                                    "text": media.to_str(include_data=False),
+                                }
+                            )
 
-                    case MediaReference() as media_referencve:
+                    case ResourceReference() as media_ref:
+                        if media_ref.mime_type and media_ref.mime_type.startswith("image"):
+                            moderated_content.append(
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": media_ref.uri},
+                                }
+                            )
+                        else:
+                            ctx.log_warning(
+                                "OpenAI moderation: unsupported resource reference;"
+                                " verifying as text."
+                            )
+                            moderated_content.append(
+                                {"type": "text", "text": media_ref.uri},
+                            )
+
+                    case ArtifactContent() as artifact:
                         moderated_content.append(
                             {
-                                "type": "image_url",
-                                "image_url": {"url": media_referencve.uri},
+                                "type": "text",
+                                "text": artifact.artifact.to_str(),
                             }
                         )
 
                     case other:
                         ctx.log_warning(
                             f"Attempting to use moderation on unsupported content ({type(other)}),"
-                            " verifying as json text..."
+                            " verifying as text..."
                         )
                         moderated_content.append(
                             {
                                 "type": "text",
-                                "text": other.to_json(),
+                                "text": other.to_str(),
                             }
                         )
 
             response: ModerationCreateResponse = await self._client.moderations.create(
                 model=moderation_config.model,
                 input=moderated_content,
-                timeout=unwrap_missing(moderation_config.timeout),
             )
 
             violations: set[str] = set()

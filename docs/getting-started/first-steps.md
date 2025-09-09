@@ -1,12 +1,5 @@
 # First Steps
 
-After completing the [Quickstart](quickstart.md), this guide will help you understand Draive's core concepts and architecture to build more sophisticated LLM applications.
-
-## Core Concepts
-
-### 1. State Management
-
-Draive uses an immutable state system built on Haiway. There are two main types:
 
 - **`State`**: For internal application state (can include non-serializable data like functions)
 - **`DataModel`**: For serializable data with JSON schema support
@@ -29,11 +22,6 @@ class UserProfile(DataModel):
     tags: Sequence[str]  # Becomes tuple
 ```
 
-**Important**: Always use `Sequence`, `Mapping`, and `Set` for collections in State/DataModel to ensure immutability.
-
-### 2. Context System
-
-Draive's context system (`ctx`) provides dependency injection and state propagation:
 
 ```python
 from draive import ctx
@@ -53,12 +41,7 @@ async with ctx.scope(
     with ctx.updated(config.updated(timeout=60.0)):
         # This scope has updated timeout
         new_config = ctx.state(AppConfig)
-        print(f"New timeout: {new_config.timeout}")
-```
 
-### 3. Resource Management
-
-Draive provides automatic resource cleanup through disposables:
 
 ```python
 from contextlib import asynccontextmanager
@@ -82,14 +65,7 @@ async with ctx.scope(
     ),
 ):
     # Use resources here
-    pass  # Cleanup happens automatically
-```
 
-## Building Blocks
-
-### 1. Tools
-
-Tools are Python functions that LLMs can call. They must be decorated with `@tool` and executed within a context scope:
 
 ```python
 from draive import tool, Argument
@@ -125,12 +101,7 @@ async def search_products(
         Search results as formatted text
     """
     # Implementation here
-    return f"Found {max_results} products matching '{query}'"
-```
 
-### 2. Text Generation
-
-Generate text using LLMs with the `TextGeneration` interface:
 
 ```python
 from draive import TextGeneration, Toolbox, ctx
@@ -155,12 +126,7 @@ async with ctx.scope(
             search_products,
             suggest=search_products,  # Suggest this tool
         ),
-    )
-```
 
-### 3. Conversation Management
-
-Build conversations using the `Conversation` interface:
 
 ```python
 from draive import Conversation, ConversationMessage, ctx
@@ -178,38 +144,28 @@ async with ctx.scope(
         tools=[search_products],  # Available tools
     )
 
-    print(f"Response: {response.content}")
-```
 
-### 4. Multimodal Content
-
-Handle text, images, and other media using `MultimodalContent`:
 
 ```python
-from draive import MultimodalContent, TextGeneration, MediaData
+from draive import MultimodalContent, TextGeneration, ResourceContent
 from pathlib import Path
 
 async def analyze_image(image_path: Path):
     # Load image data
     with open(image_path, "rb") as file:
-        image_data = file.read()
-    
+        raw_bytes = file.read()
+
     # Create multimodal content
     content = MultimodalContent.of(
         "What's in this image? Describe in detail.",
-        MediaData.of(image_data, "image/jpeg"),
+        ResourceContent.of(raw_bytes, mime_type="image/jpeg"),
     )
 
     result = await TextGeneration.generate(
         instructions="You are an image analysis expert",
         input=content,
     )
-    return result
-```
 
-### 5. Structured Generation
-
-Generate structured data using `ModelGeneration`:
 
 ```python
 from draive import ModelGeneration, DataModel
@@ -231,12 +187,7 @@ async def review_code(code: str) -> CodeReview:
         CodeReview,
         instructions="You are an expert code reviewer",
         input=f"Review this code:\n```python\n{code}\n```",
-    )
-```
 
-### 6. Vector Search and RAG
-
-Build RAG applications using vector indexing:
 
 ```python
 from draive import split_text, ctx, VectorIndex
@@ -288,12 +239,7 @@ async def search_documents(query: str) -> str:
         query=query,
         limit=3,
     )
-    return "\n---\n".join(result.content for result in results)
-```
 
-### 7. Model Context Protocol (MCP)
-
-Integrate with MCP servers for extended capabilities:
 
 ```python
 from draive import Conversation, Toolbox, ctx
@@ -321,14 +267,7 @@ async with ctx.scope(
         input="What files are in the directory?",
         tools=await Toolbox.fetched(),  # Fetches MCP tools
     )
-    print(response.content)
-```
 
-## Advanced Patterns
-
-### 1. Dependency Injection Pattern
-
-```python
 from typing import Protocol, runtime_checkable
 from draive import State, ctx
 
@@ -343,12 +282,7 @@ class RepositoryState(State):
     @classmethod
     async def get_user(cls, user_id: str) -> User:
         repo = ctx.state(cls).user_repo
-        return await repo.get_user(user_id)
-```
 
-### 2. Evaluation and Testing
-
-```python
 from draive.evaluation import evaluator, EvaluationScore, evaluator_scenario
 from draive.evaluators import groundedness_evaluator, readability_evaluator
 
@@ -377,12 +311,7 @@ async def content_quality_scenario(content: str, /, *, reference: str):
         keyword_evaluator.with_threshold(0.5).prepared(
             required_keywords=["AI", "technology"]
         ),
-    )
-```
 
-### 3. Streaming Responses
-
-```python
 from draive import Conversation
 
 async def stream_example():
@@ -401,12 +330,7 @@ async def stream_example():
                 print(text, end="", flush=True)
                 full_text += text
 
-        return full_text
-```
 
-### 4. Error Handling
-
-```python
 from draive import ToolError, GenerationError
 
 async def robust_generation():
@@ -423,12 +347,7 @@ async def robust_generation():
         ctx.log_error(f"Generation failed: {e}")
         result = "I'm having trouble generating a response"
 
-    return result
-```
 
-### 5. Observability and Metrics
-
-```python
 from draive import setup_logging, ctx
 from haiway import LoggerObservability
 
@@ -449,14 +368,7 @@ async def observable_operation():
         )
 
         ctx.record({"tokens_used": len(result.split())})
-        return result
-```
 
-## Best Practices
-
-### 1. State Design
-
-```python
 # Good: Use immutable collection types
 class GoodState(State):
     users: Sequence[str]  # Becomes tuple
@@ -466,12 +378,7 @@ class GoodState(State):
 # Bad: Mutable collections
 class BadState(State):
     users: list[str]  # Mutable - avoid!
-    settings: dict[str, Any]  # Mutable - avoid!
-```
 
-### 2. Context Management
-
-```python
 # Always use context scopes for LLM operations
 async def good_function():
     async with ctx.scope("app", disposables=(OpenAI(),)):
@@ -480,12 +387,7 @@ async def good_function():
 
 # Bad: No context
 def bad_function():
-    result = await TextGeneration.generate(input="Hello")  # Error!
-```
 
-### 3. Tool Definition
-
-```python
 # Good: Proper type hints
 @tool(description="Get current weather")
 async def get_weather(location: str, units: str = "celsius") -> str:
@@ -494,14 +396,7 @@ async def get_weather(location: str, units: str = "celsius") -> str:
 # Bad: Missing type hints
 @tool
 async def bad_tool(location):  # No types, no docstring
-    return "some result"
-```
 
-## Common Pitfalls and Solutions
-
-### 1. Context Not Available
-
-```python
 # Problem: Calling context-dependent code outside scope
 def bad_function():
     config = ctx.state(AppConfig)  # Error! No context
@@ -509,23 +404,13 @@ def bad_function():
 # Solution: Ensure context exists
 async def good_function():
     async with ctx.scope("app", AppConfig()):
-        config = ctx.state(AppConfig)  # Works!
-```
 
-### 2. Mutable State Issues
-
-```python
 # Problem: Trying to mutate state
 state = AppState(value=1)
 state.value = 2  # Error! State is immutable
 
 # Solution: Use updated()
-new_state = state.updated(value=2)  # Creates new instance
-```
 
-### 3. Resource Leaks
-
-```python
 # Problem: Manual resource management
 client = OpenAI()
 # ... use client
@@ -534,12 +419,7 @@ client = OpenAI()
 # Solution: Use disposables
 async with ctx.scope("app", disposables=(OpenAI(),)):
     # Client is automatically cleaned up
-    pass
-```
 
-## Next Steps
-
-Now that you understand Draive's core concepts:
 
 1. Explore the Guides for specific use cases:
    - [Basic Usage](../guides/BasicUsage.md)
