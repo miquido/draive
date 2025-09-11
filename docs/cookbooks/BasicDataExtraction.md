@@ -6,12 +6,7 @@ One of the most useful abilities of LLMs is to extract information from an unstr
 ```python
 from draive import load_env
 
-load_env() # load .env variables
-```
 
-## Data source
-
-For our data source we will use a short text about John Doe. For more advanced use case you might need some more advanced text extraction techniques.
 
 
 ```python
@@ -28,12 +23,7 @@ John's days are filled with exploring the city's diverse neighborhoods, trying n
 Despite the occasional homesickness for his family and the familiarity of his Texas farm, John knows that Vancouver is where he belongs. The city has captured his heart, and he can't imagine living anywhere else. He dreams of one day working in the field of environmental conservation, helping to protect the natural wonders that made him fall in love with Canada.
 
 As John reflects on his journey from a small farm in Texas to the vibrant city of Vancouver, he feels a sense of pride and accomplishment. He knows that his seven-year-old self would be proud of the life he has built in the country that captured his imagination all those years ago. With a smile on his face, John looks forward to the future and all the adventures that Vancouver has in store for him.
-"""
-```
 
-## Data structure
-
-`DataModel` base class is a perfect tool to define required data structure. We will use it to define a simple structure for this example. Please see [AdvancedState](../guides/AdvancedState.md) for more details about the advanced data model customization.
 
 
 ```python
@@ -43,12 +33,7 @@ class PersonalData(DataModel):
     first_name: str
     last_name: str
     age: int | None = None
-    country: str | None = None
-```
 
-## Extraction
-
-Since we are going to generate a structured output we will use the `ModelGeneration.generate` helper which automatically decodes the result of a model call into a python object. We have to prepare the execution context, provide instructions, the source document and specify the data model, and we can expect extracted data to be available. Keep in mind that depending on the task it might be beneficial to prepare a specific instruction and/or specify more details about the model itself.
 
 
 ```python
@@ -76,12 +61,7 @@ async with ctx.scope(
     first_name: John
     last_name: Doe
     age: 21
-    country: Canada
 
-
-## Customization
-
-We can customize data extraction by specifying more details about the model itself i.e. description of some fields. We can also choose to take more control over the prompt used to generate the model. Instead of relying on the automatically generated model description we can specify it manually or provide a placeholder inside the instruction to put it in specific place. Additionally we can choose between full json schema description and the simplified description which works better with smaller, less capable models.
 
 
 ```python

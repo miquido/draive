@@ -1,7 +1,7 @@
 from typing import cast
 
 from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
-from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
+from draive.multimodal import Multimodal, MultimodalContent
 from draive.stages import Stage
 
 __all__ = ("creativity_evaluator",)
@@ -98,12 +98,9 @@ async def creativity_evaluator(
         ),
     ).execute()
 
-    if result := MultimodalTagElement.parse_first(
-        "RESULT",
-        content=completion,
-    ):
+    if result := completion.tag("RESULT"):
         return EvaluationScore.of(
-            cast(EvaluationScoreValue, result.content.to_str()),
+            cast(EvaluationScoreValue, result.content.to_str().lower()),
             meta={"comment": completion.to_str()},
         )
 

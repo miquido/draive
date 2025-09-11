@@ -11,7 +11,10 @@ from draive.models.tools.types import (
     ToolResultFormatting,
 )
 from draive.models.types import ModelToolHandling, ModelToolSpecification
-from draive.multimodal import MultimodalContent, MultimodalContentConvertible
+from draive.multimodal import (
+    Multimodal,
+    MultimodalContent,
+)
 from draive.parameters import (
     ParameterSpecification,
     ParametrizedFunction,
@@ -322,15 +325,12 @@ def _default_result_format(result: Any) -> MultimodalContent:
     if isinstance(result, MultimodalContent):
         return result
 
-    elif isinstance(result, MultimodalContentConvertible):
+    elif isinstance(result, Multimodal):
         return MultimodalContent.of(result)
 
     elif isinstance(result, Iterable):
         return MultimodalContent.of(
-            *(
-                element if isinstance(element, MultimodalContentConvertible) else str(element)
-                for element in result
-            )
+            *(element if isinstance(element, Multimodal) else str(element) for element in result)
         )
 
     else:

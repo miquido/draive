@@ -11,7 +11,7 @@ from draive.evaluation import (
     PreparedEvaluatorSuite,
 )
 from draive.models import Instructions, InstructionsRepository, ModelInstructions
-from draive.multimodal import MultimodalContent, MultimodalTagElement
+from draive.multimodal import MultimodalContent, MultimodalTag, TextContent
 from draive.parameters import DataModel
 from draive.stages import Stage, StageState, stage
 
@@ -160,7 +160,7 @@ class _RefinementState(State):
     guidelines: str | None = None
     rounds_remaining: int
 
-    def leafs(self) -> Sequence[_RefinementTreeNode]:
+    def leaves(self) -> Sequence[_RefinementTreeNode]:
         return [node for node in self.nodes.values() if node.is_leaf and not node.pruned]
 
 
@@ -306,7 +306,7 @@ def _tree_exploration_stage[Parameters: DataModel](
 
         node_updates: Sequence[Mapping[UUID, _RefinementTreeNode]] = await execute_concurrently(
             explore,
-            refinement_state.leafs(),
+            refinement_state.leaves(),
             concurrent_tasks=concurrent_nodes,
         )
 
@@ -465,7 +465,7 @@ async def _generate_strategy_metadata(
     )
 
     strategy_prompt: str = f"""
-You are an expert prompt engineer providing feedback and recemmondations for instructions improvement.
+You are an expert prompt engineer providing feedback and recommendations for instructions improvement.
 Based on the evaluation failures analysis, prepare EXACTLY 2 DIFFERENT refinement strategies.
 
 <previous_strategy>{parent_strategy or "Initial"}</previous_strategy>
@@ -478,11 +478,11 @@ Generate 2 instructions refinement strategies and recommendations that:
 {f"\n<guidelines>\n{guidelines}</guidelines>\n" if guidelines else ""}
 <examples>
 <strategy>
-<name>Examplification</name>
+<name>Exemplification</name>
 <approach>Add more specific details and examples</approach>
 </strategy>
 <strategy>
-<name>Constraning</name>
+<name>Constraining</name>
 <approach>Add explicit constraints and rules</approach>
 </strategy>
 </examples>
@@ -502,18 +502,9 @@ For each strategy, provide the name and approach in the following tags format:
 
     # Parse strategies
     strategies: list[tuple[str, str]] = []
-    for strategy_element in MultimodalTagElement.parse(
-        "strategy",
-        content=response,
-    ):
-        name_element: MultimodalTagElement | None = MultimodalTagElement.parse_first(
-            "name",
-            content=strategy_element.content,
-        )
-        approach_element: MultimodalTagElement | None = MultimodalTagElement.parse_first(
-            "approach",
-            content=strategy_element.content,
-        )
+    for strategy_element in response.tags("strategy"):
+        name_element: MultimodalTag | None = strategy_element.content.tag("name")
+        approach_element: MultimodalTag | None = strategy_element.content.tag("approach")
 
         if name_element and approach_element:
             strategy_name: str = name_element.content.to_str().strip()
@@ -570,7 +561,7 @@ Provide ONLY the refined instructions content, without any explanation or metada
     updated_instruction: str = response.to_str().strip()
 
     ctx.log_info(f"Prepared updated instructions using {strategy_name}")
-    ctx.log_info(f"Updated instruction for {strategy_name}: {updated_instruction}")
+    ctx.log_debug(f"Updated instruction for {strategy_name}: {updated_instruction}")
 
     return updated_instruction
 
@@ -694,8 +685,10 @@ def _tree_finalization_stage[Parameters: DataModel](
         return state.updated(
             refinement_state,
             result=MultimodalContent.of(
-                best_instructions,
-                meta={"score": best_score},
+                TextContent.of(
+                    best_instructions,
+                    meta={"score": best_score},
+                ),
             ),
         )
 

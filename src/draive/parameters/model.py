@@ -279,6 +279,7 @@ class DataModelMeta(type):
                 "type": "object",
                 "properties": parameters_specification,
                 "required": parameters_specification_required,
+                "additionalProperties": False,
             }
 
         else:
@@ -592,7 +593,11 @@ class DataModel(metaclass=DataModelMeta):
         return updated
 
     def __str__(self) -> str:
-        return _data_str(self, aliased=True, converter=None).strip()
+        return _data_str(
+            self,
+            aliased=True,
+            converter=None,
+        ).strip()
 
     def __repr__(self) -> str:
         return str(self.to_mapping())
@@ -952,7 +957,7 @@ def _data_str(  # noqa: PLR0911, PLR0912, C901
             string: str = ""
             for field in dataclass_fields(dataclass):
                 element: str = _data_str(
-                    getattr(parametrized_data, field.name),
+                    getattr(dataclass, field.name),
                     aliased=aliased,
                     converter=None,
                 ).replace("\n", "\n  ")

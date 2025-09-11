@@ -1,5 +1,4 @@
 import random
-from base64 import b64encode
 from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable, Mapping, Sequence
 from typing import Any, Literal, cast, overload
 
@@ -58,14 +57,8 @@ from draive.models import (
     ModelToolSpecification,
     ModelToolsSelection,
 )
-from draive.multimodal import (
-    MediaData,
-    MediaReference,
-    MetaContent,
-    Multimodal,
-    MultimodalContent,
-    TextContent,
-)
+from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, TextContent
+from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("AnthropicMessages",)
 
@@ -487,25 +480,28 @@ def _content_elements(
             last_cacheable = text_block
             yield text_block
 
-        elif isinstance(part, MediaData):
-            if part.kind != "image":
-                raise ValueError(f"Unsupported message content kind: {part.kind}")
+        elif isinstance(part, ResourceContent):
+            # Only selected image resources are supported by Anthropic message blocks
+            if not part.mime_type.startswith("image"):
+                raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
 
             image_block: ImageBlockParam = {
                 "type": "image",
                 "source": {
                     "type": "base64",
-                    "media_type": cast(Any, part.media),
-                    "data": b64encode(part.data).decode(),
+                    "media_type": cast(Any, part.mime_type),
+                    "data": part.data,
                 },
             }
             last_cacheable = image_block
             yield image_block
 
-        elif isinstance(part, MediaReference):
-            if part.kind != "image":
-                raise ValueError(f"Unsupported message content kind: {part.kind}")
+        elif isinstance(part, ResourceReference):
+            # Only image resources are supported by Anthropic message blocks
+            if part.mime_type and not part.mime_type.startswith("image"):
+                raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
 
+            # TODO: auto resolve non http resources
             image_block: ImageBlockParam = {
                 "type": "image",
                 "source": {
@@ -513,24 +509,27 @@ def _content_elements(
                     "url": part.uri,
                 },
             }
+
             last_cacheable = image_block
             yield image_block
 
-        elif isinstance(part, MetaContent):
-            match part.category:
-                case "transcript" if part.content is not None:
-                    yield {
-                        "type": "text",
-                        "text": part.content.to_str(),
-                    }
+        elif isinstance(part, ArtifactContent):
+            # Skip artifacts that are marked as hidden
+            if part.hidden:
+                continue
 
-                case _:
-                    continue  # skip other meta
-
-        else:
             text_block: TextBlockParam = {
                 "type": "text",
-                "text": part.to_json(),
+                "text": part.artifact.to_str(),
+            }
+            last_cacheable = text_block
+            yield text_block
+
+        else:
+            # Fallback: serialize unknown parts to text
+            text_block: TextBlockParam = {
+                "type": "text",
+                "text": part.to_str(),
             }
             last_cacheable = text_block
             yield text_block

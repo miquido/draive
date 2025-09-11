@@ -116,20 +116,18 @@ class ParameterTupleSpecification(TypedDict, total=False):
 class ParameterDictSpecification(TypedDict, total=False):
     type: Required[Literal["object"]]
     additionalProperties: Required["ParameterSpecification"]
-    description: NotRequired[str]
     required: NotRequired[Sequence[str]]
+    description: NotRequired[str]
 
 
 @final
 class ParameterObjectSpecification(TypedDict, total=False):
     type: Required[Literal["object"]]
     properties: Required[Mapping[str, "ParameterSpecification"]]
+    additionalProperties: Required[Literal[False]]
+    required: NotRequired[Sequence[str]]
     title: NotRequired[str]
     description: NotRequired[str]
-    required: NotRequired[Sequence[str]]
-    # When False, keys outside of "properties" are disallowed. Many provider tool schemas
-    # require this to be False to prevent arbitrary arguments.
-    additionalProperties: NotRequired[Literal[False]]
 
 
 @final
@@ -647,6 +645,7 @@ def _prepare_specification_of_typed_dict(
         return {
             "type": "object",
             "properties": properties,
+            "additionalProperties": False,
             "required": required,
             "description": description,
         }
@@ -655,6 +654,7 @@ def _prepare_specification_of_typed_dict(
         return {
             "type": "object",
             "properties": properties,
+            "additionalProperties": False,
             "required": required,
         }
 

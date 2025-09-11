@@ -54,7 +54,6 @@ class VLLMEmbedding(VLLMAPI):
                         model=embedding_config.model,
                         dimensions=unwrap_missing(embedding_config.dimensions),
                         encoding_format="float",
-                        timeout=unwrap_missing(embedding_config.timeout),
                     )
                     for index in range(0, len(attributes), embedding_config.batch_size)
                 ]

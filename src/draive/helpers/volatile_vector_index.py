@@ -1,4 +1,5 @@
 from asyncio import Lock
+from base64 import urlsafe_b64decode
 from collections.abc import Callable, Iterable, MutableMapping, MutableSequence, Sequence
 from typing import Any, cast
 
@@ -11,8 +12,9 @@ from draive.embedding import (
     mmr_vector_similarity_search,
     vector_similarity_search,
 )
-from draive.multimodal import MediaContent, MediaData, MediaReference, TextContent
+from draive.multimodal import TextContent
 from draive.parameters import DataModel
+from draive.resources import ResourceContent, ResourceReference
 from draive.utils import VectorIndex
 
 __all__ = ("VolatileVectorIndex",)
@@ -22,7 +24,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
     lock: Lock = Lock()
     storage: MutableMapping[type[Any], MutableSequence[Embedded[Any]]] = {}
 
-    async def index[Model: DataModel, Value: MediaContent | TextContent | str](  # noqa: C901, PLR0912
+    async def index[Model: DataModel, Value: ResourceContent | TextContent | str](  # noqa: C901, PLR0912
         model: type[Model],
         /,
         *,
@@ -52,14 +54,14 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                     case TextContent() as text_content:
                         selected_values.append(text_content.text)
 
-                    case MediaData() as media_data:
-                        if media_data.kind != "image":
-                            raise ValueError(f"{media_data.kind} embedding is not supported")
+                    case ResourceContent() as data:
+                        if not data.mime_type.startswith("image"):
+                            raise ValueError(f"{data.mime_type} embedding is not supported")
 
-                        selected_values.append(media_data.data)
+                        selected_values.append(urlsafe_b64decode(data.data.encode("utf-8")))
 
-                    case MediaReference():
-                        raise ValueError("Media references are not supported")
+                    case ResourceReference():
+                        raise ValueError("Resource references are not supported")
 
             embedded_values: Sequence[Embedded[str] | Embedded[bytes]]
             if all(isinstance(value, str) for value in selected_values):
@@ -68,7 +70,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                     **extra,
                 )
 
-            elif all(value for value in selected_values):
+            elif all(isinstance(value, bytes | bytearray) for value in selected_values):
                 embedded_values = await ImageEmbedding.embed(
                     cast(list[bytes], selected_values),
                     **extra,
@@ -99,7 +101,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
         model: type[Model],
         /,
         *,
-        query: Sequence[float] | MediaContent | TextContent | str | None = None,
+        query: Sequence[float] | ResourceContent | TextContent | str | None = None,
         score_threshold: float | None = None,
         requirements: AttributeRequirement[Model] | None = None,
         limit: int | None = None,
@@ -153,18 +155,18 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                 )
                 query_vector = embedded_text.vector
 
-            case MediaData() as media_data:
-                if media_data.kind != "image":
-                    raise ValueError(f"{media_data.kind} embedding is not supported")
+            case ResourceContent() as data:
+                if not data.mime_type.startswith("image"):
+                    raise ValueError(f"{data.mime_type} embedding is not supported")
 
                 embedded_image: Embedded[bytes] = await ImageEmbedding.embed(
-                    media_data.data,
+                    urlsafe_b64decode(data.data.encode("utf-8")),
                     **extra,
                 )
                 query_vector = embedded_image.vector
 
-            case MediaReference():
-                raise ValueError("Media references are not supported")
+            case ResourceReference():
+                raise ValueError("Resource references are not supported")
 
             case vector:
                 query_vector = vector

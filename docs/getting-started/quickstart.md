@@ -1,24 +1,5 @@
 # Quickstart
 
-This guide will help you build your first Draive application in minutes. We'll create a simple AI assistant that can answer questions and use tools.
-
-## Prerequisites
-
-- Python 3.12 or higher installed
-- An API key for at least one AI provider (OpenAI, Anthropic, etc.)
-- Basic knowledge of Python async/await
-
-## Installation
-
-```bash
-pip install 'draive[openai]'  # or anthropic, gemini, etc.
-```
-
-## Your First Draive Application
-
-### 1. Basic Text Generation
-
-Let's start with the simplest example - generating text with an LLM:
 
 ```python
 import asyncio
@@ -42,12 +23,7 @@ async def main():
         # Output: The capital of France is Paris.
 
 if __name__ == "__main__":
-    asyncio.run(main())
-```
 
-### 2. Using Environment Variables
-
-Store your API keys securely:
 
 ```
 # .env file
@@ -63,12 +39,7 @@ load_env()
 # Now you can use the client without hardcoding keys
 async with ctx.scope("app", disposables=(OpenAI(),)):
     # Your code here
-    pass
-```
 
-### 3. Adding Tools
-
-Make your assistant more capable by adding tools:
 
 ```python
 from draive import tool
@@ -100,12 +71,7 @@ async def assistant_with_tools():
 
         print(result)
         # Output: The current time in UTC is 2024-03-15T10:30:00.
-        #         And 25 * 4 equals 100.
-```
 
-### 4. Structured Output
-
-Get structured data from LLMs using Pydantic-style models:
 
 ```python
 from collections.abc import Sequence
@@ -135,12 +101,7 @@ async def extract_person_info():
         print(f"Name: {person.name}")
         print(f"Age: {person.age}")
         print(f"Occupation: {person.occupation}")
-        print(f"Skills: {', '.join(person.skills)}")
-```
 
-### 5. Multi-Model Support
-
-Switch between different AI providers easily:
 
 ```python
 from draive.anthropic import Anthropic, AnthropicConfig
@@ -168,12 +129,7 @@ async with ctx.scope(
         instructions="You are Gemini, a helpful AI assistant",
         input="Tell me a short joke",
     )
-    print("Gemini:", result)
-```
 
-### 6. Conversation Management
-
-Build interactive conversations:
 
 ```python
 from draive import Conversation, ConversationMessage
@@ -192,12 +148,7 @@ async def chat_example():
                 ConversationMessage.model("Hello, how can I help you?"),
             ]
         )
-        print("Assistant:", response.content)
-```
 
-## Tips for Success
-
-1. **Start Simple**: Begin with basic text generation before adding complexity
 2. **Use Type Hints**: Draive leverages Python's type system for better IDE support
 3. **Monitor Usage**: Use observability features to track token usage and costs
 

@@ -1,3 +1,4 @@
+from base64 import urlsafe_b64decode
 from typing import Any, Literal
 
 from haiway import ObservabilityLevel, asynchronous, ctx
@@ -5,7 +6,8 @@ from haiway import ObservabilityLevel, asynchronous, ctx
 from draive.bedrock.api import BedrockAPI
 from draive.bedrock.config import BedrockInputGuardraisConfig, BedrockOutputGuardraisConfig
 from draive.guardrails import GuardrailsModeration, GuardrailsModerationException
-from draive.multimodal import MediaData, Multimodal, MultimodalContent, TextContent
+from draive.multimodal import Multimodal, MultimodalContent, TextContent
+from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("BedrockGuardrails",)
 
@@ -140,51 +142,75 @@ class BedrockGuardrails(BedrockAPI):
                         }
                     )
 
-                case MediaData() as media_data:
-                    # Check media type properly using startswith for MIME types
-                    if media_data.media.startswith("image/jpeg"):
+                case ResourceContent() as content_part:
+                    # Only selected image resources are supported by Bedrock guardrails
+                    if content_part.mime_type == "image/jpeg":
                         moderated_content.append(
                             {
                                 "image": {
                                     "format": "jpeg",
-                                    "source": {"bytes": media_data.data},
+                                    "source": {"bytes": urlsafe_b64decode(content_part.data)},
                                 }
                             }
                         )
 
-                    elif media_data.media.startswith("image/png"):
+                    elif content_part.mime_type == "image/png":
                         moderated_content.append(
                             {
                                 "image": {
                                     "format": "png",
-                                    "source": {"bytes": media_data.data},
+                                    "source": {"bytes": urlsafe_b64decode(content_part.data)},
+                                }
+                            }
+                        )
+
+                    elif content_part.mime_type == "image/gif":
+                        moderated_content.append(
+                            {
+                                "image": {
+                                    "format": "gif",
+                                    "source": {"bytes": urlsafe_b64decode(content_part.data)},
                                 }
                             }
                         )
 
                     else:
                         ctx.log_warning(
-                            f"Attempting to use guardrails on unsupported media"
-                            f" ({media_data.media}), verifying as json text..."
+                            "Attempting to use guardrails on unsupported media "
+                            f"({content_part.mime_type}), verifying as text..."
                         )
                         moderated_content.append(
                             {
                                 "text": {
-                                    "text": media_data.to_json(),
+                                    "text": content_part.to_str(),
                                     "qualifiers": [qualifier],
                                 }
                             }
                         )
 
-                case other:
+                case ResourceReference() as ref:
                     ctx.log_warning(
-                        f"Attempting to use guardrails on unsupported content ({type(other)}),"
-                        " verifying as json text..."
+                        "Bedrock guardrails require image bytes; got ResourceReference. "
+                        "Verifying reference as JSON text."
                     )
                     moderated_content.append(
                         {
                             "text": {
-                                "text": other.to_json(),
+                                "text": ref.to_str(),
+                                "qualifiers": [qualifier],
+                            }
+                        }
+                    )
+
+                case other:
+                    ctx.log_warning(
+                        f"Attempting to use guardrails on unsupported content ({type(other)}),"
+                        " verifying as text..."
+                    )
+                    moderated_content.append(
+                        {
+                            "text": {
+                                "text": other.to_str(),
                                 "qualifiers": [qualifier],
                             }
                         }

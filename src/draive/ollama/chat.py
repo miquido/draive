@@ -23,17 +23,12 @@ from draive.models import (
     ModelToolSpecification,
     ModelToolsSelection,
 )
-from draive.multimodal import (
-    MediaData,
-    MediaReference,
-    Multimodal,
-    MultimodalContent,
-    MultimodalContentElement,
-    TextContent,
-)
+from draive.multimodal import Multimodal, MultimodalContent, TextContent
+from draive.multimodal.content import MultimodalContentPart
 from draive.ollama.api import OllamaAPI
 from draive.ollama.config import OllamaChatConfig
 from draive.ollama.utils import unwrap_missing
+from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("OllamaChat",)
 
@@ -225,10 +220,13 @@ def _assistant_message_from_content(
 ) -> Message:
     return Message(
         role="assistant",
-        content=content.without_media().to_str(),
+        content=content.without_resources().to_str(),
         images=[
-            Image(value=image.data) if isinstance(image, MediaData) else Image(value=image.uri)
-            for image in content.media("image")
+            # Prefer URLs for references; use data URIs for inline content
+            Image(value=image.uri)
+            if isinstance(image, ResourceReference)
+            else Image(value=image.to_data_uri())
+            for image in content.images()
         ]
         or None,
     )
@@ -239,14 +237,14 @@ def _message_to_blocks(  # noqa: C901
 ) -> list[MultimodalContent]:
     blocks: list[MultimodalContent] = []
 
-    def flush(acc: list[MultimodalContentElement]) -> None:
+    def flush(acc: list[MultimodalContentPart]) -> None:
         if acc:
             blocks.append(MultimodalContent.of(*acc))
             acc.clear()
 
     def _convert_chunk(
         chunk: object,
-    ) -> MultimodalContentElement | None:
+    ) -> MultimodalContentPart | None:
         if isinstance(chunk, dict):
             ctype = chunk.get("type")
             if ctype == "text":
@@ -258,12 +256,12 @@ def _message_to_blocks(  # noqa: C901
                 image = chunk.get("image") or chunk.get("image_url") or {}
                 url = image.get("url")
                 if isinstance(url, str) and url:
-                    return MediaReference.of(url, media="image/*")
+                    return ResourceReference.of(url, mime_type="image/*")
 
         # Fallback: stringify any unknown object deterministically
         return TextContent.of(json.dumps(chunk, default=str))
 
-    accumulator: list[MultimodalContentElement] = []
+    accumulator: list[MultimodalContentPart] = []
     content = message.content
     if isinstance(content, str) and content:
         accumulator.append(TextContent.of(content))
@@ -271,16 +269,16 @@ def _message_to_blocks(  # noqa: C901
     elif isinstance(content, list):
         for chunk in content:
             converted = _convert_chunk(chunk)
-            if isinstance(converted, MultimodalContentElement):
+            if isinstance(converted, TextContent | ResourceReference | ResourceContent):
                 accumulator.append(converted)
 
     # Include images if present on message (some SDKs expose them separately)
     if getattr(message, "images", None):
         for img in message.images or []:
-            if isinstance(img, (bytes, bytearray)):  # noqa: UP038 - tuple is required at runtime
-                accumulator.append(MediaData.of(bytes(img), media="image/*"))
+            if isinstance(img, bytes | bytearray):
+                accumulator.append(ResourceContent.of(bytes(img), mime_type="image/*"))
             elif isinstance(img, str):
-                accumulator.append(MediaReference.of(img, media="image/*"))
+                accumulator.append(ResourceReference.of(img, mime_type="image/*"))
 
     flush(accumulator)
     return blocks
@@ -294,12 +292,12 @@ def _context_messages(
             if content := element.content:
                 yield Message(
                     role="user",
-                    content=content.without_media().to_str(),
+                    content=content.without_resources().to_str(),
                     images=[
-                        Image(value=image.data)
-                        if isinstance(image, MediaData)
-                        else Image(value=image.uri)
-                        for image in content.media("image")
+                        Image(value=image.uri)
+                        if isinstance(image, ResourceReference)
+                        else Image(value=image.to_data_uri())
+                        for image in content.images()
                     ]
                     or None,
                 )
@@ -310,19 +308,19 @@ def _context_messages(
                     yield Message(
                         role="tool",
                         tool_name=tool_resp.tool,
-                        content=tool_resp.content.without_media().to_str(),
+                        content=tool_resp.content.without_resources().to_str(),
                     )
 
         elif isinstance(element, ModelOutput):
             content = element.content
             yield Message(
                 role="assistant",
-                content=content.without_media().to_str(),
+                content=content.without_resources().to_str(),
                 images=[
-                    Image(value=image.data)
-                    if isinstance(image, MediaData)
-                    else Image(value=image.uri)
-                    for image in content.media("image")
+                    Image(value=image.uri)
+                    if isinstance(image, ResourceReference)
+                    else Image(value=image.to_data_uri())
+                    for image in content.images()
                 ]
                 or None,
                 tool_calls=[

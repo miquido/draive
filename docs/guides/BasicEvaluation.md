@@ -1,14 +1,9 @@
 # Basic Evaluation Usage
 
-Draive framework provides comprehensive evaluation capabilities to assess LLM outputs and conversational flows. The evaluation system consists of three main components: individual evaluators, scenarios that combine multiple evaluators, and evaluation suites for systematic testing.
-
-## Simple Evaluators
-
-The simplest way to evaluate content is using individual evaluators. Let's start with a basic custom evaluator that checks if text contains specific keywords:
 
 ```python
 from draive.evaluation import evaluator, EvaluationScore
-from draive.multimodal import Multimodal
+from draive import Multimodal
 
 @evaluator(name="keyword_presence", threshold=0.8)
 async def keyword_evaluator(
@@ -54,18 +49,9 @@ async with ctx.scope(
 
     print(f"Score: {result.score.value}")
     print(f"Passed: {result.passed}")
-    print(f"Comment: {result.score.comment}")
-```
 
-## Built-in Evaluators
-
-Draive includes 20 pre-built evaluators covering all major evaluation dimensions. Here are examples of key evaluator categories:
-
-### Quality and Reference-Based Evaluators
-
-```python
 from draive.evaluators import (
-    groundedness_evaluator, 
+    groundedness_evaluator,
     readability_evaluator,
     coherence_evaluator,
     coverage_evaluator
@@ -111,12 +97,7 @@ coverage_result = await coverage_evaluator(
     generated_text,
     reference=reference_text
 )
-print(f"Coverage: {coverage_result.score.value}")
-```
 
-### User-Focused Evaluators
-
-```python
 from draive.evaluators import (
     helpfulness_evaluator,
     completeness_evaluator,
@@ -148,12 +129,7 @@ print(f"Completeness: {completeness_result.score.value} ({'✓' if completeness_
 
 # Verify content safety - critical threshold
 safety_result = await safety_evaluator.with_threshold("perfect")(response)
-print(f"Safety: {safety_result.score.value} ({'✓' if safety_result.passed else '✗'})")
-```
 
-### Content Quality Evaluators
-
-```python
 from draive.evaluators import (
     factual_accuracy_evaluator,
     creativity_evaluator,
@@ -179,12 +155,7 @@ tone_result = await tone_style_evaluator.with_threshold("excellent")(
     creative_content,
     expected_tone_style=expected_tone
 )
-print(f"Tone Match: {tone_result.score.value} ({'✓' if tone_result.passed else '✗'})")
-```
 
-### Utility Evaluators
-
-```python
 from draive.evaluators import (
     required_keywords_evaluator,
     forbidden_keywords_evaluator,
@@ -217,11 +188,6 @@ similarity_result = await similarity_evaluator.with_threshold("good")(
 print(f"Similarity: {similarity_result.score.value} ({'✓' if similarity_result.passed else '✗'})")
 ```
 
-> **💡 Complete Evaluator Reference**: For detailed information about all 20 available evaluators, their parameters, and usage examples, see the [Evaluator Catalog](EvaluatorCatalog.md) guide.
-
-## Evaluation Scenarios
-
-Scenarios combine multiple evaluators to assess content from different perspectives. Here's an updated scenario that demonstrates comprehensive content evaluation:
 
 ```python
 from collections.abc import Sequence
@@ -263,12 +229,7 @@ print(f"All evaluations passed: {all_passed}")
 print(f"Average performance: {avg_performance:.2f}%")
 
 for result in evaluation_results:
-    print(f"- {result.evaluator}: {result.score.value} ({'✓' if result.passed else '✗'})")
-```
 
-### User-Focused Evaluation Scenario
-
-Here's a scenario specifically designed for evaluating user-facing content:
 
 ```python
 from draive.evaluators import (
@@ -303,12 +264,7 @@ print(f"User response quality passed: {all_passed}")
 
 # Show individual results
 for result in results:
-    print(f"- {result.evaluator}: {'✓' if result.passed else '✗'}")
-```
 
-## Evaluation Suites
-
-Evaluation suites allow systematic testing across multiple test cases. Let's create a suite to evaluate different content generation scenarios:
 
 ```python
 from typing import Sequence
@@ -370,12 +326,7 @@ print(f"Cases passed: {sum(1 for case in suite_results.results if case.passed)}/
 for case_result in suite_results.results:
     print(f"\nCase {case_result.case_identifier}:")
     print(f"  Passed: {case_result.passed}")
-    print(f"  Performance: {case_result.performance:.2f}%")
-```
 
-## Advanced Usage
-
-You can customize evaluators with execution contexts and metadata:
 
 ```python
 # Create evaluator with custom metadata
@@ -401,12 +352,7 @@ class DocumentContent(DataModel):
 
 document_evaluator = readability_evaluator.contra_map(
     lambda doc: doc.body  # Extract body text for evaluation
-)
-```
 
-## Direct Evaluation with Multiple Evaluators
-
-For simpler use cases where you don't need the full scenario framework, use the `evaluate` helper to run multiple evaluators concurrently:
 
 ```python
 from draive.evaluation import evaluate
@@ -435,9 +381,3 @@ for result in results:
 all_passed = all(result.passed for result in results)
 print(f"All evaluations passed: {all_passed}")
 ```
-
-This approach is perfect for quick evaluations without the need for scenario management or complex evaluation workflows.
-
-## Summary
-
-The evaluation system integrates seamlessly with draive's context management and provides detailed metrics logging for comprehensive analysis of your LLM applications.

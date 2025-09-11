@@ -1,6 +1,6 @@
 import json
-from base64 import b64decode, b64encode
-from collections.abc import Generator, MutableMapping, Sequence
+from base64 import b64decode, b64encode, urlsafe_b64decode
+from collections.abc import Generator, Mapping, MutableMapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -26,7 +26,6 @@ from openai.types.realtime.realtime_conversation_item_user_message import (
 from openai.types.realtime.realtime_conversation_item_user_message_param import (
     Content as UserContentParam,
 )
-from openai.types.realtime.realtime_tools_config_param import Function
 
 from draive import MISSING, Meta, Missing, ObservabilityLevel, ctx, without_missing
 from draive.models import (
@@ -50,16 +49,10 @@ from draive.models import (
     ModelToolsDeclaration,
     RealtimeGenerativeModel,
 )
-from draive.multimodal import (
-    MediaData,
-    MediaReference,
-    MetaContent,
-    MultimodalContent,
-    MultimodalContentElement,
-    TextContent,
-)
+from draive.multimodal import ArtifactContent, MultimodalContent, MultimodalContentPart, TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIRealtimeConfig
+from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("OpenAIRealtime",)
 
@@ -106,8 +99,7 @@ class OpenAIRealtime(OpenAIAPI):
                     "model.name": config.model,
                     "model.transcribe_model": config.transcribe_model,
                     "model.input_audio_noise_reduction": config.input_audio_noise_reduction,
-                    "model.vad_type": config.vad_type,
-                    "model.vad_eagerness": config.vad_eagerness,
+                    "model.vad": str(config.vad),
                     "model.voice": config.voice,
                     "model.tools": [tool["name"] for tool in tools.specifications],
                     "model.tool_selection": f"{tools.selection}",
@@ -158,9 +150,9 @@ class OpenAIRealtime(OpenAIAPI):
                         case "response.output_audio.delta":
                             # send the audio chunk
                             return ModelOutputChunk.of(
-                                MediaData.of(
+                                ResourceContent.of(
                                     b64decode(event.delta),
-                                    media=output_audio_type,
+                                    mime_type=output_audio_type,
                                 ),
                                 meta={
                                     "message_identifier": message_identifier(event.item_id),
@@ -199,12 +191,9 @@ class OpenAIRealtime(OpenAIAPI):
                             )
 
                         case "response.output_audio_transcript.delta":
-                            # send the text chunk
+                            # send the transcript text chunk (mark via meta)
                             return ModelOutputChunk.of(
-                                MetaContent.of(
-                                    "transcript",
-                                    content=TextContent.of(event.delta),
-                                ),
+                                TextContent.of(event.delta, meta={"transcript": True}),
                                 meta={
                                     "message_identifier": message_identifier(event.item_id),
                                     "created": datetime.now(UTC).isoformat(),
@@ -481,17 +470,18 @@ async def _send_input_chunk(
     *,
     connection: AsyncRealtimeConnection,
 ) -> None:
-    # stream audio if we got only audio
-    if chunk.content.is_media("audio"):
-        for part in chunk.content.media("audio"):
+    # stream audio if we got only audio resources
+    audio_parts = chunk.content.audio()
+    if audio_parts and len(audio_parts) == len(chunk.content.parts):
+        for part in audio_parts:
             match part:
-                case MediaData() as media:
-                    await connection.input_audio_buffer.append(audio=b64encode(media.data).decode())
+                case ResourceContent() as media:
+                    await connection.input_audio_buffer.append(audio=media.data)
 
-                case _:
+                case ResourceReference():
                     # skip not supported with a log to prevent connection break
                     ctx.log_error(
-                        "OpenAI realtime input (MediaReference) not supported! Skipping..."
+                        "OpenAI realtime input (ResourceReference audio) not supported! Skipping..."
                     )
 
         if chunk.eod:
@@ -595,54 +585,64 @@ async def _reset_context(
     )
 
 
-def _user_content_parts(
+def _user_content_parts(  # noqa: C901, PLR0912
     content: MultimodalContent,
 ) -> Generator[UserContentParam]:
     for part in content.parts:
         match part:
             case TextContent() as text:
-                yield {
-                    "type": "input_text",
-                    "text": text.text,
-                }
-
-            case MediaData() as media:
-                match media.kind:
-                    case "audio":
-                        yield {
-                            "type": "input_audio",
-                            "audio": b64encode(media.data).decode(),
-                        }
-
-                    case "image":
-                        # skip not supported with a log to prevent connection break
-                        ctx.log_error("OpenAI realtime input (image) not supported! Skipping...")
-
-                    case "video":
-                        # skip not supported with a log to prevent connection break
-                        ctx.log_error("OpenAI realtime input (video) not supported! Skipping...")
-
-            case MediaReference():
-                # skip not supported with a log to prevent connection break
-                ctx.log_error("OpenAI realtime input (MediaReference) not supported! Skipping...")
-
-            case MetaContent() as meta:
-                if meta.category == "transcript" and meta.content:
+                if text.meta.get("transcript", default=False):
                     yield {
                         "type": "input_text",
-                        "transcript": meta.content.to_str(),
+                        "transcript": text.text,
+                    }
+                else:
+                    yield {
+                        "type": "input_text",
+                        "text": text.text,
                     }
 
+            case ResourceContent() as media:
+                if media.mime_type.startswith("audio"):
+                    # convert stored base64 (possibly urlsafe) to standard base64 string
+                    try:
+                        raw = urlsafe_b64decode(media.data)
+                    except Exception:
+                        raw = b64decode(media.data)
+                    yield {
+                        "type": "input_audio",
+                        "audio": b64encode(raw).decode(),
+                    }
+                elif media.mime_type.startswith("image"):
+                    ctx.log_error("OpenAI realtime input (image) not supported! Skipping...")
+                elif media.mime_type.startswith("video"):
+                    ctx.log_error("OpenAI realtime input (video) not supported! Skipping...")
                 else:
-                    # skip not supported with a log to prevent connection break
-                    ctx.log_warning(
-                        "OpenAI realtime input (MetaContent) not supported! Skipping..."
+                    # unsupported media type
+                    ctx.log_error(
+                        f"OpenAI realtime input (media {media.mime_type}) not supported!"
+                        " Skipping..."
                     )
 
-            case other:  # treat other as json text
+            case ResourceReference():
+                # skip not supported with a log to prevent connection break
+                ctx.log_error(
+                    "OpenAI realtime input (ResourceReference) not supported! Skipping..."
+                )
+
+            case ArtifactContent() as artifact:
+                if artifact.hidden:
+                    continue  # skip hidden
+
                 yield {
                     "type": "input_text",
-                    "text": other.to_json(),
+                    "text": artifact.artifact.to_str(),
+                }
+
+            case other:  # treat other as text
+                yield {
+                    "type": "input_text",
+                    "text": other.to_str(),
                 }
 
 
@@ -653,59 +653,57 @@ def _assistant_content_parts(
         match part:
             case TextContent() as text:
                 yield {
-                    "type": "text",
+                    "type": "output_text",
                     "text": text.text,
                 }
 
-            case MediaData():
+            case ResourceContent():
                 # skip not supported with a log to prevent connection break
                 ctx.log_error("OpenAI realtime output media not supported! Skipping...")
 
-            case MediaReference():
+            case ResourceReference():
                 # skip not supported with a log to prevent connection break
                 ctx.log_error("OpenAI realtime output media not supported! Skipping...")
 
-            case MetaContent() as meta:
-                if meta.category == "transcript" and meta.content:
-                    yield {
-                        "type": "text",
-                        "text": meta.content.to_str(),
-                    }
+            case ArtifactContent() as artifact:
+                if artifact.hidden:
+                    continue  # skip hidden
 
-                else:
-                    # skip not supported with a log to prevent connection break
-                    ctx.log_warning(
-                        "OpenAI realtime input (MetaContent) not supported! Skipping..."
-                    )
+                yield {
+                    "type": "output_text",
+                    "text": artifact.artifact.to_str(),
+                }
 
             case other:  # treat other as json text
                 yield {
-                    "type": "text",
-                    "text": other.to_json(),
+                    "type": "output_text",
+                    "text": other.to_str(),
                 }
 
 
 def _tool_result(
     content: MultimodalContent,
 ) -> str:
-    response_output: str = ""
+    response_output: list[str] = []
     for part in content.parts:
         match part:
             case TextContent() as text:
-                response_output += text.text
+                response_output.append(text.text)
 
-            case MediaData() | MediaReference():
+            case ResourceContent() | ResourceReference():
                 # skip not supported with a log to prevent connection break
                 ctx.log_error("OpenAI realtime function result (media) not supported! Skipping...")
 
-            case MetaContent():
-                # skip not supported with a log to prevent connection break
-                ctx.log_error("OpenAI realtime function result (meta) not supported! Skipping...")
+            case ArtifactContent() as artifact:
+                if artifact.hidden:
+                    continue  # skip hidden
+
+                response_output.append(artifact.artifact.to_str())
 
             case other:  # treat other as json text
-                response_output += other.to_json()
+                response_output.append(other.to_str())
 
-    return response_output
+    return "".join(response_output)
 
 
 async def _send_tool_response(
@@ -763,7 +761,7 @@ def _prepare_session_config(
         case tool:
             tool_choice = tool
 
-    session_tools: list[Function] | Missing
+    session_tools: list[Mapping[str, Any]] | Missing
     if tools:
         session_tools = [
             without_missing(
@@ -773,7 +771,6 @@ def _prepare_session_config(
                     "description": tool.get("description", MISSING),
                     "parameters": tool.get("parameters", MISSING),
                 },
-                typed=Function,
             )
             for tool in tools.specifications
         ]
@@ -787,16 +784,27 @@ def _prepare_session_config(
             "modalities": modalities,
             "input_audio_format": config.input_audio_format,
             "output_audio_format": config.output_audio_format,
-            "turn_detection": without_missing(
-                {
-                    "create_response": True,
-                    "eagerness": config.vad_eagerness,
-                    "interrupt_response": True,
-                    "type": config.vad_type,
-                }
-            )
-            if config.vad_type is not MISSING
-            else MISSING,
+            "turn_detection": (
+                without_missing(
+                    {
+                        "create_response": True,
+                        "interrupt_response": True,
+                        "type": config.vad.get("vad_type"),
+                        "eagerness": config.vad.get("vad_eagerness", MISSING),
+                    }
+                    if config.vad.get("vad_type") == "semantic_vad"
+                    else {
+                        "create_response": True,
+                        "interrupt_response": True,
+                        "type": config.vad.get("vad_type"),
+                        "threshold": config.vad.get("threshold", MISSING),
+                        "silence_duration_ms": config.vad.get("silence_duration_ms", MISSING),
+                        "prefix_padding_ms": config.vad.get("prefix_padding_ms", MISSING),
+                    }
+                )
+                if config.vad is not MISSING
+                else MISSING
+            ),
             "voice": config.voice,
             "tools": session_tools,
             "tool_choice": tool_choice if session_tools is not MISSING else MISSING,
@@ -820,25 +828,25 @@ def _user_content_to_multimodal(
     /,
     audio_format: str,
 ) -> MultimodalContent:
-    parts: list[MultimodalContentElement] = []
+    parts: list[MultimodalContentPart] = []
     for part in content:
         if part.text:
             parts.append(TextContent.of(part.text))
 
         if part.audio:
             parts.append(
-                MediaData.of(
+                ResourceContent.of(
                     part.audio,
-                    media=audio_format,
+                    mime_type=audio_format,
                 )
             )
 
         if part.transcript:
             parts.append(
-                MetaContent.of(
-                    "transcript",
-                    content=TextContent.of(part.transcript),
-                ),
+                TextContent.of(
+                    part.transcript,
+                    meta={"transcript": True},
+                )
             )
 
     return MultimodalContent.of(*parts)
@@ -849,7 +857,7 @@ def _assistant_content_to_multimodal(
     /,
     audio_format: str,
 ) -> MultimodalContent:
-    parts: list[MultimodalContentElement] = []
+    parts: list[MultimodalContentPart] = []
     for part in content:
         if part.text:
             parts.append(TextContent.of(part.text))

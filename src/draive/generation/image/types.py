@@ -1,7 +1,8 @@
 from typing import Any, Protocol, runtime_checkable
 
 from draive.models import ResolveableInstructions
-from draive.multimodal import MediaContent, MultimodalContent
+from draive.multimodal import MultimodalContent
+from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("ImageGenerating",)
 
@@ -14,4 +15,4 @@ class ImageGenerating(Protocol):
         instructions: ResolveableInstructions,
         input: MultimodalContent,  # noqa: A002
         **extra: Any,
-    ) -> MediaContent: ...
+    ) -> ResourceContent | ResourceReference: ...

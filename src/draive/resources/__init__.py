@@ -1,28 +1,37 @@
-from draive.resources.state import Resources
-from draive.resources.template import ResourceTemplate, resource
+from draive.resources.state import ResourcesRepository
+from draive.resources.template import ResourceAvailabilityCheck, ResourceTemplate, resource
 from draive.resources.types import (
+    MimeType,
     Resource,
     ResourceContent,
-    ResourceDeclaration,
-    ResourceException,
+    ResourceCorrupted,
+    ResourceDeleting,
     ResourceFetching,
     ResourceListFetching,
     ResourceMissing,
-    ResourceTemplateDeclaration,
+    ResourceReference,
+    ResourceReferenceTemplate,
     ResourceUploading,
 )
 
+# Backwards-compatible/expected aliases
+ResourceException = ResourceCorrupted
+ResourceTemplateDeclaration = ResourceReferenceTemplate
+
 __all__ = (
+    "MimeType",
     "Resource",
+    "ResourceAvailabilityCheck",
     "ResourceContent",
-    "ResourceDeclaration",
-    "ResourceException",
+    "ResourceCorrupted",
+    "ResourceDeleting",
     "ResourceFetching",
     "ResourceListFetching",
     "ResourceMissing",
+    "ResourceReference",
+    "ResourceReferenceTemplate",
     "ResourceTemplate",
-    "ResourceTemplateDeclaration",
     "ResourceUploading",
-    "Resources",
+    "ResourcesRepository",
     "resource",
 )

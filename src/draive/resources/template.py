@@ -1,16 +1,18 @@
 import re
 from collections.abc import Callable, Coroutine, Mapping, Sequence, Set
 from typing import Any, Protocol, final
-from urllib.parse import ParseResult, parse_qs, urlparse
+from urllib.parse import ParseResult, parse_qs, quote, urlencode, urlparse
 
 from haiway import Meta, MetaValues
 
 from draive.parameters import Parameter, ParametrizedFunction
 from draive.resources.types import (
+    MimeType,
     Resource,
     ResourceContent,
-    ResourceException,
-    ResourceTemplateDeclaration,
+    ResourceCorrupted,
+    ResourceReference,
+    ResourceReferenceTemplate,
 )
 
 __all__ = (
@@ -26,7 +28,7 @@ class ResourceAvailabilityCheck(Protocol):
 
 @final
 class ResourceTemplate[**Args](
-    ParametrizedFunction[Args, Coroutine[None, None, Sequence[Resource] | ResourceContent]]
+    ParametrizedFunction[Args, Coroutine[None, None, Sequence[ResourceReference] | ResourceContent]]
 ):
     __slots__ = (
         "_check_availability",
@@ -37,19 +39,21 @@ class ResourceTemplate[**Args](
     def __init__(
         self,
         /,
-        uri_template: str,
+        template_uri: str,
         *,
-        mime_type: str | None,
         name: str,
         description: str | None,
+        mime_type: MimeType | None,
         availability_check: ResourceAvailabilityCheck | None,
         meta: Meta,
-        function: Callable[Args, Coroutine[None, None, Sequence[Resource] | ResourceContent]],
+        function: Callable[
+            Args, Coroutine[None, None, Sequence[ResourceReference] | ResourceContent]
+        ],
     ) -> None:
         super().__init__(function)
 
         # Verify URI parameters against function arguments
-        template_parameters: Set[str] = self._extract_template_parameters(uri_template)
+        template_parameters: Set[str] = self._extract_template_parameters(template_uri)
         for template_parameter in template_parameters:
             parameter: Parameter[Any] | None = self._parameters.get(template_parameter)
             if parameter is None:
@@ -57,16 +61,17 @@ class ResourceTemplate[**Args](
                     f"URI template parameter {template_parameter} not found in function arguments"
                 )
 
-        self.declaration: ResourceTemplateDeclaration
+        self.declaration: ResourceReferenceTemplate
         object.__setattr__(
             self,
             "declaration",
-            ResourceTemplateDeclaration(
-                uri_template=uri_template,
+            ResourceReferenceTemplate(
+                template_uri=template_uri,
                 mime_type=mime_type,
-                name=name,
-                description=description,
-                meta=meta,
+                meta=meta.updated(
+                    name=name,
+                    description=description,
+                ),
             ),
         )
         self._check_availability: ResourceAvailabilityCheck
@@ -82,7 +87,7 @@ class ResourceTemplate[**Args](
         object.__setattr__(
             self,
             "_match_pattern",
-            _prepare_match_pattern(uri_template) if template_parameters else None,
+            _prepare_match_pattern(template_uri) if template_parameters else None,
         )
 
     @property
@@ -98,17 +103,19 @@ class ResourceTemplate[**Args](
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Resource:
+        values: Mapping[str, Any] = self.validate_arguments(**kwargs)
+        provided_names: Set[str] = set(kwargs.keys())
+        resolved_uri: str = self._expand_uri(values, provided_names)
+
         try:
             return Resource(
-                name=self.declaration.name,
-                description=self.declaration.description,
-                uri=self.declaration.uri_template,  # TODO: resolve uri with args
+                uri=resolved_uri,
                 content=await super().__call__(*args, **kwargs),
                 meta=self.declaration.meta,
             )
 
         except Exception as exc:
-            raise ResourceException(f"Resolving resource '{self.declaration.name}' failed") from exc
+            raise ResourceCorrupted(uri=resolved_uri) from exc
 
     def _extract_template_parameters(
         self,
@@ -142,27 +149,119 @@ class ResourceTemplate[**Args](
             for key, values in query_params.items():
                 if values:
                     params[key] = values[0]  # Take first value
+
         return params
+
+    def _as_str(self, value: Any) -> str | None:
+        if value is None:
+            return None
+
+        return str(value)
+
+    def _encode_path_segment(self, value: Any) -> str:
+        s = self._as_str(value)
+        return "" if s is None else quote(s, safe="")
+
+    def _encode_fragment(self, value: Any) -> str:
+        s = self._as_str(value)
+        return "" if s is None else quote(s, safe="")
+
+    def _expand_query(
+        self,
+        names: Sequence[str],
+        base: str,
+        values: Mapping[str, Any],
+        provided: Set[str],
+    ) -> str:
+        items: list[tuple[str, str]] = []
+        for name in names:
+            if name not in provided:
+                continue
+
+            v = values.get(name)
+            if v is None:
+                continue
+
+            sv = self._as_str(v)
+            if sv is None or sv == "":
+                continue
+
+            items.append((name, sv))
+
+        if not items:
+            return ""
+
+        prefix = "&" if base.rfind("?") > base.rfind("#") else "?"
+        return prefix + urlencode(items)
+
+    def _expand_uri(self, values: Mapping[str, Any], provided: Set[str]) -> str:
+        template: str = self.declaration.template_uri
+        resolved: list[str] = []
+
+        for part in re.split(r"(\{[^}]+\})", template):
+            if not part or not part.startswith("{"):
+                resolved.append(part)
+                continue
+
+            # {/var}
+            m = re.fullmatch(r"\{/([^}]+)\}", part)
+            if m:
+                name = m.group(1)
+                seg = self._encode_path_segment(values.get(name))
+                resolved.append("/" + seg if seg else "")
+                continue
+
+            # {?a,b}
+            m = re.fullmatch(r"\{\?([^}]+)\}", part)
+            if m:
+                names = [n.strip() for n in m.group(1).split(",") if n.strip()]
+                resolved.append(self._expand_query(names, "".join(resolved), values, provided))
+                continue
+
+            # {#var}
+            m = re.fullmatch(r"\{#([^}]+)\}", part)
+            if m:
+                name = m.group(1)
+                if name in provided:
+                    frag = self._encode_fragment(values.get(name))
+                    resolved.append("#" + frag if frag else "")
+                else:
+                    resolved.append("")
+                continue
+
+            # {var}
+            m = re.fullmatch(r"\{([^}]+)\}", part)
+            if m:
+                name = m.group(1)
+                if name.startswith("?") or name.startswith("#"):
+                    resolved.append("")
+                else:
+                    resolved.append(self._encode_path_segment(values.get(name)))
+                continue
+
+            resolved.append(part)
+
+        return "".join(resolved)
 
     def _extract_fragment_parameters(
         self,
         parsed_uri: ParseResult,
     ) -> dict[str, str]:
         params: dict[str, str] = {}
-        if parsed_uri.fragment and "{#" in self.declaration.uri_template:
+        if parsed_uri.fragment and "{#" in self.declaration.template_uri:
             # Find fragment template pattern {#var}
-            fragment_start = self.declaration.uri_template.find("{#")
+            fragment_start = self.declaration.template_uri.find("{#")
             if fragment_start != -1:
-                fragment_end = self.declaration.uri_template.find("}", fragment_start)
+                fragment_end = self.declaration.template_uri.find("}", fragment_start)
                 if fragment_end != -1:
-                    param_name = self.declaration.uri_template[fragment_start + 2 : fragment_end]
+                    param_name = self.declaration.template_uri[fragment_start + 2 : fragment_end]
                     params[param_name] = parsed_uri.fragment
 
         return params
 
     def _extract_path_template(self) -> str:
-        if "://" in self.declaration.uri_template:
-            reminder = self.declaration.uri_template.split("://", 1)[1]
+        if "://" in self.declaration.template_uri:
+            reminder = self.declaration.template_uri.split("://", 1)[1]
             # Find where the netloc ends (first occurrence of {, /, ?, or #)
             netloc_end = len(reminder)
             for char in ["/", "{", "?", "#"]:
@@ -173,14 +272,14 @@ class ResourceTemplate[**Args](
             return reminder[netloc_end:]
 
         else:
-            return self.declaration.uri_template
+            return self.declaration.template_uri
 
     def _extract_path_parameters_with_slash(
         self,
         actual_path: str,
     ) -> dict[str, str]:
         params: dict[str, str] = {}
-        slash_params: list[Any] = re.findall(r"\{/([^}]+)\}", self.declaration.uri_template)
+        slash_params: list[Any] = re.findall(r"\{/([^}]+)\}", self.declaration.template_uri)
         path_template: str = self._extract_path_template()
 
         # Create regex pattern
@@ -232,14 +331,14 @@ class ResourceTemplate[**Args](
     ) -> Mapping[str, str]:
         params: dict[str, str] = {}
         parsed_uri: ParseResult = urlparse(uri)
-        parsed_template: ParseResult = urlparse(self.declaration.uri_template)
+        parsed_template: ParseResult = urlparse(self.declaration.template_uri)
 
         # Extract different types of parameters
         params.update(self._extract_query_parameters(parsed_uri))
         params.update(self._extract_fragment_parameters(parsed_uri))
 
         # Handle path parameters
-        if "{/" in self.declaration.uri_template:
+        if "{/" in self.declaration.template_uri:
             params.update(self._extract_path_parameters_with_slash(parsed_uri.path))
 
         else:
@@ -253,7 +352,7 @@ class ResourceTemplate[**Args](
         /,
     ) -> bool:
         if self._match_pattern is None:
-            return self.declaration.uri_template == uri
+            return self.declaration.template_uri == uri
 
         try:
             return bool(re.match(self._match_pattern, uri))
@@ -278,15 +377,13 @@ class ResourceTemplate[**Args](
                 content = await self.__call__()  # pyright: ignore[reportCallIssue]
 
             return Resource(
-                name=self.declaration.name,
-                description=self.declaration.description,
                 uri=uri,  # Use the actual URI provided, not the template
                 content=content,
                 meta=self.declaration.meta,
             )
 
         except Exception as exc:
-            raise ResourceException(f"Resolving resource '{uri}' failed") from exc
+            raise ResourceCorrupted(uri=uri) from exc
 
 
 def _prepare_match_pattern(uri_template: str) -> str:
@@ -322,11 +419,13 @@ def resource[**Args](
     availability_check: ResourceAvailabilityCheck | None = None,
     meta: Meta | MetaValues | None = None,
 ) -> Callable[
-    [Callable[Args, Coroutine[None, None, Sequence[Resource] | ResourceContent]]],
+    [Callable[Args, Coroutine[None, None, Sequence[ResourceReference] | ResourceContent]]],
     ResourceTemplate[Args],
 ]:
     def wrap(
-        function: Callable[Args, Coroutine[None, None, Sequence[Resource] | ResourceContent]],
+        function: Callable[
+            Args, Coroutine[None, None, Sequence[ResourceReference] | ResourceContent]
+        ],
     ) -> ResourceTemplate[Args]:
         return ResourceTemplate[Args](
             uri_template,

@@ -1,4 +1,4 @@
-from base64 import urlsafe_b64encode
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 from collections.abc import AsyncGenerator, Collection, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from typing import Any, final
@@ -9,7 +9,8 @@ from haiway import Disposable, Disposables, State, as_dict, ctx
 from mcp.server import NotificationOptions, Server
 from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.shared.message import SessionMessage
-from mcp.types import EmbeddedResource
+from mcp.types import AudioContent as MCPAudioContent
+from mcp.types import BlobResourceContents, EmbeddedResource
 from mcp.types import ImageContent as MCPImageContent
 from mcp.types import Resource as MCPResource
 from mcp.types import ResourceTemplate as MCPResourceTemplate
@@ -19,8 +20,8 @@ from pydantic import AnyUrl
 from starlette.types import ASGIApp
 
 from draive.models import Tool, Toolbox
-from draive.multimodal import MediaData, MediaReference, MultimodalContent, TextContent
-from draive.resources import Resource, ResourceContent, ResourceTemplate
+from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
+from draive.resources import Resource, ResourceContent, ResourceReference, ResourceTemplate
 
 __all__ = ("MCPServer",)
 
@@ -150,8 +151,8 @@ class MCPServer:
                                 MCPResource(
                                     uri=AnyUrl(resource.uri),
                                     mimeType=content.mime_type,
-                                    name=resource.name,
-                                    description=resource.description,
+                                    name=resource.meta.name or resource.uri,
+                                    description=resource.meta.description,
                                 )
                             )
 
@@ -164,10 +165,11 @@ class MCPServer:
                     if resource.arguments:
                         resource_template_declarations.append(
                             MCPResourceTemplate(
-                                uriTemplate=resource.declaration.uri_template,
+                                uriTemplate=resource.declaration.template_uri,
                                 mimeType=resource.declaration.mime_type,
-                                name=resource.declaration.name,
-                                description=resource.declaration.description,
+                                name=resource.declaration.meta.name
+                                or resource.declaration.template_uri,
+                                description=resource.declaration.meta.description,
                             )
                         )
                         # TODO: we might need to sort based on template uri matching priorities
@@ -176,14 +178,15 @@ class MCPServer:
                     else:
                         resource_declarations.append(
                             MCPResource(
-                                uri=AnyUrl(resource.declaration.uri_template),
+                                uri=AnyUrl(resource.declaration.template_uri),
                                 mimeType=resource.declaration.mime_type,
-                                name=resource.declaration.name,
-                                description=resource.declaration.description,
+                                name=resource.declaration.meta.name
+                                or resource.declaration.template_uri,
+                                description=resource.declaration.meta.description,
                             )
                         )
                         # we treat it as a regular resource if template has no arguments
-                        available_resources[resource.declaration.uri_template] = resource
+                        available_resources[resource.declaration.template_uri] = resource
 
         if resource_declarations:
 
@@ -267,7 +270,7 @@ class MCPServer:
         async def call_tool(  # pyright: ignore[reportUnusedFunction]
             name: str,
             arguments: Mapping[str, Any],
-        ) -> Sequence[MCPTextContent | MCPImageContent | EmbeddedResource]:
+        ) -> Sequence[MCPTextContent | MCPImageContent | MCPAudioContent | EmbeddedResource]:
             async with ctx.scope(
                 "call_tool",
                 *self._server.request_context.lifespan_context,
@@ -289,25 +292,25 @@ def _resource_content(
             match content.mime_type:
                 case "text/plain" | "application/json":
                     yield ReadResourceContents(
-                        content=content.blob.decode(),
+                        content=urlsafe_b64decode(content.data).decode(),
                         mime_type=content.mime_type,
                     )
 
                 case _:
                     yield ReadResourceContents(
-                        content=content.blob,
+                        content=urlsafe_b64decode(content.data),
                         mime_type=content.mime_type,
                     )
 
-        case [*contents]:  # is it intended use of nested resource contents?
-            for content in contents:
-                yield from _resource_content(content)
+        case [*_]:
+            # Multi-content resources (lists of references) are not supported for server reads
+            raise NotImplementedError("Multi-content resources are not supported yet")
 
 
 def _convert_multimodal_content(
     content: MultimodalContent,
-) -> Sequence[MCPTextContent | MCPImageContent | EmbeddedResource]:
-    converted: list[MCPTextContent | MCPImageContent | EmbeddedResource] = []
+) -> Sequence[MCPTextContent | MCPImageContent | MCPAudioContent | EmbeddedResource]:
+    converted: list[MCPTextContent | MCPImageContent | MCPAudioContent | EmbeddedResource] = []
     for part in content.parts:
         match part:
             case TextContent() as text:
@@ -318,32 +321,93 @@ def _convert_multimodal_content(
                     )
                 )
 
-            case MediaData() as media_data:
-                if media_data.kind != "image":
-                    raise NotImplementedError(
-                        f"Media support for {media_data.media} is not implemented"
+            case ResourceContent() as data:
+                mime: str = data.mime_type
+                if mime.startswith("image"):
+                    converted.append(
+                        MCPImageContent(
+                            type="image",
+                            data=data.data,
+                            mimeType=mime,
+                        )
                     )
 
-                converted.append(
-                    MCPImageContent(
-                        type="image",
-                        data=urlsafe_b64encode(media_data.data).decode(),
-                        mimeType=media_data.media,
+                elif mime.startswith("audio"):
+                    converted.append(
+                        MCPAudioContent(
+                            type="audio",
+                            data=data.data,
+                            mimeType=mime,
+                        )
                     )
+
+                elif mime == "text/plain":
+                    converted.append(
+                        MCPTextContent(
+                            type="text",
+                            text=urlsafe_b64decode(data.data).decode(),
+                        )
+                    )
+
+                elif mime == "application/json":
+                    encoded: str = data.data
+                    # Provide a data URI to satisfy required AnyUrl
+                    uri = AnyUrl(f"data:{mime};base64,{encoded}")
+                    converted.append(
+                        EmbeddedResource(
+                            type="resource",
+                            resource=BlobResourceContents(
+                                uri=uri,
+                                mimeType=mime,
+                                blob=encoded,
+                            ),
+                        )
+                    )
+
+                else:
+                    # Unknown blob types: embed as a resource blob
+                    encoded: str = data.data
+                    uri = AnyUrl(f"data:{mime};base64,{encoded}")
+                    converted.append(
+                        EmbeddedResource(
+                            type="resource",
+                            resource=BlobResourceContents(
+                                uri=uri,
+                                mimeType=mime,
+                                blob=encoded,
+                            ),
+                        )
+                    )
+
+            case ResourceReference():
+                # We don't return links yet; ask callers to provide content
+                # we could try to resolve those contextually using ResourceRepository
+                raise NotImplementedError(
+                    "MCP resource links are not supported yet; provide content blobs instead"
                 )
 
-            case MediaReference():
-                # TODO: download images on the fly?
-                raise NotImplementedError(
-                    "Media reference support is not implemented, please use data blobs instead"
+            case ArtifactContent() as artifact:
+                encoded: str = urlsafe_b64encode(artifact.artifact.to_json().encode()).decode()
+                uri = AnyUrl(f"data:application/json;base64,{encoded}")
+                converted.append(
+                    EmbeddedResource(
+                        type="resource",
+                        resource=BlobResourceContents(
+                            uri=uri,
+                            mimeType="application/json",
+                            blob=encoded,
+                        ),
+                    )
                 )
 
             case other:
+                # Fallback: serialize unknown parts to str
                 converted.append(
                     MCPTextContent(
                         type="text",
-                        text=other.to_json(),
+                        text=other.to_str(),
                     )
                 )
+                raise ValueError(f"Unknown content type: {type(other)}")
 
     return converted

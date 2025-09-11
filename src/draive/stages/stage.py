@@ -47,7 +47,7 @@ from draive.models import (
     Tool,
     Toolbox,
 )
-from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
+from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel
 from draive.stages.types import (
     StageCacheKeyMaking,
@@ -2069,10 +2069,7 @@ async def _model_routing(
         output="text",
     )
 
-    selection_tag = MultimodalTagElement.parse_first(
-        "SELECTION",
-        content=result.content,
-    )
+    selection_tag = result.content.tag("SELECTION")
     selection: str = (
         selection_tag.content.to_str().strip().lower()
         if selection_tag is not None

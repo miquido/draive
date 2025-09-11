@@ -17,7 +17,7 @@ from draive import (
     ValidationError,
 )
 from draive.conversation import ConversationMessage
-from draive.multimodal import MediaData, MediaReference
+from draive.resources import ResourceContent, ResourceReference
 
 
 def invalid(value: str) -> None:
@@ -284,7 +284,9 @@ basic_conversation_message_json: str = """\
 media_url_conversation_message_instance: ConversationMessage = ConversationMessage.model(
     identifier=UUID("f6da0a47556744cdb8334d263020907f"),
     created=datetime.fromisoformat("2025-06-03T18:15:58.985599"),
-    content=MultimodalContent.of(MediaReference.of("https://miquido.com/image", media="image/png")),
+    content=MultimodalContent.of(
+        ResourceReference.of(uri="https://miquido.com/image", mime_type="image/png")
+    ),
 )
 media_url_conversation_message_json: str = """\
 {
@@ -294,9 +296,12 @@ media_url_conversation_message_json: str = """\
     "content": {
         "parts": [
             {
-                "media": "image/png",
                 "uri": "https://miquido.com/image",
-                "meta": {}
+                "mime_type": "image/png",
+                "meta": {
+                    "name": null,
+                    "description": null
+                }
             }
         ]
     },
@@ -307,7 +312,7 @@ media_url_conversation_message_json: str = """\
 media_data_conversation_message_instance: ConversationMessage = ConversationMessage.model(
     identifier=UUID("f6da0a47556744cdb8334d263020907f"),
     created=datetime.fromisoformat("2025-06-03T18:15:58.985599"),
-    content=MultimodalContent.of(MediaData.of(b"image_data", media="image/png")),
+    content=MultimodalContent.of(ResourceContent.of(b"image_data", mime_type="image/png")),
 )
 media_data_conversation_message_json: str = """\
 {
@@ -317,8 +322,8 @@ media_data_conversation_message_json: str = """\
     "content": {
         "parts": [
             {
-                "media": "image/png",
                 "data": "aW1hZ2VfZGF0YQ==",
+                "mime_type": "image/png",
                 "meta": {}
             }
         ]

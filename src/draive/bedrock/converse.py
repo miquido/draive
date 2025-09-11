@@ -1,3 +1,4 @@
+from base64 import urlsafe_b64decode
 from collections.abc import AsyncGenerator, Coroutine, Iterable, Mapping, Sequence
 from typing import Any, Literal, cast, overload
 
@@ -30,13 +31,13 @@ from draive.models import (
     ModelToolsSelection,
 )
 from draive.multimodal import (
-    MediaData,
-    MetaContent,
+    ArtifactContent,
     Multimodal,
     MultimodalContent,
-    MultimodalContentElement,
+    MultimodalContentPart,
     TextContent,
 )
+from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("BedrockConverse",)
 
@@ -139,16 +140,16 @@ class BedrockConverse(BedrockAPI):
 
             if prefill is not None:
                 messages = [
-                    *_context_messages(context),
+                    *(_context_messages(context)),
                     {
                         "role": "assistant",
-                        "content": list(_convert_content(MultimodalContent.of(prefill).parts)),
+                        "content": _convert_content(MultimodalContent.of(prefill).parts),
                     },
                 ]
 
             elif output == "json" or isinstance(output, type):
                 messages = [
-                    *_context_messages(context),
+                    *(_context_messages(context)),
                     {
                         "role": "assistant",
                         "content": [{"text": "{"}],
@@ -156,7 +157,7 @@ class BedrockConverse(BedrockAPI):
                 ]
 
             else:
-                messages = list(_context_messages(context))
+                messages = _context_messages(context)
 
             tool_config: dict[str, Any] | None = _tools_as_tool_config(
                 tools.specifications,
@@ -282,9 +283,10 @@ class BedrockConverse(BedrockAPI):
 
 def _context_messages(  # noqa: C901, PLR0912
     context: ModelContext,
-) -> Iterable[ChatMessage]:
+) -> list[ChatMessage]:
     role: Literal["user", "assistant"] = "user"
     content: list[ChatMessageContent] = []
+    messages: list[ChatMessage] = []
 
     def flush(
         current_role: Literal["user", "assistant"],
@@ -304,7 +306,7 @@ def _context_messages(  # noqa: C901, PLR0912
         if isinstance(element, ModelInput):
             if role != "user":
                 if message := flush(role):
-                    yield message
+                    messages.append(message)
 
                 role = "user"
 
@@ -321,7 +323,7 @@ def _context_messages(  # noqa: C901, PLR0912
                                 "toolUseId": block.identifier,
                                 "content": cast(
                                     list[ChatMessageText | ChatMessageImage],
-                                    list(_convert_content(block.content.parts)),
+                                    _convert_content(block.content.parts),
                                 ),
                                 "status": "error" if block.handling == "error" else "success",
                             }
@@ -331,7 +333,7 @@ def _context_messages(  # noqa: C901, PLR0912
         elif isinstance(element, ModelOutput):
             if role != "assistant":
                 if message := flush(role):
-                    yield message
+                    messages.append(message)
 
                 role = "assistant"
 
@@ -359,50 +361,71 @@ def _context_messages(  # noqa: C901, PLR0912
             raise ValueError(f"Unsupported model context element: {type(element).__name__}")
 
     if message := flush(role):
-        yield message
+        messages.append(message)
+
+    return messages
 
 
-def _convert_content(
-    parts: Sequence[MultimodalContentElement],
-) -> Iterable[ChatMessageContent]:
+def _convert_content(  # noqa: C901
+    parts: Sequence[MultimodalContentPart],
+) -> list[ChatMessageContent]:
+    converted: list[ChatMessageContent] = []
     for part in parts:
         if isinstance(part, TextContent):
-            yield {"text": part.text}
+            converted.append({"text": part.text})
 
-        elif isinstance(part, MediaData):
-            if part.kind != "image":
-                raise ValueError(f"Unsupported message content kind: {part.kind}")
+        elif isinstance(part, ResourceContent):
+            # Only selected image resources are supported by Bedrock messages
+            if not part.mime_type.startswith("image"):
+                raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
 
-            if part.media == "image/png":
+            if part.mime_type == "image/png":
                 fmt = "png"
 
-            elif part.media == "image/jpeg":
+            elif part.mime_type == "image/jpeg":
                 fmt = "jpeg"
 
-            elif part.media == "image/gif":
+            elif part.mime_type == "image/gif":
                 fmt = "gif"
 
             else:
-                raise ValueError(f"Unsupported message content kind: {part.kind}")
+                raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
 
-            yield {
-                "image": {
-                    "format": fmt,
-                    "source": {
-                        "bytes": part.data,
-                    },
-                },
-            }
+            converted.append(
+                {
+                    "image": {
+                        "format": fmt,
+                        "source": {
+                            # ResourceContent.data is base64-encoded (URL-safe);
+                            # Bedrock expects raw bytes
+                            "bytes": urlsafe_b64decode(part.data),
+                        },
+                    }
+                }
+            )
 
-        elif isinstance(part, MetaContent):
-            if part.category == "transcript" and part.content:
-                yield {"text": part.content.to_str()}
+        elif isinstance(part, ResourceReference):
+            # Bedrock image message blocks only accept raw bytes. We can fetch
+            # the resource content if a repository is configured; otherwise this
+            # cannot be sent as-is. For now, raise a clear error.
+            raise ValueError(
+                "ResourceReference in message content is not supported for Bedrock. "
+                "Provide inline ResourceContent or let us implement fetching via "
+                "ResourcesRepository."
+            )
 
-            else:
+        elif isinstance(part, ArtifactContent):
+            # Skip artifacts that are marked as hidden
+            if part.hidden:
                 continue
 
+            converted.append({"text": part.artifact.to_str()})
+
         else:
-            yield {"text": part.to_json()}
+            # Fallback: serialize unknown parts to text
+            converted.append({"text": part.to_str()})
+
+    return converted
 
 
 def _convert_tool(tool: ModelToolSpecification) -> ChatTool:
@@ -447,7 +470,7 @@ def _completion_as_output_content(
     completion: Iterable[Mapping[str, Any]],
     /,
 ) -> Iterable[MultimodalContent | ModelToolRequest]:
-    accumulator: list[MultimodalContentElement] = []
+    accumulator: list[MultimodalContentPart] = []
     for block in completion:
         match block:
             case {"text": str() as text}:
@@ -472,7 +495,12 @@ def _completion_as_output_content(
                 else:
                     raise ValueError(f"Unsupported output image format: {data_format}")
 
-                accumulator.append(MediaData.of(data, media=media_type))
+                accumulator.append(
+                    ResourceContent.of(
+                        data,
+                        mime_type=media_type,
+                    )
+                )
 
             case {
                 "toolUse": {

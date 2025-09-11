@@ -1,6 +1,5 @@
 import json
 import random
-from base64 import b64encode
 from collections.abc import AsyncGenerator, Collection, Coroutine, Generator, Sequence
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
@@ -88,15 +87,10 @@ from draive.models import (
     ModelToolSpecification,
 )
 from draive.models.types import ModelReasoning
-from draive.multimodal import (
-    MediaData,
-    MediaReference,
-    MetaContent,
-    MultimodalContent,
-    TextContent,
-)
+from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIResponsesConfig
+from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("OpenAIResponses",)
 
@@ -368,10 +362,10 @@ class OpenAIResponses(OpenAIAPI):
 
                     output_blocks.append(
                         MultimodalContent.of(
-                            MediaData.of(
+                            ResourceContent.of(
                                 block.result,
-                                media="image/png",  # it seems that we always get png
-                            )
+                                mime_type="image/png",  # it seems that we always get png
+                            ),
                         )
                     )
 
@@ -483,9 +477,9 @@ class OpenAIResponses(OpenAIAPI):
                             yield TextContent(text=event.delta)
 
                         elif isinstance(event, ResponseAudioDeltaEvent):
-                            yield MediaData.of(
+                            yield ResourceContent.of(
                                 event.delta,
-                                media="audio/pcm16",  # it seems it is a default format
+                                mime_type="audio/pcm16",  # it seems it is a default format
                             )
 
                         elif isinstance(event, ResponseReasoningTextDeltaEvent):
@@ -519,11 +513,9 @@ class OpenAIResponses(OpenAIAPI):
                                         reason="Image generation result does not contain an image",
                                     )
 
-                                yield MultimodalContent.of(
-                                    MediaData.of(
-                                        event.result,
-                                        media="image/png",  # it seems that we always get png
-                                    )
+                                yield ResourceContent.of(
+                                    event.result,
+                                    mime_type="image/png",  # it seems that we always get png
                                 )
 
                             elif isinstance(event, ResponseReasoningItem):
@@ -832,19 +824,21 @@ def _input_content_parts(
                 text=part.text,
             )
 
-        elif isinstance(part, MediaData):
-            if part.kind != "image":
-                raise ValueError(f"Unsupported media - {part.kind}")
+        elif isinstance(part, ResourceContent):
+            # Only image resources are supported as OpenAI input content
+            if not part.mime_type.startswith("image"):
+                raise ValueError(f"Unsupported media - {part.mime_type}")
 
             yield ResponseInputImageParam(
                 type="input_image",
                 detail=vision_details,
-                image_url=part.to_data_uri(safe_encoding=False),
+                image_url=part.to_data_uri(),
             )
 
-        elif isinstance(part, MediaReference):
-            if part.kind != "image":
-                raise ValueError(f"Unsupported media - {part.kind}")
+        elif isinstance(part, ResourceReference):
+            # Only image references supported here; require explicit image mime
+            if part.mime_type is None or not part.mime_type.startswith("image"):
+                raise ValueError(f"Unsupported media - {part.mime_type}")
 
             yield ResponseInputImageParam(
                 type="input_image",
@@ -852,21 +846,20 @@ def _input_content_parts(
                 image_url=part.uri,
             )
 
-        elif isinstance(part, MetaContent):
-            match part.category:
-                case "transcript" if part.content is not None:
-                    yield ResponseInputTextParam(
-                        type="input_text",
-                        text=part.content.to_str(),
-                    )
+        elif isinstance(part, ArtifactContent):
+            if part.hidden:
+                continue  # skip hidden
 
-                case _:
-                    continue  # skip other meta
-
-        else:
             yield ResponseInputTextParam(
                 type="input_text",
-                text=part.to_json(),
+                text=part.artifact.to_str(),
+            )
+
+        else:
+            # Fallback: serialize unknown parts as text
+            yield ResponseInputTextParam(
+                type="input_text",
+                text=part.to_str(),
             )
 
 
@@ -1034,9 +1027,9 @@ def _output_content_blocks(  # noqa: C901
                 )
             )
 
-        elif isinstance(part, MediaData):
-            if part.kind != "image":
-                raise ValueError(f"Unsupported media - {part.kind}")
+        elif isinstance(part, ResourceContent):
+            if not part.mime_type.startswith("image"):
+                raise ValueError(f"Unsupported media - {part.mime_type}")
 
             if message := flush_message():
                 yield message
@@ -1044,26 +1037,24 @@ def _output_content_blocks(  # noqa: C901
             yield ImageGenerationCallParam(
                 id=f"img_{uuid4().hex}",
                 type="image_generation_call",
-                result=b64encode(part.data).decode("utf-8"),
+                result=part.data,
                 status="completed",
             )
 
-        elif isinstance(part, MediaReference):
+        elif isinstance(part, ResourceReference):
             raise ValueError("Media is not supported as model output")
 
-        elif isinstance(part, MetaContent):
-            match part.category:
-                case "transcript" if part.content is not None:
-                    content_accumulator.append(
-                        ResponseOutputTextParam(
-                            type="output_text",
-                            text=part.content.to_str(),
-                            annotations=(),
-                        )
-                    )
+        elif isinstance(part, ArtifactContent):
+            if part.hidden:
+                continue  # skip hidden
 
-                case _:
-                    continue  # skip other meta
+            content_accumulator.append(
+                ResponseOutputTextParam(
+                    type="output_text",
+                    text=part.artifact.to_str(),
+                    annotations=(),
+                )
+            )
 
         else:
             content_accumulator.append(

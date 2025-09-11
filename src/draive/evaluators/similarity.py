@@ -1,10 +1,11 @@
+from base64 import urlsafe_b64decode
 from collections.abc import Sequence
 from typing import cast
 
 from draive.embedding import Embedded, ImageEmbedding, TextEmbedding, vector_similarity_score
 from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
-from draive.multimodal import Multimodal, MultimodalContent, MultimodalTagElement
-from draive.multimodal.media import MediaData
+from draive.multimodal import Multimodal, MultimodalContent
+from draive.resources import ResourceContent
 from draive.stages import Stage
 
 __all__ = (
@@ -80,12 +81,9 @@ async def similarity_evaluator(
         ),
     ).execute()
 
-    if result := MultimodalTagElement.parse_first(
-        "RESULT",
-        content=completion,
-    ):
+    if result := completion.tag("RESULT"):
         return EvaluationScore.of(
-            cast(EvaluationScoreValue, result.content.to_str()),
+            cast(EvaluationScoreValue, result.content.to_str().lower()),
             meta={"comment": completion.to_str()},
         )
 
@@ -110,23 +108,23 @@ async def text_vector_similarity_evaluator(
 
 @evaluator(name="image_vector_similarity")
 async def image_vector_similarity_evaluator(
-    evaluated: MediaData | bytes,
+    evaluated: ResourceContent | bytes,
     /,
     *,
-    reference: MediaData | bytes,
+    reference: ResourceContent | bytes,
 ) -> float:
     evaluated_data: bytes
     match evaluated:
-        case MediaData() as media:
-            evaluated_data = media.data
+        case ResourceContent() as media:
+            evaluated_data = urlsafe_b64decode(media.data.encode("utf-8"))
 
         case raw_data:
             evaluated_data = raw_data
 
     reference_data: bytes
     match reference:
-        case MediaData() as media:
-            reference_data = media.data
+        case ResourceContent() as media:
+            reference_data = urlsafe_b64decode(media.data.encode("utf-8"))
 
         case raw_data:
             reference_data = raw_data

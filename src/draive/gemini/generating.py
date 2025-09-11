@@ -1,5 +1,5 @@
 import random
-from base64 import b64decode, b64encode
+from base64 import b64decode, b64encode, urlsafe_b64decode
 from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable
 from itertools import chain
 from typing import Any, Literal, cast, overload
@@ -48,7 +48,8 @@ from draive.models import (
     ModelToolResponse,
     ModelToolsDeclaration,
 )
-from draive.multimodal import MediaData, MediaReference, MetaContent, MultimodalContent, TextContent
+from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
+from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("GeminiGenerating",)
 
@@ -636,17 +637,17 @@ def _part_as_output_blocks(
 
     if part.inline_data and part.inline_data.data:  # there is no content without content...
         yield MultimodalContent.of(
-            MediaData.of(
+            ResourceContent.of(
                 part.inline_data.data,
-                media=part.inline_data.mime_type or "application/octet-stream",
+                mime_type=part.inline_data.mime_type or "application/octet-stream",
             )
         )
 
     if part.file_data and part.file_data.file_uri:  # there is no content without content...
         yield MultimodalContent.of(
-            MediaReference.of(
+            ResourceReference.of(
                 part.file_data.file_uri,
-                media=part.file_data.mime_type or "application/octet-stream",
+                mime_type=part.file_data.mime_type,
             )
         )
 
@@ -678,15 +679,15 @@ def _part_as_stream_elements(
         )
 
     if part.inline_data and part.inline_data.data:  # there is no content without content...
-        yield MediaData.of(
+        yield ResourceContent.of(
             part.inline_data.data,
-            media=part.inline_data.mime_type or "application/octet-stream",
+            mime_type=part.inline_data.mime_type or "application/octet-stream",
         )
 
     if part.file_data and part.file_data.file_uri:  # there is no content without content...
-        yield MediaReference.of(
+        yield ResourceReference.of(
             part.file_data.file_uri,
-            media=part.file_data.mime_type or "application/octet-stream",
+            mime_type=part.file_data.mime_type,
         )
 
 
@@ -743,39 +744,39 @@ def content_parts(
     content: MultimodalContent,
     /,
 ) -> Generator[PartDict]:
-    for element in content.parts:
-        if isinstance(element, TextContent):
+    for part in content.parts:
+        if isinstance(part, TextContent):
             yield {
-                "text": element.text,
+                "text": part.text,
             }
 
-        elif isinstance(element, MediaData):
+        elif isinstance(part, ResourceContent):
             yield {
                 "inline_data": {
-                    "data": element.data,
-                    "mime_type": element.media,
+                    # decode urlsafe base64 back to raw bytes for provider
+                    "data": urlsafe_b64decode(part.data),
+                    "mime_type": part.mime_type,
                 },
             }
 
-        elif isinstance(element, MediaReference):
+        elif isinstance(part, ResourceReference):
             yield {
                 "file_data": {
-                    "file_uri": element.uri,
-                    "mime_type": element.media,
+                    "file_uri": part.uri,
+                    "mime_type": part.mime_type,
                 }
             }
 
-        elif isinstance(element, MetaContent):
-            match element.category:
-                case "transcript" if element.content is not None:
-                    yield {
-                        "text": element.content.to_str(),
-                    }
+        elif isinstance(part, ArtifactContent):
+            # Skip artifacts that are marked as hidden
+            if part.hidden:
+                continue
 
-                case _:
-                    continue  # skip other meta
+            yield {
+                "text": part.artifact.to_str(),
+            }
 
         else:
             yield {
-                "text": element.to_json(),
+                "text": part.to_str(),
             }

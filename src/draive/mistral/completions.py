@@ -39,14 +39,14 @@ from draive.models import (
     ModelToolsSelection,
 )
 from draive.multimodal import (
-    MediaData,
-    MediaReference,
+    ArtifactContent,
     Multimodal,
     MultimodalContent,
-    MultimodalContentElement,
+    MultimodalContentPart,
     TextContent,
 )
 from draive.parameters import DataModel
+from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("MistralCompletions",)
 
@@ -436,7 +436,7 @@ def _build_messages(
 
 
 def _content_chunks(
-    parts: Iterable[MultimodalContentElement],
+    parts: Iterable[MultimodalContentPart],
 ) -> Iterable[dict[str, Any]]:
     for element in parts:
         match element:
@@ -446,7 +446,10 @@ def _content_chunks(
                     "text": text.text,
                 }
 
-            case MediaReference() as ref if ref.kind == "image":
+            case ResourceReference() as ref:
+                if not (ref.mime_type or "").startswith("image"):
+                    raise ValueError(f"Unsupported message content mime type: {ref.mime_type}")
+
                 yield {
                     "type": "image_url",
                     "image_url": {
@@ -454,24 +457,37 @@ def _content_chunks(
                     },
                 }
 
-            case MediaData() as data if data.kind == "image":
+            case ResourceContent() as data:
+                if not (data.mime_type or "").startswith("image"):
+                    raise ValueError(f"Unsupported message content mime type: {data.mime_type}")
+
                 yield {
                     "type": "image_url",
                     "image_url": {
-                        "url": data.to_data_uri(safe_encoding=False),
+                        # ResourceContent.to_data_uri() returns a proper data URI
+                        "url": data.to_data_uri(),
                     },
+                }
+
+            case ArtifactContent() as artifact:
+                if artifact.hidden:
+                    continue
+
+                yield {
+                    "type": "text",
+                    "text": artifact.artifact.to_str(),
                 }
 
             case other:
                 yield {
                     "type": "text",
-                    "text": other.to_json(),
+                    "text": other.to_str(),
                 }
 
 
 def content_chunk_as_content_element(
     chunk: Any,
-) -> MultimodalContentElement:
+) -> MultimodalContentPart:
     # Handle dict-like chunks first (what we emit on requests and many SDKs return)
     if isinstance(chunk, Mapping):
         ctype = cast(str | None, chunk.get("type"))
@@ -484,7 +500,9 @@ def content_chunk_as_content_element(
             image = cast(Mapping[str, Any] | None, chunk.get("image_url")) or {}
             url = cast(str | None, image.get("url")) or ""
             if url:
-                return MediaReference.of(url, media="image/*")
+                # We cannot reliably distinguish data URIs here without parsing;
+                # treat as a reference and mark mime type as generic image.
+                return ResourceReference.of(url, mime_type="image/*")
 
     # Fallback: stringify any unknown typed object deterministically
     return TextContent(text=json.dumps(chunk, default=str))

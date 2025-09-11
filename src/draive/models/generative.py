@@ -31,8 +31,9 @@ from draive.models.types import (
     ModelToolResponse,
     ModelToolsDeclaration,
 )
-from draive.multimodal import MediaContent, MultimodalContent, MultimodalContentElement, TextContent
+from draive.multimodal import ArtifactContent, MultimodalContent, MultimodalContentPart, TextContent
 from draive.parameters import DataModel
+from draive.resources import ResourceContent, ResourceReference
 
 __all__ = (
     "GenerativeModel",
@@ -399,7 +400,7 @@ class GenerativeModel(State):
 
             tools_turn += 1  # continue with next turn
 
-    async def _streaming_loop(  # noqa: C901
+    async def _streaming_loop(  # noqa: C901, PLR0912
         self,
         *,
         instructions: ModelInstructions,
@@ -431,7 +432,8 @@ class GenerativeModel(State):
                     yield chunk
 
                 else:
-                    yield MultimodalContent.of(chunk)  # stream both reasoning and content
+                    # stream content parts as-is
+                    yield chunk
 
             if not pending_tools:
                 ctx.log_debug("...streaming loop finished...")
@@ -461,7 +463,8 @@ class GenerativeModel(State):
                         # skip adding to responses as we finish loop
                         # include content in tools result instead
                         tools_result = (*tools_result, response.content)
-                        yield response.content
+                        for part in response.content.parts:
+                            yield part
 
                     elif response.handling == "output_extension":
                         tool_responses.append(response)
@@ -470,7 +473,8 @@ class GenerativeModel(State):
                             *result_extension,
                             response.content,
                         )
-                        yield response.content
+                        for part in response.content.parts:
+                            yield part
 
                     else:
                         tool_responses.append(response)
@@ -517,7 +521,7 @@ def _merge_output(
     ModelOutputBlock
         Consolidated output blocks with merged multimodal content.
     """
-    content_accumulator: list[MultimodalContentElement] = []
+    content_accumulator: list[MultimodalContentPart] = []
     for element in output:
         if isinstance(element, ModelReasoning):
             if content_accumulator:
@@ -664,26 +668,40 @@ def _decoded(  # noqa: PLR0911
             return result
 
         case "text":
-            return result.updated(blocks=(result.content.text(),))
+            return result.updated(blocks=(MultimodalContent.of(*result.content.texts()),))
 
         case "image":
-            return result.updated(blocks=(result.content.images(),))
+            return result.updated(blocks=(MultimodalContent.of(*result.content.images()),))
 
         case "audio":
-            return result.updated(blocks=(result.content.audio(),))
+            return result.updated(blocks=(MultimodalContent.of(*result.content.audio()),))
 
         case "video":
-            return result.updated(blocks=(result.content.video(),))
+            return result.updated(blocks=(MultimodalContent.of(*result.content.video()),))
 
         case "json":
             return result.updated(
-                blocks=(MultimodalContent.of(DataModel.from_json(result.content.text().to_str())),)
+                blocks=(
+                    MultimodalContent.of(
+                        ArtifactContent.of(
+                            DataModel.from_json(result.content.to_str()),
+                            category="json",
+                        )
+                    ),
+                )
             )
 
         case model:
             assert isinstance(model, type)  # nosec: B101
             return result.updated(
-                blocks=(MultimodalContent.of(model.from_json(result.content.text().to_str())),)
+                blocks=(
+                    MultimodalContent.of(
+                        ArtifactContent.of(
+                            model.from_json(result.content.to_str()),
+                            category=model.__name__,
+                        )
+                    ),
+                )
             )
 
 
@@ -721,21 +739,27 @@ async def _decoded_stream(  # noqa: C901, PLR0912
 
         case "image":
             async for part in stream:
-                if isinstance(part, MediaContent) and part.kind == "image":
+                if isinstance(part, ResourceContent | ResourceReference) and (
+                    (part.mime_type or "").startswith("image")
+                ):
                     yield part
 
                 # skip non image output
 
         case "audio":
             async for part in stream:
-                if isinstance(part, MediaContent) and part.kind == "audio":
+                if isinstance(part, ResourceContent | ResourceReference) and (
+                    (part.mime_type or "").startswith("audio")
+                ):
                     yield part
 
                 # skip non audio output
 
         case "video":
             async for part in stream:
-                if isinstance(part, MediaContent) and part.kind == "video":
+                if isinstance(part, ResourceContent | ResourceReference) and (
+                    (part.mime_type or "").startswith("video")
+                ):
                     yield part
 
                 # skip non video output
@@ -750,7 +774,10 @@ async def _decoded_stream(  # noqa: C901, PLR0912
                 # skip non text output
 
             # provide decoded model afterwards
-            yield DataModel.from_json("".join(accumulator))
+            yield ArtifactContent.of(
+                DataModel.from_json("".join(accumulator)),
+                category="json",
+            )
 
         case model:
             assert isinstance(model, type)  # nosec: B101
@@ -763,4 +790,7 @@ async def _decoded_stream(  # noqa: C901, PLR0912
                 # skip non text output
 
             # provide decoded model afterwards
-            yield model.from_json("".join(accumulator))
+            yield ArtifactContent.of(
+                model.from_json("".join(accumulator)),
+                category=model.__name__,
+            )
