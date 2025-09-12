@@ -232,9 +232,9 @@ class OpenAIResponses(OpenAIAPI):
                     safety_identifier=config.safety_identifier or NOT_GIVEN,
                     prompt_cache_key=cache_key or NOT_GIVEN,
                     stream=False,
-                    # prevent data storage by OpenAI
                     include=["reasoning.encrypted_content"]
-                    if config.reasoning is not MISSING
+                    # for gpt-5 model family we need to request encrypted reasoning
+                    if "gpt-5" in config.model.lower()
                     else NOT_GIVEN,
                     store=False,
                 )
@@ -470,9 +470,9 @@ class OpenAIResponses(OpenAIAPI):
                     truncation=config.truncation,
                     safety_identifier=config.safety_identifier or NOT_GIVEN,
                     prompt_cache_key=cache_key or NOT_GIVEN,
-                    # prevent data storage within OpenAI
                     include=["reasoning.encrypted_content"]
-                    if config.reasoning is not MISSING
+                    # for gpt-5 model family we need to request encrypted reasoning
+                    if "gpt-5" in config.model.lower()
                     else NOT_GIVEN,
                     store=False,
                 ) as stream:
@@ -792,8 +792,15 @@ def _model_output_to_params(
         elif isinstance(block, ModelReasoning):
             match block.meta.kind:
                 case "reasoning":
+                    encrypted: str | None = block.meta.get_str("encrypted")
+                    if not encrypted:
+                        continue  # Only include reasoning when we have encrypted content.
+
                     yield ResponseReasoningItemParam(
-                        id=block.meta.get_str("id", default=f"rs_{uuid4().hex}"),
+                        id=block.meta.get_str(
+                            "id",
+                            default=f"rs_{uuid4().hex}",
+                        ),
                         type="reasoning",
                         summary=[
                             {
@@ -802,7 +809,7 @@ def _model_output_to_params(
                             }
                             for part in block.content.parts
                         ],
-                        encrypted_content=block.meta.get_str("encrypted"),
+                        encrypted_content=encrypted,
                     )
 
         else:
