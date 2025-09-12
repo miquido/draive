@@ -7,7 +7,7 @@ from collections.abc import (
 )
 from typing import Any, Literal, final, overload
 
-from haiway import META_EMPTY, State, ctx, statemethod
+from haiway import META_EMPTY, Meta, State, ctx, statemethod
 
 from draive.models.instructions import InstructionsRepository, ResolveableInstructions
 from draive.models.tools import Toolbox
@@ -428,12 +428,8 @@ class GenerativeModel(State):
                 if isinstance(chunk, ModelToolRequest):
                     pending_tools.add(ctx.spawn(toolbox.respond, chunk))
 
-                elif isinstance(chunk, ModelReasoning):
-                    yield chunk
-
                 else:
-                    # stream content parts as-is
-                    yield chunk
+                    yield chunk  # stream content/reasoning parts as-is
 
             if not pending_tools:
                 ctx.log_debug("...streaming loop finished...")
@@ -508,7 +504,7 @@ class GenerativeModel(State):
     generating: ModelGenerating
 
 
-def _merge_output(
+def _merge_output(  # noqa: C901, PLR0912
     output: Sequence[ModelStreamOutput],
 ) -> Generator[ModelOutputBlock]:
     """Merge streaming output chunks into consolidated output blocks.
@@ -527,19 +523,66 @@ def _merge_output(
         Consolidated output blocks with merged multimodal content.
     """
     content_accumulator: list[MultimodalContentPart] = []
+    reasoning_accumulator: list[MultimodalContentPart] = []
+    reasoning_meta: Meta = META_EMPTY
     for element in output:
-        if isinstance(element, ModelReasoning):
+        if isinstance(element, ModelToolRequest):
+            if reasoning_accumulator:
+                assert not content_accumulator  # nosec: B101
+                yield ModelReasoning.of(
+                    MultimodalContent.of(*reasoning_accumulator),
+                    meta=reasoning_meta,
+                )
+                reasoning_accumulator = []
+                reasoning_meta = META_EMPTY
+
             if content_accumulator:
+                assert not reasoning_accumulator  # nosec: B101
                 yield MultimodalContent.of(*content_accumulator)
                 content_accumulator = []
 
             yield element
 
+        elif isinstance(element, ModelReasoning):
+            if content_accumulator:
+                yield MultimodalContent.of(*content_accumulator)
+                content_accumulator = []
+
+            if element.meta == reasoning_meta:
+                reasoning_accumulator.extend(element.content.parts)
+
+            else:
+                if reasoning_accumulator:
+                    yield ModelReasoning.of(
+                        MultimodalContent.of(*reasoning_accumulator),
+                        meta=reasoning_meta,
+                    )
+
+                reasoning_accumulator = list(element.content.parts)
+                reasoning_meta = element.meta
+
         else:
             assert isinstance(element, MultimodalContentPart)  # nosec: B101
+            if reasoning_accumulator:
+                assert not content_accumulator  # nosec: B101
+                yield ModelReasoning.of(
+                    MultimodalContent.of(*reasoning_accumulator),
+                    meta=reasoning_meta,
+                )
+                reasoning_accumulator = []
+                reasoning_meta = META_EMPTY
+
             content_accumulator.append(element)
 
+    if reasoning_accumulator:
+        assert not content_accumulator  # nosec: B101
+        yield ModelReasoning.of(
+            MultimodalContent.of(*reasoning_accumulator),
+            meta=reasoning_meta,
+        )
+
     if content_accumulator:
+        assert not reasoning_accumulator  # nosec: B101
         yield MultimodalContent.of(*content_accumulator)
 
 
