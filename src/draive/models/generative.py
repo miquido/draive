@@ -441,7 +441,7 @@ class GenerativeModel(State):
                     *result_extension,
                     *(
                         block
-                        for block in output_accumulator
+                        for block in _merge_output(output_accumulator)
                         if isinstance(block, MultimodalContent | ModelReasoning)
                     ),
                 )
@@ -483,6 +483,11 @@ class GenerativeModel(State):
                 ctx.log_debug("...streaming loop finished...")
                 result: Sequence[ModelReasoning | MultimodalContent] = (
                     *result_extension,
+                    *(
+                        block
+                        for block in _merge_output(output_accumulator)
+                        if isinstance(block, MultimodalContent | ModelReasoning)
+                    ),
                     *tools_result,
                 )
                 # include final result in context
@@ -531,12 +536,11 @@ def _merge_output(
             yield element
 
         else:
-            assert not isinstance(element, ModelToolRequest)  # nosec: B101
+            assert isinstance(element, MultimodalContentPart)  # nosec: B101
             content_accumulator.append(element)
 
     if content_accumulator:
         yield MultimodalContent.of(*content_accumulator)
-        content_accumulator = []
 
 
 @final
