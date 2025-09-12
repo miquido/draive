@@ -233,7 +233,9 @@ class OpenAIResponses(OpenAIAPI):
                     prompt_cache_key=cache_key or NOT_GIVEN,
                     stream=False,
                     # prevent data storage by OpenAI
-                    include=["reasoning.encrypted_content"],
+                    include=["reasoning.encrypted_content"]
+                    if config.reasoning is not MISSING
+                    else NOT_GIVEN,
                     store=False,
                 )
 
@@ -469,7 +471,9 @@ class OpenAIResponses(OpenAIAPI):
                     safety_identifier=config.safety_identifier or NOT_GIVEN,
                     prompt_cache_key=cache_key or NOT_GIVEN,
                     # prevent data storage within OpenAI
-                    include=["reasoning.encrypted_content"],
+                    include=["reasoning.encrypted_content"]
+                    if config.reasoning is not MISSING
+                    else NOT_GIVEN,
                     store=False,
                 ) as stream:
                     async for event in stream:  # type: ignore[reportUnknownVariableType]
