@@ -356,14 +356,26 @@ def _context_messages(
 ) -> Iterable[MessagesTypedDict]:
     for element in context:
         if isinstance(element, ModelInput):
-            user_content = element.content
-            yield cast(
-                MessagesTypedDict,
-                {
-                    "role": "user",
-                    "content": list(_content_chunks(user_content.parts)),
-                },
-            )
+            if user_content := element.content:
+                yield cast(
+                    MessagesTypedDict,
+                    {
+                        "role": "user",
+                        "content": list(_content_chunks(user_content.parts)),
+                    },
+                )
+
+            # Provide tool responses as separate tool messages expected by Mistral
+            for tool_response in element.tools:
+                yield cast(
+                    MessagesTypedDict,
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_response.identifier,
+                        "name": tool_response.tool,
+                        "content": list(_content_chunks(tool_response.content.parts)),
+                    },
+                )
 
         elif isinstance(element, ModelOutput):
             for block in element.blocks:
