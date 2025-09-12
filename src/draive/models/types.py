@@ -682,7 +682,6 @@ class ModelMemoryRecall(State):
     @classmethod
     def of(
         cls,
-        element: ModelContextElement,
         *elements: ModelContextElement,
         variables: Mapping[str, str] | None = None,
         meta: Meta | MetaValues | None = None,
@@ -691,7 +690,7 @@ class ModelMemoryRecall(State):
 
         Parameters
         ----------
-        element, elements : ModelContextElement
+        elements : ModelContextElement
             Context elements (inputs/outputs) to include in the recall.
         variables : Mapping[str, str] | None, optional
             Variables associated with the recall.
@@ -704,7 +703,7 @@ class ModelMemoryRecall(State):
             Constructed memory recall snapshot.
         """
         return cls(
-            context=(element, *elements),
+            context=elements,
             variables=variables if variables is not None else {},
             meta=Meta.of(meta),
         )
