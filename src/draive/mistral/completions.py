@@ -1,10 +1,10 @@
 import json
-from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable, Mapping
+from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
 from haiway import META_EMPTY, ObservabilityLevel, as_list, ctx, unwrap_missing
-from mistralai import ToolTypedDict
+from mistralai import ContentChunkTypedDict, ImageURLChunk, TextChunk, ThinkChunk, ToolTypedDict
 from mistralai.models import (
     AssistantMessage,
     ChatCompletionChoice,
@@ -12,6 +12,7 @@ from mistralai.models import (
     ChatCompletionResponse,
     CompletionEvent,
     CompletionResponseStreamChoice,
+    ContentChunk,
     DeltaMessage,
     MessagesTypedDict,
     ResponseFormatTypedDict,
@@ -131,7 +132,9 @@ class MistralCompletions(MistralAPI):
             instructions=instructions,
             prefill=prefill,
         )
-        response_format = _response_format(output)
+
+        tool_choice: ChatCompletionRequestToolChoiceTypedDict
+        tools_list: list[ToolTypedDict]
         tool_choice, tools_list = _tools_as_tool_config(
             tools.specifications,
             tool_selection=tools.selection,
@@ -145,7 +148,7 @@ class MistralCompletions(MistralAPI):
             max_tokens=unwrap_missing_to_unset(config.max_output_tokens),
             stop=as_list(unwrap_missing_to_none(config.stop_sequences)),
             random_seed=unwrap_missing_to_unset(config.seed),
-            response_format=response_format,
+            response_format=_response_format(output),
             tools=tools_list,
             tool_choice=tool_choice,
             stream=True,
@@ -184,8 +187,12 @@ class MistralCompletions(MistralAPI):
 
             completion_delta: DeltaMessage = completion_choice.delta
             if content := completion_delta.content:
-                for part in content:
-                    yield content_chunk_as_content_element(part)
+                if isinstance(content, str):
+                    yield TextContent.of(content)
+
+                else:
+                    for part in content:
+                        yield _content_chunk_as_content_element(part)
 
             if tool_calls := completion_delta.tool_calls:
                 if not accumulated_tool_calls:
@@ -295,7 +302,8 @@ class MistralCompletions(MistralAPI):
                 prefill=prefill,
             )
 
-            response_format = _response_format(output)
+            tool_choice: ChatCompletionRequestToolChoiceTypedDict
+            tools_list: list[ToolTypedDict]
             tool_choice, tools_list = _tools_as_tool_config(
                 tools.specifications,
                 tool_selection=tools.selection,
@@ -309,7 +317,7 @@ class MistralCompletions(MistralAPI):
                 max_tokens=unwrap_missing_to_unset(config.max_output_tokens),
                 stop=as_list(unwrap_missing_to_none(config.stop_sequences)),
                 random_seed=unwrap_missing_to_unset(config.seed),
-                response_format=response_format,
+                response_format=_response_format(output),
                 tools=tools_list,
                 tool_choice=tool_choice,
                 stream=False,
@@ -357,61 +365,47 @@ def _context_messages(
     for element in context:
         if isinstance(element, ModelInput):
             if user_content := element.content:
-                yield cast(
-                    MessagesTypedDict,
-                    {
-                        "role": "user",
-                        "content": list(_content_chunks(user_content.parts)),
-                    },
-                )
+                yield {
+                    "role": "user",
+                    "content": list(_content_chunks(user_content.parts)),
+                }
 
             # Provide tool responses as separate tool messages expected by Mistral
             for tool_response in element.tools:
-                yield cast(
-                    MessagesTypedDict,
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_response.identifier,
-                        "name": tool_response.tool,
-                        "content": list(_content_chunks(tool_response.content.parts)),
-                    },
-                )
+                yield {
+                    "role": "tool",
+                    "tool_call_id": tool_response.identifier,
+                    "name": tool_response.tool,
+                    "content": list(_content_chunks(tool_response.content.parts)),
+                }
 
-        elif isinstance(element, ModelOutput):
+        else:
+            assert isinstance(element, ModelOutput)  # nosec: B101
             for block in element.blocks:
                 if isinstance(block, MultimodalContent):
-                    yield cast(
-                        MessagesTypedDict,
-                        {
-                            "role": "assistant",
-                            "content": list(_content_chunks(block.parts)),
-                        },
-                    )
+                    yield {
+                        "role": "assistant",
+                        "content": list(_content_chunks(block.parts)),
+                    }
 
                 elif isinstance(block, ModelReasoning):
                     continue  # skip reasoning
 
                 else:
                     assert isinstance(block, ModelToolRequest)  # nosec: B101
-                    yield cast(
-                        MessagesTypedDict,
-                        {
-                            "role": "assistant",
-                            "content": "",
-                            "tool_calls": [
-                                {
-                                    "id": block.identifier,
-                                    "function": {
-                                        "name": block.tool,
-                                        "arguments": json.dumps(dict(block.arguments)),
-                                    },
-                                }
-                            ],
-                        },
-                    )
-
-        else:
-            raise TypeError(f"Unsupported model context element: {type(element).__name__}")
+                    yield {
+                        "role": "assistant",
+                        "content": "",
+                        "tool_calls": [
+                            {
+                                "id": block.identifier,
+                                "function": {
+                                    "name": block.tool,
+                                    "arguments": json.dumps(dict(block.arguments)),
+                                },
+                            }
+                        ],
+                    }
 
 
 def _build_messages(
@@ -449,7 +443,7 @@ def _build_messages(
 
 def _content_chunks(
     parts: Iterable[MultimodalContentPart],
-) -> Iterable[dict[str, Any]]:
+) -> Iterable[ContentChunkTypedDict]:
     for element in parts:
         match element:
             case TextContent() as text:
@@ -497,30 +491,34 @@ def _content_chunks(
                 }
 
 
-def content_chunk_as_content_element(
-    chunk: Any,
+def _content_chunk_as_content_element(
+    chunk: ContentChunk,
 ) -> MultimodalContentPart:
-    # Handle dict-like chunks first (what we emit on requests and many SDKs return)
-    if isinstance(chunk, Mapping):
-        ctype = cast(str | None, chunk.get("type"))
-        if ctype == "text":
-            text = cast(str | None, chunk.get("text"))
-            if text:
-                return TextContent(text=text)
+    if isinstance(chunk, TextChunk):
+        return TextContent.of(chunk.text)
 
-        if ctype == "image_url":
-            image = cast(Mapping[str, Any] | None, chunk.get("image_url")) or {}
-            url = cast(str | None, image.get("url")) or ""
-            if url:
-                # We cannot reliably distinguish data URIs here without parsing;
-                # treat as a reference and mark mime type as generic image.
-                return ResourceReference.of(url, mime_type="image/*")
+    elif isinstance(chunk, ThinkChunk):
+        return ArtifactContent.of(
+            ModelReasoning.of(
+                *(part.text for part in chunk.thinking if isinstance(part, TextChunk))
+            ),
+            category="reasoning",
+            hidden=True,
+        )
 
-    # Fallback: stringify any unknown typed object deterministically
-    return TextContent(text=json.dumps(chunk, default=str))
+    elif isinstance(chunk, ImageURLChunk):
+        return ResourceReference.of(
+            chunk.image_url if isinstance(chunk.image_url, str) else chunk.image_url.url,
+            mime_type="image/png",
+        )
+
+    else:
+        raise ValueError(f"Unsupported content chunk: {type(chunk)}")
 
 
-def _record_usage_metrics(completion: ChatCompletionResponse) -> None:
+def _record_usage_metrics(
+    completion: ChatCompletionResponse,
+) -> None:
     if usage := completion.usage:
         ctx.record(
             ObservabilityLevel.INFO,
@@ -549,7 +547,7 @@ def _message_to_blocks(
 
         else:
             yield MultimodalContent.of(
-                *(content_chunk_as_content_element(chunk) for chunk in content)
+                *(_content_chunk_as_content_element(chunk) for chunk in content)
             )
 
     if tool_calls := message.tool_calls:

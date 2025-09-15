@@ -270,6 +270,7 @@ basic_conversation_message_json: str = """\
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",
     "content": {
+        "kind": "content",
         "parts": [
             {
                 "text": "string",
@@ -294,6 +295,7 @@ media_url_conversation_message_json: str = """\
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",
     "content": {
+        "kind": "content",
         "parts": [
             {
                 "uri": "https://miquido.com/image",
@@ -320,6 +322,7 @@ media_data_conversation_message_json: str = """\
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",
     "content": {
+        "kind": "content",
         "parts": [
             {
                 "data": "aW1hZ2VfZGF0YQ==",

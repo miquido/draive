@@ -334,6 +334,7 @@ class ModelToolRequest(DataModel):
             meta=Meta.of(meta),
         )
 
+    kind: Literal["tool_request"] = "tool_request"
     identifier: str
     tool: str
     arguments: Mapping[str, Any]
@@ -397,6 +398,7 @@ class ModelToolResponse(DataModel):
             meta=Meta.of(meta),
         )
 
+    kind: Literal["tool_response"] = "tool_response"
     identifier: str
     tool: str
     content: MultimodalContent
@@ -452,6 +454,7 @@ class ModelInput(DataModel):
             meta=Meta.of(meta),
         )
 
+    kind: Literal["model_input"] = "model_input"
     blocks: ModelInputBlocks
     meta: Meta
 
@@ -522,6 +525,7 @@ class ModelReasoning(DataModel):
             meta=Meta.of(meta),
         )
 
+    kind: Literal["reasoning"] = "reasoning"
     content: MultimodalContent
     meta: Meta
 
@@ -574,6 +578,7 @@ class ModelOutput(DataModel):
             meta=Meta.of(meta),
         )
 
+    kind: Literal["model_output"] = "model_output"
     blocks: ModelOutputBlocks
     meta: Meta
 
@@ -708,8 +713,9 @@ class ModelMemoryRecall(DataModel):
             meta=Meta.of(meta),
         )
 
+    kind: Literal["model_memory"] = "model_memory"
     context: ModelContext
-    variables: Mapping[str, str]
+    variables: Mapping[str, str | int | float]
     meta: Meta
 
 
@@ -766,6 +772,7 @@ class ModelInputChunk(DataModel):
             meta=Meta.of(meta),
         )
 
+    kind: Literal["model_input_chunk"] = "model_input_chunk"
     content: MultimodalContent
     eod: bool
     meta: Meta
@@ -819,6 +826,7 @@ class ModelOutputChunk(DataModel):
             meta=Meta.of(meta),
         )
 
+    kind: Literal["model_output_chunk"] = "model_output_chunk"
     content: MultimodalContent
     eod: bool
     meta: Meta
