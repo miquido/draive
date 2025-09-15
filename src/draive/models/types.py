@@ -296,7 +296,7 @@ ModelToolsDeclaration.none = ModelToolsDeclaration(
 
 
 @final
-class ModelToolRequest(State):
+class ModelToolRequest(DataModel):
     """A request emitted by the model to call a tool function."""
 
     @classmethod
@@ -352,7 +352,7 @@ ModelToolHandling = Literal["response", "error", "output", "output_extension", "
 
 
 @final
-class ModelToolResponse(State):
+class ModelToolResponse(DataModel):
     """A response produced by a tool invocation.
 
     Content may be included in the model conversation depending on ``handling``.
@@ -412,7 +412,7 @@ ModelInputBlocks = Sequence[ModelInputBlock]
 
 
 @final
-class ModelInput(State):
+class ModelInput(DataModel):
     """Structured input to a model turn.
 
     Combines multimodal content and tool responses that become part of the
@@ -480,7 +480,7 @@ ModelOutputSelection = (
 
 
 @final
-class ModelReasoning(State):
+class ModelReasoning(DataModel):
     """Represents model reasoning or chain-of-thought content.
 
     This class encapsulates reasoning steps, thoughts, or explanations generated
@@ -534,7 +534,7 @@ ModelOutputBlocks = Sequence[ModelOutputBlock]
 
 
 @final
-class ModelOutput(State):
+class ModelOutput(DataModel):
     """Structured output of a model turn.
 
     Contains multimodal content blocks and potential tool requests.
@@ -664,7 +664,7 @@ ModelContext = Sequence[ModelContextElement]
 
 
 @final
-class ModelMemoryRecall(State):
+class ModelMemoryRecall(DataModel):
     """Immutable snapshot of recalled memory for a session/turn.
 
     Attributes
@@ -724,7 +724,7 @@ ModelMemory = Memory[ModelMemoryRecall, ModelContextElement]
 
 
 @final
-class ModelInputChunk(State):
+class ModelInputChunk(DataModel):
     """Streaming input chunk for realtime sessions.
 
     Attributes
@@ -776,7 +776,7 @@ class ModelInputChunk(State):
 
 
 @final
-class ModelOutputChunk(State):
+class ModelOutputChunk(DataModel):
     """Streaming output chunk produced by a model.
 
     Attributes
@@ -877,7 +877,7 @@ class ModelGenerating(Protocol):
 
 
 @final
-class ModelSessionEvent(State):
+class ModelSessionEvent(DataModel):
     """Session event used in realtime flows (e.g., status, typing)."""
 
     @classmethod
