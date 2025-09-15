@@ -209,7 +209,7 @@ class Toolbox(State):
             tools_selection = "required"
 
         else:  # ModelToolSpecification
-            tools_selection = tool_suggestion["name"]
+            tools_selection = tool_suggestion.name
 
         return ModelToolsDeclaration(
             specifications=available_tools,

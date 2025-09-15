@@ -182,7 +182,7 @@ class OpenAIResponses(OpenAIAPI):
                     "model.provider": "openai",
                     "model.name": config.model,
                     "model.instructions": instructions,
-                    "model.tools": [tool["name"] for tool in tools.specifications],
+                    "model.tools": [tool.name for tool in tools.specifications],
                     "model.tool_selection": tools.selection,
                     "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
@@ -422,7 +422,7 @@ class OpenAIResponses(OpenAIAPI):
                     "model.provider": "openai",
                     "model.name": config.model,
                     "model.instructions": instructions,
-                    "model.tools": [tool["name"] for tool in tools.specifications],
+                    "model.tools": [tool.name for tool in tools.specifications],
                     "model.tool_selection": tools.selection,
                     "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
@@ -727,15 +727,18 @@ def _tools_as_tool_params(
             ToolParam,
             FunctionToolParam(
                 type="function",
-                name=tool["name"],
-                description=tool["description"] or None,
-                parameters=cast(dict[str, object] | None, tool["parameters"])
+                name=tool.name,
+                description=tool.description or None,
+                parameters=cast(dict[str, object] | None, tool.parameters)
                 or {
                     "type": "object",
                     "properties": {},
                     "additionalProperties": False,
                 },
-                strict=True,
+                strict=tool.meta.get_bool(
+                    "strict_parameters",
+                    default=False,
+                ),
             ),
         )
         for tool in tools

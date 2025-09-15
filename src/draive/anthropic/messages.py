@@ -147,7 +147,7 @@ class AnthropicMessages(AnthropicAPI):
                     "model.provider": self._provider,
                     "model.name": config.model,
                     "model.instructions": instructions,
-                    "model.tools": [tool["name"] for tool in tools.specifications],
+                    "model.tools": [tool.name for tool in tools.specifications],
                     "model.tool_selection": tools.selection,
                     "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
@@ -672,7 +672,7 @@ def _tools_as_tool_params(
     tool_params: list[ToolParam] = []
     for tool in tools:
         input_schema: dict[str, Any]
-        if parameters := tool["parameters"]:
+        if parameters := tool.parameters:
             input_schema = cast(dict[str, Any], parameters)
 
         else:
@@ -685,8 +685,8 @@ def _tools_as_tool_params(
 
         tool_params.append(
             {
-                "name": tool["name"],
-                "description": tool["description"] or "",
+                "name": tool.name,
+                "description": tool.description or "",
                 "input_schema": input_schema,
             }
         )

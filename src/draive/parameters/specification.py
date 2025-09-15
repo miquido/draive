@@ -33,6 +33,12 @@ __all__ = (
 
 
 @final
+class ParameterAlternativesSpecification(TypedDict, total=False):
+    type: Required[Sequence[Literal["string", "number", "integer", "boolean", "null"]]]
+    description: NotRequired[str]
+
+
+@final
 class ParameterNoneSpecification(TypedDict, total=False):
     type: Required[Literal["null"]]
     description: NotRequired[str]
@@ -148,7 +154,8 @@ ReferenceParameterSpecification = TypedDict(
 
 
 type ParameterSpecification = (
-    ParameterUnionSpecification
+    ParameterAlternativesSpecification
+    | ParameterUnionSpecification
     | ParameterNoneSpecification
     | ParameterStringEnumSpecification
     | ParameterStringSpecification
@@ -462,22 +469,54 @@ def _prepare_specification_of_union(
     /,
     description: str | None,
 ) -> ParameterSpecification:
+    compressed_alternatives: list[Literal["string", "number", "integer", "boolean", "null"]] = []
+    alternatives: list[ParameterSpecification] = []
+    for argument in annotation.arguments:
+        specification: ParameterSpecification = parameter_specification(
+            cast(AttributeAnnotation, argument),
+            description=None,
+        )
+        alternatives.append(specification)
+        match specification:
+            case {"type": "null", **tail} if not tail:
+                compressed_alternatives.append("null")
+
+            case {"type": "string", **tail} if not tail:
+                compressed_alternatives.append("string")
+
+            case {"type": "number", **tail} if not tail:
+                compressed_alternatives.append("number")
+
+            case {"type": "integer", **tail} if not tail:
+                compressed_alternatives.append("integer")
+
+            case {"type": "boolean", **tail} if not tail:
+                compressed_alternatives.append("boolean")
+
+            case _:
+                pass  # skip - type is more complex and can't be compressed
+
     if description := description:
+        if len(compressed_alternatives) == len(alternatives):
+            # prefer comperessed when equivalent representation is available
+            return ParameterAlternativesSpecification(
+                type=compressed_alternatives,
+                description=description,
+            )
+
         return {
-            "oneOf": [
-                parameter_specification(cast(AttributeAnnotation, argument), description=None)
-                for argument in annotation.arguments
-            ],
+            "oneOf": alternatives,
             "description": description,
         }
 
     else:
-        return {
-            "oneOf": [
-                parameter_specification(cast(AttributeAnnotation, argument), description=None)
-                for argument in annotation.arguments
-            ],
-        }
+        if len(compressed_alternatives) == len(alternatives):
+            # prefer comperessed when equivalent representation is available
+            return ParameterAlternativesSpecification(
+                type=compressed_alternatives,
+            )
+
+        return {"oneOf": alternatives}
 
 
 def _prepare_specification_of_bool(

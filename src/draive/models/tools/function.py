@@ -124,6 +124,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
                 "description": description,
                 "parameters": parameters,
                 "additionalProperties": False,
+                "meta": meta,
             },
         )
         self.handling: ModelToolHandling

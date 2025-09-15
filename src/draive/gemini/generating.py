@@ -135,7 +135,7 @@ class GeminiGenerating(GeminiAPI):
                     "model.provider": "gemini",
                     "model.name": config.model,
                     "model.instructions": instructions,
-                    "model.tools": [tool["name"] for tool in tools.specifications],
+                    "model.tools": [tool.name for tool in tools.specifications],
                     "model.tool_selection": tools.selection,
                     "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
@@ -279,7 +279,7 @@ class GeminiGenerating(GeminiAPI):
                     "model.provider": "gemini",
                     "model.name": config.model,
                     "model.instructions": instructions,
-                    "model.tools": [tool["name"] for tool in tools.specifications],
+                    "model.tools": [tool.name for tool in tools.specifications],
                     "model.tool_selection": tools.selection,
                     "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
@@ -466,9 +466,9 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
     if tools.specifications:
         functions = [
             FunctionDeclarationDict(
-                name=tool["name"],
-                description=tool["description"],
-                parameters_json_schema=cast(SchemaDict, tool["parameters"]),
+                name=tool.name,
+                description=tool.description,
+                parameters_json_schema=cast(SchemaDict, tool.parameters),
             )
             for tool in tools.specifications or []
         ]

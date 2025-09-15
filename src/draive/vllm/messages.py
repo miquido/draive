@@ -127,7 +127,7 @@ class VLLMMessages(VLLMAPI):
                     "model.provider": "vllm",
                     "model.name": config.model,
                     "model.instructions": instructions,
-                    "model.tools": [tool["name"] for tool in tools.specifications],
+                    "model.tools": [tool.name for tool in tools.specifications],
                     "model.tool_selection": tools.selection,
                     "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
@@ -273,7 +273,7 @@ class VLLMMessages(VLLMAPI):
                 "model.provider": "vllm",
                 "model.name": config.model,
                 "model.instructions": instructions,
-                "model.tools": [tool["name"] for tool in tools.specifications],
+                "model.tools": [tool.name for tool in tools.specifications],
                 "model.tool_selection": tools.selection,
                 "model.context": [element.to_str() for element in context],
                 "model.temperature": config.temperature,
@@ -590,9 +590,9 @@ def _tool_specification_as_tool(tool: ModelToolSpecification) -> ChatCompletionT
     return {
         "type": "function",
         "function": {
-            "name": tool["name"],
-            "description": tool["description"] or "",
-            "parameters": cast(dict[str, Any], tool["parameters"])
+            "name": tool.name,
+            "description": tool.description or "",
+            "parameters": cast(dict[str, Any], tool.parameters)
             or {
                 "type": "object",
                 "properties": {},

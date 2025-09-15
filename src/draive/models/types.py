@@ -14,7 +14,6 @@ from typing import (
     Literal,
     Protocol,
     Self,
-    TypedDict,
     final,
     overload,
     runtime_checkable,
@@ -214,16 +213,11 @@ class ModelOutputFailed(ModelException):
 
 
 @final
-class ModelToolFunctionSpecification(TypedDict, total=True):
-    """JSON Schema-like function specification exposed to the model.
-
-    Keys mirror OpenAI/JSON Schema conventions for function tools.
-    """
-
+class ModelToolFunctionSpecification(State):
     name: str
     description: str | None
     parameters: ToolParametersSpecification | None
-    additionalProperties: Literal[False]
+    meta: Meta
 
 
 ModelToolSpecification = ModelToolFunctionSpecification

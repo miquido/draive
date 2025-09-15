@@ -125,7 +125,7 @@ class BedrockConverse(BedrockAPI):
                     "model.provider": "bedrock",
                     "model.name": config.model,
                     "model.instructions": instructions,
-                    "model.tools": [tool["name"] for tool in tools.specifications],
+                    "model.tools": [tool.name for tool in tools.specifications],
                     "model.tool_selection": tools.selection,
                     "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
@@ -430,9 +430,9 @@ def _convert_content(  # noqa: C901
 
 def _convert_tool(tool: ModelToolSpecification) -> ChatTool:
     return {
-        "name": tool["name"],
-        "description": tool["description"] or "",
-        "inputSchema": {"json": tool["parameters"]},
+        "name": tool.name,
+        "description": tool.description or "",
+        "inputSchema": {"json": tool.parameters},
     }
 
 

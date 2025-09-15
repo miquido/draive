@@ -101,7 +101,7 @@ class OpenAIRealtime(OpenAIAPI):
                     "model.input_audio_noise_reduction": config.input_audio_noise_reduction,
                     "model.vad": str(config.vad),
                     "model.voice": config.voice,
-                    "model.tools": [tool["name"] for tool in tools.specifications],
+                    "model.tools": [tool.name for tool in tools.specifications],
                     "model.tool_selection": f"{tools.selection}",
                     "model.output": f"{output}",
                 }
@@ -767,9 +767,9 @@ def _prepare_session_config(
             without_missing(
                 {
                     "type": "function",
-                    "name": tool["name"],
-                    "description": tool.get("description", MISSING),
-                    "parameters": tool.get("parameters", MISSING),
+                    "name": tool.name,
+                    "description": tool.description or MISSING,
+                    "parameters": tool.parameters or MISSING,
                 },
             )
             for tool in tools.specifications
