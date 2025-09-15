@@ -116,7 +116,7 @@ class OllamaChat(OllamaAPI):
                     "model.provider": "ollama",
                     "model.name": config.model,
                     "model.instructions": instructions,
-                    "model.tools": [tool["name"] for tool in tools.specifications],
+                    "model.tools": [tool.name for tool in tools.specifications],
                     "model.tool_selection": tools.selection,
                     "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
@@ -344,11 +344,11 @@ def _tool_specification_as_tool(
     return Tool(
         type="function",
         function=Tool.Function(
-            name=tool["name"],
-            description=tool["description"],
+            name=tool.name,
+            description=tool.description,
             parameters=(
-                cast(Tool.Function.Parameters, tool["parameters"])  # type: ignore[arg-type]
-                if tool["parameters"]
+                cast(Tool.Function.Parameters, tool.parameters)  # type: ignore[arg-type]
+                if tool.parameters
                 else {
                     "type": "object",
                     "properties": {},

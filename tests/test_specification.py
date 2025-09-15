@@ -96,7 +96,7 @@ def test_specifications() -> None:
             ],
         ),
         description=None,
-    ) == {"oneOf": [{"type": "string"}, {"type": "integer"}]}
+    ) == {"type": ["string", "integer"]}
 
 
 def test_basic_specification() -> None:

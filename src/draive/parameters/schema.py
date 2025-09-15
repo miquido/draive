@@ -194,5 +194,15 @@ def _simplified_schema_property(  # noqa: C901, PLR0912, PLR0911
         case {"type": "object", "additionalProperties": True}:
             return {}
 
+        case {"type": [*alternatives], "description": str() as description}:
+            return (
+                "|".join(alternatives) + f"({description})"
+                if description
+                else "|".join(alternatives)
+            )
+
+        case {"type": [*alternatives]}:
+            return "|".join(alternatives)
+
         case other:
             raise ValueError("Unsupported basic specification element: %s", other)

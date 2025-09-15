@@ -257,9 +257,9 @@ class MCPServer:
             ):
                 return [
                     MCPTool(
-                        name=tool["name"],
-                        description=tool["description"],
-                        inputSchema=as_dict(tool["parameters"]) or {},
+                        name=tool.name,
+                        description=tool.description,
+                        inputSchema=as_dict(tool.parameters) or {},
                     )
                     for tool in (
                         tool.specification for tool in toolbox.tools.values() if tool.available

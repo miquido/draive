@@ -42,13 +42,9 @@ json_schema: str = """\
       }
     },
     "optional_value": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
+      "type": [
+        "string",
+        "null"
       ],
       "description": "alternative"
     },
