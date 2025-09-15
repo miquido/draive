@@ -1,6 +1,6 @@
 import json
 import typing
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import fields as dataclass_fields
 from dataclasses import is_dataclass
@@ -737,7 +737,37 @@ class DataModel(metaclass=DataModelMeta):
             )
 
         except Exception as exc:
-            raise ValueError(f"Failed to decode {cls.__name__} from json:\n{value}") from exc
+            raise ValueError(f"Failed to decode {cls.__name__} from json: {exc}") from exc
+
+    @classmethod
+    def from_json_array(
+        cls,
+        value: str | bytes,
+        /,
+        decoder: type[json.JSONDecoder] = json.JSONDecoder,
+    ) -> Sequence[Self]:
+        payload: Any
+        try:
+            payload = json.loads(
+                value,
+                cls=decoder,
+            )
+
+        except Exception as exc:
+            raise ValueError(f"Failed to decode {cls.__name__} from json: {exc}") from exc
+
+        match payload:
+            case [*elements]:
+                try:
+                    return tuple(cls(**element) for element in elements)
+
+                except Exception as exc:
+                    raise ValueError(
+                        f"Failed to decode {cls.__name__} from json array: {exc}"
+                    ) from exc
+
+            case _:
+                raise ValueError("Provided json is not an array!")
 
     def to_json(
         self,
