@@ -1,5 +1,5 @@
 from collections.abc import Collection, Generator, Sequence
-from typing import ClassVar, Self, cast, final, overload
+from typing import ClassVar, Literal, Self, cast, final, overload
 
 from haiway import MISSING, Meta, MetaValue, MetaValues, Missing
 from haiway.utils.metadata import META_EMPTY
@@ -67,6 +67,7 @@ class MultimodalContent(DataModel):
 
         return cls(parts=tuple(_parts_from_elements(elements)))
 
+    kind: Literal["content"] = "content"
     parts: Sequence[MultimodalContentPart]
 
     def texts(self) -> Sequence[TextContent]:

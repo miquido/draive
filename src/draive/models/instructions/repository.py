@@ -149,7 +149,7 @@ class InstructionsRepository(State):
         instructions: ResolveableInstructions | None,
         /,
         *,
-        arguments: Mapping[str, str] | None = None,
+        arguments: Mapping[str, str | int | float] | None = None,
         default: str | None = None,
         **extra: Any,
     ) -> ModelInstructions: ...
@@ -160,7 +160,7 @@ class InstructionsRepository(State):
         instructions: ResolveableInstructions | None,
         /,
         *,
-        arguments: Mapping[str, str] | None = None,
+        arguments: Mapping[str, str | int | float] | None = None,
         default: str | None = None,
         **extra: Any,
     ) -> ModelInstructions: ...
@@ -171,7 +171,7 @@ class InstructionsRepository(State):
         instructions: ResolveableInstructions | None,
         /,
         *,
-        arguments: Mapping[str, str] | None = None,
+        arguments: Mapping[str, str | int | float] | None = None,
         default: str | None = None,
         **extra: Any,
     ) -> ModelInstructions:
@@ -187,7 +187,7 @@ class InstructionsRepository(State):
         ----------
         instructions : ResolveableInstructions | None
             Direct content, a reference, or ``None``.
-        arguments : Mapping[str, str] | None, optional
+        arguments : Mapping[str, str | int | float] | None, optional
             Template variables.
         default : str | None, optional
             Fallback content when resolution fails or input is ``None``.

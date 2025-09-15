@@ -40,7 +40,7 @@ class Instructions(State):
     ----------
     name : str
         Instruction name or key.
-    arguments : Mapping[str, str]
+    arguments : Mapping[str, str | int | float]
         Template variables for formatting the instructions content.
     meta : Meta
         Additional metadata for the lookup.
@@ -52,7 +52,7 @@ class Instructions(State):
         name: str,
         /,
         *,
-        arguments: Mapping[str, str] | None = None,
+        arguments: Mapping[str, str | int | float] | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create an instructions reference.
@@ -61,9 +61,9 @@ class Instructions(State):
         ----------
         name : str
             Name of the instructions to resolve.
-        arguments : Mapping[str, str] | None, optional
+        arguments : Mapping[str, str | int | float] | None, optional
             Variables used to format the resolved content.
-        meta : Meta | Mapping[str, Any] | None, optional
+        meta : Meta | MetaValues | None, optional
             Additional metadata for repository backends.
         """
         return cls(
@@ -73,12 +73,12 @@ class Instructions(State):
         )
 
     name: str
-    arguments: Mapping[str, str]
+    arguments: Mapping[str, str | int | float]
     meta: Meta
 
     def with_arguments(
         self,
-        **arguments: str,
+        **arguments: str | int | float,
     ) -> Self:
         """Return a new reference with additional/overridden arguments."""
         if not arguments:
