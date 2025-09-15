@@ -493,24 +493,33 @@ class OpenAIResponses(OpenAIAPI):
                             )
 
                         elif isinstance(event, ResponseOutputItemDoneEvent):
-                            if isinstance(event, ResponseFunctionToolCall):
+                            if isinstance(event.item, ResponseFunctionToolCall):
                                 try:
+                                    # arguments in DoneEvent should be a complete JSON string
+                                    args = (
+                                        json.loads(event.item.arguments)
+                                        if isinstance(event.item.arguments, str)
+                                        and event.item.arguments.strip()
+                                        else {}
+                                    )
                                     yield ModelToolRequest.of(
-                                        event.call_id,
-                                        tool=event.name,
-                                        arguments=json.loads(event.arguments),
+                                        event.item.call_id,
+                                        tool=event.item.name,
+                                        arguments=args,
                                     )
 
                                 except Exception as exc:
                                     raise ModelOutputInvalid(
                                         provider="openai",
                                         model=config.model,
-                                        reason=f"Tool arguments decoding error -"
-                                        f" {type(exc).__name__}: {exc}",
+                                        reason=(
+                                            "Tool arguments decoding error - "
+                                            f"{type(exc).__name__}: {exc}"
+                                        ),
                                     ) from exc
 
-                            elif isinstance(event, ImageGenerationCall):
-                                if event.result is None:
+                            elif isinstance(event.item, ImageGenerationCall):
+                                if event.item.result is None:
                                     raise ModelOutputInvalid(
                                         provider="openai",
                                         model=config.model,
@@ -518,22 +527,22 @@ class OpenAIResponses(OpenAIAPI):
                                     )
 
                                 yield ResourceContent.of(
-                                    event.result,
+                                    event.item.result,
                                     mime_type="image/png",  # it seems that we always get png
                                 )
 
-                            elif isinstance(event, ResponseReasoningItem):
+                            elif isinstance(event.item, ResponseReasoningItem):
                                 yield ModelReasoning.of(
                                     MultimodalContent.of(
                                         *(
                                             TextContent(text=content.text)
-                                            for content in event.summary
+                                            for content in event.item.summary
                                         ),
                                     ),
                                     meta={
-                                        "id": event.id,
+                                        "id": event.item.id,
                                         "kind": "reasoning",
-                                        "encrypted": event.encrypted_content,
+                                        "encrypted": event.item.encrypted_content,
                                     },
                                 )
 
