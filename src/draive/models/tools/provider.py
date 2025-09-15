@@ -65,8 +65,9 @@ class ToolsProvider(State):
         tool_turns_limit : int | None, optional
             Number of turns to disable suggestions (strict tools). Defaults to a sensible
             value in ``Toolbox.of``.
-        meta : Meta | Mapping[str, Any] | None, optional
-            Toolbox metadata.
+        meta : Meta | MetaValues | None, optional
+            Toolbox metadata accepted either as existing ``Meta`` or values convertible via
+            ``Meta.of``.
         **extra : Any
             Extra kwargs forwarded to ``loading``.
 

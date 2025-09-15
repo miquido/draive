@@ -203,35 +203,40 @@ class MistralCompletions(MistralAPI):
 
                 else:
                     for tool_call in tool_calls:
-                        assert tool_call.index, "Can't identify function call without index"  # nosec: B101
+                        if tool_call.index is None:
+                            raise ModelOutputFailed(
+                                provider="mistral",
+                                model=config.model,
+                                reason="Invalid completion: missing tool call index",
+                            )
+
+                        index: int = tool_call.index
 
                         # "null" is a dafault value...
                         if tool_call.id and tool_call.id != "null":
-                            accumulated_tool_calls[tool_call.index].id = tool_call.id
+                            accumulated_tool_calls[index].id = tool_call.id
 
                         if tool_call.function.name:
-                            accumulated_tool_calls[
-                                tool_call.index
-                            ].function.name += tool_call.function.name
+                            accumulated_tool_calls[index].function.name += tool_call.function.name
 
                         if isinstance(tool_call.function.arguments, str):
                             assert isinstance(  # nosec: B101
-                                accumulated_tool_calls[tool_call.index].function.arguments,
+                                accumulated_tool_calls[index].function.arguments,
                                 str,
                             )
                             accumulated_tool_calls[  # pyright: ignore[reportOperatorIssue]
-                                tool_call.index
+                                index
                             ].function.arguments += tool_call.function.arguments
 
                         else:
                             assert isinstance(  # nosec: B101
-                                accumulated_tool_calls[tool_call.index].function.arguments,
+                                accumulated_tool_calls[index].function.arguments,
                                 dict,
                             )
-                            accumulated_tool_calls[tool_call.index].function.arguments = {
+                            accumulated_tool_calls[index].function.arguments = {
                                 **cast(
                                     dict,
-                                    accumulated_tool_calls[tool_call.index].function.arguments,
+                                    accumulated_tool_calls[index].function.arguments,
                                 ),
                                 **tool_call.function.arguments,
                             }

@@ -66,6 +66,7 @@ class ArtifactContent[Artifact: DataModel](DataModel):
         Self
             A new ArtifactContent instance with normalized metadata.
         """
+
         return cls(
             category=category if category is not None else artifact.__class__.__name__,
             artifact=artifact,

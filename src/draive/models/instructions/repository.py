@@ -75,6 +75,11 @@ class InstructionsRepository(State):
         ----------
         instructions : dict[str, str]
             Mapping of instruction name to its content.
+
+        Returns
+        -------
+        InstructionsRepository
+            Repository facade configured with volatile in-memory storage.
         """
         volatile_storage: InstructionsVolatileStorage = InstructionsVolatileStorage(
             _declarations={
@@ -108,6 +113,11 @@ class InstructionsRepository(State):
         ----------
         path : Path | str
             Path to the storage file. The file is created on first write.
+
+        Returns
+        -------
+        InstructionsRepository
+            Repository facade configured with file-backed storage.
         """
         file_storage: InstructionsFileStorage = InstructionsFileStorage(path=path)
 
@@ -137,7 +147,18 @@ class InstructionsRepository(State):
         self,
         **extra: Any,
     ) -> Sequence[InstructionsDeclaration]:
-        """List available instruction declarations from the backend."""
+        """List available instruction declarations from the backend.
+
+        Parameters
+        ----------
+        **extra : Any
+            Extra keyword arguments forwarded to the underlying listing callable.
+
+        Returns
+        -------
+        Sequence[InstructionsDeclaration]
+            Declarations available in the configured storage backend.
+        """
         return await self.listing(
             **extra,
         )
@@ -198,6 +219,12 @@ class InstructionsRepository(State):
         -------
         str
             Resolved instructions content.
+
+        Raises
+        ------
+        InstructionsMissing
+            Raised when the referenced instructions cannot be loaded and no default
+            fallback is provided.
         """
         if instructions is None:
             return (
@@ -241,6 +268,25 @@ class InstructionsRepository(State):
         /,
         **extra: Any,
     ) -> ModelInstructions:
+        """Load the raw instructions content from the backend.
+
+        Parameters
+        ----------
+        instructions : Instructions
+            Instructions reference identifying what to load.
+        **extra : Any
+            Extra keyword arguments forwarded to the loading callable.
+
+        Returns
+        -------
+        str
+            Loaded instructions content.
+
+        Raises
+        ------
+        InstructionsMissing
+            Raised when the repository backend has no content for the reference.
+        """
         loaded_instructions: str | None = await self.loading(
             instructions.name,
             meta=instructions.meta,
@@ -281,7 +327,22 @@ class InstructionsRepository(State):
         content: str,
         **extra: Any,
     ) -> None:
-        """Create or update an instructions template in the backend."""
+        """Create or update an instructions template in the backend.
+
+        Parameters
+        ----------
+        instructions : InstructionsDeclaration | str
+            Template declaration or name describing what to define.
+        content : str
+            Template body that should be stored.
+        **extra : Any
+            Extra keyword arguments forwarded to the defining callable.
+
+        Returns
+        -------
+        None
+            This method performs a side effect on the configured backend.
+        """
         declaration: InstructionsDeclaration
         if isinstance(instructions, str):
             declaration = InstructionsDeclaration.of(instructions)
@@ -319,7 +380,20 @@ class InstructionsRepository(State):
         /,
         **extra: Any,
     ) -> None:
-        """Remove an instructions template from the backend."""
+        """Remove an instructions template from the backend.
+
+        Parameters
+        ----------
+        instructions : InstructionsDeclaration
+            Template declaration identifying what to remove.
+        **extra : Any
+            Extra keyword arguments forwarded to the removing callable.
+
+        Returns
+        -------
+        None
+            This method performs a side effect on the configured backend.
+        """
         await self.removing(
             name=instructions.name,
             meta=instructions.meta,
@@ -462,37 +536,44 @@ class InstructionsFileStorage(Immutable):
 
         declarations: MutableMapping[str, InstructionsDeclaration] = {}
         contents: MutableMapping[str, str] = {}
-        match json.loads(file_contents):
-            case [*elements]:
-                for element in elements:
-                    match element:
-                        case {
-                            "name": str() as name,
-                            "arguments": [*arguments],
-                            "content": str() as content,
-                            "description": str() | None as description,
-                            "meta": {**meta},
-                        }:
-                            declarations[name] = InstructionsDeclaration(
-                                name=name,
-                                arguments=[
-                                    InstructionsArgumentDeclaration.from_mapping(argument)
-                                    for argument in arguments
-                                ],
-                                description=description,
-                                meta=Meta.of(meta),
-                            )
-                            contents[name] = content
+        try:
+            match json.loads(file_contents):
+                case [*elements]:
+                    for element in elements:
+                        match element:
+                            case {
+                                "name": str() as name,
+                                "arguments": [*arguments],
+                                "content": str() as content,
+                                "description": str() | None as description,
+                                "meta": {**meta},
+                            }:
+                                declarations[name] = InstructionsDeclaration(
+                                    name=name,
+                                    arguments=[
+                                        InstructionsArgumentDeclaration.from_mapping(argument)
+                                        for argument in arguments
+                                    ],
+                                    description=description,
+                                    meta=Meta.of(meta),
+                                )
+                                contents[name] = content
 
-                        case _:
-                            # skip with warning
-                            ctx.log_warning(
-                                "Invalid file instructions storage element, skipping..."
-                            )
+                            case _:
+                                # skip with warning
+                                ctx.log_warning(
+                                    "Invalid file instructions storage element, skipping..."
+                                )
 
-            case _:
-                # empty storage with warning
-                ctx.log_warning("Invalid file instructions storage, using empty storage...")
+                case _:
+                    # empty storage with error
+                    ctx.log_error("Invalid file instructions storage, using empty storage...")
+
+        except Exception as exc:
+            ctx.log_error(
+                "Invalid file instructions storage, using empty storage...",
+                exception=exc,
+            )
 
         object.__setattr__(
             self,

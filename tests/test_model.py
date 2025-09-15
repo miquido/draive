@@ -1,20 +1,25 @@
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncGenerator, Mapping, Sequence
 from copy import copy, deepcopy
 from datetime import UTC, datetime
 from typing import Any, Literal, NotRequired, Required, TypedDict
 from uuid import UUID, uuid4
 
 from haiway import Default
-from pytest import raises
+from pytest import mark, raises
 
 from draive import (
     MISSING,
     DataModel,
     Field,
+    GenerativeModel,
     Missing,
+    ModelOutput,
+    ModelToolsDeclaration,
     MultimodalContent,
+    TextContent,
     ValidationError,
+    ctx,
 )
 from draive.conversation import ConversationMessage
 from draive.resources import ResourceContent, ResourceReference
@@ -270,7 +275,7 @@ basic_conversation_message_json: str = """\
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",
     "content": {
-        "kind": "content",
+        "type": "content",
         "parts": [
             {
                 "text": "string",
@@ -295,7 +300,7 @@ media_url_conversation_message_json: str = """\
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",
     "content": {
-        "kind": "content",
+        "type": "content",
         "parts": [
             {
                 "uri": "https://miquido.com/image",
@@ -322,7 +327,7 @@ media_data_conversation_message_json: str = """\
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",
     "content": {
-        "kind": "content",
+        "type": "content",
         "parts": [
             {
                 "data": "aW1hZ2VfZGF0YQ==",
@@ -336,7 +341,7 @@ media_data_conversation_message_json: str = """\
 """
 
 
-def test_llm_message_decoding() -> None:
+def test_message_decoding() -> None:
     assert (
         ConversationMessage.from_json(basic_conversation_message_json)
         == basic_conversation_message_instance
@@ -351,7 +356,7 @@ def test_llm_message_decoding() -> None:
     )
 
 
-def test_llm_message_encoding() -> None:
+def test_message_encoding() -> None:
     assert basic_conversation_message_instance.to_json(indent=4) == basic_conversation_message_json
     assert (
         media_url_conversation_message_instance.to_json(indent=4)
@@ -441,3 +446,104 @@ def test_copying_leaves_same_object() -> None:
     origin = Copied(string="42", nested=Nested(string="answer"))
     assert copy(origin) is origin
     assert deepcopy(origin) is origin
+
+
+@mark.asyncio
+async def test_generative_model_completion_multi_modal_selection() -> None:
+    text_part: TextContent = TextContent.of("hello")
+    image_part: ResourceReference = ResourceReference.of(
+        "image://example",
+        mime_type="image/png",
+    )
+    audio_part: ResourceReference = ResourceReference.of(
+        "audio://example",
+        mime_type="audio/mpeg",
+    )
+
+    async def _non_stream_generating(**_: Any) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of(text_part, image_part, audio_part))
+
+    def generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[Any],
+        output: Any,
+        stream: bool = False,
+        **_: Any,
+    ) -> AsyncGenerator[Any, None] | Any:
+        assert not stream
+        return _non_stream_generating()
+
+    async with ctx.scope(
+        "test.multi.selection",
+        GenerativeModel(generating=generating),
+    ):
+        result: ModelOutput = await GenerativeModel.completion(
+            instructions="",
+            tools=ModelToolsDeclaration.none,
+            context=(),
+            output={"text", "image"},
+        )
+
+    parts = result.content.parts
+    assert len(parts) == 2
+    assert isinstance(parts[0], TextContent)
+    assert isinstance(parts[1], ResourceReference)
+    assert (parts[1].mime_type or "").startswith("image")
+
+
+@mark.asyncio
+async def test_generative_model_stream_multi_modal_selection() -> None:
+    text_part: TextContent = TextContent.of("stream")
+    image_part: ResourceReference = ResourceReference.of(
+        "image://example",
+        mime_type="image/png",
+    )
+    audio_part: ResourceReference = ResourceReference.of(
+        "audio://example",
+        mime_type="audio/mpeg",
+    )
+
+    async def _non_stream_generating(**_: Any) -> ModelOutput:
+        return ModelOutput.of(MultimodalContent.of(text_part, image_part, audio_part))
+
+    def generating(
+        *,
+        instructions: str,
+        tools: ModelToolsDeclaration,
+        context: Sequence[Any],
+        output: Any,
+        stream: bool = False,
+        **_: Any,
+    ) -> AsyncGenerator[Any, None] | Any:
+        if stream:
+            async def iterator() -> AsyncGenerator[Any, None]:
+                yield text_part
+                yield image_part
+                yield audio_part
+
+            return iterator()
+
+        return _non_stream_generating()
+
+    async with ctx.scope(
+        "test.multi.selection.stream",
+        GenerativeModel(generating=generating),
+    ):
+        stream = await GenerativeModel.completion(
+            instructions="",
+            tools=ModelToolsDeclaration.none,
+            context=(),
+            output={"text", "image"},
+            stream=True,
+        )
+
+        parts: list[Any] = [
+            chunk async for chunk in stream
+        ]
+
+    assert len(parts) == 2
+    assert isinstance(parts[0], TextContent)
+    assert isinstance(parts[1], ResourceReference)
+    assert (parts[1].mime_type or "").startswith("image")

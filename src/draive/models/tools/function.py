@@ -10,7 +10,11 @@ from draive.models.tools.types import (
     ToolErrorFormatting,
     ToolResultFormatting,
 )
-from draive.models.types import ModelToolHandling, ModelToolSpecification
+from draive.models.types import (
+    ModelToolFunctionSpecification,
+    ModelToolHandling,
+    ModelToolSpecification,
+)
 from draive.multimodal import (
     Multimodal,
     MultimodalContent,
@@ -41,14 +45,12 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         Tool name.
     description : str | None
         Human-readable tool description.
-    parameters : ParametersSpecification | None
-        JSON Schema-like parameters spec inferred from argument specs when omitted.
+    parameters : ToolParametersSpecification | None
+        JSON Schema-like parameters spec as provided or inferred from function arguments.
     specification : ModelToolSpecification
         Full tool specification exposed to the model.
     handling : ModelToolHandling
         Response handling policy (e.g., ``"response"``, ``"output"``).
-    meta : Meta
-        Tool metadata (includes name/description tags).
     """
 
     __slots__ = (
@@ -57,7 +59,6 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         "format_error",
         "format_result",
         "handling",
-        "meta",
         "name",
         "parameters",
         "specification",
@@ -100,16 +101,14 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
                 if parameter.required:
                     aliased_required.append(parameter.alias or parameter.name)
 
-            built: ToolParametersSpecification = {
+            parameters = {
                 "type": "object",
                 "properties": specifications,
                 "required": aliased_required,
                 "additionalProperties": False,
             }
 
-            parameters = None if not built["properties"] else built
-
-        self.parameters: ToolParametersSpecification | None
+        self.parameters: ToolParametersSpecification
         object.__setattr__(
             self,
             "parameters",
@@ -119,13 +118,12 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         object.__setattr__(
             self,
             "specification",
-            {
-                "name": name,
-                "description": description,
-                "parameters": parameters,
-                "additionalProperties": False,
-                "meta": meta,
-            },
+            ModelToolFunctionSpecification(
+                name=name,
+                description=description,
+                parameters=parameters,
+                meta=meta,
+            ),
         )
         self.handling: ModelToolHandling
         object.__setattr__(
@@ -151,27 +149,10 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
             "format_error",
             error_formatting,
         )
-        self.meta: Meta
-        if description:
-            object.__setattr__(
-                self,
-                "meta",
-                meta.updated(
-                    kind="tool",
-                    name=name,
-                    description=description,
-                ),
-            )
 
-        else:
-            object.__setattr__(
-                self,
-                "meta",
-                meta.updated(
-                    kind="tool",
-                    name=name,
-                ),
-            )
+    @property
+    def meta(self) -> Meta:
+        return self.specification.meta
 
     def updated(
         self,
@@ -186,7 +167,34 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         handling: ModelToolHandling | None = None,
         meta: Meta | None = None,
     ) -> Self:
-        """Return a new tool with updated configuration."""
+        """Return a new tool with updated configuration.
+
+        Parameters
+        ----------
+        name : str | None, optional
+            Override for the tool name.
+        description : str | None, optional
+            Override for the tool description.
+        function : Callable[Args, Coroutine[None, None, Result]] | None, optional
+            Replacement callable backing the tool.
+        parameters : ToolParametersSpecification | None, optional
+            Replacement parameters specification. ``None`` keeps existing value.
+        availability : ToolAvailabilityChecking | None, optional
+            Custom availability checker; defaults to current checker.
+        result_formatting : ToolResultFormatting[Result] | None, optional
+            Replacement result formatter.
+        error_formatting : ToolErrorFormatting | None, optional
+            Replacement error formatter.
+        handling : ModelToolHandling | None, optional
+            Updated handling strategy for the model response.
+        meta : Meta | None, optional
+            Replacement metadata for the tool.
+
+        Returns
+        -------
+        FunctionTool
+            Newly constructed tool instance with applied overrides.
+        """
         return self.__class__(
             function or self._call,
             name=name or self.name,
@@ -200,18 +208,29 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
             if error_formatting is not None
             else self.format_error,
             handling=handling if handling is not None else self.handling,
-            meta=meta or self.meta,
+            meta=meta or self.specification.meta,
         )
 
     def available(
         self,
         tools_turn: int,
     ) -> bool:
-        """Return ``True`` when the tool is available for the given turn."""
+        """Return ``True`` when the tool is available for the given turn.
+
+        Parameters
+        ----------
+        tools_turn : int
+            Index of the current tool turn (0-based).
+
+        Returns
+        -------
+        bool
+            ``True`` when the tool may be used, otherwise ``False``.
+        """
         try:
             return self._check_availability(
                 tools_turn=tools_turn,
-                meta=self.meta,
+                specification=self.specification,
             )
 
         except Exception as e:
@@ -232,6 +251,23 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
 
         Errors are caught and wrapped into ``ToolError`` with formatted content; base
         exceptions are re-raised.
+
+        Parameters
+        ----------
+        call_id : str
+            Identifier of the tool invocation.
+        **arguments : Any
+            Arguments passed to the underlying function.
+
+        Returns
+        -------
+        MultimodalContent
+            Formatted tool result.
+
+        Raises
+        ------
+        ToolError
+            When the wrapped function raises an exception that should be surfaced to the model.
         """
         async with ctx.scope(f"tool.{self.name}"):
             ctx.record(
@@ -294,7 +330,20 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Result:
-        """Call the underlying function directly, bypassing tool formatting."""
+        """Call the underlying function directly, bypassing tool formatting.
+
+        Parameters
+        ----------
+        *args : Args.args
+            Positional arguments for the wrapped function.
+        **kwargs : Args.kwargs
+            Keyword arguments for the wrapped function.
+
+        Returns
+        -------
+        Result
+            Raw result returned by the wrapped function.
+        """
         return await super().__call__(
             *args,
             **kwargs,
@@ -317,7 +366,7 @@ class PartialFunctionToolWrapper[Result](Protocol):
 
 def _available(
     tools_turn: int,
-    meta: Meta,
+    specification: ModelToolSpecification,
 ) -> bool:
     return True
 
@@ -388,28 +437,25 @@ def tool[Result](
     name: str
         name to be used in a tool specification.
         Default is the name of the wrapped function.
-    description: int
-        description to be used in a tool specification. Allows to present the tool behavior to the
-        external system.
-        Default is empty.
+    description: str | None
+        Description to be used in a tool specification. Allows presenting tool behavior to the
+        external system. Default is ``None``.
     availability: ToolAvailabilityChecking
-        function used to verify availability of the tool in given context. It can be used to check
-        permissions or occurrence of a specific state to allow its usage.
-        Provided function should raise an Exception when the tool should not be available.
-        Default is always available.
+        Function returning ``True`` when the tool should be available in the given context.
+        Default always returns ``True``.
     result_formatting: ToolResultFormatting[Result]
-        function converting tool result to MultimodalContent. It is used to format the result
-        for model processing. Default implementation converts the result to string if needed.
+        Function converting tool result to ``MultimodalContent``. Default converts results to
+        strings when needed.
     error_formatting: ToolErrorFormatting
-        function converting tool call exception to a fallback MultimodalContent.
-        Default implementation return "ERROR" string and logs the exception.
+        Function converting tool call exceptions to fallback ``MultimodalContent``.
+        Default returns an error string and logs the exception.
     handling: ModelToolHandling
         controls if tool result should break the ongoing processing and be the direct result of it.
         Note that during concurrent execution of multiple tools the call/result order defines
         direct result and exact behavior is not defined.
         Default is "response".
-    meta: Mapping[str, str | float | int | bool | None] | None
-        custom metadata allowing to access tool metadata like its source in case of remote tools.
+    meta: Meta | MetaValues | None
+        Custom metadata allowing to access tool metadata such as remote source identifiers.
 
     Returns
     -------
@@ -440,25 +486,22 @@ def tool(
     name: str
         name to be used in a tool specification.
         Default is the name of the wrapped function.
-    description: int
-        description to be used in a tool specification. Allows to present the tool behavior to the
-        external system.
-        Default is empty.
+    description: str | None
+        Description to be used in a tool specification. Allows presenting tool behavior to the
+        external system. Default is ``None``.
     availability: ToolAvailabilityChecking
-        function used to verify availability of the tool in given context. It can be used to check
-        permissions or occurrence of a specific state to allow its usage.
-        Provided function should raise an Exception when the tool should not be available.
-        Default is always available.
+        Function returning ``True`` when the tool should be available in the given context.
+        Default always returns ``True``.
     error_formatting: ToolErrorFormatting
-        function converting tool call exception to a fallback MultimodalContent.
-        Default implementation return "ERROR" string and logs the exception.
+        Function converting tool call exceptions to fallback ``MultimodalContent``.
+        Default returns an error string and logs the exception.
     handling: ModelToolHandling
         controls if tool result should break the ongoing processing and be the direct result of it.
         Note that during concurrent execution of multiple tools the call/result order defines
         direct result and exact behavior is not defined.
         Default is "response".
     meta: Meta | MetaValues | None
-        custom metadata allowing to access tool metadata like its source in case of remote tools.
+        Custom metadata allowing to access tool metadata such as remote source identifiers.
 
     Returns
     -------

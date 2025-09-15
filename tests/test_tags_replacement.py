@@ -1,4 +1,4 @@
-from draive import MultimodalContent
+from draive import MultimodalContent, TextContent
 from draive.resources import ResourceReference
 
 
@@ -244,17 +244,17 @@ def test_returns_replaced_with_valid_tag():
     )
 
 
-def test_returns_replaced_outer_with_multiple_nested_tags():
+def test_replaces_first_completed_tag_when_nested():
     assert MultimodalContent.of("<test>Other<test>Lorem ipsum</test></test>").replacing_tag(
         "test",
         replacement="replaced",
-    ) == MultimodalContent.of("<test>replaced</test></test>")
+    ) == MultimodalContent.of("<test>Other<test>replaced</test></test>")
 
     assert MultimodalContent.of("<test>Other<test>Lorem ipsum</test></test>").replacing_tag(
         "test",
         replacement="replaced",
         strip_tags=True,
-    ) == MultimodalContent.of("replaced</test>")
+    ) == MultimodalContent.of("<test>Otherreplaced</test>")
 
     assert MultimodalContent.of(
         "Lorem",
@@ -266,7 +266,7 @@ def test_returns_replaced_outer_with_multiple_nested_tags():
     ) == MultimodalContent.of(
         "Lorem",
         ResourceReference.of(uri="http://image", mime_type="image/png"),
-        "<test>replaced</test></test>",
+        "<test>Other<test>replaced</test></test>",
     )
 
 
@@ -298,17 +298,17 @@ def test_returns_replaced_with_surrounded_tag():
     )
 
 
-def test_returns_unchanged_with_nested_in_tags():
+def test_replacing_nested_inside_other_tag():
     assert MultimodalContent.of("<other>Other<test>Lorem ipsum</test></other>").replacing_tag(
         "test",
         replacement="replaced",
-    ) == MultimodalContent.of("<other>Other<test>Lorem ipsum</test></other>")
+    ) == MultimodalContent.of("<other>Other<test>replaced</test></other>")
 
     assert MultimodalContent.of("<other>Other<test>Lorem ipsum</test></other>").replacing_tag(
         "test",
         replacement="replaced",
         strip_tags=True,
-    ) == MultimodalContent.of("<other>Other<test>Lorem ipsum</test></other>")
+    ) == MultimodalContent.of("<other>Otherreplaced</other>")
 
     assert MultimodalContent.of(
         "<other>Other",
@@ -322,6 +322,46 @@ def test_returns_unchanged_with_nested_in_tags():
         ResourceReference.of(uri="http://image", mime_type="image/png"),
         "<test>replaced</test></other>",
     )
+
+
+def test_replacing_skips_unclosed_tag():
+    assert MultimodalContent.of("<broken>value<test>ok</test>").replacing_tag(
+        "test",
+        replacement="replaced",
+    ) == MultimodalContent.of("<broken>value<test>replaced</test>")
+
+    assert MultimodalContent.of(
+        "<broken>value",
+        ResourceReference.of(uri="http://image", mime_type="image/png"),
+        "<test>ok</test>",
+    ).replacing_tag(
+        "test",
+        replacement="replaced",
+    ) == MultimodalContent.of(
+        "<broken>value",
+        ResourceReference.of(uri="http://image", mime_type="image/png"),
+        "<test>replaced</test>",
+    )
+
+
+def test_replacing_tag_spanning_multiple_text_parts():
+    content = MultimodalContent(
+        parts=(
+            TextContent.of("<test", meta={"segment": "a"}),
+            TextContent.of(' attr="value">payload', meta={"segment": "a"}),
+            TextContent.of("</test>", meta={"segment": "a"}),
+        ),
+    )
+
+    replaced = content.replacing_tag("test", replacement="done")
+    assert replaced.to_str() == '<test attr="value">done</test>'
+
+    stripped = content.replacing_tag(
+        "test",
+        replacement="done",
+        strip_tags=True,
+    )
+    assert stripped.to_str() == "done"
 
 
 def test_returns_replaced_content_with_fake_tags():

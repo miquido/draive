@@ -15,6 +15,7 @@ from draive.models.instructions import (
 )
 from draive.models.tools import (
     FunctionTool,
+    ModelToolSpecification,
     Tool,
     ToolAvailabilityChecking,
     Toolbox,
@@ -66,7 +67,6 @@ from draive.models.types import (
     ModelToolRequest,
     ModelToolResponse,
     ModelToolsDeclaration,
-    ModelToolSpecification,
     ModelToolsSelection,
 )
 

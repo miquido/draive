@@ -198,8 +198,8 @@ class Toolbox(State):
             )
 
         tool_suggestion: ModelToolSpecification | bool = self.suggesting(
-            tools=available_tools,
             tools_turn=tools_turn,
+            tools=available_tools,
         )
         tools_selection: ModelToolsSelection
         if tool_suggestion is False:
@@ -224,6 +224,20 @@ class Toolbox(State):
         arguments: Mapping[str, Any],
     ) -> MultimodalContent:
         """Call a tool by name with provided arguments.
+
+        Parameters
+        ----------
+        name : str
+            Registered tool name.
+        call_id : str
+            Identifier for the tool invocation.
+        arguments : Mapping[str, Any]
+            Arguments passed to the underlying tool.
+
+        Returns
+        -------
+        MultimodalContent
+            Content returned by the tool.
 
         Raises
         ------
@@ -252,6 +266,16 @@ class Toolbox(State):
         Handles ``detached`` tools by spawning their execution and returning an immediate
         response, and formats ``ToolError`` into error responses. Unknown tools return a
         fallback error response and are logged.
+
+        Parameters
+        ----------
+        request : ModelToolRequest
+            Incoming tool execution request from the model.
+
+        Returns
+        -------
+        ModelToolResponse
+            Response containing success, error or detached acknowledgement payload.
         """
         if tool := self.tools.get(request.tool):
             try:
@@ -308,7 +332,20 @@ class Toolbox(State):
         /,
         *tools: Tool,
     ) -> Self:
-        """Return a new toolbox extended with additional tools."""
+        """Return a new toolbox extended with additional tools.
+
+        Parameters
+        ----------
+        tool : Tool
+            Primary tool to add.
+        *tools : Tool
+            Additional tools to add alongside the primary tool.
+
+        Returns
+        -------
+        Toolbox
+            New toolbox instance containing the original and provided tools.
+        """
         return self.__class__(
             tools={
                 **self.tools,
@@ -335,7 +372,12 @@ class Toolbox(State):
             ``True`` to suggest any tool, a ``Tool`` instance to suggest that tool, ``False``
             to disable suggestions, or a custom ``ToolsSuggesting`` implementation.
         turns : int, optional
-            Number of initial loop turns for which the suggestion applies.
+            Number of initial loop turns for which the suggestion applies. Default is ``1``.
+
+        Returns
+        -------
+        Toolbox
+            New toolbox instance configured with the provided suggestion policy.
         """
         suggestion: ToolsSuggesting
         if suggesting is True:
@@ -384,6 +426,20 @@ class Toolbox(State):
     ) -> Self:
         """Return a new toolbox filtered by tool names or meta tags.
 
+        Parameters
+        ----------
+        tools : Collection[str] | None, optional
+            Names of tools to keep. Mutually exclusive with ``tags``.
+        tags : MetaTags | None, optional
+            Metadata tags the tools must contain. Mutually exclusive with ``tools``.
+
+        Returns
+        -------
+        Toolbox
+            Toolbox instance containing only tools matching the filter.
+
+        Notes
+        -----
         Exactly one of ``tools`` or ``tags`` must be provided.
         """
         assert tools is None or tags is None  # nosec: B101
@@ -397,7 +453,11 @@ class Toolbox(State):
 
         elif tags:
             return self.__class__(
-                tools={name: tool for name, tool in self.tools.items() if tool.meta.has_tags(tags)},
+                tools={
+                    name: tool
+                    for name, tool in self.tools.items()
+                    if tool.specification.meta.has_tags(tags)
+                },
                 suggesting=self.suggesting,
                 tool_turns_limit=self.tool_turns_limit,
                 meta=self.meta,
@@ -416,8 +476,8 @@ def _suggest_tool(
     suggested_tool: ModelToolSpecification = tool.specification
 
     def suggest_tool(
-        tools: Sequence[ModelToolSpecification],
         tools_turn: int,
+        tools: Sequence[ModelToolSpecification],
     ) -> ModelToolSpecification | bool:
         if tools_turn >= turns or suggested_tool not in tools:
             return False
@@ -432,8 +492,8 @@ def _suggest_any(
     turns: int,
 ) -> ToolsSuggesting:
     def suggest_any(
-        tools: Sequence[ModelToolSpecification],
         tools_turn: int,
+        tools: Sequence[ModelToolSpecification],
     ) -> ModelToolSpecification | bool:
         return tools_turn < turns and len(tools) > 0
 
@@ -441,8 +501,8 @@ def _suggest_any(
 
 
 def _no_suggestion(
-    tools: Sequence[ModelToolSpecification],
     tools_turn: int,
+    tools: Sequence[ModelToolSpecification],
 ) -> ModelToolSpecification | bool:
     return False
 
