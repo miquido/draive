@@ -464,7 +464,16 @@ class ModelInput(DataModel):
     @property
     def tools(self) -> Sequence[ModelToolResponse]:
         """Return only the tool responses included in the input."""
-        return [block for block in self.blocks if isinstance(block, ModelToolResponse)]
+        return tuple(block for block in self.blocks if isinstance(block, ModelToolResponse))
+
+    def without_tools(self) -> Self:
+        """Return a copy of this input without tool responses."""
+        return self.__class__(
+            blocks=tuple(
+                block for block in self.blocks if not isinstance(block, ModelToolResponse)
+            ),
+            meta=self.meta,
+        )
 
     def __bool__(self) -> bool:
         """Return ``True`` when any input blocks are present."""
@@ -618,12 +627,19 @@ class ModelOutput(DataModel):
     @property
     def reasoning(self) -> Sequence[ModelReasoning]:
         """Return only the reasoning included in the output."""
-        return [block for block in self.blocks if isinstance(block, ModelReasoning)]
+        return tuple(block for block in self.blocks if isinstance(block, ModelReasoning))
 
     @property
     def tools(self) -> Sequence[ModelToolRequest]:
         """Return only the tool requests included in the output."""
-        return [block for block in self.blocks if isinstance(block, ModelToolRequest)]
+        return tuple(block for block in self.blocks if isinstance(block, ModelToolRequest))
+
+    def without_tools(self) -> Self:
+        """Return a copy of this output without tool requests."""
+        return self.__class__(
+            blocks=tuple(block for block in self.blocks if not isinstance(block, ModelToolRequest)),
+            meta=self.meta,
+        )
 
     def __bool__(self) -> bool:
         """Return ``True`` when any output blocks are present."""
