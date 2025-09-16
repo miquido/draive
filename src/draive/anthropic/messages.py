@@ -146,16 +146,22 @@ class AnthropicMessages(AnthropicAPI):
                 attributes={
                     "model.provider": self._provider,
                     "model.name": config.model,
-                    "model.instructions": instructions,
-                    "model.tools": [tool.name for tool in tools.specifications],
-                    "model.tool_selection": tools.selection,
-                    "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
                     "model.thinking_budget": config.thinking_budget,
                     "model.stop_sequences": config.stop_sequences,
                     "model.output": str(output),
                     "model.max_output_tokens": config.max_output_tokens,
-                    "model.streaming": False,
+                    "model.tools.count": len(tools.specifications),
+                    "model.tools.selection": tools.selection,
+                    "model.stream": False,
+                },
+            )
+            ctx.record(
+                ObservabilityLevel.DEBUG,
+                attributes={
+                    "model.instructions": instructions,
+                    "model.tools": [tool.name for tool in tools.specifications],
+                    "model.context": [element.to_str() for element in context],
                 },
             )
 

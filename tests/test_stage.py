@@ -970,10 +970,10 @@ async def test_stage_result_evaluation():
 
     # Test failing evaluation
     failing_evaluator = MockEvaluator(should_pass=False)
-    fail_eval_stage = Stage.result_evaluation(failing_evaluator)
+    fail_raising_eval_stage = Stage.result_evaluation(failing_evaluator, raises=True)
 
     with raises(StageException) as exc_info:
-        await fail_eval_stage(state=initial_state)
+        await fail_raising_eval_stage(state=initial_state)
 
     assert "Result evaluation failed" in str(exc_info.value)
     assert exc_info.value.meta["evaluation_performance"] == 60.0  # (0.3/0.5) * 100

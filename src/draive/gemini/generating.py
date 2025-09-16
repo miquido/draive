@@ -134,15 +134,21 @@ class GeminiGenerating(GeminiAPI):
                 attributes={
                     "model.provider": "gemini",
                     "model.name": config.model,
-                    "model.instructions": instructions,
-                    "model.tools": [tool.name for tool in tools.specifications],
-                    "model.tool_selection": tools.selection,
-                    "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
                     "model.output": str(output),
                     "model.max_output_tokens": config.max_output_tokens,
                     "model.thinking_budget": config.thinking_budget,
-                    "model.streaming": False,
+                    "model.tools.count": len(tools.specifications),
+                    "model.tools.selection": tools.selection,
+                    "model.stream": False,
+                },
+            )
+            ctx.record(
+                ObservabilityLevel.DEBUG,
+                attributes={
+                    "model.instructions": instructions,
+                    "model.tools": [tool.name for tool in tools.specifications],
+                    "model.context": [element.to_str() for element in context],
                 },
             )
 
@@ -278,15 +284,21 @@ class GeminiGenerating(GeminiAPI):
                 attributes={
                     "model.provider": "gemini",
                     "model.name": config.model,
-                    "model.instructions": instructions,
-                    "model.tools": [tool.name for tool in tools.specifications],
-                    "model.tool_selection": tools.selection,
-                    "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
                     "model.output": str(output),
                     "model.max_output_tokens": config.max_output_tokens,
                     "model.thinking_budget": config.thinking_budget,
-                    "model.streaming": True,
+                    "model.tools.count": len(tools.specifications),
+                    "model.tools.selection": tools.selection,
+                    "model.stream": True,
+                },
+            )
+            ctx.record(
+                ObservabilityLevel.DEBUG,
+                attributes={
+                    "model.instructions": instructions,
+                    "model.tools": [tool.name for tool in tools.specifications],
+                    "model.context": [element.to_str() for element in context],
                 },
             )
 

@@ -124,14 +124,21 @@ class BedrockConverse(BedrockAPI):
                 attributes={
                     "model.provider": "bedrock",
                     "model.name": config.model,
-                    "model.instructions": instructions,
-                    "model.tools": [tool.name for tool in tools.specifications],
-                    "model.tool_selection": tools.selection,
-                    "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
                     "model.stop_sequences": config.stop_sequences,
                     "model.max_output_tokens": config.max_output_tokens,
                     "model.output": str(output),
+                    "model.tools.count": len(tools.specifications),
+                    "model.tools.selection": tools.selection,
+                    "model.stream": False,
+                },
+            )
+            ctx.record(
+                ObservabilityLevel.DEBUG,
+                attributes={
+                    "model.instructions": instructions,
+                    "model.tools": [tool.name for tool in tools.specifications],
+                    "model.context": [element.to_str() for element in context],
                 },
             )
 
