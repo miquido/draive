@@ -932,6 +932,7 @@ class Stage:
         | PreparedEvaluator[MultimodalContent],
         /,
         *,
+        raises: bool = False,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
@@ -945,6 +946,9 @@ class Stage:
         evaluator : PreparedEvaluatorScenario[MultimodalContent]
         | PreparedEvaluator[MultimodalContent]
             The evaluator or scenario evaluator to use for evaluation.
+        raises: bool = False
+            Determines whether to raise ``StageException`` when the evaluation fails.
+            When ``False``, the stage returns the input state unchanged on failure.
         meta: Meta | MetaValues | None = None
             Additional stage metadata including tags, description etc.
 
@@ -967,7 +971,7 @@ class Stage:
                     state.result
                 )
 
-                if evaluation_result.passed:
+                if evaluation_result.passed or not raises:
                     return state  # evaluation passed, keep going
 
                 performance: float = evaluation_result.performance
@@ -992,6 +996,7 @@ class Stage:
         evaluator: PreparedEvaluatorScenario[ModelContext] | PreparedEvaluator[ModelContext],
         /,
         *,
+        raises: bool = False,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
@@ -1004,6 +1009,9 @@ class Stage:
         ----------
         evaluator : PreparedEvaluatorScenario[Value] | PreparedEvaluator[Value]
             The evaluator or scenario evaluator to use for evaluation.
+        raises: bool = False
+            Determines whether to raise ``StageException`` when the evaluation fails.
+            When ``False``, the stage returns the input state unchanged on failure.
         meta: Meta | MetaValues | None = None
             Additional stage metadata including tags, description etc.
 
@@ -1026,7 +1034,7 @@ class Stage:
                     state.context
                 )
 
-                if evaluation_result.passed:
+                if evaluation_result.passed or not raises:
                     return state  # evaluation passed, keep going
 
                 performance: float = evaluation_result.performance

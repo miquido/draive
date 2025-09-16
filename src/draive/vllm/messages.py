@@ -126,13 +126,20 @@ class VLLMMessages(VLLMAPI):
                 attributes={
                     "model.provider": "vllm",
                     "model.name": config.model,
+                    "model.temperature": config.temperature,
+                    "model.max_output_tokens": config.max_output_tokens,
+                    "model.output": str(output),
+                    "model.tools.count": len(tools.specifications),
+                    "model.tools.selection": tools.selection,
+                    "model.stream": False,
+                },
+            )
+            ctx.record(
+                ObservabilityLevel.DEBUG,
+                attributes={
                     "model.instructions": instructions,
                     "model.tools": [tool.name for tool in tools.specifications],
-                    "model.tool_selection": tools.selection,
                     "model.context": [element.to_str() for element in context],
-                    "model.temperature": config.temperature,
-                    "model.output": str(output),
-                    "model.streaming": False,
                 },
             )
 
@@ -272,13 +279,20 @@ class VLLMMessages(VLLMAPI):
             attributes={
                 "model.provider": "vllm",
                 "model.name": config.model,
+                "model.temperature": config.temperature,
+                "model.max_output_tokens": config.max_output_tokens,
+                "model.output": str(output),
+                "model.tools.count": len(tools.specifications),
+                "model.tools.selection": tools.selection,
+                "model.stream": True,
+            },
+        )
+        ctx.record(
+            ObservabilityLevel.DEBUG,
+            attributes={
                 "model.instructions": instructions,
                 "model.tools": [tool.name for tool in tools.specifications],
-                "model.tool_selection": tools.selection,
                 "model.context": [element.to_str() for element in context],
-                "model.temperature": config.temperature,
-                "model.output": str(output),
-                "model.streaming": True,
             },
         )
 

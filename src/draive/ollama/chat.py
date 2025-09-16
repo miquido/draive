@@ -115,13 +115,19 @@ class OllamaChat(OllamaAPI):
                 attributes={
                     "model.provider": "ollama",
                     "model.name": config.model,
-                    "model.instructions": instructions,
-                    "model.tools": [tool.name for tool in tools.specifications],
-                    "model.tool_selection": tools.selection,
-                    "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
                     "model.output": str(output),
-                    "model.streaming": False,
+                    "model.tools.count": len(tools.specifications),
+                    "model.tools.selection": tools.selection,
+                    "model.stream": False,
+                },
+            )
+            ctx.record(
+                ObservabilityLevel.DEBUG,
+                attributes={
+                    "model.instructions": instructions,
+                    "model.tools": [tool.name for tool in tools.specifications],
+                    "model.context": [element.to_str() for element in context],
                 },
             )
 
