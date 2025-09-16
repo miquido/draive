@@ -86,7 +86,7 @@ class Stage:
     - Built-in caching, retry, and fallback mechanisms
     - Context and result transformation capabilities
     - Support for concurrent and sequential execution
-    - Memory integration for conversation state
+    - Memory integration for state restoration
     - Tool integration for model completion stages
     """
 
@@ -178,11 +178,10 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            async with ctx.scope("stage.predefined"):
-                return state.updated(
-                    context=(*state.context, *context),
-                    result=result if result is not None else state.result,
-                )
+            return state.updated(
+                context=(*state.context, *context),
+                result=result if result is not None else state.result,
+            )
 
         return cls(
             stage,
@@ -313,7 +312,7 @@ class Stage:
         input : Multimodal
             Input content to provide to the model.
         instruction : ResolveableInstructions
-            Instruction(s) or guidance for the model.
+            Instructions or guidance for the model.
         tools : Toolbox | Iterable[Tool]
             Tools that the model can use during completion generation.
         output : ModelOutputSelection
@@ -401,7 +400,7 @@ class Stage:
         input : Callable[[], Coroutine[None, None, Multimodal]]
             Async function returning input content to provide to the model.
         instruction : ResolveableInstructions
-            Instruction(s) or guidance for the model.
+            Instructions or guidance for the model.
         tools : Toolbox | Iterable[Tool]
             Tools that the model can use during completion generation.
         output : ModelOutputSelection
@@ -439,11 +438,12 @@ class Stage:
             state: StageState,
         ) -> StageState:
             async with ctx.scope("stage.completion.prompting"):
+                ctx.log_debug("Waiting for prompting completion input...")
                 context: list[ModelContextElement] = [
                     *state.context,
                     ModelInput.of(MultimodalContent.of(await input())),
                 ]
-                ctx.log_debug("prompting completion input provided")
+                ctx.log_debug("...prompting completion input provided")
                 result: ModelOutput = await GenerativeModel.loop(
                     instructions=await InstructionsRepository.resolve(instruction),
                     toolbox=toolbox,
@@ -483,7 +483,7 @@ class Stage:
         Parameters
         ----------
         instruction : ResolveableInstructions
-            Instruction(s) or guidance for the model.
+            Instructions or guidance for the model.
         tools : Toolbox | Iterable[Tool]
             Tools that the model can use during completion generation.
         output : ModelOutputSelection
@@ -514,12 +514,10 @@ class Stage:
                     ctx.log_warning("loopback_completion has been skipped due to invalid context")
                     return state
 
-                context: list[ModelContextElement] = list(state.context)
-
                 # Find the index of the last ModelInput in the context
                 last_input_idx: int | None = None
-                for idx in range(len(context) - 2, -1, -1):
-                    if isinstance(context[idx], ModelInput):
+                for idx in range(len(state.context) - 2, -1, -1):
+                    if isinstance(state.context[idx], ModelInput):
                         last_input_idx = idx
                         break
 
@@ -532,10 +530,9 @@ class Stage:
                 # Use last output content as new input
                 last_output = state.context[-1]
                 assert isinstance(last_output, ModelOutput)  # nosec: B101
-                last_output_content: MultimodalContent = last_output.content
-                context = [
-                    *context[:last_input_idx],
-                    ModelInput.of(last_output_content, meta={"loopback": True}),
+                context: list[ModelContextElement] = [
+                    *state.context[:last_input_idx],
+                    ModelInput.of(last_output.content, meta={"loopback": True}),
                 ]
                 result: ModelOutput = await GenerativeModel.loop(
                     instructions=await InstructionsRepository.resolve(instruction),
@@ -575,7 +572,7 @@ class Stage:
         Parameters
         ----------
         instruction : ResolveableInstructions
-            Instruction(s) or guidance for the model.
+            Instructions or guidance for the model.
         tools : Toolbox | Iterable[Tool]
             Tools that the model can use during completion generation.
         output : ModelOutputSelection
@@ -786,7 +783,7 @@ class Stage:
             state: StageState,
         ) -> StageState:
             return state.updated(
-                context=[element.updated(blocks=(element.content,)) for element in state.context]
+                context=tuple(element.without_tools() for element in state.context)
             )
 
         return cls(
@@ -1725,13 +1722,16 @@ class Stage:
                 return await execution(state=state)
 
             except Exception as exc:
-                async with ctx.scope("stage.fallback"):
-                    if type(exc) in exceptions:
-                        return await fallback_execution(state=state)
+                if any(isinstance(exc, exception) for exception in exceptions):
+                    ctx.log_info(f"Using fallback stage for {type(exc)}")
+                    return await fallback_execution(state=state)
 
                 raise exc
 
-        return self.__class__(stage, meta=self.meta)
+        return self.__class__(
+            stage,
+            meta=self.meta,
+        )
 
     def with_volatile_context(self) -> Self:
         """
@@ -1795,7 +1795,7 @@ class Stage:
             return state.updated(
                 context=(
                     *common_prefix,
-                    *(element.updated(blocks=(element.content,)) for element in suffix),
+                    *(element.without_tools() for element in suffix),
                 ),
                 result=processed_state.result,
             )
