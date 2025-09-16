@@ -26,7 +26,7 @@ from mcp.types import ResourceLink as MCPResourceLink
 from mcp.types import TextContent as MCPTextContent
 from pydantic import AnyUrl
 
-from draive.models import FunctionTool, Tool, ToolError, ToolsProvider
+from draive.models import FunctionTool, ModelToolSpecification, Tool, ToolError, ToolsProvider
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 from draive.parameters import DataModel, validated_tool_specification
 from draive.resources import ResourceContent, ResourceReference, ResourcesRepository
@@ -502,7 +502,7 @@ def _convert_tool(
 
 def _available(
     tools_turn: int,
-    meta: Meta,
+    specification: ModelToolSpecification,
 ) -> bool:
     return True
 

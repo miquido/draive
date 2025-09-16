@@ -1,4 +1,4 @@
-from draive import MultimodalContent
+from draive import MultimodalContent, MultimodalTag, TextContent
 from draive.resources import ResourceReference
 
 
@@ -72,6 +72,53 @@ def test_returns_none_with_unclosed_tag():
         ).tag("test")
         is None
     )
+
+
+def test_unclosed_tag_does_not_block_other_tags():
+    tags = list(
+        MultimodalContent.of("<broken>value", "<strategy>plan</strategy>").tags("strategy")
+    )
+
+    assert len(tags) == 1
+    assert tags[0].content == MultimodalContent.of("plan")
+
+    tags = list(
+        MultimodalContent.of(
+            "<broken>value",
+            ResourceReference.of(uri="http://image", mime_type="image/png"),
+            "<strategy>plan</strategy>",
+        ).tags("strategy")
+    )
+
+    assert len(tags) == 1
+    assert tags[0].content == MultimodalContent.of("plan")
+
+
+def test_tag_to_str_escapes_attributes():
+    tag = MultimodalTag.of(
+        "inner",
+        name="sample",
+        meta={
+            "attr": '<>&"',
+        },
+    )
+
+    expected = '<sample attr="&lt;&gt;&amp;{}">inner</sample>'.format('\\"')
+    assert tag.to_str() == expected
+
+
+def test_parses_tag_spanning_multiple_text_parts():
+    content = MultimodalContent(
+        parts=(
+            TextContent.of("<test", meta={"segment": "a"}),
+            TextContent.of(' attr="value">payload', meta={"segment": "a"}),
+            TextContent.of("</test>", meta={"segment": "a"}),
+        ),
+    )
+
+    tag = content.tag("test")
+    assert tag is not None
+    assert tag.content.to_str() == "payload"
 
 
 def test_returns_none_with_incomplete_opening_tag():
@@ -223,12 +270,12 @@ def test_returns_all_tags():
     assert tags[1].content == MultimodalContent.of("Other")
 
 
-def test_returns_outer_tag_with_nested():
+def test_returns_nested_tags_with_same_name():
     tags = list(MultimodalContent.of("<test>Other<test>Lorem ipsum</test></test>").tags("test"))
 
-    assert len(tags) == 1
-    assert tags[0].name == "test"
-    assert tags[0].content == MultimodalContent.of("Other<test>Lorem ipsum")
+    assert [tag.name for tag in tags] == ["test", "test"]
+    assert tags[0].content == MultimodalContent.of("Other", "<test>Lorem ipsum</test>")
+    assert tags[1].content == MultimodalContent.of("Lorem ipsum")
 
     tags = list(
         MultimodalContent.of(
@@ -238,13 +285,13 @@ def test_returns_outer_tag_with_nested():
         ).tags("test")
     )
 
-    assert len(tags) == 1
-    assert tags[0].name == "test"
+    assert [tag.name for tag in tags] == ["test", "test"]
     assert tags[0].content == MultimodalContent.of(
         "Other",
         ResourceReference.of(uri="http://image", mime_type="image/png"),
-        "<test>ipsum",
+        "<test>ipsum</test>",
     )
+    assert tags[1].content == MultimodalContent.of("ipsum")
 
 
 def test_returns_tag_with_fake_content():

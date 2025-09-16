@@ -1,6 +1,7 @@
 from asyncio import ALL_COMPLETED, FIRST_COMPLETED, Task, wait
 from collections.abc import (
     AsyncGenerator,
+    Collection,
     Generator,
     MutableSequence,
     Sequence,
@@ -314,6 +315,11 @@ class GenerativeModel(State):
         output: ModelOutputSelection,
         **extra: Any,
     ) -> ModelOutput:
+        """Run the non-streaming tool loop and return the final output.
+
+        Executes repeated ``generating`` calls, dispatches tool requests, and merges tool
+        responses back into the mutable ``context`` until a terminal output is produced.
+        """
         ctx.log_debug("GenerativeModel loop started...")
         tools_turn: int = 0
         result_extension: Sequence[ModelReasoning | MultimodalContent] = ()
@@ -409,6 +415,12 @@ class GenerativeModel(State):
         output: ModelOutputSelection,
         **extra: Any,
     ) -> AsyncGenerator[ModelStreamOutput]:
+        """Stream chunks while coordinating tool execution between turns.
+
+        Accumulates streamed model output, forwards tool requests to the ``toolbox`` as they
+        appear, yields intermediate content, and updates ``context`` until the session
+        completes.
+        """
         ctx.log_debug("GenerativeModel streaming loop started...")
         tools_turn: int = 0
         result_extension: Sequence[ModelReasoning | MultimodalContent] = ()
@@ -690,6 +702,31 @@ class RealtimeGenerativeModel(State):
     session_preparing: ModelSessionPreparing
 
 
+def _matches_modalities(
+    part: MultimodalContentPart,
+    *,
+    allowed: Collection[Literal["text", "image", "audio", "video"]],
+) -> bool:
+    if not allowed:
+        return False
+
+    if "text" in allowed and isinstance(part, TextContent):
+        return True
+
+    if isinstance(part, ResourceContent | ResourceReference):
+        mime_type: str = part.mime_type or ""
+        if "image" in allowed and mime_type.startswith("image"):
+            return True
+
+        if "audio" in allowed and mime_type.startswith("audio"):
+            return True
+
+        if "video" in allowed and mime_type.startswith("video"):
+            return True
+
+    return False
+
+
 def _decoded(  # noqa: PLR0911
     result: ModelOutput,
     /,
@@ -725,6 +762,14 @@ def _decoded(  # noqa: PLR0911
 
         case "video":
             return result.updated(blocks=(MultimodalContent.of(*result.content.video()),))
+
+        case selection if isinstance(selection, Collection) and not isinstance(selection, str):
+            selected_parts: tuple[MultimodalContentPart, ...] = tuple(
+                part
+                for part in result.content.parts
+                if _matches_modalities(part, allowed=set(selection))
+            )
+            return result.updated(blocks=(MultimodalContent.of(*selected_parts),))
 
         case "json":
             return result.updated(
@@ -810,6 +855,16 @@ async def _decoded_stream(  # noqa: C901, PLR0912
                     yield part
 
                 # skip non video output
+
+        case selection if isinstance(selection, Collection) and not isinstance(selection, str):
+            async for part in stream:
+                if isinstance(part, MultimodalContentPart) and _matches_modalities(
+                    part,
+                    allowed=set(selection),
+                ):
+                    yield part
+
+                # skip non matching output
 
         case "json":
             accumulator: list[str] = []

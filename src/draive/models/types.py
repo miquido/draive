@@ -214,10 +214,12 @@ class ModelOutputFailed(ModelException):
 
 @final
 class ModelToolFunctionSpecification(State):
+    """Specification of a function tool for model usage."""
+
     name: str
     description: str | None
     parameters: ToolParametersSpecification | None
-    meta: Meta
+    meta: Meta = META_EMPTY
 
 
 ModelToolSpecification = ModelToolFunctionSpecification
@@ -229,7 +231,7 @@ ModelToolsSelection = Literal["auto", "required", "none"] | str
 - "auto": Let the model decide when to use tools
 - "required": Force the model to use at least one tool
 - "none": Disable tool use for this turn
-- Provider-specific strings for custom selection modes
+or a name of tool to be selected
 """
 
 
@@ -328,21 +330,21 @@ class ModelToolRequest(DataModel):
             meta=Meta.of(meta),
         )
 
-    kind: Literal["tool_request"] = "tool_request"
+    type: Literal["tool_request"] = "tool_request"
     identifier: str
     tool: str
     arguments: Mapping[str, Any]
-    meta: Meta
+    meta: Meta = META_EMPTY
 
 
 ModelToolHandling = Literal["response", "error", "output", "output_extension", "detached"]
-"""Defines how tool responses should be handled in the conversation flow.
+"""Defines how tool responses should be handled in the invocation loop flow.
 
-- "response": Include the response in the conversation context for the next turn
+- "response": Include the response in the loop context for the next turn
 - "error": Treat the response as an error and include it in context
-- "output": Use this response as the final output, ending the conversation loop
+- "output": Use this response as the final output, ending the loop
 - "output_extension": Include content in final output while continuing the loop
-- "detached": Handle the response outside the normal conversation flow
+- "detached": Handle the response outside the normal loop flow
 """
 
 
@@ -392,12 +394,12 @@ class ModelToolResponse(DataModel):
             meta=Meta.of(meta),
         )
 
-    kind: Literal["tool_response"] = "tool_response"
+    type: Literal["tool_response"] = "tool_response"
     identifier: str
     tool: str
     content: MultimodalContent
     handling: ModelToolHandling
-    meta: Meta
+    meta: Meta = META_EMPTY
 
 
 ModelInputBlock = MultimodalContent | ModelToolResponse
@@ -448,9 +450,9 @@ class ModelInput(DataModel):
             meta=Meta.of(meta),
         )
 
-    kind: Literal["model_input"] = "model_input"
+    type: Literal["model_input"] = "model_input"
     blocks: ModelInputBlocks
-    meta: Meta
+    meta: Meta = META_EMPTY
 
     @property
     def content(self) -> MultimodalContent:
@@ -474,6 +476,12 @@ ModelOutputSelection = (
     | Literal["auto", "text", "json", "image", "audio", "video"]
     | type[DataModel]
 )
+"""Output selection policy for turn-level generations.
+
+Supports the broadest set of modalities to allow providers to narrow or expand
+what the model may return, including custom ``DataModel`` subclasses for
+provider-specific envelopes.
+"""
 
 
 @final
@@ -519,9 +527,9 @@ class ModelReasoning(DataModel):
             meta=Meta.of(meta),
         )
 
-    kind: Literal["reasoning"] = "reasoning"
+    type: Literal["reasoning"] = "reasoning"
     content: MultimodalContent
-    meta: Meta
+    meta: Meta = META_EMPTY
 
 
 ModelOutputBlock = MultimodalContent | ModelReasoning | ModelToolRequest
@@ -572,9 +580,9 @@ class ModelOutput(DataModel):
             meta=Meta.of(meta),
         )
 
-    kind: Literal["model_output"] = "model_output"
+    type: Literal["model_output"] = "model_output"
     blocks: ModelOutputBlocks
-    meta: Meta
+    meta: Meta = META_EMPTY
 
     @property
     def content(self) -> MultimodalContent:
@@ -585,8 +593,11 @@ class ModelOutput(DataModel):
 
     @property
     def content_with_reasoning(self) -> MultimodalContent:
-        """\
-        Return the multimodal content blocks merged into one and including reasoning as MetaContent
+        """Return multimodal content merged with hidden reasoning artifacts.
+
+        Reasoning blocks are wrapped as hidden ``ArtifactContent`` items so the
+        caller can surface or inspect them without exposing the raw chain of
+        thought by default.
         """
         parts: list[MultimodalContentPart] = []
         for block in self.blocks:
@@ -635,7 +646,7 @@ class ModelOutputLimit(ModelException):
         Partial content produced before the limit was hit.
     """
 
-    __slots__ = ("content", "max_output")
+    __slots__ = ("content", "max_output_tokens")
 
     def __init__(
         self,
@@ -670,7 +681,7 @@ class ModelMemoryRecall(DataModel):
     ----------
     context : ModelContext
         Recalled context elements (inputs/outputs) to include.
-    variables : Mapping[str, str]
+    variables : Mapping[str, str | int | float]
         Key-value variables associated with the recall.
     meta : Meta
         Additional metadata.
@@ -682,7 +693,7 @@ class ModelMemoryRecall(DataModel):
     def of(
         cls,
         *elements: ModelContextElement,
-        variables: Mapping[str, str] | None = None,
+        variables: Mapping[str, str | int | float] | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create a recall from one or more context elements.
@@ -691,7 +702,7 @@ class ModelMemoryRecall(DataModel):
         ----------
         elements : ModelContextElement
             Context elements (inputs/outputs) to include in the recall.
-        variables : Mapping[str, str] | None, optional
+        variables : Mapping[str, str | int | float] | None, optional
             Variables associated with the recall.
         meta : Meta | MetaValues | None, optional
             Additional metadata.
@@ -703,21 +714,17 @@ class ModelMemoryRecall(DataModel):
         """
         return cls(
             context=elements,
-            variables=variables if variables is not None else {},
+            variables=variables,
             meta=Meta.of(meta),
         )
 
-    kind: Literal["model_memory"] = "model_memory"
+    type: Literal["model_memory"] = "model_memory"
     context: ModelContext
-    variables: Mapping[str, str | int | float]
-    meta: Meta
+    variables: Mapping[str, str | int | float] | None = None
+    meta: Meta = META_EMPTY
 
 
-ModelMemoryRecall.empty = ModelMemoryRecall(
-    context=(),
-    variables={},
-    meta=META_EMPTY,
-)
+ModelMemoryRecall.empty = ModelMemoryRecall(context=())
 
 ModelMemory = Memory[ModelMemoryRecall, ModelContextElement]
 """Memory abstraction for managing conversation context and variables."""
@@ -766,10 +773,10 @@ class ModelInputChunk(DataModel):
             meta=Meta.of(meta),
         )
 
-    kind: Literal["model_input_chunk"] = "model_input_chunk"
+    type: Literal["model_input_chunk"] = "model_input_chunk"
     content: MultimodalContent
-    eod: bool
-    meta: Meta
+    eod: bool = False
+    meta: Meta = META_EMPTY
 
     def __bool__(self) -> bool:
         """Return ``True`` when any content is present."""
@@ -820,10 +827,10 @@ class ModelOutputChunk(DataModel):
             meta=Meta.of(meta),
         )
 
-    kind: Literal["model_output_chunk"] = "model_output_chunk"
+    type: Literal["model_output_chunk"] = "model_output_chunk"
     content: MultimodalContent
-    eod: bool
-    meta: Meta
+    eod: bool = False
+    meta: Meta = META_EMPTY
 
     def __bool__(self) -> bool:
         """Return ``True`` when any content is present."""
@@ -915,7 +922,7 @@ class ModelSessionEvent(DataModel):
 
     category: str
     content: MultimodalContent
-    meta: Meta
+    meta: Meta = META_EMPTY
 
 
 ModelSessionInput = ModelInputChunk | ModelToolResponse | ModelSessionEvent
@@ -963,7 +970,7 @@ class ModelSession(State):
         return await ctx.state(cls).reading()
 
     @classmethod
-    async def reader(cls) -> AsyncIterable[ModelSessionOutput]:
+    async def stream_read(cls) -> AsyncIterable[ModelSessionOutput]:
         """Async iterator that continuously reads session outputs until error."""
         session: Self = ctx.state(cls)
         while True:  # breaks on exception
@@ -978,7 +985,7 @@ class ModelSession(State):
         await ctx.state(cls).writing(input=input)
 
     @classmethod
-    async def writer(
+    async def stream_write(
         cls,
         input: AsyncIterable[ModelSessionInput],  # noqa: A002
     ) -> None:

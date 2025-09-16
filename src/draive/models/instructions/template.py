@@ -17,10 +17,23 @@ __all__ = (
 
 @final
 class InstructionsTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, None, str]]):
-    """Wraps an async function to define instructions content and declaration.
+    """Wrap an async function to define instructions content and declaration.
 
-    Builds an ``InstructionsDeclaration`` from the function's parameter specifications
-    and exposes a callable that renders the content at runtime.
+    Parameters
+    ----------
+    function : Callable[..., Coroutine[None, None, str]]
+        Async function producing instructions content when invoked.
+    name : str
+        Name assigned to the resulting instructions template.
+    description : str | None
+        Optional human-readable description of the template.
+    meta : Meta
+        Metadata stored on the resulting declaration.
+
+    Attributes
+    ----------
+    declaration : InstructionsDeclaration
+        Declaration derived from the wrapped function signature.
     """
 
     __slots__ = ("declaration",)
@@ -90,7 +103,23 @@ def instructions[**Args](
 ) -> InstructionsTemplateWrapper | InstructionsTemplate[Args]:
     """Convert a function into an ``InstructionsTemplate``.
 
-    When called without a function, returns a decorator with configured parameters.
+    Parameters
+    ----------
+    function : Callable[..., Coroutine[None, None, str]] | None, optional
+        Async function producing template content. When ``None`` a decorator is
+        produced awaiting the function.
+    name : str | None, optional
+        Explicit name for the template. Defaults to the wrapped function name.
+    description : str | None, optional
+        Optional human-readable description.
+    meta : Meta | MetaValues | None, optional
+        Metadata merged into the template declaration.
+
+    Returns
+    -------
+    InstructionsTemplate | InstructionsTemplateWrapper
+        ``InstructionsTemplate`` when a function is provided, otherwise a decorator
+        configuring template creation.
     """
 
     def wrap[**Arg](

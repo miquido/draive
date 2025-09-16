@@ -1,8 +1,6 @@
 from collections.abc import Sequence
 from typing import Any, Protocol, runtime_checkable
 
-from haiway import Meta
-
 from draive.models.types import ModelToolHandling, ModelToolSpecification
 from draive.multimodal import MultimodalContent
 from draive.parameters import ToolParametersSpecification
@@ -43,7 +41,7 @@ class ToolAvailabilityChecking(Protocol):
     def __call__(
         self,
         tools_turn: int,
-        meta: Meta,
+        specification: ModelToolSpecification,
     ) -> bool: ...
 
 
@@ -78,13 +76,10 @@ class Tool(Protocol):
     def description(self) -> str | None: ...
 
     @property
-    def parameters(self) -> ToolParametersSpecification | None: ...
+    def parameters(self) -> ToolParametersSpecification: ...
 
     @property
     def specification(self) -> ModelToolSpecification: ...
-
-    @property
-    def meta(self) -> Meta: ...
 
     @property
     def handling(self) -> ModelToolHandling: ...
@@ -108,8 +103,8 @@ class ToolsSuggesting(Protocol):
 
     def __call__(
         self,
-        tools: Sequence[ModelToolSpecification],
         tools_turn: int,
+        tools: Sequence[ModelToolSpecification],
     ) -> ModelToolSpecification | bool: ...
 
 

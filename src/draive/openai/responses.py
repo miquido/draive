@@ -148,7 +148,7 @@ class OpenAIResponses(OpenAIAPI):
                 context=context,
                 tools=tools,
                 output=output,
-                config=config or ctx.state(OpenAIResponsesConfig),
+                config=config if config is not None else ctx.state(OpenAIResponsesConfig),
                 cache_key=cache_key,
                 **extra,
             )
@@ -159,7 +159,7 @@ class OpenAIResponses(OpenAIAPI):
                 context=context,
                 tools=tools,
                 output=output,
-                config=config or ctx.state(OpenAIResponsesConfig),
+                config=config if config is not None else ctx.state(OpenAIResponsesConfig),
                 cache_key=cache_key,
                 **extra,
             )
@@ -181,15 +181,21 @@ class OpenAIResponses(OpenAIAPI):
                 attributes={
                     "model.provider": "openai",
                     "model.name": config.model,
-                    "model.instructions": instructions,
-                    "model.tools": [tool.name for tool in tools.specifications],
-                    "model.tool_selection": tools.selection,
-                    "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
-                    "model.output": str(output),
                     "model.max_output_tokens": config.max_output_tokens,
+                    "model.output": str(output),
+                    "model.tools.count": len(tools.specifications),
+                    "model.tools.selection": tools.selection,
                     "model.cache_key": cache_key,
                     "model.stream": False,
+                },
+            )
+            ctx.record(
+                ObservabilityLevel.DEBUG,
+                attributes={
+                    "model.instructions": instructions,
+                    "model.tools": [tool.name for tool in tools.specifications],
+                    "model.context": [element.to_str() for element in context],
                 },
             )
 
@@ -231,12 +237,12 @@ class OpenAIResponses(OpenAIAPI):
                     truncation=config.truncation,
                     safety_identifier=config.safety_identifier or NOT_GIVEN,
                     prompt_cache_key=cache_key or NOT_GIVEN,
-                    stream=False,
                     include=["reasoning.encrypted_content"]
                     # for gpt-5 model family we need to request encrypted reasoning
                     if "gpt-5" in config.model.lower()
                     else NOT_GIVEN,
                     store=False,
+                    stream=False,
                 )
 
             except OpenAIRateLimitError as exc:
@@ -421,17 +427,24 @@ class OpenAIResponses(OpenAIAPI):
                 attributes={
                     "model.provider": "openai",
                     "model.name": config.model,
-                    "model.instructions": instructions,
-                    "model.tools": [tool.name for tool in tools.specifications],
-                    "model.tool_selection": tools.selection,
-                    "model.context": [element.to_str() for element in context],
                     "model.temperature": config.temperature,
-                    "model.output": str(output),
                     "model.max_output_tokens": config.max_output_tokens,
+                    "model.output": str(output),
+                    "model.tools.count": len(tools.specifications),
+                    "model.tools.selection": tools.selection,
                     "model.cache_key": cache_key,
                     "model.stream": True,
                 },
             )
+            ctx.record(
+                ObservabilityLevel.DEBUG,
+                attributes={
+                    "model.instructions": instructions,
+                    "model.tools": [tool.name for tool in tools.specifications],
+                    "model.context": [element.to_str() for element in context],
+                },
+            )
+
             input_context: list[ResponseInputItemParam]
             try:
                 input_context = list(
@@ -476,7 +489,7 @@ class OpenAIResponses(OpenAIAPI):
                     else NOT_GIVEN,
                     store=False,
                 ) as stream:
-                    async for event in stream:  # type: ignore[reportUnknownVariableType]
+                    async for event in stream:
                         if isinstance(event, ResponseTextDeltaEvent):
                             yield TextContent(text=event.delta)
 
