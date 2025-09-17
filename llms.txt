@@ -326,7 +326,7 @@ async def main():
 
         # LLM generation works automatically
         result = await TextGeneration.generate(
-            instruction="Process this data",
+            instructions="Process this data",
             input=user_input,
         )
 ```
@@ -418,7 +418,7 @@ from draive.openai import OpenAI, OpenAIChatConfig
 # Basic completion - most common pattern
 basic_stage = Stage.completion(
     "Analyze user feedback data: <<feedback data here>>",
-    instruction="Identify key themes and sentiment patterns"
+    instructions="Identify key themes and sentiment patterns"
 )
 
 # Completion with tools - enables agent-like behavior
@@ -428,7 +428,7 @@ async def search_database(query: str) -> str:
 
 agent_stage = Stage.completion(
     "Find information about product issues",
-    instruction="Use available tools to research the topic",
+    instructions="Use available tools to research the topic",
     tools=[search_database]
 )
 
@@ -442,7 +442,7 @@ class AnalysisResult(DataModel):
 
 extraction_stage = Stage.completion(
     "User feedback about our mobile app...",
-    instruction="Extract structured analysis",
+    instructions="Extract structured analysis",
     output=AnalysisResult
 )
 ```
@@ -456,12 +456,12 @@ async def get_latest_data() -> str:
 
 dynamic_stage = Stage.prompting_completion(
     get_latest_data,
-    instruction="Analyze the latest feedback data"
+    instructions="Analyze the latest feedback data"
 )
 
 # Loopback completion - iterative refinement, treats last output as input
 refinement_stage = Stage.loopback_completion(
-    instruction="Improve and expand on the previous analysis",
+    instructions="Improve and expand on the previous analysis",
     tools=[research_tool]
 )
 ```
@@ -494,7 +494,7 @@ analysis_pipeline = Stage.sequence(
     # Step 1: Initial analysis
     Stage.completion(
         "Raw customer feedback data...",
-        instruction="Analyze feedback and identify main categories"
+        instructions="Analyze feedback and identify main categories"
     ),
 
     # Step 2: Deep dive into categories
@@ -505,7 +505,7 @@ analysis_pipeline = Stage.sequence(
     # Step 3: Final formatting
     Stage.completion(
         "Format as executive summary with action items",
-        instruction="User markdown formatting for the result."
+        instructions="User markdown formatting for the result."
     )
 )
 
@@ -526,7 +526,7 @@ async def needs_more_detail(*, state: StageState, iteration: int) -> bool:
 improvement_loop = Stage.loop(
     Stage.completion(
         "Research the topic of....",
-        instruction="Expand and improve the analysis with more detail",
+        instructions="Expand and improve the analysis with more detail",
         tools=[research_tool, fact_checker]
     ),
     condition=needs_more_detail,
@@ -573,12 +573,12 @@ conditional_stage = Stage.completion(
 # Intelligent routing based on metadata
 technical_stage = Stage.completion(
     "Prepare deep technical analysis",
-    instruction="Focus on technical aspects and implementation details"
+    instructions="Focus on technical aspects and implementation details"
 ).with_meta(type="technical", complexity="high")
 
 summary_stage = Stage.completion(
     "Prepare executive summary",
-    instruction="High-level overview for leadership"
+    instructions="High-level overview for leadership"
 ).with_meta(type="executive", complexity="low")
 
 # Router automatically selects appropriate stage
@@ -933,13 +933,13 @@ async with ctx.scope(
     )
 
     result = await TextGeneration.generate(
-        instruction="Describe what you see in the image",
+        instructions="Describe what you see in the image",
         input=content
     )
 
     # Conversation with mixed content
     response = await Conversation.completion(
-        instruction="You are a data analyst assistant",
+        instructions="You are a data analyst assistant",
         input=MultimodalContent.of(
             "Here are the quarterly reports:",
             MediaReference.of("https://company.com/q1-report.pdf", media="application/pdf"),
@@ -967,7 +967,7 @@ async with ctx.scope(
     # Model generation with multimodal input
     result = await ModelGeneration.generate(
         ImageDescription,
-        instruction="Analyze the image and extract key information",
+        instructions="Analyze the image and extract key information",
         input=MultimodalContent.of(
             "Analyze this marketing material:",
             MediaData.of(poster_image, media="image/jpeg"),
@@ -991,7 +991,7 @@ media_analysis_stage = Stage.completion(
         MediaData.of(product_image_1, media="image/jpeg"),
         MediaData.of(product_image_2, media="image/jpeg")
     ),
-    instruction="Compare products and provide detailed analysis"
+    instructions="Compare products and provide detailed analysis"
 )
 
 # Content transformation stages using appending
@@ -1088,7 +1088,7 @@ async def extract_text_from_images(content: MultimodalContent) -> MultimodalCont
 
 # Usage in conversation
 response = await Conversation.completion(
-    instruction="Help analyze the provided content",
+    instructions="Help analyze the provided content",
     input=MultimodalContent.of(
         "Please process these documents:",
         MediaData.of(document_image, media="image/png")
@@ -1117,7 +1117,7 @@ memory = ConversationMemory.constant((
 
 # Continue conversation with multimodal context
 response = await Conversation.completion(
-    instruction="You are a business analyst assistant",
+    instructions="You are a business analyst assistant",
     input="Now compare Q3 data with the previous quarters",
     memory=memory
 )
@@ -1231,13 +1231,13 @@ async with ctx.scope(
 ):
     # Basic generation
     result = await TextGeneration.generate(
-        instruction="You are a helpful assistant",
+        instructions="You are a helpful assistant",
         input="Explain quantum computing",
     )
 
     # Conversation is better for chat interactions
     response = await Conversation.completion(
-        instruction="You are a helpful assistant",
+        instructions="You are a helpful assistant",
         input="What is machine learning?",
     )
 ```
@@ -1257,7 +1257,7 @@ async with ctx.scope("extraction", config, disposables=(provider,)):
     # Structured output with automatic validation
     result = await ModelGeneration.generate(
         AnalysisResult,
-        instruction="Analyze the following text comprehensively",
+        instructions="Analyze the following text comprehensively",
         input=text_content,
     )
 
@@ -1287,7 +1287,7 @@ async def interactive_chat():
 
             # Get AI response with managed memory
             response = await Conversation.completion(
-                instruction="You are a friendly AI assistant",
+                instructions="You are a friendly AI assistant",
                 input=user_input,
                 memory=memory,  # Automatically managed conversation history
             )
@@ -1307,17 +1307,17 @@ async def compare_providers(query: str) -> Sequence[str]:
 
     # OpenAI
     async with ctx.scope("openai", OpenAIChatConfig(model="gpt-4o-mini"), disposables=(OpenAI(),)):
-        result = await TextGeneration.generate(instruction="Answer concisely", input=query)
+        result = await TextGeneration.generate(instructions="Answer concisely", input=query)
         results.append(f"OpenAI: {result}")
 
     # Anthropic
     async with ctx.scope("anthropic", AnthropicChatConfig(model="claude-3-haiku"), disposables=(Anthropic(),)):
-        result = await TextGeneration.generate(instruction="Answer concisely", input=query)
+        result = await TextGeneration.generate(instructions="Answer concisely", input=query)
         results.append(f"Claude: {result}")
 
     # Gemini
     async with ctx.scope("gemini", GeminiChatConfig(model="gemini-1.5-flash"), disposables=(Gemini(),)):
-        result = await TextGeneration.generate(instruction="Answer concisely", input=query)
+        result = await TextGeneration.generate(instructions="Answer concisely", input=query)
         results.append(f"Gemini: {result}")
 
     return tuple(results)
@@ -1349,7 +1349,7 @@ async def advanced_search_tool(
 
 # Use tools in generation
 result = await TextGeneration.generate(
-    instruction="Help the user with their request using available tools",
+    instructions="Help the user with their request using available tools",
     input="What's the weather in Paris and search for travel info?",
     tools=Toolbox.of(get_weather, advanced_search_tool, suggest=get_weather),
 )
@@ -1371,7 +1371,7 @@ content = MultimodalContent.of(
 # Multimodal generation with vision-capable models
 async with ctx.scope("multimodal", OpenAIChatConfig(model="gpt-4o"), disposables=(OpenAI(),)):
     analysis = await TextGeneration.generate(
-        instruction="Analyze this image and provide detailed insights",
+        instructions="Analyze this image and provide detailed insights",
         input=MultimodalContent.of(
             "Please examine this chart:",
             MediaData.of(chart_image, media="image/png"),
@@ -1435,7 +1435,7 @@ async def code_quality_evaluator(
 
     evaluation = await ModelGeneration.generate(
         CodeEvaluation,
-        instruction=f"Evaluate this {language} code based on: {', '.join(criteria)}",
+        instructions=f"Evaluate this {language} code based on: {', '.join(criteria)}",
         input=code
     )
 
@@ -1493,7 +1493,7 @@ async def search_documents(query: str) -> str:
 # Use in RAG pipeline
 async with ctx.scope("rag_chat", OpenAIChatConfig(model="gpt-4o-mini"), vector_index, disposables=(OpenAI(),)):
     response = await Conversation.completion(
-        instruction="Answer questions based on search results from the documentation",
+        instructions="Answer questions based on search results from the documentation",
         input="How do I set up context scopes in Draive?",
         tools=[search_documents],
     )
@@ -1518,7 +1518,7 @@ async with ctx.scope(
 ):
     # Tools are automatically available from MCP
     response = await Conversation.completion(
-        instruction="You can read and analyze files using available tools",
+        instructions="You can read and analyze files using available tools",
         input="What files are in the documentation directory?",
         tools=await Toolbox.fetched(),  # Get tools from MCP
     )

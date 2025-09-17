@@ -9,7 +9,7 @@
 # Basic completion
 basic_stage = Stage.completion(
     "Explain quantum computing",
-    instruction="Provide a clear, concise explanation"
+    instructions="Provide a clear, concise explanation"
 )
 
 # Completion with tools
@@ -22,14 +22,14 @@ async def calculate(a: int, b: int) -> int:
 
 tool_stage = Stage.completion(
     "What is 15 + 27?",
-    instruction="Use the calculator tool to solve this",
+    instructions="Use the calculator tool to solve this",
     tools=[calculate]
 )
 
 # Completion with specific output format
 structured_stage = Stage.completion(
     "List three programming languages",
-    instruction="Return as a JSON array",
+    instructions="Return as a JSON array",
     output="json"
 )
 ```
@@ -51,14 +51,14 @@ async def get_user_query():
 
 prompting_stage = Stage.prompting_completion(
     get_user_query,
-    instruction="Answer the user's question",
+    instructions="Answer the user's question",
     tools=[weather_tool]
 
 
 ```python
 # This takes the last completion and feeds it back as input
 refinement_stage = Stage.loopback_completion(
-    instruction="Improve and refine the previous response",
+    instructions="Improve and refine the previous response",
     tools=[research_tool]
 
 
@@ -96,7 +96,7 @@ loop_stage = Stage.loop(
 # Create individual stages
 analyze_stage = Stage.completion(
     "Large dataset with user behavior patterns...",
-    instruction="Analyze the input data and identify key patterns"
+    instructions="Analyze the input data and identify key patterns"
 )
 
 summarize_stage = Stage.completion(
@@ -121,7 +121,7 @@ pipeline = Stage.sequence(
 # Create stages with metadata for routing
 analysis_stage = Stage.completion(
     "Perform detailed analysis",
-    instruction="Analyze the data thoroughly"
+    instructions="Analyze the data thoroughly"
 ).with_meta(
     name="detailed_analysis",
     description="Performs comprehensive data analysis"
@@ -129,7 +129,7 @@ analysis_stage = Stage.completion(
 
 summary_stage = Stage.completion(
     "Create a brief summary",
-    instruction="Summarize the key points"
+    instructions="Summarize the key points"
 ).with_meta(
     name="quick_summary",
     description="Creates a quick summary of the data"
@@ -337,7 +337,7 @@ async def process_document(document: str):
             # Step 1: Analyze document
             Stage.completion(
                 document,
-                instruction="Analyze the document structure and content"
+                instructions="Analyze the document structure and content"
             ).with_meta(name="analyzer", description="Document analysis"),
 
             # Step 2: Add word count if document is long

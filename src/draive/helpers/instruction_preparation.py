@@ -46,7 +46,7 @@ async def prepare_instructions(
         assert instruction_declaration.description is not None  # nosec: B101
         result: MultimodalContent = await Stage.completion(
             f"<USER_TASK>{instruction_declaration.description}</USER_TASK>{_format_variables(instruction_declaration)}",
-            instruction=PREPARE_INSTRUCTION.format(
+            instructions=PREPARE_INSTRUCTION.format(
                 guidelines=f"\n<GUIDELINES>{guidelines}</GUIDELINES>\n" if guidelines else "",
             ),
         ).execute()

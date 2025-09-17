@@ -235,7 +235,7 @@ tools = Toolbox.of(sum_tool)
 Resources are split into typed state/contracts and templates.
 
 Key changes and aliases:
-- `ResourceException` → `ResourceCorrupted` 
+- `ResourceException` → `ResourceCorrupted`
 - `ResourceDeclaration`/`ResourceTemplateDeclaration` → `ResourceReferenceTemplate` (alias available as `draive.resources.ResourceTemplateDeclaration`)
 - Top-level exports concentrate on `Resource`, `ResourceContent`, `ResourceReference`, `ResourceTemplate`, `ResourcesRepository`, `resource`
 

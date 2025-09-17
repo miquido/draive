@@ -66,7 +66,7 @@ async def expectations_evaluator(
             expectations,
             "</EXPECTATIONS>",
         ),
-        instruction=INSTRUCTION.format(
+        instructions=INSTRUCTION.format(
             guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
             if guidelines is not None
             else ""
