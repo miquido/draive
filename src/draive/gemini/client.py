@@ -29,12 +29,14 @@ class Gemini(
     def __init__(
         self,
         api_key: str | None = None,
+        vertexai: bool = False,
         http_options: HttpOptionsDict | None = None,
         features: Collection[type[GenerativeModel | TextEmbedding]] | None = None,
         **extra: Any,
     ) -> None:
         super().__init__(
             api_key=api_key,
+            vertexai=vertexai,
             http_options=http_options,
             **extra,
         )

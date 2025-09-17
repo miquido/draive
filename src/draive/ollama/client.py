@@ -1,6 +1,6 @@
 from collections.abc import Collection, Iterable
 from types import TracebackType
-from typing import final
+from typing import Any, final
 
 from haiway import State
 
@@ -28,9 +28,15 @@ class Ollama(
     def __init__(
         self,
         server_url: str | None = None,
+        timeout: float | None = None,
         features: Collection[type[GenerativeModel | TextEmbedding]] | None = None,
+        **extra: Any,
     ) -> None:
-        super().__init__(server_url=server_url)
+        super().__init__(
+            server_url=server_url,
+            timeout=timeout,
+            **extra,
+        )
 
         self._features: frozenset[type[State]] = (
             frozenset(features)

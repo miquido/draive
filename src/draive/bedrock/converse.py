@@ -20,6 +20,7 @@ from draive.models import (
     ModelInput,
     ModelInstructions,
     ModelOutput,
+    ModelOutputFailed,
     ModelOutputLimit,
     ModelOutputSelection,
     ModelReasoning,
@@ -230,8 +231,6 @@ class BedrockConverse(BedrockAPI):
                 )
 
             if stop_reason in ("guardrail_intervened", "content_filtered"):
-                from draive.models import ModelOutputFailed
-
                 raise ModelOutputFailed(
                     provider="bedrock",
                     model=config.model,
