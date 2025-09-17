@@ -371,7 +371,9 @@ class MultimodalContent(DataModel):
 
         for part in self.parts:
             # Get metadata value for this part
-            part_value: MetaValue | None = part.meta.get(key, default=None)
+            part_value: MetaValue | Missing = part.meta.get(key, default=MISSING)
+            if part_value is MISSING:
+                continue  # skip elements without explicit value
 
             # If this is the first part or value changed, start new group
             if current_value != part_value:
