@@ -26,7 +26,10 @@ from google.genai.types import (
 from haiway import META_EMPTY, MISSING, ObservabilityLevel, as_dict, as_list, ctx
 
 from draive.gemini.api import GeminiAPI
-from draive.gemini.config import GeminiConfig, GeminiSafetyConfig
+from draive.gemini.config import (
+    GeminiConfig,
+    GeminiSafetyConfig,
+)
 from draive.gemini.utils import unwrap_missing
 from draive.models import (
     GenerativeModel,
@@ -268,7 +271,7 @@ class GeminiGenerating(GeminiAPI):
                 },
             )
 
-    async def _completion_stream(
+    async def _completion_stream(  # noqa: C901
         self,
         *,
         instructions: ModelInstructions,
@@ -320,6 +323,10 @@ class GeminiGenerating(GeminiAPI):
                     contents=request_content,
                 )
 
+                collected_blocks: list[ModelOutputBlock] = []
+                finish_reason: FinishReason | None = None
+                finish_message: str | None = None
+
                 async for chunk in response_stream:
                     _record_usage_metrics(
                         chunk.usage_metadata,
@@ -330,13 +337,61 @@ class GeminiGenerating(GeminiAPI):
                         continue
 
                     chunk_candidate: Candidate = chunk.candidates[0]  # we always request only one
+                    finish_reason = chunk_candidate.finish_reason
+                    finish_message = chunk_candidate.finish_message
+
+                    if chunk_candidate.safety_ratings:
+                        ctx.record(
+                            ObservabilityLevel.INFO,
+                            event="model.safety.results",
+                            attributes={
+                                "results": [
+                                    f"{rating.category} |blocked: {rating.blocked}"
+                                    f" |probability:{rating.probability_score}"
+                                    f" |severity:{rating.severity_score}"
+                                    for rating in chunk_candidate.safety_ratings
+                                    if rating.category
+                                ],
+                            },
+                        )
+
                     if not chunk_candidate.content or not chunk_candidate.content.parts:
                         continue
 
                     for part in chunk_candidate.content.parts:
+                        collected_blocks.extend(_part_as_output_blocks(part))
                         for element in _part_as_stream_elements(part):
                             # element is either a MultimodalContentElement or ModelToolRequest
                             yield element
+
+                if finish_reason == FinishReason.SAFETY:
+                    raise ModelOutputFailed(
+                        provider="gemini",
+                        model=config.model,
+                        reason=f"Safety filtering: {finish_message or ''}",
+                    )
+
+                if finish_reason == FinishReason.MAX_TOKENS:
+                    raise ModelOutputLimit(
+                        provider="gemini",
+                        model=config.model,
+                        max_output_tokens=unwrap_missing(
+                            config.max_output_tokens,
+                            default=0,
+                        ),
+                        content=tuple(collected_blocks),
+                    )
+
+                if finish_reason not in (None, FinishReason.STOP):
+                    raise ModelOutputFailed(
+                        provider="gemini",
+                        model=config.model,
+                        reason=(
+                            f"Completion error: {finish_message}"
+                            if finish_message
+                            else "Completion error"
+                        ),
+                    )
 
             except ResourceExhausted as exc:
                 ctx.record(

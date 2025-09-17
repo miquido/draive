@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.84.7"
+version = "0.85.0"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
@@ -21,7 +21,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 license = { file = "LICENSE" }
-dependencies = ["numpy~=2.2", "haiway~=0.31.4"]
+dependencies = ["numpy~=2.2", "haiway~=0.32.0"]
 
 [project.urls]
 Homepage = "https://miquido.com"
@@ -47,6 +47,7 @@ opentelemetry = [
   "opentelemetry-exporter-otlp-proto-grpc",
 ]
 httpx = ["haiway[httpx]", "httpx"]
+postgres = ["haiway[postgres]", "asyncpg"]
 dev = [
   "bandit~=1.8",
   "pyright~=1.1",
