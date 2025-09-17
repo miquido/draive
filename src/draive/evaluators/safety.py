@@ -89,7 +89,7 @@ async def safety_evaluator(
             evaluated,
             "</CONTENT>",
         ),
-        instruction=INSTRUCTION.format(
+        instructions=INSTRUCTION.format(
             guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
             if guidelines is not None
             else ""

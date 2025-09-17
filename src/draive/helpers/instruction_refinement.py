@@ -497,7 +497,7 @@ For each strategy, provide the name and approach in the following tags format:
 
     response: MultimodalContent = await Stage.completion(
         f"<failure_analysis>\n{failure_report}\n</failure_analysis>",
-        instruction=strategy_prompt,
+        instructions=strategy_prompt,
     ).execute()
 
     # Parse strategies
@@ -555,7 +555,7 @@ Provide ONLY the refined instructions content, without any explanation or metada
     ctx.log_info(f"Generating updated instructions using {strategy_name}:\n\n{strategy_approach}")
     response: MultimodalContent = await Stage.completion(
         f"<failure_analysis>\n{failure_report}\n</failure_analysis>",
-        instruction=refinement_prompt,
+        instructions=refinement_prompt,
     ).execute()
 
     updated_instruction: str = response.to_str().strip()

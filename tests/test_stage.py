@@ -144,7 +144,7 @@ async def test_stage_completion_basic():
         return ModelOutput.of(MultimodalContent.of("Completion response"))
 
     async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
-        stage = Stage.completion("What is AI?", instruction="Explain clearly")
+        stage = Stage.completion("What is AI?", instructions="Explain clearly")
 
         initial_state = StageState.of(context=(), result=MultimodalContent.empty)
 
@@ -205,7 +205,7 @@ async def test_stage_prompting_completion():
 
     async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
         stage = Stage.prompting_completion(
-            get_dynamic_input, instruction="Process the dynamic input"
+            get_dynamic_input, instructions="Process the dynamic input"
         )
 
         initial_state = StageState.of(context=(), result=MultimodalContent.empty)
@@ -224,7 +224,7 @@ async def test_stage_loopback_completion():
         return ModelOutput.of(MultimodalContent.of("Refined response"))
 
     async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
-        stage = Stage.loopback_completion(instruction="Refine the previous response")
+        stage = Stage.loopback_completion(instructions="Refine the previous response")
 
         # Initial state with existing context ending in completion
         initial_context = (
@@ -251,7 +251,7 @@ async def test_stage_loopback_completion_invalid_context():
         return ModelOutput.of(MultimodalContent.of("Default response"))
 
     async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
-        stage = Stage.loopback_completion(instruction="Refine response")
+        stage = Stage.loopback_completion(instructions="Refine response")
 
         # Empty context (valid but no completion to loop back)
         initial_state = StageState.of(context=(), result=MultimodalContent.of("result"))
@@ -270,7 +270,7 @@ async def test_stage_result_completion():
         return ModelOutput.of(MultimodalContent.of("Processed result"))
 
     async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
-        stage = Stage.result_completion(instruction="Process the current result")
+        stage = Stage.result_completion(instructions="Process the current result")
 
         initial_state = StageState.of(
             context=(), result=MultimodalContent.of("Current result content")

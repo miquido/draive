@@ -72,7 +72,7 @@ async def truthfulness_evaluator(
             evaluated,
             "</EVALUATED>",
         ),
-        instruction=INSTRUCTION.format(
+        instructions=INSTRUCTION.format(
             guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
             if guidelines is not None
             else ""
