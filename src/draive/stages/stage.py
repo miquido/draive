@@ -291,7 +291,7 @@ class Stage:
         input: Multimodal,  # noqa: A002
         /,
         *,
-        instruction: ResolveableInstructions = "",
+        instructions: ResolveableInstructions = "",
         tools: Toolbox | Iterable[Tool] = (),
         output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
@@ -311,7 +311,7 @@ class Stage:
         ----------
         input : Multimodal
             Input content to provide to the model.
-        instruction : ResolveableInstructions
+        instructions : ResolveableInstructions
             Instructions or guidance for the model.
         tools : Toolbox | Iterable[Tool]
             Tools that the model can use during completion generation.
@@ -354,7 +354,7 @@ class Stage:
                 ]
                 # Run loop and merge content parts into a single MultimodalContent
                 result: ModelOutput = await GenerativeModel.loop(
-                    instructions=await InstructionsRepository.resolve(instruction),
+                    instructions=await InstructionsRepository.resolve(instructions),
                     toolbox=toolbox,
                     context=context,
                     output=output,
@@ -378,7 +378,7 @@ class Stage:
         input: Callable[[], Coroutine[None, None, Multimodal]],  # noqa: A002
         /,
         *,
-        instruction: ResolveableInstructions = "",
+        instructions: ResolveableInstructions = "",
         tools: Toolbox | Iterable[Tool] = (),
         output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
@@ -399,7 +399,7 @@ class Stage:
         ----------
         input : Callable[[], Coroutine[None, None, Multimodal]]
             Async function returning input content to provide to the model.
-        instruction : ResolveableInstructions
+        instructions : ResolveableInstructions
             Instructions or guidance for the model.
         tools : Toolbox | Iterable[Tool]
             Tools that the model can use during completion generation.
@@ -445,7 +445,7 @@ class Stage:
                 ]
                 ctx.log_debug("...prompting completion input provided")
                 result: ModelOutput = await GenerativeModel.loop(
-                    instructions=await InstructionsRepository.resolve(instruction),
+                    instructions=await InstructionsRepository.resolve(instructions),
                     toolbox=toolbox,
                     context=context,
                     output=output,
@@ -467,7 +467,7 @@ class Stage:
     def loopback_completion(
         cls,
         *,
-        instruction: ResolveableInstructions = "",
+        instructions: ResolveableInstructions = "",
         tools: Toolbox | Iterable[Tool] = (),
         output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
@@ -482,7 +482,7 @@ class Stage:
 
         Parameters
         ----------
-        instruction : ResolveableInstructions
+        instructions : ResolveableInstructions
             Instructions or guidance for the model.
         tools : Toolbox | Iterable[Tool]
             Tools that the model can use during completion generation.
@@ -535,7 +535,7 @@ class Stage:
                     ModelInput.of(last_output.content, meta={"loopback": True}),
                 ]
                 result: ModelOutput = await GenerativeModel.loop(
-                    instructions=await InstructionsRepository.resolve(instruction),
+                    instructions=await InstructionsRepository.resolve(instructions),
                     toolbox=toolbox,
                     context=context,
                     output=output,
@@ -557,7 +557,7 @@ class Stage:
     def result_completion(
         cls,
         *,
-        instruction: ResolveableInstructions = "",
+        instructions: ResolveableInstructions = "",
         tools: Toolbox | Iterable[Tool] = (),
         output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
@@ -571,7 +571,7 @@ class Stage:
 
         Parameters
         ----------
-        instruction : ResolveableInstructions
+        instructions : ResolveableInstructions
             Instructions or guidance for the model.
         tools : Toolbox | Iterable[Tool]
             Tools that the model can use during completion generation.
@@ -604,7 +604,7 @@ class Stage:
                     ModelInput.of(state.result),
                 ]
                 result: ModelOutput = await GenerativeModel.loop(
-                    instructions=await InstructionsRepository.resolve(instruction),
+                    instructions=await InstructionsRepository.resolve(instructions),
                     toolbox=toolbox,
                     context=context,
                     output=output,
