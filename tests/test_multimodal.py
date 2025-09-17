@@ -206,17 +206,16 @@ def test_split_by_meta_multiple_groups():
     assert result[2].parts == (text_important2,)
 
 
-def test_split_by_meta_handles_none_values():
+def test_split_by_meta_skips_missing_values():
     text_with_meta = input_text.updated(meta={"category": "important"})
     text_without_meta = input_text  # no meta
-    text_with_different_meta = input_text.updated(meta={"other": "value"})  # no "category" key
+    text_with_missing_meta = input_text.updated(meta={"other": "value"})  # no "category" key
 
-    content = MultimodalContent.of(text_with_meta, text_without_meta, text_with_different_meta)
+    content = MultimodalContent.of(text_with_meta, text_without_meta, text_with_missing_meta)
     result = content.split_by_meta(key="category")
 
-    assert len(result) == 2
+    assert len(result) == 1
     assert result[0].parts == (text_with_meta,)
-    assert result[1].parts == (text_without_meta, text_with_different_meta)
 
 
 def test_split_by_meta_includes_datamodel_artifacts():
@@ -224,7 +223,7 @@ def test_split_by_meta_includes_datamodel_artifacts():
         value: str
 
     text_with_meta = input_text.updated(meta={"category": "important"})
-    artifact = ArtifactContent.of(TestArtifact(value="test"))
+    artifact = ArtifactContent.of(TestArtifact(value="test"), meta={"category": "artifact"})
     text_with_same_meta = input_text.updated(meta={"category": "important"})
 
     content = MultimodalContent.of(text_with_meta, artifact, text_with_same_meta)
