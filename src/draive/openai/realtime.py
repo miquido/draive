@@ -780,6 +780,7 @@ def _prepare_session_config(
 
     return without_missing(
         {
+            "type": "realtime",
             "instructions": instructions if instructions is not None else MISSING,
             "modalities": modalities,
             "input_audio_format": config.input_audio_format,
