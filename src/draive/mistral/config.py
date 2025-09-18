@@ -1,10 +1,11 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from haiway import MISSING, Configuration, Missing
 
 __all__ = (
     "MistralChatConfig",
     "MistralEmbeddingConfig",
+    "MistralModerationConfig",
 )
 
 
@@ -20,3 +21,8 @@ class MistralChatConfig(Configuration):
 class MistralEmbeddingConfig(Configuration):
     model: str
     batch_size: int = 128
+
+
+class MistralModerationConfig(Configuration):
+    model: str = "mistral-moderation-latest"
+    category_thresholds: Mapping[str, float] | Missing = MISSING

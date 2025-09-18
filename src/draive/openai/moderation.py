@@ -13,10 +13,13 @@ __all__ = ("OpenAIContentModeration",)
 
 
 class OpenAIContentModeration(OpenAIAPI):
-    def content_guardrails(self) -> GuardrailsModeration:
-        return GuardrailsModeration(input_checking=self.content_verification)
+    def moderation_guardrails(self) -> GuardrailsModeration:
+        return GuardrailsModeration(
+            input_checking=self.content_moderation,
+            output_checking=self.content_moderation,
+        )
 
-    async def content_verification(  # noqa: C901, PLR0912, PLR0915
+    async def content_moderation(  # noqa: C901, PLR0912, PLR0915
         self,
         content: Multimodal,
         /,
@@ -25,7 +28,7 @@ class OpenAIContentModeration(OpenAIAPI):
         **extra: Any,
     ) -> None:
         moderation_config: OpenAIModerationConfig = config or ctx.state(OpenAIModerationConfig)
-        async with ctx.scope("openai_moderation"):
+        async with ctx.scope("moderation"):
             ctx.record(
                 ObservabilityLevel.INFO,
                 attributes={
@@ -85,6 +88,9 @@ class OpenAIContentModeration(OpenAIAPI):
                             )
 
                     case ArtifactContent() as artifact:
+                        if artifact.hidden:
+                            continue  # skip hidden
+
                         moderated_content.append(
                             {
                                 "type": "text",
@@ -109,135 +115,143 @@ class OpenAIContentModeration(OpenAIAPI):
                 input=moderated_content,
             )
 
-            violations: set[str] = set()
+            violations: dict[str, float] = {}
             for result in response.results:
                 if (
                     not_missing(moderation_config.harassment_threshold)
                     and result.category_scores.harassment >= moderation_config.harassment_threshold
                 ):
-                    violations.add("harassment")
+                    violations["harassment"] = result.category_scores.harassment
 
                 elif result.categories.harassment:
-                    violations.add("harassment")
+                    violations["harassment"] = result.category_scores.harassment
 
                 if (
                     not_missing(moderation_config.harassment_threatening_threshold)
                     and result.category_scores.harassment_threatening
                     >= moderation_config.harassment_threatening_threshold
                 ):
-                    violations.add("harassment_threatening")
+                    violations["harassment_threatening"] = (
+                        result.category_scores.harassment_threatening
+                    )
 
                 elif result.categories.harassment_threatening:
-                    violations.add("harassment_threatening")
+                    violations["harassment_threatening"] = (
+                        result.category_scores.harassment_threatening
+                    )
 
                 if (
                     not_missing(moderation_config.hate_threshold)
                     and result.category_scores.hate >= moderation_config.hate_threshold
                 ):
-                    violations.add("hate")
+                    violations["hate"] = result.category_scores.hate
 
                 elif result.categories.hate:
-                    violations.add("hate")
+                    violations["hate"] = result.category_scores.hate
 
                 if (
                     not_missing(moderation_config.hate_threatening_threshold)
                     and result.category_scores.hate_threatening
                     >= moderation_config.hate_threatening_threshold
                 ):
-                    violations.add("hate_threatening")
+                    violations["hate_threatening"] = result.category_scores.hate_threatening
 
                 elif result.categories.hate_threatening:
-                    violations.add("hate_threatening")
+                    violations["hate_threatening"] = result.category_scores.hate_threatening
 
                 if (
                     not_missing(moderation_config.self_harm_threshold)
                     and result.category_scores.self_harm >= moderation_config.self_harm_threshold
                 ):
-                    violations.add("self_harm")
+                    violations["self_harm"] = result.category_scores.self_harm
 
                 elif result.categories.self_harm:
-                    violations.add("self_harm")
+                    violations["self_harm"] = result.category_scores.self_harm
 
                 if (
                     not_missing(moderation_config.self_harm_instructions_threshold)
                     and result.category_scores.self_harm_instructions
                     >= moderation_config.self_harm_instructions_threshold
                 ):
-                    violations.add("self_harm_instructions")
+                    violations["self_harm_instructions"] = (
+                        result.category_scores.self_harm_instructions
+                    )
 
                 elif result.categories.self_harm_instructions:
-                    violations.add("self_harm_instructions")
+                    violations["self_harm_instructions"] = (
+                        result.category_scores.self_harm_instructions
+                    )
 
                 if (
                     not_missing(moderation_config.self_harm_intent_threshold)
                     and result.category_scores.self_harm_intent
                     >= moderation_config.self_harm_intent_threshold
                 ):
-                    violations.add("self_harm_intent")
+                    violations["self_harm_intent"] = result.category_scores.self_harm_intent
 
                 elif result.categories.self_harm_intent:
-                    violations.add("self_harm_intent")
+                    violations["self_harm_intent"] = result.category_scores.self_harm_intent
 
                 if (
                     not_missing(moderation_config.sexual_threshold)
                     and result.category_scores.sexual >= moderation_config.sexual_threshold
                 ):
-                    violations.add("sexual")
+                    violations["sexual"] = result.category_scores.sexual
 
                 elif result.categories.sexual:
-                    violations.add("sexual")
+                    violations["sexual"] = result.category_scores.sexual
 
                 if (
                     not_missing(moderation_config.sexual_minors_threshold)
                     and result.category_scores.sexual_minors
                     >= moderation_config.sexual_minors_threshold
                 ):
-                    violations.add("sexual_minors")
+                    violations["sexual_minors"] = result.category_scores.sexual_minors
 
                 elif result.categories.sexual_minors:
-                    violations.add("sexual_minors")
+                    violations["sexual_minors"] = result.category_scores.sexual_minors
 
                 if (
                     not_missing(moderation_config.violence_threshold)
                     and result.category_scores.violence >= moderation_config.violence_threshold
                 ):
-                    violations.add("violence")
+                    violations["violence"] = result.category_scores.violence
 
                 elif result.categories.violence:
-                    violations.add("violence")
+                    violations["violence"] = result.category_scores.violence
 
                 if (
                     not_missing(moderation_config.violence_graphic_threshold)
                     and result.category_scores.violence_graphic
                     >= moderation_config.violence_graphic_threshold
                 ):
-                    violations.add("violence_graphic")
+                    violations["violence_graphic"] = result.category_scores.violence_graphic
 
                 elif result.categories.violence_graphic:
-                    violations.add("violence_graphic")
+                    violations["violence_graphic"] = result.category_scores.violence_graphic
 
                 if (
                     not_missing(moderation_config.illicit_threshold)
                     and result.category_scores.illicit >= moderation_config.illicit_threshold
                 ):
-                    violations.add("illicit")
+                    violations["illicit"] = result.category_scores.illicit
 
                 elif result.categories.illicit:
-                    violations.add("illicit")
+                    violations["illicit"] = result.category_scores.illicit
 
                 if (
                     not_missing(moderation_config.illicit_violent_threshold)
                     and result.category_scores.illicit_violent
                     >= moderation_config.illicit_violent_threshold
                 ):
-                    violations.add("illicit_violent")
+                    violations["illicit_violent"] = result.category_scores.illicit_violent
 
                 elif result.categories.illicit_violent:
-                    violations.add("illicit_violent")
+                    violations["illicit_violent"] = result.category_scores.illicit_violent
 
             if violations:
                 raise GuardrailsModerationException(
                     f"Content violated rule(s): {violations}",
-                    violations=tuple(violations),
+                    violations=violations,
                     content=content,
                 )

@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping
 from typing import Any, Protocol, runtime_checkable
 
 from haiway import Meta, MetaValues
@@ -17,13 +17,13 @@ class GuardrailsModerationException(Exception):
     def __init__(
         self,
         *args: object,
-        violations: Sequence[str],
+        violations: Mapping[str, float],
         content: MultimodalContent,
         replacement: MultimodalContent | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> None:
         super().__init__(*args)
-        self.violations: Sequence[str] = violations
+        self.violations: Mapping[str, float] = violations
         self.content: MultimodalContent = content
         self.replacement: MultimodalContent | None = replacement
         self.meta: Meta = Meta.of(meta)
@@ -33,7 +33,7 @@ class GuardrailsInputModerationException(GuardrailsModerationException):
     def __init__(
         self,
         *args: object,
-        violations: Sequence[str],
+        violations: Mapping[str, float],
         content: MultimodalContent,
         replacement: MultimodalContent | None = None,
         meta: Meta | MetaValues | None = None,
@@ -51,7 +51,7 @@ class GuardrailsOutputModerationException(GuardrailsModerationException):
     def __init__(
         self,
         *args: object,
-        violations: Sequence[str],
+        violations: Mapping[str, float],
         content: MultimodalContent,
         replacement: MultimodalContent | None = None,
         meta: Meta | MetaValues | None = None,
