@@ -1,6 +1,8 @@
 from typing import Literal, TypedDict
 
 from haiway import MISSING, Configuration, Missing
+from openai.types.realtime.realtime_audio_config_input_param import RealtimeAudioConfigInputParam
+from openai.types.realtime.realtime_audio_config_output_param import RealtimeAudioConfigOutputParam
 
 __all__ = (
     "OpenAIEmbeddingConfig",
@@ -37,19 +39,10 @@ class ServerVADParameters(TypedDict):
     prefix_padding_ms: int
 
 
-class SemanticVADParameters(TypedDict):
-    vad_type: Literal["semantic_vad"]
-    vad_eagerness: Literal["low", "medium", "high", "auto"]
-
-
 class OpenAIRealtimeConfig(Configuration):
     model: Literal["gpt-realtime"] | str = "gpt-realtime"
-    input_audio_format: Literal["pcm16", "g711_ulaw", "g711_alaw"] = "pcm16"
-    output_audio_format: Literal["pcm16", "g711_ulaw", "g711_alaw"] = "pcm16"
-    input_audio_noise_reduction: Literal["near_field", "far_field"] | Missing = MISSING
-    voice: str | Missing = MISSING
-    vad: ServerVADParameters | SemanticVADParameters | Missing = MISSING
-    transcribe_model: str | Missing = MISSING
+    input_parameters: RealtimeAudioConfigInputParam
+    output_parameters: RealtimeAudioConfigOutputParam
 
 
 class OpenAIEmbeddingConfig(Configuration):
