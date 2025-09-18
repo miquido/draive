@@ -30,11 +30,13 @@ class VLLM(
         base_url: str | None = None,
         default_headers: Mapping[str, str] | None = None,
         features: Collection[type[State]] | None = None,
+        timeout: float | None = None,
         **extra: Any,
     ) -> None:
         super().__init__(
             base_url=base_url,
             default_headers=default_headers,
+            timeout=timeout,
             **extra,
         )
         self._features: frozenset[type[State]] = (

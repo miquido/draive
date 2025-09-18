@@ -1,6 +1,6 @@
 from collections.abc import Collection, Iterable
 from types import TracebackType
-from typing import final
+from typing import Any, final
 
 from haiway import State
 
@@ -41,7 +41,9 @@ class OpenAI(
         azure_api_endpoint: str | None = None,
         azure_api_version: str | None = None,
         azure_deployment: str | None = None,
+        timeout: float | None = None,
         features: Collection[type[State]] | None = None,
+        **extra: Any,
     ) -> None:
         super().__init__(
             base_url=base_url,
@@ -50,6 +52,8 @@ class OpenAI(
             azure_api_endpoint=azure_api_endpoint,
             azure_api_version=azure_api_version,
             azure_deployment=azure_deployment,
+            timeout=timeout,
+            **extra,
         )
 
         self._features: frozenset[type[State]] = (

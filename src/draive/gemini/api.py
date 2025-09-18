@@ -13,11 +13,13 @@ class GeminiAPI:
     def __init__(
         self,
         api_key: str | None,
+        vertexai: bool,
         http_options: HttpOptionsDict | None,
         **extra: Any,
     ) -> None:
         self._client = Client(
             api_key=api_key or getenv_str("GEMINI_API_KEY"),
+            vertexai=vertexai,
             http_options=http_options,
             **extra,
         )

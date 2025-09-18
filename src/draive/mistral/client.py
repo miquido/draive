@@ -1,6 +1,6 @@
 from collections.abc import Collection, Iterable
 from types import TracebackType
-from typing import final
+from typing import Any, final
 
 from haiway import State
 
@@ -29,11 +29,15 @@ class Mistral(
         self,
         server_url: str | None = None,
         api_key: str | None = None,
+        timeout: float | None = None,
         features: Collection[type[GenerativeModel | TextEmbedding]] | None = None,
+        **extra: Any,
     ) -> None:
         super().__init__(
             server_url=server_url,
             api_key=api_key,
+            timeout=timeout,
+            **extra,
         )
 
         self._features: frozenset[type[State]] = (
