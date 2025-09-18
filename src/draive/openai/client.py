@@ -10,8 +10,8 @@ from draive.guardrails import GuardrailsModeration
 from draive.models import GenerativeModel, RealtimeGenerativeModel
 from draive.openai.api import OpenAIAPI
 from draive.openai.embedding import OpenAIEmbedding
-from draive.openai.guardrails import OpenAIContentModeration
 from draive.openai.images import OpenAIImageGeneration
+from draive.openai.moderation import OpenAIContentModeration
 from draive.openai.realtime import OpenAIRealtime
 from draive.openai.responses import OpenAIResponses
 
@@ -86,7 +86,7 @@ class OpenAI(
             state.append(self.image_generation())
 
         if GuardrailsModeration in self._features:
-            state.append(self.content_guardrails())
+            state.append(self.moderation_guardrails())
 
         return state
 

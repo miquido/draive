@@ -59,12 +59,12 @@ class BedrockGuardrails(BedrockAPI):
         if response.get("action") == "GUARDRAIL_INTERVENED":
             raise GuardrailsModerationException(
                 f"Content violated guardrails ({config.guardrail_identifier}) rules",
-                violations=tuple(
-                    filter["type"]
+                violations={
+                    filter["type"]: 1.0  # bedrock do not provide scores in response
                     for assessment in response.get("assessments", ())
                     for filter in assessment.get("contentPolicy", {}).get("filters", ())  # noqa: A001
                     if "type" in filter and filter.get("detected", False)
-                ),
+                },
                 content=content,
             )
 
@@ -118,7 +118,8 @@ class BedrockGuardrails(BedrockAPI):
         if response.get("action") == "GUARDRAIL_INTERVENED":
             raise GuardrailsModerationException(
                 f"Violated guardrails rules: {response.get('actionReason')}",
-                violations=(config.guardrail_identifier,),
+                # bedrock do not provide scores in response
+                violations={config.guardrail_identifier: 1.0},
                 content=content,
             )
 

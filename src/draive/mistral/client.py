@@ -5,9 +5,11 @@ from typing import Any, final
 from haiway import State
 
 from draive.embedding import TextEmbedding
+from draive.guardrails import GuardrailsModeration
 from draive.mistral.api import MistralAPI
 from draive.mistral.completions import MistralCompletions
 from draive.mistral.embedding import MistralEmbedding
+from draive.mistral.moderation import MistralContentModeration
 from draive.models import GenerativeModel
 
 __all__ = ("Mistral",)
@@ -17,6 +19,7 @@ __all__ = ("Mistral",)
 class Mistral(
     MistralCompletions,
     MistralEmbedding,
+    MistralContentModeration,
     MistralAPI,
 ):
     """
@@ -30,7 +33,8 @@ class Mistral(
         server_url: str | None = None,
         api_key: str | None = None,
         timeout: float | None = None,
-        features: Collection[type[GenerativeModel | TextEmbedding]] | None = None,
+        features: Collection[type[GenerativeModel | TextEmbedding | GuardrailsModeration]]
+        | None = None,
         **extra: Any,
     ) -> None:
         super().__init__(
@@ -43,7 +47,7 @@ class Mistral(
         self._features: frozenset[type[State]] = (
             frozenset(features)
             if features is not None
-            else frozenset((GenerativeModel, TextEmbedding))
+            else frozenset((GenerativeModel, TextEmbedding, GuardrailsModeration))
         )
 
     async def __aenter__(self) -> Iterable[State]:
@@ -55,6 +59,9 @@ class Mistral(
 
         if TextEmbedding in self._features:
             state.append(self.text_embedding())
+
+        if GuardrailsModeration in self._features:
+            state.append(self.content_guardrails())
 
         return state
 
