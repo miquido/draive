@@ -87,8 +87,21 @@ class OpenAIRealtime(OpenAIAPI):
                 "max_size": None,  # explicitly define no size limit
             },
         )
-        # prepare output audio format
-        output_audio_type: str = f"audio/{config.output_audio_format}"
+        input_audio_format: str
+        match config.input_parameters:
+            case {"format": {"type": str() as audio_input}}:
+                input_audio_format = audio_input
+
+            case _:
+                input_audio_format = "audio/pcm"
+
+        output_audio_format: str
+        match config.output_parameters:
+            case {"format": {"type": str() as audio_input}}:
+                output_audio_format = audio_input
+
+            case _:
+                output_audio_format = "audio/pcm"
 
         async def open_session() -> ModelSession:  # noqa: C901, PLR0915
             # enter scope
@@ -97,10 +110,6 @@ class OpenAIRealtime(OpenAIAPI):
                 attributes={
                     "model.provider": "openai",
                     "model.name": config.model,
-                    "model.transcribe_model": config.transcribe_model,
-                    "model.input_audio_noise_reduction": config.input_audio_noise_reduction,
-                    "model.vad": str(config.vad),
-                    "model.voice": config.voice,
                     "model.tools": [tool.name for tool in tools.specifications],
                     "model.tool_selection": f"{tools.selection}",
                     "model.output": f"{output}",
@@ -139,9 +148,6 @@ class OpenAIRealtime(OpenAIAPI):
                     connection=connection,
                 )
 
-            input_audio_format: str = f"audio/{config.input_audio_format}"
-            output_audio_format: str = f"audio/{config.output_audio_format}"
-
             async def read() -> ModelSessionOutput:  # noqa: C901, PLR0911, PLR0912, PLR0915
                 nonlocal current_items
                 while True:
@@ -152,7 +158,7 @@ class OpenAIRealtime(OpenAIAPI):
                             return ModelOutputChunk.of(
                                 ResourceContent.of(
                                     b64decode(event.delta),
-                                    mime_type=output_audio_type,
+                                    mime_type=output_audio_format,
                                 ),
                                 meta={
                                     "message_identifier": message_identifier(event.item_id),
@@ -324,9 +330,6 @@ class OpenAIRealtime(OpenAIAPI):
                                         "created": datetime.now(UTC).isoformat(),
                                     }
                                 )
-
-                                if config.transcribe_model:
-                                    continue  # wait for transcript to complete first
 
                             elif event.item.role == "assistant":
                                 current_items[event.item.id] = Meta.of(
@@ -607,16 +610,20 @@ def _user_content_parts(  # noqa: C901, PLR0912
                     # convert stored base64 (possibly urlsafe) to standard base64 string
                     try:
                         raw = urlsafe_b64decode(media.data)
+
                     except Exception:
                         raw = b64decode(media.data)
+
                     yield {
                         "type": "input_audio",
                         "audio": b64encode(raw).decode(),
                     }
                 elif media.mime_type.startswith("image"):
                     ctx.log_error("OpenAI realtime input (image) not supported! Skipping...")
+
                 elif media.mime_type.startswith("video"):
                     ctx.log_error("OpenAI realtime input (video) not supported! Skipping...")
+
                 else:
                     # unsupported media type
                     ctx.log_error(
@@ -781,44 +788,15 @@ def _prepare_session_config(
     return without_missing(
         {
             "type": "realtime",
+            "model": config.model,
             "instructions": instructions if instructions is not None else MISSING,
-            "modalities": modalities,
-            "input_audio_format": config.input_audio_format,
-            "output_audio_format": config.output_audio_format,
-            "turn_detection": (
-                without_missing(
-                    {
-                        "create_response": True,
-                        "interrupt_response": True,
-                        "type": config.vad.get("vad_type"),
-                        "eagerness": config.vad.get("vad_eagerness", MISSING),
-                    }
-                    if config.vad.get("vad_type") == "semantic_vad"
-                    else {
-                        "create_response": True,
-                        "interrupt_response": True,
-                        "type": config.vad.get("vad_type"),
-                        "threshold": config.vad.get("threshold", MISSING),
-                        "silence_duration_ms": config.vad.get("silence_duration_ms", MISSING),
-                        "prefix_padding_ms": config.vad.get("prefix_padding_ms", MISSING),
-                    }
-                )
-                if config.vad is not MISSING
-                else MISSING
-            ),
-            "voice": config.voice,
+            "audio": {
+                "input": config.input_parameters,
+                "output": config.output_parameters,
+            },
+            "output_modalities": modalities,
             "tools": session_tools,
             "tool_choice": tool_choice if session_tools is not MISSING else MISSING,
-            "input_audio_noise_reduction": {
-                "type": config.input_audio_noise_reduction,
-            }
-            if config.input_audio_noise_reduction is not MISSING
-            else MISSING,
-            "input_audio_transcription": {
-                "model": config.transcribe_model,
-            }
-            if config.transcribe_model is not MISSING
-            else MISSING,
         },
         typed=RealtimeSessionCreateRequestParam,
     )
