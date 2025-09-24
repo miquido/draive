@@ -5,7 +5,7 @@ from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
 from haiway import MISSING, Meta, Missing, ObservabilityLevel, as_dict, ctx, unwrap_missing
-from openai import NOT_GIVEN, NotGiven
+from openai import Omit, omit
 from openai import RateLimitError as OpenAIRateLimitError
 from openai.types.responses import (
     Response,
@@ -217,9 +217,9 @@ class OpenAIResponses(OpenAIAPI):
             try:
                 response: Response = await self._client.responses.create(
                     model=config.model,
-                    instructions=instructions or NOT_GIVEN,
+                    instructions=instructions or omit,
                     input=input_context,
-                    temperature=unwrap_missing(config.temperature, default=NOT_GIVEN),
+                    temperature=unwrap_missing(config.temperature, default=omit),
                     tool_choice=_tool_choice(tools),
                     tools=_tools_as_tool_params(tools.specifications),
                     text=_text_output(output, verbosity=config.verbosity),
@@ -229,18 +229,18 @@ class OpenAIResponses(OpenAIAPI):
                             summary=config.reasoning_summary,
                         )
                         if isinstance(config.reasoning, str)
-                        else NOT_GIVEN
+                        else omit
                     ),
                     parallel_tool_calls=config.parallel_tool_calls,
                     max_output_tokens=config.max_output_tokens,
                     service_tier=config.service_tier,
                     truncation=config.truncation,
-                    safety_identifier=config.safety_identifier or NOT_GIVEN,
-                    prompt_cache_key=cache_key or NOT_GIVEN,
+                    safety_identifier=config.safety_identifier or omit,
+                    prompt_cache_key=cache_key or omit,
                     include=["reasoning.encrypted_content"]
                     # for gpt-5 model family we need to request encrypted reasoning
                     if "gpt-5" in config.model.lower()
-                    else NOT_GIVEN,
+                    else omit,
                     store=False,
                     stream=False,
                 )
@@ -463,9 +463,9 @@ class OpenAIResponses(OpenAIAPI):
             try:
                 async with self._client.responses.stream(
                     model=config.model,
-                    instructions=instructions or NOT_GIVEN,
+                    instructions=instructions or omit,
                     input=input_context,
-                    temperature=unwrap_missing(config.temperature, default=NOT_GIVEN),
+                    temperature=unwrap_missing(config.temperature, default=omit),
                     tool_choice=_tool_choice(tools),
                     tools=_tools_as_tool_params(tools.specifications),
                     text=_text_output(output, verbosity=config.verbosity),
@@ -475,18 +475,18 @@ class OpenAIResponses(OpenAIAPI):
                             summary=config.reasoning_summary,
                         )
                         if isinstance(config.reasoning, str)
-                        else NOT_GIVEN
+                        else omit
                     ),
                     parallel_tool_calls=config.parallel_tool_calls,
                     max_output_tokens=config.max_output_tokens,
                     service_tier=config.service_tier,
                     truncation=config.truncation,
-                    safety_identifier=config.safety_identifier or NOT_GIVEN,
-                    prompt_cache_key=cache_key or NOT_GIVEN,
+                    safety_identifier=config.safety_identifier or omit,
+                    prompt_cache_key=cache_key or omit,
                     include=["reasoning.encrypted_content"]
                     # for gpt-5 model family we need to request encrypted reasoning
                     if "gpt-5" in config.model.lower()
-                    else NOT_GIVEN,
+                    else omit,
                     store=False,
                 ) as stream:
                     async for event in stream:
@@ -660,9 +660,9 @@ def _text_output(  # noqa: PLR0911
     /,
     *,
     verbosity: Literal["low", "medium", "high"] | Missing = MISSING,
-) -> ResponseTextConfigParam | NotGiven:
+) -> ResponseTextConfigParam | Omit:
     if output == "auto":
-        return NOT_GIVEN
+        return omit
 
     if output == "text":
         if verbosity is MISSING:
@@ -713,7 +713,7 @@ def _text_output(  # noqa: PLR0911
             "verbosity": cast(Literal["low", "medium", "high"], verbosity),
         }
 
-    return NOT_GIVEN
+    return omit
 
 
 def _tool_choice(

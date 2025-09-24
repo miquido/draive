@@ -5,8 +5,6 @@ from draive.parameters.specification import (
     ParameterSpecification,
     ParametersSpecification,
     ToolParametersSpecification,
-    validated_specification,
-    validated_tool_specification,
 )
 from draive.parameters.validation import ParameterValidator, ParameterVerification
 
@@ -21,6 +19,4 @@ __all__ = (
     "ParametersSpecification",
     "ParametrizedFunction",
     "ToolParametersSpecification",
-    "validated_specification",
-    "validated_tool_specification",
 )

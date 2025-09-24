@@ -518,6 +518,7 @@ async def test_generative_model_stream_multi_modal_selection() -> None:
         **_: Any,
     ) -> AsyncGenerator[Any, None] | Any:
         if stream:
+
             async def iterator() -> AsyncGenerator[Any, None]:
                 yield text_part
                 yield image_part
@@ -539,9 +540,7 @@ async def test_generative_model_stream_multi_modal_selection() -> None:
             stream=True,
         )
 
-        parts: list[Any] = [
-            chunk async for chunk in stream
-        ]
+        parts: list[Any] = [chunk async for chunk in stream]
 
     assert len(parts) == 2
     assert isinstance(parts[0], TextContent)

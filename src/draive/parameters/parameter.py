@@ -1,9 +1,7 @@
 from collections.abc import Mapping, MutableMapping
 from typing import Any, Self, cast, final
 
-from haiway import MISSING, DefaultValue, Missing, ValidationContext
-from haiway.state import AttributeAnnotation
-from haiway.state.validation import Validator
+from haiway import MISSING, AttributeAnnotation, DefaultValue, Missing, ValidationContext, Validator
 
 from draive.parameters.specification import ParameterSpecification, parameter_specification
 from draive.parameters.types import ParameterConversion, ParameterVerification
@@ -43,7 +41,6 @@ class Parameter[Type]:
                 verifier=None
                 if verifier is MISSING
                 else cast(ParameterVerification[Type], verifier),
-                recursion_guard={},  # TODO: add enclosing type Self?
             )
             if validator is MISSING
             else cast(Validator[Type], validator),
@@ -127,7 +124,7 @@ class Parameter[Type]:
         else:
             return MISSING
 
-    def validated(
+    def validate(
         self,
         value: Any,
         /,

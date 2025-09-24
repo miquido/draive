@@ -1,7 +1,17 @@
 from collections.abc import Mapping, Sequence
-from types import EllipsisType, NoneType, UnionType
+from types import UnionType
 
-from haiway.state import AttributeAnnotation
+from haiway.attributes.annotations import (
+    BoolAttribute,
+    FloatAttribute,
+    IntegerAttribute,
+    MappingAttribute,
+    NoneAttribute,
+    SequenceAttribute,
+    StringAttribute,
+    TupleAttribute,
+    UnionAttribute,
+)
 
 from draive import DataModel
 from draive.parameters import ParametersSpecification
@@ -10,90 +20,81 @@ from draive.parameters.specification import parameter_specification
 
 def test_specifications() -> None:
     assert parameter_specification(
-        AttributeAnnotation(origin=str),
+        StringAttribute(),
         description=None,
     ) == {
         "type": "string",
     }
     assert parameter_specification(
-        AttributeAnnotation(origin=int),
+        IntegerAttribute(),
         description=None,
     ) == {
         "type": "integer",
     }
     assert parameter_specification(
-        AttributeAnnotation(origin=float),
+        FloatAttribute(),
         description=None,
     ) == {
         "type": "number",
     }
     assert parameter_specification(
-        AttributeAnnotation(origin=bool),
+        BoolAttribute(),
         description=None,
     ) == {
         "type": "boolean",
     }
     assert parameter_specification(
-        AttributeAnnotation(origin=NoneType),
+        NoneAttribute(),
         description=None,
     ) == {
         "type": "null",
     }
     assert parameter_specification(
-        AttributeAnnotation(
-            origin=Sequence,
-            arguments=[
-                AttributeAnnotation(origin=str),
-            ],
+        SequenceAttribute(
+            base=Sequence,
+            values=StringAttribute(),
         ),
         description=None,
     ) == {"type": "array", "items": {"type": "string"}}
     assert parameter_specification(
-        AttributeAnnotation(
-            origin=tuple,
-            arguments=[
-                AttributeAnnotation(origin=str),
-                AttributeAnnotation(origin=EllipsisType),
-            ],
+        SequenceAttribute(
+            base=tuple,
+            values=StringAttribute(),
         ),
         description=None,
     ) == {"type": "array", "items": {"type": "string"}}
     assert parameter_specification(
-        AttributeAnnotation(
-            origin=tuple,
-            arguments=[
-                AttributeAnnotation(origin=str),
-                AttributeAnnotation(origin=str),
-            ],
+        TupleAttribute(
+            base=tuple,
+            values=(
+                StringAttribute(),
+                StringAttribute(),
+            ),
         ),
         description=None,
     ) == {"type": "array", "prefixItems": [{"type": "string"}, {"type": "string"}]}
     assert parameter_specification(
-        AttributeAnnotation(
-            origin=Sequence,
-            arguments=[
-                AttributeAnnotation(origin=str),
-            ],
+        SequenceAttribute(
+            base=Sequence,
+            values=StringAttribute(),
         ),
         description=None,
     ) == {"type": "array", "items": {"type": "string"}}
     assert parameter_specification(
-        AttributeAnnotation(
-            origin=Mapping,
-            arguments=[
-                AttributeAnnotation(origin=str),
-                AttributeAnnotation(origin=str),
-            ],
+        MappingAttribute(
+            base=Mapping,
+            keys=StringAttribute(),
+            values=StringAttribute(),
         ),
         description=None,
     ) == {"type": "object", "additionalProperties": {"type": "string"}}
     assert parameter_specification(
-        AttributeAnnotation(
-            origin=UnionType,
-            arguments=[
-                AttributeAnnotation(origin=str),
-                AttributeAnnotation(origin=int),
-            ],
+        UnionAttribute(
+            base=UnionType,
+            alternatives=(
+                StringAttribute(),
+                IntegerAttribute(),
+            ),
         ),
         description=None,
     ) == {"type": ["string", "integer"]}
