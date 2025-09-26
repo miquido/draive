@@ -1,11 +1,13 @@
+import json
 import re
 from collections.abc import Callable, Coroutine, Mapping, Sequence, Set
 from typing import Any, Protocol, final
 from urllib.parse import ParseResult, parse_qs, quote, urlencode, urlparse
 
-from haiway import Meta, MetaValues
+from haiway import MISSING, Meta, MetaValues
 
 from draive.parameters import Parameter, ParametrizedFunction
+from draive.parameters.specification import ParameterSpecification
 from draive.resources.types import (
     MimeType,
     Resource,
@@ -346,6 +348,166 @@ class ResourceTemplate[**Args](
 
         return params
 
+    def _coerce_uri_arguments(
+        self,
+        uri_params: Mapping[str, str],
+    ) -> dict[str, Any]:
+        coerced: dict[str, Any] = dict(uri_params)
+        for parameter in self._parameters.values():
+            raw_value: Any = parameter.find(uri_params)
+            if raw_value is MISSING:
+                continue
+
+            converted: Any = self._coerce_parameter_value(parameter, raw_value)
+            coerced[parameter.name] = converted
+            if parameter.alias:
+                coerced[parameter.alias] = converted
+
+        return coerced
+
+    def _coerce_parameter_value(
+        self,
+        parameter: Parameter[Any],
+        value: Any,
+    ) -> Any:
+        if not isinstance(value, str):
+            return value
+
+        converted, _ = self._coerce_from_specification(parameter.specification, value)
+        return converted
+
+    def _coerce_from_specification(  # noqa: C901, PLR0911, PLR0912
+        self,
+        specification: ParameterSpecification,
+        value: str,
+    ) -> tuple[Any, bool]:
+        if isinstance(specification, Mapping) and "oneOf" in specification:
+            for option in specification["oneOf"]:
+                converted, changed = self._coerce_from_specification(option, value)
+                if changed:
+                    return converted, True
+
+            return value, False
+
+        if isinstance(specification, Mapping):
+            type_name: Any | None = specification.get("type")
+            if type_name == "integer":
+                try:
+                    return int(value), True
+                except ValueError:
+                    return value, False
+
+            if type_name == "number":
+                try:
+                    return float(value), True
+                except ValueError:
+                    return value, False
+
+            if type_name == "boolean":
+                parsed_bool = self._parse_boolean(value)
+                if parsed_bool is not None:
+                    return parsed_bool, True
+
+                return value, False
+
+            if type_name == "array":
+                parsed_array = self._parse_json_sequence(value)
+                if parsed_array is not None:
+                    return parsed_array, True
+
+                return value, False
+
+            if type_name == "object":
+                parsed_object = self._parse_json_mapping(value)
+                if parsed_object is not None:
+                    return parsed_object, True
+
+                return value, False
+
+            if type_name == "null":
+                normalised = value.strip().lower()
+                if normalised in {"null", "none"}:
+                    return None, True
+
+                return value, False
+
+            if "enum" in specification:
+                converted_enum, enum_changed = self._match_enum(specification["enum"], value)
+                if enum_changed:
+                    return converted_enum, True
+
+        return value, False
+
+    def _parse_boolean(self, raw: str) -> bool | None:
+        normalised = raw.strip().lower()
+        if normalised in {"true", "1", "yes", "y", "on"}:
+            return True
+
+        if normalised in {"false", "0", "no", "n", "off"}:
+            return False
+
+        return None
+
+    def _parse_json_sequence(self, raw: str) -> Sequence[Any] | None:
+        try:
+            parsed = json.loads(raw)
+        except ValueError:
+            return None
+
+        if isinstance(parsed, Sequence) and not isinstance(parsed, (str, bytes)):
+            return parsed
+
+        return None
+
+    def _parse_json_mapping(self, raw: str) -> Mapping[str, Any] | None:
+        try:
+            parsed = json.loads(raw)
+        except ValueError:
+            return None
+
+        if isinstance(parsed, Mapping):
+            return parsed
+
+        return None
+
+    def _match_enum(  # noqa: C901, PLR0911, PLR0912
+        self,
+        enum_values: Sequence[Any],
+        value: str,
+    ) -> tuple[Any, bool]:
+        for enum_value in enum_values:
+            if isinstance(enum_value, str) and value == enum_value:
+                return enum_value, True
+
+            if isinstance(enum_value, bool):
+                parsed_bool = self._parse_boolean(value)
+                if parsed_bool is not None and parsed_bool is enum_value:
+                    return enum_value, True
+
+            if isinstance(enum_value, int):
+                try:
+                    if int(value) == enum_value:
+                        return enum_value, True
+                except ValueError:
+                    continue
+
+            if isinstance(enum_value, float):
+                try:
+                    if float(value) == enum_value:
+                        return enum_value, True
+                except ValueError:
+                    continue
+
+            if enum_value is None:
+                normalised = value.strip().lower()
+                if normalised in {"null", "none", ""}:
+                    return None, True
+
+            if value == str(enum_value):
+                return enum_value, True
+
+        return value, False
+
     def matches_uri(
         self,
         uri: str,
@@ -370,11 +532,11 @@ class ResourceTemplate[**Args](
             uri_params: Mapping[str, str] = self._extract_uri_parameters(uri)
 
             # If we have parameters, try to call with them
-            if uri_params:
-                content = await self.__call__(**uri_params)  # pyright: ignore[reportCallIssue]
+            call_kwargs: dict[str, Any] = (
+                self._coerce_uri_arguments(uri_params) if uri_params else {}
+            )
 
-            else:
-                content = await self.__call__()  # pyright: ignore[reportCallIssue]
+            content = await self.__call__(**call_kwargs)  # pyright: ignore[reportCallIssue]
 
             return Resource(
                 uri=uri,  # Use the actual URI provided, not the template

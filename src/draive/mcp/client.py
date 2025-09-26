@@ -28,7 +28,7 @@ from pydantic import AnyUrl
 
 from draive.models import FunctionTool, ModelToolSpecification, Tool, ToolError, ToolsProvider
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
-from draive.parameters import DataModel, validated_tool_specification
+from draive.parameters import DataModel, ToolParametersSpecification
 from draive.resources import ResourceContent, ResourceReference, ResourcesRepository
 
 __all__ = (
@@ -480,11 +480,12 @@ def _convert_tool(
     return FunctionTool(
         name=name,
         description=mcp_tool.description,
-        parameters=validated_tool_specification(
+        parameters=cast(
+            ToolParametersSpecification,
             {
                 **mcp_tool.inputSchema,
                 "additionalProperties": False,
-            }
+            },
         ),
         function=remote_call,
         availability=_available,

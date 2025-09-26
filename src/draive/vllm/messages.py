@@ -5,7 +5,7 @@ from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
 from haiway import META_EMPTY, MISSING, ObservabilityLevel, as_list, ctx
-from openai import NOT_GIVEN, NotGiven
+from openai import Omit, omit
 from openai import RateLimitError as OpenAIRateLimitError
 from openai.types.chat import (
     ChatCompletion,
@@ -168,7 +168,7 @@ class VLLMMessages(VLLMAPI):
                 )
 
             # Response format
-            response_format: ResponseFormat | NotGiven
+            response_format: ResponseFormat | Omit
             if output == "json":
                 response_format = {"type": "json_object"}
 
@@ -183,7 +183,7 @@ class VLLMMessages(VLLMAPI):
                 }
 
             else:
-                response_format = NOT_GIVEN
+                response_format = omit
 
             tool_choice, tools_list = _tools_as_tool_config(
                 tools.specifications,
@@ -201,14 +201,14 @@ class VLLMMessages(VLLMAPI):
                     tools=tools_list,
                     tool_choice=tool_choice,
                     parallel_tool_calls=unwrap_missing(config.parallel_tool_calls)
-                    if tools_list is not NOT_GIVEN
-                    else NOT_GIVEN,
+                    if tools_list is not omit
+                    else omit,
                     max_tokens=unwrap_missing(config.max_output_tokens),
                     response_format=response_format,
                     seed=unwrap_missing(config.seed),
                     stop=as_list(cast(Iterable[str], config.stop_sequences))
                     if config.stop_sequences is not MISSING
-                    else NOT_GIVEN,
+                    else omit,
                     stream=False,
                 )
 
@@ -320,7 +320,7 @@ class VLLMMessages(VLLMAPI):
                 )
             )
 
-        response_format: ResponseFormat | NotGiven
+        response_format: ResponseFormat | Omit
         if output == "json":
             response_format = {"type": "json_object"}
 
@@ -335,7 +335,7 @@ class VLLMMessages(VLLMAPI):
             }
 
         else:
-            response_format = NOT_GIVEN
+            response_format = omit
 
         tool_choice, tools_list = _tools_as_tool_config(
             tools.specifications,
@@ -353,14 +353,14 @@ class VLLMMessages(VLLMAPI):
                 tools=tools_list,
                 tool_choice=tool_choice,
                 parallel_tool_calls=unwrap_missing(config.parallel_tool_calls)
-                if tools_list is not NOT_GIVEN
-                else NOT_GIVEN,
+                if tools_list is not omit
+                else omit,
                 max_tokens=unwrap_missing(config.max_output_tokens),
                 response_format=response_format,
                 seed=unwrap_missing(config.seed),
                 stop=as_list(cast(Iterable[str], config.stop_sequences))
                 if config.stop_sequences is not MISSING
-                else NOT_GIVEN,
+                else omit,
                 stream=True,
             )
         except OpenAIRateLimitError as exc:
@@ -622,14 +622,14 @@ def _tools_as_tool_config(
     *,
     tool_selection: ModelToolsSelection,
 ) -> tuple[
-    ChatCompletionToolChoiceOptionParam | NotGiven,
-    list[ChatCompletionToolParam] | NotGiven,
+    ChatCompletionToolChoiceOptionParam | Omit,
+    list[ChatCompletionToolParam] | Omit,
 ]:
     tools_list: list[ChatCompletionToolParam] = [
         _tool_specification_as_tool(tool) for tool in (tools or [])
     ]
     if not tools_list:
-        return (NOT_GIVEN, NOT_GIVEN)
+        return (omit, omit)
 
     if tool_selection == "auto":
         return ("auto", tools_list)

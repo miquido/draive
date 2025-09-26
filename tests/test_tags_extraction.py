@@ -75,9 +75,7 @@ def test_returns_none_with_unclosed_tag():
 
 
 def test_unclosed_tag_does_not_block_other_tags():
-    tags = list(
-        MultimodalContent.of("<broken>value", "<strategy>plan</strategy>").tags("strategy")
-    )
+    tags = list(MultimodalContent.of("<broken>value", "<strategy>plan</strategy>").tags("strategy"))
 
     assert len(tags) == 1
     assert tags[0].content == MultimodalContent.of("plan")

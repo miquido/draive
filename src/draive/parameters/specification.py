@@ -1,34 +1,44 @@
 from collections.abc import Callable, Mapping, Sequence
-from datetime import date, datetime, time
-from enum import IntEnum, StrEnum
-from types import EllipsisType, NoneType, UnionType
 from typing import (
     Any,
-    Final,
     Literal,
     NotRequired,
     Required,
     TypedDict,
-    Union,
     cast,
     final,
-    is_typeddict,
 )
-from uuid import UUID
 
-from haiway import Meta, Missing
-from haiway.state import AttributeAnnotation
-from haiway.state.validation import Validator
-
-from draive.parameters.validation import ParameterValidator
+from haiway import AttributeAnnotation, Meta
+from haiway.attributes.annotations import (
+    AliasAttribute,
+    AnyAttribute,
+    BoolAttribute,
+    CustomAttribute,
+    DatetimeAttribute,
+    FloatAttribute,
+    IntegerAttribute,
+    IntEnumAttribute,
+    LiteralAttribute,
+    MappingAttribute,
+    MissingAttribute,
+    NoneAttribute,
+    SequenceAttribute,
+    StrEnumAttribute,
+    StringAttribute,
+    TimeAttribute,
+    TupleAttribute,
+    TypedDictAttribute,
+    UnionAttribute,
+    UUIDAttribute,
+    ValidableAttribute,
+)
 
 __all__ = (
     "ParameterSpecification",
     "ParametersSpecification",
     "ToolParametersSpecification",
     "parameter_specification",
-    "validated_specification",
-    "validated_tool_specification",
 )
 
 
@@ -175,20 +185,6 @@ type ParameterSpecification = (
 type ParametersSpecification = ParameterObjectSpecification
 
 
-def validated_specification(
-    specification: dict[str, Any],
-    /,
-) -> ParameterObjectSpecification:
-    return _specification_validation(
-        specification,
-    )
-
-
-_specification_validation: Final[Validator[ParameterObjectSpecification]] = (
-    ParameterValidator.of_typed_dict(ParameterObjectSpecification)
-)
-
-
 @final
 class ToolParametersSpecification(TypedDict, total=False):
     """Strict object schema used for tool parameters.
@@ -204,74 +200,29 @@ class ToolParametersSpecification(TypedDict, total=False):
     additionalProperties: Required[Literal[False]]
 
 
-def validated_tool_specification(
-    specification: dict[str, Any],
-    /,
-) -> ToolParametersSpecification:
-    return _tool_specification_validation(
-        specification,
-    )
-
-
-_tool_specification_validation: Final[Validator[ToolParametersSpecification]] = (
-    ParameterValidator.of_typed_dict(ToolParametersSpecification)
-)
-
-
-def parameter_specification(  # noqa: PLR0911
+def parameter_specification(
     annotation: AttributeAnnotation,
     /,
     description: str | None,
 ) -> ParameterSpecification:
-    if specification := SPECIFICATIONS.get(annotation.origin):
+    if isinstance(annotation, AliasAttribute):
+        return parameter_specification(annotation.resolved, description)
+
+    if specification := SPECIFICATIONS.get(type(annotation)):
         return specification(annotation, description)
 
-    elif hasattr(annotation.origin, "__PARAMETERS_SPECIFICATION__"):
+    elif hasattr(annotation.base, "__PARAMETERS_SPECIFICATION__"):
         if description := description:
             return cast(
                 ParameterSpecification,
                 {
-                    **annotation.origin.__PARAMETERS_SPECIFICATION__,
+                    **annotation.base.__PARAMETERS_SPECIFICATION__,
                     "description": description,
                 },
             )
 
         else:
-            return annotation.origin.__PARAMETERS_SPECIFICATION__
-
-    elif is_typeddict(annotation.origin):
-        return _prepare_specification_of_typed_dict(
-            annotation,
-            description=description,
-        )
-
-    elif issubclass(annotation.origin, IntEnum):
-        if description := description:
-            return {
-                "type": "integer",
-                "enum": list(annotation.origin),
-                "description": description,
-            }
-
-        else:
-            return {
-                "type": "integer",
-                "enum": list(annotation.origin),
-            }
-
-    elif issubclass(annotation.origin, StrEnum):
-        if description := description:
-            return {
-                "type": "string",
-                "enum": list(annotation.origin),
-                "description": description,
-            }
-
-        else:
-            return {
-                "type": "string",
-                "enum": list(annotation.origin),
-            }
+            return annotation.base.__PARAMETERS_SPECIFICATION__
 
     else:
         raise TypeError(f"Unsupported type annotation: {annotation}")
@@ -335,19 +286,22 @@ def _prepare_specification_of_literal(
     /,
     description: str | None,
 ) -> ParameterSpecification:
-    if all(isinstance(element, str) for element in annotation.arguments):
+    literal = cast(LiteralAttribute, annotation)
+
+    if all(isinstance(element, str) for element in literal.values):
         if description := description:
             return {
                 "type": "string",
-                "enum": annotation.arguments,
+                "enum": literal.values,
                 "description": description,
             }
 
         else:
             return {
                 "type": "string",
-                "enum": annotation.arguments,
+                "enum": literal.values,
             }
+
     else:
         raise TypeError(f"Unsupported type annotation: {annotation}")
 
@@ -357,11 +311,13 @@ def _prepare_specification_of_sequence(
     /,
     description: str | None,
 ) -> ParameterSpecification:
+    sequence = cast(SequenceAttribute, annotation)
+
     if description := description:
         return {
             "type": "array",
             "items": parameter_specification(
-                annotation.arguments[0],
+                sequence.values,
                 description=None,
             ),
             "description": description,
@@ -371,7 +327,7 @@ def _prepare_specification_of_sequence(
         return {
             "type": "array",
             "items": parameter_specification(
-                annotation.arguments[0],
+                sequence.values,
                 description=None,
             ),
         }
@@ -382,11 +338,13 @@ def _prepare_specification_of_mapping(
     /,
     description: str | None,
 ) -> ParameterSpecification:
+    mapping = cast(MappingAttribute, annotation)
+
     if description := description:
         return {
             "type": "object",
             "additionalProperties": parameter_specification(
-                annotation.arguments[1],
+                mapping.values,
                 description=None,
             ),
             "description": description,
@@ -396,7 +354,7 @@ def _prepare_specification_of_mapping(
         return {
             "type": "object",
             "additionalProperties": parameter_specification(
-                annotation.arguments[1],
+                mapping.values,
                 description=None,
             ),
         }
@@ -427,29 +385,14 @@ def _prepare_specification_of_tuple(
     /,
     description: str | None,
 ) -> ParameterSpecification:
-    if (
-        annotation.arguments[-1].origin == Ellipsis
-        or annotation.arguments[-1].origin == EllipsisType
-    ):
-        if description := description:
-            return {
-                "type": "array",
-                "items": parameter_specification(annotation.arguments[0], description=None),
-                "description": description,
-            }
+    tuple_attribute = cast(TupleAttribute, annotation)
 
-        else:
-            return {
-                "type": "array",
-                "items": parameter_specification(annotation.arguments[0], description=None),
-            }
-
-    elif description := description:
+    if description := description:
         return {
             "type": "array",
             "prefixItems": [
                 parameter_specification(element, description=None)
-                for element in annotation.arguments
+                for element in tuple_attribute.values
             ],
             "description": description,
         }
@@ -459,7 +402,7 @@ def _prepare_specification_of_tuple(
             "type": "array",
             "prefixItems": [
                 parameter_specification(element, description=None)
-                for element in annotation.arguments
+                for element in tuple_attribute.values
             ],
         }
 
@@ -469,9 +412,11 @@ def _prepare_specification_of_union(
     /,
     description: str | None,
 ) -> ParameterSpecification:
+    union = cast(UnionAttribute, annotation)
+
     compressed_alternatives: list[Literal["string", "number", "integer", "boolean", "null"]] = []
     alternatives: list[ParameterSpecification] = []
-    for argument in annotation.arguments:
+    for argument in union.alternatives:
         specification: ParameterSpecification = parameter_specification(
             cast(AttributeAnnotation, argument),
             description=None,
@@ -587,6 +532,44 @@ def _prepare_specification_of_str(
         }
 
 
+def _prepare_specification_of_str_enum(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    enum_attribute = cast(StrEnumAttribute, annotation)
+    enum_values: list[str] = [member.value for member in enum_attribute.base]
+
+    specification: ParameterStringEnumSpecification = {
+        "type": "string",
+        "enum": enum_values,
+    }
+
+    if description := description:
+        specification["description"] = description
+
+    return specification
+
+
+def _prepare_specification_of_int_enum(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    enum_attribute = cast(IntEnumAttribute, annotation)
+    enum_values: list[int] = [int(member.value) for member in enum_attribute.base]
+
+    specification: ParameterIntegerEnumSpecification = {
+        "type": "integer",
+        "enum": enum_values,
+    }
+
+    if description := description:
+        specification["description"] = description
+
+    return specification
+
+
 def _prepare_specification_of_uuid(
     annotation: AttributeAnnotation,
     /,
@@ -663,22 +646,72 @@ def _prepare_specification_of_time(
         }
 
 
+def _prepare_specification_of_custom(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    base: Any = annotation.base
+    if hasattr(base, "__PARAMETERS_SPECIFICATION__"):
+        specification = cast(ParameterSpecification, base.__PARAMETERS_SPECIFICATION__)
+        if description := description:
+            return cast(
+                ParameterSpecification,
+                {
+                    **cast(dict[str, Any], specification),
+                    "description": description,
+                },
+            )
+
+        return specification
+
+    if base is Meta:
+        if description := description:
+            return {
+                "type": "object",
+                "additionalProperties": True,
+                "description": description,
+            }
+
+        else:
+            return {
+                "type": "object",
+                "additionalProperties": True,
+            }
+
+    raise TypeError(f"Unsupported custom attribute: {annotation}")
+
+
+def _prepare_specification_of_validable(
+    annotation: AttributeAnnotation,
+    /,
+    description: str | None,
+) -> ParameterSpecification:
+    validable = cast(ValidableAttribute, annotation)
+    return parameter_specification(validable.attribute, description)
+
+
 def _prepare_specification_of_typed_dict(
     annotation: AttributeAnnotation,
     /,
     description: str | None,
 ) -> ParameterSpecification:
+    typed_dict = cast(TypedDictAttribute, annotation)
+
     required: list[str] = []
     properties: dict[str, ParameterSpecification] = {}
 
-    for key, element in annotation.extra["attributes"].items():
+    for key, element in typed_dict.attributes.items():
         properties[key] = parameter_specification(
             element,
             description=None,
         )
 
-        if getattr(element, "required", True):
-            required.append(key)
+        if NotRequired in element.annotations:
+            continue  # not required
+
+        # default to required when annotations are missing
+        required.append(key)
 
     if description := description:
         return {
@@ -699,24 +732,27 @@ def _prepare_specification_of_typed_dict(
 
 
 SPECIFICATIONS: Mapping[
-    Any, Callable[[AttributeAnnotation, str | None], ParameterSpecification]
+    type[AttributeAnnotation],
+    Callable[[AttributeAnnotation, str | None], ParameterSpecification],
 ] = {
-    Any: _prepare_specification_of_any,
-    NoneType: _prepare_specification_of_none,
-    Missing: _prepare_specification_of_missing,
-    bool: _prepare_specification_of_bool,
-    int: _prepare_specification_of_int,
-    float: _prepare_specification_of_float,
-    str: _prepare_specification_of_str,
-    tuple: _prepare_specification_of_tuple,
-    Literal: _prepare_specification_of_literal,
-    Sequence: _prepare_specification_of_sequence,
-    Mapping: _prepare_specification_of_mapping,
-    Meta: _prepare_specification_of_meta,
-    UUID: _prepare_specification_of_uuid,
-    date: _prepare_specification_of_date,
-    datetime: _prepare_specification_of_datetime,
-    time: _prepare_specification_of_time,
-    Union: _prepare_specification_of_union,
-    UnionType: _prepare_specification_of_union,
+    AnyAttribute: _prepare_specification_of_any,
+    NoneAttribute: _prepare_specification_of_none,
+    MissingAttribute: _prepare_specification_of_missing,
+    BoolAttribute: _prepare_specification_of_bool,
+    IntegerAttribute: _prepare_specification_of_int,
+    FloatAttribute: _prepare_specification_of_float,
+    StringAttribute: _prepare_specification_of_str,
+    StrEnumAttribute: _prepare_specification_of_str_enum,
+    IntEnumAttribute: _prepare_specification_of_int_enum,
+    LiteralAttribute: _prepare_specification_of_literal,
+    SequenceAttribute: _prepare_specification_of_sequence,
+    TupleAttribute: _prepare_specification_of_tuple,
+    MappingAttribute: _prepare_specification_of_mapping,
+    TypedDictAttribute: _prepare_specification_of_typed_dict,
+    UnionAttribute: _prepare_specification_of_union,
+    ValidableAttribute: _prepare_specification_of_validable,
+    UUIDAttribute: _prepare_specification_of_uuid,
+    DatetimeAttribute: _prepare_specification_of_datetime,
+    TimeAttribute: _prepare_specification_of_time,
+    CustomAttribute: _prepare_specification_of_custom,
 }

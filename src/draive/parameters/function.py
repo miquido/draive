@@ -3,12 +3,10 @@ from inspect import Parameter as InspectParameter
 from inspect import _empty as INSPECT_EMPTY  # pyright: ignore[reportPrivateUsage]
 from inspect import signature
 from types import EllipsisType
-from typing import Any, ClassVar, cast, final, get_type_hints, overload
+from typing import Any, ClassVar, Required, cast, final, get_type_hints, overload
 
-from haiway import MISSING, DefaultValue, Missing, ValidationContext
-from haiway.state import AttributeAnnotation
-from haiway.state.attributes import resolve_attribute_annotation
-from haiway.state.validation import Validator
+from haiway import MISSING, AttributeAnnotation, DefaultValue, Missing, ValidationContext, Validator
+from haiway.attributes.annotations import resolve_attribute
 from haiway.utils import mimic_function
 
 from draive.parameters.parameter import Parameter
@@ -226,20 +224,20 @@ class ParametrizedFunction[**Args, Result]:
         if self._variadic_keyword_parameters is None:
             for parameter in self._parameters.values():
                 with ValidationContext.scope(f".{parameter.name}"):
-                    validated[parameter.name] = parameter.validated(
+                    validated[parameter.name] = parameter.validate(
                         parameter.find(kwargs),
                     )
 
         else:
             for parameter in self._parameters.values():
                 with ValidationContext.scope(f".{parameter.name}"):
-                    validated[parameter.name] = parameter.validated(
+                    validated[parameter.name] = parameter.validate(
                         parameter.pick(kwargs),
                     )
 
             for key, value in kwargs.items():
                 with ValidationContext.scope(f".{key}"):
-                    validated[key] = self._variadic_keyword_parameters.validated(
+                    validated[key] = self._variadic_keyword_parameters.validate(
                         value,
                     )
 
@@ -286,11 +284,10 @@ def _resolve_argument(
             parameter.name,
         )
 
-    attribute: AttributeAnnotation = resolve_attribute_annotation(
+    attribute: AttributeAnnotation = resolve_attribute(
         type_hint,
         module=module,
-        type_parameters={},
-        self_annotation=None,
+        resolved_parameters={},
         recursion_guard={},
     )
 
@@ -310,9 +307,9 @@ def _resolve_argument(
                 verifier=argument.verifier,
                 converter=MISSING,
                 specification=argument.specification,
-                required=attribute.required
-                and argument.default is MISSING
-                and argument.default_factory is MISSING,
+                required=argument.default is MISSING
+                and argument.default_factory is MISSING
+                and Required in attribute.annotations,
             )
 
         case DefaultValue() as default:  # pyright: ignore[reportUnknownVariableType]
@@ -340,5 +337,5 @@ def _resolve_argument(
                 verifier=MISSING,
                 converter=MISSING,
                 specification=MISSING,
-                required=attribute.required and value is INSPECT_EMPTY,
+                required=value is INSPECT_EMPTY and Required in attribute.annotations,
             )

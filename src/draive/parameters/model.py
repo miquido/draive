@@ -1,10 +1,8 @@
 import json
-import typing
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, MutableSequence, Sequence
 from copy import deepcopy
 from dataclasses import fields as dataclass_fields
 from dataclasses import is_dataclass
-from datetime import date, datetime, time
 from types import EllipsisType, GenericAlias
 from typing import (
     Any,
@@ -17,13 +15,22 @@ from typing import (
     final,
     overload,
 )
-from uuid import UUID
 from weakref import WeakValueDictionary
 
-from haiway import MISSING, AttributePath, DefaultValue, Missing, ValidationContext, not_missing
-from haiway.state import AttributeAnnotation, attribute_annotations
-from haiway.state.validation import Validator
+from haiway import (
+    MISSING,
+    AttributeAnnotation,
+    AttributePath,
+    DefaultValue,
+    Missing,
+    ValidationContext,
+    ValidationError,
+    Validator,
+    not_missing,
+)
+from haiway.attributes.annotations import ObjectAttribute, resolve_self_attribute
 
+from draive.parameters.coding import ParametersJSONEncoder
 from draive.parameters.parameter import Parameter
 from draive.parameters.schema import json_schema, simplified_schema
 from draive.parameters.specification import (
@@ -170,6 +177,12 @@ def _resolve_field(
 ) -> Parameter[Any]:
     match default:
         case DataField() as data_field:
+            has_explicit_default: bool = (
+                data_field.default_value is not MISSING
+                or data_field.default_factory is not MISSING
+                or data_field.default_env is not MISSING
+            )
+
             return Parameter[Any].of(
                 attribute,
                 name=name,
@@ -184,9 +197,7 @@ def _resolve_field(
                 verifier=data_field.verifier,
                 converter=data_field.converter,
                 specification=data_field.specification,
-                required=attribute.required
-                and data_field.default_value is MISSING
-                and data_field.default_factory is MISSING,
+                required=not has_explicit_default,
             )
 
         case DefaultValue() as default:  # pyright: ignore[reportUnknownVariableType]
@@ -203,6 +214,20 @@ def _resolve_field(
                 required=False,
             )
 
+        case value if value is MISSING:
+            return Parameter[Any].of(
+                attribute,
+                name=name,
+                alias=None,
+                description=MISSING,
+                default=DefaultValue(value),
+                validator=MISSING,
+                verifier=MISSING,
+                converter=MISSING,
+                specification=MISSING,
+                required=True,
+            )
+
         case value:
             return Parameter[Any].of(
                 attribute,
@@ -214,7 +239,7 @@ def _resolve_field(
                 verifier=MISSING,
                 converter=MISSING,
                 specification=MISSING,
-                required=attribute.required,
+                required=False,
             )
 
 
@@ -225,57 +250,60 @@ def _resolve_field(
 )
 class DataModelMeta(type):
     def __new__(
-        cls,
+        mcs,
+        /,
         name: str,
         bases: tuple[type, ...],
         namespace: dict[str, Any],
-        type_base: type[Any] | None = None,
         type_parameters: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Any:
-        data_type = super().__new__(
-            cls,
+        cls = type.__new__(
+            mcs,
             name,
             bases,
             namespace,
             **kwargs,
         )
+        self_attribute: ObjectAttribute = resolve_self_attribute(
+            cls,
+            parameters=type_parameters or {},
+        )
 
-        parameters: dict[str, Parameter[Any]] = {}
+        parameters: MutableSequence[Parameter[Any]] = []
         parameters_specification: dict[str, ParameterSpecification] = {}
         parameters_specification_required: list[str] = []
-        for key, annotation in attribute_annotations(
-            data_type,
-            type_parameters=type_parameters or {},
-        ).items():
-            default: Any = getattr(data_type, key, MISSING)
-            updated_annotation = annotation.update_required(_check_required(default))
+        for key, attribute in self_attribute.attributes.items():
             parameter: Parameter[Any] = _resolve_field(
-                updated_annotation,
+                attribute,
                 name=key,
-                default=default,
+                default=getattr(cls, key, MISSING),
             )
             # we are using aliased name for specification
             aliased_name: str = parameter.alias or parameter.name
             parameters_specification[aliased_name] = parameter.specification
 
+            # and actual key/name for object itself
+            parameters.append(parameter)
+
             if parameter.required:
                 parameters_specification_required.append(aliased_name)
 
-            # we are using actual key/name for object itself
-            parameters[key] = parameter
+        cls.__SELF_ATTRIBUTE__ = self_attribute  # pyright: ignore[reportAttributeAccessIssue]
 
-        if bases:
-            data_type.__PARAMETERS__ = parameters  # pyright: ignore[reportAttributeAccessIssue]
-            data_type.__TYPE_PARAMETERS__ = type_parameters  # pyright: ignore[reportAttributeAccessIssue]
+        if not bases:
+            assert len(parameters) == 0  # nosec: B101
+            cls.__TYPE_PARAMETERS__ = None  # pyright: ignore[reportAttributeAccessIssue]
+            cls.__FIELDS__ = ()  # pyright: ignore[reportAttributeAccessIssue]
 
         else:
-            assert len(parameters) == 0  # nosec: B101
-            data_type.__PARAMETERS__ = MISSING  # pyright: ignore[reportAttributeAccessIssue]
-            data_type.__TYPE_PARAMETERS__ = None  # pyright: ignore[reportAttributeAccessIssue]
+            cls.__TYPE_PARAMETERS__ = type_parameters  # pyright: ignore[reportAttributeAccessIssue]
+            cls.__FIELDS__ = tuple(parameters)  # pyright: ignore[reportAttributeAccessIssue]
+            cls.__slots__ = tuple(parameter.name for parameter in parameters)  # pyright: ignore[reportAttributeAccessIssue]
+            cls.__match_args__ = cls.__slots__  # pyright: ignore[reportAttributeAccessIssue]
 
         if parameters_specification:
-            data_type.__PARAMETERS_SPECIFICATION__ = {  # pyright: ignore[reportAttributeAccessIssue]
+            cls.__PARAMETERS_SPECIFICATION__ = {  # pyright: ignore[reportAttributeAccessIssue]
                 "type": "object",
                 "properties": parameters_specification,
                 "required": parameters_specification_required,
@@ -283,109 +311,99 @@ class DataModelMeta(type):
             }
 
         else:
-            data_type.__PARAMETERS_SPECIFICATION__ = {  # pyright: ignore[reportAttributeAccessIssue]
+            cls.__PARAMETERS_SPECIFICATION__ = {  # pyright: ignore[reportAttributeAccessIssue]
                 "type": "object",
                 "additionalProperties": True,
             }
 
-        data_type.__slots__ = frozenset(parameters.keys())  # pyright: ignore[reportAttributeAccessIssue]
-        data_type.__match_args__ = data_type.__slots__  # pyright: ignore[reportAttributeAccessIssue]
-        data_type._ = AttributePath(data_type, attribute=data_type)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportCallIssue]
+        cls._ = AttributePath(cls, attribute=cls)  # pyright: ignore[reportCallIssue, reportUnknownMemberType, reportAttributeAccessIssue]
 
-        return data_type
+        return cls
+
+    def validate(
+        cls,
+        value: Any,
+    ) -> Any: ...
 
     def __instancecheck__(
         self,
         instance: Any,
     ) -> bool:
-        # check for type match
-        if self.__subclasscheck__(type(instance)):  # pyright: ignore[reportUnknownArgumentType]
-            return True
-
-        # otherwise check if we are dealing with unparametrized base
-        # against the parametrized one, our generic subtypes have base of unparametrized type
-        if type(instance) not in self.__bases__:
+        instance_type: type[Any] = type(instance)
+        if not self.__subclasscheck__(instance_type):
             return False
 
-        try:
-            # validate instance to check unparametrized fields
-            _ = self(**vars(instance))
+        if hasattr(self, "__origin__") or hasattr(instance_type, "__origin__"):
+            try:  # TODO: find a better way to validate partially typed instances
+                self(**vars(instance))
 
-        except Exception:
-            return False
+            except ValidationError:
+                return False
 
-        else:
-            return True
+        return True
 
-    def __subclasscheck__(  # noqa: C901, PLR0911, PLR0912
+    def __subclasscheck__(
         self,
         subclass: type[Any],
     ) -> bool:
-        # check if we are the same class for early exit
-        if self == subclass:
+        if self is subclass:
             return True
 
-        # then check if we are parametrized
-        checked_parameters: Mapping[str, Any] | None = getattr(
+        self_origin: type[Any] = getattr(self, "__origin__", self)
+
+        # Handle case where we're checking not parameterized type
+        if self_origin is self:
+            return type.__subclasscheck__(self, subclass)
+
+        subclass_origin: type[Any] = getattr(subclass, "__origin__", subclass)
+
+        # Both must be based on the same generic class
+        if self_origin is not subclass_origin:
+            return False
+
+        return self._check_type_parameters(subclass)
+
+    def _check_type_parameters(
+        self,
+        subclass: type[Any],
+    ) -> bool:
+        self_args: Sequence[Any] | None = getattr(
             self,
-            "__TYPE_PARAMETERS__",
+            "__args__",
             None,
         )
-        if checked_parameters is None:
-            # if we are not parametrized allow any subclass
-            return self in subclass.__bases__  # pyright: ignore[reportUnnecessaryContains]
+        subclass_args: Sequence[Any] | None = getattr(
+            subclass,
+            "__args__",
+            None,
+        )
 
-        # verify if we have common base next - our generic subtypes have the same base
-        if self.__bases__ == subclass.__bases__:
-            # if we have the same bases we have different generic subtypes
-            # we can verify all of the attributes to check if we have common base
-            available_parameters: Mapping[str, Any] | None = getattr(
-                subclass,
-                "__TYPE_PARAMETERS__",
-                None,
-            )
+        if self_args is None and subclass_args is None:
+            return True
 
-            if available_parameters is None:
-                # if we have no parameters at this stage this is a serious bug
-                raise RuntimeError("Invalid type parametrization for %s", subclass)
+        if self_args is None:
+            assert subclass_args is not None  # nosec: B101
+            self_args = tuple(Any for _ in subclass_args)
 
-            for key, param in checked_parameters.items():
-                match available_parameters.get(key):
-                    case None:  # if any parameter is missing we should not be there already
-                        return False
+        elif subclass_args is None:
+            assert self_args is not None  # nosec: B101
+            subclass_args = tuple(Any for _ in self_args)
 
-                    case typing.Any:
-                        continue  # Any ignores type checks
+        # Check if the type parameters are compatible (covariant)
+        for self_arg, subclass_arg in zip(
+            self_args,
+            subclass_args,
+            strict=True,
+        ):
+            if self_arg is Any or subclass_arg is Any:
+                continue
 
-                    case checked:
-                        if param is Any:
-                            continue  # Any ignores type checks
+            # For covariance: GenericState[Child] should be subclass of GenericState[Parent]
+            # This means subclass_param should be a subclass of self_param
+            if not issubclass(subclass_arg, self_arg):
+                return False
 
-                        elif issubclass(checked, param):
-                            continue  # if we have matching type we are fine
-
-                        else:
-                            return False  # types are not matching
-
-            return True  # when all parameters were matching we have matching subclass
-
-        elif subclass in self.__bases__:  # our generic subtypes have base of unparametrized type
-            # if subclass parameters were not provided then we can be valid ony if all were Any
-            return all(param is Any for param in checked_parameters.values())
-
-        else:
-            return False  # we have different base / comparing to not parametrized
-
-
-def _check_required(default: Any) -> bool:
-    if default is MISSING:
         return True
-
-    elif isinstance(default, DataField):
-        return default.default_value is MISSING and default.default_factory is MISSING
-
-    else:
-        return False
 
 
 _types_cache: WeakValueDictionary[
@@ -400,10 +418,12 @@ _types_cache: WeakValueDictionary[
 class DataModel(metaclass=DataModelMeta):
     _: ClassVar[Self]
     __IMMUTABLE__: ClassVar[EllipsisType] = ...
-    __PARAMETERS__: ClassVar[dict[str, Parameter[Any]]]
-    __PARAMETERS_SPECIFICATION__: ClassVar[ParametersSpecification]
     __TYPE_PARAMETERS__: ClassVar[Mapping[str, Any] | None] = None
+    __SELF_ATTRIBUTE__: ClassVar[ObjectAttribute]
+    __FIELDS__: ClassVar[Sequence[Parameter[Any]]]
+    __PARAMETERS_SPECIFICATION__: ClassVar[ParametersSpecification]
 
+    @classmethod
     def __class_getitem__(
         cls,
         type_argument: tuple[type[Any], ...] | type[Any],
@@ -457,6 +477,9 @@ class DataModel(metaclass=DataModelMeta):
             namespace={"__module__": cls.__module__},
             type_parameters=type_parameters,
         )
+        # Set origin for subclass checks
+        parametrized_type.__origin__ = cls  # pyright: ignore[reportAttributeAccessIssue]
+        parametrized_type.__args__ = type_arguments  # pyright: ignore[reportAttributeAccessIssue]
         _types_cache[(cls, type_arguments)] = parametrized_type
         return parametrized_type
 
@@ -464,7 +487,16 @@ class DataModel(metaclass=DataModelMeta):
         self,
         **kwargs: Any,
     ) -> None:
-        if self.__PARAMETERS__ is MISSING:
+        for parameter in self.__FIELDS__:
+            with ValidationContext.scope(f".{parameter.name}"):
+                object.__setattr__(
+                    self,  # pyright: ignore[reportUnknownArgumentType]
+                    parameter.name,
+                    parameter.validate(parameter.find(kwargs)),
+                )
+
+        if not getattr(self, "__slots__", ()):  # if we do not have slots accept everything
+            assert not self.__FIELDS__  # nosec: B101
             for key, value in kwargs.items():
                 object.__setattr__(
                     self,  # pyright: ignore[reportUnknownArgumentType]
@@ -472,20 +504,10 @@ class DataModel(metaclass=DataModelMeta):
                     value,
                 )
 
-        else:
-            for name, parameter in self.__PARAMETERS__.items():
-                with ValidationContext.scope(f".{name}"):
-                    object.__setattr__(
-                        self,  # pyright: ignore[reportUnknownArgumentType]
-                        name,
-                        parameter.validated(parameter.find(kwargs)),
-                    )
-
     @classmethod
-    def instance_validator(
+    def validate(
         cls,
         value: Any,
-        /,
     ) -> Self:
         match value:
             case valid if isinstance(valid, cls):
@@ -495,39 +517,7 @@ class DataModel(metaclass=DataModelMeta):
                 return cls(**values)
 
             case _:
-                raise TypeError(f"Expected '{cls.__name__}', received '{type(value).__name__}'")
-
-    @classmethod
-    def model_validator(
-        cls,
-        *,
-        verifier: ParameterVerification[Self] | None,
-    ) -> Validator[Self]:
-        if verifier := verifier:
-
-            def validator(
-                value: Any,
-                /,
-            ) -> Self:
-                match value:
-                    case validated if isinstance(validated, cls):
-                        verifier(validated)
-                        return validated
-
-                    case {**values}:
-                        validated: Self = cls(**values)
-                        verifier(validated)
-                        return validated
-
-                    case _:
-                        raise TypeError(
-                            f"Expected '{cls.__name__}', received '{type(value).__name__}'"
-                        )
-
-            return validator
-
-        else:
-            return cls.instance_validator
+                raise TypeError(f"'{value}' is not matching expected type of '{cls}'")
 
     @classmethod
     def from_mapping(
@@ -558,37 +548,31 @@ class DataModel(metaclass=DataModelMeta):
 
     def __replace__(
         self,
-        **parameters: Any,
+        **kwargs: Any,
     ) -> Self:
-        if not parameters or parameters.keys().isdisjoint(self.__PARAMETERS__.keys()):
+        if not kwargs or kwargs.keys().isdisjoint(getattr(self, "__slots__", ())):
             return self  # do not make a copy when nothing will be updated
 
-        updated: Self = self.__new__(self.__class__)
-        for parameter in self.__PARAMETERS__.values():
-            validated_value: Any
-            if parameter.name in parameters:
-                with ValidationContext.scope(f".{parameter.name}"):
-                    validated_value = parameter.validated(
-                        parameters[parameter.name],
-                    )
+        if not kwargs:
+            return self
 
-            elif parameter.alias and parameter.alias in parameters:
-                with ValidationContext.scope(f".{parameter.alias}"):
-                    validated_value = parameter.validated(
-                        parameters[parameter.alias],
-                    )
-
-            else:  # no need to validate again when reusing current value
-                validated_value = object.__getattribute__(
-                    self,
-                    parameter.name,
+        updated: Self = object.__new__(self.__class__)
+        for field in self.__class__.__FIELDS__:
+            update: Any | Missing = kwargs.get(field.name, MISSING)
+            if update is MISSING:  # reuse missing elements
+                object.__setattr__(
+                    updated,
+                    field.name,
+                    getattr(self, field.name),
                 )
 
-            object.__setattr__(
-                updated,
-                parameter.name,
-                validated_value,
-            )
+            else:  # and validate updates
+                with ValidationContext.scope(f".{field.name}"):
+                    object.__setattr__(
+                        updated,
+                        field.name,
+                        field.validate(update),
+                    )
 
         return updated
 
@@ -606,19 +590,19 @@ class DataModel(metaclass=DataModelMeta):
         if other.__class__ != self.__class__:
             return False
 
-        if self.__PARAMETERS__ is MISSING:
+        if self.__FIELDS__ is MISSING:
             return all(value == getattr(other, key, MISSING) for key, value in vars(self).items())
 
         else:
             return all(
-                getattr(self, key, MISSING) == getattr(other, key, MISSING)
-                for key in self.__PARAMETERS__.keys()
+                getattr(self, field.name, MISSING) == getattr(other, field.name, MISSING)
+                for field in self.__FIELDS__
             )
 
     def __hash__(self) -> int:
         hash_values: list[int] = []
-        for key in self.__PARAMETERS__.keys():
-            value: Any = getattr(self, key, MISSING)
+        for field in self.__FIELDS__:
+            value: Any = getattr(self, field.name, MISSING)
 
             # Skip MISSING values to ensure consistent hashing
             if value is MISSING:
@@ -643,7 +627,7 @@ class DataModel(metaclass=DataModelMeta):
         self,
         name: str,
     ) -> Any | Missing:
-        return vars(self).get(name, MISSING)
+        return getattr(self, name, MISSING)
 
     @overload
     def get(
@@ -663,11 +647,7 @@ class DataModel(metaclass=DataModelMeta):
         name: str,
         default: Any | Missing = MISSING,
     ) -> Any | Missing:
-        if self.__contains__(name):
-            return self.__getitem__(name)
-
-        else:
-            return default
+        return getattr(self, name, default)
 
     def __setattr__(
         self,
@@ -773,13 +753,13 @@ class DataModel(metaclass=DataModelMeta):
         self,
         aliased: bool = True,
         indent: int | None = None,
-        encoder_class: type[json.JSONEncoder] | None = None,
+        encoder_class: type[json.JSONEncoder] = ParametersJSONEncoder,
     ) -> str:
         try:
             return json.dumps(
                 self.to_mapping(aliased=aliased),
                 indent=indent,
-                cls=encoder_class or ModelJSONEncoder,
+                cls=encoder_class,
             )
 
         except Exception as exc:
@@ -788,26 +768,8 @@ class DataModel(metaclass=DataModelMeta):
             ) from exc
 
 
-class ModelJSONEncoder(json.JSONEncoder):
-    def default(self, o: object) -> Any:
-        if isinstance(o, UUID):
-            return o.hex
-
-        elif isinstance(o, datetime):
-            return o.isoformat()
-
-        elif isinstance(o, time):
-            return o.isoformat()
-
-        elif isinstance(o, date):
-            return o.isoformat()
-
-        else:
-            return json.JSONEncoder.default(self, o)
-
-
 # based on python dataclass asdict but simplified
-def _data_dict(  # noqa: PLR0911
+def _data_dict(  # noqa: PLR0911, C901
     data: Any,
     /,
     aliased: bool,
@@ -821,39 +783,36 @@ def _data_dict(  # noqa: PLR0911
         case str() | None | int() | float() | bool():
             return data  # use basic value types as they are
 
-        case parametrized_data if hasattr(parametrized_data, "__PARAMETERS__"):
-            # convert parametrized data to dict
-            if parametrized_data.__PARAMETERS__ is MISSING:  # if base - use all variables
-                return cast(
-                    dict[str, Any],
-                    {
-                        key: value
-                        for key, value in vars(parametrized_data).items()  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
-                        if value is not MISSING
-                    },
+        case DataModel() as model:
+            fields: Sequence[Parameter[Any]] = model.__class__.__FIELDS__
+
+            field_names: set[str] = {field.name for field in fields}
+            mapping: dict[str, Any] = {}
+
+            for field in fields:
+                value: Any = getattr(model, field.name, MISSING)
+                if value is MISSING:
+                    continue
+
+                key: str = field.alias if aliased and field.alias else field.name
+                mapping[key] = _data_dict(
+                    value,
+                    aliased=aliased,
+                    converter=field.converter,
                 )
 
-            elif aliased:  # alias if needed
-                return {
-                    field.alias or field.name: _data_dict(
-                        getattr(parametrized_data, field.name),
-                        aliased=aliased,
-                        converter=field.converter,
-                    )
-                    for field in parametrized_data.__PARAMETERS__.values()
-                    if getattr(parametrized_data, field.name, MISSING) is not MISSING
-                }
+            # include dynamically attached attributes (when __slots__ is not defined)
+            for key, value in getattr(model, "__dict__", {}).items():
+                if key in field_names or value is MISSING:
+                    continue
 
-            else:
-                return {
-                    field.name: _data_dict(
-                        getattr(parametrized_data, field.name),
-                        aliased=aliased,
-                        converter=field.converter,
-                    )
-                    for field in parametrized_data.__PARAMETERS__.values()
-                    if getattr(parametrized_data, field.name, MISSING) is not MISSING
-                }
+                mapping[key] = _data_dict(
+                    value,
+                    aliased=aliased,
+                    converter=None,
+                )
+
+            return mapping
 
         case {**elements}:  # replace mapping with dict
             return {
@@ -912,46 +871,39 @@ def _data_str(  # noqa: PLR0911, PLR0912, C901
         case None | int() | float() | bool():
             return str(data)
 
-        case parametrized_data if hasattr(parametrized_data, "__PARAMETERS__"):
-            # convert parametrized data to dict
-            if parametrized_data.__PARAMETERS__ is MISSING:  # if base - use all variables
-                string: str = ""
-                for key, value in vars(parametrized_data).items():  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                    element: str = _data_str(
-                        value,
-                        aliased=aliased,
-                        converter=None,
-                    ).replace("\n", "\n  ")
+        case DataModel() as model:
+            fields: Sequence[Parameter[Any]] = model.__class__.__FIELDS__
+            field_names: set[str] = {field.name for field in fields}
 
-                    string += f"\n{key}: {element}"
+            lines: list[str] = []
 
-                return string
+            for field in fields:
+                value: Any = getattr(model, field.name, MISSING)
+                if value is MISSING:
+                    continue
 
-            elif aliased:  # alias if needed
-                string: str = ""
-                for field in parametrized_data.__PARAMETERS__.values():
-                    element: str = _data_str(
-                        getattr(parametrized_data, field.name),
-                        aliased=aliased,
-                        converter=field.converter,
-                    ).replace("\n", "\n  ")
+                key: str = field.alias if aliased and field.alias else field.name
+                element: str = _data_str(
+                    value,
+                    aliased=aliased,
+                    converter=field.converter,
+                ).replace("\n", "\n  ")
 
-                    string += f"\n{field.alias or field.name}: {element}"
+                lines.append(f"\n{key}: {element}")
 
-                return string
+            for key, value in getattr(model, "__dict__", {}).items():
+                if key in field_names or value is MISSING:
+                    continue
 
-            else:
-                string: str = ""
-                for field in parametrized_data.__PARAMETERS__.values():
-                    element: str = _data_str(
-                        getattr(parametrized_data, field.name),
-                        aliased=aliased,
-                        converter=field.converter,
-                    ).replace("\n", "\n  ")
+                element = _data_str(
+                    value,
+                    aliased=aliased,
+                    converter=None,
+                ).replace("\n", "\n  ")
 
-                    string += f"\n{field.name}: {element}"
+                lines.append(f"\n{key}: {element}")
 
-                return string
+            return "".join(lines)
 
         case {**elements}:  # replace mapping with dict
             string: str = ""
