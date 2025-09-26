@@ -1,4 +1,4 @@
-from base64 import urlsafe_b64decode, urlsafe_b64encode
+from base64 import b64decode, b64encode, urlsafe_b64encode
 from collections.abc import Collection, Sequence
 from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
 
@@ -156,8 +156,8 @@ class ResourceContent(DataModel):
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         if isinstance(content, str):
-            # Treat plain strings as text content; encode safely to base64
-            encoded_content: str = urlsafe_b64encode(content.encode("utf-8")).decode("utf-8")
+            # Treat plain strings as text content; encode to base64
+            encoded_content: str = b64encode(content.encode("utf-8")).decode("utf-8")
 
             return cls(
                 data=encoded_content,
@@ -169,7 +169,7 @@ class ResourceContent(DataModel):
             assert isinstance(content, bytes)  # nosec: B101
 
             return cls(
-                data=urlsafe_b64encode(content).decode("utf-8"),
+                data=b64encode(content).decode("utf-8"),
                 mime_type=mime_type if mime_type is not None else "application/octet-stream",
                 meta=Meta.of(meta),
             )
@@ -203,10 +203,10 @@ class ResourceContent(DataModel):
             return f"![{kind}](REDACTED)"
 
     def to_bytes(self) -> bytes:
-        return urlsafe_b64decode(self.data)
+        return b64decode(self.data)
 
     def to_data_uri(self) -> str:
-        return f"data:{self.mime_type};base64,{self.data}"
+        return f"data:{self.mime_type};base64,{urlsafe_b64encode(b64decode(self.data))}"
 
     def __bool__(self) -> bool:
         return len(self.data) > 0
