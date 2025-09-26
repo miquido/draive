@@ -740,13 +740,13 @@ def _prepare_session_config(
     modalities: list[Literal["text", "audio"]]
     match output:
         case "auto":
-            modalities = ["text", "audio"]
+            modalities = ["audio"]
 
         case "text":
             modalities = ["text"]
 
         case "audio":
-            modalities = ["text", "audio"]  # openai does not allow to use only audio
+            modalities = ["audio"]
 
         case ["text", "audio"] | ["audio", "text"]:
             modalities = ["text", "audio"]
