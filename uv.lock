@@ -348,7 +348,7 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.86.0"
+version = "0.86.1"
 source = { editable = "." }
 dependencies = [
     { name = "haiway" },
@@ -434,7 +434,7 @@ requires-dist = [
     { name = "cohere", marker = "extra == 'cohere-bedrock'", specifier = "~=5.17" },
     { name = "google-api-core", marker = "extra == 'gemini'" },
     { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=1.30" },
-    { name = "haiway", specifier = "~=0.34.1" },
+    { name = "haiway", specifier = "~=0.34.4" },
     { name = "haiway", extras = ["httpx"], marker = "extra == 'httpx'" },
     { name = "haiway", extras = ["opentelemetry"], marker = "extra == 'opentelemetry'" },
     { name = "haiway", extras = ["postgres"], marker = "extra == 'postgres'" },
@@ -649,11 +649,11 @@ wheels = [
 
 [[package]]
 name = "haiway"
-version = "0.34.1"
+version = "0.34.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d3/b1/ea13d24aa8bfdbb31ecb7392f45e202d20ef21e09cc66b121731d0797c53/haiway-0.34.1.tar.gz", hash = "sha256:20c4a8cf5f75e3f9c0b7ff84f51a7b43887b9c442bb2e7e35b8d9456d7af23b2", size = 95190, upload-time = "2025-09-26T11:51:51.26Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fb/ae/3dccdb75a1c16e0ff0697130f40d0b05be7ec9048d72f1d5c858d3c112eb/haiway-0.34.4.tar.gz", hash = "sha256:51fcdd4f4fa7197f060347d77e762a1f2a43f3ce856f961def0fec29df18e5df", size = 95256, upload-time = "2025-09-26T13:48:46.052Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/db/7d/0e4b2a179a8af9b70c90e2c02319d5635fdd1e1b9f94ec7e4bb62a98038a/haiway-0.34.1-py3-none-any.whl", hash = "sha256:a5e620e4a9145c5c2166b9ca357630ee8272c513f7c1d4a753cf6c7c0dec5079", size = 121788, upload-time = "2025-09-26T11:51:50.108Z" },
+    { url = "https://files.pythonhosted.org/packages/25/21/39ec4bac1e43dc6754a9bca03601676c205cc56e56ad0991d74b49f8a1aa/haiway-0.34.4-py3-none-any.whl", hash = "sha256:68d12e57af2c4715f84d07e22e73c775a4d9dd88d6b71662eec08c53f5274a2e", size = 121766, upload-time = "2025-09-26T13:48:44.575Z" },
 ]
 
 [package.optional-dependencies]
