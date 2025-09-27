@@ -1,4 +1,4 @@
-from base64 import b64decode, b64encode, urlsafe_b64encode
+from base64 import b64decode, b64encode
 from collections.abc import Collection, Sequence
 from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
 
@@ -206,7 +206,7 @@ class ResourceContent(DataModel):
         return b64decode(self.data)
 
     def to_data_uri(self) -> str:
-        return f"data:{self.mime_type};base64,{urlsafe_b64encode(b64decode(self.data))}"
+        return f"data:{self.mime_type};base64,{self.data}"
 
     def __bool__(self) -> bool:
         return len(self.data) > 0

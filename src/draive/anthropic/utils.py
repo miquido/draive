@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import cast, overload
 
-from anthropic import NOT_GIVEN, NotGiven
+from anthropic import Omit, omit
 from haiway import MISSING, Missing
 
 __all__ = ("unwrap_missing",)
@@ -11,7 +11,7 @@ __all__ = ("unwrap_missing",)
 def unwrap_missing[Value](
     value: Value | Missing,
     /,
-) -> Value | NotGiven: ...
+) -> Value | Omit: ...
 
 
 @overload
@@ -19,16 +19,16 @@ def unwrap_missing[Value, Converted](
     value: Value | Missing,
     /,
     convert: Callable[[Value], Converted],
-) -> Converted | NotGiven: ...
+) -> Converted | Omit: ...
 
 
 def unwrap_missing[Value, Converted](
     value: Value | Missing,
     /,
     convert: Callable[[Value], Converted] | None = None,
-) -> Converted | Value | NotGiven:
+) -> Converted | Value | Omit:
     if value is MISSING:
-        return NOT_GIVEN
+        return omit
 
     elif convert is not None:
         return convert(cast(Value, value))
