@@ -2,7 +2,7 @@ import random
 from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable, Mapping, Sequence
 from typing import Any, Literal, cast, overload
 
-from anthropic import NOT_GIVEN, NotGiven
+from anthropic import Omit, omit
 from anthropic import RateLimitError as AnthropicRateLimitError
 from anthropic.types import (
     CitationCharLocation,
@@ -201,21 +201,21 @@ class AnthropicMessages(AnthropicAPI):
                     model=config.model,
                 ) from exc
 
-            tools_list: Iterable[ToolParam] | NotGiven
-            tool_choice: ToolChoiceParam | NotGiven
+            tools_list: Iterable[ToolParam] | Omit
+            tool_choice: ToolChoiceParam | Omit
             if tools.specifications:
                 tool_choice = _tools_selection_as_tool_choice(tools.selection)
                 tools_list = _tools_as_tool_params(tools.specifications)
 
             else:
-                tool_choice = NOT_GIVEN
-                tools_list = NOT_GIVEN
+                tool_choice = omit
+                tools_list = omit
 
             completion: Message
             try:
                 completion = await self._client.messages.create(
                     model=config.model,
-                    system=instructions if instructions else NOT_GIVEN,
+                    system=instructions if instructions else omit,
                     messages=messages,
                     temperature=config.temperature,
                     max_tokens=config.max_output_tokens,
@@ -224,7 +224,7 @@ class AnthropicMessages(AnthropicAPI):
                     tool_choice=tool_choice,
                     stop_sequences=as_list(cast(Sequence[str], config.stop_sequences))
                     if config.stop_sequences is not MISSING
-                    else NOT_GIVEN,
+                    else omit,
                     stream=False,
                 )
 
@@ -656,9 +656,9 @@ def _extract_text_citations(
 
 def _thinking_budget_config(
     budget: int | None | Missing,
-) -> ThinkingConfigParam | NotGiven:
+) -> ThinkingConfigParam | Omit:
     if budget is MISSING:
-        return NOT_GIVEN
+        return omit
 
     assert isinstance(budget, int | None)  # nosec: B101
 
