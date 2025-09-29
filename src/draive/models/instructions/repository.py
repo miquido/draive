@@ -3,7 +3,17 @@ from collections.abc import Mapping, MutableMapping, Sequence
 from pathlib import Path
 from typing import Any, Self, final, overload
 
-from haiway import META_EMPTY, File, FileAccess, Immutable, Meta, State, ctx, statemethod
+from haiway import (
+    META_EMPTY,
+    BasicValue,
+    File,
+    FileAccess,
+    Immutable,
+    Meta,
+    State,
+    ctx,
+    statemethod,
+)
 
 from draive.models.instructions.types import (
     Instructions,
@@ -170,7 +180,7 @@ class InstructionsRepository(State):
         instructions: ResolveableInstructions | None,
         /,
         *,
-        arguments: Mapping[str, str | int | float] | None = None,
+        arguments: Mapping[str, BasicValue] | None = None,
         default: str | None = None,
         **extra: Any,
     ) -> ModelInstructions: ...
@@ -181,7 +191,7 @@ class InstructionsRepository(State):
         instructions: ResolveableInstructions | None,
         /,
         *,
-        arguments: Mapping[str, str | int | float] | None = None,
+        arguments: Mapping[str, BasicValue] | None = None,
         default: str | None = None,
         **extra: Any,
     ) -> ModelInstructions: ...

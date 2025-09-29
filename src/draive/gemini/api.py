@@ -13,7 +13,7 @@ class GeminiAPI:
     def __init__(
         self,
         api_key: str | None,
-        vertexai: bool,
+        vertexai: bool | None,
         http_options: HttpOptionsDict | None,
         **extra: Any,
     ) -> None:

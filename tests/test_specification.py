@@ -1,5 +1,6 @@
 from collections.abc import Mapping, Sequence
 from types import UnionType
+from typing import TypedDict
 
 from haiway.attributes.annotations import (
     BoolAttribute,
@@ -250,3 +251,66 @@ def test_nested_parametrized_specification() -> None:
     assert TestModel[TestModelNested[str]] == TestModel[TestModelNested[str]]
     assert TestModel[TestModelNested[int]] == TestModel[TestModelNested[int]]
     assert TestModel[TestModelNested[str]] != TestModel[TestModelNested[int]]
+
+
+def test_recursive_typed_dict_specification() -> None:
+    class NodeDict(TypedDict):
+        value: int
+        next: 'NodeDict | None'
+
+    class Wrapper(DataModel):
+        node: NodeDict
+
+    identifier = f"#{NodeDict.__qualname__}"
+    assert Wrapper.__PARAMETERS_SPECIFICATION__ == {
+        "type": "object",
+        "properties": {
+            "node": {
+                "type": "object",
+                "properties": {
+                    "value": {"type": "integer"},
+                    "next": {
+                        "oneOf": [
+                            {"$ref": identifier},
+                            {"type": "null"},
+                        ],
+                    },
+                },
+                "additionalProperties": False,
+                "required": ["value", "next"],
+                "$id": identifier,
+            },
+        },
+        "required": ["node"],
+        "additionalProperties": False,
+    }
+
+
+def test_recursive_typed_dict_references_use_identifier() -> None:
+    class NodeDict(TypedDict):
+        value: int
+        next: 'NodeDict | None'
+        sibling: 'NodeDict | None'
+
+    class Wrapper(DataModel):
+        node: NodeDict
+
+    node_spec = Wrapper.__PARAMETERS_SPECIFICATION__["properties"]["node"]
+    identifier = node_spec["$id"]
+
+    assert identifier.startswith("#")
+    for relation in ("next", "sibling"):
+        alternatives = node_spec["properties"][relation]["oneOf"]
+        assert {"$ref": identifier} in alternatives
+        assert {"type": "null"} in alternatives
+
+
+def test_non_recursive_typed_dict_has_no_identifier() -> None:
+    class SimpleDict(TypedDict):
+        value: int
+
+    class Wrapper(DataModel):
+        payload: SimpleDict
+
+    payload_spec = Wrapper.__PARAMETERS_SPECIFICATION__["properties"]["payload"]
+    assert "$id" not in payload_spec

@@ -29,7 +29,7 @@ class Gemini(
     def __init__(
         self,
         api_key: str | None = None,
-        vertexai: bool = False,
+        vertexai: bool | None = None,
         http_options: HttpOptionsDict | None = None,
         features: Collection[type[GenerativeModel | TextEmbedding]] | None = None,
         **extra: Any,
