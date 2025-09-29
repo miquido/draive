@@ -1,6 +1,5 @@
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from typing import (
-    Any,
     Literal,
     NotRequired,
     Required,
@@ -44,7 +43,9 @@ __all__ = (
 
 @final
 class ParameterAlternativesSpecification(TypedDict, total=False):
-    type: Required[Sequence[Literal["string", "number", "integer", "boolean", "null"]]]
+    type: Required[
+        Sequence[Literal["string", "number", "integer", "boolean", "null", "object", "array"]]
+    ]
     description: NotRequired[str]
 
 
@@ -205,24 +206,96 @@ def parameter_specification(
     /,
     description: str | None,
 ) -> ParameterSpecification:
-    if isinstance(annotation, AliasAttribute):
-        return parameter_specification(annotation.resolved, description)
+    return _with_description(
+        _parameter_specification(
+            annotation,
+            recursion_guard={},
+        ),
+        description=description,
+    )
 
-    if specification := SPECIFICATIONS.get(type(annotation)):
-        return specification(annotation, description)
 
-    elif hasattr(annotation.base, "__PARAMETERS_SPECIFICATION__"):
-        if description := description:
-            return cast(
-                ParameterSpecification,
-                {
-                    **annotation.base.__PARAMETERS_SPECIFICATION__,
-                    "description": description,
-                },
+class _RecursionGuard:
+    __slots__ = (
+        "annotation",
+        "requested",
+    )
+
+    def __init__(
+        self,
+        annotation: AttributeAnnotation,
+    ) -> None:
+        self.annotation: AttributeAnnotation = annotation
+        self.requested: bool = False
+
+    @property
+    def name(self) -> str:
+        return self.annotation.name
+
+
+def _parameter_specification(  # noqa: PLR0911
+    annotation: AttributeAnnotation,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
+) -> ParameterSpecification:
+    key: int = id(annotation)
+
+    if guard := recursion_guard.get(key):
+        guard.requested = True
+        return {"$ref": f"#{guard.name}"}
+
+    elif isinstance(annotation, AliasAttribute):
+        recursion_guard[key] = _RecursionGuard(annotation)
+        specification: ParameterSpecification = _parameter_specification(
+            annotation.resolved,
+            recursion_guard,
+        )
+
+        if recursion_guard[key].requested:
+            return _with_identifier(
+                specification,
+                identifier=annotation.name,
             )
 
-        else:
-            return annotation.base.__PARAMETERS_SPECIFICATION__
+        return specification
+
+    elif hasattr(annotation.base, "__PARAMETERS_SPECIFICATION__"):
+        recursion_guard[key] = _RecursionGuard(annotation)
+        specification: ParameterSpecification = cast(
+            ParameterSpecification,
+            annotation.base.__PARAMETERS_SPECIFICATION__,
+        )
+        if recursion_guard[key].requested:
+            return _with_identifier(
+                specification,
+                identifier=annotation.name,
+            )
+
+        return specification
+
+    elif specification_factory := SPECIFICATIONS.get(type(annotation)):
+        guard = recursion_guard.setdefault(
+            key,
+            _RecursionGuard(annotation),
+        )
+
+        specification: ParameterSpecification
+        try:
+            specification = specification_factory(
+                annotation,
+                recursion_guard,
+            )
+
+        finally:
+            if not guard.requested:
+                recursion_guard.pop(key, None)
+
+        if guard.requested:
+            return _with_identifier(
+                specification,
+                identifier=guard.name,
+            )
+
+        return specification
 
     else:
         raise TypeError(f"Unsupported type annotation: {annotation}")
@@ -230,197 +303,118 @@ def parameter_specification(
 
 def _prepare_specification_of_any(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    if description := description:
-        return {
-            "type": "object",
-            "additionalProperties": True,
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "object",
-            "additionalProperties": True,
-        }
+    return {
+        "type": "object",
+        "additionalProperties": True,
+    }
 
 
 def _prepare_specification_of_none(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    if description := description:
-        return {
-            "type": "null",
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "null",
-        }
+    return {
+        "type": "null",
+    }
 
 
 def _prepare_specification_of_missing(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    if description := description:
-        return {
-            "type": "null",
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "null",
-        }
+    return {
+        "type": "null",
+    }
 
 
 def _prepare_specification_of_literal(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    literal = cast(LiteralAttribute, annotation)
+    literal: LiteralAttribute = cast(LiteralAttribute, annotation)
 
     if all(isinstance(element, str) for element in literal.values):
-        if description := description:
-            return {
-                "type": "string",
-                "enum": literal.values,
-                "description": description,
-            }
+        return {
+            "type": "string",
+            "enum": literal.values,
+        }
 
-        else:
-            return {
-                "type": "string",
-                "enum": literal.values,
-            }
+    elif all(isinstance(element, int) for element in literal.values):
+        return {
+            "type": "integer",
+            "enum": literal.values,
+        }
 
-    else:
-        raise TypeError(f"Unsupported type annotation: {annotation}")
+    raise TypeError(f"Unsupported literal annotation: {annotation}")
 
 
 def _prepare_specification_of_sequence(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    sequence = cast(SequenceAttribute, annotation)
-
-    if description := description:
-        return {
-            "type": "array",
-            "items": parameter_specification(
-                sequence.values,
-                description=None,
-            ),
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "array",
-            "items": parameter_specification(
-                sequence.values,
-                description=None,
-            ),
-        }
+    return {
+        "type": "array",
+        "items": _parameter_specification(
+            cast(SequenceAttribute, annotation).values,
+            recursion_guard=recursion_guard,
+        ),
+    }
 
 
 def _prepare_specification_of_mapping(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    mapping = cast(MappingAttribute, annotation)
-
-    if description := description:
-        return {
-            "type": "object",
-            "additionalProperties": parameter_specification(
-                mapping.values,
-                description=None,
-            ),
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "object",
-            "additionalProperties": parameter_specification(
-                mapping.values,
-                description=None,
-            ),
-        }
+    return {
+        "type": "object",
+        "additionalProperties": _parameter_specification(
+            cast(MappingAttribute, annotation).values,
+            recursion_guard=recursion_guard,
+        ),
+    }
 
 
 def _prepare_specification_of_meta(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    # TODO: prepare actual property types declaration
-    if description := description:
-        return {
-            "type": "object",
-            "additionalProperties": True,
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "object",
-            "additionalProperties": True,
-        }
+    return {
+        "type": "object",
+        "additionalProperties": True,
+    }
 
 
 def _prepare_specification_of_tuple(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
     tuple_attribute = cast(TupleAttribute, annotation)
-
-    if description := description:
-        return {
-            "type": "array",
-            "prefixItems": [
-                parameter_specification(element, description=None)
-                for element in tuple_attribute.values
-            ],
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "array",
-            "prefixItems": [
-                parameter_specification(element, description=None)
-                for element in tuple_attribute.values
-            ],
-        }
+    return {
+        "type": "array",
+        "prefixItems": [
+            _parameter_specification(
+                cast(AttributeAnnotation, element),
+                recursion_guard=recursion_guard,
+            )
+            for element in tuple_attribute.values
+        ],
+    }
 
 
 def _prepare_specification_of_union(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    union = cast(UnionAttribute, annotation)
-
     compressed_alternatives: list[Literal["string", "number", "integer", "boolean", "null"]] = []
     alternatives: list[ParameterSpecification] = []
-    for argument in union.alternatives:
-        specification: ParameterSpecification = parameter_specification(
-            cast(AttributeAnnotation, argument),
-            description=None,
+    for argument in cast(UnionAttribute, annotation).alternatives:
+        specification: ParameterSpecification = _parameter_specification(
+            argument,
+            recursion_guard=recursion_guard,
         )
+
         alternatives.append(specification)
         match specification:
             case {"type": "null", **tail} if not tail:
@@ -439,262 +433,143 @@ def _prepare_specification_of_union(
                 compressed_alternatives.append("boolean")
 
             case _:
-                pass  # skip - type is more complex and can't be compressed
+                pass
 
-    if description := description:
-        if len(compressed_alternatives) == len(alternatives):
-            # prefer comperessed when equivalent representation is available
-            return ParameterAlternativesSpecification(
-                type=compressed_alternatives,
-                description=description,
-            )
+    if alternatives and len(compressed_alternatives) == len(alternatives):
+        return cast(
+            ParameterSpecification,
+            {
+                "type": list(compressed_alternatives),
+            },
+        )
 
-        return {
-            "oneOf": alternatives,
-            "description": description,
-        }
-
-    else:
-        if len(compressed_alternatives) == len(alternatives):
-            # prefer comperessed when equivalent representation is available
-            return ParameterAlternativesSpecification(
-                type=compressed_alternatives,
-            )
-
-        return {"oneOf": alternatives}
+    return {
+        "oneOf": alternatives,
+    }
 
 
 def _prepare_specification_of_bool(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    if description := description:
-        return {
-            "type": "boolean",
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "boolean",
-        }
+    return {
+        "type": "boolean",
+    }
 
 
 def _prepare_specification_of_int(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    if description := description:
-        return {
-            "type": "integer",
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "integer",
-        }
+    return {
+        "type": "integer",
+    }
 
 
 def _prepare_specification_of_float(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    if description := description:
-        return {
-            "type": "number",
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "number",
-        }
+    return {
+        "type": "number",
+    }
 
 
 def _prepare_specification_of_str(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    if description := description:
-        return {
-            "type": "string",
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "string",
-        }
+    return {
+        "type": "string",
+    }
 
 
 def _prepare_specification_of_str_enum(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    enum_attribute = cast(StrEnumAttribute, annotation)
-    enum_values: list[str] = [member.value for member in enum_attribute.base]
-
-    specification: ParameterStringEnumSpecification = {
+    return {
         "type": "string",
-        "enum": enum_values,
+        "enum": [member.value for member in cast(StrEnumAttribute, annotation).base],
     }
-
-    if description := description:
-        specification["description"] = description
-
-    return specification
 
 
 def _prepare_specification_of_int_enum(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    enum_attribute = cast(IntEnumAttribute, annotation)
-    enum_values: list[int] = [int(member.value) for member in enum_attribute.base]
-
-    specification: ParameterIntegerEnumSpecification = {
+    return {
         "type": "integer",
-        "enum": enum_values,
+        "enum": [int(member.value) for member in cast(IntEnumAttribute, annotation).base],
     }
-
-    if description := description:
-        specification["description"] = description
-
-    return specification
 
 
 def _prepare_specification_of_uuid(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    if description := description:
-        return {
-            "type": "string",
-            "format": "uuid",
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "string",
-            "format": "uuid",
-        }
+    return {
+        "type": "string",
+        "format": "uuid",
+    }
 
 
 def _prepare_specification_of_date(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    if description := description:
-        return {
-            "type": "string",
-            "format": "date",
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "string",
-            "format": "date",
-        }
+    return {
+        "type": "string",
+        "format": "date",
+    }
 
 
 def _prepare_specification_of_datetime(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    if description := description:
-        return {
-            "type": "string",
-            "format": "date-time",
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "string",
-            "format": "date-time",
-        }
+    return {
+        "type": "string",
+        "format": "date-time",
+    }
 
 
 def _prepare_specification_of_time(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    if description := description:
-        return {
-            "type": "string",
-            "format": "time",
-            "description": description,
-        }
-
-    else:
-        return {
-            "type": "string",
-            "format": "time",
-        }
+    return {
+        "type": "string",
+        "format": "time",
+    }
 
 
 def _prepare_specification_of_custom(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    base: Any = annotation.base
-    if hasattr(base, "__PARAMETERS_SPECIFICATION__"):
-        specification = cast(ParameterSpecification, base.__PARAMETERS_SPECIFICATION__)
-        if description := description:
-            return cast(
-                ParameterSpecification,
-                {
-                    **cast(dict[str, Any], specification),
-                    "description": description,
-                },
-            )
-
-        return specification
-
-    if base is Meta:
-        if description := description:
-            return {
-                "type": "object",
-                "additionalProperties": True,
-                "description": description,
-            }
-
-        else:
-            return {
-                "type": "object",
-                "additionalProperties": True,
-            }
+    if annotation.base is Meta:
+        return {
+            "type": "object",
+            "additionalProperties": True,
+        }
 
     raise TypeError(f"Unsupported custom attribute: {annotation}")
 
 
 def _prepare_specification_of_validable(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
-    validable = cast(ValidableAttribute, annotation)
-    return parameter_specification(validable.attribute, description)
+    return _parameter_specification(
+        cast(ValidableAttribute, annotation).attribute,
+        recursion_guard=recursion_guard,
+    )
 
 
 def _prepare_specification_of_typed_dict(
     annotation: AttributeAnnotation,
-    /,
-    description: str | None,
+    recursion_guard: MutableMapping[int, _RecursionGuard],
 ) -> ParameterSpecification:
     typed_dict = cast(TypedDictAttribute, annotation)
 
@@ -702,38 +577,59 @@ def _prepare_specification_of_typed_dict(
     properties: dict[str, ParameterSpecification] = {}
 
     for key, element in typed_dict.attributes.items():
-        properties[key] = parameter_specification(
+        properties[key] = _parameter_specification(
             element,
-            description=None,
+            recursion_guard=recursion_guard,
         )
 
         if NotRequired in element.annotations:
-            continue  # not required
+            continue
 
-        # default to required when annotations are missing
         required.append(key)
 
-    if description := description:
-        return {
-            "type": "object",
-            "properties": properties,
-            "additionalProperties": False,
-            "required": required,
-            "description": description,
-        }
+    return {
+        "type": "object",
+        "properties": properties,
+        "additionalProperties": False,
+        "required": required,
+    }
 
-    else:
-        return {
-            "type": "object",
-            "properties": properties,
-            "additionalProperties": False,
-            "required": required,
-        }
+
+def _with_description(
+    specification: ParameterSpecification,
+    description: str | None,
+) -> ParameterSpecification:
+    if not description:
+        return specification
+
+    return cast(
+        ParameterSpecification,
+        {
+            **specification,
+            "description": description,
+        },
+    )
+
+
+def _with_identifier(
+    specification: ParameterSpecification,
+    identifier: str,
+) -> ParameterSpecification:
+    return cast(
+        ParameterSpecification,
+        {
+            **specification,
+            "$id": f"#{identifier}",
+        },
+    )
 
 
 SPECIFICATIONS: Mapping[
     type[AttributeAnnotation],
-    Callable[[AttributeAnnotation, str | None], ParameterSpecification],
+    Callable[
+        [AttributeAnnotation, MutableMapping[int, _RecursionGuard]],
+        ParameterSpecification,
+    ],
 ] = {
     AnyAttribute: _prepare_specification_of_any,
     NoneAttribute: _prepare_specification_of_none,

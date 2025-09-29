@@ -4,6 +4,7 @@ from haiway import State
 
 __all__ = (
     "Memory",
+    "MemoryMaintaining",
     "MemoryRecalling",
     "MemoryRemembering",
 )
@@ -26,8 +27,22 @@ class MemoryRemembering[Remembered](Protocol):
     ) -> None: ...
 
 
+@runtime_checkable
+class MemoryMaintaining(Protocol):
+    async def __call__(
+        self,
+        **extra: Any,
+    ) -> None: ...
+
+
 async def _remember_none(
     *items: Any,
+    **extra: Any,
+) -> None:
+    pass  # noop
+
+
+async def _maintenance_noop(
     **extra: Any,
 ) -> None:
     pass  # noop
@@ -52,3 +67,4 @@ class Memory[Recalled, Remembered](State):
 
     recall: MemoryRecalling[Recalled]
     remember: MemoryRemembering[Remembered]
+    maintenance: MemoryMaintaining = _maintenance_noop

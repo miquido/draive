@@ -19,7 +19,7 @@ from typing import (
     runtime_checkable,
 )
 
-from haiway import META_EMPTY, Meta, MetaValues, State, ctx
+from haiway import META_EMPTY, BasicValue, Meta, MetaValues, State, ctx
 
 from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, MultimodalContentPart
 from draive.parameters import DataModel, ToolParametersSpecification
@@ -709,7 +709,7 @@ class ModelMemoryRecall(DataModel):
     def of(
         cls,
         *elements: ModelContextElement,
-        variables: Mapping[str, str | int | float] | None = None,
+        variables: Mapping[str, BasicValue] | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create a recall from one or more context elements.
@@ -718,7 +718,7 @@ class ModelMemoryRecall(DataModel):
         ----------
         elements : ModelContextElement
             Context elements (inputs/outputs) to include in the recall.
-        variables : Mapping[str, str | int | float] | None, optional
+        variables : Mapping[str, BasicValue] | None, optional
             Variables associated with the recall.
         meta : Meta | MetaValues | None, optional
             Additional metadata.
@@ -736,7 +736,7 @@ class ModelMemoryRecall(DataModel):
 
     type: Literal["model_memory"] = "model_memory"
     context: ModelContext
-    variables: Mapping[str, str | int | float] | None = None
+    variables: Mapping[str, BasicValue] | None = None
     meta: Meta = META_EMPTY
 
 
