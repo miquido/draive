@@ -82,6 +82,7 @@ def _format_variables(
 
     return f"<TASK_VARIABLES>\n{arguments}\n</TASK_VARIABLES>"
 
+
 def _format_guidelines(guidelines: str | None) -> str:
     if not guidelines:
         return ""

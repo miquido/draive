@@ -1,5 +1,6 @@
 import json
 from collections.abc import Generator, Mapping, Sequence
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
 from haiway import BasicValue, Map, ctx
@@ -83,11 +84,11 @@ def PostgresModelMemory(
         )
 
     async def remember(
-        *items: ModelContextElement,
+        *elements: ModelContextElement,
         variables: Mapping[str, BasicValue] | None = None,
         **extra: Any,
     ) -> None:
-        if not items and variables is None:
+        if not elements and variables is None:
             return ctx.log_info(f"No content to remember for {identifier}, skipping!")
 
         ctx.log_info(f"Remembering content for {identifier}...")
@@ -113,8 +114,9 @@ def PostgresModelMemory(
                         json.dumps(variables),
                     )
 
-                ctx.log_info(f"...remembering {len(items)} context elements...")
-                for element in items:
+                ctx.log_info(f"...remembering {len(elements)} context elements...")
+                created_timestamp: datetime = datetime.now(UTC)
+                for idx, element in enumerate(elements):
                     await connection.execute(
                         """
                         INSERT INTO
@@ -125,11 +127,13 @@ def PostgresModelMemory(
 
                         VALUES (
                             $1::TEXT,
-                            $2::JSONB
+                            $2::JSONB,
+                            $3::TIMESTAMPTZ
                         );
                         """,
                         identifier,
                         element.to_json(),
+                        created_timestamp + timedelta(microseconds=idx),
                     )
 
         ctx.log_info("...memory persisted!")
@@ -143,7 +147,6 @@ def PostgresModelMemory(
         async with Postgres.acquire_connection() as connection:
             async with connection.transaction():
                 ctx.log_info("...ensuring memory entry exists...")
-                ctx.log_info("...creating memories entry if missing...")
                 await connection.execute(
                     """
                         INSERT INTO

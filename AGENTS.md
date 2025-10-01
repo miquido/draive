@@ -4,7 +4,7 @@ Rules for coding agents to contribute correctly and safely.
 
 ## Development Toolchain
 
-- Python: 3.12
+- Python: 3.12+
 - Virtualenv: managed by uv, available at `./.venv`, assume already set up and working within venv
 - Formatting: Ruff formatter (`make format`), no other formatter
 - Linters/Type-checkers: Ruff, Bandit, Pyright (strict). Run via `make lint`
@@ -14,7 +14,7 @@ Rules for coding agents to contribute correctly and safely.
 
 - Draive is built on top of Haiway (state, context, observability, config). See: https://github.com/miquido/haiway
 - Import symbols from `haiway` directly: `from haiway import State, ctx`
-- Use context scoping (`ctx.scope(...)`) to bind active `State` instances and avoid global state
+- Use context scoping (`ctx.scope(...)`) to bind scoped `Disposables`, active `State` instances and avoid global state
 - All logs go through `ctx.log_*`; do not use `print`.
 
 ## Project Layout
@@ -34,7 +34,7 @@ Top-level code lives under `src/draive/`, key packages and what they contain:
 - Provider adapters — unified shape per provider:
   - `draive/openai/`, `draive/anthropic/`, `draive/mistral/`, `draive/gemini/`, `draive/vllm/`, `draive/ollama/`, `draive/bedrock/`, `draive/cohere/`
   - Each has `config.py`, `client.py`, `api.py`, and feature-specific modules.
-- Integrations: `draive/httpx/`, `draive/mcp/`, `draive/opentelemetry/` (opt-in extras)
+- Integrations: `draive/httpx/`, `draive/mcp/`, `draive/postgres/`, `draive/opentelemetry/` (opt-in extras)
 
 Public exports are centralized in `src/draive/__init__.py`.
 
@@ -42,6 +42,7 @@ Public exports are centralized in `src/draive/__init__.py`.
 
 ### Typing & Immutability
 
+- Ensure latest, most strict typing syntax available from python 3.12+
 - Strict typing only: no untyped public APIs, no loose `Any` unless required by third-party boundaries
 - Prefer explicit attribute access with static types. Avoid dynamic `getattr` except at narrow boundaries.
 - Prefer abstract immutable protocols: `Mapping`, `Sequence`, `Iterable` over `dict`/`list`/`set` in public types
@@ -187,32 +188,3 @@ async def test_greeter_returns_greeting() -> None:
 - Tests: `make test` passes, add/update tests if behavior changes
 - Types: strict, no ignores, no loosening of typing
 - API surface: update `__init__.py` exports and docs if needed
-
-## Code Search (ast-grep)
-
-Use ast-grep for precise, structural search and refactors. Prefer `rg` for simple text matches.
-
-- Invocation: `sg run --lang python --pattern "<PATTERN>" [FLAGS]`
-- Useful patterns for this repo:
-  - `ctx.scope($X)` — find context scopes
-  - `@statemethod` — find state-dispatched classmethods
-  - `class $NAME(State)` — locate `haiway.State` subclasses
-  - `MultimodalContent.of($X)` — multimodal composition sites
-  - `$FUNC(meta=$META)` — functions receiving `meta`
-- Common flags:
-  - `--json` — machine-readable results
-  - `--selector field_declaration` — restrict matches (e.g., type fields)
-  - `--rewrite "<REWRITE>"` — propose changes; always review diffs first
-
-### Examples:
-
-```bash
-# Where do we open context scopes?
-sg run --lang python --pattern "ctx.scope($X)" src
-
-# Find all State types
-sg run --lang python --pattern "class $NAME(State)" src
-
-# Find multimodal builders
-sg run --lang python --pattern "MultimodalContent.of($X)" src
-```
