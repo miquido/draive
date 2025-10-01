@@ -12,11 +12,9 @@ __all__ = ("PostgresConfigurationRepository",)
 # CREATE TABLE configurations (
 #     identifier TEXT NOT NULL,
 #     content JSONB NOT NULL,
-#     created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+#     created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+#     PRIMARY KEY (identifier, created)
 # );
-#
-# CREATE INDEX configurations_identifier_created_idx
-#     ON configurations (identifier, created DESC);
 #
 
 
@@ -38,6 +36,7 @@ def PostgresConfigurationRepository(
     ConfigurationRepository
         Repository facade backed by the ``configurations`` Postgres table.
     """
+
     @cache(
         limit=1,
         expiration=cache_expiration,
@@ -49,7 +48,7 @@ def PostgresConfigurationRepository(
         results: Sequence[PostgresRow] = await Postgres.fetch(
             """
                 SELECT DISTINCT ON (identifier)
-                    identifier
+                    identifier::TEXT
 
                 FROM
                     configurations
@@ -75,8 +74,8 @@ def PostgresConfigurationRepository(
         loaded: PostgresRow | None = await Postgres.fetch_one(
             """
             SELECT DISTINCT ON (identifier)
-                identifier,
-                content
+                identifier::TEXT,
+                content::TEXT
 
             FROM
                 configurations
@@ -118,8 +117,8 @@ def PostgresConfigurationRepository(
                 )
 
             VALUES (
-                $1,
-                $2::jsonb
+                $1::TEXT,
+                $2::JSONB
             );
             """,
             identifier,
