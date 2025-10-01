@@ -122,7 +122,8 @@ def PostgresModelMemory(
                         INSERT INTO
                             memories_elements (
                                 identifier,
-                                content
+                                content,
+                                created
                             )
 
                         VALUES (
