@@ -1,215 +1,190 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Rules for coding agents to contribute correctly and safely.
 
-## Development Commands
+## Development Toolchain
 
-### Setup
+- Python: 3.12+
+- Virtualenv: managed by uv, available at `./.venv`, assume already set up and working within venv
+- Formatting: Ruff formatter (`make format`), no other formatter
+- Linters/Type-checkers: Ruff, Bandit, Pyright (strict). Run via `make lint`
+- Tests: `make test` or targeted `pytest tests/test_...::test_...`
 
-- `make venv` - Setup development environment and install git hooks
-- `source .venv/bin/activate && make sync` - Sync dependencies with uv lock file
-- `source .venv/bin/activate && make update` - Update and lock dependencies
+## Framework Foundation (Haiway)
 
-### Code Quality
+- Draive is built on top of Haiway (state, context, observability, config). See: https://github.com/miquido/haiway
+- Import symbols from `haiway` directly: `from haiway import State, ctx`
+- Use context scoping (`ctx.scope(...)`) to bind scoped `Disposables`, active `State` instances and avoid global state
+- All logs go through `ctx.log_*`; do not use `print`.
 
-- `source .venv/bin/activate && make format` - Format code with Ruff
-- `source .venv/bin/activate && make lint` - Run linters (Ruff + Bandit + Pyright strict mode)
-- `source .venv/bin/activate && make test` - Run pytest with coverage
-- `source .venv/bin/activate && pytest tests/test_specific.py` - Run single test file
-- `source .venv/bin/activate && pytest tests/test_specific.py::test_function` - Run specific test
+## Project Layout
 
-## Architecture Overview
+Top-level code lives under `src/draive/`, key packages and what they contain:
 
-Draive is a Python framework (3.12+) for LLM applications built on the **Haiway** framework, leveraging its state, dependency, and task-management facilities. It emphasizes:
+- `draive/models/` — core model abstractions: `GenerativeModel`, tools (`models/tools`), instructions handling
+- `draive/generation/` — typed generation facades for text, image, audio, and model wiring (`state.py`, `types.py`, `default.py`)
+- `draive/conversation/` — higher-level chat/realtime conversations (completion and realtime sessions)
+- `draive/multimodal/` — content types and helpers: `MultimodalContent`, `TextContent`, `ArtifactContent`
+- `draive/resources/` — resource references and blobs: `ResourceContent`, `ResourceReference`, repository interfaces
+- `draive/parameters/` — strongly-typed parameter schemas and validation helpers
+- `draive/embedding/` — vector operations, similarity, indexing, and typed embedding states
+- `draive/guardrails/` — moderation, privacy, quality verification states and types
+- `draive/stages/` — pipeline stages abstractions and helpers
+- `draive/utils/` — utilities (e.g., `Memory`, `VectorIndex`)
+- Provider adapters — unified shape per provider:
+  - `draive/openai/`, `draive/anthropic/`, `draive/mistral/`, `draive/gemini/`, `draive/vllm/`, `draive/ollama/`, `draive/bedrock/`, `draive/cohere/`
+  - Each has `config.py`, `client.py`, `api.py`, and feature-specific modules.
+- Integrations: `draive/httpx/`, `draive/mcp/`, `draive/postgres/`, `draive/opentelemetry/` (opt-in extras)
 
-1. **Immutable State Management**: Type-safe, immutable data structures with validation
-2. **Context-based Dependency Injection**: Safe state propagation in concurrent environments
-3. **Functional Approach**: Pure functions over objects with methods
-4. **Structured Concurrency**: Automatic task management and resource cleanup
-5. **Haiway Proxy**: draive builds on top of haiway and exports its symbols
+Public exports are centralized in `src/draive/__init__.py`.
 
-### Core Components
+## Style & Patterns
 
-- **Integrations**: Various AI service provider integrations. Including Anthropic, AWS Bedrock, Cohere, Gemini, Mistral, Ollama, OpenAI, VLLM
-- **Functionalities**: High- and low-level interfaces and implementations of application building blocks, including embedding, **LMM**, evaluation, generation, conversation, guardrails, instructions, resources, prompts, tools, **MCP** support
-- **Parameters**: Immutable data structures and **parameterized** functions with **JSON Schema** generation, validation, and generic-type support
-- **Utils**: Application utilities, common types and interfaces
-- **Helpers**: Implementations of selected functionalities combining other components
+### Typing & Immutability
 
-### Code Style
+- Ensure latest, most strict typing syntax available from python 3.12+
+- Strict typing only: no untyped public APIs, no loose `Any` unless required by third-party boundaries
+- Prefer explicit attribute access with static types. Avoid dynamic `getattr` except at narrow boundaries.
+- Prefer abstract immutable protocols: `Mapping`, `Sequence`, `Iterable` over `dict`/`list`/`set` in public types
+- Use `final` where applicable; avoid complex inheritance, prefer type composition
+- Use precise unions (`|`) and narrow with `match`/`isinstance`, avoid `cast` unless provably safe and localized
 
-- Use absolute imports from `draive` package
-- Put exported symbols into `__init__.py`
-- Follow Ruff import ordering (standard library, third party, local)
-- Use Python 3.12+ type features (type unions with `|`, generic syntax)
-- Use base and abstract types like `Sequence` or `Iterable` instead of concrete
-- Use custom exceptions for specific errors
+### State & Context
 
-### Documentation Style
+- Use `haiway.State` for immutable data/config and service facades. Construct with classmethods like `of(...)` when ergonomic.
+- Avoid in-place mutation; use `State.updated(...)`/functional builders to create new instances.
+- Access active state through `haiway.ctx` inside async scopes (`ctx.scope(...)`).
+- Public state methods that dispatch on the active instance should use `@statemethod` (see `GenerativeModel`).
 
-- Use NumPy docstring convention for all functions, classes, and methods
-- Skip module-level docstrings unless explicitly requested
-- Include sections: Parameters, Returns, Raises, Notes (if needed)
-- Example:
+#### Examples:
 
+State with instantiation helper:
 ```python
-def function_name(
-    param1: str,
-    param2: int | None = None,
-) -> bool:
-    """
-    Brief one-line description of function.
+from typing import Self
+from haiway import State, statemethod, Meta, MetaValues
 
-    Optional longer description explaining the function's behavior,
-    use cases, or important details.
-
-    Parameters
-    ----------
-    param1 : str
-        Description of param1
-    param2 : int | None, optional
-        Description of param2, by default None
-
-    Returns
-    -------
-    bool
-        Description of return value
-
-    Raises
-    ------
-    ValueError
-        When invalid parameters are provided
-    """
-```
-
-### Testing Guidelines
-
-- Uses pytest with async support. Tests are in `tests/` directory.
-- Mock dependencies within scope using stubbed functionality state.
-
-## Examples
-
-### Immutability Rules
-
-**ALWAYS use these types for collections in State, Config and DataModel classes:**
-- Use `Sequence[T]` instead of `list[T]` (becomes tuple)
-- Use `Mapping[K,V]` instead of `dict[K,V]` (becomes immutable)
-- Use `Set[T]` instead of `set[T]` (becomes frozenset)
-
-```python
-from typing import Sequence, Mapping, Set
-from haiway import State
-
-class UserData(State):
-    roles: Sequence[str]  # Will be tuple
-    metadata: Mapping[str, Any]  # Will be immutable
-    tags: Set[str]  # Will be frozenset
-
-```
-
-### State Definition Patterns
-
-```python
-from typing import Protocol, runtime_checkable
-from uuid import UUID, uuid4
-from haiway import State
-from draive import Field
-
-# Basic data structure
-class UserData(State):
-    id: UUID
-    name: str
-    email: str | None = None
-
-# Generic state classes
-class Container[Element](State):
-    items: Sequence[Element]
-    metadata: Mapping[str, Any]
-
-# Special kind of State supporting loading from external source
-class UserConfig(Config):
-    value: str
-
-# Serializable counterpart of State
-class UserModel(DataModel):
-    # Field allows customizing DataModel fields with various options
-    id: UUID = Field(default_factory=uuid4, aliased="user_id")
-    name: str
-
-# Function protocol
-@runtime_checkable
-class UserFetching(Protocol):
-    async def __call__(self, id: str) -> UserData: ...
-
-# Functionality state pattern used for dependency injection
-class UserService(State):
-    # Function implementations
-    user_fetching: UserFetching
-
-    # Class method interface to access functions within context
+class Counter(State):
     @classmethod
-    async def fetch_user(cls, *, id: str) -> UserData:
-        return await ctx.state(cls).user_fetching(id)
+    def of(
+        cls,
+        *,
+        start: int = 0,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        return cls(
+            value=start,
+            meta=Meta.of(meta),
+        )
+
+    value: int
+    meta: Meta
 ```
 
-### State Updates
-
+State with statemethod helper:
 ```python
-# Immutable updates through copy, same for State, Config and DataModel
-user: UserData = ...
-updated_user: UserData = user.updated(name="Updated")
+from typing import Self, Protocol
+from haiway import State, statemethod
+
+class Printing(Protocol):
+    async def __call__(self, text: str) -> None: ...
+
+class Printer(State):
+    @statemethod
+    async def print(
+        self,
+        *,
+        value: str | int | float,
+    ) -> None:
+        await self.printing(str(value))
+
+    printing: Printing
 ```
 
-### Resource Management
+### Observability & Logging
 
-```python
-from contextlib import asynccontextmanager
-from haiway import ctx, State
+- Use `ctx.log_debug/info/warn/error` for logs; do not use `print`
+- Log around generation calls, tool dispatch, provider requests/responses (without leaking secrets)
+- Add appropriate metrics tracking using `ctx.record` where applicable
+- Prefer structured/concise messages; avoid excessive verbosity in hot paths
 
-class ResourceAccess(State):
-    accessing: ResourceAccessing
+### Concurrency & Async
 
-    @classmethod
-    def access(cls) -> ResourceData:
-        return ctx.state(cls).accessing()
+- All I/O is async, keep boundaries async and use `ctx.spawn` for detached tasks
+- Ensure structured concurrency concepts and valid coroutine usage
+- Rely on haiway and asyncio packages with coroutines, avoid custom threading
 
-@asynccontextmanager
-async def create_resource_disposable():
-    # Create a disposable resource
-    resource: ResourceHandle = await open_resource()
-    try:
-        # Yield the state that will be made available in the context
-        yield ResourceState(accessing=resource.access)
+### Exceptions & Error Translation
 
-    finally:
-        # Cleanup happens automatically when context exits
-        await resource.close()
+- Translate provider/SDK errors into appropriate typed exceptions
+- Don’t raise bare `Exception`, preserve contextual information in exception construction
 
-# Resources are automatically cleaned up and their state included in context
-async with ctx.scope(
-    "work",
-    disposables=(create_resource_disposable(),)
-):
-    # ResourceAccess is now available in the context
-    resource_data: ResourceData = ResourceAccess.access()
-# Cleanup happens automatically here
-```
+### Multimodal
 
-## Testing Patterns
+- Build content with `MultimodalContent.of(...)` and prefer composing content blocks explicitly
+- Use ResourceContent/Reference for media and data blobs
+- Wrap custom types and data within ArtifactContent, use hidden when needed
+
+## Testing & CI
+
+- No network in unit tests, mock providers/HTTP
+- Keep tests fast and specific to the code you change, start with unit tests around new types/functions and adapters
+- Use fixtures from `tests/` or add focused ones; avoid heavy integration scaffolding
+- Linting/type gates must be clean: `make format` then `make lint`
+
+### Async tests
+
+- Use `pytest-asyncio` for coroutine tests (`@pytest.mark.asyncio`).
+- Prefer scoping with `ctx.scope(...)` and bind required `State` instances explicitly.
+- Avoid real I/O and network; stub provider calls and HTTP.
+
+#### Examples
 
 ```python
 import pytest
-from haiway import ctx
+from draive import State, ctx
+
+class Example(State):
+    name: str
 
 @pytest.mark.asyncio
-async def test_functionality():
-    # Set up test context
-    async with ctx.scope("test", TestState(value="test")):
-        result = await some_function()
-        assert result == expected_result
-
-@pytest.mark.asyncio
-async def test_with_mock():
-    async with ctx.scope("test", ServiceState(fetching=mock_fetching)):
-        # Test with mocked service
+async def test_greeter_returns_greeting() -> None:
+    async with ctx.scope(Example(name="Ada")):
+        example: Example = ctx.state(Example)
+        assert example.name == "Ada"
 ```
+
+### Self verification
+
+- Ensure type checking soundness as a part of the workflow
+- Do not mute or ignore errors, double check correctness and seek for solutions
+- Verify code correctness with unit tests or by running ad-hoc scripts
+- Ask for additional guidance and confirmation when uncertain or about to modify additional elements
+
+## Documentation
+
+- Public symbols: add NumPy-style docstrings. Include Parameters/Returns/Raises sections and rationale when not obvious
+- Internal helpers: avoid docstrings, keep names self-explanatory
+- If behavior/API changes, update relevant docs under `docs/` and examples if applicable
+- Skip module docstrings
+
+### Docs (MkDocs)
+
+- Site is built with MkDocs + Material and `mkdocstrings` for API docs.
+- Author pages under `docs/` and register navigation in `mkdocs.yml` (`nav:` section).
+- Preview locally: `make docs-server` (serves at http://127.0.0.1:8000).
+- Build static site: `make docs` (outputs to `site/`).
+- Keep docstrings high‑quality; `mkdocstrings` pulls them into reference pages.
+- When adding public APIs, update examples/guides as needed and ensure cross‑links render.
+
+## Security & Secrets
+
+- Never log secrets or full request bodies containing keys/tokens
+- Use environment variables for credentials, resolve via helpers like `getenv_str`
+
+## Contribution Checklist
+
+- Build: `make format` succeeds
+- Quality: `make lint` is clean (Ruff, Bandit, Pyright strict)
+- Tests: `make test` passes, add/update tests if behavior changes
+- Types: strict, no ignores, no loosening of typing
+- API surface: update `__init__.py` exports and docs if needed
