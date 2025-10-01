@@ -3,7 +3,7 @@ from collections.abc import Generator, Mapping, Sequence
 from typing import Any, cast
 
 from haiway import BasicValue, Map, ctx
-from haiway.postgres import Postgres, PostgresConnection, PostgresRow, PostgresValue
+from haiway.postgres import Postgres, PostgresRow, PostgresValue
 
 from draive.models import ModelMemory, ModelMemoryRecall
 from draive.models.types import ModelContextElement, ModelInput, ModelOutput
@@ -15,21 +15,21 @@ __all__ = ("PostgresModelMemory",)
 #
 # CREATE TABLE memories (
 #     identifier TEXT NOT NULL,
+#     created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+#     PRIMARY KEY (identifier)
+# );
+#
+# CREATE TABLE memories_variables (
+#     identifier TEXT NOT NULL REFERENCES memories (identifier) ON DELETE CASCADE,
 #     variables JSONB NOT NULL DEFAULT '{}'::jsonb,
 #     created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 # );
-#
-# CREATE INDEX memories_identifier_created_idx
-#     ON memories (identifier, created DESC);
 #
 # CREATE TABLE memories_elements (
 #     identifier TEXT NOT NULL REFERENCES memories (identifier) ON DELETE CASCADE,
 #     content JSONB NOT NULL,
 #     created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 # );
-#
-# CREATE INDEX memories_elements_identifier_idx
-#     ON memories_elements (identifier, created DESC);
 #
 
 
@@ -92,21 +92,21 @@ def PostgresModelMemory(
 
         ctx.log_info(f"Remembering content for {identifier}...")
 
-        async with Postgres.acquire_connection():
-            async with PostgresConnection.transaction():
+        async with Postgres.acquire_connection() as connection:
+            async with connection.transaction():
                 if variables is not None:
                     ctx.log_info(f"...remembering {len(variables)} variables...")
-                    await PostgresConnection.execute(
+                    await connection.execute(
                         """
                         INSERT INTO
-                            memories (
+                            memories_variables (
                                 identifier,
                                 variables
                             )
 
                         VALUES (
-                            $1,
-                            $2::jsonb
+                            $1::TEXT,
+                            $2::JSONB
                         );
                         """,
                         identifier,
@@ -115,7 +115,7 @@ def PostgresModelMemory(
 
                 ctx.log_info(f"...remembering {len(items)} context elements...")
                 for element in items:
-                    await PostgresConnection.execute(
+                    await connection.execute(
                         """
                         INSERT INTO
                             memories_elements (
@@ -124,8 +124,8 @@ def PostgresModelMemory(
                             )
 
                         VALUES (
-                            $1,
-                            $2::jsonb
+                            $1::TEXT,
+                            $2::JSONB
                         );
                         """,
                         identifier,
@@ -140,63 +140,45 @@ def PostgresModelMemory(
     ) -> None:
         ctx.log_info(f"Performing maintenance for {identifier}...")
 
-        async with Postgres.acquire_connection():
-            async with PostgresConnection.transaction():
+        async with Postgres.acquire_connection() as connection:
+            async with connection.transaction():
+                ctx.log_info("...ensuring memory entry exists...")
+                ctx.log_info("...creating memories entry if missing...")
+                await connection.execute(
+                    """
+                        INSERT INTO
+                            memories (
+                                identifier
+                            )
+
+                        VALUES (
+                            $1::TEXT
+                        )
+
+                        ON CONFLICT (identifier)
+                        DO NOTHING;
+                        """,
+                    identifier,
+                )
+
                 if variables is not None:
                     ctx.log_info(f"...remembering {len(variables)} variables...")
-                    await PostgresConnection.execute(
+                    await connection.execute(
                         """
-                            INSERT INTO
-                                memories (
-                                    identifier,
-                                    variables
-                                )
+                        INSERT INTO
+                            memories_variables (
+                                identifier,
+                                variables
+                            )
 
-                            VALUES (
-                                $1,
-                                $2::jsonb
-                            );
-                            """,
+                        VALUES (
+                            $1::TEXT,
+                            $2::JSONB
+                        );
+                        """,
                         identifier,
                         json.dumps(variables),
                     )
-
-                else:
-                    ctx.log_info("...ensuring memory entry exists...")
-                    existing: PostgresRow | None = await PostgresConnection.fetch_one(
-                        """
-                            SELECT
-                                1
-
-                            FROM
-                                memories
-
-                            WHERE
-                                identifier = $1
-
-                            LIMIT 1;
-                            """,
-                        identifier,
-                    )
-
-                    if existing is None:
-                        ctx.log_info("... creating new memories...")
-                        await PostgresConnection.execute(
-                            """
-                                INSERT INTO
-                                    memories (
-                                        identifier,
-                                        variables
-                                    )
-
-                                VALUES (
-                                    $1,
-                                    $2::jsonb
-                                );
-                                """,
-                            identifier,
-                            json.dumps({}),
-                        )
 
         ctx.log_info("...maintenance completed!")
 
@@ -217,7 +199,7 @@ async def _load_context(
     if limit:
         statement = """
         SELECT
-            content
+            content::TEXT
 
         FROM
             memories_elements
@@ -236,7 +218,7 @@ async def _load_context(
     else:
         statement = """
         SELECT
-            content
+            content::TEXT
 
         FROM
             memories_elements
@@ -288,10 +270,10 @@ async def _load_variables(
     row: PostgresRow | None = await Postgres.fetch_one(
         """
         SELECT DISTINCT ON (identifier)
-            variables
+            variables::TEXT
 
         FROM
-            memories
+            memories_variables
 
         WHERE
             identifier = $1

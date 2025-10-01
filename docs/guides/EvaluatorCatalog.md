@@ -394,6 +394,9 @@ partial_result = await required_keywords_evaluator(
 print(f"Partial keyword score: {partial_result.score.value}")  # Output: 0.75 (3 out of 4 keywords)
 ```
 
+```python
+from collections.abc import Sequence
+
 from draive.evaluation import evaluate, evaluator_scenario, EvaluatorResult
 from draive.evaluators import (
     creativity_evaluator,
@@ -405,11 +408,12 @@ from draive.evaluators import (
     tone_style_evaluator,
 )
 
+
 @evaluator_scenario(name="marketing_content_quality")
 async def evaluate_marketing_content(
     content: str,
     brand_guidelines: str,
-    target_keywords: list[str]
+    target_keywords: Sequence[str],
 ) -> Sequence[EvaluatorResult]:
     """Comprehensive marketing content evaluation."""
 
@@ -422,13 +426,17 @@ async def evaluate_marketing_content(
 
         # Brand compliance
         tone_style_evaluator.prepared(expected_tone_style=brand_guidelines),
-        required_keywords_evaluator.prepared(keywords=target_keywords, require_all=False),
+        required_keywords_evaluator.prepared(
+            keywords=target_keywords,
+            require_all=False,
+        ),
 
         # Safety and accuracy
         safety_evaluator.prepared(),
         factual_accuracy_evaluator.prepared(),
-        concurrent_tasks=3  # Control concurrency
+        concurrent_tasks=3,  # Control concurrency
     )
+
 
 # Usage example
 marketing_copy = "Discover our revolutionary AI platform that transforms how businesses connect with customers..."
@@ -443,16 +451,18 @@ Avoid: Technical jargon, superlatives without proof
 result = await evaluate_marketing_content(
     marketing_copy,
     brand_guide,
-    ["AI", "platform", "business", "customers"]
+    ["AI", "platform", "business", "customers"],
 )
 
 print(f"Marketing content passed: {result.passed}")
 for eval_result in result.evaluations:
+    print(f"{eval_result.name}: {eval_result.score.value}")
+
 
 async def evaluate_support_response(
     response: str,
     customer_query: str,
-    company_policy: str
+    company_policy: str,
 ) -> Sequence[EvaluatorResult]:
     """Evaluate customer support response quality."""
 
@@ -468,13 +478,17 @@ async def evaluate_support_response(
 
         # Policy compliance
         consistency_evaluator.prepared(reference=company_policy),
-        tone_style_evaluator.prepared(expected_tone_style="Professional, empathetic, solution-focused"),
-        concurrent_tasks=2
+        tone_style_evaluator.prepared(
+            expected_tone_style="Professional, empathetic, solution-focused",
+        ),
+        concurrent_tasks=2,
+    )
+
 
 async def evaluate_academic_content(
     content: str,
     source_material: str,
-    academic_standards: str
+    academic_standards: str,
 ) -> Sequence[EvaluatorResult]:
     """Evaluate academic content against standards."""
 
@@ -491,29 +505,35 @@ async def evaluate_academic_content(
 
         # Standards compliance
         expectations_evaluator.prepared(expectations=academic_standards),
-        concurrent_tasks=3
+        concurrent_tasks=3,
+    )
+
 
 # For user-facing content - prioritize user experience and safety
 user_focused_evaluators = [
     helpfulness_evaluator.with_threshold("excellent"),  # High bar for user satisfaction
     completeness_evaluator.with_threshold("good"),      # Moderate - some flexibility
     safety_evaluator.with_threshold("perfect"),         # Critical - no compromise
-    readability_evaluator.with_threshold("good")        # Moderate - depends on audience
+    readability_evaluator.with_threshold("good"),       # Moderate - depends on audience
 ]
+
 
 # For content with source material - accuracy is paramount
 reference_based_evaluators = [
     coverage_evaluator.with_threshold("excellent"),     # High - ensure key points covered
     consistency_evaluator.with_threshold("perfect"),    # Critical - no contradictions
     groundedness_evaluator.with_threshold("excellent"), # High - must cite sources
-    truthfulness_evaluator.with_threshold("excellent")  # High - accuracy matters
+    truthfulness_evaluator.with_threshold("excellent"), # High - accuracy matters
 ]
+
 
 # For creative content - balance creativity with quality
 creative_evaluators = [
     creativity_evaluator.with_threshold("good"),        # Moderate - allow variety
     tone_style_evaluator.with_threshold("excellent"),   # High - brand consistency
-    fluency_evaluator.with_threshold("excellent")       # High - basic quality requirement
+    fluency_evaluator.with_threshold("excellent"),      # High - basic quality requirement
+]
+```
 
 
 ```python
@@ -536,6 +556,10 @@ readability_evaluator.with_threshold("good")            # Accessible but flexibl
 similarity_evaluator.with_threshold("fair")             # Loose matching
 
 
+```
+
+
+```python
 # Run independent evaluators concurrently
 results = await evaluate(
     content,
@@ -555,6 +579,9 @@ result = await tone_style_evaluator(
     - Consistency with brand voice
     - Professional yet approachable tone
     """
+
+
+```
 
 
 - **20 specialized evaluators** covering quality, safety, user needs, and content requirements

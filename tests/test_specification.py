@@ -256,7 +256,7 @@ def test_nested_parametrized_specification() -> None:
 def test_recursive_typed_dict_specification() -> None:
     class NodeDict(TypedDict):
         value: int
-        next: 'NodeDict | None'
+        next: "NodeDict | None"
 
     class Wrapper(DataModel):
         node: NodeDict
@@ -289,8 +289,8 @@ def test_recursive_typed_dict_specification() -> None:
 def test_recursive_typed_dict_references_use_identifier() -> None:
     class NodeDict(TypedDict):
         value: int
-        next: 'NodeDict | None'
-        sibling: 'NodeDict | None'
+        next: "NodeDict | None"
+        sibling: "NodeDict | None"
 
     class Wrapper(DataModel):
         node: NodeDict

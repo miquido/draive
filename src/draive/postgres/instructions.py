@@ -21,11 +21,9 @@ __all__ = ("PostgresInstructionsRepository",)
 #     content TEXT NOT NULL,
 #     arguments JSONB NOT NULL DEFAULT '[]'::jsonb,
 #     meta JSONB NOT NULL DEFAULT '{}'::jsonb,
-#     created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+#     created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+#     PRIMARY KEY (name, created)
 # );
-#
-# CREATE INDEX instructions_name_created_idx
-#     ON instructions (name, created DESC);
 #
 
 
@@ -47,6 +45,7 @@ def PostgresInstructionsRepository(
     InstructionsRepository
         Repository facade operating on the ``instructions`` Postgres table.
     """
+
     @cache(
         limit=1,
         expiration=cache_expiration,
@@ -58,10 +57,10 @@ def PostgresInstructionsRepository(
         results: Sequence[PostgresRow] = await Postgres.fetch(
             """
             SELECT DISTINCT ON (name)
-                name,
-                description,
-                arguments,
-                meta
+                name::TEXT,
+                description::TEXT,
+                arguments::TEXT,
+                meta::TEXT
 
             FROM
                 instructions
@@ -81,7 +80,7 @@ def PostgresInstructionsRepository(
                 arguments=InstructionsArgumentDeclaration.from_json_array(
                     cast(str, result["arguments"] or "[]")
                 ),
-                meta=Meta.from_json(cast(str, result["meta"])),
+                meta=Meta.from_json(cast(str, result["meta"] or "{}")),
             )
             for result in results
         )
@@ -136,7 +135,6 @@ def PostgresInstructionsRepository(
         **extra: Any,
     ) -> None:
         ctx.log_info(f"Defining '{declaration.name}' instruction...")
-        description = declaration.description or ""
         await Postgres.execute(
             """
             INSERT INTO
@@ -150,15 +148,15 @@ def PostgresInstructionsRepository(
 
             VALUES
                 (
-                    $1,
-                    $2,
-                    $3,
-                    $4::jsonb,
-                    $5::jsonb
+                    $1::TEXT,
+                    $2::TEXT,
+                    $3::TEXT,
+                    $4::JSONB,
+                    $5::JSONB
                 );
             """,
             declaration.name,
-            description,
+            declaration.description or None,
             content,
             f"[{','.join(argument.to_json() for argument in declaration.arguments)}]",
             declaration.meta.to_json(),
