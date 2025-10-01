@@ -15,10 +15,10 @@ from openai.types.responses import (
     ResponseFailedEvent,
     ResponseFunctionToolCall,
     ResponseIncompleteEvent,
-    ResponseInputContentParam,
-    ResponseInputImageParam,
+    ResponseInputImageContentParam,
     ResponseInputItemParam,
-    ResponseInputTextParam,
+    ResponseInputMessageContentListParam,
+    ResponseInputTextContentParam,
     ResponseOutputMessage,
     ResponseOutputMessageParam,
     ResponseOutputText,
@@ -790,11 +790,14 @@ def _model_input_to_params(
             yield Message(
                 type="message",
                 role="user",
-                content=list(
-                    _input_content_parts(
-                        block,
-                        vision_details=vision_details,
-                    )
+                content=cast(
+                    ResponseInputMessageContentListParam,
+                    list(
+                        _input_content_parts(
+                            block,
+                            vision_details=vision_details,
+                        )
+                    ),
                 ),
             )
 
@@ -802,7 +805,12 @@ def _model_input_to_params(
             yield FunctionCallOutput(
                 type="function_call_output",
                 call_id=block.identifier,
-                output=block.content.to_str(),
+                output=list(
+                    _input_content_parts(
+                        block.content,
+                        vision_details=vision_details,
+                    )
+                ),
             )
 
 
@@ -852,10 +860,10 @@ def _input_content_parts(
     content: MultimodalContent,
     /,
     vision_details: Literal["auto", "low", "high"],
-) -> Generator[ResponseInputContentParam]:
+) -> Generator[ResponseInputTextContentParam | ResponseInputImageContentParam]:
     for part in content.parts:
         if isinstance(part, TextContent):
-            yield ResponseInputTextParam(
+            yield ResponseInputTextContentParam(
                 type="input_text",
                 text=part.text,
             )
@@ -865,7 +873,7 @@ def _input_content_parts(
             if not part.mime_type.startswith("image"):
                 raise ValueError(f"Unsupported media - {part.mime_type}")
 
-            yield ResponseInputImageParam(
+            yield ResponseInputImageContentParam(
                 type="input_image",
                 detail=vision_details,
                 image_url=part.to_data_uri(),
@@ -876,7 +884,7 @@ def _input_content_parts(
             if part.mime_type is None or not part.mime_type.startswith("image"):
                 raise ValueError(f"Unsupported media - {part.mime_type}")
 
-            yield ResponseInputImageParam(
+            yield ResponseInputImageContentParam(
                 type="input_image",
                 detail=vision_details,
                 image_url=part.uri,
@@ -886,14 +894,14 @@ def _input_content_parts(
             if part.hidden:
                 continue  # skip hidden
 
-            yield ResponseInputTextParam(
+            yield ResponseInputTextContentParam(
                 type="input_text",
                 text=part.artifact.to_str(),
             )
 
         else:
             # Fallback: serialize unknown parts as text
-            yield ResponseInputTextParam(
+            yield ResponseInputTextContentParam(
                 type="input_text",
                 text=part.to_str(),
             )
