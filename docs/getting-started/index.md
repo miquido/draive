@@ -1,21 +1,42 @@
 # Getting Started
 
-- Core concepts of immutable state management and context system
-- How to use tools, conversations, and structured generation
+Welcome to Draive, a Haiway-powered toolkit for building reliable, observable AI applications. This guide gives you the context you need before diving into installation and hands-on tutorials.
 
-- Basic understanding of async/await in Python
+## Why Draive
 
+- **Composable foundations**: Build on immutable `State` objects and scoped context managers, so every component remains testable and predictable.
+- **Provider flexibility**: Switch between OpenAI, Anthropic, Gemini, Mistral, local models, and more without rewriting your pipelines.
+- **Multimodal-first**: Work with text, audio, images, and artifacts through a unified content API.
+- **Production guardrails**: Apply moderation, privacy, validation, and telemetry with the same abstractions you use for generation.
 
-- **🧱 Composable by Design**: Every component is reusable and testable
-- **🔄 Multi-Model Support**: Switch between OpenAI, Claude, Gemini, and more in seconds
+## What You Will Build
 
-- Tools and structured generation
+Throughout the getting-started journey you will assemble:
 
+- A basic assistant that can call your own Python tools.
+- A multimodal workflow that combines text and image inputs.
+- A retrieval-augmented generation (RAG) flow over your documents.
+- A structured extraction pipeline that yields typed outputs you can store or downstream.
+- A test and evaluation harness to keep regressions out of production.
 
-- ✅ A basic AI assistant that can call Python functions
-- ✅ A multi-modal application that processes text and images
-- ✅ A RAG system that searches through documents
-- ✅ A structured data extraction pipeline
-- ✅ An evaluated and tested LLM application
+## Prerequisites
 
-Ready to build something amazing? Let's get started with [Installation](installation.md)!
+- Python 3.12+ with `uv` managing the virtual environment at `./.venv` (this repository includes a ready-to-use setup).
+- Familiarity with `async`/`await` and running `pytest` from the command line.
+- Access tokens for the model providers you plan to use (store them in environment variables—never hard-code secrets).
+
+## Core Concepts
+
+1. **State management** – mutable-looking, immutable-under-the-hood `State` classes represent configuration and runtime data. You update them with methods like `State.updated(...)` to keep histories, snapshots, and metrics consistent.
+2. **Context scoping** – `ctx.scope(...)` activates a stack of `State` instances and disposables for a logical unit of work, ensuring structured concurrency and clean teardown.
+3. **Generation flows** – typed facades in `draive.generation` orchestrate text, image, and audio calls, while provider adapters translate the request to each backend.
+4. **Tools and multimodal content** – `MultimodalContent`, `ResourceContent`, and tool abstractions let you stream artifacts, call Python functions, or chain agents without sacrificing type safety.
+5. **Guardrails and observability** – moderation, privacy, metrics, and logging integrations keep your application auditable. Use `ctx.log_*` for structured logs and `ctx.record` for metrics.
+
+## Next Steps
+
+1. Follow the [Installation](installation.md) guide to set up dependencies and the runtime environment.
+2. Walk through the quickstart notebooks and examples under `docs/cookbooks/` to see Draive in action.
+3. Explore provider-specific instructions in `docs/guides/` when you are ready to connect to production endpoints.
+
+You now have the core mental model for Draive. Continue with installation to bring the toolkit to life.
