@@ -25,7 +25,6 @@ from draive.openai import OpenAIResponsesConfig, OpenAI
 load_env() # load .env variables
 setup_logging("mcp")
 
-
 # initialize dependencies and configuration
 async with ctx.scope(
     "mcp",

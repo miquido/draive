@@ -13,7 +13,7 @@ ifndef UV_VERSION
 	UV_VERSION := 0.8.22
 endif
 
-.PHONY: uv_check venv sync update format lint test docs docs-server release
+.PHONY: uv_check venv sync update format lint test docs docs-server release docs-lint
 
 # Check installed UV version and install if needed
 uv_check:
@@ -77,6 +77,10 @@ lint:
 	@bandit -r $(SOURCES_PATH)
 	@ruff check $(SOURCES_PATH) $(TESTS_PATH)
 	@pyright --project ./
+	@python -B tools/markdown_lint.py docs
+
+docs-lint:
+	@python -B tools/markdown_lint.py docs
 
 # Run tests suite.
 test:
@@ -90,7 +94,7 @@ docs-server:
 # Build documentation for production
 docs:
 	@echo '# Building documentation...'
-	@mkdocs build --clean
+	@mkdocs build --clean --strict
 	@echo '...documentation built in site/ directory!'
 
 release: lint test

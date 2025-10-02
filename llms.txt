@@ -1,4 +1,267 @@
-# Draive Framework Reference for AI Models
+# Draive Production Guide
+
+Use this guide to emit production-ready Draive code. Treat every directive as mandatory to preserve reliability, safety, and maintainability.
+
+## Quality Pillars
+- **Reliability:** Immutable `State` composition, deterministic configuration, defensive error translation, and clear fallbacks.
+- **Observability:** Structured logs, metrics via `ctx.record`, and scope-level tracing with `LoggerObservability` (or provider-specific observers).
+- **Safety:** Guardrails before/after generation, secrets management via `load_env()`, and zero tolerance for `print` or leaking payloads.
+- **Testing & Tooling:** Ruff formatting, strict Pyright types, Bandit security linting, targeted async tests, and uv-managed environments.
+
+## Runtime & Environment
+- Target Python 3.12+; the repo ships an `uv`-managed venv at `./.venv`. Run commands through `uv run ...` so tooling reuses the same interpreter.
+- Keep dependencies in `pyproject.toml`. Never mutate the venv manually.
+- Store provider secrets in `.env`; call `draive.load_env()` once during startup before touching any clients or configuration.
+- Use `make format`, `make lint`, `make test` (or focused `pytest tests/test_...::test_...`) before shipping. Do not introduce alternative formatters.
+- Configure logging once with `setup_logging("entrypoint")`; all runtime logs must flow through `ctx.log_debug`, `ctx.log_info`, `ctx.log_warning`, or `ctx.log_error`.
+
+## Architecture & State Design
+- Wrap every Draive interaction inside `async with ctx.scope(identifier, *states, disposables=..., observability=...)`.
+- Prefer small, descriptive scope identifiers (`"api.chat"`, `"workflow.retrieval"`) and keep scopes tight. Use `ctx.updated(...)` for temporary overrides instead of re-opening expensive disposables.
+- Model configuration with subclasses of `haiway.State` or `haiway.Configuration`. Offer ergonomic constructors (`.of(...)` or `.from_env(...)`) and expose only immutable fields.
+- Derive variations through `.updated(...)`; never mutate state attributes in-place.
+- Access active state via `ctx.state(MyState)`. Avoid module-level singletons or globals.
+
+```python
+from typing import Self
+from draive import LoggerObservability, State, ctx, load_env
+from draive.openai import OpenAI, OpenAIResponsesConfig
+
+class AppConfig(State):
+    default_temperature: float
+
+    @classmethod
+    def of(cls, *, default_temperature: float) -> Self:
+        return cls(default_temperature=default_temperature)
+
+load_env()
+
+async with ctx.scope(
+    "summaries.generate",
+    AppConfig.of(default_temperature=0.2),
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
+    disposables=(OpenAI(),),
+    observability=LoggerObservability(),
+):
+    config = ctx.state(AppConfig)
+    base_model = ctx.state(OpenAIResponsesConfig)
+    with ctx.updated(base_model.updated(temperature=config.default_temperature)):
+        ...
+```
+
+## Provider Orchestration & Fallbacks
+- Require provider configs (`OpenAIResponsesConfig`, `AnthropicConfig`, etc.) in scope state; never hardcode API keys or model IDs inline.
+- Inject guardrails and moderation configs alongside provider configs to ensure consistent enforcement.
+- When adding provider fallbacks, wrap the primary call in a `try/except` block, translate exceptions, and retry with a secondary scope.
+
+```python
+from draive import TextGeneration, ctx
+from draive.openai import OpenAI, OpenAIResponsesConfig
+from draive.anthropic import Anthropic, AnthropicConfig
+
+async def generate_with_fallback(instructions: str, prompt: str) -> str:
+    try:
+        async with ctx.scope(
+            "llm.primary",
+            OpenAIResponsesConfig(model="gpt-4o-mini"),
+            disposables=(OpenAI(),),
+        ):
+            return await TextGeneration.generate(
+                instructions=instructions,
+                input=prompt,
+                temperature=0.4,
+            )
+    except Exception as exc:
+        ctx.log_warning("primary_failed", exception=exc)
+        async with ctx.scope(
+            "llm.backup",
+            AnthropicConfig(model="claude-3-5-haiku-20241022"),
+            disposables=(Anthropic(),),
+        ):
+            return await TextGeneration.generate(
+                instructions=instructions,
+                input=prompt,
+                temperature=0.6,
+            )
+```
+- Never raise bare `Exception`; convert provider failures into typed domain errors preserving context.
+- Limit `retry` loops (`haiway.retry`) to well-defined, idempotent operations.
+
+## Instructions, Prompt Assets & Knowledge
+- Accept `instructions` as raw strings, `Instructions.of(...)`, or templated values. Bundle reusable prompts in an `InstructionsRepository` (volatile for tests, file/remote for prod).
+- Use `@instructions(...)` decorator to declare templates with metadata. Register templates during scope setup for discoverability.
+
+```python
+from draive import Instructions, InstructionsRepository, ctx, instructions
+
+@instructions(name="summary_system", description="One-sentence summaries")
+async def summary_system() -> str:
+    return "You are a concise assistant. Reply in one sentence."  # noqa: D205
+
+async with ctx.scope(
+    "prompts",
+    InstructionsRepository.volatile(summary=await summary_system()),
+):
+    system_prompt = await InstructionsRepository.resolve(Instructions.of("summary"))
+```
+- Keep instruction content immutable; derive variants with `.with_arguments(...)` or `.with_meta(...)` instead of string concatenation.
+
+## Generation Patterns
+- `TextGeneration.generate(...)` returns a `str`. Pass `Multimodal` inputs (strings, `MultimodalContent`, `TextContent`, etc.) and keep examples as `(prompt_content, completion_text)` tuples.
+- `ModelGeneration.generate(MyDataModel, ...)` enforces schema validation. Use `schema_injection="full" | "simplified" | "skip"` based on provider capabilities, and supply custom `decoder=` when normalizing outputs.
+- `ImageGeneration.generate(...)` / `AudioGeneration.generate(...)` return `ResourceContent` or `ResourceReference`. Treat media as opaque and persist via `ResourcesRepository` when needed.
+- For fine-grained control, use `GenerativeModel.loop(...)` with explicit `ModelInput`/`ModelOutput` lists and `Toolbox` declarations.
+
+## Multimodal & Resources
+- Construct prompts with `MultimodalContent.of(...)` combining `TextContent`, `ArtifactContent`, and media. Keep text context explicit; avoid implicit conversions.
+- Store binary payloads using `ResourceContent.of(...)` (base64) or `ResourceReference` for repository-backed assets. Redact base64 in logs (`ctx.log_*` should never emit raw data).
+- When referencing large knowledge bases, preload them into `VectorIndex` implementations such as `VolatileVectorIndex()` or custom repositories.
+
+## Retrieval, Embeddings & Memory
+- Embed text/images through `TextEmbedding.embed(...)` / `ImageEmbedding.embed(...)` within a scope that includes the correct provider disposables.
+- Encapsulate retrieval logic inside dedicated `State` or `Stage` classes to avoid scattering prompt assembly.
+- Use `VectorIndex.index(...)`, `VectorIndex.search(...)`, and `vector_similarity_search` helpers for top-k selection. Apply `mmr_vector_similarity_search` for diversity.
+- Maintain conversational context via `draive.utils.Memory` or `ModelMemory.constant(...)`. Never store chat history in globals.
+
+## Tools & Function Calling
+- Tool functions must be `async` and execute while a scope is active. Decorate with `@tool(...)` to derive JSON schema and metadata.
+- Configure arguments via `Argument(...)` to expose aliases, descriptions, and defaults. Validate inputs inside the tool before external calls.
+- Assemble tool collections with `Toolbox.of(...)`, controlling suggestion policy (`suggesting=...`, `tool_turns_limit=`) and availability (`availability=` in the `@tool` decorator).
+- Handle tool results with `MultimodalContent`—return structured payloads using `ArtifactContent` when richer semantics are required.
+
+```python
+from draive import Argument, Toolbox, TextGeneration, ctx, tool
+from draive.openai import OpenAI, OpenAIResponsesConfig
+
+@tool(description="Return the ISO8601 UTC timestamp.")
+async def current_time() -> str:
+    from datetime import UTC, datetime
+    return datetime.now(UTC).isoformat()
+
+@tool(
+    name="fun_fact",
+    description="Return a quirky fact about a topic.",
+)
+async def fact(
+    topic: str = Argument(
+        aliased="subject",
+        description="Topic to explore",
+        default="AI",
+    ),
+) -> str:
+    return f"{topic} makes humans rethink creativity."
+
+toolbox = Toolbox.of(current_time, fact, suggesting=fact, tool_turns_limit=2)
+
+async with ctx.scope(
+    "tools.demo",
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
+    disposables=(OpenAI(),),
+):
+    reply = await TextGeneration.generate(
+        instructions="You are witty and concise.",
+        input="Tell me something entertaining about LLMs.",
+        tools=toolbox,
+    )
+    ctx.log_info("joke", joke=reply)
+```
+
+## Conversations & Realtime Sessions
+- `Conversation.completion(...)` supports both full responses and streaming via `stream=True`. Supply memory as `ModelMemory`, `Memory`, or iterables of `ConversationMessage`.
+- Keep scopes alive across turns to reuse shared state (toolbox, guardrails, memory). For realtime interactions, operate through `RealtimeConversationSession` with provider-specific clients (OpenAI, Anthropic, Gemini, etc.).
+- Apply guardrails to both user input and model output. Terminate sessions gracefully when moderation blocks messages.
+
+## Observability & Operations
+- Initialize logging once per process with `setup_logging(...)`.
+- Wrap long-running flows in contextual scopes and emit structured logs with namespace keys (`ctx.log_info("rag.match", matches=[...])`).
+- Record metrics via `ctx.record(event="retrieval", attributes={"count": len(results)})` and feed them into telemetry sinks.
+- Avoid logging secrets, raw prompts, or media blobs. Redact sensitive fields manually if necessary.
+- When wiring providers, pass `observability=LoggerObservability()` (or a custom observer) to scopes.
+
+## Safety, Guardrails & Compliance
+- Load guardrail states (`OpenAIModerationConfig`, `GuardrailsModeration`, privacy filters) alongside provider configs.
+- Call guardrails explicitly: `await guardrails.check_input(...)` before generation and `await guardrails.check_output(...)` afterwards.
+- Translate SDK exceptions into domain-specific errors. Include contextual metadata (`scope`, `provider`, `attempt`) in error payloads without exposing secrets.
+- Ensure personally identifiable information (PII) is sanitized or masked before logging/storage.
+
+```python
+from draive import TextGeneration, ctx
+from draive.guardrails import GuardrailsModeration
+from draive.openai import OpenAI, OpenAIModerationConfig, OpenAIResponsesConfig
+
+async with ctx.scope(
+    "moderated",
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
+    OpenAIModerationConfig(),
+    disposables=(OpenAI(),),
+):
+    guardrails = ctx.state(GuardrailsModeration)
+    prompt = "Draft a friendly welcome message for new users."
+    await guardrails.check_input(prompt)
+    reply = await TextGeneration.generate(
+        instructions="Answer safely and respectfully.",
+        input=prompt,
+    )
+    await guardrails.check_output(reply)
+```
+
+## Testing Strategy
+- Use `pytest-asyncio` for coroutine tests. Always open scopes inside the test body and inject fake disposables to avoid network calls.
+- Prefer targeted unit tests for new states, tools, and retrieval helpers over broad E2E suites. Mock provider responses deterministically.
+- Validate serialization/deserialization (DataModels, ResourceContent) and rejection paths (guardrails, moderation) with dedicated tests.
+- Keep fixtures lightweight; reuse shared factories under `tests/fixtures/` when available.
+- Gate merges with `make format`, `make lint`, and `make test` executed locally and in CI.
+
+```python
+import pytest
+from draive import TextGeneration, ctx
+from draive.openai import OpenAIResponsesConfig
+
+@pytest.mark.asyncio
+async def test_text_generation_returns_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_generate(
+        *,
+        instructions: str,
+        input,
+        toolbox,
+        examples,
+        **extra: object,
+    ) -> str:
+        assert input.to_str() == "ping"
+        return "ok"
+
+    monkeypatch.setattr(TextGeneration, "generating", fake_generate)
+
+    async with ctx.scope(
+        "text.test",
+        OpenAIResponsesConfig(model="gpt-4o-mini"),
+    ):
+        result = await TextGeneration.generate(input="ping")
+
+    assert result == "ok"
+```
+
+## Deployment & Operations Checklist
+- Load environment variables and open scopes before the first provider call in every entrypoint.
+- Ensure states, tools, and models remain immutable—derive variants with `.updated(...)`.
+- Provide meaningful scope labels for tracing and metrics aggregation.
+- Keep documentation (`docs/`, `mkdocs.yml`) and public exports (`src/draive/__init__.py`) in sync when adding APIs.
+- Plan migrations or backward-incompatible changes with feature flags stored in `State` definitions rather than global constants.
+- Run `make format && make lint && make test` before publishing. Resolve lint/type errors instead of disabling checks.
+
+## Anti-Patterns to Avoid
+- No `print`, global mutable state, or ad-hoc `asyncio.create_task` outside `ctx.spawn`.
+- Do not access environment variables directly—always route through `load_env()` and `haiway.getenv_*` helpers.
+- Avoid storing raw strings for prompts; prefer `InstructionsRepository` or DataModels for structured context.
+- Never leak API keys, prompts, or resource payloads into logs, errors, or test fixtures.
+
+Following these practices keeps Draive applications production-ready, observable, and safe, allowing language models to generate code that integrates cleanly with the framework and passes the full quality pipeline.
+
+## Extended Reference (Full Framework Manual)
+
+The following manual preserves the broader conceptual and API guidance from the original Draive framework reference. Consult it when you need deeper background, rationale, or expanded examples beyond the production quick-start above.
+
+## Comprehensive Framework Reference for AI Models
 
 Draive is a functional programming framework for Python 3.12+ designed to facilitate development of high-quality LLM applications using functional programming paradigms combined with structured concurrency concepts. Built on the **Haiway** framework, Draive emphasizes immutability, pure functions, and context-based state management, enabling developers to build scalable and maintainable AI applications.
 

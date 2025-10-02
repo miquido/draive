@@ -1,8 +1,6 @@
 # Comprehensive Evaluation Framework
 
-
 1. **Evaluators** - Individual evaluation functions with configurable thresholds
-
 
 ```python
 from draive import EvaluationScore
@@ -42,14 +40,12 @@ async def check_sentiment(value: str) -> EvaluationScore:
             "confidence": 0.95
         }
 
-
 ```python
 # Create a prepared evaluator with fixed parameters
 strict_length_check = check_response_length.prepared(min_length=200)
 
 # Use it multiple times
 result1 = await strict_length_check("Response 1...")
-
 
 ```python
 from collections.abc import Sequence
@@ -83,7 +79,6 @@ print(f"All evaluations passed: {all_passed}")
 print(f"Average performance: {avg_performance:.1f}%")
 
 for result in evaluation_results:
-
 
 ```python
 from draive.evaluation import evaluate
@@ -200,7 +195,6 @@ field_evaluator = my_evaluator.contra_map(MyModel._.attribute.path)
 transformed = my_evaluator.contra_map(
     lambda data: data["response"].strip().lower()
 
-
 ```python
 from draive import State
 
@@ -216,7 +210,6 @@ async def strict_evaluator(value: str) -> float:
     config = ctx.state(EvaluationConfig)
     if config.strict_mode:
         # Apply stricter evaluation logic
-
 
 ```python
 from draive.evaluators import (
@@ -262,7 +255,6 @@ precise_check = factual_accuracy_evaluator.with_threshold(0.85)  # Between excel
 - **Safety & Compliance**: Always use "perfect" - no tolerance for violations
 - **Core Quality**: Use "excellent" - high standards for user-facing content
 
-
 ```python
 @evaluator
 async def evaluate_with_context(response: str) -> EvaluationScore:
@@ -276,7 +268,6 @@ async def evaluate_with_context(response: str) -> EvaluationScore:
             "evaluation_model": "gpt-4",
             "confidence": 0.85
         }
-
 
 ```python
 # Define diverse, high-quality examples
@@ -304,7 +295,6 @@ cases = await suite.generate_cases(
     - Edge cases and error conditions
     - Performance boundaries
     """
-
 
 - **Flexible scoring** with normalized values and named levels
 - **Composable evaluators** with thresholds and metadata

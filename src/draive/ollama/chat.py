@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import AsyncGenerator, Coroutine, Iterable, Mapping, Sequence
-from typing import Any, Literal, cast, overload
+from typing import Any, Final, Literal, cast, overload
 from uuid import uuid4
 
 from haiway import META_EMPTY, ObservabilityLevel, ctx
@@ -402,6 +402,43 @@ def _schema_for_ollama(output: type) -> dict[str, Any] | None:
     return normalized_schema
 
 
+def _collapse_ollama_type_union(schema_types: Sequence[Any]) -> str | None:  # noqa: PLR0911
+    allowed: Final[set[str]] = {"string", "number", "integer", "boolean", "null"}
+    primitive_types: list[str] = []
+    for schema_type in schema_types:
+        if not isinstance(schema_type, str) or schema_type not in allowed:
+            return None
+
+        primitive_types.append(schema_type)
+
+    if not primitive_types:
+        return None
+
+    distinct: set[str] = set(primitive_types)
+
+    if distinct == {"null"}:
+        return "null"
+
+    if len(distinct) == 1:
+        value = next(iter(distinct))
+        return "number" if value == "integer" else value
+
+    non_null: set[str] = distinct - {"null"}
+    if not non_null:
+        return "null"
+
+    if non_null <= {"number", "integer"}:
+        return "number"
+
+    if "string" in non_null and non_null <= {"string", "number", "integer"}:
+        return "string"
+
+    if non_null == {"boolean"}:
+        return "boolean"
+
+    return None
+
+
 def _normalize_schema_for_ollama(schema: Any) -> tuple[dict[str, Any] | None, bool]:  # noqa: C901, PLR0911, PLR0912, PLR0915
     if not isinstance(schema, Mapping):
         return None, False
@@ -413,12 +450,15 @@ def _normalize_schema_for_ollama(schema: Any) -> tuple[dict[str, Any] | None, bo
     schema_type: Any = schema.get("type")
 
     if isinstance(schema_type, Sequence) and not isinstance(schema_type, (str, bytes)):
-        elements = list(schema_type)
-        if len(elements) == 1 and isinstance(elements[0], str):
-            schema_type = elements[0]
-            changed = True
-        else:
+        elements: list[Any] = list(schema_type)
+        collapsed: str | None = _collapse_ollama_type_union(elements)
+        if collapsed is None:
             return None, changed
+
+        if len(elements) != 1 or elements[0] != collapsed:
+            changed = True
+
+        schema_type = collapsed
 
     if schema_type == "object" or "properties" in schema or "required" in schema:
         normalized_properties: dict[str, Any] = {}

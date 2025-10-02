@@ -63,7 +63,6 @@ import asyncio
 from draive import TextGeneration, ctx
 from draive.openai import OpenAI, OpenAIResponsesConfig
 
-
 async def main() -> None:
     async with ctx.scope(
         "quickstart",
@@ -75,7 +74,6 @@ async def main() -> None:
             input="Give me three tagline ideas for an AI travel app",
         )
         ctx.log_info("generated.response", content=response)
-
 
 if __name__ == "__main__":
     asyncio.run(main())

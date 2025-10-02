@@ -1,16 +1,11 @@
 # Basic tools use
 
-
-
 ```python
 from draive import tool
-
 
 @tool # simply annotate function as a tool, tools can have arguments using basic types
 async def current_time(location: str) -> str:
     # return result of tool execution, we are using fake time here
-
-
 
 ```python
 from draive import ctx
@@ -25,11 +20,9 @@ async with ctx.scope("basics"):
 
     Time in London is 9:53:22
 
-
 The biggest benefit of defining a tool becomes apparent when using an LLM. We can instruct the model to use available tools to extend its capabilities. Higher-level interfaces automatically handle tool calls and return results to the LLM to generate the final output.
 We can observe how this works within a simple text generator. Tools are provided through an iterable collection such as a list or tuple, or within a Toolbox object that allows for customized tool execution. You can prepare a tools collection each time it is used, or you can reuse a preconstructed one.
 We will use the OpenAI GPT model since it natively supports tool use. Make sure to provide an .env file with an OPENAI_API_KEY key before running the code.
-
 
 ```python
 from draive import TextGeneration, load_env
@@ -52,12 +45,8 @@ async with ctx.scope(
     print(result)
 ```
 
-
-
-
 ```python
 from draive import Argument
-
 
 @tool( # this time we will use additional arguments within tool annotation
     # we can define an alias used as the tool name when explaining it to LLM,
@@ -88,9 +77,7 @@ print(customized.specification)
 
     {'name': 'fun_fact', 'description': 'Find a fun fact in a given topic', 'parameters': {'type': 'object', 'properties': {'topic': {'type': 'string', 'description': 'Topic of a fact to find'}}, 'required': []}}
 
-
 We can customize tools even more using additional parameters like custom result formatting or requiring direct result from tool when used.
-
 
 ```python
 @tool( # this time we will use different arguments within tool annotation
@@ -104,8 +91,6 @@ We can customize tools even more using additional parameters like custom result 
     availability_check=lambda: True
 )
 async def customized_more() -> str:
-
-
 
 ```python
 from draive import Toolbox
@@ -133,9 +118,6 @@ async with ctx.scope(
 
     print(result)
 ```
-
-
-
 
 ```python
 from haiway import LoggerObservability
@@ -166,8 +148,6 @@ async with ctx.scope(
 ```
 
     07/Mar/2025:13:40:43 +0000 [DEBUG] [basics] [8ffed39264134e679e87ae5a34311ad8] [basics] [24eee7a7577b4f25b7c59a43c20a3423] Entering context...
-
-
 
     Result:
     One funny thing about LLMs (Large Language Models) is that they can generate text that sounds like it was written by a human, but sometimes they mix up facts in the most amusing ways! For example, they might describe a cat as "a small, furry creature that loves to swim" – which is definitely not the case for most cats! They have a knack for making up their own versions of reality, which can lead to some hilarious misunderstandings!
@@ -339,6 +319,5 @@ async with ctx.scope(
     |  |  ⌊
     |  ⌊
     ⌊
-
 
     07/Mar/2025:13:40:47 +0000 [DEBUG] [basics] [8ffed39264134e679e87ae5a34311ad8] [basics] [24eee7a7577b4f25b7c59a43c20a3423] ...exiting context after 3.82s

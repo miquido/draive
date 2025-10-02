@@ -2,10 +2,8 @@
 
 Draive framework provides various ways to use LLM depending on the use case. The simplest interface is to generate text by using `TextGeneration.generate` method. We can use it to make a simple text completion function.
 
-
 ```python
 from draive import TextGeneration
-
 
 async def text_completion(text: str) -> str:
     # TextGeneration.generate is a simple interface for generating text
@@ -19,7 +17,6 @@ async def text_completion(text: str) -> str:
 
 The result of this function is a completion from a currently used model. What is a currently used model? We have to define it yet by providing basic setup of state and dependencies. In this example we are going to use OpenAI client, you have to provide the api key to that service in .env file with `OPENAI_API_KEY` key before running.
 
-
 ```python
 from draive import load_env
 
@@ -27,7 +24,6 @@ load_env()  # load .env variables
 ```
 
 When we have .env loaded we can prepare a context scope with the OpenAI client and use our function. The low-level model interface is the GenerativeModel. Draive supports multi-model solutions out of the box. Selecting the OpenAI client and configuration in the context chooses this provider for our generations.
-
 
 ```python
 from draive import ctx
@@ -49,9 +45,7 @@ async with ctx.scope(  # prepare new context
     Sugar is sweet,
     And so are you.
 
-
 As we now know how to set up OpenAI as our model provider, we can start customizing it further by providing model configuration.
-
 
 ```python
 from draive.openai import OpenAIResponsesConfig
@@ -101,15 +95,11 @@ async with ctx.scope(  # prepare the new context
 
     RESULT GPT 3.5 | temperature 0.4: Violets are blue.
 
-
     RESULT GPT 4o | temperature 0.4: Violets are blue.
-
 
     RESULT GPT 3.5 | temperature 0.7: Violets are blue.
 
-
 Since we know the basics, now we can examine the details of our execution to see what actually happened inside. We can setup the logger before execution and assign a logging metrics handler to see context metrics logs.
-
 
 ```python
 from draive import setup_logging
@@ -141,7 +131,6 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
 ```
 
     07/Mar/2025:13:40:51 +0000 [DEBUG] [basics] [8d198c3d552b48f1b7473f1e14ba50ed] [basics] [057c9032a45a48f38dcbb7861e4b172e] Entering context...
-
 
     07/Mar/2025:13:40:52 +0000 [DEBUG] [basics] [8d198c3d552b48f1b7473f1e14ba50ed] [basics] [057c9032a45a48f38dcbb7861e4b172e] Metrics summary:
     ⎡ @basics [057c9032a45a48f38dcbb7861e4b172e](1.38s):
@@ -222,8 +211,6 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
     |  ⌊
     ⌊
 
-
     07/Mar/2025:13:40:52 +0000 [DEBUG] [basics] [8d198c3d552b48f1b7473f1e14ba50ed] [basics] [057c9032a45a48f38dcbb7861e4b172e] ...exiting context after 1.38s
-
 
 The more advanced usage and use cases can be explored in other notebooks.
