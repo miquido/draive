@@ -89,7 +89,7 @@ Run the script with your preferred OpenAI credentials set via environment variab
 
 ## Where to go next
 
-- Explore the [examples](./examples.md) for end-to-end agent, RAG, and multimodal templates.
+- Explore the [getting started guide](./getting-started/index.md) to build your first workflows.
 - Dive into architecture guides under `docs/` to understand stages, state, and context patterns.
 - Run `make format && make lint && make test` to verify your contributions before submitting a PR.
 - Extend the framework by creating a new provider adapter or resource backend.
