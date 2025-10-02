@@ -7,7 +7,7 @@ This comprehensive guide covers all predefined evaluators in the Draive framewor
 Draive provides 20 predefined evaluators covering all major dimensions of LLM evaluation:
 
 - **Quality Evaluators**: Assess content structure, style, and linguistic quality
-- **Reference-Based Evaluators**: Compare generated content against reference material  
+- **Reference-Based Evaluators**: Compare generated content against reference material
 - **User-Focused Evaluators**: Measure how well content serves user needs
 - **Safety & Content Evaluators**: Detect harmful content and verify factual accuracy
 - **Similarity Evaluators**: Measure semantic and vector-based similarity
@@ -74,7 +74,7 @@ print(f"Good fluency: {good_result.score.value}")   # Output: 0.90
 
 **Best for**: All content types as a basic quality check, especially user-facing text.
 
-### Readability Evaluator  
+### Readability Evaluator
 **Purpose**: Evaluates ease of understanding and accessibility of content.
 
 ```python
@@ -103,7 +103,7 @@ from draive.evaluators import coverage_evaluator
 reference = """
 Key features of renewable energy:
 1. Sustainable and environmentally friendly
-2. Reduces carbon emissions significantly  
+2. Reduces carbon emissions significantly
 3. Lower long-term operational costs
 4. Energy independence from fossil fuels
 """
@@ -263,7 +263,7 @@ System Requirements:
 
 Pricing:
 - Basic plan: $19/month
-- Professional: $49/month  
+- Professional: $49/month
 - Enterprise: Custom pricing
 
 Supported Platforms:
@@ -308,7 +308,7 @@ The shift to remote work presents unique challenges and opportunities...
 
 ## 3 Key Tips for Success
 1. Create a dedicated workspace...
-2. Establish clear boundaries...  
+2. Establish clear boundaries...
 3. Invest in reliable technology...
 
 ## Real-World Example
@@ -321,7 +321,7 @@ Remote work success depends on intentional planning and consistent habits...
 """
 
 result = await expectations_evaluator.with_threshold("excellent")(
-    content, 
+    content,
     expectations=expectations,
     guidelines="Evaluate each requirement separately and provide specific feedback"
 )
@@ -471,7 +471,7 @@ print(f"Text similarity: {text_similarity:.3f}")  # Output: 0.842
 # Image vector similarity (requires image data)
 with open("image1.jpg", "rb") as f:
     image1_data = f.read()
-    
+
 with open("image2.jpg", "rb") as f:
     image2_data = f.read()
 
@@ -498,7 +498,7 @@ required_result = await required_keywords_evaluator(
     require_all=True  # All keywords must be present
 )
 
-# Check for forbidden keywords  
+# Check for forbidden keywords
 forbidden_result = await forbidden_keywords_evaluator(
     content,
     keywords=["hack", "exploit", "unauthorized"],
@@ -547,18 +547,18 @@ async def evaluate_marketing_content(
     target_keywords: list[str]
 ) -> Sequence[EvaluatorResult]:
     """Comprehensive marketing content evaluation."""
-    
+
     return await evaluate(
         content,
         # Quality checks
         fluency_evaluator.prepared(),
         readability_evaluator.prepared(),
         creativity_evaluator.prepared(),
-        
+
         # Brand compliance
         tone_style_evaluator.prepared(expected_tone_style=brand_guidelines),
         required_keywords_evaluator.prepared(keywords=target_keywords, require_all=False),
-        
+
         # Safety and accuracy
         safety_evaluator.prepared(),
         factual_accuracy_evaluator.prepared(),
@@ -595,17 +595,17 @@ async def evaluate_support_response(
     company_policy: str
 ) -> Sequence[EvaluatorResult]:
     """Evaluate customer support response quality."""
-    
+
     return await evaluate(
         response,
         # User focus
         helpfulness_evaluator.prepared(user_query=customer_query),
         completeness_evaluator.prepared(user_query=customer_query),
-        
+
         # Quality and safety
         fluency_evaluator.prepared(),
         safety_evaluator.prepared(),
-        
+
         # Policy compliance
         consistency_evaluator.prepared(reference=company_policy),
         tone_style_evaluator.prepared(expected_tone_style="Professional, empathetic, solution-focused"),
@@ -622,18 +622,18 @@ async def evaluate_academic_content(
     academic_standards: str
 ) -> Sequence[EvaluatorResult]:
     """Evaluate academic content against standards."""
-    
+
     return await evaluate(
         content,
         # Accuracy and grounding
         factual_accuracy_evaluator.prepared(),
         groundedness_evaluator.prepared(reference=source_material),
         consistency_evaluator.prepared(reference=source_material),
-        
+
         # Academic quality
         coherence_evaluator.prepared(reference=source_material),
         coverage_evaluator.prepared(reference=source_material),
-        
+
         # Standards compliance
         expectations_evaluator.prepared(expectations=academic_standards),
         concurrent_tasks=3
@@ -679,7 +679,7 @@ safety_evaluator.with_threshold("perfect")              # User safety
 forbidden_keywords_evaluator.with_threshold("perfect")  # Compliance
 consistency_evaluator.with_threshold("perfect")         # No contradictions
 
-# EXCELLENT (0.7) - High quality requirements  
+# EXCELLENT (0.7) - High quality requirements
 helpfulness_evaluator.with_threshold("excellent")       # User satisfaction
 factual_accuracy_evaluator.with_threshold("excellent")  # Information quality
 tone_style_evaluator.with_threshold("excellent")        # Brand consistency

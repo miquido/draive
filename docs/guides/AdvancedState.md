@@ -1,15 +1,11 @@
 # Advanced state
 
-
-
 ```python
 from draive import BasicValue, DataModel
-
 
 class DictConverted(DataModel):
     name: str
     value: int
-
 
 # all of this applies to the `DataModel` as well
 dict_converted: DictConverted = DictConverted(name="converted", value=42)
@@ -20,13 +16,10 @@ print(dict_converted_from_dict)
 
     name: converted
 
-
-
 ```python
 class Mutable(DataModel):
     identifier: str
     value: int
-
 
 # prepare an instance of state
 initial: Mutable = Mutable(
@@ -49,16 +42,12 @@ print("final", final)
     value: 42
     final identifier: pre
 
-
-
 ```python
 from draive import DataModel
-
 
 class JSONConverted(DataModel):
     name: str
     value: int
-
 
 json_converted: JSONConverted = JSONConverted(name="converted", value=42)
 json_converted_as_json: str = json_converted.as_json()
@@ -67,8 +56,6 @@ print(json_converted_from_json)
 ```
 
     name: converted
-
-
 
 ```python
 class BasicModel(DataModel):
@@ -89,9 +76,7 @@ print(BasicModel.json_schema(indent=2))
       ]
     }
 
-
 Additionally each model can generate a simplified schema description. This can be useful when requesting LLM structured data generation in some cases. Let's have a look:
-
 
 ```python
 print(BasicModel.simplified_schema(indent=2))
@@ -101,17 +86,12 @@ print(BasicModel.simplified_schema(indent=2))
       "field": "string"
     }
 
-
-
-
 ```python
 from draive import Field
-
 
 class CustomizedSchemaModel(DataModel):
     described: int = Field(description="Field description")
     aliased: str = Field(aliased="field_alias")
-
 
 print(f"JSON schema:\n{CustomizedSchemaModel.json_schema(indent=2)}")
 print(f"Simplified schema:\n{CustomizedSchemaModel.simplified_schema(indent=2)}")
@@ -139,17 +119,13 @@ print(f"Simplified schema:\n{CustomizedSchemaModel.simplified_schema(indent=2)}"
       "described": "integer(Field description)",
       "field_alias": "string"
 
-
-
 ```python
 from collections.abc import Sequence
-
 
 class CustomizedDefaultsModel(DataModel):
     default: int = 42
     field_default: int = Field(default=21)
     field_default_factory: Sequence[str] = Field(default_factory=tuple)
-
 
 # since all fields have defaults we can initialize without arguments
 print(CustomizedDefaultsModel())
@@ -158,8 +134,6 @@ print(CustomizedDefaultsModel())
     default: 42
     field_default: 21
 
-
-
 ```python
 # verifier gets pre-validated value, it already have required type
 def verifier(value: int) -> None:
@@ -167,16 +141,12 @@ def verifier(value: int) -> None:
         # raise an Exception if something is wrong with the value
         raise ValueError("Value can't be less than zero!")
 
-
 class VerifiedModel(DataModel):
-
-
 
 ```python
 from typing import Any
 
 from draive import ValidatorContext, ValidatorError
-
 
 def validator(
     # validator gets unknown type as an input, make sure to verify or convert it
@@ -193,15 +163,11 @@ def validator(
     else:
         raise ValidatorError(f"Expected int but received {type(value)}")
 
-
 class ValidatedModel(DataModel):
-
-
 
 ```python
 class CustomizedSpecificationModel(DataModel):
     value: int = Field(specification={"type": "integer", "description": "Fully custom"})
-
 
 print(CustomizedSpecificationModel.json_schema(indent=2))
 ```
@@ -218,37 +184,27 @@ print(CustomizedSpecificationModel.json_schema(indent=2))
         "value"
       ]
 
-
-
 ```python
 def converter(value: str, /,) -> int:
     return len(value)
 
-
 class CustomizedConversionModel(DataModel):
     value: str = Field(converter=converter)
 
-
 print(CustomizedConversionModel(value="integer?"))
 ```
-
-
-
 
 ```python
 from typing import cast
 
 from draive import AttributePath
 
-
 class NestedPathModel(DataModel):
     values: Sequence[int]
-
 
 class PathModel(DataModel):
     nested: NestedPathModel
     value: int
-
 
 # we can construct the path for any given field inside
 path: AttributePath[PathModel, Sequence[int]] = cast(
@@ -267,9 +223,7 @@ print(path(path_model_instance))
 
     (42, 21)
 
-
 Property paths can be used not only as the getters for field values. It also preserves the path as a string to be accessed later if needed.
-
 
 ```python
 print(path)
@@ -277,9 +231,7 @@ print(path)
 
     nested.values
 
-
 Besides that paths can be also used to prepare per field requirements. We can simplify usage of paths in that case by avoiding the type conversion step:
-
 
 ```python
 from draive import AttributeRequirement
@@ -295,10 +247,7 @@ requirement.check(path_model_instance)
 ```
     True
 
-
-
 Requirements can be combined and examined. This can be used to provide an expressive interface for defining various filters.
-
 
 ```python
 print("lhs:", requirement.lhs)

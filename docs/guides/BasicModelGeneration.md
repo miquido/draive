@@ -26,7 +26,6 @@ If you already manage secrets elsewhere (Docker, cloud secret manager, CI), skip
 ```python
 from draive import DataModel
 
-
 class InterestingPlace(DataModel):
     """Structured description of a sight we want to surface to the user."""
 
@@ -46,7 +45,6 @@ All provider calls run inside a Haiway `ctx.scope` so dependencies are tracked a
 from draive import ctx
 from draive.openai import OpenAI, OpenAIResponsesConfig
 
-
 responses_config = OpenAIResponsesConfig(model="gpt-4o-mini")
 
 async with ctx.scope(
@@ -64,7 +62,6 @@ With the scope active, call `ModelGeneration.generate(...)`. Provide the `DataMo
 
 ```python
 from draive import ModelGeneration
-
 
 async with ctx.scope(
     "basic_generation",

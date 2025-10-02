@@ -29,7 +29,6 @@ from datetime import UTC, datetime
 
 from draive import tool
 
-
 @tool(description="UTC time and date now")
 async def utc_datetime() -> str:
     """Return the current date and time formatted as a readable string."""
@@ -43,7 +42,6 @@ Inside a `ctx.scope(...)` block you can compose the state required for the conve
 ```python
 from draive import Conversation, ConversationMessage, ctx
 from draive.openai import OpenAI, OpenAIResponsesConfig
-
 
 async with ctx.scope(
     "basics",  # scope name visible in logs and traces

@@ -1,13 +1,14 @@
 # Basic data extraction
 
-One of the most useful abilities of LLMs is to extract information from an unstructured source and put it into a desired structure. The typical flow would be to load some kind of document and instruct the model to provide a JSON with a list of required fields. Draive comes with a dedicated solution for generating structured output which we can use to extract required information from any source. We will use OpenAI for this task, make sure to provide .env file with `OPENAI_API_KEY` key before running.
-
+One of the most useful abilities of LLMs is to extract information from an unstructured source and put it into a desired structure. The typical flow would be to load some kind of document and instruct the model to provide a JSON with a list of required fields. Draive comes with a dedicated solution for generating structured output which we can use to extract required information from any source. We will use OpenAI for this task—make sure to provide a `.env` file with `OPENAI_API_KEY` before running.
 
 ```python
 from draive import load_env
 
+load_env()
+```
 
-
+Prepare a sample document that we will parse during the examples.
 
 ```python
 # load document contents for the extraction
@@ -23,8 +24,10 @@ John's days are filled with exploring the city's diverse neighborhoods, trying n
 Despite the occasional homesickness for his family and the familiarity of his Texas farm, John knows that Vancouver is where he belongs. The city has captured his heart, and he can't imagine living anywhere else. He dreams of one day working in the field of environmental conservation, helping to protect the natural wonders that made him fall in love with Canada.
 
 As John reflects on his journey from a small farm in Texas to the vibrant city of Vancouver, he feels a sense of pride and accomplishment. He knows that his seven-year-old self would be proud of the life he has built in the country that captured his imagination all those years ago. With a smile on his face, John looks forward to the future and all the adventures that Vancouver has in store for him.
+"""
+```
 
-
+Define the structure we expect from the model.
 
 ```python
 from draive import DataModel
@@ -33,8 +36,10 @@ class PersonalData(DataModel):
     first_name: str
     last_name: str
     age: int | None = None
+    country: str | None = None
+```
 
-
+Call the model with the default schema description.
 
 ```python
 from draive import ctx, ModelGeneration
@@ -42,48 +47,44 @@ from draive.openai import OpenAIResponsesConfig, OpenAI
 
 async with ctx.scope(
     "data_extraction",
-    # initialize OpenAI client within the context
     OpenAIResponsesConfig(model="gpt-4o-mini"),
     disposables=(OpenAI(),),
 ):
     result: PersonalData = await ModelGeneration.generate(
-        # define model to generate
         PersonalData,
-        # provide additional instructions
-        # note that the data structure will be automatically explained to the model
         instructions="Extract information from the given input",
-        # we will provide the document as an input
         input=document,
     )
 
     print(result)
 ```
-    first_name: John
-    last_name: Doe
-    age: 21
 
+```text
+first_name: John
+last_name: Doe
+age: 21
+country: Canada
+```
 
+It is also possible to take full control over the prompt while keeping schema injection enabled.
 
 ```python
 from draive import ctx, ModelGeneration
+from draive.openai import OpenAIResponsesConfig, OpenAI
 
 async with ctx.scope(
     "customized_extraction",
-    # initialize OpenAI client within the context
     OpenAIResponsesConfig(model="gpt-4o-mini"),
     disposables=(OpenAI(),),
 ):
     result: PersonalData = await ModelGeneration.generate(
         PersonalData,
         instructions=(
-            # provide extended instructions and take full control over the prompt
             "Extract information from the given input."
             " Put it into the JSON according to the following description:\n"
-            "{schema}"  # 'schema' is the name of the format argument used to fill in the schema
+            "{schema}"
         ),
         input=document,
-        # we will use the simplified schema description
-        # you can also skip adding schema at all
         schema_injection="simplified",
     )
 
@@ -92,51 +93,38 @@ async with ctx.scope(
     print(f"Result:\n{result}")
 ```
 
-    JSON schema:
-    {
-      "type": "object",
-      "properties": {
-        "first_name": {
-          "type": "string"
-        },
-        "last_name": {
-          "type": "string"
-        },
-        "age": {
-          "oneOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "country": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "first_name",
-        "last_name"
+```text
+JSON schema:
+{
+  "type": "object",
+  "properties": {
+    "first_name": {"type": "string"},
+    "last_name": {"type": "string"},
+    "age": {
+      "oneOf": [
+        {"type": "integer"},
+        {"type": "null"}
+      ]
+    },
+    "country": {
+      "oneOf": [
+        {"type": "string"},
+        {"type": "null"}
       ]
     }
-    Simplified schema:
-    {
-      "first_name": "string",
-      "last_name": "string",
-      "age": "integer|null",
-      "country": "string|null"
-    }
-    Result:
-    first_name: John
-    last_name: Doe
-    age: 21
-    country: Canada
+  },
+  "required": ["first_name", "last_name"]
+}
+Simplified schema:
+{
+  "first_name": "string",
+  "last_name": "string",
+  "age": "integer|null",
+  "country": "string|null"
+}
+Result:
+first_name: John
+last_name: Doe
+age: 21
+country: Canada
+```

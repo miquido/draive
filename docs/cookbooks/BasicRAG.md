@@ -2,11 +2,8 @@
 
 RAG is a technique of adding additional information to the LLM context, to achieve better results. This applies to adding a knowledge source to be used by LLM to generate correct response as well as to introducing details about the task or personalization for more tailored result. The typical flow would be to prepare a vector index and search through the data to extend the model input with suitable context. We will use OpenAI services for this task, make sure to provide .env file with `OPENAI_API_KEY` key before running.
 
-
 ```python
 from draive import load_env
-
-
 
 ```python
 from draive import DataModel, ctx, split_text
@@ -67,8 +64,6 @@ print("\n---\n".join(chunk.content for chunk in document_chunks))
     As John reflects on his journey from a small farm in Texas to the vibrant city of Vancouver, he feels a sense of pride and accomplishment. He knows that his seven-year-old self would be proud of the life he has built in the country that captured his imagination all those years ago. With a smile on his
     ---
 
-
-
 ```python
 from collections.abc import Sequence
 
@@ -93,14 +88,11 @@ async with ctx.scope(
         # define what value will be embedded for each chunk
         attribute=DocumentChunk._.content,
 
-
-
 ```python
 from collections.abc import Sequence
 
 from draive import Toolbox, TextGeneration, tool, VectorIndex
 from draive.openai import OpenAIResponsesConfig, OpenAI, OpenAIEmbeddingConfig
-
 
 @tool(name="search") # prepare a simple tool for searching the index
 async def index_search_tool(query: str) -> str:
@@ -111,7 +103,6 @@ async def index_search_tool(query: str) -> str:
     )
 
     return "\n---\n".join(result.content for result in results)
-
 
 async with ctx.scope(
     "searching",

@@ -31,6 +31,9 @@ jobs:
       - name: Lint
         run: uv run ruff check --output-format=github ./src ./tests && uv run pyright --project ./
 
+      - name: Docs Lint
+        run: uv run python tools/markdown_lint.py docs
+
       - name: Test
         run: uv run pytest --rootdir= ./tests --doctest-modules --junitxml=junit/test-results.xml
 
