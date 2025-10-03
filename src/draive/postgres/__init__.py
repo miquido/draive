@@ -10,6 +10,7 @@ from haiway.postgres import (
 from draive.postgres.configuration import PostgresConfigurationRepository
 from draive.postgres.instructions import PostgresInstructionsRepository
 from draive.postgres.memory import PostgresModelMemory
+from draive.postgres.vector_index import PostgresVectorIndex
 
 __all__ = (
     "Postgres",
@@ -21,4 +22,5 @@ __all__ = (
     "PostgresModelMemory",
     "PostgresRow",
     "PostgresValue",
+    "PostgresVectorIndex",
 )
