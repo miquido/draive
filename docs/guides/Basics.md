@@ -10,7 +10,14 @@ class BasicState(State):
     value: int
 ```
 
-Both `State` and `DataModel` utilize transformation similar to Python's dataclass or pydantic BaseModel which means that all properties defined for the class will be converted into the instance properties and an appropriate `__init__` function will be generated as well. Additionally, both types come with built-in validation. Each object is automatically validated during the initialization ensuring proper types and values for each field. Both types are also immutable by default - you will receive linting and runtime errors when trying to mutate those. To make a mutation of an instance of either of those we can use a dedicated `updated` method which makes a copy on the fly and validates mutation as well. Let's have a look:
+Both `State` and `DataModel` utilize transformation similar to Python's dataclass or pydantic
+BaseModel which means that all properties defined for the class will be converted into the instance
+properties and an appropriate `__init__` function will be generated as well. Additionally, both
+types come with built-in validation. Each object is automatically validated during the
+initialization ensuring proper types and values for each field. Both types are also immutable by
+default - you will receive linting and runtime errors when trying to mutate those. To make a
+mutation of an instance of either of those we can use a dedicated `updated` method which makes a
+copy on the fly and validates mutation as well. Let's have a look:
 
 ```python
 # create an instance of BasicState
@@ -32,7 +39,9 @@ updated_state: BasicState = basic_state.updated(
 # basic_state.value = 0 # error! can't mutate the state
 ```
 
-When it comes to the `DataModel` type in addition to `State` features, we can use JSON serialization to directly create an instance. We can access its associated schema as well. `DataModel` has also more strict validation including nested structures validation and automatic type conversion.
+When it comes to the `DataModel` type in addition to `State` features, we can use JSON serialization
+to directly create an instance. We can access its associated schema as well. `DataModel` has also
+more strict validation including nested structures validation and automatic type conversion.
 
 ```python
 from collections.abc import Sequence
@@ -59,36 +68,38 @@ print(f"Decoded model:\n{decoded_model}")
 print(f"JSON Schema:\n{BasicModel.json_schema(indent=2)}")
 ```
 
-    Decoded model:
-    username: John Doe
-    tags:
-      - example
-      - json
-    JSON Schema:
-    {
-      "type": "object",
-      "properties": {
-        "username": {
-          "type": "string"
+```
+Decoded model:
+username: John Doe
+tags:
+  - example
+  - json
+JSON Schema:
+{
+  "type": "object",
+  "properties": {
+    "username": {
+      "type": "string"
+    },
+    "tags": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
-        "tags": {
-          "oneOf": [
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            {
-              "type": "null"
-            }
-          ]
+        {
+          "type": "null"
         }
-      },
-      "required": [
-        "username"
       ]
     }
+  },
+  "required": [
+    "username"
+  ]
+}
+```
 
 ```python
 from draive import ctx
@@ -99,14 +110,23 @@ async with ctx.scope("basics"):
     pass # now everything executed inside will use that scope
 ```
 
-Ok, we have defined our first context scope, but it is not useful yet. Since we already defined a state, let's see how to propagate it. When defining a function we typically define its arguments to access the state within its scope:
+Ok, we have defined our first context scope, but it is not useful yet. Since we already defined a
+state, let's see how to propagate it. When defining a function we typically define its arguments to
+access the state within its scope:
 
 ```python
 def do_something(state: BasicState) -> None:
     pass # use the state here
 ```
 
-It is still the go-to solution for accessing the data in a function scope. However, when a piece of data has to propagate through various function calls, it can be annoying to add an extra argument everywhere, especially in the functions that do not require it by itself. A common solution would be to introduce a shared global state to which all functions have access to, but this has some significant drawbacks. First, it can't be mutated locally to have a different value only for a subset of functions. Otherwise, we introduce a globally shared, mutable state, which is a common source of bugs. When using draive you can propagate any state through the context scope and change it locally when needed. We can begin by defining the initial state:
+It is still the go-to solution for accessing the data in a function scope. However, when a piece of
+data has to propagate through various function calls, it can be annoying to add an extra argument
+everywhere, especially in the functions that do not require it by itself. A common solution would be
+to introduce a shared global state to which all functions have access to, but this has some
+significant drawbacks. First, it can't be mutated locally to have a different value only for a
+subset of functions. Otherwise, we introduce a globally shared, mutable state, which is a common
+source of bugs. When using draive you can propagate any state through the context scope and change
+it locally when needed. We can begin by defining the initial state:
 
 ```python
 # when defining context scope we can provide any number of state objects,
@@ -117,7 +137,10 @@ async with ctx.scope("basics", basic_state):
 # out of the scope, state is not defined here
 ```
 
-Each state type can have a single instance available in the context. Its value can be accessed by using the type as a key with proper Generic (parametrized types) handling. Note that only subclasses of `State` can be used as context state, `DataModel` has a different purpose and cannot be used that way. Now we can see how to access it inside the function:
+Each state type can have a single instance available in the context. Its value can be accessed by
+using the type as a key with proper Generic (parametrized types) handling. Note that only subclasses
+of `State` can be used as context state, `DataModel` has a different purpose and cannot be used that
+way. Now we can see how to access it inside the function:
 
 ```python
 def do_something_contextually() -> None:
@@ -126,7 +149,9 @@ def do_something_contextually() -> None:
     print(state) # then you can use it in the scope of the function
 ```
 
-What will be the current state is defined by the context of the execution. We can change it locally by using another function from `ctx` called `updated` which allows us to update the state by copying the context and allowing to enter a new scope with it:
+What will be the current state is defined by the context of the execution. We can change it locally
+by using another function from `ctx` called `updated` which allows us to update the state by copying
+the context and allowing to enter a new scope with it:
 
 ```python
 async with ctx.scope("basics", basic_state):
@@ -147,11 +172,13 @@ async with ctx.scope("basics", basic_state):
 # do_something_contextually() # calling it outside of any context scope will cause an error
 ```
 
-    Initial:
-    BasicState(identifier: basic, value: 42)
-    Updated:
-    BasicState(identifier: updated, value: 42)
-    Final:
+```
+Initial:
+BasicState(identifier: basic, value: 42)
+Updated:
+BasicState(identifier: updated, value: 42)
+Final:
+```
 
 ```python
 # we can assign label to the context to better identify it
@@ -162,7 +189,8 @@ async with ctx.scope("logging"):
     ctx.record(BasicState(identifier="recorded", value=42))
 ```
 
-Nice, but we can't see anything here. How about configuring the loggers first? Draive comes with a helper function for that:
+Nice, but we can't see anything here. How about configuring the loggers first? Draive comes with a
+helper function for that:
 
 ```python
 from draive import setup_logging
@@ -179,7 +207,11 @@ from draive import load_env
 load_env()
 ```
 
-Those two helpers should be called when initializing your application to ensure proper environment and logging. Now let's go back to the metrics. When dealing with metrics, we have to define an observability handler; otherwise, all metrics will be simply logged. Draive comes with a predefined logger observability called `LoggerObservability` converting all metrics into logs with a call tree summary at the scope exit:
+Those two helpers should be called when initializing your application to ensure proper environment
+and logging. Now let's go back to the metrics. When dealing with metrics, we have to define an
+observability handler; otherwise, all metrics will be simply logged. Draive comes with a predefined
+logger observability called `LoggerObservability` converting all metrics into logs with a call tree
+summary at the scope exit:
 
 ```python
 from haiway import LoggerObservability
@@ -206,43 +238,50 @@ async with ctx.scope(
 # including all recorded metrics
 ```
 
-    07/Mar/2025:13:40:54 +0000 [DEBUG] [logging] [73243ab2691a4753a85a4ddf23643b47] [logging] [488ece9d384e4b6fac258d87ca78d52c] Entering context...
+```
+07/Mar/2025:13:40:54 +0000 [DEBUG] [logging] [73243ab2691a4753a85a4ddf23643b47] [logging] [488ece9d384e4b6fac258d87ca78d52c] Entering context...
 
-    07/Mar/2025:13:40:54 +0000 [INFO] [logging] [73243ab2691a4753a85a4ddf23643b47] [logging] [488ece9d384e4b6fac258d87ca78d52c] Now we can see the logs!
+07/Mar/2025:13:40:54 +0000 [INFO] [logging] [73243ab2691a4753a85a4ddf23643b47] [logging] [488ece9d384e4b6fac258d87ca78d52c] Now we can see the logs!
 
-    07/Mar/2025:13:40:54 +0000 [DEBUG] [logging] [73243ab2691a4753a85a4ddf23643b47] [logging] [488ece9d384e4b6fac258d87ca78d52c] Recorded metric:
-    ⎡ BasicState:
-    ├ identifier: "recorded"
-    ├ value: 42
-    ⌊
+07/Mar/2025:13:40:54 +0000 [DEBUG] [logging] [73243ab2691a4753a85a4ddf23643b47] [logging] [488ece9d384e4b6fac258d87ca78d52c] Recorded metric:
+⎡ BasicState:
+├ identifier: "recorded"
+├ value: 42
+⌊
 
-    07/Mar/2025:13:40:54 +0000 [DEBUG] [nested] [73243ab2691a4753a85a4ddf23643b47] [nested] [aa01c8e4dad44122bfa79447d964f016] Entering context...
+07/Mar/2025:13:40:54 +0000 [DEBUG] [nested] [73243ab2691a4753a85a4ddf23643b47] [nested] [aa01c8e4dad44122bfa79447d964f016] Entering context...
 
-    07/Mar/2025:13:40:54 +0000 [DEBUG] [nested] [73243ab2691a4753a85a4ddf23643b47] [nested] [aa01c8e4dad44122bfa79447d964f016] Recorded metric:
-    ⎡ BasicState:
-    ├ identifier: "recorded-nested"
-    ├ value: 11
-    ⌊
+07/Mar/2025:13:40:54 +0000 [DEBUG] [nested] [73243ab2691a4753a85a4ddf23643b47] [nested] [aa01c8e4dad44122bfa79447d964f016] Recorded metric:
+⎡ BasicState:
+├ identifier: "recorded-nested"
+├ value: 11
+⌊
 
-    07/Mar/2025:13:40:54 +0000 [DEBUG] [nested] [73243ab2691a4753a85a4ddf23643b47] [nested] [aa01c8e4dad44122bfa79447d964f016] ...exiting context after 0.00s
+07/Mar/2025:13:40:54 +0000 [DEBUG] [nested] [73243ab2691a4753a85a4ddf23643b47] [nested] [aa01c8e4dad44122bfa79447d964f016] ...exiting context after 0.00s
 
-    07/Mar/2025:13:40:54 +0000 [DEBUG] [logging] [73243ab2691a4753a85a4ddf23643b47] [logging] [488ece9d384e4b6fac258d87ca78d52c] Metrics summary:
-    ⎡ @logging [488ece9d384e4b6fac258d87ca78d52c](0.00s):
-    |  ⎡ •BasicState:
-    |  |  ├ identifier: "recorded"
-    |  |  ├ value: 42
-    |  ⌊
-    |
-    |  ⎡ @nested [aa01c8e4dad44122bfa79447d964f016](0.00s):
-    |  |  ⎡ •BasicState:
-    |  |  |  ├ identifier: "recorded-nested"
-    |  |  |  ├ value: 11
-    |  |  ⌊
-    |  ⌊
-    ⌊
+07/Mar/2025:13:40:54 +0000 [DEBUG] [logging] [73243ab2691a4753a85a4ddf23643b47] [logging] [488ece9d384e4b6fac258d87ca78d52c] Metrics summary:
+⎡ @logging [488ece9d384e4b6fac258d87ca78d52c](0.00s):
+|  ⎡ •BasicState:
+|  |  ├ identifier: "recorded"
+|  |  ├ value: 42
+|  ⌊
+|
+|  ⎡ @nested [aa01c8e4dad44122bfa79447d964f016](0.00s):
+|  |  ⎡ •BasicState:
+|  |  |  ├ identifier: "recorded-nested"
+|  |  |  ├ value: 11
+|  |  ⌊
+|  ⌊
+⌊
 
-    07/Mar/2025:13:40:54 +0000 [DEBUG] [logging] [73243ab2691a4753a85a4ddf23643b47] [logging] [488ece9d384e4b6fac258d87ca78d52c] ...exiting context after 0.00s
+07/Mar/2025:13:40:54 +0000 [DEBUG] [logging] [73243ab2691a4753a85a4ddf23643b47] [logging] [488ece9d384e4b6fac258d87ca78d52c] ...exiting context after 0.00s
+```
 
-Now that is useful! You can customize how those metrics are reported and gathered by implementing the custom MetricsHandler and using it when creating a new scope context. This allows you to use any custom metrics-gathering tool you like.
+Now that is useful! You can customize how those metrics are reported and gathered by implementing
+the custom MetricsHandler and using it when creating a new scope context. This allows you to use any
+custom metrics-gathering tool you like.
 
-We have covered all basic concepts related to draive framework. Familiarizing with those is very important and allows us to build on top of that foundation to provide elegant and simple solutions for complex problems. This is not the end of our journey though, there are a lot more details, helpers, and customizations to explore!
+We have covered all basic concepts related to draive framework. Familiarizing with those is very
+important and allows us to build on top of that foundation to provide elegant and simple solutions
+for complex problems. This is not the end of our journey though, there are a lot more details,
+helpers, and customizations to explore!

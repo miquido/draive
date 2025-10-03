@@ -1,6 +1,8 @@
 # Multimodal Content
 
-`MultimodalContent` is the core container for mixing text, media, and structured data across Draive pipelines. It keeps parts immutable, preserves ordering, and exposes rich helpers to query and transform what you feed into or receive from models.
+`MultimodalContent` is the core container for mixing text, media, and structured data across Draive
+pipelines. It keeps parts immutable, preserves ordering, and exposes rich helpers to query and
+transform what you feed into or receive from models.
 
 ## Quick Start
 
@@ -14,21 +16,24 @@ report = MultimodalContent.of(
 )
 ```
 
-- Input accepts plain strings, `TextContent`, `ResourceContent`, `ResourceReference`, `ArtifactContent`, other `MultimodalContent`, and `MultimodalTag` instances.
-- Construction is normalized: adjacent text fragments are merged and existing `MultimodalContent` instances are reused.
+- Input accepts plain strings, `TextContent`, `ResourceContent`, `ResourceReference`,
+  `ArtifactContent`, other `MultimodalContent`, and `MultimodalTag` instances.
+- Construction is normalized: adjacent text fragments are merged and existing `MultimodalContent`
+  instances are reused.
 - The resulting object is immutable; every mutating-style call returns a new instance.
 
 ## Building Blocks
 
-| Part type | When to use | Key helpers |
-| --- | --- | --- |
-| `TextContent` | Text blocks with optional metadata (e.g. author, language) | `.of(...)`, `.meta`, `.to_str()` |
-| `ResourceContent` | Inline binary data such as images or audio | `.of(bytes, mime_type=...)`, `.to_data_uri()` |
-| `ResourceReference` | Reference external resources by URI when you cannot embed bytes | `.of(url, mime_type=...)` |
-| `ArtifactContent` | Wrap strongly typed `DataModel` objects for passing structured payloads | `.of(artifact, category=...)` |
-| `MultimodalTag` | Lightweight XML-like tags for templating or post-processing | `.of(content, name=..., meta=...)` |
+| Part type           | When to use                                                             | Key helpers                                   |
+| ------------------- | ----------------------------------------------------------------------- | --------------------------------------------- |
+| `TextContent`       | Text blocks with optional metadata (e.g. author, language)              | `.of(...)`, `.meta`, `.to_str()`              |
+| `ResourceContent`   | Inline binary data such as images or audio                              | `.of(bytes, mime_type=...)`, `.to_data_uri()` |
+| `ResourceReference` | Reference external resources by URI when you cannot embed bytes         | `.of(url, mime_type=...)`                     |
+| `ArtifactContent`   | Wrap strongly typed `DataModel` objects for passing structured payloads | `.of(artifact, category=...)`                 |
+| `MultimodalTag`     | Lightweight XML-like tags for templating or post-processing             | `.of(content, name=..., meta=...)`            |
 
-All parts share the same metadata model, so you can attach consistent descriptors like `{"section": "summary"}` regardless of part type.
+All parts share the same metadata model, so you can attach consistent descriptors like
+`{"section": "summary"}` regardless of part type.
 
 ## Creating Content
 
@@ -75,7 +80,9 @@ section_groups = content.split_by_meta(key="section")
 ```
 
 Common patterns:
-- Tag user-generated vs. system-generated text with `{ "source": "user" }` and `{ "source": "assistant" }`.
+
+- Tag user-generated vs. system-generated text with `{ "source": "user" }` and
+  `{ "source": "assistant" }`.
 - Store structured routing hints like `{ "stage": "retrieval" }` to drive downstream stages.
 
 ## Working with Resources and Artifacts
@@ -96,11 +103,13 @@ content_without_artifacts = content.without_artifacts()
 ```
 
 - `resources(mime_type=...)` narrows by MIME type (exact match).
-- `artifacts(model=..., category=...)` lets you filter by wrapped `DataModel` type and logical category.
+- `artifacts(model=..., category=...)` lets you filter by wrapped `DataModel` type and logical
+  category.
 
 ## Tagging & Lightweight Markup
 
-Wrap content in `MultimodalTag` when you need template-like markers that survive round-trips through generation.
+Wrap content in `MultimodalTag` when you need template-like markers that survive round-trips through
+generation.
 
 ```python
 from draive import MultimodalContent, MultimodalTag, TextContent
@@ -127,7 +136,8 @@ updated = document.replacing_tag(
 ```
 
 - `tag(name)` returns the first matching tag; `tags(name)` returns all.
-- `replacing_tag(...)` swaps one or all occurrences. Pass `strip_tags=True` to unwrap the original tag markers.
+- `replacing_tag(...)` swaps one or all occurrences. Pass `strip_tags=True` to unwrap the original
+  tag markers.
 
 ## Transformations & Utilities
 
@@ -142,7 +152,8 @@ final = MultimodalContent.of(content, extended)
 text_view = content.to_str()
 ```
 
-Because every method returns a new instance, you can chain calls to build complex documents while keeping the original inputs intact.
+Because every method returns a new instance, you can chain calls to build complex documents while
+keeping the original inputs intact.
 
 ## Using in Generation Pipelines
 
@@ -170,14 +181,20 @@ async def analyze_image(image_bytes: bytes) -> str:
 asyncio.run(analyze_image(b"..."))
 ```
 
-This example scopes provider configuration, builds a mixed prompt, and feeds it directly into a generation facade. The response is also a `MultimodalContent`, so you can reuse the same helpers when handling model outputs.
+This example scopes provider configuration, builds a mixed prompt, and feeds it directly into a
+generation facade. The response is also a `MultimodalContent`, so you can reuse the same helpers
+when handling model outputs.
 
 ## Best Practices
 
 - Keep metadata small and serializable; prefer strings, numbers, and tuples of primitives.
-- Embed only assets that must travel with the request. Use `ResourceReference` for large, cacheable files.
+- Embed only assets that must travel with the request. Use `ResourceReference` for large, cacheable
+  files.
 - Normalize user content early to attach provenance metadata and validate MIME types.
-- When chaining transformations, retain the original content for auditing by storing both the source and derived instances.
-- Use `ArtifactContent` to bridge typed internal data (e.g. summaries, retrieval chunks) rather than serializing to JSON manually.
+- When chaining transformations, retain the original content for auditing by storing both the source
+  and derived instances.
+- Use `ArtifactContent` to bridge typed internal data (e.g. summaries, retrieval chunks) rather than
+  serializing to JSON manually.
 
-With these patterns you can confidently build, inspect, and transform rich multimodal payloads while preserving structure for downstream Draive stages.
+With these patterns you can confidently build, inspect, and transform rich multimodal payloads while
+preserving structure for downstream Draive stages.

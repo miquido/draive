@@ -1,6 +1,8 @@
 # Basic Conversation with Draive and OpenAI
 
-This guide walks you through a minimal yet complete conversation flow using Draive's conversation helpers and OpenAI as the model provider. By the end you will know how to load secrets, register simple tools, and request a response from the model inside a managed Haiway context.
+This guide walks you through a minimal yet complete conversation flow using Draive's conversation
+helpers and OpenAI as the model provider. By the end you will know how to load secrets, register
+simple tools, and request a response from the model inside a managed Haiway context.
 
 ## Prerequisites
 
@@ -8,7 +10,8 @@ This guide walks you through a minimal yet complete conversation flow using Drai
 - Project dependencies installed (for example `uv sync`).
 - An `.env` file with `OPENAI_API_KEY` set so Draive can authenticate against OpenAI.
 
-> 💡 Draive never reads environment variables directly. Always load them through `draive.load_env()` so secrets are available to Haiway states.
+> 💡 Draive never reads environment variables directly. Always load them through `draive.load_env()`
+> so secrets are available to Haiway states.
 
 ## 1. Load environment secrets
 
@@ -22,7 +25,8 @@ load_env()  # pulls OPENAI_API_KEY (and other variables) into the session
 
 ## 2. Define optional tools
 
-Tools extend the model with deterministic abilities such as retrieving the current time. Define them with the `@tool` decorator and standard Python code. Tools must be async functions.
+Tools extend the model with deterministic abilities such as retrieving the current time. Define them
+with the `@tool` decorator and standard Python code. Tools must be async functions.
 
 ```python
 from datetime import UTC, datetime
@@ -37,7 +41,9 @@ async def utc_datetime() -> str:
 
 ## 3. Run a conversation
 
-Inside a `ctx.scope(...)` block you can compose the state required for the conversation. Provide configuration for the OpenAI model, instantiate the OpenAI client as a disposable resource, and finally call `Conversation.completion(...)` with your prompt and optional tools.
+Inside a `ctx.scope(...)` block you can compose the state required for the conversation. Provide
+configuration for the OpenAI model, instantiate the OpenAI client as a disposable resource, and
+finally call `Conversation.completion(...)` with your prompt and optional tools.
 
 ```python
 from draive import Conversation, ConversationMessage, ctx
@@ -68,10 +74,13 @@ content:
     - text: The current UTC time and date is Friday, 7th March 2025, 12:40:29.
 ```
 
-The `ConversationMessage` object contains structured parts that you can inspect or render. If you prefer to display only the assistant text, use `response.text`.
+The `ConversationMessage` object contains structured parts that you can inspect or render. If you
+prefer to display only the assistant text, use `response.text`.
 
 ## Next steps
 
-- Swap `OpenAIResponsesConfig` for another provider module (for example `draive.mistral`) to try different models.
+- Swap `OpenAIResponsesConfig` for another provider module (for example `draive.mistral`) to try
+  different models.
 - Add more tools to give the model controlled access to proprietary data or services.
-- Wrap the code in an async function and trigger it from your application entrypoint or a CLI script.
+- Wrap the code in an async function and trigger it from your application entrypoint or a CLI
+  script.

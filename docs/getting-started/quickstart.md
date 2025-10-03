@@ -1,6 +1,7 @@
 # Quickstart
 
-Build a minimal Draive app that talks to OpenAI, loads environment variables, invokes tools, and adapts to other providers.
+Build a minimal Draive app that talks to OpenAI, loads environment variables, invokes tools, and
+adapts to other providers.
 
 ## Prerequisites
 

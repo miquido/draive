@@ -7,7 +7,9 @@
 
 > **🏎️ Build production-grade LLM workflows and AI applications with confidence.**
 
-Draive is a batteries-included Python framework for composing multi-model AI systems. It combines structured state management, typed parameters, multimodal content handling, and comprehensive observability so that teams can ship reliable AI features faster.
+Draive is a batteries-included Python framework for composing multi-model AI systems. It combines
+structured state management, typed parameters, multimodal content handling, and comprehensive
+observability so that teams can ship reliable AI features faster.
 
 ## Why teams choose Draive
 
@@ -19,12 +21,17 @@ Draive is a batteries-included Python framework for composing multi-model AI sys
 
 ## Key capabilities
 
-- **Multimodal content**: Work with text, images, audio, documents, and artifacts in a single, typed API.
-- **Conversation flows**: Maintain contextual, stateful chat sessions tuned for completion and realtime use cases.
-- **Retrieval & memory**: Include vector search, resource repositories, and memory utilities for RAG pipelines.
-- **Tooling & orchestration**: Model execution, tool calling, retries, and error handling patterns that keep agents resilient.
+- **Multimodal content**: Work with text, images, audio, documents, and artifacts in a single, typed
+  API.
+- **Conversation flows**: Maintain contextual, stateful chat sessions tuned for completion and
+  realtime use cases.
+- **Retrieval & memory**: Include vector search, resource repositories, and memory utilities for RAG
+  pipelines.
+- **Tooling & orchestration**: Model execution, tool calling, retries, and error handling patterns
+  that keep agents resilient.
 - **Safety & governance**: Moderation, privacy, and quality guardrails configurable per workflow.
-- **Operational excellence**: First-class observability, metrics, and structured concurrency to run AI in production.
+- **Operational excellence**: First-class observability, metrics, and structured concurrency to run
+  AI in production.
 
 ## Provider coverage
 
@@ -37,8 +44,10 @@ Draive ships adapters with a shared interface for:
 ## Architecture essentials
 
 - Built on Haiway state containers (`State`, `ctx.scope`) for dependency injection without globals.
-- Modules such as `draive/generation`, `draive/conversation`, `draive/embedding`, and `draive/guardrails` keep concerns separated and discoverable.
-- Provider adapters live under `draive/<provider>/` and expose consistent config, client, and API layers.
+- Modules such as `draive/generation`, `draive/conversation`, `draive/embedding`, and
+  `draive/guardrails` keep concerns separated and discoverable.
+- Provider adapters live under `draive/<provider>/` and expose consistent config, client, and API
+  layers.
 - Utilities, resources, and multimodal helpers are ready to mix into your own stages and agents.
 
 ## Quick start
@@ -49,7 +58,8 @@ Draive ships adapters with a shared interface for:
 pip install draive
 ```
 
-Using [uv](https://github.com/astral-sh/uv)? Create an isolated environment and install Draive in one step:
+Using [uv](https://github.com/astral-sh/uv)? Create an isolated environment and install Draive in
+one step:
 
 ```bash
 uv venv
@@ -79,13 +89,16 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-Run the script with your preferred OpenAI credentials set via environment variables. Swap the configuration to another provider (e.g., Cohere, Gemini) without changing the rest of the code.
+Run the script with your preferred OpenAI credentials set via environment variables. Swap the
+configuration to another provider (e.g., Cohere, Gemini) without changing the rest of the code.
 
 ### Add retrieval or tools
 
 - Use `draive.embedding` with `VectorIndex` to ingest documents and power RAG pipelines.
-- Wire external actions with `draive.models.tools` and invoke them from `TextGeneration` or custom stages.
-- Combine guardrails from `draive.guardrails` to validate outputs before returning them to end users.
+- Wire external actions with `draive.models.tools` and invoke them from `TextGeneration` or custom
+  stages.
+- Combine guardrails from `draive.guardrails` to validate outputs before returning them to end
+  users.
 
 ## Where to go next
 
@@ -100,4 +113,5 @@ Run the script with your preferred OpenAI credentials set via environment variab
 - Join discussions, propose enhancements, or share your integrations via pull requests.
 - Follow [Miquido](https://miquido.com) for updates and case studies powered by Draive.
 
-**Built by [Miquido](https://miquido.com)** — empowering developers to build amazing AI applications.
+**Built by [Miquido](https://miquido.com)** — empowering developers to build amazing AI
+applications.

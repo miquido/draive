@@ -1,6 +1,7 @@
 # First Steps
 
-Build confidence with Draive by learning how scoped contexts, state containers, and typed models fit together. This guide walks through the essential patterns you will use in every project.
+Build confidence with Draive by learning how scoped contexts, state containers, and typed models fit
+together. This guide walks through the essential patterns you will use in every project.
 
 ## Activate your environment
 
@@ -17,7 +18,8 @@ async def main() -> None:
         ...
 ```
 
-`ctx.scope` binds configuration and disposables to a structured context. Everything inside the scope can access the active configuration via `ctx.state`.
+`ctx.scope` binds configuration and disposables to a structured context. Everything inside the scope
+can access the active configuration via `ctx.state`.
 
 ## Define immutable state
 
@@ -127,7 +129,7 @@ Moderation, quality, and privacy guardrails plug into the same scoping mechanics
 ## Next steps
 
 1. Explore the [Guides](../guides/BasicUsage.md) for focused scenarios.
-2. Try applied blueprints in the [Cookbooks](../cookbooks/BasicRAG.md).
-3. Reference the API from your editor with Draive's strict type hints.
+1. Try applied blueprints in the [Cookbooks](../cookbooks/BasicRAG.md).
+1. Reference the API from your editor with Draive's strict type hints.
 
 Remember: keep code inside `ctx.scope`, favour immutable state, and add features incrementally.

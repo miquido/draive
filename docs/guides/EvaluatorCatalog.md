@@ -1,6 +1,7 @@
 # Evaluator Catalog: Complete Guide to Available Evaluators
 
-This comprehensive guide covers all predefined evaluators in the Draive framework, organized by category with practical examples and real-world usage patterns.
+This comprehensive guide covers all predefined evaluators in the Draive framework, organized by
+category with practical examples and real-world usage patterns.
 
 ## Overview
 
@@ -13,11 +14,16 @@ Draive provides 20 predefined evaluators covering all major dimensions of LLM ev
 - **Similarity Evaluators**: Measure semantic and vector-based similarity
 - **Utility Evaluators**: Rule-based checks for specific requirements
 
-All evaluators return numeric scores between 0.00 and 1.00. Draive ships a default interpretation mapping these values to five qualitative labels: `poor` (0.10), `fair` (0.30), `good` (0.50), `excellent` (0.70), and `perfect` (0.90). Reserve `none` for 0.00 when content cannot be evaluated. The examples below log the raw scores; the comments show them rounded to two decimals for consistency.
+All evaluators return numeric scores between 0.00 and 1.00. Draive ships a default interpretation
+mapping these values to five qualitative labels: `poor` (0.10), `fair` (0.30), `good` (0.50),
+`excellent` (0.70), and `perfect` (0.90). Reserve `none` for 0.00 when content cannot be evaluated.
+The examples below log the raw scores; the comments show them rounded to two decimals for
+consistency.
 
 ## Quality Evaluators
 
 ### Coherence Evaluator
+
 **Purpose**: Evaluates logical flow and structural organization of content.
 
 ```python
@@ -35,9 +41,11 @@ result = await coherence_evaluator(
 print(f"Coherence: {result.score.value}")  # Output: 0.70
 ```
 
-**Best for**: Evaluating reports, explanations, structured content where logical organization matters.
+**Best for**: Evaluating reports, explanations, structured content where logical organization
+matters.
 
 ### Conciseness Evaluator
+
 **Purpose**: Measures brevity while maintaining completeness of information.
 
 ```python
@@ -54,9 +62,11 @@ print(f"Verbose: {verbose_result.score.value}")   # Output: 0.30
 print(f"Concise: {concise_result.score.value}")   # Output: 0.70
 ```
 
-**Best for**: Executive summaries, product descriptions, social media content where brevity is valued.
+**Best for**: Executive summaries, product descriptions, social media content where brevity is
+valued.
 
 ### Fluency Evaluator
+
 **Purpose**: Assesses grammar, spelling, punctuation, and natural language flow.
 
 ```python
@@ -75,6 +85,7 @@ print(f"Good fluency: {good_result.score.value}")   # Output: 0.90
 **Best for**: All content types as a basic quality check, especially user-facing text.
 
 ### Readability Evaluator
+
 **Purpose**: Evaluates ease of understanding and accessibility of content.
 
 ```python
@@ -95,6 +106,7 @@ print(f"Simple: {simple_result.score.value}")     # Output: 0.70
 ## Reference-Based Evaluators
 
 ### Coverage Evaluator
+
 **Purpose**: Ensures generated content includes all key points from reference material.
 
 ```python
@@ -121,6 +133,7 @@ print(f"Full: {full_result.score.value}")        # Output: 0.70
 **Best for**: Summarization tasks, report generation, ensuring comprehensive information transfer.
 
 ### Consistency Evaluator
+
 **Purpose**: Checks factual alignment and consistency with reference content.
 
 ```python
@@ -138,9 +151,11 @@ print(f"Consistent: {consistent_result.score.value}")    # Output: 0.90
 print(f"Inconsistent: {inconsistent_result.score.value}") # Output: 0.10
 ```
 
-**Best for**: Fact-checking, ensuring generated content aligns with source material, preventing hallucinations.
+**Best for**: Fact-checking, ensuring generated content aligns with source material, preventing
+hallucinations.
 
 ### Groundedness Evaluator
+
 **Purpose**: Verifies content is anchored in and traceable to source material.
 
 ```python
@@ -165,9 +180,11 @@ print(f"Grounded: {grounded_result.score.value} ({'✓' if grounded_result.passe
 print(f"Ungrounded: {ungrounded_result.score.value} ({'✓' if ungrounded_result.passed else '✗'})") # Output: 0.10 ✗
 ```
 
-**Best for**: Scientific content, legal documents, journalism, any content requiring citation and source attribution.
+**Best for**: Scientific content, legal documents, journalism, any content requiring citation and
+source attribution.
 
 ### Relevance Evaluator
+
 **Purpose**: Measures selection of important information while avoiding redundancy.
 
 ```python
@@ -196,6 +213,7 @@ print(f"Irrelevant: {irrelevant_result.score.value}") # Output: 0.10
 **Best for**: Product descriptions, feature highlights, content curation where focus is important.
 
 ### Truthfulness Evaluator
+
 **Purpose**: Evaluates factual correctness against reference material.
 
 ```python
@@ -218,6 +236,7 @@ print(f"False: {false_result.score.value}")        # Output: 0.10
 ## User-Focused Evaluators
 
 ### Helpfulness Evaluator
+
 **Purpose**: Assesses how effectively content addresses user needs and questions.
 
 ```python
@@ -248,6 +267,7 @@ print(f"Unhelpful: {unhelpful_result.score.value} ({'✓' if unhelpful_result.pa
 **Best for**: Customer support responses, FAQ answers, instructional content, chatbot responses.
 
 ### Completeness Evaluator
+
 **Purpose**: Ensures all aspects of a user query are fully addressed.
 
 ```python
@@ -284,6 +304,7 @@ print(f"Incomplete: {incomplete_result.score.value}") # Output: 0.30
 **Best for**: Multi-part questions, complex inquiries, ensuring comprehensive responses.
 
 ### Expectations Evaluator
+
 **Purpose**: Measures fulfillment of specific defined criteria or expectations.
 
 ```python
@@ -334,6 +355,7 @@ print(f"Expectations met: {result.score.value} ({'✓' if result.passed else '�
 ## Safety & Content Evaluators
 
 ### Safety Evaluator
+
 **Purpose**: Detects harmful, dangerous, or inappropriate content.
 
 ```python
@@ -354,9 +376,11 @@ print(f"Safe content: {safe_result.score.value} ({'✓' if safe_result.passed el
 print(f"Unsafe content: {unsafe_result.score.value} ({'✓' if unsafe_result.passed else '✗'})") # Output: 0.10 ✗
 ```
 
-**Best for**: Content moderation, user-generated content, ensuring platform safety guidelines compliance.
+**Best for**: Content moderation, user-generated content, ensuring platform safety guidelines
+compliance.
 
 ### Factual Accuracy Evaluator
+
 **Purpose**: Verifies factual correctness using general knowledge (no reference required).
 
 ```python
@@ -373,9 +397,11 @@ print(f"Factual: {factual_result.score.value}")     # Output: 0.90
 print(f"Inaccurate: {inaccurate_result.score.value}") # Output: 0.10
 ```
 
-**Best for**: Educational content, general knowledge verification, fact-checking without specific sources.
+**Best for**: Educational content, general knowledge verification, fact-checking without specific
+sources.
 
 ### Tone/Style Evaluator
+
 **Purpose**: Evaluates alignment with expected tone and writing style.
 
 ```python
@@ -407,9 +433,11 @@ print(f"Appropriate tone: {appropriate_result.score.value}")   # Output: 0.70
 print(f"Inappropriate tone: {inappropriate_result.score.value}") # Output: 0.30
 ```
 
-**Best for**: Brand voice consistency, customer communications, content matching specific style guides.
+**Best for**: Brand voice consistency, customer communications, content matching specific style
+guides.
 
 ### Creativity Evaluator
+
 **Purpose**: Measures originality, novelty, and innovative thinking.
 
 ```python
@@ -431,11 +459,13 @@ print(f"Generic: {generic_result.score.value}")   # Output: 0.10
 print(f"Creative: {creative_result.score.value}")  # Output: 0.70
 ```
 
-**Best for**: Marketing copy, creative writing, brainstorming content, innovative problem-solving explanations.
+**Best for**: Marketing copy, creative writing, brainstorming content, innovative problem-solving
+explanations.
 
 ## Similarity Evaluators
 
 ### Semantic Similarity Evaluator
+
 **Purpose**: Measures semantic similarity between two pieces of content using LLM evaluation.
 
 ```python
@@ -456,6 +486,7 @@ print(f"Dissimilar content: {dissimilar_result.score.value}") # Output: 0.10
 **Best for**: Duplicate detection, paraphrasing evaluation, content matching.
 
 ### Vector Similarity Evaluators
+
 **Purpose**: Calculate mathematical similarity using embedding vectors.
 
 ```python
@@ -484,6 +515,7 @@ print(f"Image similarity: {image_similarity:.3f}")  # Output: 0.756
 ## Utility Evaluators
 
 ### Keyword Evaluators
+
 **Purpose**: Rule-based checking for required or forbidden keywords.
 
 ```python
@@ -527,6 +559,7 @@ print(f"Partial keyword score: {partial_result.score.value}")  # Output: 0.75 (3
 ## Real-World Evaluation Scenarios
 
 ### Content Marketing Evaluation
+
 ```python
 from collections.abc import Sequence
 from draive.evaluation import evaluate, evaluator_scenario, EvaluatorResult
@@ -587,6 +620,7 @@ for eval_result in result.evaluations:
 ```
 
 ### Customer Support Response Evaluation
+
 ```python
 @evaluator_scenario(name="support_response_quality")
 async def evaluate_support_response(
@@ -614,6 +648,7 @@ async def evaluate_support_response(
 ```
 
 ### Academic Content Evaluation
+
 ```python
 @evaluator_scenario(name="academic_content_review")
 async def evaluate_academic_content(
@@ -695,6 +730,7 @@ required_keywords_evaluator.with_threshold("fair")      # Flexible keyword match
 ```
 
 ### 3. Use Concurrent Evaluation for Performance
+
 ```python
 from draive.evaluation import evaluate
 
@@ -710,6 +746,7 @@ results = await evaluate(
 ```
 
 ### 4. Provide Context with Guidelines
+
 ```python
 # Specific evaluation context improves accuracy
 result = await tone_style_evaluator(
@@ -727,11 +764,13 @@ result = await tone_style_evaluator(
 
 ## Summary
 
-The Draive evaluator catalog provides comprehensive coverage for evaluating LLM outputs across all major dimensions:
+The Draive evaluator catalog provides comprehensive coverage for evaluating LLM outputs across all
+major dimensions:
 
 - **20 specialized evaluators** covering quality, safety, user needs, and content requirements
 - **Consistent numeric scoring** with a standard five-level interpretation mapping
 - **Flexible composition** allowing complex evaluation scenarios
 - **Real-world optimized** with guidelines support and concurrent execution
 
-Choose evaluators based on your specific use case, combine them in scenarios for comprehensive testing, and use appropriate thresholds based on the criticality of each evaluation dimension.
+Choose evaluators based on your specific use case, combine them in scenarios for comprehensive
+testing, and use appropriate thresholds based on the criticality of each evaluation dimension.

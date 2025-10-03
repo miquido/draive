@@ -1,20 +1,19 @@
 # Basic Stage Usage
 
-Stages are the programmable building blocks of Draive pipelines. Every `Stage`
-receives a `StageState` (which encapsulates the active context and latest
-result), performs its work, and returns a new state. This guide walks through
-the most common operations so you can assemble reliable pipelines with
-confidence.
+Stages are the programmable building blocks of Draive pipelines. Every `Stage` receives a
+`StageState` (which encapsulates the active context and latest result), performs its work, and
+returns a new state. This guide walks through the most common operations so you can assemble
+reliable pipelines with confidence.
 
 ## Core Concepts
 
 - **Stage** – an async callable that produces or transforms multimodal content.
-- **StageState** – an immutable snapshot holding context entries and the latest
-  result. Always return `state.updated(...)` instead of mutating in place.
-- **MultimodalContent** – container for text, images, artifacts, and resources
-  used as model inputs or outputs.
-- **`ctx.scope(...)`** – binds providers, disposables, and logging/metrics for
-  the lifetime of your pipeline. All observability flows through `ctx`.
+- **StageState** – an immutable snapshot holding context entries and the latest result. Always
+  return `state.updated(...)` instead of mutating in place.
+- **MultimodalContent** – container for text, images, artifacts, and resources used as model inputs
+  or outputs.
+- **`ctx.scope(...)`** – binds providers, disposables, and logging/metrics for the lifetime of your
+  pipeline. All observability flows through `ctx`.
 
 ## Creating Your First Completion
 
@@ -30,10 +29,9 @@ result_state = await basic_stage.execute()
 summary = result_state.result.as_string()
 ```
 
-`Stage.completion` wires a model call, applies optional instructions, and
-returns a `StageState` whose `result` contains the generated content. Use
-`.execute()` for quick experiments or tests; in production you typically compose
-stages into larger flows.
+`Stage.completion` wires a model call, applies optional instructions, and returns a `StageState`
+whose `result` contains the generated content. Use `.execute()` for quick experiments or tests; in
+production you typically compose stages into larger flows.
 
 ## Adding Tools and Structured Output
 
@@ -58,8 +56,8 @@ structured_stage = Stage.completion(
 )
 ```
 
-Provide the tools the model is allowed to call, and use `output` when you need
-structured responses (for example, `"json"` or `"yaml"`).
+Provide the tools the model is allowed to call, and use `output` when you need structured responses
+(for example, `"json"` or `"yaml"`).
 
 ## Working with Static or Prompted Content
 
@@ -84,8 +82,8 @@ loopback_stage = Stage.loopback_completion(
 )
 ```
 
-`Stage.predefined` injects fixed conversation turns. Prompting and loopback
-stages fetch new input at runtime and feed it into subsequent completions.
+`Stage.predefined` injects fixed conversation turns. Prompting and loopback stages fetch new input
+at runtime and feed it into subsequent completions.
 
 ## Transforming Context and Results
 
@@ -101,9 +99,8 @@ transform_context_stage = Stage.transform_context(
 )
 ```
 
-Use transformers when you need to adjust only the result or the conversation
-context. Because `StageState` is immutable, each transformation returns a fresh
-copy.
+Use transformers when you need to adjust only the result or the conversation context. Because
+`StageState` is immutable, each transformation returns a fresh copy.
 
 ## Looping Until a Condition Is Met
 
@@ -120,8 +117,8 @@ loop_stage = Stage.loop(
 )
 ```
 
-`Stage.loop` repeatedly executes a stage while `condition` stays true. The
-`iteration` argument lets you cap retries or break on custom signals.
+`Stage.loop` repeatedly executes a stage while `condition` stays true. The `iteration` argument lets
+you cap retries or break on custom signals.
 
 ## Sequencing Stages into Pipelines
 
@@ -150,8 +147,8 @@ pipeline = Stage.sequence(
 final_state = await pipeline.execute()
 ```
 
-`Stage.sequence` runs each stage in order, feeding the updated state forward.
-You can nest sequences to build larger flows.
+`Stage.sequence` runs each stage in order, feeding the updated state forward. You can nest sequences
+to build larger flows.
 
 ## Routing, Concurrency, and Merging
 
@@ -202,8 +199,8 @@ concurrent_stage = Stage.concurrent(
 )
 ```
 
-Routers pick the most appropriate stage at runtime, while `Stage.concurrent`
-fans out work and merges the resulting states.
+Routers pick the most appropriate stage at runtime, while `Stage.concurrent` fans out work and
+merges the resulting states.
 
 ## Conditional, Cached, and Resilient Stages
 
@@ -230,8 +227,8 @@ resilient_stage = Stage.completion("Call external API.").with_retry(
 )
 ```
 
-`when` toggles execution dynamically, `.cached(...)` stores results, and
-`.with_retry(...)` protects against transient failures.
+`when` toggles execution dynamically, `.cached(...)` stores results, and `.with_retry(...)` protects
+against transient failures.
 
 ## Advanced Context Management
 
@@ -265,8 +262,8 @@ extending_stage = Stage.completion(
 ).extend_result()
 ```
 
-These helpers trim, clean, or discard context and results so downstream stages
-only see what they need.
+These helpers trim, clean, or discard context and results so downstream stages only see what they
+need.
 
 ## Building Composite Behaviour
 
@@ -283,8 +280,7 @@ composite_stage = (
 )
 ```
 
-You can chain modifiers to produce sophisticated behaviour from a single stage
-definition.
+You can chain modifiers to produce sophisticated behaviour from a single stage definition.
 
 ## Defining Custom Stages
 
@@ -297,8 +293,8 @@ async def custom_processor(*, state: StageState) -> StageState:
     return state.updated(result=processed)
 ```
 
-Any async function decorated with `@stage` gains the same API as built-in stages
-and can be mixed freely with them.
+Any async function decorated with `@stage` gains the same API as built-in stages and can be mixed
+freely with them.
 
 ## End-to-End Example
 
@@ -339,6 +335,6 @@ async def process_document(document: str) -> str:
         return result_state.result.as_string()
 ```
 
-This pipeline analyzes a document, augments it with tool output when needed,
-summarizes the result, and records the outcome for observability. Combine these
-patterns to compose the exact behaviour your application needs.
+This pipeline analyzes a document, augments it with tool output when needed, summarizes the result,
+and records the outcome for observability. Combine these patterns to compose the exact behaviour
+your application needs.
