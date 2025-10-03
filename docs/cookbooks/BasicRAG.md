@@ -1,8 +1,13 @@
 # Basic RAG
 
-RAG is a technique of adding additional information to the LLM context, to achieve better results. This applies to adding a knowledge source to be used by LLM to generate correct response as well as to introducing details about the task or personalization for more tailored result. The typical flow would be to prepare a vector index and search through the data to extend the model input with suitable context. We will use OpenAI services for this task, make sure to provide .env file with `OPENAI_API_KEY` key before running.
+RAG is a technique of adding additional information to the LLM context, to achieve better results.
+This applies to adding a knowledge source to be used by LLM to generate correct response as well as
+to introducing details about the task or personalization for more tailored result. The typical flow
+would be to prepare a vector index and search through the data to extend the model input with
+suitable context. We will use OpenAI services for this task, make sure to provide .env file with
+`OPENAI_API_KEY` key before running.
 
-```python
+````python
 from draive import load_env
 
 ```python
@@ -39,32 +44,34 @@ async with ctx.scope("basic_rag"):
 
 print(f"Prepared {len(document_chunks)} chunks:\n---")
 print("\n---\n".join(chunk.content for chunk in document_chunks))
+````
+
+```
+Prepared 11 chunks:
+---
+John Doe, originally from a small farm in Texas, has been living in Vancouver for more than three years. His fascination with Canada began when he first visited the country at the age of seven. The experience left a lasting impression on him, and he knew that one day he would make Canada his home.
+---
+At the age of 18, John made the bold decision to leave his rural life in Texas behind and move to Vancouver. The transition was not without its challenges, as he had to adapt to the fast-paced city life, which was a stark contrast to the slow, quiet days on the farm. However,
+---
+contrast to the slow, quiet days on the farm. However, John's determination and love for his new home helped him overcome any obstacles he faced.
+---
+Now, at 21, John has fully embraced his life in Vancouver. He has made new friends, discovered his favorite local spots, and even started attending college to pursue his passion for environmental science. The city's stunning natural beauty, with its lush forests and pristine coastline, reminds him of why he fell in love
+---
+lush forests and pristine coastline, reminds him of why he fell in love with Canada in the first place.
+---
+John's days are filled with exploring the city's diverse neighborhoods, trying new cuisines, and participating in various outdoor activities. He has become an avid hiker, taking advantage of the numerous trails in and around Vancouver. On weekends, he often finds himself hiking in the nearby mountains, breathing in the crisp air and
+---
+himself hiking in the nearby mountains, breathing in the crisp air and marveling at the breathtaking views.
+---
+Despite the occasional homesickness for his family and the familiarity of his Texas farm, John knows that Vancouver is where he belongs. The city has captured his heart, and he can't imagine living anywhere else. He dreams of one day working in the field of environmental conservation, helping to protect the natural wonders that made him
+---
+field of environmental conservation, helping to protect the natural wonders that made him fall in love with Canada.
+---
+As John reflects on his journey from a small farm in Texas to the vibrant city of Vancouver, he feels a sense of pride and accomplishment. He knows that his seven-year-old self would be proud of the life he has built in the country that captured his imagination all those years ago. With a smile on his
+---
 ```
 
-    Prepared 11 chunks:
-    ---
-    John Doe, originally from a small farm in Texas, has been living in Vancouver for more than three years. His fascination with Canada began when he first visited the country at the age of seven. The experience left a lasting impression on him, and he knew that one day he would make Canada his home.
-    ---
-    At the age of 18, John made the bold decision to leave his rural life in Texas behind and move to Vancouver. The transition was not without its challenges, as he had to adapt to the fast-paced city life, which was a stark contrast to the slow, quiet days on the farm. However,
-    ---
-    contrast to the slow, quiet days on the farm. However, John's determination and love for his new home helped him overcome any obstacles he faced.
-    ---
-    Now, at 21, John has fully embraced his life in Vancouver. He has made new friends, discovered his favorite local spots, and even started attending college to pursue his passion for environmental science. The city's stunning natural beauty, with its lush forests and pristine coastline, reminds him of why he fell in love
-    ---
-    lush forests and pristine coastline, reminds him of why he fell in love with Canada in the first place.
-    ---
-    John's days are filled with exploring the city's diverse neighborhoods, trying new cuisines, and participating in various outdoor activities. He has become an avid hiker, taking advantage of the numerous trails in and around Vancouver. On weekends, he often finds himself hiking in the nearby mountains, breathing in the crisp air and
-    ---
-    himself hiking in the nearby mountains, breathing in the crisp air and marveling at the breathtaking views.
-    ---
-    Despite the occasional homesickness for his family and the familiarity of his Texas farm, John knows that Vancouver is where he belongs. The city has captured his heart, and he can't imagine living anywhere else. He dreams of one day working in the field of environmental conservation, helping to protect the natural wonders that made him
-    ---
-    field of environmental conservation, helping to protect the natural wonders that made him fall in love with Canada.
-    ---
-    As John reflects on his journey from a small farm in Texas to the vibrant city of Vancouver, he feels a sense of pride and accomplishment. He knows that his seven-year-old self would be proud of the life he has built in the country that captured his imagination all those years ago. With a smile on his
-    ---
-
-```python
+````python
 from collections.abc import Sequence
 
 from draive import VectorIndex
@@ -121,5 +128,8 @@ async with ctx.scope(
         tools=Toolbox.of(index_search_tool, suggest=index_search_tool),
     )
     print(result)
+````
+
 ```
-    According to available sources, John Doe lives in Vancouver.
+According to available sources, John Doe lives in Vancouver.
+```

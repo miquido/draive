@@ -1,16 +1,24 @@
 # Basic Evaluation Guide
 
-Use evaluations to automatically score and validate the outputs of your generative pipelines. This guide walks through the core building blocks, shows how to combine Draive's built-in evaluators, and highlights practical patterns for running repeatable quality checks.
+Use evaluations to automatically score and validate the outputs of your generative pipelines. This
+guide walks through the core building blocks, shows how to combine Draive's built-in evaluators, and
+highlights practical patterns for running repeatable quality checks.
 
 ## Prerequisites
-- Python 3.12+ with Draive installed and your project configured to use the shared Haiway context (`ctx`).
+
+- Python 3.12+ with Draive installed and your project configured to use the shared Haiway context
+  (`ctx`).
 - Provider credentials available through `load_env()` or your preferred secrets loader.
 - Familiarity with async/await. All evaluation APIs are asynchronous.
 
-> Tip: When experimenting interactively you can rely on `print(...)`. In production code prefer `ctx.log_info(...)`, `ctx.log_warn(...)`, etc., to integrate with Haiway observability.
+> Tip: When experimenting interactively you can rely on `print(...)`. In production code prefer
+> `ctx.log_info(...)`, `ctx.log_warn(...)`, etc., to integrate with Haiway observability.
 
 ## 1. Write Your First Evaluator
-Evaluators are async callables decorated with `@evaluator`. They receive the content you want to check, optional parameters, and return an `EvaluationScore` with a numeric score (0.0–1.0) and metadata about the decision.
+
+Evaluators are async callables decorated with `@evaluator`. They receive the content you want to
+check, optional parameters, and return an `EvaluationScore` with a numeric score (0.0–1.0) and
+metadata about the decision.
 
 ```python
 from draive.evaluation import evaluator, EvaluationScore
@@ -37,12 +45,16 @@ async def keyword_evaluator(
 ```
 
 Key ideas:
+
 - `name` identifies the evaluator in reports.
-- `threshold` defines the default pass/fail cutoff. You can override it later with `.with_threshold(...)`.
+- `threshold` defines the default pass/fail cutoff. You can override it later with
+  `.with_threshold(...)`.
 - Always return an `EvaluationScore` so downstream tooling has consistent metadata.
 
 ## 2. Run an Evaluator Inside a Context Scope
-All provider calls must run inside a Haiway context. Prepare the scope, generate or collect the content to evaluate, and await your evaluator.
+
+All provider calls must run inside a Haiway context. Prepare the scope, generate or collect the
+content to evaluate, and await your evaluator.
 
 ```python
 from draive import ctx, load_env
@@ -66,28 +78,36 @@ async with ctx.scope(
     print(f"Passed default threshold: {result.passed}")
 ```
 
-`EvaluationScore.passed` compares the computed score with the evaluator's active threshold. Use `.comment` for human-readable feedback when showing results to reviewers.
+`EvaluationScore.passed` compares the computed score with the evaluator's active threshold. Use
+`.comment` for human-readable feedback when showing results to reviewers.
 
 ## 3. Explore Built-in Evaluators
-Draive ships ready-to-use evaluators that cover most quality axes. Import them from `draive.evaluators` and configure per use case.
+
+Draive ships ready-to-use evaluators that cover most quality axes. Import them from
+`draive.evaluators` and configure per use case.
 
 **Quality and Structure**
+
 - `readability_evaluator` – favors concise, accessible language.
 - `coherence_evaluator` – checks internal consistency.
 - `coverage_evaluator` – verifies whether the output covers reference points.
 - `conciseness_evaluator` – penalizes overly long responses.
 
 **Trust and Safety**
+
 - `safety_evaluator` – screens for policy violations.
 - `factual_accuracy_evaluator` – checks factual alignment.
 - `groundedness_evaluator` – ensures outputs map to supporting references.
 
 **Interaction Quality**
-- `helpfulness_evaluator`, `completeness_evaluator`, `tone_style_evaluator` – score responses to user prompts.
+
+- `helpfulness_evaluator`, `completeness_evaluator`, `tone_style_evaluator` – score responses to
+  user prompts.
 - `required_keywords_evaluator` / `forbidden_keywords_evaluator` – enforce terminology.
 - `similarity_evaluator` – compares semantic similarity to a reference.
 
 ### Example: Stack Multiple Built-ins
+
 ```python
 from draive.evaluators import (
     groundedness_evaluator,
@@ -129,10 +149,13 @@ for label, result in {
     print(f"{label}: {result.score.value:.2f} ({'✓' if result.passed else '✗'})")
 ```
 
-Adjust thresholds by chaining `.with_threshold("good")`, `.with_threshold("excellent")`, etc. Each evaluator documents its supported levels.
+Adjust thresholds by chaining `.with_threshold("good")`, `.with_threshold("excellent")`, etc. Each
+evaluator documents its supported levels.
 
 ## 4. Combine Evaluators with Scenarios
-Use `@evaluator_scenario` to bundle several evaluators into a reusable checklist. Scenarios return a sequence of `EvaluatorResult` objects so you can compute aggregates or present detailed feedback.
+
+Use `@evaluator_scenario` to bundle several evaluators into a reusable checklist. Scenarios return a
+sequence of `EvaluatorResult` objects so you can compute aggregates or present detailed feedback.
 
 ```python
 from collections.abc import Sequence
@@ -175,7 +198,9 @@ for item in results:
 ```
 
 ## 5. Automate Regression Checks with Suites
-Suites orchestrate content generation and evaluation over structured test cases. Use them for nightly quality gates or pre-release validation.
+
+Suites orchestrate content generation and evaluation over structured test cases. Use them for
+nightly quality gates or pre-release validation.
 
 ```python
 from typing import Sequence
@@ -235,25 +260,38 @@ print(
 )
 ```
 
-Each `EvaluatorSuiteCase` produces a detailed result object. You can persist these to dashboards, CI artifacts, or team reports.
+Each `EvaluatorSuiteCase` produces a detailed result object. You can persist these to dashboards, CI
+artifacts, or team reports.
 
 ## 6. Advanced Patterns
-- **Attach metadata**: `keyword_evaluator.with_meta({"version": "1.0"})` adds context that surfaces in result payloads.
-- **Compose evaluators**: `Evaluator.highest(...)` and `Evaluator.lowest(...)` let you compare multiple evaluators and keep the best/worst outcome.
-- **Adapt inputs**: `.contra_map(lambda doc: doc.body)` transforms incoming data before evaluation, perfect for domain models.
-- **Control concurrency**: `evaluate(..., concurrent_tasks=2)` balances throughput with provider rate limits when running many checks at once.
-- **Tune thresholds per run**: Choose qualitative targets (`"good"`, `"excellent"`, etc.) or numeric thresholds when converting results into pass/fail signals for CI.
+
+- **Attach metadata**: `keyword_evaluator.with_meta({"version": "1.0"})` adds context that surfaces
+  in result payloads.
+- **Compose evaluators**: `Evaluator.highest(...)` and `Evaluator.lowest(...)` let you compare
+  multiple evaluators and keep the best/worst outcome.
+- **Adapt inputs**: `.contra_map(lambda doc: doc.body)` transforms incoming data before evaluation,
+  perfect for domain models.
+- **Control concurrency**: `evaluate(..., concurrent_tasks=2)` balances throughput with provider
+  rate limits when running many checks at once.
+- **Tune thresholds per run**: Choose qualitative targets (`"good"`, `"excellent"`, etc.) or numeric
+  thresholds when converting results into pass/fail signals for CI.
 
 ## 7. Troubleshooting and Best Practices
+
 - Start with generous thresholds to establish a baseline, then tighten as you collect data.
 - Log both scores and comments so reviewers understand failures quickly.
-- Use scenarios for deterministic evaluations and suites when content generation is part of the test.
+- Use scenarios for deterministic evaluations and suites when content generation is part of the
+  test.
 - Mock provider calls in unit tests; evaluation functions themselves remain pure async callables.
 - Keep evaluators small and single-purpose. Compose rather than creating monoliths.
 
 ## Next Steps
-- Dive into the full API reference in `docs/reference/evaluation.md` (or run `make docs-server` to explore locally).
-- Explore domain-specific evaluators under `draive/evaluators/` for inspiration.
-- Extend scenarios with custom analytics by post-processing `EvaluatorResult.performance` across runs.
 
-With these building blocks you can turn qualitative reviews into automated guardrails that keep your agents and workflows on target.
+- Dive into the full API reference in `docs/reference/evaluation.md` (or run `make docs-server` to
+  explore locally).
+- Explore domain-specific evaluators under `draive/evaluators/` for inspiration.
+- Extend scenarios with custom analytics by post-processing `EvaluatorResult.performance` across
+  runs.
+
+With these building blocks you can turn qualitative reviews into automated guardrails that keep your
+agents and workflows on target.

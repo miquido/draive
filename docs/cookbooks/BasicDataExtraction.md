@@ -1,6 +1,11 @@
 # Basic data extraction
 
-One of the most useful abilities of LLMs is to extract information from an unstructured source and put it into a desired structure. The typical flow would be to load some kind of document and instruct the model to provide a JSON with a list of required fields. Draive comes with a dedicated solution for generating structured output which we can use to extract required information from any source. We will use OpenAI for this task—make sure to provide a `.env` file with `OPENAI_API_KEY` before running.
+One of the most useful abilities of LLMs is to extract information from an unstructured source and
+put it into a desired structure. The typical flow would be to load some kind of document and
+instruct the model to provide a JSON with a list of required fields. Draive comes with a dedicated
+solution for generating structured output which we can use to extract required information from any
+source. We will use OpenAI for this task—make sure to provide a `.env` file with `OPENAI_API_KEY`
+before running.
 
 ```python
 from draive import load_env

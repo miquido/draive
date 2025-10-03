@@ -13,7 +13,7 @@ ifndef UV_VERSION
 	UV_VERSION := 0.8.22
 endif
 
-.PHONY: uv_check venv sync update format lint test docs docs-server release docs-lint
+.PHONY: uv_check venv sync update format lint test docs docs-server docs-format docs-lint release
 
 # Check installed UV version and install if needed
 uv_check:
@@ -52,7 +52,7 @@ venv: uv_check
 	@echo '...preparing git hooks...'
 	@cp -n ./config/pre-push ./.git/hooks/pre-push || :
 	@echo '...preparing venv...'
-	@uv sync --all-groups --all-extras --frozen --reinstall --managed-python
+	@uv sync --all-groups --all-extras --frozen --reinstall
 	@echo '...development environment ready! Activate venv using `. ./.venv/bin/activate`.'
 
 # Sync environment with uv based on constraints
@@ -77,25 +77,33 @@ lint:
 	@bandit -r $(SOURCES_PATH)
 	@ruff check $(SOURCES_PATH) $(TESTS_PATH)
 	@pyright --project ./
-	@python -B tools/markdown_lint.py docs
 
+# Format Markdown docs and README
+docs-format:
+	@echo '# Formatting Markdown...'
+	@uv run mdformat --wrap 100 README.md docs
+	@echo '...finished!'
+
+# Lint Markdown docs and README
 docs-lint:
-	@python -B tools/markdown_lint.py docs
+	@echo '# Linting Markdown...'
+	@uv run pymarkdown --config .pymarkdown.json scan README.md docs
+	@echo '...finished!'
 
 # Run tests suite.
 test:
 	@python -B -m pytest -v --cov=$(SOURCES_PATH) --rootdir=$(TESTS_PATH)
-
-# Build and serve documentation locally
-docs-server:
-	@echo '# Starting documentation server...'
-	@mkdocs serve --dev-addr 127.0.0.1:8000
 
 # Build documentation for production
 docs:
 	@echo '# Building documentation...'
 	@mkdocs build --clean --strict
 	@echo '...documentation built in site/ directory!'
+
+# Build and serve documentation locally
+docs-server:
+	@echo '# Starting documentation server...'
+	@mkdocs serve --dev-addr 127.0.0.1:8000
 
 release: lint test
 	@echo '# Preparing release...'

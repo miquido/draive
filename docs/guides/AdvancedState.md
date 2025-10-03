@@ -14,7 +14,9 @@ dict_converted_from_dict: DictConverted = DictConverted.from_dict(dict_converted
 print(dict_converted_from_dict)
 ```
 
-    name: converted
+```
+name: converted
+```
 
 ```python
 class Mutable(DataModel):
@@ -36,11 +38,13 @@ print("updated", updated)
 print("final", final)
 ```
 
-    initial identifier: pre
-    value: 42
-    updated identifier: post
-    value: 42
-    final identifier: pre
+```
+initial identifier: pre
+value: 42
+updated identifier: post
+value: 42
+final identifier: pre
+```
 
 ```python
 from draive import DataModel
@@ -55,7 +59,9 @@ json_converted_from_json: JSONConverted = JSONConverted.from_json(json_converted
 print(json_converted_from_json)
 ```
 
-    name: converted
+```
+name: converted
+```
 
 ```python
 class BasicModel(DataModel):
@@ -64,27 +70,32 @@ class BasicModel(DataModel):
 print(BasicModel.json_schema(indent=2))
 ```
 
-    {
-      "type": "object",
-      "properties": {
-        "field": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "field"
-      ]
+```
+{
+  "type": "object",
+  "properties": {
+    "field": {
+      "type": "string"
     }
+  },
+  "required": [
+    "field"
+  ]
+}
+```
 
-Additionally each model can generate a simplified schema description. This can be useful when requesting LLM structured data generation in some cases. Let's have a look:
+Additionally each model can generate a simplified schema description. This can be useful when
+requesting LLM structured data generation in some cases. Let's have a look:
 
 ```python
 print(BasicModel.simplified_schema(indent=2))
 ```
 
-    {
-      "field": "string"
-    }
+```
+{
+  "field": "string"
+}
+```
 
 ```python
 from draive import Field
@@ -97,27 +108,29 @@ print(f"JSON schema:\n{CustomizedSchemaModel.json_schema(indent=2)}")
 print(f"Simplified schema:\n{CustomizedSchemaModel.simplified_schema(indent=2)}")
 ```
 
-    JSON schema:
-    {
-      "type": "object",
-      "properties": {
-        "described": {
-          "type": "integer",
-          "description": "Field description"
-        },
-        "field_alias": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "described",
-        "field_alias"
-      ]
+```
+JSON schema:
+{
+  "type": "object",
+  "properties": {
+    "described": {
+      "type": "integer",
+      "description": "Field description"
+    },
+    "field_alias": {
+      "type": "string"
     }
-    Simplified schema:
-    {
-      "described": "integer(Field description)",
-      "field_alias": "string"
+  },
+  "required": [
+    "described",
+    "field_alias"
+  ]
+}
+Simplified schema:
+{
+  "described": "integer(Field description)",
+  "field_alias": "string"
+```
 
 ```python
 from collections.abc import Sequence
@@ -131,10 +144,12 @@ class CustomizedDefaultsModel(DataModel):
 print(CustomizedDefaultsModel())
 ```
 
-    default: 42
-    field_default: 21
+```
+default: 42
+field_default: 21
+```
 
-```python
+````python
 # verifier gets pre-validated value, it already have required type
 def verifier(value: int) -> None:
     if value < 0:
@@ -170,19 +185,21 @@ class CustomizedSpecificationModel(DataModel):
     value: int = Field(specification={"type": "integer", "description": "Fully custom"})
 
 print(CustomizedSpecificationModel.json_schema(indent=2))
-```
+````
 
-    {
-      "type": "object",
-      "properties": {
-        "value": {
-          "type": "integer",
-          "description": "Fully custom"
-        }
-      },
-      "required": [
-        "value"
-      ]
+```
+{
+  "type": "object",
+  "properties": {
+    "value": {
+      "type": "integer",
+      "description": "Fully custom"
+    }
+  },
+  "required": [
+    "value"
+  ]
+```
 
 ```python
 def converter(value: str, /,) -> int:
@@ -221,17 +238,23 @@ path_model_instance: PathModel = PathModel(
 print(path(path_model_instance))
 ```
 
-    (42, 21)
+```
+(42, 21)
+```
 
-Property paths can be used not only as the getters for field values. It also preserves the path as a string to be accessed later if needed.
+Property paths can be used not only as the getters for field values. It also preserves the path as a
+string to be accessed later if needed.
 
 ```python
 print(path)
 ```
 
-    nested.values
+```
+nested.values
+```
 
-Besides that paths can be also used to prepare per field requirements. We can simplify usage of paths in that case by avoiding the type conversion step:
+Besides that paths can be also used to prepare per field requirements. We can simplify usage of
+paths in that case by avoiding the type conversion step:
 
 ```python
 from draive import AttributeRequirement
@@ -245,9 +268,13 @@ requirement: AttributeRequirement[PathModel] = AttributeRequirement[PathModel].e
 # requirement can be executed to check value on any instance
 requirement.check(path_model_instance)
 ```
-    True
 
-Requirements can be combined and examined. This can be used to provide an expressive interface for defining various filters.
+```
+True
+```
+
+Requirements can be combined and examined. This can be used to provide an expressive interface for
+defining various filters.
 
 ```python
 print("lhs:", requirement.lhs)
@@ -263,8 +290,11 @@ combined_requirement: AttributeRequirement[PathModel] = requirement & AttributeR
 
 combined_requirement.check(path_model_instance)
 ```
-    lhs: nested.values[0]
-    operator: equal
-    rhs: 42
 
-    True
+```
+lhs: nested.values[0]
+operator: equal
+rhs: 42
+
+True
+```

@@ -1,31 +1,56 @@
-# Draive Production Guide
+# Draive LLM Usage Guide
 
-Use this guide to emit production-ready Draive code. Treat every directive as mandatory to preserve reliability, safety, and maintainability.
+This guide explains how to use Draive to orchestrate language model workloads. It focuses on runtime usage and omits repository contribution details.
 
-## Quality Pillars
-- **Reliability:** Immutable `State` composition, deterministic configuration, defensive error translation, and clear fallbacks.
-- **Observability:** Structured logs, metrics via `ctx.record`, and scope-level tracing with `LoggerObservability` (or provider-specific observers).
-- **Safety:** Guardrails before/after generation, secrets management via `load_env()`, and zero tolerance for `print` or leaking payloads.
-- **Testing & Tooling:** Ruff formatting, strict Pyright types, Bandit security linting, targeted async tests, and uv-managed environments.
+## 1. Installation & Environment
+- Install Draive in your Python 3.12+ environment: `pip install draive` or `pip install -e .` from a cloned repository.
+- Provide provider credentials through environment variables or a `.env` file (e.g., `OPENAI_API_KEY`).
+- Call `draive.load_env()` once during application startup to hydrate configuration from the environment.
 
-## Runtime & Environment
-- Target Python 3.12+; the repo ships an `uv`-managed venv at `./.venv`. Run commands through `uv run ...` so tooling reuses the same interpreter.
-- Keep dependencies in `pyproject.toml`. Never mutate the venv manually.
-- Store provider secrets in `.env`; call `draive.load_env()` once during startup before touching any clients or configuration.
-- Use `make format`, `make lint`, `make test` (or focused `pytest tests/test_...::test_...`) before shipping. Do not introduce alternative formatters.
-- Configure logging once with `setup_logging("entrypoint")`; all runtime logs must flow through `ctx.log_debug`, `ctx.log_info`, `ctx.log_warning`, or `ctx.log_error`.
+```python
+from draive import load_env
 
-## Architecture & State Design
-- Wrap every Draive interaction inside `async with ctx.scope(identifier, *states, disposables=..., observability=...)`.
-- Prefer small, descriptive scope identifiers (`"api.chat"`, `"workflow.retrieval"`) and keep scopes tight. Use `ctx.updated(...)` for temporary overrides instead of re-opening expensive disposables.
-- Model configuration with subclasses of `haiway.State` or `haiway.Configuration`. Offer ergonomic constructors (`.of(...)` or `.from_env(...)`) and expose only immutable fields.
-- Derive variations through `.updated(...)`; never mutate state attributes in-place.
-- Access active state via `ctx.state(MyState)`. Avoid module-level singletons or globals.
+load_env()  # safely loads .env entries into the process environment
+```
+
+## 2. Core Concepts
+- **State**: Immutable runtime configuration and services (`haiway.State`).
+- **Scope**: Context manager that activates state, disposables, and observability (`ctx.scope(...)`).
+- **Disposables**: Async resources that are started/stopped with the scope lifetime (e.g., API clients).
+- **Generation APIs**: Typed facades for text, tool, and multimodal generation.
+
+## 3. Minimal Text Generation
+```python
+import asyncio
+from draive import TextGeneration, ctx, load_env
+from draive.openai import OpenAI, OpenAIResponsesConfig
+
+load_env()
+
+async def main() -> None:
+    async with ctx.scope(
+        "demo.text",
+        OpenAIResponsesConfig(model="gpt-4o-mini"),
+        disposables=(OpenAI(),),
+    ):
+        reply = await TextGeneration.generate(
+            instructions="You are a concise assistant.",
+            input="List three benefits of typed prompts.",
+            temperature=0.2,
+        )
+        ctx.log_info("reply", value=reply)
+
+asyncio.run(main())
+```
+
+## 4. Managing State and Configuration
+1. Define typed configuration states.
+2. Use constructor helpers (`.of`, `.from_env`) to validate inputs.
+3. Read the active state inside scopes with `ctx.state(MyState)`.
 
 ```python
 from typing import Self
-from draive import LoggerObservability, State, ctx, load_env
-from draive.openai import OpenAI, OpenAIResponsesConfig
+from haiway import State, ctx
 
 class AppConfig(State):
     default_temperature: float
@@ -34,1809 +59,168 @@ class AppConfig(State):
     def of(cls, *, default_temperature: float) -> Self:
         return cls(default_temperature=default_temperature)
 
-load_env()
-
-async with ctx.scope(
-    "summaries.generate",
-    AppConfig.of(default_temperature=0.2),
-    OpenAIResponsesConfig(model="gpt-4o-mini"),
-    disposables=(OpenAI(),),
-    observability=LoggerObservability(),
-):
-    config = ctx.state(AppConfig)
-    base_model = ctx.state(OpenAIResponsesConfig)
-    with ctx.updated(base_model.updated(temperature=config.default_temperature)):
-        ...
+async def run_with_config() -> None:
+    async with ctx.scope(
+        "demo.config",
+        AppConfig.of(default_temperature=0.3),
+    ):
+        config = ctx.state(AppConfig)
+        ctx.log_info("temperature", value=config.default_temperature)
 ```
 
-## Provider Orchestration & Fallbacks
-- Require provider configs (`OpenAIResponsesConfig`, `AnthropicConfig`, etc.) in scope state; never hardcode API keys or model IDs inline.
-- Inject guardrails and moderation configs alongside provider configs to ensure consistent enforcement.
-- When adding provider fallbacks, wrap the primary call in a `try/except` block, translate exceptions, and retry with a secondary scope.
+## 5. Provider Adapters
+- Import provider configs from `draive.<provider>.config` modules (e.g., `OpenAIResponsesConfig`, `AnthropicConfig`).
+- Place configs and clients into the scope: configs as state, clients as disposables.
+- Combine multiple providers by nesting or sequencing scopes.
 
 ```python
-from draive import TextGeneration, ctx
 from draive.openai import OpenAI, OpenAIResponsesConfig
 from draive.anthropic import Anthropic, AnthropicConfig
 
-async def generate_with_fallback(instructions: str, prompt: str) -> str:
-    try:
-        async with ctx.scope(
-            "llm.primary",
-            OpenAIResponsesConfig(model="gpt-4o-mini"),
-            disposables=(OpenAI(),),
-        ):
-            return await TextGeneration.generate(
-                instructions=instructions,
-                input=prompt,
-                temperature=0.4,
-            )
-    except Exception as exc:
-        ctx.log_warning("primary_failed", exception=exc)
-        async with ctx.scope(
-            "llm.backup",
-            AnthropicConfig(model="claude-3-5-haiku-20241022"),
-            disposables=(Anthropic(),),
-        ):
-            return await TextGeneration.generate(
-                instructions=instructions,
-                input=prompt,
-                temperature=0.6,
-            )
-```
-- Never raise bare `Exception`; convert provider failures into typed domain errors preserving context.
-- Limit `retry` loops (`haiway.retry`) to well-defined, idempotent operations.
-
-## Instructions, Prompt Assets & Knowledge
-- Accept `instructions` as raw strings, `Instructions.of(...)`, or templated values. Bundle reusable prompts in an `InstructionsRepository` (volatile for tests, file/remote for prod).
-- Use `@instructions(...)` decorator to declare templates with metadata. Register templates during scope setup for discoverability.
-
-```python
-from draive import Instructions, InstructionsRepository, ctx, instructions
-
-@instructions(name="summary_system", description="One-sentence summaries")
-async def summary_system() -> str:
-    return "You are a concise assistant. Reply in one sentence."  # noqa: D205
-
-async with ctx.scope(
-    "prompts",
-    InstructionsRepository.volatile(summary=await summary_system()),
-):
-    system_prompt = await InstructionsRepository.resolve(Instructions.of("summary"))
-```
-- Keep instruction content immutable; derive variants with `.with_arguments(...)` or `.with_meta(...)` instead of string concatenation.
-
-## Generation Patterns
-- `TextGeneration.generate(...)` returns a `str`. Pass `Multimodal` inputs (strings, `MultimodalContent`, `TextContent`, etc.) and keep examples as `(prompt_content, completion_text)` tuples.
-- `ModelGeneration.generate(MyDataModel, ...)` enforces schema validation. Use `schema_injection="full" | "simplified" | "skip"` based on provider capabilities, and supply custom `decoder=` when normalizing outputs.
-- `ImageGeneration.generate(...)` / `AudioGeneration.generate(...)` return `ResourceContent` or `ResourceReference`. Treat media as opaque and persist via `ResourcesRepository` when needed.
-- For fine-grained control, use `GenerativeModel.loop(...)` with explicit `ModelInput`/`ModelOutput` lists and `Toolbox` declarations.
-
-## Multimodal & Resources
-- Construct prompts with `MultimodalContent.of(...)` combining `TextContent`, `ArtifactContent`, and media. Keep text context explicit; avoid implicit conversions.
-- Store binary payloads using `ResourceContent.of(...)` (base64) or `ResourceReference` for repository-backed assets. Redact base64 in logs (`ctx.log_*` should never emit raw data).
-- When referencing large knowledge bases, preload them into `VectorIndex` implementations such as `VolatileVectorIndex()` or custom repositories.
-
-## Retrieval, Embeddings & Memory
-- Embed text/images through `TextEmbedding.embed(...)` / `ImageEmbedding.embed(...)` within a scope that includes the correct provider disposables.
-- Encapsulate retrieval logic inside dedicated `State` or `Stage` classes to avoid scattering prompt assembly.
-- Use `VectorIndex.index(...)`, `VectorIndex.search(...)`, and `vector_similarity_search` helpers for top-k selection. Apply `mmr_vector_similarity_search` for diversity.
-- Maintain conversational context via `draive.utils.Memory` or `ModelMemory.constant(...)`. Never store chat history in globals.
-
-## Tools & Function Calling
-- Tool functions must be `async` and execute while a scope is active. Decorate with `@tool(...)` to derive JSON schema and metadata.
-- Configure arguments via `Argument(...)` to expose aliases, descriptions, and defaults. Validate inputs inside the tool before external calls.
-- Assemble tool collections with `Toolbox.of(...)`, controlling suggestion policy (`suggesting=...`, `tool_turns_limit=`) and availability (`availability=` in the `@tool` decorator).
-- Handle tool results with `MultimodalContent`—return structured payloads using `ArtifactContent` when richer semantics are required.
-
-```python
-from draive import Argument, Toolbox, TextGeneration, ctx, tool
-from draive.openai import OpenAI, OpenAIResponsesConfig
-
-@tool(description="Return the ISO8601 UTC timestamp.")
-async def current_time() -> str:
-    from datetime import UTC, datetime
-    return datetime.now(UTC).isoformat()
-
-@tool(
-    name="fun_fact",
-    description="Return a quirky fact about a topic.",
-)
-async def fact(
-    topic: str = Argument(
-        aliased="subject",
-        description="Topic to explore",
-        default="AI",
-    ),
-) -> str:
-    return f"{topic} makes humans rethink creativity."
-
-toolbox = Toolbox.of(current_time, fact, suggesting=fact, tool_turns_limit=2)
-
-async with ctx.scope(
-    "tools.demo",
-    OpenAIResponsesConfig(model="gpt-4o-mini"),
-    disposables=(OpenAI(),),
-):
-    reply = await TextGeneration.generate(
-        instructions="You are witty and concise.",
-        input="Tell me something entertaining about LLMs.",
-        tools=toolbox,
-    )
-    ctx.log_info("joke", joke=reply)
-```
-
-## Conversations & Realtime Sessions
-- `Conversation.completion(...)` supports both full responses and streaming via `stream=True`. Supply memory as `ModelMemory`, `Memory`, or iterables of `ConversationMessage`.
-- Keep scopes alive across turns to reuse shared state (toolbox, guardrails, memory). For realtime interactions, operate through `RealtimeConversationSession` with provider-specific clients (OpenAI, Anthropic, Gemini, etc.).
-- Apply guardrails to both user input and model output. Terminate sessions gracefully when moderation blocks messages.
-
-## Observability & Operations
-- Initialize logging once per process with `setup_logging(...)`.
-- Wrap long-running flows in contextual scopes and emit structured logs with namespace keys (`ctx.log_info("rag.match", matches=[...])`).
-- Record metrics via `ctx.record(event="retrieval", attributes={"count": len(results)})` and feed them into telemetry sinks.
-- Avoid logging secrets, raw prompts, or media blobs. Redact sensitive fields manually if necessary.
-- When wiring providers, pass `observability=LoggerObservability()` (or a custom observer) to scopes.
-
-## Safety, Guardrails & Compliance
-- Load guardrail states (`OpenAIModerationConfig`, `GuardrailsModeration`, privacy filters) alongside provider configs.
-- Call guardrails explicitly: `await guardrails.check_input(...)` before generation and `await guardrails.check_output(...)` afterwards.
-- Translate SDK exceptions into domain-specific errors. Include contextual metadata (`scope`, `provider`, `attempt`) in error payloads without exposing secrets.
-- Ensure personally identifiable information (PII) is sanitized or masked before logging/storage.
-
-```python
-from draive import TextGeneration, ctx
-from draive.guardrails import GuardrailsModeration
-from draive.openai import OpenAI, OpenAIModerationConfig, OpenAIResponsesConfig
-
-async with ctx.scope(
-    "moderated",
-    OpenAIResponsesConfig(model="gpt-4o-mini"),
-    OpenAIModerationConfig(),
-    disposables=(OpenAI(),),
-):
-    guardrails = ctx.state(GuardrailsModeration)
-    prompt = "Draft a friendly welcome message for new users."
-    await guardrails.check_input(prompt)
-    reply = await TextGeneration.generate(
-        instructions="Answer safely and respectfully.",
-        input=prompt,
-    )
-    await guardrails.check_output(reply)
-```
-
-## Testing Strategy
-- Use `pytest-asyncio` for coroutine tests. Always open scopes inside the test body and inject fake disposables to avoid network calls.
-- Prefer targeted unit tests for new states, tools, and retrieval helpers over broad E2E suites. Mock provider responses deterministically.
-- Validate serialization/deserialization (DataModels, ResourceContent) and rejection paths (guardrails, moderation) with dedicated tests.
-- Keep fixtures lightweight; reuse shared factories under `tests/fixtures/` when available.
-- Gate merges with `make format`, `make lint`, and `make test` executed locally and in CI.
-
-```python
-import pytest
-from draive import TextGeneration, ctx
-from draive.openai import OpenAIResponsesConfig
-
-@pytest.mark.asyncio
-async def test_text_generation_returns_response(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_generate(
-        *,
-        instructions: str,
-        input,
-        toolbox,
-        examples,
-        **extra: object,
-    ) -> str:
-        assert input.to_str() == "ping"
-        return "ok"
-
-    monkeypatch.setattr(TextGeneration, "generating", fake_generate)
-
+async def dual_provider() -> str:
     async with ctx.scope(
-        "text.test",
+        "primary",
         OpenAIResponsesConfig(model="gpt-4o-mini"),
-    ):
-        result = await TextGeneration.generate(input="ping")
-
-    assert result == "ok"
-```
-
-## Deployment & Operations Checklist
-- Load environment variables and open scopes before the first provider call in every entrypoint.
-- Ensure states, tools, and models remain immutable—derive variants with `.updated(...)`.
-- Provide meaningful scope labels for tracing and metrics aggregation.
-- Keep documentation (`docs/`, `mkdocs.yml`) and public exports (`src/draive/__init__.py`) in sync when adding APIs.
-- Plan migrations or backward-incompatible changes with feature flags stored in `State` definitions rather than global constants.
-- Run `make format && make lint && make test` before publishing. Resolve lint/type errors instead of disabling checks.
-
-## Anti-Patterns to Avoid
-- No `print`, global mutable state, or ad-hoc `asyncio.create_task` outside `ctx.spawn`.
-- Do not access environment variables directly—always route through `load_env()` and `haiway.getenv_*` helpers.
-- Avoid storing raw strings for prompts; prefer `InstructionsRepository` or DataModels for structured context.
-- Never leak API keys, prompts, or resource payloads into logs, errors, or test fixtures.
-
-Following these practices keeps Draive applications production-ready, observable, and safe, allowing language models to generate code that integrates cleanly with the framework and passes the full quality pipeline.
-
-## Extended Reference (Full Framework Manual)
-
-The following manual preserves the broader conceptual and API guidance from the original Draive framework reference. Consult it when you need deeper background, rationale, or expanded examples beyond the production quick-start above.
-
-## Comprehensive Framework Reference for AI Models
-
-Draive is a functional programming framework for Python 3.12+ designed to facilitate development of high-quality LLM applications using functional programming paradigms combined with structured concurrency concepts. Built on the **Haiway** framework, Draive emphasizes immutability, pure functions, and context-based state management, enabling developers to build scalable and maintainable AI applications.
-
-## Why Draive's Design Matters
-
-**Problem**: Traditional LLM applications often struggle with:
-- Race conditions from mutable shared state
-- Complex dependency injection frameworks
-- Difficult-to-test tightly coupled code
-- Manual resource cleanup and lifecycle management
-- Provider lock-in and integration complexity
-- Inconsistent evaluation and quality control
-
-**Solution**: Draive addresses these through functional programming principles and AI-first design:
-- **Immutability prevents race conditions** - State objects cannot be modified after creation
-- **Context-based DI is simple** - No decorators or complex containers, just scoped state propagation
-- **Protocol separation enables testability** - Clear contracts between interfaces and implementations
-- **Structured concurrency handles lifecycle** - Automatic task management and resource cleanup
-- **Multi-provider abstraction** - Unified interface for OpenAI, Anthropic, Gemini, Mistral, Cohere, Ollama, VLLM, AWS Bedrock
-- **Built-in evaluation framework** - Quality control integrated into the development workflow
-
-## Core Architectural Principles
-
-### 1. Immutable State Management
-**Reasoning**: Immutable data structures eliminate race conditions and ensure predictable behavior in concurrent environments. All data structures use the `State` base class with runtime type validation and automatic collection conversion to immutable types.
-
-### 2. Context-Based Dependency Injection
-**Reasoning**: Instead of complex DI frameworks, Draive uses execution contexts to propagate state and functionality. This provides safe state propagation in concurrent environments and simplifies dependency management through natural Python context managers.
-
-### 3. Protocol-Based Functionality
-**Reasoning**: Business logic is organized using Protocol interfaces that define clear contracts separate from implementations. This promotes modularity, testability, and allows easy swapping of implementations without changing calling code.
-
-### 4. Structured Concurrency
-**Reasoning**: Manual task and resource management is error-prone. Draive provides automatic task lifecycle management with guaranteed resource cleanup, ensuring resources are properly disposed of even in error cases.
-
-### 5. Multi-Provider Abstraction
-**Reasoning**: LLM applications should not be locked into a single provider. Draive provides unified interfaces that work across multiple LLM providers, enabling easy switching and comparison.
-
-### 6. Evaluation-First Development
-**Reasoning**: LLM application quality is hard to ensure without systematic evaluation. Draive includes built-in evaluation capabilities that integrate naturally into the development workflow.
-
-## ⚠️  CRITICAL TYPING REQUIREMENTS ⚠️
-
-**Draive REQUIRES complete, strict type annotations throughout all code. This is NOT optional:**
-
-- **Every State attribute** MUST have a type annotation
-- **Every function parameter and return type** MUST be typed
-- **Every Protocol method** MUST have complete signatures
-- **Abstract collection types ONLY** - never `list`, `dict`, `set`
-- **Union syntax ONLY** - use `str | None`, never `Optional[str]`
-- **Runtime validation enforces types** - incorrect types cause immediate failures
-
-## Essential Imports
-
-```python
-# Core framework imports
-from draive import ctx, load_env, setup_logging, State, DataModel, Field, Config
-from typing import Protocol, runtime_checkable, Any
-from collections.abc import Sequence, Mapping, Set  # NEVER use list, dict, set
-from contextlib import asynccontextmanager
-
-# LLM generation imports
-from draive import TextGeneration, ModelGeneration, ImageGeneration
-from draive import MultimodalContent, MediaData, MediaReference, TextContent, MetaContent
-
-# Stage API for pipelines
-from draive import Stage, StageState, stage
-
-# Tools and conversation
-from draive import tool, Toolbox, Conversation, ConversationMessage, ConversationMemory, Argument
-
-# Provider-specific imports
-from draive.openai import OpenAI, OpenAIChatConfig, OpenAIEmbeddingConfig
-from draive.anthropic import Anthropic, AnthropicChatConfig
-from draive.gemini import Gemini, GeminiChatConfig
-from draive.mistral import Mistral, MistralChatConfig
-from draive.cohere import Cohere, CohereChatConfig
-from draive.ollama import Ollama, OllamaChatConfig
-
-# Evaluation
-from draive.evaluation import evaluator, evaluate, evaluator_scenario, evaluator_suite
-from draive.evaluators import (
-    safety_evaluator, helpfulness_evaluator, factual_accuracy_evaluator,
-    groundedness_evaluator, creativity_evaluator, tone_style_evaluator
-)
-
-# MCP and RAG
-from draive.mcp import MCPClient
-from draive import VectorIndex, split_text, Tokenization
-from draive.helpers import (
-    VolatileVectorIndex, prepare_instruction, refine_instruction,
-    VolatileMemory, Instructions
-)
-```
-
-# PART I: CORE ARCHITECTURE & DATA STRUCTURES
-
-## State vs DataModel System
-
-### CRITICAL DISTINCTION: State vs DataModel
-
-**State**: Used for dependency injection and context management
-- **Purpose**: Service containers, context propagation, non-serializable state
-- **Base**: `haiway.State` (imported via `draive`)
-- **Features**: Context access via `ctx.state()`, holds functions/services
-- **Use Cases**: Service layer, dependency injection, contextual data
-
-**DataModel**: Used for serializable data structures with schema support
-- **Purpose**: Data that needs JSON serialization, API I/O, LLM structured outputs
-- **Base**: NOT a State subclass, uses independent `DataModel` class
-- **Features**: `to_json()`, `from_json()`, `json_schema()`, `Field()` customization
-- **Use Cases**: API requests/responses, configuration data, structured LLM outputs
-
-### Basic State Definition (for Services & Context)
-
-```python
-from draive import State, ctx
-from typing import Any
-from collections.abc import Sequence, Mapping, Set
-from datetime import datetime
-from uuid import UUID
-
-class UserData(State):
-    id: UUID
-    name: str
-    email: str | None = None
-    active: bool = True
-    created_at: datetime
-
-    # CRITICAL: Use abstract collection types for immutability
-    roles: Sequence[str]       # Becomes tuple (not list)
-    metadata: Mapping[str, Any] # Stays dict but validated
-    tags: Set[str]    # Becomes frozenset (not set)
-
-# Service container (State for dependency injection)
-class UserService(State):
-    fetching: UserFetching  # Protocol implementation
-    processing: UserProcessing
-
-    @classmethod # helper for quicker access and avoiding boilerplate
-    async def get_user(cls, id: UUID) -> UserData:
-        return await ctx.state(cls).fetching(id)
-```
-
-### DataModel Definition (for Serializable Data)
-
-```python
-from draive import DataModel, Field
-from uuid import UUID, uuid4
-
-# Serializable data models for structured generation
-class UserProfile(DataModel):
-    name: str
-    age: int | None = None
-    skills: Sequence[str] = Field(default_factory=tuple)
-    preferences: Mapping[str, str] = Field(default_factory=dict)
-
-    # Custom field with alias and description for LLM schema
-    user_id: UUID = Field(
-        default_factory=uuid4,
-        aliased="id",
-        description="Unique identifier for the user"
-    )
-
-# Configuration classes for LLM providers (use Config for context injection)
-class LLMConfig(Config):
-    model: str
-    temperature: float = 0.7
-    max_output_tokens: int | None = None
-
-# DataModel serialization capabilities
-profile = UserProfile(name="Alice", age=30)
-json_str = profile.to_json()  # Serialize to JSON
-schema = profile.json_schema()  # Get JSON schema for LLM
-profile_copy = UserProfile.from_json(json_str)  # Deserialize
-```
-
-**Why this pattern works:**
-- **Type annotations are MANDATORY**: Every State attribute MUST have a type annotation - Draive validates all values at runtime
-- **Abstract collection types ensure immutability**: `Sequence[T]` becomes `tuple`, `Set[T]` becomes `frozenset`
-- **Optional fields use union syntax**: `str | None` follows Python 3.10+ union syntax - NEVER use `Optional[T]`
-- **Defaults prevent constructor errors**: Provide sensible defaults for optional attributes
-- **NO missing type hints allowed**: State classes without complete type annotations will fail at runtime
-
-### State Updates (Immutable)
-
-```python
-# Create updated copies (original unchanged)
-user = User(id=uuid4(), name="Alice", created_at=datetime.now())
-
-# Simple updates
-updated_user = user.updated(name="Alice Smith", active=False)
-
-# Path-based updates for nested structures
-nested_update = user.updating(User._.metadata, {"role": "admin"})
-
-# Chained updates
-final_user = user.updated(name="Bob").updating(User._.tags, {"vip", "premium"})
-```
-
-**Why immutable updates work:**
-- **Original data is preserved**: `user.updated()` creates a new instance, original remains unchanged
-- **Path-based updates for precision**: `User._.metadata` syntax provides type-safe nested updates
-- **Chaining enables composition**: Multiple updates can be chained together fluently
-- **Thread-safe by design**: Immutable objects eliminate race conditions in concurrent code
-
-## Protocol-Based Functionality
-
-### Function Protocols
-
-```python
-from typing import Protocol, runtime_checkable
-
-@runtime_checkable
-class UserFetching(Protocol):
-    async def __call__(self, id: UUID) -> User: ...
-
-@runtime_checkable
-class ContentAnalyzing(Protocol):
-    async def __call__(self, content: str) -> UserProfile: ...
-
-@runtime_checkable
-class TextProcessing(Protocol):
-    async def __call__(self, text: str, instructions: str) -> str: ...
-```
-
-**Why protocols are essential:**
-- **Clear contracts**: Protocols define what functions must do without specifying how
-- **Runtime checking**: `@runtime_checkable` enables isinstance() checks for better error messages
-- **STRICT type signatures**: Every protocol method MUST have complete type annotations for parameters and return types
-- **Easy testing**: Mock implementations can be swapped in without complex setup
-- **Implementation flexibility**: Database, API, LLM - any implementation that matches the protocol works
-- **Type safety enforcement**: Protocol implementations are validated at runtime against their type signatures
-
-### Service Container Pattern
-
-```python
-class UserService(State):
-    # Protocol implementations
-    fetching: UserFetching
-    analyzing: ContentAnalyzing
-    processing: TextProcessing
-
-    # Clean API through class methods
-    @classmethod
-    async def get_user(cls, id: UUID) -> User:
-        return await ctx.state(cls).fetching(id)
-
-    @classmethod
-    async def analyze_content(cls, content: str) -> UserProfile:
-        return await ctx.state(cls).analyzing(content)
-
-    @classmethod
-    async def process_text(cls, text: str, instructions: str) -> str:
-        return await ctx.state(cls).processing(text, instructions)
-```
-
-**Why service containers work:**
-- **Dependency injection without frameworks**: State-based containers hold implementations
-- **Clean public API**: Class methods hide the complexity of accessing context state
-- **Type safety**: `ctx.state(cls)` retrieves the exact service type with all its protocols
-- **Composable**: Multiple services can be combined in a single context scope
-
-## Context System & Resource Management
-
-### Basic Context Usage
-
-```python
-from draive.openai import OpenAI, OpenAIChatConfig
-from haiway import LoggerObservability
-
-async def main():
-    # Create service and config
-    user_service = AIUserService()
-    llm_config = OpenAIChatConfig(model="gpt-4o-mini", temperature=0.7)
-
-    # Establish context with state and resources
-    async with ctx.scope(
-        "app",
-        user_service,
-        llm_config,
-        disposables=(OpenAI(),),  # Automatic resource cleanup
-        observability=LoggerObservability(),  # Logging and metrics
-    ):
-        # All code in this scope has access to state and LLM provider
-        user = await UserService.get_user(some_id)
-        profile = await UserService.analyze_content("User bio text")
-        processed = await UserService.process_text("Text", "Summarize this")
-```
-
-**Why context scopes solve dependency injection:**
-- **No global state**: State is scoped to execution contexts, preventing global state pollution
-- **Automatic propagation**: All code within the scope (including nested function calls) has access to state
-- **Type-based lookup**: `ctx.state(OpenAIChatConfig)` retrieves config by type, no string keys needed
-- **Hierarchical scoping**: Nested scopes inherit and can override parent state
-- **Resource management**: Disposables are automatically cleaned up when scope exits
-
-### Disposable Resources
-
-```python
-from contextlib import asynccontextmanager
-
-@asynccontextmanager
-async def database_connection():
-    # Setup resource
-    conn = await create_database_connection()
-    try:
-        # Yield state that will be available in context
-        yield DatabaseService(connection=conn)
-    finally:
-        # Cleanup happens automatically
-        await conn.close()
-
-# Use multiple disposable resources
-async def main():
-    async with ctx.scope(
-        "app",
-        disposables=[
-            database_connection(),
-            OpenAI(),  # LLM provider
-        ]
-    ):
-        # All services available
-        db_service = ctx.state(DatabaseService)
-
-        # LLM generation works automatically
-        result = await TextGeneration.generate(
-            instructions="Process this data",
-            input=user_input,
-        )
-```
-
-**Why disposable resources prevent leaks:**
-- **Guaranteed cleanup**: Resources are cleaned up even if exceptions occur
-- **State integration**: Yielded state objects become available in the context automatically
-- **Composition**: Multiple disposables can be used together without interference
-- **Lifecycle management**: Setup and teardown are clearly separated and automatic
-
-## Provider Setup and Authentication
-
-### Environment Setup
-
-```python
-from draive import load_env, setup_logging
-
-# Load environment variables and setup logging
-load_env()  # Loads from .env file
-setup_logging()  # Configure structured logging
-
-# Required environment variables by provider:
-# OpenAI: OPENAI_API_KEY
-# Anthropic: ANTHROPIC_API_KEY
-# Gemini: GOOGLE_API_KEY
-# Mistral: MISTRAL_API_KEY
-# Cohere: COHERE_API_KEY
-```
-
-### Provider Configuration Patterns
-
-```python
-from draive.openai import OpenAI, OpenAIChatConfig, OpenAIEmbeddingConfig
-from draive.anthropic import Anthropic, AnthropicChatConfig
-from draive.gemini import Gemini, GeminiChatConfig
-
-# OpenAI configuration
-openai_config = OpenAIChatConfig(
-    model="gpt-4o-mini",
-    temperature=0.7,
-    max_tokens=1000,
-    timeout=30.0,
-)
-
-# Anthropic configuration
-anthropic_config = AnthropicChatConfig(
-    model="claude-3-haiku",
-    temperature=0.5,
-    max_tokens=2000,
-)
-
-# Gemini configuration
-gemini_config = GeminiChatConfig(
-    model="gemini-1.5-flash",
-    temperature=0.8,
-    max_tokens=1500,
-)
-
-# Embedding configuration
-embedding_config = OpenAIEmbeddingConfig(
-    model="text-embedding-3-small",
-    dimensions=512,
-)
-```
-
-# PART II: AI INTERFACES & WORKFLOWS
-
-## Stage API for AI Pipelines
-
-**The Stage API is Draive's primary interface for building AI workflows and should be your go-to choice for most LLM tasks.**
-
-### Understanding Stages
-
-**Stages** are immutable, composable units of work that transform LLM context and content. Each stage:
-- Receives `StageState` containing context and result
-- Returns updated `StageState`
-- Can be chained, looped, run concurrently, or executed conditionally
-- Supports caching, retry logic, tracing, and error handling
-- Provides type-safe, predictable AI pipeline construction
-
-### Core Stage Types
-
-#### 1. Completion Stages - Primary Interface
-
-```python
-from draive import Stage, StageState, ctx, tool
-from draive.openai import OpenAI, OpenAIChatConfig
-
-# Basic completion - most common pattern
-basic_stage = Stage.completion(
-    "Analyze user feedback data: <<feedback data here>>",
-    instructions="Identify key themes and sentiment patterns"
-)
-
-# Completion with tools - enables agent-like behavior
-@tool(description="Search internal database for information.")
-async def search_database(query: str) -> str:
-    return f"Database results for: {query}"
-
-agent_stage = Stage.completion(
-    "Find information about product issues",
-    instructions="Use available tools to research the topic",
-    tools=[search_database]
-)
-
-# Structured output - for data extraction
-from draive import DataModel
-
-class AnalysisResult(DataModel):
-    summary: str
-    key_themes: Sequence[str]
-    sentiment: str
-
-extraction_stage = Stage.completion(
-    "User feedback about our mobile app...",
-    instructions="Extract structured analysis",
-    output=AnalysisResult
-)
-```
-
-#### 2. Dynamic Input Stages
-
-```python
-# Prompting completion - dynamic input generation
-async def get_latest_data() -> str:
-    return "Latest user feedback from API..."
-
-dynamic_stage = Stage.prompting_completion(
-    get_latest_data,
-    instructions="Analyze the latest feedback data"
-)
-
-# Loopback completion - iterative refinement, treats last output as input
-refinement_stage = Stage.loopback_completion(
-    instructions="Improve and expand on the previous analysis",
-    tools=[research_tool]
-)
-```
-
-#### 3. Utility Stages
-
-```python
-# Predefined content - inject static context
-context_stage = Stage.predefined(
-    "User: User is a premium customer",
-    "Assistant: Previous interaction was positive"
-)
-
-# Result transformation - modify output without LLM call
-transform_stage = Stage.transform_result(
-    lambda content: MultimodalContent.of("Enhanced: ", content)
-)
-
-# Context manipulation
-trim_stage = Stage.trim_context(limit=4)  # Keep last 4 context items
-```
-
-### Stage Composition - Building Complex Workflows
-
-#### Sequential Pipelines
-
-```python
-# Multi-step processing pipeline
-analysis_pipeline = Stage.sequence(
-    # Step 1: Initial analysis
-    Stage.completion(
-        "Raw customer feedback data...",
-        instructions="Analyze feedback and identify main categories"
-    ),
-
-    # Step 2: Deep dive into categories
-    Stage.completion(
-        "For each category, provide specific recommendations"
-    ),
-
-    # Step 3: Final formatting
-    Stage.completion(
-        "Format as executive summary with action items",
-        instructions="User markdown formatting for the result."
-    )
-)
-
-# Execute entire pipeline
-async with ctx.scope("analysis", config, disposables=(provider,)):
-    result = await analysis_pipeline.execute()
-```
-
-#### Looping with Conditions
-
-```python
-# Iterative improvement loop
-async def needs_more_detail(*, state: StageState, iteration: int) -> bool:
-    # Stop after 3 iterations or when result is detailed enough
-    content = state.result.as_string()
-    return iteration < 3 and len(content) < 500
-
-improvement_loop = Stage.loop(
-    Stage.completion(
-        "Research the topic of....",
-        instructions="Expand and improve the analysis with more detail",
-        tools=[research_tool, fact_checker]
-    ),
-    condition=needs_more_detail,
-    mode="post_check"  # Check condition after execution
-)
-```
-
-#### Concurrent Processing
-
-```python
-# Parallel analysis from different perspectives
-async def merge_analyses(branches: Sequence[StageState | Exception]) -> StageState:
-    """Combine multiple analysis results."""
-    successful_states = [
-        state for state in branches if isinstance(state, StageState)
-    ]
-
-    combined_content = MultimodalContent.of(
-        "Combined Analysis:\n",
-        *[state.result for state in successful_states]
-    )
-
-    return successful_states[0].updated(result=combined_content)
-
-parallel_analysis = Stage.concurrent(
-    Stage.completion("Analyze from technical perspective"),
-    Stage.completion("Analyze from business perspective"),
-    Stage.completion("Analyze from user experience perspective"),
-    merge=merge_analyses
-)
-```
-
-#### Conditional Execution and Routing
-
-```python
-# Conditional processing based on content
-conditional_stage = Stage.completion(
-    "Detailed technical analysis..."
-).when(
-    condition=lambda *, state: len(state.result.as_string()) > 100,
-    alternative=Stage.completion("Provide brief summary instead")
-)
-
-# Intelligent routing based on metadata
-technical_stage = Stage.completion(
-    "Prepare deep technical analysis",
-    instructions="Focus on technical aspects and implementation details"
-).with_meta(type="technical", complexity="high")
-
-summary_stage = Stage.completion(
-    "Prepare executive summary",
-    instructions="High-level overview for leadership"
-).with_meta(type="executive", complexity="low")
-
-# Router automatically selects appropriate stage
-router_stage = Stage.router(
-    technical_stage,
-    summary_stage
-    # Router uses stage metadata and current context to decide
-)
-```
-
-### Stage Enhancement Features
-
-#### Method Chaining - Fluent API
-
-```python
-# Combine multiple enhancements fluently
-production_stage = (
-    Stage.completion("Process customer request")
-    .with_meta(name="request_processor", description="Main customer service stage")
-    .cached(limit=50, expiration=3600)  # Cache for 1 hour
-    .with_retry(limit=3, delay=1.0, catching=ConnectionError)
-    .when(lambda *, state: len(state.result.as_string()) > 10)
-)
-```
-
-#### Caching for Performance
-
-```python
-# Cache expensive operations
-expensive_stage = Stage.completion(
-    "Perform complex data analysis",
-    tools=[database_query, ml_analysis]
-).cached(limit=10, expiration=7200)  # Cache 10 results for 2 hours
-```
-
-#### Error Handling and Resilience
-
-```python
-# Primary processing with fallback
-primary_stage = Stage.completion(
-    "Advanced analysis using external API",
-    tools=[external_api_tool]
-)
-
-fallback_stage = Stage.completion(
-    "Basic analysis using local data",
-    tools=[local_data_tool]
-)
-
-resilient_stage = primary_stage.with_fallback(
-    fallback_stage,
-    catching=ConnectionError  # Fall back on connection errors
-)
-
-# Retry with fixed delay
-retry_stage = Stage.completion(
-    "Process with external service"
-).with_retry(limit=3, delay=1.0, catching=Exception)
-```
-
-#### Memory Integration
-
-```python
-from draive.helpers import VolatileMemory
-
-# Persistent memory across stage executions
-memory = VolatileMemory(initial=())
-
-memory_enhanced_stage = Stage.sequence(
-    Stage.memory_recall(memory, handling="merge"),  # Load previous context
-    Stage.completion("Process with memory context"),
-    Stage.memory_remember(memory)  # Save current context
-)
-```
-
-### Custom Stages
-
-```python
-from draive import stage
-
-# Define fully custom stage behavior
-@stage
-async def custom_data_processor(*, state: StageState) -> StageState:
-    """Custom stage that processes data with special logic."""
-    current_result = state.result.as_string()
-
-    # Custom processing logic
-    if "urgent" in current_result.lower():
-        processed = f"PRIORITY: {current_result}"
-    else:
-        processed = f"Standard: {current_result}"
-
-    return state.updated(
-        result=MultimodalContent.of(processed)
-    )
-
-# Use custom stage in pipelines
-custom_pipeline = Stage.sequence(
-    Stage.completion("Analyze request priority"),
-    custom_data_processor,  # Your custom stage
-    Stage.completion("Generate appropriate response")
-)
-```
-
-**Key Stage API Benefits:**
-- **Composability**: Build complex workflows from simple stages
-- **Reusability**: Share and reuse stage components across projects
-- **Error Handling**: Built-in retry, fallback, and error recovery
-- **Performance**: Automatic caching and concurrent execution
-- **Observability**: Comprehensive tracing and monitoring
-- **Type Safety**: Full type checking and validation throughout
-
-## MultimodalContent - The Universal Data Format
-
-**MultimodalContent is the backbone of all LLM interactions in Draive. Every input, output, and intermediate result uses MultimodalContent as the universal data format.**
-
-### Understanding MultimodalContent
-
-MultimodalContent represents any combination of text, images, audio, video, and metadata in a unified, type-safe structure. It's used throughout Draive for:
-- LLM inputs and outputs
-- Stage results and transformations
-- Conversation messages
-- Tool inputs and outputs
-- Evaluation content
-
-### Content Types and Construction
-
-#### Basic Text Content
-
-```python
-from draive import MultimodalContent, TextContent
-
-# Simple text content
-content = MultimodalContent.of("Hello, world!")
-
-# Explicit text content
-text_content = TextContent.of("This is structured text content")
-content = MultimodalContent.of(text_content)
-
-# Multiple text parts
-content = MultimodalContent.of(
-    "Introduction: ",
-    "This is the main content.",
-    " Conclusion follows."
-)
-```
-
-#### Media Content Integration
-
-```python
-from draive import MediaData, MediaReference
-
-# Embedded media (from bytes)
-image_content = MultimodalContent.of(
-    "Here's an analysis chart:",
-    MediaData.of(
-        image_bytes,
-        media="image/png"
-    ),
-    "The chart shows key trends."
-)
-
-# Referenced media (from URLs)
-mixed_content = MultimodalContent.of(
-    "Report with supporting materials:",
-    MediaReference.of(
-        "https://example.com/chart.png",
-        media="image/png"
-    ),
-    MediaReference.of(
-        "https://example.com/audio.mp3",
-        media="audio/mpeg"
-    ),
-    "Analysis based on above media."
-)
-
-# Multiple media types
-rich_content = MultimodalContent.of(
-    "Comprehensive analysis:",
-    MediaData.of(chart_image, media="image/jpeg"),
-    "Visual analysis above. Audio transcript below:",
-    MediaData.of(audio_bytes, media="audio/wav"),
-    "Final summary and recommendations."
-)
-```
-
-#### Metadata Integration
-
-```python
-from draive import MetaContent, TextContent
-from haiway import Meta
-
-# Meta content with categories (from docs)
-meta_content = MultimodalContent.of(
-    "Document Analysis Report",
-    MetaContent.of(
-        category="title",
-        content=TextContent.of("Q1 Sales Report")
-    ),
-    "Summary: Sales increased by 15%"
-)
-
-# Content with Meta object attached
-content_with_meta = MultimodalContent.of(
-    "Content with metadata",
-    meta=Meta.of({
-        "source": "user",
-        "timestamp": "2024-01-01"
-    })
-)
-
-# Access meta content by category
-title_meta = content.meta(category="title")
-all_meta = content.meta()
-```
-
-#### Artifacts - Structured Data Models
-
-```python
-from draive import DataModel
-
-# Any DataModel (not predefined content types) becomes an artifact
-class UserProfile(DataModel):
-    name: str
-    age: int
-    skills: Sequence[str]
-
-class ReportData(DataModel):
-    title: str
-    metrics: Mapping[str, float]
-
-# Content with artifacts - automatically converted to JSON for LLM
-content_with_artifacts = MultimodalContent.of(
-    "User information:",
-    UserProfile(name="John", age=30, skills=("Python", "AI")),
-    "Report data:",
-    ReportData(title="Q1 Results", metrics={"revenue": 150000.0, "growth": 15.5})
-)
-
-# Check for artifacts
-has_artifacts: bool = content.has_artifacts
-is_artifact_only: bool = content.is_artifact()
-
-# Get all artifacts
-all_artifacts: Sequence[DataModel] = content.artifacts()
-
-# Get specific artifact type
-profiles: Sequence[UserProfile] = content.artifacts(UserProfile)
-reports: Sequence[ReportData] = content.artifacts(ReportData)
-
-# Remove artifacts
-clean_content = content.without_artifacts()
-```
-
-### Content Manipulation and Access
-
-#### String Conversion and Extraction
-
-```python
-# Convert to plain text (strips media and metadata)
-text_only: str = content.to_str()
-
-# Convert with custom joiner
-text_joined: str = content.to_str(joiner=" | ")
-
-# Include data URIs for media
-text_with_data: str = content.to_str(include_data=True)
-
-# Check if content contains media
-has_media: bool = content.has_media
-
-# Get all media items
-all_media: Sequence[MediaContent] = content.media()
-
-# Get specific media types
-images: Sequence[MediaContent] = content.media("image")
-audio_files: Sequence[MediaContent] = content.media("audio")
-```
-
-#### Content Combination and Transformation
-
-```python
-# Combine multiple MultimodalContent objects
-combined = MultimodalContent.of(
-    intro_content,
-    analysis_content,
-    conclusion_content
-)
-
-# Append new content to existing
-extended = content.appending(
-    "Additional text",
-    MediaData.of(new_image_bytes, media="image/png")
-)
-
-# Extend with other multimodal content
-other_content = MultimodalContent.of("More content")
-combined = content.extended_by(other_content)
-
-# Filter content by type - use built-in methods
-text_only = content.text()
-images_only = content.images()
-audio_only = content.audio()
-video_only = content.video()
-
-# Remove specific content types
-without_media = content.without_media()
-without_artifacts = content.without_artifacts()
-without_meta = content.without_meta()
-```
-
-#### Content Validation and Type Checking
-
-```python
-# Check if content contains only specific types
-is_media_only: bool = content.is_media()  # Any media type
-is_images_only: bool = content.is_media("image")  # Only images
-is_audio_only: bool = content.is_media("audio")   # Only audio
-
-is_artifacts_only: bool = content.is_artifact()
-is_meta_only: bool = content.is_meta()
-
-# Boolean check for non-empty content
-if content:
-    print("Content is not empty")
-
-# Check for specific content presence
-has_media: bool = content.has_media
-has_artifacts: bool = content.has_artifacts
-```
-
-### Usage in LLM Operations
-
-#### Generation with MultimodalContent Input
-
-```python
-from draive import ctx, TextGeneration, MultimodalContent, MediaData
-from draive.openai import OpenAI, OpenAIChatConfig
-
-async with ctx.scope(
-    "multimodal_analysis",
-    OpenAIChatConfig(model="gpt-4o"),
-    disposables=(OpenAI(),),
-):
-    # Text generation with rich input
-    content = MultimodalContent.of(
-        "Analyze this image:",
-        MediaData.of(
-            image_bytes,
-            media="image/jpeg"
-        )
-    )
-
-    result = await TextGeneration.generate(
-        instructions="Describe what you see in the image",
-        input=content
-    )
-
-    # Conversation with mixed content
-    response = await Conversation.completion(
-        instructions="You are a data analyst assistant",
-        input=MultimodalContent.of(
-            "Here are the quarterly reports:",
-            MediaReference.of("https://company.com/q1-report.pdf", media="application/pdf"),
-            MediaReference.of("https://company.com/q2-report.pdf", media="application/pdf"),
-            "Compare Q1 and Q2 performance metrics."
-        )
-    )
-```
-
-#### Structured Generation Output
-
-```python
-from collections.abc import Sequence
-from draive import ModelGeneration, DataModel
-
-class ImageDescription(DataModel):
-    description: str
-    objects: Sequence[str]
-
-async with ctx.scope(
-    "multimodal_generation",
-    OpenAIChatConfig(model="gpt-4o"),
-    disposables=(OpenAI(),),
-):
-    # Model generation with multimodal input
-    result = await ModelGeneration.generate(
-        ImageDescription,
-        instructions="Analyze the image and extract key information",
-        input=MultimodalContent.of(
-            "Analyze this marketing material:",
-            MediaData.of(poster_image, media="image/jpeg"),
-            "Focus on visual elements and messaging."
-        )
-    )
-
-    print(f"Description: {result.description}")
-    print(f"Objects found: {result.objects}")
-```
-
-### Stage API Integration
-
-#### Content Flow Through Stages
-
-```python
-# Stages automatically handle MultimodalContent
-media_analysis_stage = Stage.completion(
-    MultimodalContent.of(
-        "Product images for analysis:",
-        MediaData.of(product_image_1, media="image/jpeg"),
-        MediaData.of(product_image_2, media="image/jpeg")
-    ),
-    instructions="Compare products and provide detailed analysis"
-)
-
-# Content transformation stages using appending
-content_enhancer = Stage.transform_result(
-    lambda result: result.appending(
-        "\n--- Analysis Complete ---",
-        "Enhanced with additional processing context."
-    )
-)
-
-# Pipeline with rich content flow
-analysis_pipeline = Stage.sequence(
-    media_analysis_stage,
-    content_enhancer,
-    Stage.completion("Provide executive summary of the enhanced analysis")
-)
-```
-
-#### Custom Stages with Content Processing
-
-```python
-from draive import stage, StageState, MetaContent, TextContent
-
-@stage
-async def media_validator(*, state: StageState) -> StageState:
-    """Validate that content contains required media types."""
-    content = state.result
-
-    # Check for required media using built-in method
-    if not content.has_media:
-        # Add warning using appending
-        enhanced_content = content.appending(
-            MetaContent.of(
-                category="warning",
-                content=TextContent.of("No image media found")
-            ),
-            "Note: Analysis performed without visual data."
-        )
-        return state.updated(result=enhanced_content)
-
-    # Check specifically for images
-    images = content.media("image")
-    if not images:
-        enhanced_content = content.appending(
-            "Warning: No image content detected for visual analysis."
-        )
-        return state.updated(result=enhanced_content)
-
-    return state
-```
-
-### Tool System Integration
-
-#### Tools with MultimodalContent
-
-```python
-from draive import tool
-
-@tool(description="Analyze uploaded images and documents")
-async def analyze_media(content: MultimodalContent) -> str:
-    """Analyze various media types in the content."""
-    # Use built-in methods for media detection
-    all_media = content.media()
-    images = content.media("image")
-    audio_files = content.media("audio")
-
-    text_content = content.to_str()
-
-    analysis = [
-        f"Found {len(all_media)} total media items:",
-        f"- {len(images)} images",
-        f"- {len(audio_files)} audio files",
-        f"Text content: {text_content[:100]}..."
-    ]
-
-    return "\n".join(analysis)
-
-@tool(description="Extract text from images using OCR")
-async def extract_text_from_images(content: MultimodalContent) -> MultimodalContent:
-    """Process images and return enhanced content with extracted text."""
-    if not content.has_media:
-        return content.appending("No media found for OCR processing.")
-
-    images = content.media("image")
-    if not images:
-        return content.appending("No images found for OCR processing.")
-
-    # Simulate OCR extraction for each image
-    ocr_results = []
-    for i, image in enumerate(images):
-        ocr_results.append(f"[OCR Image {i+1}] Extracted text from {image.media} image")
-
-    return content.appending(*ocr_results)
-
-# Usage in conversation
-response = await Conversation.completion(
-    instructions="Help analyze the provided content",
-    input=MultimodalContent.of(
-        "Please process these documents:",
-        MediaData.of(document_image, media="image/png")
-    ),
-    tools=[analyze_media, extract_text_from_images]
-)
-```
-
-### Memory and Conversation Integration
-
-#### ConversationMemory with Rich Content
-
-```python
-from draive import ConversationMessage
-
-# Conversations naturally handle MultimodalContent
-memory = ConversationMemory.constant((
-    ConversationMessage.user(MultimodalContent.of(
-        "I'm uploading some charts for analysis:",
-        MediaData.of(chart1_bytes, media="image/png"),
-        MediaData.of(chart2_bytes, media="image/png")
-    )),
-    ConversationMessage.assistant("I'll analyze both charts for you."),
-    ConversationMessage.user("Focus on the revenue trends in chart 1.")
-))
-
-# Continue conversation with multimodal context
-response = await Conversation.completion(
-    instructions="You are a business analyst assistant",
-    input="Now compare Q3 data with the previous quarters",
-    memory=memory
-)
-```
-
-### Best Practices for MultimodalContent
-
-#### Content Construction Patterns
-
-```python
-# ✅ GOOD: Build content incrementally using appending
-base_content = MultimodalContent.of("Analysis Report:")
-
-if has_chart_data:
-    base_content = base_content.appending(
-        MediaData.of(chart_bytes, media="image/png"),
-        "Chart analysis above."
-    )
-
-if include_metadata:
-    base_content = base_content.appending(
-        MetaContent.of(
-            category="report_type",
-            content=TextContent.of("quarterly")
-        )
-    )
-
-# ✅ GOOD: Use helper functions for complex content
-def create_report_content(
-    title: str,
-    charts: Sequence[bytes],
-    summary: str,
-    include_meta: bool = False
-) -> MultimodalContent:
-    content = MultimodalContent.of(f"# {title}\n")
-
-    for i, chart in enumerate(charts):
-        content = content.appending(
-            f"## Chart {i+1}",
-            MediaData.of(chart, media="image/png")
-        )
-
-    content = content.appending(f"\n## Summary\n{summary}")
-
-    if include_meta:
-        content = content.appending(
-            MetaContent.of(
-                category="report_info",
-                content=TextContent.of(f"Generated report: {title}")
-            )
-        )
-
-    return content
-```
-
-#### Performance Considerations
-
-```python
-# ✅ GOOD: Use MediaReference for large files to avoid memory issues
-large_content = MultimodalContent.of(
-    "Processing large video file:",
-    MediaReference.of("s3://bucket/large-video.mp4", media="video/mp4"),
-    "Analyze key moments and themes."
-)
-
-# ✅ GOOD: Batch media processing with appending
-async def process_media_batch(media_items: Sequence[bytes]) -> MultimodalContent:
-    content = MultimodalContent.of("Batch processing results:")
-
-    for i, media_bytes in enumerate(media_items):
-        content = content.appending(
-            f"Image {i+1} analysis:",
-            MediaData.of(media_bytes, media="image/jpeg")
-        )
-
-    return content
-
-# ✅ GOOD: Use filtering methods efficiently
-def extract_visual_content(content: MultimodalContent) -> MultimodalContent:
-    # Get only images and videos using built-in methods
-    images = content.images()
-    videos = content.video()
-
-    return MultimodalContent.of(
-        "Visual content extracted:",
-        images,
-        videos
-    )
-```
-
-**Key MultimodalContent Rules:**
-- **Universal format**: ALL LLM interactions use MultimodalContent
-- **Type safety**: Content parts are strictly typed and validated
-- **Immutable**: Content objects cannot be modified after creation
-- **Composable**: Combine and transform content fluently with `.of()`
-- **Media support**: Handle images, audio, video, and documents natively
-- **Metadata integration**: Include processing hints and context information
-
-## LLM Generation & Conversation APIs
-
-### Basic Text Generation
-
-```python
-from draive import TextGeneration, Conversation, ConversationMemory
-from draive.openai import OpenAI, OpenAIChatConfig
-
-async with ctx.scope(
-    "text_gen",
-    OpenAIChatConfig(model="gpt-4o-mini", temperature=0.7),
-    disposables=(OpenAI(),),
-):
-    # Basic generation
-    result = await TextGeneration.generate(
-        instructions="You are a helpful assistant",
-        input="Explain quantum computing",
-    )
-
-    # Conversation is better for chat interactions
-    response = await Conversation.completion(
-        instructions="You are a helpful assistant",
-        input="What is machine learning?",
-    )
-```
-
-### Structured Model Generation
-
-```python
-from draive import ModelGeneration, DataModel, Field
-
-class AnalysisResult(DataModel):
-    entities: Sequence[str] = Field(description="Named entities found")
-    sentiment: str = Field(description="Overall sentiment: positive, negative, neutral")
-    confidence: float = Field(description="Confidence score 0-1")
-    summary: str = Field(description="Brief summary of content")
-
-async with ctx.scope("extraction", config, disposables=(provider,)):
-    # Structured output with automatic validation
-    result = await ModelGeneration.generate(
-        AnalysisResult,
-        instructions="Analyze the following text comprehensively",
-        input=text_content,
-    )
-
-    # Result is fully typed with validation
-    print(f"Found {len(result.entities)} entities")
-    print(f"Sentiment: {result.sentiment} (confidence: {result.confidence})")
-```
-
-### Conversation with Memory
-
-```python
-from draive import Conversation, ConversationMemory, ConversationMessage
-
-async def interactive_chat():
-    # Use proper ConversationMemory for automatic management
-    memory = ConversationMemory.accumulative_volatile(limit=10)  # Keeps last 10 messages
-
-    async with ctx.scope(
-        "chat",
-        OpenAIChatConfig(model="gpt-4o-mini"),
         disposables=(OpenAI(),),
     ):
-        while True:
-            user_input = input("You: ")
-            if user_input.lower() == "quit":
-                break
-
-            # Get AI response with managed memory
-            response = await Conversation.completion(
-                instructions="You are a friendly AI assistant",
-                input=user_input,
-                memory=memory,  # Automatically managed conversation history
+        try:
+            return await TextGeneration.generate(
+                instructions="Primary responder.",
+                input="Explain embeddings in one paragraph.",
             )
-            print(f"Assistant: {response}")
-            # Memory is automatically updated by Conversation.completion
+        except Exception as exc:
+            ctx.log_warning("primary_failed", exception=exc)
+            async with ctx.scope(
+                "fallback",
+                AnthropicConfig(model="claude-3-haiku"),
+                disposables=(Anthropic(),),
+            ):
+                return await TextGeneration.generate(
+                    instructions="Fallback responder.",
+                    input="Explain embeddings in one paragraph.",
+                )
 ```
 
-### Multi-Provider Usage
+## 6. Tool Calling
+- Wrap callable tools with `@tool` and register them in scope.
+- Tools can access active state with `ctx.state(...)`.
+- Pass tools to `Conversation.completion()` or `TextGeneration.generate()` where supported.
 
 ```python
-from draive.anthropic import Anthropic, AnthropicChatConfig
-from draive.gemini import Gemini, GeminiChatConfig
+from draive import Conversation
+from draive.models.tools import tool
+from draive.resources import ResourceReference
 
-# Easy provider switching with same interface
-async def compare_providers(query: str) -> Sequence[str]:
-    results = []
+@tool(name="lookup_document")
+async def lookup_document(doc_id: str) -> ResourceReference:
+    # Resolve and return references; implement custom storage logic here.
+    return ResourceReference(uri=f"s3://docs/{doc_id}.txt")
 
-    # OpenAI
-    async with ctx.scope("openai", OpenAIChatConfig(model="gpt-4o-mini"), disposables=(OpenAI(),)):
-        result = await TextGeneration.generate(instructions="Answer concisely", input=query)
-        results.append(f"OpenAI: {result}")
-
-    # Anthropic
-    async with ctx.scope("anthropic", AnthropicChatConfig(model="claude-3-haiku"), disposables=(Anthropic(),)):
-        result = await TextGeneration.generate(instructions="Answer concisely", input=query)
-        results.append(f"Claude: {result}")
-
-    # Gemini
-    async with ctx.scope("gemini", GeminiChatConfig(model="gemini-1.5-flash"), disposables=(Gemini(),)):
-        result = await TextGeneration.generate(instructions="Answer concisely", input=query)
-        results.append(f"Gemini: {result}")
-
-    return tuple(results)
+async def answer_with_tools(question: str) -> str:
+    async with ctx.scope(
+        "tools.chat",
+        OpenAIResponsesConfig(model="gpt-4o-mini"),
+        disposables=(OpenAI(),),
+    ):
+        return await Conversation.completion(
+            instructions="Use tools when necessary.",
+            input=question,
+            tools=[lookup_document],
+        )
 ```
 
-## Tools & Multimodal Content
-
-### Tool Definition & Usage
+## 7. Structured Outputs
+- Use `ModelGeneration.generate()` with `DataModel` schemas for validated responses.
+- Draive uses `pydantic`-style models; invalid payloads raise validation errors.
 
 ```python
-from draive import tool, Toolbox, Argument
+from draive import ModelGeneration
+from draive.multimodal import TextContent
+from pydantic import BaseModel, Field
 
-@tool(description="Get weather information for a location.")
-async def get_weather(location: str) -> str:
-    """Get weather information for a location."""
-    return f"Weather in {location}: 22°C, sunny"
+class Summary(BaseModel):
+    topic: str = Field(description="Topic of the summary")
+    bullets: list[str] = Field(description="Key takeaways")
 
-@tool(
-    name="search_documents",
-    description="Search through document database",
-)
-async def advanced_search_tool(
-    query: str = Argument(description="What to search for", aliased="search_query"),
-    limit: int = Argument(description="Maximum number of results", default=5),
-) -> str:
-    """Advanced search with multiple parameters."""
-    results = perform_search(query, limit)
-    return "\n".join(results)
-
-# Use tools in generation
-result = await TextGeneration.generate(
-    instructions="Help the user with their request using available tools",
-    input="What's the weather in Paris and search for travel info?",
-    tools=Toolbox.of(get_weather, advanced_search_tool, suggest=get_weather),
-)
+async def generate_summary(text: str) -> Summary:
+    async with ctx.scope(
+        "structured.output",
+        OpenAIResponsesConfig(model="gpt-4o-mini"),
+        disposables=(OpenAI(),),
+    ):
+        return await ModelGeneration.generate(
+            instructions="Summarize the document precisely.",
+            input=TextContent.of(text=text),
+            output_type=Summary,
+        )
 ```
 
-### Multimodal Content System
+## 8. Multimodal Payloads
+- Compose content with `MultimodalContent.of(...)` using `TextContent`, `ArtifactContent`, and `ResourceContent`.
+- Ensure binary data is stored externally and referenced with `ResourceReference` when large.
 
 ```python
-from draive import MultimodalContent, MediaData, MediaReference, MetaContent, TextContent
+from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 
-# Creating multimodal content from various sources
-content = MultimodalContent.of(
-    "Here's an analysis with supporting materials:",
-    MediaData.of(image_bytes, media="image/jpeg"),
-    "The image shows key findings.",
-    MediaReference.of("https://example.com/chart.png", media="image/png"),
-)
-
-# Multimodal generation with vision-capable models
-async with ctx.scope("multimodal", OpenAIChatConfig(model="gpt-4o"), disposables=(OpenAI(),)):
-    analysis = await TextGeneration.generate(
-        instructions="Analyze this image and provide detailed insights",
-        input=MultimodalContent.of(
-            "Please examine this chart:",
-            MediaData.of(chart_image, media="image/png"),
-            "Focus on trends and outliers.",
-        ),
-    )
+async def multimodal_prompt(image_bytes: bytes) -> str:
+    async with ctx.scope(
+        "multimodal.demo",
+        OpenAIResponsesConfig(model="gpt-4o-realtime-preview"),
+        disposables=(OpenAI(),),
+    ):
+        content = MultimodalContent.of(
+            TextContent.of(text="Describe the uploaded image."),
+            ArtifactContent.of(data=image_bytes, mime_type="image/png"),
+        )
+        return await TextGeneration.generate(
+            instructions="Respond with a single paragraph.",
+            input=content,
+        )
 ```
 
-# PART III: EVALUATION & ADVANCED FEATURES
-
-## Evaluation System
-
-**Draive provides comprehensive evaluation capabilities for ensuring LLM output quality and safety.**
-
-### Built-in Evaluators
+## 9. Conversation Memory
+- Use `ConversationMemory.constant()` for stateless replies and `.accumulative_volatile()` for rolling transcripts.
 
 ```python
-from draive.evaluators import (
-    safety_evaluator, helpfulness_evaluator, factual_accuracy_evaluator,
-    groundedness_evaluator, creativity_evaluator, tone_style_evaluator
-)
-from draive.evaluation import evaluate
+from draive.conversation import ConversationMemory
 
-# Single evaluator with threshold
-safety_result = await safety_evaluator.with_threshold("excellent")(
-    content="This is safe, helpful content about Python programming.",
-)
-
-# Multiple evaluators in parallel
-evaluation_results = await evaluate(
-    content="AI assistant response about machine learning...",
-    safety_evaluator.with_threshold("perfect").prepared(),
-    helpfulness_evaluator.with_threshold("excellent").prepared(
-        user_query="How does machine learning work?"
-    ),
-    factual_accuracy_evaluator.with_threshold("good").prepared(),
-    concurrent_tasks=3  # Run evaluations concurrently
-)
-
-# Check if all evaluations passed
-all_passed = all(result.passed for result in evaluation_results)
-```
-
-### Custom Evaluators
-
-```python
-from draive.evaluation import evaluator, EvaluationScore
-
-@evaluator(name="code_quality", threshold="good")
-async def code_quality_evaluator(
-    code: str,
-    /,
-    language: str = "python",
-    criteria: Sequence[str] = ("readability", "efficiency", "correctness")
-) -> EvaluationScore:
-    """Evaluate code quality based on multiple criteria."""
-
-    class CodeEvaluation(DataModel):
-        overall_score: float = Field(description="Overall quality score 0-1")
-        feedback: str = Field(description="Detailed feedback")
-
-    evaluation = await ModelGeneration.generate(
-        CodeEvaluation,
-        instructions=f"Evaluate this {language} code based on: {', '.join(criteria)}",
-        input=code
-    )
-
-    return EvaluationScore.of(evaluation.overall_score, comment=evaluation.feedback)
-```
-
-**Evaluation Best Practices:**
-- Use `perfect` threshold for safety-critical evaluations (safety, consistency)
-- Use `excellent` for user-facing quality (helpfulness, groundedness)
-- Use `good` for general quality standards (fluency, readability)
-- Run independent evaluators concurrently for performance
-
-## RAG & MCP Integration
-
-### Basic RAG Pattern
-
-```python
-from draive import VectorIndex, split_text, Tokenization
-from draive.helpers import VolatileVectorIndex
-from draive.openai import OpenAIEmbeddingConfig
-
-class DocumentChunk(DataModel):
-    content: str
-    source: str
-    chunk_id: int
-
-# Prepare vector index
-vector_index = VolatileVectorIndex()
+memory = ConversationMemory.accumulative_volatile()
 
 async with ctx.scope(
-    "rag_setup",
-    vector_index,
-    OpenAIEmbeddingConfig(model="text-embedding-3-small"),
+    "chat.session",
+    OpenAIResponsesConfig(model="gpt-4o-mini"),
     disposables=(OpenAI(),),
+    states=(memory,),
 ):
-    # Split and index documents
-    chunks = [
-        DocumentChunk(content=chunk, source="doc1.txt", chunk_id=i)
-        for i, chunk in enumerate(split_text(
-            text=document_text,
-            separators=("\n\n", "\n", ". ", " "),
-            part_size=512,
-            part_overlap_size=64,
-            count_size=Tokenization.count_tokens,
-        ))
-    ]
-
-    await vector_index.index(DocumentChunk, values=chunks, attribute=DocumentChunk._.content)
-
-@tool(name="search")
-async def search_documents(query: str) -> str:
-    results = await ctx.state(VectorIndex).search(DocumentChunk, query=query, limit=3)
-    return "\n---\n".join(result.content for result in results)
-
-# Use in RAG pipeline
-async with ctx.scope("rag_chat", OpenAIChatConfig(model="gpt-4o-mini"), vector_index, disposables=(OpenAI(),)):
     response = await Conversation.completion(
-        instructions="Answer questions based on search results from the documentation",
-        input="How do I set up context scopes in Draive?",
-        tools=[search_documents],
+        instructions="Be helpful and brief.",
+        input="How do I track conversation state in Draive?",
     )
 ```
 
-### MCP Integration
+## 10. Guardrails and Evaluations
+- Attach moderation, privacy, or quality states (`draive.guardrails`) to a scope to enforce policies.
+- Run evaluators via `draive.evaluation` helpers before committing responses to downstream systems.
 
-```python
-from draive.mcp import MCPClient
+## 11. Observability
+- Log with `ctx.log_debug/info/warn/error`.
+- Record metrics via `ctx.record(metric_name, value=...)`.
+- Wrap long-lived processes in descriptive scope identifiers to aid tracing.
 
-# Filesystem MCP server
-async with ctx.scope(
-    "mcp_filesystem",
-    OpenAIChatConfig(model="gpt-4o-mini"),
-    disposables=(
-        OpenAI(),
-        MCPClient.stdio(
-            command="npx",
-            args=["-y", "@modelcontextprotocol/server-filesystem", "/path/to/docs"],
-        ),
-    ),
-):
-    # Tools are automatically available from MCP
-    response = await Conversation.completion(
-        instructions="You can read and analyze files using available tools",
-        input="What files are in the documentation directory?",
-        tools=await Toolbox.fetched(),  # Get tools from MCP
-    )
-```
+## 12. Error Translation
+- Catch provider-specific exceptions and raise domain-specific errors with context.
+- Avoid bare `Exception`; include actionable metadata for operators (e.g., model name, request id).
 
-# PART IV: KEY RULES FOR AI MODELS
+## 13. Testing Your Usage
+- Write async unit tests using `pytest-asyncio` or similar frameworks.
+- Stub provider clients; do not make real network calls in tests.
+- Validate structured outputs with the same `DataModel` classes you use in production.
 
-## CRITICAL TYPING REQUIREMENTS (MANDATORY)
+## 14. Deployment Tips
+- Keep scopes short-lived for per-request work; share expensive disposables by creating higher-level scopes that manage resource pools.
+- Rotate provider credentials via environment changes; restart scopes to pick up new configs.
+- Monitor latency and cost metrics through logs and `ctx.record` hooks.
 
-**Draive REQUIRES complete, strict type annotations throughout all code:**
+---
 
-- **Every State attribute** MUST have a type annotation
-- **Every function parameter and return type** MUST be typed
-- **Every Protocol method** MUST have complete signatures
-- **Abstract collection types ONLY**: Use `Sequence[T]`, `Mapping[K,V]`, `Set[T]` - NEVER `list`, `dict`, `set`
-- **Union syntax ONLY**: Use `str | None` - NEVER `Optional[str]`
-- **Runtime validation enforces types** - incorrect types cause immediate failures
-
-## Core Development Rules
-
-### 1. State Class Rules
-- **MANDATORY type annotations**: Every State attribute MUST be typed
-- **Abstract collections**: `Sequence[T]` becomes `tuple`, `Set[T]` becomes `frozenset`
-- **Immutable updates**: Use `.updated()` and `.updating()` methods
-- **Protocol-based services**: Hold Protocol implementations for dependency injection
-
-### 2. Protocol Rules
-- **MANDATORY `@runtime_checkable`**: Every Protocol class MUST have this decorator
-- **Complete signatures**: All protocol methods need full type annotations
-- **Single responsibility**: Protocols should focus on one functional concern
-
-### 3. LLM Generation Rules
-- **Always use context scopes**: All LLM operations must be within `ctx.scope()`
-- **Stage API first**: Use Stage API as the primary interface for most LLM tasks
-- **Provider independence**: Write code that works with multiple providers
-- **Structured outputs**: Use `ModelGeneration.generate()` with DataModel classes
-
-### 4. Conversation Rules
-- **Use ConversationMemory**: NEVER manual lists - use `ConversationMemory.constant()` or `.accumulative_volatile()`
-- **Conversation API for chat**: Use `Conversation.completion()` instead of `TextGeneration` for interactive scenarios
-- **Memory management**: ConversationMemory automatically handles updates
-
-### 5. Tool System Rules
-- **`@tool` decorator required**: All tool functions must use `@tool`
-- **Complete type annotations**: Tools need full type hints for parameters and return types
-- **Context access**: Tools can access needed state via `ctx.state()`
-
-### 6. Evaluation Rules
-- **Built-in evaluators**: Use provided evaluators with appropriate thresholds
-- **Custom evaluator decoration**: Use `@evaluator` decorator for domain-specific evaluation
-- **Concurrent evaluation**: Use `concurrent_tasks` parameter for performance
-
-### 7. Error Handling Rules
-- **Specific exceptions**: Handle `LMMException`, `ValidatorError`, `EvaluationError`
-- **Context logging**: Use `ctx.log_error()`, `ctx.log_info()` for structured logging
-- **Graceful degradation**: Implement fallbacks for LLM failures
-
-**Bottom Line**: Follow these rules strictly for reliable, type-safe, high-quality Draive applications.
+Use this guide as a checklist when embedding Draive into applications: configure scopes, activate the right states, call the higher-level generation APIs, and wrap everything with observability and guardrails for safe production usage.

@@ -1,0 +1,18 @@
+{
+  "plugins": {
+    "md013": {
+      "line_length": 100,
+      "code_block_line_length": 0,
+      "code_blocks": false,
+      "tables": false,
+      "headings": false
+    },
+    "md033": {
+      "allowed_elements": [
+        "br",
+        "sub",
+        "sup"
+      ]
+    }
+  }
+}

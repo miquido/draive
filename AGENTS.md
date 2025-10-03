@@ -46,7 +46,7 @@ Public exports are centralized in `src/draive/__init__.py`.
 - Strict typing only: no untyped public APIs, no loose `Any` unless required by third-party boundaries
 - Prefer explicit attribute access with static types. Avoid dynamic `getattr` except at narrow boundaries.
 - Prefer abstract immutable protocols: `Mapping`, `Sequence`, `Iterable` over `dict`/`list`/`set` in public types
-- Use `final` where applicable; avoid complex inheritance, prefer type composition
+- Use `final` where applicable; avoid inheritance, prefer type composition
 - Use precise unions (`|`) and narrow with `match`/`isinstance`, avoid `cast` unless provably safe and localized
 
 ### State & Context
@@ -172,6 +172,7 @@ async def test_greeter_returns_greeting() -> None:
 - Site is built with MkDocs + Material and `mkdocstrings` for API docs.
 - Author pages under `docs/` and register navigation in `mkdocs.yml` (`nav:` section).
 - Preview locally: `make docs-server` (serves at http://127.0.0.1:8000).
+- Lint `make docs-lint` and format `make docs-format` after editing.
 - Build static site: `make docs` (outputs to `site/`).
 - Keep docstrings high‑quality; `mkdocstrings` pulls them into reference pages.
 - When adding public APIs, update examples/guides as needed and ensure cross‑links render.
