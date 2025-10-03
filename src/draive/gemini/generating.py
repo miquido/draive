@@ -650,7 +650,7 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
         "response_schema": response_schema,
         "speech_config": speech_config,
         "thinking_config": {
-            "include_thoughts": True,
+            "include_thoughts": (cast(int, config.thinking_budget) > 0),
             "thinking_budget": config.thinking_budget,
         }
         if config.thinking_budget is not MISSING
