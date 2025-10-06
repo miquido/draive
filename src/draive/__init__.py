@@ -78,6 +78,7 @@ from haiway import (
 
 from draive.conversation import (
     Conversation,
+    ConversationEvent,
     ConversationInputChunk,
     ConversationMessage,
     ConversationOutputChunk,
@@ -231,6 +232,7 @@ __all__ = (
     "ConfigurationRepository",
     "ContextPreset",
     "Conversation",
+    "ConversationEvent",
     "ConversationInputChunk",
     "ConversationMessage",
     "ConversationOutputChunk",

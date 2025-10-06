@@ -431,6 +431,8 @@ class OpenAIRealtime(OpenAIAPI):
                 else:  # session event
                     match input.category:
                         case "memory.update":
+                            ctx.log_debug("Received memory update event")
+
                             await _reset_context(
                                 (await memory.recall()).context,
                                 current_items=current_items,
