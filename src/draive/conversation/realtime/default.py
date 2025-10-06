@@ -8,7 +8,11 @@ from draive.conversation.realtime.types import (
     RealtimeConversationSession,
     RealtimeConversationSessionScope,
 )
-from draive.conversation.types import ConversationInputChunk, ConversationOutputChunk
+from draive.conversation.types import (
+    ConversationEvent,
+    ConversationInputChunk,
+    ConversationOutputChunk,
+)
 from draive.models import (
     ModelMemory,
     ModelSession,
@@ -90,7 +94,7 @@ async def realtime_conversation_preparing(  # noqa: C901
                     f"...tool request ({tool_request.identifier}) handling completed!",
                 )
 
-        async def read() -> ConversationOutputChunk:
+        async def read() -> ConversationOutputChunk | ConversationEvent:
             while True:
                 match await session.reading():
                     case ModelOutputChunk() as chunk:
@@ -102,6 +106,11 @@ async def realtime_conversation_preparing(  # noqa: C901
 
                     case ModelSessionEvent() as event:
                         ctx.log_debug(f"...received {event.category} event...")
+                        return ConversationEvent.of(
+                            event.category,
+                            content=event.content,
+                            meta=event.meta,
+                        )
 
                     case ModelToolRequest() as tool_request:
                         ctx.log_debug(f"...received {tool_request.tool} request...")
@@ -111,14 +120,23 @@ async def realtime_conversation_preparing(  # noqa: C901
                         )
 
         async def write(
-            input: ConversationInputChunk,  # noqa: A002
+            input: ConversationInputChunk | ConversationEvent,  # noqa: A002
         ) -> None:
-            await session.writing(
-                input=ModelInputChunk.of(
-                    input.content,
-                    eod=input.eod,
+            if isinstance(input, ConversationEvent):
+                await session.writing(
+                    input=ModelSessionEvent.of(
+                        input.category,
+                        content=input.content,
+                    )
                 )
-            )
+
+            else:
+                await session.writing(
+                    input=ModelInputChunk.of(
+                        input.content,
+                        eod=input.eod,
+                    )
+                )
 
         return RealtimeConversationSession(
             reading=read,

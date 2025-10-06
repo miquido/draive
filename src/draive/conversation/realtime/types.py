@@ -4,7 +4,11 @@ from typing import Any, Protocol, Self, runtime_checkable
 
 from haiway import State, ctx
 
-from draive.conversation.types import ConversationInputChunk, ConversationOutputChunk
+from draive.conversation.types import (
+    ConversationEvent,
+    ConversationInputChunk,
+    ConversationOutputChunk,
+)
 from draive.models import ModelMemory, ResolveableInstructions, Toolbox
 
 __all__ = (
@@ -22,7 +26,7 @@ __all__ = (
 class RealtimeConversationSessionReading(Protocol):
     """Callable that reads the next output chunk from the realtime session."""
 
-    async def __call__(self) -> ConversationOutputChunk: ...
+    async def __call__(self) -> ConversationOutputChunk | ConversationEvent: ...
 
 
 @runtime_checkable
@@ -31,7 +35,7 @@ class RealtimeConversationSessionWriting(Protocol):
 
     async def __call__(
         self,
-        input: ConversationInputChunk,  # noqa: A002
+        input: ConversationInputChunk | ConversationEvent,  # noqa: A002
     ) -> None: ...
 
 
@@ -39,12 +43,12 @@ class RealtimeConversationSession(State):
     """Static helpers for interacting with the active realtime conversation session."""
 
     @classmethod
-    async def read(cls) -> ConversationOutputChunk:
+    async def read(cls) -> ConversationOutputChunk | ConversationEvent:
         """Read a single ``ConversationOutputChunk`` from the session."""
         return await ctx.state(cls).reading()
 
     @classmethod
-    async def reader(cls) -> AsyncGenerator[ConversationOutputChunk]:
+    async def reader(cls) -> AsyncGenerator[ConversationOutputChunk | ConversationEvent]:
         """Async iterator continuously yielding session output chunks until error."""
         session: Self = ctx.state(cls)
         while True:  # breaks on exception
@@ -53,7 +57,7 @@ class RealtimeConversationSession(State):
     @classmethod
     async def write(
         cls,
-        input: ConversationInputChunk,  # noqa: A002
+        input: ConversationInputChunk | ConversationEvent,  # noqa: A002
     ) -> None:
         """Write a single input chunk into the session."""
         return await ctx.state(cls).writing(input=input)
@@ -61,7 +65,7 @@ class RealtimeConversationSession(State):
     @classmethod
     async def writer(
         cls,
-        input: AsyncIterator[ConversationInputChunk],  # noqa: A002
+        input: AsyncIterator[ConversationInputChunk | ConversationEvent],  # noqa: A002
     ) -> None:
         """Consume an async iterator and write its chunks to the session."""
         session: Self = ctx.state(cls)

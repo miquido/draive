@@ -2,12 +2,13 @@ from datetime import UTC, datetime
 from typing import Literal, Self, final
 from uuid import UUID, uuid4
 
-from haiway import Meta, MetaValues
+from haiway import META_EMPTY, Meta, MetaValues
 
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.parameters import DataModel
 
 __all__ = (
+    "ConversationEvent",
     "ConversationInputChunk",
     "ConversationMessage",
     "ConversationOutputChunk",
@@ -94,6 +95,44 @@ class ConversationOutputChunk(DataModel):
     def __bool__(self) -> bool:
         """Return ``True`` when any content is present."""
         return bool(self.content)
+
+
+@final
+class ConversationEvent(DataModel):
+    """Streaming event produced during a conversation session.
+
+    Attributes
+    ----------
+    created : datetime
+        Timestamp when the event was created (UTC).
+    category : str
+        Name of the event type.
+    content : MultimodalContent
+        Optional, multimodal content payload.
+    meta : Meta
+        Additional metadata.
+    """
+
+    @classmethod
+    def of(
+        cls,
+        category: str,
+        *,
+        content: Multimodal = MultimodalContent.empty,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        """Create a conversation event from content."""
+        return cls(
+            created=datetime.now(UTC),
+            category=category,
+            content=MultimodalContent.of(content),
+            meta=Meta.of(meta),
+        )
+
+    created: datetime
+    category: str
+    content: MultimodalContent
+    meta: Meta = META_EMPTY
 
 
 @final
