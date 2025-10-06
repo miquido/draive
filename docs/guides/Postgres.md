@@ -131,6 +131,92 @@ Use the memory helper when you need stateful chat sessions, per-user progressive
 auditable interaction logs. Set `recall_limit` to bound the amount of context loaded back into
 generation pipelines.
 
+## VectorIndex implementation (pgvector)
+
+The `PostgresVectorIndex` helper persists dense embeddings in Postgres using the
+[pgvector](https://github.com/pgvector/pgvector) extension. Each indexed `DataModel` maps to its own
+table, derived by converting the model class name to snake case (for example, `Chunk` → `chunk`).
+
+### Enable pgvector and create tables
+
+Install the extension once per database and create a table for every data model you plan to index.
+The implementation expects three columns and manages timestamps automatically. For a `Chunk` model
+the migration could look like this (adjust the vector dimension to match your embedding provider):
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE chunk (
+    id UUID NOT NULL DEFAULT gen_random_uuid(),
+    embedding VECTOR(1536) NOT NULL,
+    payload JSONB NOT NULL,
+    meta JSONB NOT NULL,
+    created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Optional ANN index (requires pgvector >= 0.4.0)
+CREATE INDEX IF NOT EXISTS chunk_embedding_idx
+    ON chunk
+    USING ivfflat (embedding vector_cosine_ops)
+    WITH (lists = 100);
+```
+
+The helper stores the serialized `DataModel` instance inside `payload`, so the JSON schema mirrors
+the model definition. It writes monotonically increasing `created` timestamps to preserve insertion
+order for non-similarity queries.
+
+### Wiring the index
+
+Construct the index with `PostgresVectorIndex()` and reuse the shared `Postgres` state inside an
+active context scope. The optional `mmr_multiplier` argument controls how many rows are fetched
+before applying Maximal Marginal Relevance re-ranking when `rerank=True`.
+
+```python
+from collections.abc import Sequence
+from draive import ctx
+from draive.parameters import DataModel, Field
+from draive.postgres import PostgresConnectionPool, PostgresVectorIndex
+from draive.utils import VectorIndex
+
+
+class Chunk(DataModel):
+    identifier: str = Field(alias="id")
+    text: str
+
+
+async with ctx.scope(
+    "pgvector-demo",
+    PostgresVectorIndex(),
+    disposables=(
+        PostgresConnectionPool.of(dsn="postgresql://draive:secret@localhost:5432/draive"),
+    ),
+):
+    await VectorIndex.index(
+        Chunk,
+        values=[Chunk(identifier="doc-1", text="hello world")],
+        attribute=Chunk._.text,
+    )
+
+    results: Sequence[Chunk] = await VectorIndex.search(
+        Chunk,
+        query="hello",
+        limit=3,
+        score_threshold=0.6,  # optional cosine similarity cutoff
+        rerank=True,
+    )
+```
+
+Queries can be strings, `TextContent`, `ResourceContent` (text or image), or pre-computed vectors.
+When `score_threshold` is provided the helper converts it to the cosine distance cutoff used by
+pgvector. Set `rerank=False` to return rows ordered solely by the database similarity operator.
+
+### Payload filtering and requirements
+
+Search and deletion accept `AttributeRequirement` instances which are evaluated against the stored
+payload JSON. Requirements are translated to SQL expressions (for example, `AttributeRequirement.equal`
+becomes `payload #>> '{text}' = $2`). Unsupported operators raise `NotImplementedError`, ensuring the
+query surface remains explicit.
+
 ## Putting it together
 
 Combine these adapters with higher-level Draive components to centralise operational data in
