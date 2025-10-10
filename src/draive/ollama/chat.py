@@ -390,7 +390,7 @@ def _tools_as_tool_config(
 
 
 def _schema_for_ollama(output: type) -> dict[str, Any] | None:
-    normalized_schema, changed = _normalize_schema_for_ollama(output.__PARAMETERS_SPECIFICATION__)
+    normalized_schema, changed = _normalize_schema_for_ollama(output.__SPECIFICATION__)
     if normalized_schema is None:
         return None
 

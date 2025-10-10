@@ -2,6 +2,7 @@ from collections.abc import Mapping, Sequence
 from types import UnionType
 from typing import TypedDict
 
+from haiway import TypeSpecification
 from haiway.attributes.annotations import (
     BoolAttribute,
     FloatAttribute,
@@ -13,58 +14,57 @@ from haiway.attributes.annotations import (
     TupleAttribute,
     UnionAttribute,
 )
+from haiway.attributes.specification import type_specification
 
 from draive import DataModel
-from draive.parameters import ParametersSpecification
-from draive.parameters.specification import parameter_specification
 
 
 def test_specifications() -> None:
-    assert parameter_specification(
+    assert type_specification(
         StringAttribute(),
         description=None,
     ) == {
         "type": "string",
     }
-    assert parameter_specification(
+    assert type_specification(
         IntegerAttribute(),
         description=None,
     ) == {
         "type": "integer",
     }
-    assert parameter_specification(
+    assert type_specification(
         FloatAttribute(),
         description=None,
     ) == {
         "type": "number",
     }
-    assert parameter_specification(
+    assert type_specification(
         BoolAttribute(),
         description=None,
     ) == {
         "type": "boolean",
     }
-    assert parameter_specification(
+    assert type_specification(
         NoneAttribute(),
         description=None,
     ) == {
         "type": "null",
     }
-    assert parameter_specification(
+    assert type_specification(
         SequenceAttribute(
             base=Sequence,
             values=StringAttribute(),
         ),
         description=None,
     ) == {"type": "array", "items": {"type": "string"}}
-    assert parameter_specification(
+    assert type_specification(
         SequenceAttribute(
             base=tuple,
             values=StringAttribute(),
         ),
         description=None,
     ) == {"type": "array", "items": {"type": "string"}}
-    assert parameter_specification(
+    assert type_specification(
         TupleAttribute(
             base=tuple,
             values=(
@@ -73,15 +73,12 @@ def test_specifications() -> None:
             ),
         ),
         description=None,
-    ) == {"type": "array", "prefixItems": [{"type": "string"}, {"type": "string"}]}
-    assert parameter_specification(
-        SequenceAttribute(
-            base=Sequence,
-            values=StringAttribute(),
-        ),
-        description=None,
-    ) == {"type": "array", "items": {"type": "string"}}
-    assert parameter_specification(
+    ) == {
+        "type": "array",
+        "prefixItems": [{"type": "string"}, {"type": "string"}],
+        "items": False,
+    }
+    assert type_specification(
         MappingAttribute(
             base=Mapping,
             keys=StringAttribute(),
@@ -89,7 +86,7 @@ def test_specifications() -> None:
         ),
         description=None,
     ) == {"type": "object", "additionalProperties": {"type": "string"}}
-    assert parameter_specification(
+    assert type_specification(
         UnionAttribute(
             base=UnionType,
             alternatives=(
@@ -98,7 +95,7 @@ def test_specifications() -> None:
             ),
         ),
         description=None,
-    ) == {"type": ["string", "integer"]}
+    ) == {"type": ("string", "integer")}
 
 
 def test_basic_specification() -> None:
@@ -111,7 +108,7 @@ def test_basic_specification() -> None:
         list_value: Sequence[str]
         dict_value: Mapping[str, str]
 
-    specification: ParametersSpecification = {
+    specification: TypeSpecification = {
         "type": "object",
         "properties": {
             "str_value": {"type": "string"},
@@ -133,14 +130,14 @@ def test_basic_specification() -> None:
         ],
         "additionalProperties": False,
     }
-    assert TestModel.__PARAMETERS_SPECIFICATION__ == specification
+    assert TestModel.__SPECIFICATION__ == specification
 
 
 def test_parametrized_specification() -> None:
     class TestModel[Param](DataModel):
         param: Param
 
-    assert TestModel.__PARAMETERS_SPECIFICATION__ == {
+    assert TestModel.__SPECIFICATION__ == {
         "type": "object",
         "properties": {
             "param": {
@@ -151,7 +148,7 @@ def test_parametrized_specification() -> None:
         "required": ["param"],
         "additionalProperties": False,
     }
-    assert TestModel[str].__PARAMETERS_SPECIFICATION__ == {
+    assert TestModel[str].__SPECIFICATION__ == {
         "type": "object",
         "properties": {
             "param": {"type": "string"},
@@ -159,7 +156,7 @@ def test_parametrized_specification() -> None:
         "required": ["param"],
         "additionalProperties": False,
     }
-    assert TestModel[int].__PARAMETERS_SPECIFICATION__ == {
+    assert TestModel[int].__SPECIFICATION__ == {
         "type": "object",
         "properties": {
             "param": {"type": "integer"},
@@ -182,7 +179,7 @@ def test_nested_parametrized_specification() -> None:
     class TestModel[Param: DataModel](DataModel):
         param: TestModelHolder[Param]
 
-    assert TestModel.__PARAMETERS_SPECIFICATION__ == {
+    assert TestModel.__SPECIFICATION__ == {
         "type": "object",
         "properties": {
             "param": {
@@ -200,7 +197,7 @@ def test_nested_parametrized_specification() -> None:
         "required": ["param"],
         "additionalProperties": False,
     }
-    assert TestModel[TestModelNested[str]].__PARAMETERS_SPECIFICATION__ == {
+    assert TestModel[TestModelNested[str]].__SPECIFICATION__ == {
         "type": "object",
         "properties": {
             "param": {
@@ -224,7 +221,7 @@ def test_nested_parametrized_specification() -> None:
         "required": ["param"],
         "additionalProperties": False,
     }
-    assert TestModel[TestModelNested[int]].__PARAMETERS_SPECIFICATION__ == {
+    assert TestModel[TestModelNested[int]].__SPECIFICATION__ == {
         "type": "object",
         "properties": {
             "param": {
@@ -262,7 +259,7 @@ def test_recursive_typed_dict_specification() -> None:
         node: NodeDict
 
     identifier = f"#{NodeDict.__qualname__}"
-    assert Wrapper.__PARAMETERS_SPECIFICATION__ == {
+    assert Wrapper.__SPECIFICATION__ == {
         "type": "object",
         "properties": {
             "node": {
@@ -295,7 +292,7 @@ def test_recursive_typed_dict_references_use_identifier() -> None:
     class Wrapper(DataModel):
         node: NodeDict
 
-    node_spec = Wrapper.__PARAMETERS_SPECIFICATION__["properties"]["node"]
+    node_spec = Wrapper.__SPECIFICATION__["properties"]["node"]
     identifier = node_spec["$id"]
 
     assert identifier.startswith("#")
@@ -312,5 +309,5 @@ def test_non_recursive_typed_dict_has_no_identifier() -> None:
     class Wrapper(DataModel):
         payload: SimpleDict
 
-    payload_spec = Wrapper.__PARAMETERS_SPECIFICATION__["properties"]["payload"]
+    payload_spec = Wrapper.__SPECIFICATION__["properties"]["payload"]
     assert "$id" not in payload_spec

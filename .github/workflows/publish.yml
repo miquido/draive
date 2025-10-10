@@ -18,7 +18,7 @@ jobs:
       - name: Install uv and set the python version
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: 3.12
+          python-version: 3.13
 
       - name: Install
         run: uv sync --all-groups --all-extras --frozen --no-python-downloads

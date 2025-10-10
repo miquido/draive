@@ -173,14 +173,15 @@ before applying Maximal Marginal Relevance re-ranking when `rerank=True`.
 
 ```python
 from collections.abc import Sequence
-from draive import ctx
-from draive.parameters import DataModel, Field
+from typing import Annotated
+
+from draive import Alias, DataModel, ctx
 from draive.postgres import PostgresConnectionPool, PostgresVectorIndex
 from draive.utils import VectorIndex
 
 
 class Chunk(DataModel):
-    identifier: str = Field(alias="id")
+    identifier: Annotated[str, Alias("id")]
     text: str
 
 

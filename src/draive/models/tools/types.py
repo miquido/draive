@@ -1,9 +1,16 @@
 from collections.abc import Sequence
-from typing import Any, Protocol, runtime_checkable
+from typing import (
+    Any,
+    Protocol,
+    runtime_checkable,
+)
 
-from draive.models.types import ModelToolHandling, ModelToolSpecification
+from draive.models.types import (
+    ModelToolHandling,
+    ModelToolParametersSpecification,
+    ModelToolSpecification,
+)
 from draive.multimodal import MultimodalContent
-from draive.parameters import ToolParametersSpecification
 
 __all__ = (
     "Tool",
@@ -76,7 +83,7 @@ class Tool(Protocol):
     def description(self) -> str | None: ...
 
     @property
-    def parameters(self) -> ToolParametersSpecification: ...
+    def parameters(self) -> ModelToolParametersSpecification | None: ...
 
     @property
     def specification(self) -> ModelToolSpecification: ...

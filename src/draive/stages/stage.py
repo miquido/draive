@@ -1655,7 +1655,7 @@ class Stage:
         *,
         limit: int = 1,
         delay: Callable[[int, Exception], float] | float | None = None,
-        catching: set[type[Exception]] | tuple[type[Exception], ...] | type[Exception] = Exception,
+        catching: Callable[[Exception], bool] | type[Exception] = Exception,
     ) -> Self:
         """
         Add retry behavior to this stage.
@@ -1673,8 +1673,9 @@ class Stage:
             Delay between retries in seconds. Can be a fixed float, a function
             that accepts the retry attempt number (starting from 0) and the raised
             exception and returns the delay, or None for no delay. Defaults to None.
-        catching : set[type[Exception]] | tuple[type[Exception], ...] | type[Exception]
-            Exception types to catch and retry on. Defaults to catching all Exceptions.
+        catching : Callable[[Exception], bool] | type[Exception]
+            Predicate or exception type that determine whether the raised
+            exception should trigger a retry. Defaults to catching all Exceptions.
 
         Returns
         -------

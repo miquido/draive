@@ -26,9 +26,16 @@ from mcp.types import ResourceLink as MCPResourceLink
 from mcp.types import TextContent as MCPTextContent
 from pydantic import AnyUrl
 
-from draive.models import FunctionTool, ModelToolSpecification, Tool, ToolError, ToolsProvider
+from draive.models import (
+    FunctionTool,
+    ModelToolParametersSpecification,
+    ModelToolSpecification,
+    Tool,
+    ToolError,
+    ToolsProvider,
+)
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
-from draive.parameters import DataModel, ToolParametersSpecification
+from draive.parameters import DataModel
 from draive.resources import ResourceContent, ResourceReference, ResourcesRepository
 
 __all__ = (
@@ -481,7 +488,7 @@ def _convert_tool(
         name=name,
         description=mcp_tool.description,
         parameters=cast(
-            ToolParametersSpecification,
+            ModelToolParametersSpecification,
             {
                 **mcp_tool.inputSchema,
                 "additionalProperties": False,

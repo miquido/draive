@@ -1,6 +1,6 @@
 import random
 from base64 import b64decode, b64encode, urlsafe_b64decode
-from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable
+from collections.abc import AsyncGenerator, AsyncIterator, Coroutine, Generator, Iterable
 from itertools import chain
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
@@ -317,7 +317,9 @@ class GeminiGenerating(GeminiAPI):
             ]
 
             try:
-                response_stream = await self._client.aio.models.generate_content_stream(
+                response_stream: AsyncIterator[
+                    GenerateContentResponse
+                ] = await self._client.aio.models.generate_content_stream(
                     model=config.model,
                     config=request_config,
                     contents=request_content,
@@ -478,7 +480,7 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
 
     # Prefer explicit isinstance check for structured output to satisfy typing
     if isinstance(output, type):
-        response_schema = cast(SchemaDict, output.__PARAMETERS_SPECIFICATION__)
+        response_schema = cast(SchemaDict, output.__SPECIFICATION__)
         response_modalities = [Modality.TEXT]
         response_mime_type = "application/json"
 

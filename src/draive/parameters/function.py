@@ -2,16 +2,21 @@ from collections.abc import Callable, Iterable, Mapping
 from inspect import Parameter as InspectParameter
 from inspect import _empty as INSPECT_EMPTY  # pyright: ignore[reportPrivateUsage]
 from inspect import signature
-from types import EllipsisType
-from typing import Any, ClassVar, Required, cast, final, get_type_hints, overload
+from typing import Any, cast, final, get_type_hints
 
-from haiway import MISSING, AttributeAnnotation, DefaultValue, Missing, ValidationContext, Validator
+from haiway import (
+    MISSING,
+    AttributeAnnotation,
+    DefaultValue,
+    Missing,
+    TypeSpecification,
+    ValidationContext,
+    not_missing,
+)
+from haiway.attributes import Attribute
 from haiway.attributes.annotations import resolve_attribute
+from haiway.attributes.specification import type_specification
 from haiway.utils import mimic_function
-
-from draive.parameters.parameter import Parameter
-from draive.parameters.specification import ParameterSpecification
-from draive.parameters.types import ParameterVerification
 
 __all__ = (
     "Argument",
@@ -19,61 +24,6 @@ __all__ = (
 )
 
 
-@overload
-def Argument[Value](
-    *,
-    aliased: str | None = None,
-    description: str | Missing = MISSING,
-    default: Value | Missing = MISSING,
-    validator: Validator[Value] | Missing = MISSING,
-    specification: ParameterSpecification | Missing = MISSING,
-) -> Value: ...
-
-
-@overload
-def Argument[Value](
-    *,
-    aliased: str | None = None,
-    description: str | Missing = MISSING,
-    default_factory: Callable[[], Value] | Missing = MISSING,
-    validator: Validator[Value] | Missing = MISSING,
-    specification: ParameterSpecification | Missing = MISSING,
-) -> Value: ...
-
-
-@overload
-def Argument[Value](
-    *,
-    aliased: str | None = None,
-    description: str | Missing = MISSING,
-    default: Value | Missing = MISSING,
-    verifier: ParameterVerification[Value] | Missing = MISSING,
-    specification: ParameterSpecification | Missing = MISSING,
-) -> Value: ...
-
-
-@overload
-def Argument[Value](
-    *,
-    aliased: str | None = None,
-    description: str | Missing = MISSING,
-    default_factory: Callable[[], Value] | Missing = MISSING,
-    verifier: ParameterVerification[Value] | Missing = MISSING,
-    specification: ParameterSpecification | Missing = MISSING,
-) -> Value: ...
-
-
-@overload
-def Argument[Value](
-    *,
-    aliased: str | None = None,
-    description: str | Missing = MISSING,
-    default_env: str | Missing = MISSING,
-    verifier: ParameterVerification[Value] | Missing = MISSING,
-    specification: ParameterSpecification | Missing = MISSING,
-) -> Value: ...
-
-
 def Argument[Value](
     *,
     aliased: str | None = None,
@@ -81,9 +31,7 @@ def Argument[Value](
     default: Value | Missing = MISSING,
     default_factory: Callable[[], Value] | Missing = MISSING,
     default_env: str | Missing = MISSING,
-    validator: Validator[Value] | Missing = MISSING,
-    verifier: ParameterVerification[Value] | Missing = MISSING,
-    specification: ParameterSpecification | Missing = MISSING,
+    specification: TypeSpecification | Missing = MISSING,
 ) -> Value:  # it is actually a FunctionArgument, but type checker has to be fooled
     assert (  # nosec: B101
         default is MISSING or default_factory is MISSING or default_env is MISSING
@@ -91,10 +39,6 @@ def Argument[Value](
     assert (  # nosec: B101
         description is MISSING or specification is MISSING
     ), "Can't specify both description and specification"
-    assert (  # nosec: B101
-        validator is MISSING or verifier is MISSING
-    ), "Can't specify both validator and verifier"
-
     return cast(
         Value,
         FunctionArgument(
@@ -103,8 +47,6 @@ def Argument[Value](
             default=default,
             default_factory=default_factory,
             default_env=default_env,
-            validator=validator,
-            verifier=verifier,
             specification=specification,
         ),
     )
@@ -119,23 +61,17 @@ class FunctionArgument:
         default: Any | Missing,
         default_factory: Callable[[], Any] | Missing,
         default_env: str | Missing,
-        validator: Validator[Any] | Missing,
-        verifier: ParameterVerification[Any] | Missing,
-        specification: ParameterSpecification | Missing,
+        specification: TypeSpecification | Missing,
     ) -> None:
         self.aliased: str | None = aliased
         self.description: str | Missing = description
         self.default: Any | Missing = default
         self.default_factory: Callable[[], Any] | Missing = default_factory
         self.default_env: str | Missing = default_env
-        self.validator: Validator[Any] | Missing = validator
-        self.verifier: ParameterVerification[Any] | Missing = verifier
-        self.specification: ParameterSpecification | Missing = specification
+        self.specification: TypeSpecification | Missing = specification
 
 
 class ParametrizedFunction[**Args, Result]:
-    __IMMUTABLE__: ClassVar[EllipsisType] = ...
-
     __slots__ = (
         "__defaults__",
         "__doc__",
@@ -172,19 +108,22 @@ class ParametrizedFunction[**Args, Result]:
             "_name",
             function.__name__,
         )
-        self._parameters: dict[str, Parameter[Any]]
+        self._parameters: dict[str, Attribute[Any]]
         object.__setattr__(
             self,
             "_parameters",
             {},
         )
-        self._variadic_keyword_parameters: Parameter[Any] | None
+        self._variadic_keyword_parameters: Attribute[Any] | None
         object.__setattr__(
             self,
             "_variadic_keyword_parameters",
             None,
         )
-        type_hints: Mapping[str, Any] = get_type_hints(function)
+        type_hints: Mapping[str, Any] = get_type_hints(
+            function,
+            include_extras=True,
+        )
         for parameter in signature(function).parameters.values():
             match parameter.kind:
                 case InspectParameter.POSITIONAL_ONLY | InspectParameter.VAR_POSITIONAL:
@@ -212,7 +151,7 @@ class ParametrizedFunction[**Args, Result]:
         mimic_function(function, within=self)
 
     @property
-    def arguments(self) -> Iterable[Parameter[Any]]:
+    def arguments(self) -> Iterable[Attribute[Any]]:
         return self._parameters.values()
 
     def validate_arguments(
@@ -224,16 +163,12 @@ class ParametrizedFunction[**Args, Result]:
         if self._variadic_keyword_parameters is None:
             for parameter in self._parameters.values():
                 with ValidationContext.scope(f".{parameter.name}"):
-                    validated[parameter.name] = parameter.validate(
-                        parameter.find(kwargs),
-                    )
+                    validated[parameter.name] = parameter.validate_from(kwargs)
 
         else:
             for parameter in self._parameters.values():
                 with ValidationContext.scope(f".{parameter.name}"):
-                    validated[parameter.name] = parameter.validate(
-                        parameter.pick(kwargs),
-                    )
+                    validated[parameter.name] = parameter.validate_from(kwargs)
 
             for key, value in kwargs.items():
                 with ValidationContext.scope(f".{key}"):
@@ -277,12 +212,9 @@ def _resolve_argument(
     *,
     module: str,
     type_hint: Any,
-) -> Parameter[Any]:
+) -> Attribute[Any]:
     if parameter.annotation is INSPECT_EMPTY or type_hint is None:
-        raise TypeError(
-            "Untyped argument %s",
-            parameter.name,
-        )
+        raise TypeError(f"Untyped argument {parameter.name}")
 
     attribute: AttributeAnnotation = resolve_attribute(
         type_hint,
@@ -293,49 +225,60 @@ def _resolve_argument(
 
     match parameter.default:
         case FunctionArgument() as argument:
-            return Parameter[Any].of(
-                attribute,
+            alias: str | None = (
+                argument.aliased
+                if argument.aliased is not None
+                else attribute.alias
+            )
+            specification: TypeSpecification | None = None
+
+            if not_missing(argument.specification):
+                specification = argument.specification
+
+            else:
+                description: str | None = None
+                if not_missing(argument.description):
+                    description = argument.description
+
+                else:
+                    description = attribute.description
+
+                specification = type_specification(
+                    attribute,
+                    description=description,
+                )
+
+            return Attribute(
                 name=parameter.name,
-                alias=argument.aliased,
-                description=argument.description,
+                annotation=attribute,
+                alias=alias,
                 default=DefaultValue(
                     argument.default,
                     factory=argument.default_factory,
                     env=argument.default_env,
                 ),
-                validator=argument.validator,
-                verifier=argument.verifier,
-                converter=MISSING,
-                specification=argument.specification,
+                specification=specification,
                 required=argument.default is MISSING
                 and argument.default_factory is MISSING
-                and Required in attribute.annotations,
+                and argument.default_env is MISSING,
             )
 
-        case DefaultValue() as default:  # pyright: ignore[reportUnknownVariableType]
-            return Parameter[Any].of(
-                attribute,
+        case DefaultValue() as default:
+            return Attribute(
                 name=parameter.name,
-                alias=None,
-                description=MISSING,
-                default=default,  # pyright: ignore[reportUnknownArgumentType]
-                validator=MISSING,
-                verifier=MISSING,
-                converter=MISSING,
-                specification=MISSING,
+                annotation=attribute,
+                alias=attribute.alias,
+                default=default,
+                specification=type_specification(attribute, None),
                 required=False,
             )
 
         case value:
-            return Parameter[Any].of(
-                attribute,
+            return Attribute(
                 name=parameter.name,
-                alias=None,
-                description=MISSING,
+                annotation=attribute,
+                alias=attribute.alias,
                 default=DefaultValue(MISSING if value is INSPECT_EMPTY else value),
-                validator=MISSING,
-                verifier=MISSING,
-                converter=MISSING,
-                specification=MISSING,
-                required=value is INSPECT_EMPTY and Required in attribute.annotations,
+                specification=type_specification(attribute, None),
+                required=value is INSPECT_EMPTY and attribute.required,
             )

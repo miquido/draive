@@ -95,12 +95,12 @@ def evaluation_score_value(  # noqa: C901, PLR0911
             return float(value)
 
         case _:
-            raise ValueError("Invalid evaluation score value - %s", value)
+            raise ValueError(f"Invalid evaluation score value - {value}")
 
 
 def evaluation_score_verifier(
     value: float,
-) -> None:
+) -> float:
     """
     Verify that a score value is within valid range.
 
@@ -115,6 +115,6 @@ def evaluation_score_verifier(
         If value is not between 0 and 1 inclusive
     """
     if 0 <= value <= 1:
-        return  # valid
+        return value  # valid
 
     raise ValueError(f"Evaluation score has to be a value between 0 and 1, received: {value}")

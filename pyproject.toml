@@ -1,27 +1,30 @@
 [build-system]
-requires = ["uv_build>=0.8.0,<0.9.0"]
+requires = ["uv_build>=0.9.0,<0.10.0"]
 build-backend = "uv_build"
 
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.88.0"
+version = "0.89.0"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 classifiers = [
   "License :: OSI Approved :: MIT License",
   "Intended Audience :: Developers",
   "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.13",
   "Typing :: Typed",
   "Topic :: Software Development",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 license = { file = "LICENSE" }
-dependencies = ["numpy~=2.3", "haiway~=0.34.7"]
+dependencies = ["numpy~=2.3", "haiway~=0.35.3"]
 
 [project.urls]
 Homepage = "https://miquido.com"
@@ -54,7 +57,7 @@ dev = [
   "pytest~=8.4",
   "pytest-asyncio~=1.2",
   "pytest-cov~=7.0",
-  "ruff~=0.13",
+  "ruff~=0.14",
 ]
 docs = [
   "mkdocs~=1.6",
@@ -66,7 +69,7 @@ docs = [
 ]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py313"
 line-length = 100
 extend-exclude = [".venv", ".git", ".cache"]
 lint.select = ["E", "F", "A", "I", "B", "PL", "W", "C", "RUF", "UP", "NPY201"]
@@ -81,7 +84,7 @@ lint.pydocstyle.convention = "numpy"
 max-args = 12
 
 [tool.pyright]
-pythonVersion = "3.12"
+pythonVersion = "3.13"
 venvPath = "."
 venv = ".venv"
 include = ["./src"]

@@ -72,6 +72,14 @@ def make_volatile_memory(initial: StageState) -> Memory[StageState, StageState]:
     return Memory(recall=recall, remember=remember)
 
 
+def make_evaluator_result(*, score: float, threshold: float) -> EvaluatorResult:
+    return EvaluatorResult.of(
+        "mock_evaluator",
+        score=score,
+        threshold=threshold,
+    )
+
+
 @mark.asyncio
 async def test_stage_predefined_simple():
     """Test basic predefined stage creation and execution."""
@@ -732,7 +740,7 @@ async def test_stage_with_retry():
         retry_stage = base_stage.with_retry(
             limit=3,
             delay=0.01,  # Short delay for testing
-            catching=ConnectionError,
+            catching=lambda exc: isinstance(exc, ConnectionError),
         )
 
         initial_state = StageState.of(context=(), result=MultimodalContent.empty)
@@ -955,8 +963,9 @@ async def test_stage_result_evaluation():
             self.should_pass = should_pass
 
         async def __call__(self, result: MultimodalContent) -> EvaluatorResult:
-            return EvaluatorResult.of(
-                "mock_evaluator", score=0.8 if self.should_pass else 0.3, threshold=0.5
+            return make_evaluator_result(
+                score=0.8 if self.should_pass else 0.3,
+                threshold=0.5,
             )
 
     # Test passing evaluation
