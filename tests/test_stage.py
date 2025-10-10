@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from uuid import uuid4
 
-from haiway import MissingState, State, ctx
+from haiway import Meta, MissingState, State, ctx
 from pytest import mark, raises
 
 from draive import MultimodalContent, tool
@@ -70,6 +70,15 @@ def make_volatile_memory(initial: StageState) -> Memory[StageState, StageState]:
             store["value"] = items[-1]
 
     return Memory(recall=recall, remember=remember)
+
+
+def make_evaluator_result(*, score: float, threshold: float) -> EvaluatorResult:
+    evaluation = object.__new__(EvaluatorResult)
+    object.__setattr__(evaluation, 'evaluator', 'mock_evaluator')
+    object.__setattr__(evaluation, 'score', score)
+    object.__setattr__(evaluation, 'threshold', threshold)
+    object.__setattr__(evaluation, 'meta', Meta.of({}))
+    return evaluation
 
 
 @mark.asyncio
@@ -428,6 +437,8 @@ async def test_stage_memory_remember():
     empty_state = StageState.of(context=(), result=MultimodalContent.empty)
 
     def make_volatile_memory(initial: StageState) -> Memory[StageState, StageState]:
+
+
         store = {"value": initial}
 
         async def recall(**extra):
@@ -732,7 +743,7 @@ async def test_stage_with_retry():
         retry_stage = base_stage.with_retry(
             limit=3,
             delay=0.01,  # Short delay for testing
-            catching=ConnectionError,
+            catching=lambda exc: isinstance(exc, ConnectionError),
         )
 
         initial_state = StageState.of(context=(), result=MultimodalContent.empty)
@@ -955,8 +966,9 @@ async def test_stage_result_evaluation():
             self.should_pass = should_pass
 
         async def __call__(self, result: MultimodalContent) -> EvaluatorResult:
-            return EvaluatorResult.of(
-                "mock_evaluator", score=0.8 if self.should_pass else 0.3, threshold=0.5
+            return make_evaluator_result(
+                score=0.8 if self.should_pass else 0.3,
+                threshold=0.5,
             )
 
     # Test passing evaluation

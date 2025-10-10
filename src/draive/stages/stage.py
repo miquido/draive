@@ -1655,7 +1655,9 @@ class Stage:
         *,
         limit: int = 1,
         delay: Callable[[int, Exception], float] | float | None = None,
-        catching: set[type[Exception]] | tuple[type[Exception], ...] | type[Exception] = Exception,
+        catching: Callable[[Exception], bool]
+        | Iterable[type[Exception]]
+        | type[Exception] = Exception,
     ) -> Self:
         """
         Add retry behavior to this stage.
@@ -1673,8 +1675,11 @@ class Stage:
             Delay between retries in seconds. Can be a fixed float, a function
             that accepts the retry attempt number (starting from 0) and the raised
             exception and returns the delay, or None for no delay. Defaults to None.
-        catching : set[type[Exception]] | tuple[type[Exception], ...] | type[Exception]
-            Exception types to catch and retry on. Defaults to catching all Exceptions.
+        catching : Callable[[Exception], bool] | Iterable[type[Exception]] | type[Exception]
+            Predicate or exception type(s) that determine whether the raised
+            exception should trigger a retry. Iterables of exception types are
+            converted to a predicate internally. Defaults to catching all
+            Exceptions.
 
         Returns
         -------
@@ -1682,11 +1687,43 @@ class Stage:
             A new Stage instance with retry behavior.
         """
 
+        resolved_catching: Callable[[Exception], bool] | type[Exception]
+
+        if isinstance(catching, type) and issubclass(catching, Exception):
+            resolved_catching = catching
+
+        elif callable(catching):
+            resolved_catching = catching
+
+        else:
+            normalized: list[type[Exception]] = []
+            for exception_type in catching:
+                if not isinstance(exception_type, type) or not issubclass(
+                    exception_type,
+                    Exception,
+                ):
+                    msg = "catching iterable must contain Exception subclasses"
+                    raise TypeError(msg)
+                normalized.append(exception_type)
+
+            if not normalized:
+                msg = "catching iterable must not be empty"
+                raise ValueError(msg)
+
+            exception_types: tuple[type[Exception], ...] = tuple(normalized)
+
+            def predicate(exception: Exception) -> bool:
+                return any(
+                    isinstance(exception, exception_type) for exception_type in exception_types
+                )
+
+            resolved_catching = predicate
+
         return self.__class__(
             retry(
                 limit=limit,
                 delay=delay,
-                catching=catching,
+                catching=resolved_catching,
             )(self._execution),
             meta=self.meta,
         )

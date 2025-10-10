@@ -1,27 +1,17 @@
 from collections.abc import Sequence
 
+from haiway import TypeSpecification
+
 from draive import State
-from draive.parameters import ParameterSpecification
 
 
 def test_validation() -> None:
     class ModelState(State):
-        specification: Sequence[ParameterSpecification]
+        specification: Sequence[TypeSpecification]
 
-    specification: Sequence[ParameterSpecification] = (
+    specification: Sequence[TypeSpecification] = (
         {  # union
-            "oneOf": (
-                {
-                    "type": "integer",
-                },
-                {
-                    "type": "string",
-                    "enum": ("enum",),
-                },
-                {
-                    "type": "null",
-                },
-            ),
+            "type": ("integer", "string", "null"),
         },
         {  # string format
             "type": "string",
@@ -60,16 +50,10 @@ def test_validation() -> None:
                 "type": "integer",
             },
         },
-        {  # tuple
+        {  # tuple-like array
             "type": "array",
-            "prefixItems": (
-                {
-                    "type": "integer",
-                },
-            ),
-        },
-        {  # array any
-            "type": "array",
+            "prefixItems": ({"type": "integer"},),
+            "items": False,
         },
         {  # object
             "type": "object",
@@ -78,6 +62,7 @@ def test_validation() -> None:
                     "type": "integer",
                 }
             },
+            "required": ("integer",),
             "additionalProperties": False,
         },
         {  # dict

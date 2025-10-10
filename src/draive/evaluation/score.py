@@ -1,13 +1,13 @@
-from typing import Any, Self
+from typing import Annotated, Any, Self
 
-from haiway import META_EMPTY, Meta, MetaValues
+from haiway import META_EMPTY, Description, Meta, MetaValues, Validator
 
 from draive.evaluation.value import (
     EvaluationScoreValue,
     evaluation_score_value,
     evaluation_score_verifier,
 )
-from draive.parameters import DataModel, Field
+from draive.parameters import DataModel
 
 __all__ = ("EvaluationScore",)
 
@@ -55,14 +55,15 @@ class EvaluationScore(DataModel):
             meta=Meta.of(meta),
         )
 
-    value: float = Field(
-        description="Score value, between 0 (failure) and 1 (success)",
-        verifier=evaluation_score_verifier,
-    )
-    meta: Meta = Field(
-        description="Metadata about the score",
-        default=META_EMPTY,
-    )
+    value: Annotated[
+        float,
+        Description("Score value, between 0 (failure) and 1 (success)"),
+        Validator(evaluation_score_verifier),
+    ]
+    meta: Annotated[
+        Meta,
+        Description("Metadata about the score"),
+    ] = META_EMPTY
 
     def __eq__(self, other: Any) -> bool:
         """

@@ -12,17 +12,20 @@ from typing import (
     Any,
     ClassVar,
     Literal,
+    NotRequired,
     Protocol,
+    Required,
     Self,
+    TypedDict,
     final,
     overload,
     runtime_checkable,
 )
 
-from haiway import META_EMPTY, BasicValue, Meta, MetaValues, State, ctx
+from haiway import META_EMPTY, BasicValue, Meta, MetaValues, State, TypeSpecification, ctx
 
 from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, MultimodalContentPart
-from draive.parameters import DataModel, ToolParametersSpecification
+from draive.parameters import DataModel
 from draive.utils import Memory
 
 __all__ = (
@@ -62,6 +65,7 @@ __all__ = (
     "ModelStreamOutput",
     "ModelToolFunctionSpecification",
     "ModelToolHandling",
+    "ModelToolParametersSpecification",
     "ModelToolRequest",
     "ModelToolResponse",
     "ModelToolSpecification",
@@ -213,12 +217,24 @@ class ModelOutputFailed(ModelException):
 
 
 @final
+class ModelToolParametersSpecification(TypedDict, total=False):
+    """Strict object schema used for tool parameters."""
+
+    type: Required[Literal["object"]]
+    properties: Required[Mapping[str, TypeSpecification]]
+    title: NotRequired[str]
+    description: NotRequired[str]
+    required: NotRequired[Sequence[str]]
+    additionalProperties: Required[Literal[False]]
+
+
+@final
 class ModelToolFunctionSpecification(State):
     """Specification of a function tool for model usage."""
 
     name: str
     description: str | None
-    parameters: ToolParametersSpecification | None
+    parameters: ModelToolParametersSpecification | None
     meta: Meta = META_EMPTY
 
 

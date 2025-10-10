@@ -134,13 +134,13 @@ async def answer_with_tools(question: str) -> str:
 - Draive uses `pydantic`-style models; invalid payloads raise validation errors.
 
 ```python
-from draive import ModelGeneration
-from draive.multimodal import TextContent
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from draive import DataModel, Description, ModelGeneration, TextContent
 
 class Summary(BaseModel):
-    topic: str = Field(description="Topic of the summary")
-    bullets: list[str] = Field(description="Key takeaways")
+    topic: Annotated[str, Description("Topic of the summary")]
+    bullets: Annotated[Sequence[str], Description("Key takeaways")]
 
 async def generate_summary(text: str) -> Summary:
     async with ctx.scope(
