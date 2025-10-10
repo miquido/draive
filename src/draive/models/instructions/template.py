@@ -59,7 +59,9 @@ class InstructionsTemplate[**Args](ParametrizedFunction[Args, Coroutine[None, No
                 arguments=[  # should we verify if all are strings?
                     InstructionsArgumentDeclaration(
                         name=parameter.alias or parameter.name,
-                        description=parameter.description,
+                        description=parameter.specification.get("description", None)
+                        if parameter.specification is not None
+                        else None,
                         required=parameter.required,
                     )
                     for parameter in self._parameters.values()

@@ -98,11 +98,14 @@ print(BasicModel.simplified_schema(indent=2))
 ```
 
 ```python
-from draive import Field
+from typing import Annotated
+
+from draive import Alias, DataModel, Description
+
 
 class CustomizedSchemaModel(DataModel):
-    described: int = Field(description="Field description")
-    aliased: str = Field(aliased="field_alias")
+    described: Annotated[int, Description("Field description")]
+    aliased: Annotated[str, Alias("field_alias")]
 
 print(f"JSON schema:\n{CustomizedSchemaModel.json_schema(indent=2)}")
 print(f"Simplified schema:\n{CustomizedSchemaModel.simplified_schema(indent=2)}")
@@ -135,10 +138,13 @@ Simplified schema:
 ```python
 from collections.abc import Sequence
 
+from draive import DataModel, Default
+
+
 class CustomizedDefaultsModel(DataModel):
     default: int = 42
-    field_default: int = Field(default=21)
-    field_default_factory: Sequence[str] = Field(default_factory=tuple)
+    field_default: int = 21
+    field_default_factory: Sequence[str] = Default(factory=tuple)
 
 # since all fields have defaults we can initialize without arguments
 print(CustomizedDefaultsModel())
@@ -161,7 +167,7 @@ class VerifiedModel(DataModel):
 ```python
 from typing import Any
 
-from draive import ValidatorContext, ValidatorError
+from draive import DataModel, ValidatorContext, ValidatorError
 
 def validator(
     # validator gets unknown type as an input, make sure to verify or convert it
@@ -181,8 +187,13 @@ def validator(
 class ValidatedModel(DataModel):
 
 ```python
+from typing import Annotated
+
+from draive import DataModel, Specification
+
+
 class CustomizedSpecificationModel(DataModel):
-    value: int = Field(specification={"type": "integer", "description": "Fully custom"})
+    value: Annotated[int, Specification({"type": "integer", "description": "Fully custom"})]
 
 print(CustomizedSpecificationModel.json_schema(indent=2))
 ````
@@ -202,11 +213,18 @@ print(CustomizedSpecificationModel.json_schema(indent=2))
 ```
 
 ```python
+from typing import Annotated
+
+from draive import DataModel, Validator
+
+
 def converter(value: str, /,) -> int:
     return len(value)
 
+
 class CustomizedConversionModel(DataModel):
-    value: str = Field(converter=converter)
+    value: Annotated[int, Validator(converter)]
+
 
 print(CustomizedConversionModel(value="integer?"))
 ```

@@ -2,6 +2,7 @@ import json
 
 from pytest import mark
 
+from draive.parameters import Argument
 from draive.resources.template import resource
 from draive.resources.types import ResourceContent
 
@@ -62,3 +63,14 @@ async def test_resolve_encoding_of_values():
     res = await items.resolve(item_id="a/b c", q="python rocks")
     # path encodes '/' and space; query encodes space as '+' via urlencode
     assert res.uri == "https://api.example.com/items/a%2Fb%20c?q=python+rocks"
+
+
+@mark.asyncio
+async def test_resolve_uses_canonical_name_for_aliased_argument():
+    @resource(uri_template="https://api.example.com/search{?language}")
+    async def search(language: str = Argument(aliased="lang")) -> ResourceContent:
+        return ResourceContent.of(b"ok", mime_type="text/plain")
+
+    res = await search.resolve(lang="pl")
+
+    assert res.uri == "https://api.example.com/search?language=pl"

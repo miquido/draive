@@ -2,6 +2,7 @@ import json
 
 from pytest import mark
 
+from draive.parameters import Argument
 from draive.resources import ResourceContent, resource
 
 
@@ -142,6 +143,19 @@ async def test_resolve_from_uri_with_missing_default_params():
     resource_result = await search.resolve_from_uri("https://api.example.com/search?q=python")
 
     assert resource_result.uri == "https://api.example.com/search?q=python"
+    assert resource_result.meta.name == "search"
+    assert isinstance(resource_result.content, ResourceContent)
+
+
+@mark.asyncio
+async def test_resolve_from_uri_coerces_aliased_arguments():
+    @resource(uri_template="https://api.example.com/search{?language}")
+    async def search(language: str = Argument(aliased="lang")) -> ResourceContent:
+        return ResourceContent.of(f"Search results for language '{language}'")
+
+    resource_result = await search.resolve_from_uri("https://api.example.com/search?language=pl")
+
+    assert resource_result.uri == "https://api.example.com/search?language=pl"
     assert resource_result.meta.name == "search"
     assert isinstance(resource_result.content, ResourceContent)
 

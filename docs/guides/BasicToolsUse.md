@@ -53,7 +53,10 @@ async with ctx.scope(
 ```
 
 ```python
-from draive import Argument
+from typing import Annotated
+
+from draive import Alias, Description
+
 
 @tool( # this time we will use additional arguments within tool annotation
     # we can define an alias used as the tool name when explaining it to LLM,
@@ -65,15 +68,7 @@ from draive import Argument
 async def customized(
     # we can also annotate arguments to provide even more details
     # and specify argument handling logic
-    arg: str = Argument(
-        # we can alias each argument name
-        aliased="topic",
-        # further describe its use
-        description="Topic of a fact to find",
-        # provide default value or default value factory
-        default="random",
-        # end more, including custom validators
-    ),
+    arg: Annotated[str, Alias("topic"), Description("Topic of a fact to find")] = "random",
 ) -> str:
     return f"{arg} is very funny on its own!"
 

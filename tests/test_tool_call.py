@@ -102,7 +102,7 @@ async def test_retries_with_auto_retry():
 async def test_returns_cached_with_cache():
     async with ctx.scope("test"):
 
-        def fake_random() -> Generator[int, None, None]:
+        def fake_random() -> Generator[int]:
             yield from range(0, 65536)
 
         @tool

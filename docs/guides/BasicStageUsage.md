@@ -228,7 +228,9 @@ resilient_stage = Stage.completion("Call external API.").with_retry(
 ```
 
 `when` toggles execution dynamically, `.cached(...)` stores results, and `.with_retry(...)` protects
-against transient failures.
+against transient failures. Provide either a single exception type or a predicate such as
+`lambda exc: isinstance(exc, (TimeoutError, ConnectionError))` via `catching` to control which
+errors trigger a retry.
 
 ## Advanced Context Management
 
