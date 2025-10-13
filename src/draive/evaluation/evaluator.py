@@ -1,9 +1,19 @@
 import re
 from asyncio import gather
 from collections.abc import Callable, Collection
-from typing import Protocol, Self, cast, overload, runtime_checkable
+from typing import Annotated, Protocol, Self, cast, overload, runtime_checkable
 
-from haiway import META_EMPTY, AttributePath, Immutable, Meta, MetaValues, State, ctx
+from haiway import (
+    META_EMPTY,
+    AttributePath,
+    Description,
+    Immutable,
+    Meta,
+    MetaValues,
+    State,
+    Validator,
+    ctx,
+)
 
 from draive.evaluation.score import EvaluationScore
 from draive.evaluation.value import (
@@ -11,7 +21,7 @@ from draive.evaluation.value import (
     evaluation_score_value,
     evaluation_score_verifier,
 )
-from draive.parameters import DataModel, Field
+from draive.parameters import DataModel
 
 __all__ = (
     "Evaluator",
@@ -77,22 +87,26 @@ class EvaluatorResult(DataModel):
             meta=evaluation_meta,
         )
 
-    evaluator: str = Field(
-        description="Name of the evaluator",
-    )
-    score: float = Field(
-        description="Evaluation score value",
-        verifier=evaluation_score_verifier,
-    )
-    threshold: float = Field(
-        description="Score threshold required to pass evaluation, "
-        "a value between 0 (min) and 1 (max)",
-        verifier=evaluation_score_verifier,
-    )
-    meta: Meta = Field(
-        description="Additional evaluation metadata",
-        default=META_EMPTY,
-    )
+    evaluator: Annotated[
+        str,
+        Description("Name of the evaluator"),
+    ]
+    score: Annotated[
+        float,
+        Description("Evaluation score value"),
+        Validator(evaluation_score_verifier),
+    ]
+    threshold: Annotated[
+        float,
+        Description(
+            "Score threshold required to pass evaluation, a value between 0 (min) and 1 (max)"
+        ),
+        Validator(evaluation_score_verifier),
+    ]
+    meta: Annotated[
+        Meta,
+        Description("Additional evaluation metadata"),
+    ] = META_EMPTY
 
     @property
     def passed(self) -> bool:

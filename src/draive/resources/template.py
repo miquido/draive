@@ -4,10 +4,10 @@ from collections.abc import Callable, Coroutine, Mapping, Sequence, Set
 from typing import Any, Protocol, final
 from urllib.parse import ParseResult, parse_qs, quote, urlencode, urlparse
 
-from haiway import MISSING, Meta, MetaValues
+from haiway import MISSING, Meta, MetaValues, TypeSpecification
+from haiway.attributes import Attribute
 
-from draive.parameters import Parameter, ParametrizedFunction
-from draive.parameters.specification import ParameterSpecification
+from draive.parameters import ParametrizedFunction
 from draive.resources.types import (
     MimeType,
     Resource,
@@ -57,7 +57,7 @@ class ResourceTemplate[**Args](
         # Verify URI parameters against function arguments
         template_parameters: Set[str] = self._extract_template_parameters(template_uri)
         for template_parameter in template_parameters:
-            parameter: Parameter[Any] | None = self._parameters.get(template_parameter)
+            parameter: Attribute[Any] | None = self._parameters.get(template_parameter)
             if parameter is None:
                 raise ValueError(
                     f"URI template parameter {template_parameter} not found in function arguments"
@@ -106,7 +106,12 @@ class ResourceTemplate[**Args](
         **kwargs: Args.kwargs,
     ) -> Resource:
         values: Mapping[str, Any] = self.validate_arguments(**kwargs)
-        provided_names: Set[str] = set(kwargs.keys())
+        provided_names: Set[str] = {
+            parameter.name
+            for parameter in self._parameters.values()
+            if parameter.name in kwargs
+            or (parameter.alias is not None and parameter.alias in kwargs)
+        }
         resolved_uri: str = self._expand_uri(values, provided_names)
 
         try:
@@ -354,7 +359,22 @@ class ResourceTemplate[**Args](
     ) -> dict[str, Any]:
         coerced: dict[str, Any] = dict(uri_params)
         for parameter in self._parameters.values():
-            raw_value: Any = parameter.find(uri_params)
+            raw_value: Any
+            if parameter.alias is None:
+                raw_value = uri_params.get(
+                    parameter.name,
+                    parameter.default(),
+                )
+
+            else:
+                raw_value = uri_params.get(
+                    parameter.alias,
+                    uri_params.get(
+                        parameter.name,
+                        parameter.default(),
+                    ),
+                )
+
             if raw_value is MISSING:
                 continue
 
@@ -367,18 +387,19 @@ class ResourceTemplate[**Args](
 
     def _coerce_parameter_value(
         self,
-        parameter: Parameter[Any],
+        parameter: Attribute,
         value: Any,
     ) -> Any:
         if not isinstance(value, str):
             return value
 
+        assert parameter.specification  # nosec: B101
         converted, _ = self._coerce_from_specification(parameter.specification, value)
         return converted
 
     def _coerce_from_specification(  # noqa: C901, PLR0911, PLR0912
         self,
-        specification: ParameterSpecification,
+        specification: TypeSpecification,
         value: str,
     ) -> tuple[Any, bool]:
         if isinstance(specification, Mapping) and "oneOf" in specification:

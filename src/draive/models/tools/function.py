@@ -1,7 +1,7 @@
 from collections.abc import Callable, Coroutine, Iterable
 from typing import Any, Protocol, Self, cast, final, overload
 
-from haiway import Meta, MetaValues, ctx
+from haiway import Meta, MetaValues, TypeSpecification, ctx
 from haiway.utils import format_str
 
 from draive.models.tools.types import (
@@ -13,17 +13,14 @@ from draive.models.tools.types import (
 from draive.models.types import (
     ModelToolFunctionSpecification,
     ModelToolHandling,
+    ModelToolParametersSpecification,
     ModelToolSpecification,
 )
 from draive.multimodal import (
     Multimodal,
     MultimodalContent,
 )
-from draive.parameters import (
-    ParameterSpecification,
-    ParametrizedFunction,
-    ToolParametersSpecification,
-)
+from draive.parameters import ParametrizedFunction
 
 __all__ = (
     "FunctionTool",
@@ -45,7 +42,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         Tool name.
     description : str | None
         Human-readable tool description.
-    parameters : ToolParametersSpecification | None
+    parameters : ModelToolParametersSpecification | None
         JSON Schema-like parameters spec as provided or inferred from function arguments.
     specification : ModelToolSpecification
         Full tool specification exposed to the model.
@@ -71,7 +68,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         *,
         name: str,
         description: str | None,
-        parameters: ToolParametersSpecification | None,
+        parameters: ModelToolParametersSpecification | None,
         availability: ToolAvailabilityChecking,
         result_formatting: ToolResultFormatting[Result],
         error_formatting: ToolErrorFormatting,
@@ -94,9 +91,15 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
 
         if parameters is None:
             aliased_required: list[str] = []
-            specifications: dict[str, ParameterSpecification] = {}
+            specifications: dict[str, TypeSpecification] = {}
             for parameter in self._parameters.values():
-                specifications[parameter.alias or parameter.name] = parameter.specification
+                specification: TypeSpecification | None = parameter.specification
+                if specification is None:
+                    raise RuntimeError(
+                        f"Function argument {parameter.name} does not provide a valid specification"
+                    )
+
+                specifications[parameter.alias or parameter.name] = specification
 
                 if parameter.required:
                     aliased_required.append(parameter.alias or parameter.name)
@@ -108,7 +111,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
                 "additionalProperties": False,
             }
 
-        self.parameters: ToolParametersSpecification
+        self.parameters: ModelToolParametersSpecification
         object.__setattr__(
             self,
             "parameters",
@@ -160,7 +163,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
         name: str | None = None,
         description: str | None = None,
         function: Callable[Args, Coroutine[None, None, Result]] | None = None,
-        parameters: ToolParametersSpecification | None = None,
+        parameters: ModelToolParametersSpecification | None = None,
         availability: ToolAvailabilityChecking | None = None,
         result_formatting: ToolResultFormatting[Result] | None = None,
         error_formatting: ToolErrorFormatting | None = None,
@@ -177,7 +180,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
             Override for the tool description.
         function : Callable[Args, Coroutine[None, None, Result]] | None, optional
             Replacement callable backing the tool.
-        parameters : ToolParametersSpecification | None, optional
+        parameters : ModelToolParametersSpecification | None, optional
             Replacement parameters specification. ``None`` keeps existing value.
         availability : ToolAvailabilityChecking | None, optional
             Custom availability checker; defaults to current checker.
@@ -270,12 +273,21 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
             When the wrapped function raises an exception that should be surfaced to the model.
         """
         async with ctx.scope(f"tool.{self.name}"):
-            ctx.record(
-                attributes={
-                    "call_id": call_id,
-                    **{key: f"{arg}" for key, arg in arguments.items()},
-                }
-            )
+            if __debug__:
+                ctx.record(
+                    attributes={
+                        "call_id": call_id,
+                        **{key: f"{arg}" for key, arg in arguments.items()},
+                    }
+                )
+
+            else:
+                ctx.record(
+                    attributes={
+                        "call_id": call_id,
+                        **{key: "<redacted>" for key, _ in arguments.items()},
+                    }
+                )
 
             try:
                 result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]

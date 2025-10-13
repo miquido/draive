@@ -1,9 +1,18 @@
 import json
-from collections.abc import Callable, Iterator, Mapping, MutableSequence, Sequence
+import typing
+from collections.abc import (
+    Callable,
+    Iterable,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    MutableSequence,
+    Sequence,
+)
 from copy import deepcopy
 from dataclasses import fields as dataclass_fields
 from dataclasses import is_dataclass
-from types import EllipsisType, GenericAlias
+from types import GenericAlias
 from typing import (
     Any,
     ClassVar,
@@ -23,21 +32,20 @@ from haiway import (
     AttributePath,
     DefaultValue,
     Missing,
+    State,
+    TypeSpecification,
     ValidationContext,
     ValidationError,
-    Validator,
     not_missing,
 )
-from haiway.attributes.annotations import ObjectAttribute, resolve_self_attribute
-
-from draive.parameters.coding import ParametersJSONEncoder
-from draive.parameters.parameter import Parameter
-from draive.parameters.schema import json_schema, simplified_schema
-from draive.parameters.specification import (
-    ParameterSpecification,
-    ParametersSpecification,
+from haiway.attributes import Attribute, AttributesJSONEncoder
+from haiway.attributes.annotations import (
+    ObjectAttribute,
+    resolve_self_attribute,
 )
-from draive.parameters.types import ParameterConversion, ParameterVerification
+from haiway.attributes.specification import type_specification
+
+from draive.parameters.schema import simplified_schema
 
 __all__ = (
     "DataModel",
@@ -45,66 +53,6 @@ __all__ = (
 )
 
 
-@overload
-def Field[Value](
-    *,
-    aliased: str | None = None,
-    description: str | Missing = MISSING,
-    default: Value | Missing = MISSING,
-    validator: Validator[Value] | Missing = MISSING,
-    converter: ParameterConversion[Value] | Missing = MISSING,
-    specification: ParameterSpecification | Missing = MISSING,
-) -> Value: ...
-
-
-@overload
-def Field[Value](
-    *,
-    aliased: str | None = None,
-    description: str | Missing = MISSING,
-    default_factory: Callable[[], Value] | Missing = MISSING,
-    validator: Validator[Value] | Missing = MISSING,
-    converter: ParameterConversion[Value] | Missing = MISSING,
-    specification: ParameterSpecification | Missing = MISSING,
-) -> Value: ...
-
-
-@overload
-def Field[Value](
-    *,
-    aliased: str | None = None,
-    description: str | Missing = MISSING,
-    default: Value | Missing = MISSING,
-    verifier: ParameterVerification[Value] | Missing = MISSING,
-    converter: ParameterConversion[Value] | Missing = MISSING,
-    specification: ParameterSpecification | Missing = MISSING,
-) -> Value: ...
-
-
-@overload
-def Field[Value](
-    *,
-    aliased: str | None = None,
-    description: str | Missing = MISSING,
-    default_factory: Callable[[], Value] | Missing = MISSING,
-    verifier: ParameterVerification[Value] | Missing = MISSING,
-    converter: ParameterConversion[Value] | Missing = MISSING,
-    specification: ParameterSpecification | Missing = MISSING,
-) -> Value: ...
-
-
-@overload
-def Field[Value](
-    *,
-    aliased: str | None = None,
-    description: str | Missing = MISSING,
-    default_env: str | Missing = MISSING,
-    verifier: ParameterVerification[Value] | Missing = MISSING,
-    converter: ParameterConversion[Value] | Missing = MISSING,
-    specification: ParameterSpecification | Missing = MISSING,
-) -> Value: ...
-
-
 def Field[Value](
     *,
     aliased: str | None = None,
@@ -112,10 +60,7 @@ def Field[Value](
     default: Value | Missing = MISSING,
     default_factory: Callable[[], Value] | Missing = MISSING,
     default_env: str | Missing = MISSING,
-    validator: Validator[Value] | Missing = MISSING,
-    verifier: ParameterVerification[Value] | Missing = MISSING,
-    converter: ParameterConversion[Value] | Missing = MISSING,
-    specification: ParameterSpecification | Missing = MISSING,
+    specification: TypeSpecification | Missing = MISSING,
 ) -> Value:  # it is actually a DataField, but type checker has to be fooled
     assert (  # nosec: B101
         default is MISSING or default_factory is MISSING or default_env is MISSING
@@ -123,28 +68,22 @@ def Field[Value](
     assert (  # nosec: B101
         description is MISSING or specification is MISSING
     ), "Can't specify both description and specification"
-    assert (  # nosec: B101
-        validator is MISSING or verifier is MISSING
-    ), "Can't specify both validator and verifier"
 
     return cast(
         Value,
-        DataField(
+        FieldAnnotation(
             aliased=aliased,
             description=description,
             default_value=default,
             default_factory=default_factory,
             default_env=default_env,
-            validator=validator,
-            verifier=verifier,
-            converter=converter,
             specification=specification,
         ),
     )
 
 
 @final
-class DataField:
+class FieldAnnotation:
     def __init__(
         self,
         aliased: str | None,
@@ -152,95 +91,30 @@ class DataField:
         default_value: Any | Missing,
         default_factory: Callable[[], Any] | Missing,
         default_env: str | Missing,
-        validator: Validator[Any] | Missing,
-        verifier: ParameterVerification[Any] | Missing,
-        converter: ParameterConversion[Any] | Missing,
-        specification: ParameterSpecification | Missing,
+        specification: TypeSpecification | Missing,
     ) -> None:
         self.aliased: str | None = aliased
         self.description: str | Missing = description
         self.default_value: Any | Missing = default_value
         self.default_factory: Callable[[], Any] | Missing = default_factory
         self.default_env: str | Missing = default_env
-        self.validator: Validator[Any] | Missing = validator
-        self.verifier: ParameterVerification[Any] | Missing = verifier
-        self.converter: ParameterConversion[Any] | Missing = converter
-        self.specification: ParameterSpecification | Missing = specification
+        self.specification: TypeSpecification | Missing = specification
 
+    @property
+    def required(self) -> bool:
+        return (
+            self.default_value is MISSING
+            and self.default_factory is MISSING
+            and self.default_env is MISSING
+        )
 
-def _resolve_field(
-    attribute: AttributeAnnotation,
-    /,
-    *,
-    name: str,
-    default: Any,
-) -> Parameter[Any]:
-    match default:
-        case DataField() as data_field:
-            has_explicit_default: bool = (
-                data_field.default_value is not MISSING
-                or data_field.default_factory is not MISSING
-                or data_field.default_env is not MISSING
-            )
-
-            return Parameter[Any].of(
-                attribute,
-                name=name,
-                alias=data_field.aliased,
-                description=data_field.description,
-                default=DefaultValue(
-                    data_field.default_value,
-                    factory=data_field.default_factory,
-                    env=data_field.default_env,
-                ),
-                validator=data_field.validator,
-                verifier=data_field.verifier,
-                converter=data_field.converter,
-                specification=data_field.specification,
-                required=not has_explicit_default,
-            )
-
-        case DefaultValue() as default:  # pyright: ignore[reportUnknownVariableType]
-            return Parameter[Any].of(
-                attribute,
-                name=name,
-                alias=None,
-                description=MISSING,
-                default=default,  # pyright: ignore[reportUnknownArgumentType]
-                validator=MISSING,
-                verifier=MISSING,
-                converter=MISSING,
-                specification=MISSING,
-                required=False,
-            )
-
-        case value if value is MISSING:
-            return Parameter[Any].of(
-                attribute,
-                name=name,
-                alias=None,
-                description=MISSING,
-                default=DefaultValue(value),
-                validator=MISSING,
-                verifier=MISSING,
-                converter=MISSING,
-                specification=MISSING,
-                required=True,
-            )
-
-        case value:
-            return Parameter[Any].of(
-                attribute,
-                name=name,
-                alias=None,
-                description=MISSING,
-                default=DefaultValue(value),
-                validator=MISSING,
-                verifier=MISSING,
-                converter=MISSING,
-                specification=MISSING,
-                required=False,
-            )
+    @property
+    def default(self) -> DefaultValue[Any]:
+        return DefaultValue(
+            self.default_value,
+            env=self.default_env,
+            factory=self.default_factory,
+        )
 
 
 @dataclass_transform(
@@ -249,7 +123,12 @@ def _resolve_field(
     field_specifiers=(Field,),
 )
 class DataModelMeta(type):
-    def __new__(
+    __SELF_ATTRIBUTE__: ObjectAttribute
+    __TYPE_PARAMETERS__: Mapping[str, Any] | None
+    __SPECIFICATION__: TypeSpecification
+    __FIELDS__: Sequence[Attribute]
+
+    def __new__(  # noqa: C901, PLR0912, PLR0915
         mcs,
         /,
         name: str,
@@ -270,51 +149,101 @@ class DataModelMeta(type):
             parameters=type_parameters or {},
         )
 
-        parameters: MutableSequence[Parameter[Any]] = []
-        parameters_specification: dict[str, ParameterSpecification] = {}
-        parameters_specification_required: list[str] = []
-        for key, attribute in self_attribute.attributes.items():
-            parameter: Parameter[Any] = _resolve_field(
-                attribute,
+        specification_fields: MutableMapping[str, TypeSpecification] = {}
+        required_fields: MutableSequence[str] = []
+        fields: MutableSequence[Attribute] = []
+        for key, element in self_attribute.attributes.items():
+            base_attribute: AttributeAnnotation = element
+            attribute: AttributeAnnotation = base_attribute
+            alias: str | None = attribute.alias
+            description: str | None = attribute.description
+            required: bool = attribute.required
+            specification: TypeSpecification | None = attribute.specification
+
+            default_value: DefaultValue
+            default: Any = getattr(cls, key, MISSING)
+            if isinstance(default, FieldAnnotation):
+                if default.aliased is not None:
+                    alias = default.aliased
+
+                if not_missing(default.description):
+                    description = default.description
+
+                default_value = default.default
+                required = default.required
+
+                if not_missing(default.specification):
+                    specification = default.specification
+
+            elif isinstance(default, DefaultValue):
+                default_value = default
+
+            else:
+                default_value = DefaultValue[Any](
+                    default,
+                    env=MISSING,
+                    factory=MISSING,
+                )
+
+            if specification is None:
+                specification = type_specification(
+                    attribute,
+                    description=description,
+                )
+
+            if specification is None:
+                raise RuntimeError(
+                    f"Attribute {key} of {name} does not provide a valid specification"
+                )
+
+            field: Attribute = Attribute(
                 name=key,
-                default=getattr(cls, key, MISSING),
+                alias=alias,
+                annotation=attribute,
+                required=required,
+                default=default_value,
+                specification=specification,
             )
-            # we are using aliased name for specification
-            aliased_name: str = parameter.alias or parameter.name
-            parameters_specification[aliased_name] = parameter.specification
 
-            # and actual key/name for object itself
-            parameters.append(parameter)
+            fields.append(field)
 
-            if parameter.required:
-                parameters_specification_required.append(aliased_name)
+            if field.alias is not None:
+                assert field.alias not in specification_fields  # nosec: B101
+                assert field.name not in specification_fields  # nosec: B101
+                specification_fields[field.alias] = specification
+                if field.required:
+                    required_fields.append(field.alias)
 
-        cls.__SELF_ATTRIBUTE__ = self_attribute  # pyright: ignore[reportAttributeAccessIssue]
+            else:
+                assert field.name not in specification_fields  # nosec: B101
+                specification_fields[field.name] = specification
+                if field.required:
+                    required_fields.append(field.name)
 
+        cls.__SELF_ATTRIBUTE__ = self_attribute
+        cls.__TYPE_PARAMETERS__ = type_parameters
         if not bases:
-            assert len(parameters) == 0  # nosec: B101
-            cls.__TYPE_PARAMETERS__ = None  # pyright: ignore[reportAttributeAccessIssue]
+            assert not type_parameters  # nosec: B101
             cls.__FIELDS__ = ()  # pyright: ignore[reportAttributeAccessIssue]
-
-        else:
-            cls.__TYPE_PARAMETERS__ = type_parameters  # pyright: ignore[reportAttributeAccessIssue]
-            cls.__FIELDS__ = tuple(parameters)  # pyright: ignore[reportAttributeAccessIssue]
-            cls.__slots__ = tuple(parameter.name for parameter in parameters)  # pyright: ignore[reportAttributeAccessIssue]
-            cls.__match_args__ = cls.__slots__  # pyright: ignore[reportAttributeAccessIssue]
-
-        if parameters_specification:
-            cls.__PARAMETERS_SPECIFICATION__ = {  # pyright: ignore[reportAttributeAccessIssue]
-                "type": "object",
-                "properties": parameters_specification,
-                "required": parameters_specification_required,
-                "additionalProperties": False,
-            }
-
-        else:
-            cls.__PARAMETERS_SPECIFICATION__ = {  # pyright: ignore[reportAttributeAccessIssue]
+            cls.__SPECIFICATION__ = {  # pyright: ignore[reportAttributeAccessIssue]
                 "type": "object",
                 "additionalProperties": True,
             }
+
+        else:
+            cls.__FIELDS__ = tuple(fields)
+            cls.__SPECIFICATION__ = (
+                {  # pyright: ignore[reportAttributeAccessIssue]
+                    "type": "object",
+                    "properties": specification_fields,
+                    "required": required_fields,
+                    "additionalProperties": False,
+                }
+                if specification_fields is not None
+                else None
+            )
+            cls.__slots__ = tuple(field.name for field in fields)  # pyright: ignore[reportAttributeAccessIssue]
+            cls.__match_args__ = cls.__slots__  # pyright: ignore[reportAttributeAccessIssue]
 
         cls._ = AttributePath(cls, attribute=cls)  # pyright: ignore[reportCallIssue, reportUnknownMemberType, reportAttributeAccessIssue]
 
@@ -417,11 +346,6 @@ _types_cache: WeakValueDictionary[
 
 class DataModel(metaclass=DataModelMeta):
     _: ClassVar[Self]
-    __IMMUTABLE__: ClassVar[EllipsisType] = ...
-    __TYPE_PARAMETERS__: ClassVar[Mapping[str, Any] | None] = None
-    __SELF_ATTRIBUTE__: ClassVar[ObjectAttribute]
-    __FIELDS__: ClassVar[Sequence[Parameter[Any]]]
-    __PARAMETERS_SPECIFICATION__: ClassVar[ParametersSpecification]
 
     @classmethod
     def __class_getitem__(
@@ -483,6 +407,115 @@ class DataModel(metaclass=DataModelMeta):
         _types_cache[(cls, type_arguments)] = parametrized_type
         return parametrized_type
 
+    @classmethod
+    def validate(
+        cls,
+        value: Any,
+    ) -> Self:
+        if isinstance(value, cls):
+            return value
+
+        elif isinstance(value, Mapping | typing.Mapping):
+            return cls(**value)
+
+        else:
+            raise TypeError(f"'{value}' is not matching expected type of '{cls}'")
+
+    @classmethod
+    def from_mapping(
+        cls,
+        value: Mapping[str, Any],
+        /,
+    ) -> Self:
+        return cls(**value)
+
+    @classmethod
+    def simplified_schema(
+        cls,
+        indent: int | None = None,
+    ) -> str:
+        return simplified_schema(
+            cls.__SPECIFICATION__,
+            indent=indent,
+        )
+
+    @classmethod
+    def json_schema(
+        cls,
+        *,
+        indent: int | None = None,
+    ) -> str:
+        return json.dumps(
+            cls.__SPECIFICATION__,
+            indent=indent,
+        )
+
+    @classmethod
+    def from_json(
+        cls,
+        value: str | bytes,
+        /,
+        decoder: type[json.JSONDecoder] = json.JSONDecoder,
+    ) -> Self:
+        try:
+            return cls(
+                **json.loads(
+                    value,
+                    cls=decoder,
+                )
+            )
+
+        except Exception as exc:
+            raise ValueError(f"Failed to decode {cls.__name__} from json: {exc}") from exc
+
+    @classmethod
+    def from_json_array(
+        cls,
+        value: str | bytes,
+        /,
+        decoder: type[json.JSONDecoder] = json.JSONDecoder,
+    ) -> Sequence[Self]:
+        payload: Any
+        try:
+            payload = json.loads(
+                value,
+                cls=decoder,
+            )
+
+        except Exception as exc:
+            raise ValueError(f"Failed to decode {cls.__name__} from json: {exc}") from exc
+
+        match payload:
+            case [*elements]:
+                try:
+                    return tuple(cls(**element) for element in elements)
+
+                except Exception as exc:
+                    raise ValueError(
+                        f"Failed to decode {cls.__name__} from json array: {exc}"
+                    ) from exc
+
+            case _:
+                raise ValueError("Provided json is not an array!")
+
+    def to_json(
+        self,
+        indent: int | None = None,
+        encoder_class: type[json.JSONEncoder] = AttributesJSONEncoder,
+    ) -> str:
+        mapping: Mapping[str, Any] = self.to_mapping()
+        try:
+            return json.dumps(
+                mapping,
+                indent=indent,
+                cls=encoder_class,
+            )
+
+        except Exception as exc:
+            raise ValueError(
+                f"Failed to encode {self.__class__.__name__} to json:\n{mapping}"
+            ) from exc
+
     def __init__(
         self,
         **kwargs: Any,
@@ -492,7 +525,7 @@ class DataModel(metaclass=DataModelMeta):
                 object.__setattr__(
                     self,  # pyright: ignore[reportUnknownArgumentType]
                     parameter.name,
-                    parameter.validate(parameter.find(kwargs)),
+                    parameter.validate_from(kwargs),
                 )
 
         if not getattr(self, "__slots__", ()):  # if we do not have slots accept everything
@@ -504,41 +537,26 @@ class DataModel(metaclass=DataModelMeta):
                     value,
                 )
 
-    @classmethod
-    def validate(
-        cls,
-        value: Any,
-    ) -> Self:
-        match value:
-            case valid if isinstance(valid, cls):
-                return valid
-
-            case {**values}:
-                return cls(**values)
-
-            case _:
-                raise TypeError(f"'{value}' is not matching expected type of '{cls}'")
-
-    @classmethod
-    def from_mapping(
-        cls,
-        value: Mapping[str, Any],
-        /,
-    ) -> Self:
-        return cls(**value)
-
     def to_str(self) -> str:
         return self.__str__()
 
-    def to_mapping(
-        self,
-        aliased: bool = True,
-    ) -> Mapping[str, Any]:
-        return _data_dict(
-            self,
-            aliased=aliased,
-            converter=None,
-        )
+    def to_mapping(self) -> Mapping[str, Any]:
+        dict_result: dict[str, Any] = {}
+        if getattr(self.__class__, "__slots__", ()):
+            for field in self.__FIELDS__:
+                key: str = field.alias if field.alias is not None else field.name
+                value: Any | Missing = getattr(self, field.name, MISSING)
+
+                if not_missing(value):
+                    dict_result[key] = _recursive_mapping(value)
+
+        else:
+            # include dynamically attached attributes (when __slots__ is not defined)
+            for key, value in getattr(self, "__dict__", {}).items():
+                if not_missing(value):
+                    dict_result[key] = _recursive_mapping(value)
+
+        return dict_result
 
     def updated(
         self,
@@ -546,42 +564,8 @@ class DataModel(metaclass=DataModelMeta):
     ) -> Self:
         return self.__replace__(**kwargs)
 
-    def __replace__(
-        self,
-        **kwargs: Any,
-    ) -> Self:
-        if not kwargs or kwargs.keys().isdisjoint(getattr(self, "__slots__", ())):
-            return self  # do not make a copy when nothing will be updated
-
-        if not kwargs:
-            return self
-
-        updated: Self = object.__new__(self.__class__)
-        for field in self.__class__.__FIELDS__:
-            update: Any | Missing = kwargs.get(field.name, MISSING)
-            if update is MISSING:  # reuse missing elements
-                object.__setattr__(
-                    updated,
-                    field.name,
-                    getattr(self, field.name),
-                )
-
-            else:  # and validate updates
-                with ValidationContext.scope(f".{field.name}"):
-                    object.__setattr__(
-                        updated,
-                        field.name,
-                        field.validate(update),
-                    )
-
-        return updated
-
     def __str__(self) -> str:
-        return _data_str(
-            self,
-            aliased=True,
-            converter=None,
-        ).strip()
+        return str(self.to_mapping())
 
     def __repr__(self) -> str:
         return str(self.to_mapping())
@@ -677,276 +661,80 @@ class DataModel(metaclass=DataModelMeta):
     ) -> Self:
         return self  # DataModel is immutable, no need to provide an actual copy
 
-    @classmethod
-    def json_schema(
-        cls,
-        indent: int | None = None,
-    ) -> str:
-        return json_schema(
-            cls.__PARAMETERS_SPECIFICATION__,
-            indent=indent,
-        )
-
-    @classmethod
-    def simplified_schema(
-        cls,
-        indent: int | None = None,
-    ) -> str:
-        assert not_missing(  # nosec: B101
-            cls.__PARAMETERS_SPECIFICATION__
-        ), f"{cls.__qualname__} can't be represented using simplified schema"
-
-        return simplified_schema(
-            cls.__PARAMETERS_SPECIFICATION__,
-            indent=indent,
-        )
-
-    @classmethod
-    def from_json(
-        cls,
-        value: str | bytes,
-        /,
-        decoder: type[json.JSONDecoder] = json.JSONDecoder,
-    ) -> Self:
-        try:
-            return cls(
-                **json.loads(
-                    value,
-                    cls=decoder,
-                )
-            )
-
-        except Exception as exc:
-            raise ValueError(f"Failed to decode {cls.__name__} from json: {exc}") from exc
-
-    @classmethod
-    def from_json_array(
-        cls,
-        value: str | bytes,
-        /,
-        decoder: type[json.JSONDecoder] = json.JSONDecoder,
-    ) -> Sequence[Self]:
-        payload: Any
-        try:
-            payload = json.loads(
-                value,
-                cls=decoder,
-            )
-
-        except Exception as exc:
-            raise ValueError(f"Failed to decode {cls.__name__} from json: {exc}") from exc
-
-        match payload:
-            case [*elements]:
-                try:
-                    return tuple(cls(**element) for element in elements)
-
-                except Exception as exc:
-                    raise ValueError(
-                        f"Failed to decode {cls.__name__} from json array: {exc}"
-                    ) from exc
-
-            case _:
-                raise ValueError("Provided json is not an array!")
-
-    def to_json(
+    def __replace__(
         self,
-        aliased: bool = True,
-        indent: int | None = None,
-        encoder_class: type[json.JSONEncoder] = ParametersJSONEncoder,
-    ) -> str:
-        try:
-            return json.dumps(
-                self.to_mapping(aliased=aliased),
-                indent=indent,
-                cls=encoder_class,
-            )
+        **kwargs: Any,
+    ) -> Self:
+        if not kwargs:
+            return self  # do not make a copy when nothing will be updated
 
-        except Exception as exc:
-            raise ValueError(
-                f"Failed to encode {self.__class__.__name__} to json:\n{self.to_mapping()}"
-            ) from exc
+        if not self.__class__.__FIELDS__:
+            return self.__class__(**(vars(self) | kwargs))
 
+        fields: Sequence[Attribute] = self.__class__.__FIELDS__
+        alias_to_name: dict[str, str] = {
+            field.alias if field.alias is not None else field.name: field.name for field in fields
+        }
+        valid_keys: set[str] = set(alias_to_name.keys()) | set(alias_to_name.values())
 
-# based on python dataclass asdict but simplified
-def _data_dict(  # noqa: PLR0911, C901
-    data: Any,
-    /,
-    aliased: bool,
-    converter: ParameterConversion[Any] | None,
-) -> Any:
-    # use converter if able
-    if converter := converter:
-        return converter(data)
+        if kwargs.keys().isdisjoint(valid_keys):
+            return self  # do not make a copy when nothing will be updated
 
-    match data:
-        case str() | None | int() | float() | bool():
-            return data  # use basic value types as they are
+        canonical_updates: dict[str, Any] = {}
+        for key, value in kwargs.items():
+            if key in valid_keys:
+                canonical_updates[alias_to_name.get(key, key)] = value
 
-        case DataModel() as model:
-            fields: Sequence[Parameter[Any]] = model.__class__.__FIELDS__
+        if not canonical_updates:
+            return self
 
-            field_names: set[str] = {field.name for field in fields}
-            mapping: dict[str, Any] = {}
-
-            for field in fields:
-                value: Any = getattr(model, field.name, MISSING)
-                if value is MISSING:
-                    continue
-
-                key: str = field.alias if aliased and field.alias else field.name
-                mapping[key] = _data_dict(
-                    value,
-                    aliased=aliased,
-                    converter=field.converter,
+        updated: Self = object.__new__(self.__class__)
+        for field in fields:
+            update: Any | Missing = canonical_updates.get(field.name, MISSING)
+            if update is MISSING:  # reuse missing elements
+                object.__setattr__(
+                    updated,
+                    field.name,
+                    getattr(self, field.name),
                 )
 
-            # include dynamically attached attributes (when __slots__ is not defined)
-            for key, value in getattr(model, "__dict__", {}).items():
-                if key in field_names or value is MISSING:
-                    continue
-
-                mapping[key] = _data_dict(
-                    value,
-                    aliased=aliased,
-                    converter=None,
-                )
-
-            return mapping
-
-        case {**elements}:  # replace mapping with dict
-            return {
-                key: _data_dict(
-                    value,
-                    aliased=aliased,
-                    converter=None,
-                )
-                for key, value in elements.items()
-                if value is not MISSING
-            }
-
-        case [*values]:  # replace sequence with list
-            return [
-                _data_dict(
-                    value,
-                    aliased=aliased,
-                    converter=None,
-                )
-                for value in values
-                if value is not MISSING
-            ]
-
-        case dataclass if is_dataclass(dataclass):
-            return {
-                f.name: _data_dict(
-                    getattr(dataclass, f.name),
-                    aliased=aliased,
-                    converter=None,
-                )
-                for f in dataclass_fields(dataclass)
-            }
-
-        case other:  # for other types use deepcopy
-            return deepcopy(other)
-
-
-def _data_str(  # noqa: PLR0911, PLR0912, C901
-    data: Any,
-    /,
-    aliased: bool,
-    converter: ParameterConversion[Any] | None,
-) -> str:
-    # use converter if able
-    if converter := converter:
-        return _data_str(
-            converter(data),
-            aliased=aliased,
-            converter=None,
-        )
-
-    match data:
-        case str() as string:
-            return string
-
-        case None | int() | float() | bool():
-            return str(data)
-
-        case DataModel() as model:
-            fields: Sequence[Parameter[Any]] = model.__class__.__FIELDS__
-            field_names: set[str] = {field.name for field in fields}
-
-            lines: list[str] = []
-
-            for field in fields:
-                value: Any = getattr(model, field.name, MISSING)
-                if value is MISSING:
-                    continue
-
-                key: str = field.alias if aliased and field.alias else field.name
-                element: str = _data_str(
-                    value,
-                    aliased=aliased,
-                    converter=field.converter,
-                ).replace("\n", "\n  ")
-
-                lines.append(f"\n{key}: {element}")
-
-            for key, value in getattr(model, "__dict__", {}).items():
-                if key in field_names or value is MISSING:
-                    continue
-
-                element = _data_str(
-                    value,
-                    aliased=aliased,
-                    converter=None,
-                ).replace("\n", "\n  ")
-
-                lines.append(f"\n{key}: {element}")
-
-            return "".join(lines)
-
-        case {**elements}:  # replace mapping with dict
-            string: str = ""
-            for key, value in elements.items():
-                element: str = _data_str(
-                    value,
-                    aliased=aliased,
-                    converter=None,
-                ).replace("\n", "\n  ")
-
-                string += f"\n{key}: {element}"
-
-            return string
-
-        case [*values]:  # replace sequence with list
-            string: str = ""
-            for value in values:
-                element: str = (
-                    _data_str(
-                        value,
-                        aliased=aliased,
-                        converter=None,
+            else:  # and validate updates
+                with ValidationContext.scope(f".{field.name}"):
+                    object.__setattr__(
+                        updated,
+                        field.name,
+                        field.validate(update),
                     )
-                    .replace("\n", "\n  ")
-                    .strip()
-                )
 
-                string += f"\n- {element}"
+        return updated
 
-            return string
 
-        case dataclass if is_dataclass(dataclass):
-            string: str = ""
-            for field in dataclass_fields(dataclass):
-                element: str = _data_str(
-                    getattr(dataclass, field.name),
-                    aliased=aliased,
-                    converter=None,
-                ).replace("\n", "\n  ")
+def _recursive_mapping(  # noqa: PLR0911
+    value: Any,
+) -> Any:
+    if isinstance(value, str | bytes | float | int | bool | None):
+        return value
 
-                string += f"\n{field.name}: {element}"
+    elif isinstance(value, State):
+        return value.to_mapping(recursive=True)
 
-            return string
+    elif isinstance(value, DataModel):
+        return value.to_mapping()
 
-        case other:  # for other types use its str
-            return str(other)
+    elif is_dataclass(value):
+        return {
+            field.name: _recursive_mapping(getattr(value, field.name))
+            for field in dataclass_fields(value)
+        }
+
+    elif isinstance(value, Mapping | typing.Mapping):
+        return {key: _recursive_mapping(element) for key, element in value.items()}
+
+    elif isinstance(value, Iterable | typing.Iterable):
+        return [_recursive_mapping(element) for element in value]
+
+    elif hasattr(value, "to_mapping") and callable(value.to_mapping):
+        return value.to_mapping()
+
+    else:
+        return deepcopy(value)

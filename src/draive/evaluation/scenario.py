@@ -1,9 +1,10 @@
 import re
 from collections.abc import Callable, Sequence
-from typing import Protocol, Self, cast, overload, runtime_checkable
+from typing import Annotated, Protocol, Self, cast, overload, runtime_checkable
 
 from haiway import (
     AttributePath,
+    Description,
     Immutable,
     Meta,
     MetaValues,
@@ -12,7 +13,7 @@ from haiway import (
 )
 
 from draive.evaluation.evaluator import EvaluatorResult
-from draive.parameters import DataModel, Field
+from draive.parameters import DataModel
 
 __all__ = (
     "EvaluatorScenario",
@@ -37,12 +38,14 @@ class EvaluatorScenarioResult(DataModel):
         Results from all evaluators in the scenario
     """
 
-    scenario: str = Field(
-        description="Name of the evaluated scenario",
-    )
-    results: Sequence[EvaluatorResult] = Field(
-        description="Scenario evaluation results",
-    )
+    scenario: Annotated[
+        str,
+        Description("Name of the evaluated scenario"),
+    ]
+    results: Annotated[
+        Sequence[EvaluatorResult],
+        Description("Scenario evaluation results"),
+    ]
 
     @property
     def passed(self) -> bool:
@@ -93,10 +96,10 @@ class EvaluatorScenarioResult(DataModel):
 
         if not detailed:
             if results_report:
-                return f"{self.scenario}: {status} ({self.performance}%)\n{results_report}"
+                return f"{self.scenario}: {status} ({self.performance:.2f}%)\n{results_report}"
 
             else:
-                return f"{self.scenario}: {status} ({self.performance}%)"
+                return f"{self.scenario}: {status} ({self.performance:.2f}%)"
 
         if results_report:
             return (

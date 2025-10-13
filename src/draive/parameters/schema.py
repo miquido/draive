@@ -1,26 +1,13 @@
 import json
 from typing import Any
 
-from draive.parameters.specification import ParameterSpecification, ParametersSpecification
+from haiway import TypeSpecification
 
-__all__ = (
-    "json_schema",
-    "simplified_schema",
-)
-
-
-def json_schema(
-    specification: ParametersSpecification,
-    indent: int | None = None,
-) -> str:
-    return json.dumps(
-        specification,
-        indent=indent,
-    )
+__all__ = ("simplified_schema",)
 
 
 def simplified_schema(
-    specification: ParametersSpecification,
+    specification: TypeSpecification,
     indent: int | None = None,
 ) -> str:
     match specification:
@@ -36,11 +23,11 @@ def simplified_schema(
             )
 
         case other:
-            raise ValueError("Unsupported basic specification: %s", other)
+            raise ValueError(f"Unsupported basic specification: {other}")
 
 
 def _simplified_schema_property(  # noqa: C901, PLR0912, PLR0911
-    specification: ParameterSpecification,
+    specification: TypeSpecification,
 ) -> dict[str, Any] | list[Any] | str:
     match specification:
         case {"type": "null", "description": str() as description}:
@@ -143,17 +130,12 @@ def _simplified_schema_property(  # noqa: C901, PLR0912, PLR0911
 
             return "|".join(alternative_elements)
 
-        case {"type": "array", "items": items, "description": str() as description}:
-            return [_simplified_schema_property(specification=items)]  # TODO: add description?
-
-        case {"type": "array", "items": items}:
-            return [
-                _simplified_schema_property(
-                    specification=items,
-                ),
-            ]
-
-        case {"type": "array", "prefixItems": items, "description": str() as description}:
+        case {
+            "type": "array",
+            "items": False,
+            "prefixItems": [*items],
+            "description": str() as description,
+        }:
             return [
                 _simplified_schema_property(
                     specification=item,
@@ -161,12 +143,22 @@ def _simplified_schema_property(  # noqa: C901, PLR0912, PLR0911
                 for item in items
             ]  # TODO: add description?
 
-        case {"type": "array", "prefixItems": items}:
+        case {"type": "array", "items": False, "prefixItems": [*items]}:
             return [
                 _simplified_schema_property(
                     specification=item,
                 )
                 for item in items
+            ]
+
+        case {"type": "array", "items": [*items], "description": str() as description}:
+            return [_simplified_schema_property(specification=items)]  # TODO: add description?
+
+        case {"type": "array", "items": [*items]}:
+            return [
+                _simplified_schema_property(
+                    specification=items,
+                ),
             ]
 
         case {"type": "array", "description": str() as description}:
@@ -205,4 +197,4 @@ def _simplified_schema_property(  # noqa: C901, PLR0912, PLR0911
             return "|".join(alternatives)
 
         case other:
-            raise ValueError("Unsupported basic specification element: %s", other)
+            raise ValueError(f"Unsupported basic specification element: {other}")

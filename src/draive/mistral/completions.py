@@ -662,7 +662,7 @@ def _response_format(
                     "type": "json_schema",
                     "json_schema": {
                         "name": output.__name__,
-                        "schema": output.__PARAMETERS_SPECIFICATION__,
+                        "schema": output.__SPECIFICATION__,
                     },
                 },
             )

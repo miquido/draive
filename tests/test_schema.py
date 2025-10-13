@@ -96,9 +96,7 @@ simplified_schema: str = """\
   "int_value": "integer",
   "float_value": "number",
   "bool_value": "boolean",
-  "list_value": [
-    "string"
-  ],
+  "list_value": [],
   "optional_value": "string|null(alternative)",
   "nested_value": {
     "value": "'A'|'B'|'C'(selection)",

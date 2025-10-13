@@ -2,10 +2,10 @@ import json
 from collections.abc import AsyncGenerator, Mapping, Sequence
 from copy import copy, deepcopy
 from datetime import UTC, datetime
-from typing import Any, Literal, NotRequired, Required, TypedDict
+from typing import Annotated, Any, Literal, NotRequired, Required, TypedDict
 from uuid import UUID, uuid4
 
-from haiway import Default
+from haiway import Default, Validator
 from pytest import mark, raises
 
 from draive import (
@@ -25,9 +25,11 @@ from draive.conversation import ConversationMessage
 from draive.resources import ResourceContent, ResourceReference
 
 
-def invalid(value: str) -> None:
+def invalid_value(value: str) -> str:
     if value != "valid":
         raise ValueError()
+
+    return value
 
 
 class ExampleNestedModel(DataModel):
@@ -40,7 +42,7 @@ class ExampleModel(DataModel):
     number: int = Field(aliased="alias", description="description", default=1)
     none_default: int | None = Field(default=None)
     value_default: int = Field(default=9)
-    invalid: str = Field(verifier=invalid, default="valid")
+    invalid: Annotated[str, Validator(invalid_value)] = Field(default="valid")
     nested: ExampleNestedModel = Field(aliased="answer", default=ExampleNestedModel())
     full: Literal["A", "B"] | Sequence[int] | str | bool | None = Field(
         aliased="all",
@@ -471,7 +473,7 @@ async def test_generative_model_completion_multi_modal_selection() -> None:
         output: Any,
         stream: bool = False,
         **_: Any,
-    ) -> AsyncGenerator[Any, None] | Any:
+    ) -> AsyncGenerator[Any] | Any:
         assert not stream
         return _non_stream_generating()
 
@@ -516,10 +518,10 @@ async def test_generative_model_stream_multi_modal_selection() -> None:
         output: Any,
         stream: bool = False,
         **_: Any,
-    ) -> AsyncGenerator[Any, None] | Any:
+    ) -> AsyncGenerator[Any] | Any:
         if stream:
 
-            async def iterator() -> AsyncGenerator[Any, None]:
+            async def iterator() -> AsyncGenerator[Any]:
                 yield text_part
                 yield image_part
                 yield audio_part

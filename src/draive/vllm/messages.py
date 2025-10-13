@@ -177,7 +177,7 @@ class VLLMMessages(VLLMAPI):
                     "type": "json_schema",
                     "json_schema": {
                         "name": output.__name__,
-                        "schema": cast(dict[str, Any], output.__PARAMETERS_SPECIFICATION__),
+                        "schema": cast(dict[str, Any], output.__SPECIFICATION__),
                         "strict": False,
                     },
                 }
@@ -329,7 +329,7 @@ class VLLMMessages(VLLMAPI):
                 "type": "json_schema",
                 "json_schema": {
                     "name": output.__name__,
-                    "schema": cast(dict[str, Any], output.__PARAMETERS_SPECIFICATION__),
+                    "schema": cast(dict[str, Any], output.__SPECIFICATION__),
                     "strict": False,
                 },
             }

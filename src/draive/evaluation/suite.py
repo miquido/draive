@@ -3,10 +3,12 @@ import random
 from asyncio import Lock
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
-from typing import Protocol, Self, runtime_checkable
+from typing import Annotated, Protocol, Self, runtime_checkable
 from uuid import uuid4
 
 from haiway import (
+    Default,
+    Description,
     Immutable,
     Meta,
     MetaValues,
@@ -19,7 +21,7 @@ from haiway import (
 from draive.evaluation.evaluator import EvaluatorResult
 from draive.evaluation.generator import generate_case_parameters
 from draive.evaluation.scenario import EvaluatorScenarioResult
-from draive.parameters import DataModel, Field
+from draive.parameters import DataModel
 
 __all__ = (
     "EvaluatorSuite",
@@ -46,7 +48,7 @@ class EvaluatorSuiteCase[Parameters: DataModel](DataModel):
         Parameters specific to this test case
     """
 
-    identifier: str = Field(default_factory=lambda: str(uuid4()))
+    identifier: str = Default(factory=lambda: str(uuid4()))
     parameters: Parameters
 
 
@@ -65,12 +67,14 @@ class EvaluatorSuiteCaseResult(DataModel):
         Results from all scenario evaluations
     """
 
-    case_identifier: str = Field(
-        description="Evaluated case identifier",
-    )
-    results: Sequence[EvaluatorScenarioResult | EvaluatorResult] = Field(
-        description="Evaluation results",
-    )
+    case_identifier: Annotated[
+        str,
+        Description("Evaluated case identifier"),
+    ]
+    results: Annotated[
+        Sequence[EvaluatorScenarioResult | EvaluatorResult],
+        Description("Evaluation results"),
+    ]
 
     @property
     def passed(self) -> bool:
@@ -481,7 +485,11 @@ class EvaluatorSuite[**Args, Parameters: DataModel](Immutable):
                 for case in cases:
                     if isinstance(case, str):
                         if evaluation_case := next(
-                            iter(case for case in available_cases if case.identifier == case),
+                            iter(
+                                available
+                                for available in available_cases
+                                if available.identifier == case
+                            ),
                             None,
                         ):
                             selected_cases.append(evaluation_case)
@@ -934,5 +942,6 @@ class _EvaluatorSuiteFileStorage[Parameters: DataModel](Immutable):
         self,
         cases: Sequence[EvaluatorSuiteCase[Parameters]],
     ) -> None:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
         with open(self._path, mode="wb+") as file:
             file.write(json.dumps([case.to_mapping() for case in cases]).encode("utf-8"))

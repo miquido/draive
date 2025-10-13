@@ -49,11 +49,14 @@ asyncio.run(main())
 3. Read the active state inside scopes with `ctx.state(MyState)`.
 
 ```python
-from typing import Self
-from haiway import State, ctx
+from typing import Annotated, Self
+from haiway import Description, State, ctx
 
 class AppConfig(State):
-    default_temperature: float
+    default_temperature: Annotated[
+        float,
+        Description("Fallback sampling temperature for text generation"),
+    ]
 
     @classmethod
     def of(cls, *, default_temperature: float) -> Self:
@@ -131,16 +134,20 @@ async def answer_with_tools(question: str) -> str:
 
 ## 7. Structured Outputs
 - Use `ModelGeneration.generate()` with `DataModel` schemas for validated responses.
-- Draive uses `pydantic`-style models; invalid payloads raise validation errors.
+- Declare attributes with `typing.Annotated` and Haiway annotations (`Description`, `Alias`, `Specification`, `Validator`, etc.). Avoid `Field`, which is deprecated and will be removed.
+- Optionally enable schema injection (`"full"`/`"simplified"`) to steer model formatting; defaults to `"skip"` for provider-agnostic prompts.
 
 ```python
-from draive import ModelGeneration
-from draive.multimodal import TextContent
-from pydantic import BaseModel, Field
+from collections.abc import Sequence
+from typing import Annotated
 
-class Summary(BaseModel):
-    topic: str = Field(description="Topic of the summary")
-    bullets: list[str] = Field(description="Key takeaways")
+from draive import Alias, DataModel, Description, ModelGeneration, TextContent
+
+
+class Summary(DataModel):
+    topic: Annotated[str, Description("Topic of the summary")]
+    bullets: Annotated[Sequence[str], Description("Key takeaways")]
+    style: Annotated[str, Alias("format"), Description("Preferred presentation style")] = "bullet"
 
 async def generate_summary(text: str) -> Summary:
     async with ctx.scope(
@@ -149,9 +156,10 @@ async def generate_summary(text: str) -> Summary:
         disposables=(OpenAI(),),
     ):
         return await ModelGeneration.generate(
+            Summary,
             instructions="Summarize the document precisely.",
             input=TextContent.of(text=text),
-            output_type=Summary,
+            schema_injection="simplified",
         )
 ```
 
