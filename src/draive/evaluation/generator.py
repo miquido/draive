@@ -16,7 +16,7 @@ Results should cover various possible valid outcomes to cover multiple possible 
 </INSTRUCTION>
 {guidelines}
 <SCHEMA>
-{{schema}}
+{{model_schema}}
 </SCHEMA>
 
 <FORMAT>
