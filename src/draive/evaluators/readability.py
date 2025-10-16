@@ -71,7 +71,7 @@ async def readability_evaluator(
 
     if result := completion.tag("RESULT"):
         return EvaluationScore.of(
-            cast(EvaluationScoreValue, result.content.to_str().lower()),
+            cast(EvaluationScoreValue, result.content.to_str().strip().lower()),
             meta={"comment": completion.to_str()},
         )
 
