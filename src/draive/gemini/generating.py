@@ -1,6 +1,14 @@
 import random
 from base64 import b64decode, b64encode, urlsafe_b64decode
-from collections.abc import AsyncGenerator, AsyncIterator, Coroutine, Generator, Iterable
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Coroutine,
+    Generator,
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from itertools import chain
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
@@ -52,6 +60,7 @@ from draive.models import (
     ModelToolsDeclaration,
 )
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
+from draive.parameters.model import DataModel
 from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("GeminiGenerating",)
@@ -480,7 +489,7 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
 
     # Prefer explicit isinstance check for structured output to satisfy typing
     if isinstance(output, type):
-        response_schema = cast(SchemaDict, output.__SPECIFICATION__)
+        response_schema = _normalized_schema(output)
         response_modalities = [Modality.TEXT]
         response_mime_type = "application/json"
 
@@ -849,3 +858,26 @@ def content_parts(
             yield {
                 "text": part.to_str(),
             }
+
+
+def _normalized_schema(
+    output: type[DataModel],
+) -> SchemaDict:
+    return cast(SchemaDict, _normalized_schema_content(output.__SPECIFICATION__))
+
+
+def _normalized_schema_content(
+    schema: Any,
+) -> Any:
+    if isinstance(schema, Mapping):
+        return {
+            key: _normalized_schema_content(value)
+            for key, value in schema.items()
+            # it seems gemini is not supporting `additionalProperties` key within json schema
+            if key != "additionalProperties"
+        }
+
+    if isinstance(schema, Sequence) and not isinstance(schema, str):
+        return [_normalized_schema_content(element) for element in schema]
+
+    return schema
