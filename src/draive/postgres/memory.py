@@ -236,32 +236,49 @@ async def _load_context(
         """
         parameters = (identifier,)
 
-    return tuple(
-        reversed(
-            tuple(
-                _decode_context(
-                    await Postgres.fetch(
-                        statement,
-                        *parameters,
-                    )
-                )
-            )
-        )
+    rows: Sequence[PostgresRow] = await Postgres.fetch(
+        statement,
+        *parameters,
     )
+
+    return tuple(_decode_context(rows))
 
 
 def _decode_context(
     rows: Sequence[PostgresRow],
     /,
 ) -> Generator[ModelContextElement]:
-    for row in rows:
+    trim_prefix: bool = True
+    skip_output: bool = True
+    for row in reversed(rows):
         decoded: Mapping[str, BasicValue] = json.loads(cast(str, row["content"]))
-        match decoded:
-            case {"type": "model_input"}:
-                yield ModelInput.from_mapping(decoded)
+        match decoded.get("type"):
+            case "model_input":
+                model_input: ModelInput = ModelInput.from_mapping(decoded)
+                if trim_prefix:
+                    if model_input.contains_tools:
+                        skip_output = True
+                        continue
 
-            case {"type": "model_output"}:
-                yield ModelOutput.from_mapping(decoded)
+                    else:
+                        skip_output = False
+                        trim_prefix = False
+
+                yield model_input
+
+            case "model_output":
+                model_output: ModelOutput = ModelOutput.from_mapping(decoded)
+                if trim_prefix:
+                    if model_output.contains_tools:
+                        continue
+
+                    elif skip_output:
+                        continue
+
+                    else:
+                        trim_prefix = False
+
+                yield model_output
 
             case other:
                 raise ValueError(f"Invalid model context element: {other}")

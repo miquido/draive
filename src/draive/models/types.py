@@ -478,6 +478,11 @@ class ModelInput(DataModel):
         )
 
     @property
+    def contains_tools(self) -> bool:
+        """Return True if any tool responses are included in the input."""
+        return any(isinstance(block, ModelToolResponse) for block in self.blocks)
+
+    @property
     def tools(self) -> Sequence[ModelToolResponse]:
         """Return only the tool responses included in the input."""
         return tuple(block for block in self.blocks if isinstance(block, ModelToolResponse))
@@ -644,6 +649,11 @@ class ModelOutput(DataModel):
     def reasoning(self) -> Sequence[ModelReasoning]:
         """Return only the reasoning included in the output."""
         return tuple(block for block in self.blocks if isinstance(block, ModelReasoning))
+
+    @property
+    def contains_tools(self) -> bool:
+        """Return True if any tool requests are included in the output."""
+        return any(isinstance(block, ModelToolRequest) for block in self.blocks)
 
     @property
     def tools(self) -> Sequence[ModelToolRequest]:
