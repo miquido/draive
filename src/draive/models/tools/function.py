@@ -282,22 +282,15 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
                 )
 
             else:
-                ctx.record(
-                    attributes={
-                        "call_id": call_id,
-                        **{key: "<redacted>" for key, _ in arguments.items()},
-                    }
-                )
+                ctx.record(attributes={"call_id": call_id})
 
             try:
                 result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
+                if __debug__:
+                    ctx.record(attributes={"result": format_str(result)})
+
                 formatted_result: MultimodalContent = MultimodalContent.of(
                     self.format_result(result)
-                )
-
-                ctx.record(
-                    event="result",
-                    attributes={"value": format_str(formatted_result)},
                 )
 
                 return formatted_result
