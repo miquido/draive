@@ -226,9 +226,7 @@ def _resolve_argument(
     match parameter.default:
         case FunctionArgument() as argument:
             alias: str | None = (
-                argument.aliased
-                if argument.aliased is not None
-                else attribute.alias
+                argument.aliased if argument.aliased is not None else attribute.alias
             )
             specification: TypeSpecification | None = None
 
