@@ -81,12 +81,12 @@ from draive.models import (
     ModelOutputLimit,
     ModelOutputSelection,
     ModelRateLimit,
+    ModelReasoning,
     ModelStreamOutput,
     ModelToolRequest,
     ModelToolsDeclaration,
     ModelToolSpecification,
 )
-from draive.models.types import ModelReasoning
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIResponsesConfig

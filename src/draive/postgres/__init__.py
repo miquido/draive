@@ -8,8 +8,8 @@ from haiway.postgres import (
 )
 
 from draive.postgres.configuration import PostgresConfigurationRepository
-from draive.postgres.instructions import PostgresInstructionsRepository
 from draive.postgres.memory import PostgresModelMemory
+from draive.postgres.templates import PostgresTemplatesRepository
 from draive.postgres.vector_index import PostgresVectorIndex
 
 __all__ = (
@@ -18,9 +18,9 @@ __all__ = (
     "PostgresConnection",
     "PostgresConnectionPool",
     "PostgresException",
-    "PostgresInstructionsRepository",
     "PostgresModelMemory",
     "PostgresRow",
+    "PostgresTemplatesRepository",
     "PostgresValue",
     "PostgresVectorIndex",
 )

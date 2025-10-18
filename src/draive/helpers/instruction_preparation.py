@@ -2,8 +2,8 @@ from typing import Final
 
 from haiway import ctx
 
-from draive.models import InstructionsDeclaration, ModelInstructions
-from draive.multimodal import MultimodalContent
+from draive.models import ModelInstructions
+from draive.multimodal import MultimodalContent, TemplateDeclaration
 from draive.stages import Stage
 
 __all__ = (
@@ -23,7 +23,7 @@ class InstructionPreparationAmbiguity(Exception):
 
 
 async def prepare_instructions(
-    instruction: InstructionsDeclaration | str,
+    instruction: TemplateDeclaration | str,
     /,
     *,
     guidelines: str | None = None,
@@ -31,13 +31,13 @@ async def prepare_instructions(
     async with ctx.scope("prepare_instruction"):
         ctx.log_info("Preparing instruction...")
 
-        instruction_declaration: InstructionsDeclaration
+        instruction_declaration: TemplateDeclaration
         match instruction:
             case str() as description:
-                instruction_declaration = InstructionsDeclaration(
-                    name="instruction",
+                instruction_declaration = TemplateDeclaration(
+                    identifier="instruction",
                     description=description,
-                    arguments=(),
+                    variables={},
                 )
 
             case declaration:
@@ -66,18 +66,14 @@ async def prepare_instructions(
 
 
 def _format_variables(
-    instruction: InstructionsDeclaration,
+    instruction: TemplateDeclaration,
 ) -> str:
-    if not instruction.arguments:
+    if not instruction.variables:
         return "<TASK_VARIABLES>N/A</TASK_VARIABLES>"
 
     arguments: str = "\n".join(
-        (
-            f"- {argument.name}: {argument.description}"
-            if argument.description
-            else f"- {argument.name}"
-        )
-        for argument in instruction.arguments
+        (f"- {name}: {description}" if description else f"- {name}")
+        for name, description in instruction.variables.items()
     )
 
     return f"<TASK_VARIABLES>\n{arguments}\n</TASK_VARIABLES>"

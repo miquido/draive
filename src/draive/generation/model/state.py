@@ -5,8 +5,8 @@ from haiway import State, statemethod
 
 from draive.generation.model.default import generate_model
 from draive.generation.model.types import ModelGenerating, ModelGenerationDecoder
-from draive.models import ResolveableInstructions, Tool, Toolbox
-from draive.multimodal import Multimodal, MultimodalContent
+from draive.models import ModelInstructions, Tool, Toolbox
+from draive.multimodal import Multimodal, MultimodalContent, Template
 from draive.parameters import DataModel
 
 __all__ = ("ModelGeneration",)
@@ -20,7 +20,7 @@ class ModelGeneration(State):
         generated: type[Generated],
         /,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         input: Multimodal,
         schema_injection: Literal["full", "simplified", "skip"] = "skip",
         tools: Toolbox | Iterable[Tool] = (),
@@ -35,7 +35,7 @@ class ModelGeneration(State):
         generated: type[Generated],
         /,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         input: Multimodal,
         schema_injection: Literal["full", "simplified", "skip"] = "skip",
         tools: Toolbox | Iterable[Tool] = (),
@@ -50,7 +50,7 @@ class ModelGeneration(State):
         generated: type[Generated],
         /,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         input: Multimodal,  # noqa: A002
         schema_injection: Literal["full", "simplified", "skip"] = "skip",
         tools: Toolbox | Iterable[Tool] = (),

@@ -5,8 +5,8 @@ from openai.types.image import Image
 from openai.types.images_response import ImagesResponse
 
 from draive.generation import ImageGeneration
-from draive.models import InstructionsRepository, ResolveableInstructions
-from draive.multimodal import MultimodalContent
+from draive.models import ModelInstructions
+from draive.multimodal import MultimodalContent, Template, TemplatesRepository
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIImageGenerationConfig
 from draive.resources import ResourceContent, ResourceReference
@@ -21,7 +21,7 @@ class OpenAIImageGeneration(OpenAIAPI):
     async def generate_image(
         self,
         *,
-        instructions: ResolveableInstructions,
+        instructions: Template | ModelInstructions,
         input: MultimodalContent,  # noqa: A002
         config: OpenAIImageGenerationConfig | None = None,
         **extra: Any,
@@ -33,7 +33,7 @@ class OpenAIImageGeneration(OpenAIAPI):
             response: ImagesResponse = await self._client.images.generate(
                 model=generation_config.model,
                 n=1,
-                prompt=await InstructionsRepository.resolve(instructions),
+                prompt=await TemplatesRepository.resolve_str(instructions),
                 quality=generation_config.quality,
                 size=generation_config.size,
                 style=generation_config.style,

@@ -1,18 +1,4 @@
 from draive.models.generative import GenerativeModel, RealtimeGenerativeModel
-from draive.models.instructions import (
-    Instructions,
-    InstructionsArgumentDeclaration,
-    InstructionsDeclaration,
-    InstructionsDefining,
-    InstructionsListing,
-    InstructionsLoading,
-    InstructionsMissing,
-    InstructionsRemoving,
-    InstructionsRepository,
-    InstructionsTemplate,
-    ResolveableInstructions,
-    instructions,
-)
 from draive.models.tools import (
     FunctionTool,
     ModelToolSpecification,
@@ -74,16 +60,6 @@ from draive.models.types import (
 __all__ = (
     "FunctionTool",
     "GenerativeModel",
-    "Instructions",
-    "InstructionsArgumentDeclaration",
-    "InstructionsDeclaration",
-    "InstructionsDefining",
-    "InstructionsListing",
-    "InstructionsLoading",
-    "InstructionsMissing",
-    "InstructionsRemoving",
-    "InstructionsRepository",
-    "InstructionsTemplate",
     "ModelContext",
     "ModelContextElement",
     "ModelException",
@@ -127,7 +103,6 @@ __all__ = (
     "ModelToolsDeclaration",
     "ModelToolsSelection",
     "RealtimeGenerativeModel",
-    "ResolveableInstructions",
     "Tool",
     "ToolAvailabilityChecking",
     "ToolError",
@@ -137,6 +112,5 @@ __all__ = (
     "ToolsLoading",
     "ToolsProvider",
     "ToolsSuggesting",
-    "instructions",
     "tool",
 )

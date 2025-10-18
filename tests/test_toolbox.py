@@ -11,7 +11,7 @@ from draive import (
     ctx,
     tool,
 )
-from draive.models.types import ModelToolSpecification
+from draive.models import ModelToolSpecification
 
 
 @mark.asyncio

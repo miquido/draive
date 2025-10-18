@@ -11,14 +11,15 @@ from draive.conversation.realtime.types import (
 from draive.conversation.types import ConversationMessage
 from draive.models import (
     ModelInput,
+    ModelInstructions,
     ModelMemory,
     ModelMemoryRecall,
     ModelOutput,
     ModelSessionOutputSelection,
-    ResolveableInstructions,
     Tool,
     Toolbox,
 )
+from draive.multimodal import Template
 from draive.utils import Memory
 
 __all__ = ("RealtimeConversation",)
@@ -36,7 +37,7 @@ class RealtimeConversation(State):
     async def prepare(
         cls,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         tools: Toolbox | Iterable[Tool] = (),
         memory: ModelMemory | Iterable[ConversationMessage] = (),
         output: ModelSessionOutputSelection = "auto",
@@ -46,7 +47,7 @@ class RealtimeConversation(State):
 
         Parameters
         ----------
-        instructions : ResolveableInstructions, optional
+        instructions : Template | ModelInstructions, optional
             Instructions to steer the session.
         tools : Toolbox | Iterable[Tool], optional
             Tools to expose within the session.

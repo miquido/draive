@@ -14,12 +14,12 @@ from draive.conversation.types import (
     ConversationOutputChunk,
 )
 from draive.models import (
+    ModelInstructions,
     ModelMemory,
     ModelSession,
     ModelSessionOutputSelection,
     ModelSessionScope,
     RealtimeGenerativeModel,
-    ResolveableInstructions,
     Toolbox,
 )
 from draive.models.types import (
@@ -29,13 +29,14 @@ from draive.models.types import (
     ModelToolRequest,
     ModelToolResponse,
 )
+from draive.multimodal import Template, TemplatesRepository
 
 __all__ = ("realtime_conversation_preparing",)
 
 
 async def realtime_conversation_preparing(  # noqa: C901
     *,
-    instructions: ResolveableInstructions,
+    instructions: Template | ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     output: ModelSessionOutputSelection,
@@ -48,7 +49,7 @@ async def realtime_conversation_preparing(  # noqa: C901
     """
     # TODO: rework RealtimeLMM interface to allow instruction and tools changes during the session
     session_scope: ModelSessionScope = await RealtimeGenerativeModel.session(
-        instructions=instructions,
+        instructions=await TemplatesRepository.resolve_str(instructions),
         memory=memory,
         tools=toolbox.available_tools_declaration(),
         output=output,
