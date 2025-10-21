@@ -4,12 +4,11 @@ from haiway import ctx
 
 from draive.models import (
     GenerativeModel,
-    InstructionsRepository,
     ModelInput,
+    ModelInstructions,
     ModelOutput,
-    ResolveableInstructions,
 )
-from draive.multimodal import MultimodalContent
+from draive.multimodal import MultimodalContent, Template, TemplatesRepository
 from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("generate_image",)
@@ -17,13 +16,13 @@ __all__ = ("generate_image",)
 
 async def generate_image(
     *,
-    instructions: ResolveableInstructions,
+    instructions: Template | ModelInstructions,
     input: MultimodalContent,  # noqa: A002
     **extra: Any,
 ) -> ResourceContent | ResourceReference:
     async with ctx.scope("generate_image"):
         result: ModelOutput = await GenerativeModel.completion(
-            instructions=await InstructionsRepository.resolve(instructions),
+            instructions=await TemplatesRepository.resolve_str(instructions),
             context=[ModelInput.of(input)],
             output="image",
             **extra,

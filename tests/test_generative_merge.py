@@ -1,5 +1,5 @@
+from draive.models import ModelReasoning, ModelToolRequest
 from draive.models.generative import _merge_output
-from draive.models.types import ModelReasoning, ModelToolRequest
 from draive.multimodal import MultimodalContent, TextContent
 
 

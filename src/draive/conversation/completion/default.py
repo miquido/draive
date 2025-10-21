@@ -7,18 +7,17 @@ from haiway import ctx
 from draive.conversation.types import ConversationMessage, ConversationOutputChunk
 from draive.models import (
     GenerativeModel,
-    InstructionsRepository,
     ModelContextElement,
     ModelInput,
+    ModelInstructions,
     ModelMemory,
     ModelMemoryRecall,
     ModelOutput,
     ModelReasoning,
-    ResolveableInstructions,
+    ModelToolRequest,
     Toolbox,
 )
-from draive.models.types import ModelToolRequest
-from draive.multimodal import ArtifactContent
+from draive.multimodal import ArtifactContent, Template, TemplatesRepository
 
 __all__ = ("conversation_completion",)
 
@@ -26,7 +25,7 @@ __all__ = ("conversation_completion",)
 @overload
 async def conversation_completion(
     *,
-    instructions: ResolveableInstructions,
+    instructions: Template | ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,
@@ -38,7 +37,7 @@ async def conversation_completion(
 @overload
 async def conversation_completion(
     *,
-    instructions: ResolveableInstructions,
+    instructions: Template | ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,
@@ -49,7 +48,7 @@ async def conversation_completion(
 
 async def conversation_completion(
     *,
-    instructions: ResolveableInstructions,
+    instructions: Template | ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,  # noqa: A002
@@ -81,7 +80,7 @@ async def conversation_completion(
 
 
 async def _conversation_completion(
-    instructions: ResolveableInstructions,
+    instructions: Template | ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,  # noqa: A002
@@ -95,11 +94,18 @@ async def _conversation_completion(
             ModelInput.of(input.content),
         ]
 
+        resolved_instructions: str = await TemplatesRepository.resolve_str(
+            instructions,
+            arguments={
+                key: value if isinstance(value, str) else str(value)
+                for key, value in memory_recall.variables.items()
+            }
+            if memory_recall.variables
+            else None,
+        )
+
         result: ModelOutput = await GenerativeModel.loop(
-            instructions=await InstructionsRepository.resolve(
-                instructions,
-                arguments=memory_recall.variables,
-            ),
+            instructions=resolved_instructions,
             toolbox=toolbox,
             context=context,
             **extra,
@@ -127,7 +133,7 @@ async def _conversation_completion(
 
 
 async def _conversation_completion_stream(
-    instructions: ResolveableInstructions,
+    instructions: Template | ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,  # noqa: A002
@@ -141,9 +147,14 @@ async def _conversation_completion_stream(
         ]
 
         async for chunk in await GenerativeModel.loop(
-            instructions=await InstructionsRepository.resolve(
+            instructions=await TemplatesRepository.resolve_str(
                 instructions,
-                arguments=memory_recall.variables,
+                arguments={
+                    key: value if isinstance(value, str) else str(value)
+                    for key, value in memory_recall.variables.items()
+                }
+                if memory_recall.variables
+                else None,
             ),
             toolbox=toolbox,
             context=context,

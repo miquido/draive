@@ -33,21 +33,20 @@ from draive.evaluation import (
 from draive.models import (
     FunctionTool,
     GenerativeModel,
-    InstructionsRepository,
     ModelContext,
     ModelContextElement,
     ModelInput,
+    ModelInstructions,
     ModelMemory,
     ModelMemoryRecall,
     ModelOutput,
     ModelOutputSelection,
     ModelToolRequest,
     ModelToolResponse,
-    ResolveableInstructions,
     Tool,
     Toolbox,
 )
-from draive.multimodal import Multimodal, MultimodalContent
+from draive.multimodal import Multimodal, MultimodalContent, Template, TemplatesRepository
 from draive.parameters import DataModel
 from draive.stages.types import (
     StageCacheKeyMaking,
@@ -291,7 +290,7 @@ class Stage:
         input: Multimodal,  # noqa: A002
         /,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         tools: Toolbox | Iterable[Tool] = (),
         output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
@@ -311,7 +310,7 @@ class Stage:
         ----------
         input : Multimodal
             Input content to provide to the model.
-        instructions : ResolveableInstructions
+        instructions : Template | ModelInstructions
             Instructions or guidance for the model.
         tools : Toolbox | Iterable[Tool]
             Tools that the model can use during completion generation.
@@ -354,7 +353,7 @@ class Stage:
                 ]
                 # Run loop and merge content parts into a single MultimodalContent
                 result: ModelOutput = await GenerativeModel.loop(
-                    instructions=await InstructionsRepository.resolve(instructions),
+                    instructions=await TemplatesRepository.resolve_str(instructions),
                     toolbox=toolbox,
                     context=context,
                     output=output,
@@ -378,7 +377,7 @@ class Stage:
         input: Callable[[], Coroutine[None, None, Multimodal]],  # noqa: A002
         /,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         tools: Toolbox | Iterable[Tool] = (),
         output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
@@ -399,7 +398,7 @@ class Stage:
         ----------
         input : Callable[[], Coroutine[None, None, Multimodal]]
             Async function returning input content to provide to the model.
-        instructions : ResolveableInstructions
+        instructions : Template | ModelInstructions
             Instructions or guidance for the model.
         tools : Toolbox | Iterable[Tool]
             Tools that the model can use during completion generation.
@@ -445,7 +444,7 @@ class Stage:
                 ]
                 ctx.log_debug("...prompting completion input provided")
                 result: ModelOutput = await GenerativeModel.loop(
-                    instructions=await InstructionsRepository.resolve(instructions),
+                    instructions=await TemplatesRepository.resolve_str(instructions),
                     toolbox=toolbox,
                     context=context,
                     output=output,
@@ -467,7 +466,7 @@ class Stage:
     def loopback_completion(
         cls,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         tools: Toolbox | Iterable[Tool] = (),
         output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
@@ -482,7 +481,7 @@ class Stage:
 
         Parameters
         ----------
-        instructions : ResolveableInstructions
+        instructions : Template | ModelInstructions
             Instructions or guidance for the model.
         tools : Toolbox | Iterable[Tool]
             Tools that the model can use during completion generation.
@@ -535,7 +534,7 @@ class Stage:
                     ModelInput.of(last_output.content, meta={"loopback": True}),
                 ]
                 result: ModelOutput = await GenerativeModel.loop(
-                    instructions=await InstructionsRepository.resolve(instructions),
+                    instructions=await TemplatesRepository.resolve_str(instructions),
                     toolbox=toolbox,
                     context=context,
                     output=output,
@@ -557,7 +556,7 @@ class Stage:
     def result_completion(
         cls,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         tools: Toolbox | Iterable[Tool] = (),
         output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
@@ -571,7 +570,7 @@ class Stage:
 
         Parameters
         ----------
-        instructions : ResolveableInstructions
+        instructions : Template | ModelInstructions
             Instructions or guidance for the model.
         tools : Toolbox | Iterable[Tool]
             Tools that the model can use during completion generation.
@@ -604,7 +603,7 @@ class Stage:
                     ModelInput.of(state.result),
                 ]
                 result: ModelOutput = await GenerativeModel.loop(
-                    instructions=await InstructionsRepository.resolve(instructions),
+                    instructions=await TemplatesRepository.resolve_str(instructions),
                     toolbox=toolbox,
                     context=context,
                     output=output,
@@ -2052,7 +2051,7 @@ async def _model_routing(
         [f"- {key}: {meta.description or 'No description'}" for key, meta in options.items()]
     )
 
-    instruction: str = (
+    instructions: str = (
         "Based on the provided context and the current result,"  # nosec: B608 - false positive
         " select the most appropriate option from the following:"
         f"\n\n{options_text}"
@@ -2073,7 +2072,7 @@ async def _model_routing(
     ]
 
     result: ModelOutput = await GenerativeModel.loop(
-        instructions=await InstructionsRepository.resolve(instruction),
+        instructions=await TemplatesRepository.resolve_str(instructions),
         context=routing_context,
         output="text",
     )

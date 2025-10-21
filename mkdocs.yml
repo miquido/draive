@@ -98,6 +98,7 @@ nav:
       - Basic Stage Usage: guides/BasicStageUsage.md
       - Advanced State: guides/AdvancedState.md
       - Multimodal Content: guides/MultimodalContent.md
+      - Templates: guides/Templates.md
       - Postgres: guides/Postgres.md
       - Basics: guides/Basics.md
   - Cookbooks:

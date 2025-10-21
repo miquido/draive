@@ -5,8 +5,8 @@ from haiway import State, statemethod
 
 from draive.generation.text.default import generate_text
 from draive.generation.text.types import TextGenerating
-from draive.models import ResolveableInstructions, Tool, Toolbox
-from draive.multimodal import Multimodal, MultimodalContent
+from draive.models import ModelInstructions, Tool, Toolbox
+from draive.multimodal import Multimodal, MultimodalContent, Template
 
 __all__ = ("TextGeneration",)
 
@@ -17,7 +17,7 @@ class TextGeneration(State):
     async def generate(
         cls,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         input: Multimodal,
         tools: Toolbox | Iterable[Tool] = (),
         examples: Iterable[tuple[Multimodal, str]] = (),
@@ -28,7 +28,7 @@ class TextGeneration(State):
     async def generate(
         self,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         input: Multimodal,
         tools: Toolbox | Iterable[Tool] = (),
         examples: Iterable[tuple[Multimodal, str]] = (),
@@ -39,7 +39,7 @@ class TextGeneration(State):
     async def generate(
         self,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         input: Multimodal,  # noqa: A002
         tools: Toolbox | Iterable[Tool] = (),
         examples: Iterable[tuple[Multimodal, str]] = (),

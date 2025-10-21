@@ -9,7 +9,8 @@ from draive.conversation.types import (
     ConversationInputChunk,
     ConversationOutputChunk,
 )
-from draive.models import ModelMemory, ResolveableInstructions, Toolbox
+from draive.models import ModelInstructions, ModelMemory, Toolbox
+from draive.multimodal import Template
 
 __all__ = (
     "RealtimeConversationPreparing",
@@ -126,7 +127,7 @@ class RealtimeConversationPreparing(Protocol):
     async def __call__(
         self,
         *,
-        instructions: ResolveableInstructions,
+        instructions: Template | ModelInstructions,
         toolbox: Toolbox,
         memory: ModelMemory,
         **extra: Any,

@@ -10,7 +10,6 @@ from typing import Any, Literal, final, overload
 
 from haiway import META_EMPTY, Meta, State, ctx, statemethod
 
-from draive.models.instructions import InstructionsRepository, ResolveableInstructions
 from draive.models.tools import Toolbox
 from draive.models.types import (
     ModelContext,
@@ -618,7 +617,7 @@ class RealtimeGenerativeModel(State):
     async def session(
         cls,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: ModelInstructions = "",
         memory: ModelMemory | ModelContext = (),
         tools: ModelToolsDeclaration = ModelToolsDeclaration.none,
         output: ModelSessionOutputSelection = "auto",
@@ -629,7 +628,7 @@ class RealtimeGenerativeModel(State):
     async def session(
         self,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: ModelInstructions = "",
         memory: ModelMemory | ModelContext = (),
         tools: ModelToolsDeclaration = ModelToolsDeclaration.none,
         output: ModelSessionOutputSelection = "auto",
@@ -640,7 +639,7 @@ class RealtimeGenerativeModel(State):
     async def session(
         self,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: ModelInstructions = "",
         memory: ModelMemory | ModelContext = (),
         tools: ModelToolsDeclaration = ModelToolsDeclaration.none,
         output: ModelSessionOutputSelection = "auto",
@@ -654,7 +653,7 @@ class RealtimeGenerativeModel(State):
 
         Parameters
         ----------
-        instructions : ResolveableInstructions, optional
+        instructions : ModelInstructions, optional
             Instructions or an instruction reference resolvable by ``InstructionsRepository``.
         memory : ModelMemory or ModelContext, optional
             Initial memory for the session. If a plain context sequence is provided, it is
@@ -692,7 +691,7 @@ class RealtimeGenerativeModel(State):
 
         return await self.session_preparing(
             # TODO: FIXME: pass memory_recall.variables ??
-            instructions=await InstructionsRepository.resolve(instructions),
+            instructions=instructions,
             memory=session_memory,
             output=output,
             tools=tools,

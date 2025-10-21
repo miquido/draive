@@ -5,20 +5,19 @@ from haiway import ctx
 
 from draive.models import (
     GenerativeModel,
-    InstructionsRepository,
     ModelInput,
+    ModelInstructions,
     ModelOutput,
-    ResolveableInstructions,
     Toolbox,
 )
-from draive.multimodal import MultimodalContent
+from draive.multimodal import MultimodalContent, Template, TemplatesRepository
 
 __all__ = ("generate_text",)
 
 
 async def generate_text(
     *,
-    instructions: ResolveableInstructions,
+    instructions: Template | ModelInstructions,
     input: MultimodalContent,  # noqa: A002
     toolbox: Toolbox,
     examples: Iterable[tuple[MultimodalContent, str]],
@@ -26,7 +25,7 @@ async def generate_text(
 ) -> str:
     async with ctx.scope("generate_text"):
         result: ModelOutput = await GenerativeModel.loop(
-            instructions=await InstructionsRepository.resolve(instructions),
+            instructions=await TemplatesRepository.resolve_str(instructions),
             context=[
                 *[
                     message

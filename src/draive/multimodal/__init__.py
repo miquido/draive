@@ -5,6 +5,15 @@ from draive.multimodal.content import (
     MultimodalContentPart,
     MultimodalTag,
 )
+from draive.multimodal.templates import (
+    Template,
+    TemplateDeclaration,
+    TemplateDefining,
+    TemplateListing,
+    TemplateLoading,
+    TemplateMissing,
+    TemplatesRepository,
+)
 from draive.multimodal.text import TextContent
 
 __all__ = (
@@ -13,5 +22,12 @@ __all__ = (
     "MultimodalContent",
     "MultimodalContentPart",
     "MultimodalTag",
+    "Template",
+    "TemplateDeclaration",
+    "TemplateDefining",
+    "TemplateListing",
+    "TemplateLoading",
+    "TemplateMissing",
+    "TemplatesRepository",
     "TextContent",
 )

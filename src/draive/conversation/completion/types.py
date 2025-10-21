@@ -5,7 +5,8 @@ from draive.conversation.types import (
     ConversationMessage,
     ConversationOutputChunk,
 )
-from draive.models import ModelMemory, ResolveableInstructions, Toolbox
+from draive.models import ModelInstructions, ModelMemory, Toolbox
+from draive.multimodal import Template
 
 __all__ = ("ConversationCompleting",)
 
@@ -22,7 +23,7 @@ class ConversationCompleting(Protocol):
     async def __call__(
         self,
         *,
-        instructions: ResolveableInstructions,
+        instructions: Template | ModelInstructions,
         toolbox: Toolbox,
         memory: ModelMemory,
         input: ConversationMessage,
@@ -34,7 +35,7 @@ class ConversationCompleting(Protocol):
     async def __call__(
         self,
         *,
-        instructions: ResolveableInstructions,
+        instructions: Template | ModelInstructions,
         toolbox: Toolbox,
         memory: ModelMemory,
         input: ConversationMessage,
@@ -45,7 +46,7 @@ class ConversationCompleting(Protocol):
     async def __call__(
         self,
         *,
-        instructions: ResolveableInstructions,
+        instructions: Template | ModelInstructions,
         toolbox: Toolbox,
         memory: ModelMemory,
         input: ConversationMessage,  # noqa: A002

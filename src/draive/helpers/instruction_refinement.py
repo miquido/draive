@@ -10,8 +10,14 @@ from draive.evaluation import (
     EvaluatorSuiteResult,
     PreparedEvaluatorSuite,
 )
-from draive.models import Instructions, InstructionsRepository, ModelInstructions
-from draive.multimodal import MultimodalContent, MultimodalTag, TextContent
+from draive.models import ModelInstructions
+from draive.multimodal import (
+    MultimodalContent,
+    MultimodalTag,
+    Template,
+    TemplatesRepository,
+    TextContent,
+)
 from draive.parameters import DataModel
 from draive.stages import Stage, StageState, stage
 
@@ -19,7 +25,7 @@ __all__ = ("refine_instructions",)
 
 
 async def refine_instructions[Parameters: DataModel](
-    instructions: Instructions,
+    instructions: Template,
     /,
     *,
     instructions_content: ModelInstructions | None = None,
@@ -96,7 +102,7 @@ async def refine_instructions[Parameters: DataModel](
 
 class _RefinementTreeNode(State):
     identifier: UUID
-    instructions: Instructions
+    instructions: Template
     instructions_content: ModelInstructions
     strategy: str
     parent_id: UUID | None
@@ -126,26 +132,26 @@ class _RefinementTreeNode(State):
         return self.complete_evaluation.performance
 
     @property
-    def patched_instructions_repository(self) -> InstructionsRepository:
-        repository: InstructionsRepository = ctx.state(InstructionsRepository)
+    def patched_instructions_repository(self) -> TemplatesRepository:
+        repository: TemplatesRepository = ctx.state(TemplatesRepository)
 
         async def instructions_loading(
-            name: str,
+            identifier: str,
             meta: Meta,
             **extra: Any,
         ) -> str | None:
             # use updated instructions if able
-            if name == self.instructions.name:
+            if identifier == self.instructions.identifier:
                 return self.instructions_content
 
             else:  # otherwise preserve unchanged instructions
                 return await repository.loading(
-                    name=name,
+                    identifier=identifier,
                     meta=meta,
                     **extra,
                 )
 
-        return InstructionsRepository(
+        return TemplatesRepository(
             listing=repository.listing,  # keep current listing
             loading=instructions_loading,  # replace loading
             # do not allow modifications - use default noop implementation
@@ -216,7 +222,7 @@ def _select_focused_cases[Parameters: DataModel](
 
 def _tree_initialization_stage[Parameters: DataModel](
     *,
-    instructions: Instructions,
+    instructions: Template,
     instructions_content: ModelInstructions | None,
     evaluator_suite: PreparedEvaluatorSuite[Parameters],
     sample_ratio: float,
@@ -237,7 +243,7 @@ def _tree_initialization_stage[Parameters: DataModel](
 
         content: ModelInstructions
         if instructions_content is None:
-            content = await InstructionsRepository.load(instructions)
+            content = await TemplatesRepository.load(instructions)
 
         else:
             content = instructions_content

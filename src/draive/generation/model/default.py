@@ -6,14 +6,12 @@ from haiway import ctx
 from draive.generation.model.types import ModelGenerationDecoder
 from draive.models import (
     GenerativeModel,
-    InstructionsRepository,
     ModelInput,
     ModelInstructions,
     ModelOutput,
-    ResolveableInstructions,
     Toolbox,
 )
-from draive.multimodal import MultimodalContent
+from draive.multimodal import MultimodalContent, Template, TemplatesRepository
 from draive.parameters import DataModel
 
 __all__ = ("generate_model",)
@@ -23,7 +21,7 @@ async def generate_model[Generated: DataModel](
     generated: type[Generated],
     /,
     *,
-    instructions: ResolveableInstructions,
+    instructions: Template | ModelInstructions,
     input: MultimodalContent,  # noqa: A002
     schema_injection: Literal["full", "simplified", "skip"],
     toolbox: Toolbox,
@@ -35,23 +33,33 @@ async def generate_model[Generated: DataModel](
         resolved_instructions: ModelInstructions
         match schema_injection:
             case "full":
-                resolved_instructions = await InstructionsRepository.resolve(
-                    instructions,
-                    arguments={
-                        "model_schema": generated.json_schema(indent=2),
-                    },
-                )
+                if isinstance(instructions, str):
+                    resolved_instructions = instructions.format(
+                        model_schema=generated.json_schema(indent=2),
+                    )
+
+                else:
+                    resolved_instructions = await TemplatesRepository.resolve_str(
+                        instructions.with_arguments(
+                            model_schema=generated.json_schema(indent=2),
+                        )
+                    )
 
             case "simplified":
-                resolved_instructions = await InstructionsRepository.resolve(
-                    instructions,
-                    arguments={
-                        "model_schema": generated.simplified_schema(indent=2),
-                    },
-                )
+                if isinstance(instructions, str):
+                    resolved_instructions = instructions.format(
+                        model_schema=generated.simplified_schema(indent=2),
+                    )
+
+                else:
+                    resolved_instructions = await TemplatesRepository.resolve_str(
+                        instructions.with_arguments(
+                            model_schema=generated.simplified_schema(indent=2),
+                        )
+                    )
 
             case "skip":  # instruction is not modified
-                resolved_instructions = await InstructionsRepository.resolve(instructions)
+                resolved_instructions = await TemplatesRepository.resolve_str(instructions)
 
         result: ModelOutput = await GenerativeModel.loop(
             instructions=resolved_instructions,

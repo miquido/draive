@@ -8,14 +8,14 @@ from draive.conversation.completion.types import ConversationCompleting
 from draive.conversation.types import ConversationMessage, ConversationOutputChunk
 from draive.models import (
     ModelInput,
+    ModelInstructions,
     ModelMemory,
     ModelMemoryRecall,
     ModelOutput,
-    ResolveableInstructions,
     Tool,
     Toolbox,
 )
-from draive.multimodal import Multimodal
+from draive.multimodal import Multimodal, Template
 from draive.utils import Memory
 
 __all__ = ("Conversation",)
@@ -34,7 +34,7 @@ class Conversation(State):
     async def completion(
         cls,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         tools: Toolbox | Iterable[Tool] | None = None,
         memory: ModelMemory | Iterable[ConversationMessage] | None = None,
         input: ConversationMessage | Multimodal,
@@ -47,7 +47,7 @@ class Conversation(State):
     async def completion(
         cls,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         tools: Toolbox | Iterable[Tool] = (),
         memory: ModelMemory | Iterable[ConversationMessage] = (),
         input: ConversationMessage | Multimodal,
@@ -59,7 +59,7 @@ class Conversation(State):
     async def completion(
         cls,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         tools: Toolbox | Iterable[Tool] | None = None,
         memory: ModelMemory | Iterable[ConversationMessage] | None = None,
         input: ConversationMessage | Multimodal,  # noqa: A002
@@ -70,7 +70,7 @@ class Conversation(State):
 
         Parameters
         ----------
-        instructions : ResolveableInstructions, optional
+        instructions : Template | ModelInstructions, optional
             Instruction reference or content to steer the model.
         tools : Toolbox | Iterable[Tool] | None, optional
             Tools to expose for this turn.

@@ -1,12 +1,17 @@
 # Comprehensive Evaluation Framework
 
-Use Draive's evaluation primitives to score model outputs consistently and keep quality criteria transparent. This guide walks through evaluators, scenarios, suites, and supporting patterns for building end-to-end evaluation flows.
+Use Draive's evaluation primitives to score model outputs consistently and keep quality criteria
+transparent. This guide walks through evaluators, scenarios, suites, and supporting patterns for
+building end-to-end evaluation flows.
 
 ## Evaluator Basics
 
-- Evaluators are async callables decorated with `@evaluator` that return an `EvaluationScore` or a compatible numeric value.
-- Thresholds determine whether an evaluation passes; named levels (`"perfect"`, `"excellent"`, `"good"`, `"fair"`, `"poor"`) are easier to reason about than raw floats.
-- `EvaluationScore.performance` is reported as a percentage and can exceed 100 when a score comfortably beats its threshold.
+- Evaluators are async callables decorated with `@evaluator` that return an `EvaluationScore` or a
+  compatible numeric value.
+- Thresholds determine whether an evaluation passes; named levels (`"perfect"`, `"excellent"`,
+  `"good"`, `"fair"`, `"poor"`) are easier to reason about than raw floats.
+- `EvaluationScore.performance` is reported as a percentage and can exceed 100 when a score
+  comfortably beats its threshold.
 
 ### Working with `EvaluationScore`
 
@@ -58,7 +63,8 @@ async def evaluate_response_quality(value: str, context: str) -> Sequence[Evalua
     )
 ```
 
-`evaluate` can run evaluators concurrently. Limit concurrency when evaluators hit rate-limited services.
+`evaluate` can run evaluators concurrently. Limit concurrency when evaluators hit rate-limited
+services.
 
 ```python
 async def evaluate_response_quality_parallel(value: str, context: str) -> Sequence[EvaluatorResult]:
@@ -273,4 +279,5 @@ cases = await suite.generate_cases(
 - Reporting helpers for insight into failures and regressions
 - Concurrent execution to balance latency and throughput
 
-Use evaluators for quick checks, scenarios for logical groupings, and suites for comprehensive regression coverage backed by persistent cases and automated generation.
+Use evaluators for quick checks, scenarios for logical groupings, and suites for comprehensive
+regression coverage backed by persistent cases and automated generation.

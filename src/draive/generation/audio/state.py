@@ -4,8 +4,8 @@ from haiway import State, statemethod
 
 from draive.generation.audio.default import generate_audio
 from draive.generation.audio.types import AudioGenerating
-from draive.models import ResolveableInstructions
-from draive.multimodal import Multimodal, MultimodalContent
+from draive.models import ModelInstructions
+from draive.multimodal import Multimodal, MultimodalContent, Template
 from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("AudioGeneration",)
@@ -17,7 +17,7 @@ class AudioGeneration(State):
     async def generate(
         cls,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         input: Multimodal,
         **extra: Any,
     ) -> ResourceContent | ResourceReference: ...
@@ -26,7 +26,7 @@ class AudioGeneration(State):
     async def generate(
         self,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         input: Multimodal,
         **extra: Any,
     ) -> ResourceContent | ResourceReference: ...
@@ -35,7 +35,7 @@ class AudioGeneration(State):
     async def generate(
         self,
         *,
-        instructions: ResolveableInstructions = "",
+        instructions: Template | ModelInstructions = "",
         input: Multimodal,  # noqa: A002
         **extra: Any,
     ) -> ResourceContent | ResourceReference:

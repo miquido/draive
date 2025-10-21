@@ -6,8 +6,13 @@ from typing import Any, cast
 from haiway import BasicValue, Map, ctx
 from haiway.postgres import Postgres, PostgresRow, PostgresValue
 
-from draive.models import ModelMemory, ModelMemoryRecall
-from draive.models.types import ModelContextElement, ModelInput, ModelOutput
+from draive.models import (
+    ModelContextElement,
+    ModelInput,
+    ModelMemory,
+    ModelMemoryRecall,
+    ModelOutput,
+)
 
 __all__ = ("PostgresModelMemory",)
 

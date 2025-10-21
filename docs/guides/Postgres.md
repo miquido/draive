@@ -15,14 +15,14 @@ from draive.postgres import (
     Postgres,
     PostgresConnectionPool,
     PostgresConfigurationRepository,
-    PostgresInstructionsRepository,
     PostgresModelMemory,
+    PostgresTemplatesRepository,
 )
 
 async with ctx.scope(
     "postgres-demo",
     PostgresConfigurationRepository(), # use use postgres configurations
-    PostgresInstructionsRepository(), # use postgres instructions
+    PostgresTemplatesRepository(), # use postgres templates
     disposables=(
         PostgresConnectionPool.of(dsn="postgresql://draive:secret@localhost:5432/draive"),
     ),
@@ -62,36 +62,36 @@ Key capabilities:
 Tune memory pressure through `cache_limit` and `cache_expiration` arguments when instantiating the
 repository.
 
-## InstructionsRepository implementation
+## TemplatesRepository implementation
 
-`PostgresInstructionsRepository` mirrors the behaviour of the in-memory instructions repository
-while persisting values in a dedicated `instructions` table:
+`PostgresTemplatesRepository` mirrors the behaviour of the file-backed templates repository while
+storing revisions inside a dedicated `templates` table:
+
+See the [Templates](./Templates.md) guide for authoring patterns and runtime resolution examples.
 
 ```sql
-CREATE TABLE instructions (
-    name TEXT NOT NULL,
+CREATE TABLE templates (
+    identifier TEXT NOT NULL,
     description TEXT DEFAULT NULL,
     content TEXT NOT NULL,
-    arguments JSONB NOT NULL DEFAULT '[]'::jsonb,
+    variables JSONB NOT NULL DEFAULT '{}'::jsonb,
     meta JSONB NOT NULL DEFAULT '{}'::jsonb,
     created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (name, created)
+    PRIMARY KEY (identifier, created)
 );
 ```
 
-Highlights:
+Capabilities:
 
-- `available_instructions()` returns structured `InstructionsDeclaration` objects with cached
-  results for quick catalog views.
-- `resolve(instructions, arguments)` resolves the latest instruction body, leveraging a dedicated
-  cache keyed by name and utilizing the provided arguments.
-- `load(instructions)` loads the raw latest instructions keyed by name.
-- `define(instructions, content)` stores new revisions and invalidates caches so subsequent reads
-  return the fresh version.
-- `remove(instructions)` removes all revisions for the instruction and drops relevant cache entries.
+- `templates()` returns cached `TemplateDeclaration` objects reflecting the newest revision per
+  identifier.
+- `resolve(template)` and `resolve_str(template)` reuse a cached loader keyed by identifier to
+  pull the latest template body before rendering arguments.
+- `define(template, content)` persists a new revision, invalidates caches, and ensures subsequent
+  reads see the updated payload.
 
-This adapter is ideal when you author system prompts and tool manifests centrally and want version
-history per instruction.
+Use this adapter whenever your multimodal templates live alongside other structured content in
+Postgres and you want on-demand caching with revision history.
 
 ## ModelMemory implementation
 
@@ -214,9 +214,9 @@ pgvector. Set `rerank=False` to return rows ordered solely by the database simil
 ### Payload filtering and requirements
 
 Search and deletion accept `AttributeRequirement` instances which are evaluated against the stored
-payload JSON. Requirements are translated to SQL expressions (for example, `AttributeRequirement.equal`
-becomes `payload #>> '{text}' = $2`). Unsupported operators raise `NotImplementedError`, ensuring the
-query surface remains explicit.
+payload JSON. Requirements are translated to SQL expressions (for example,
+`AttributeRequirement.equal` becomes `payload #>> '{text}' = $2`). Unsupported operators raise
+`NotImplementedError`, ensuring the query surface remains explicit.
 
 ## Putting it together
 
