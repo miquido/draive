@@ -8,7 +8,7 @@ __all__ = ("ArtifactContent",)
 
 
 @final
-class ArtifactContent[Artifact: DataModel](DataModel):
+class ArtifactContent[Artifact: DataModel = DataModel](DataModel):
     """
     Typed wrapper for a DataModel artifact with optional metadata.
 
