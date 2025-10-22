@@ -1,9 +1,9 @@
 from base64 import urlsafe_b64decode
 from collections.abc import Sequence
-from typing import cast
 
 from draive.embedding import Embedded, ImageEmbedding, TextEmbedding, vector_similarity_score
-from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.utils import FORMAT_INSTRUCTION, extract_evaluation_result
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.resources import ResourceContent
 from draive.stages import Stage
@@ -15,35 +15,29 @@ __all__ = (
 )
 
 
-INSTRUCTION: str = """\
+INSTRUCTION: str = f"""\
 You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
-Compare the REFERENCE and the EVALUATED content by carefully examining them, then rate\
- the EVALUATED content using solely a similarity metric according to the EVALUATION_CRITERIA.
+Compare the REFERENCE and the EVALUATED content by carefully examining them, then rate the EVALUATED content using solely a similarity metric according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
-Evaluated metric is similarity - the degree of semantic similarity between the REFERENCE\
- and the EVALUATED content.
+Evaluated metric is similarity - the degree of semantic similarity between the REFERENCE and the EVALUATED content.
 </EVALUATION_CRITERIA>
-{guidelines}
+{{guidelines}}
 <RATING>
 Assign a similarity score using the exact name of one of the following values:
 - "poor" is very low similarity; the content is completely unrelated in meaning.
 - "good" is moderate similarity; the content shares some common themes or ideas.
-- "perfect" is very high similarity; the content is very close in meaning\
- or conveys the same information.
+- "perfect" is very high similarity; the content is very close in meaning or conveys the same information.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 
-<FORMAT>
-The final result, containing only the rating value, MUST be placed inside a\
- `RESULT` XML tag, e.g., `<RESULT>good</RESULT>`.
-</FORMAT>
-"""
+{FORMAT_INSTRUCTION}
+"""  # noqa: E501
 
 
 @evaluator(name="similarity")
@@ -66,29 +60,20 @@ async def similarity_evaluator(
             meta={"comment": "Reference was empty!"},
         )
 
-    completion: MultimodalContent = await Stage.completion(
-        MultimodalContent.of(
-            "<REFERENCE>",
-            reference,
-            "</REFERENCE>\n<EVALUATED>",
-            evaluated,
-            "</EVALUATED>",
-        ),
-        instructions=INSTRUCTION.format(
-            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
-            if guidelines is not None
-            else ""
-        ),
-    ).execute()
-
-    if result := completion.tag("RESULT"):
-        return EvaluationScore.of(
-            cast(EvaluationScoreValue, result.content.to_str().strip().lower()),
-            meta={"comment": completion.to_str()},
-        )
-
-    else:
-        raise ValueError(f"Invalid evaluator result:\n{completion}")
+    return extract_evaluation_result(
+        await Stage.completion(
+            MultimodalContent.of(
+                "<REFERENCE>",
+                reference,
+                "</REFERENCE>\n<EVALUATED>",
+                evaluated,
+                "</EVALUATED>",
+            ),
+            instructions=INSTRUCTION.format(
+                guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
+            ),
+        ).execute()
+    )
 
 
 @evaluator(name="text_vector_similarity")

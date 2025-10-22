@@ -1,48 +1,37 @@
-from typing import cast
-
-from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.utils import FORMAT_INSTRUCTION, extract_evaluation_result
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.stages import Stage
 
 __all__ = ("conciseness_evaluator",)
 
 
-INSTRUCTION: str = """\
+INSTRUCTION: str = f"""\
 You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
-Compare the REFERENCE and the EVALUATED content by carefully examining them, then rate\
- the EVALUATED content using solely a conciseness metric according to the EVALUATION_CRITERIA.
+Compare the REFERENCE and the EVALUATED content by carefully examining them, then rate the EVALUATED content using solely a conciseness metric according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
-Evaluated metric is conciseness - a extent to which the EVALUATED content is brief and to the\
- point while still covering all key information.
-A concise content avoids unnecessary details and repetition, also avoiding being overly verbose\
- or include irrelevant information.
+Evaluated metric is conciseness — the extent to which the EVALUATED content is brief and to the point while still covering all key information.
+Concise content avoids unnecessary details and repetition, while not being overly verbose or including irrelevant information.
 </EVALUATION_CRITERIA>
-{guidelines}
+{{guidelines}}
 <RATING>
 Assign a conciseness score using exact name of one of the following values:
-- "poor" is very low conciseness, the content is excessively verbose with much irrelevant\
- information.
-- "fair" is low conciseness, the content contains unnecessary details and some irrelevant\
- information.
+- "poor" is very low conciseness, the content is excessively verbose with much irrelevant information.
+- "fair" is low conciseness, the content contains unnecessary details and some irrelevant information.
 - "good" is moderate conciseness, the content is somewhat concise but could be more focused.
-- "excellent" is high conciseness, the content is mostly concise with minimal unnecessary\
- information.
-- "perfect" is very high conciseness, the content is highly concise, containing only essential\
- information.
+- "excellent" is high conciseness, the content is mostly concise with minimal unnecessary information.
+- "perfect" is very high conciseness, the content is highly concise, containing only essential information.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 
-<FORMAT>
-The final result containing only the rating value, HAVE to be put inside a `RESULT`\
- xml tag within the result i.e. `<RESULT>good</RESULT>`.
-</FORMAT>
-"""
+{FORMAT_INSTRUCTION}
+"""  # noqa: E501
 
 
 @evaluator(name="conciseness")
@@ -65,26 +54,17 @@ async def conciseness_evaluator(
             meta={"comment": "Reference was empty!"},
         )
 
-    completion: MultimodalContent = await Stage.completion(
-        MultimodalContent.of(
-            "<REFERENCE>",
-            reference,
-            "</REFERENCE>\n<EVALUATED>",
-            evaluated,
-            "</EVALUATED>",
-        ),
-        instructions=INSTRUCTION.format(
-            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
-            if guidelines is not None
-            else ""
-        ),
-    ).execute()
-
-    if result := completion.tag("RESULT"):
-        return EvaluationScore.of(
-            cast(EvaluationScoreValue, result.content.to_str().strip().lower()),
-            meta={"comment": completion.to_str()},
-        )
-
-    else:
-        raise ValueError(f"Invalid evaluator result:\n{completion}")
+    return extract_evaluation_result(
+        await Stage.completion(
+            MultimodalContent.of(
+                "<REFERENCE>",
+                reference,
+                "</REFERENCE>\n<EVALUATED>",
+                evaluated,
+                "</EVALUATED>",
+            ),
+            instructions=INSTRUCTION.format(
+                guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
+            ),
+        ).execute()
+    )

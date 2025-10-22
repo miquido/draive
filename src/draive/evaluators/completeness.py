@@ -1,49 +1,36 @@
-from typing import cast
-
-from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.utils import FORMAT_INSTRUCTION, extract_evaluation_result
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.stages import Stage
 
 __all__ = ("completeness_evaluator",)
 
 
-INSTRUCTION: str = """\
+INSTRUCTION: str = f"""\
 You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
-Compare the USER_QUERY and the EVALUATED content by carefully examining them, then rate\
- the EVALUATED content using solely a completeness metric according to the EVALUATION_CRITERIA.
+Compare the USER_QUERY and the EVALUATED content by carefully examining them, then rate the EVALUATED content using solely a completeness metric according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
-Evaluated metric is completeness - the extent to which the EVALUATED content fully\
- addresses and answers all aspects of the USER_QUERY. Complete content should address\
- all parts of multi-part questions, provide comprehensive responses to complex queries,\
- and not leave important aspects of the user's request unanswered.
+Evaluated metric is completeness - the extent to which the EVALUATED content fully addresses and answers all aspects of the USER_QUERY. Complete content should address all parts of multi-part questions, provide comprehensive responses to complex queries, and not leave important aspects of the user's request unanswered.
 </EVALUATION_CRITERIA>
-{guidelines}
+{{guidelines}}
 <RATING>
 Assign a completeness score using exact name of one of the following values:
-- "poor" is very low completeness, the content addresses very few aspects of the\
- user's query, leaving most questions unanswered.
-- "fair" is low completeness, the content addresses some aspects of the user's query\
- but leaves several important parts unanswered or incomplete.
-- "good" is moderate completeness, the content addresses most aspects of the user's\
- query but may miss some details or minor components.
-- "excellent" is high completeness, the content addresses nearly all aspects of the\
- user's query with only minor gaps or omissions.
-- "perfect" is very high completeness, the content fully and comprehensively addresses\
- all aspects of the user's query without any significant omissions.
+- "poor" is very low completeness, the content addresses very few aspects of the user's query, leaving most questions unanswered.
+- "fair" is low completeness, the content addresses some aspects of the user's query but leaves several important parts unanswered or incomplete.
+- "good" is moderate completeness, the content addresses most aspects of the user's query but may miss some details or minor components.
+- "excellent" is high completeness, the content addresses nearly all aspects of the user's query with only minor gaps or omissions.
+- "perfect" is very high completeness, the content fully and comprehensively addresses all aspects of the user's query without any significant omissions.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 
-<FORMAT>
-The final result containing only the rating value, HAVE to be put inside a `RESULT`\
- xml tag within the result i.e. `<RESULT>good</RESULT>`.
-</FORMAT>
-"""
+{FORMAT_INSTRUCTION}
+"""  # noqa: E501
 
 
 @evaluator(name="completeness")
@@ -92,26 +79,17 @@ async def completeness_evaluator(
             meta={"comment": "User query was empty!"},
         )
 
-    completion: MultimodalContent = await Stage.completion(
-        MultimodalContent.of(
-            "<USER_QUERY>",
-            user_query,
-            "</USER_QUERY>\n<EVALUATED>",
-            evaluated,
-            "</EVALUATED>",
-        ),
-        instructions=INSTRUCTION.format(
-            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
-            if guidelines is not None
-            else ""
-        ),
-    ).execute()
-
-    if result := completion.tag("RESULT"):
-        return EvaluationScore.of(
-            cast(EvaluationScoreValue, result.content.to_str().strip().lower()),
-            meta={"comment": completion.to_str()},
-        )
-
-    else:
-        raise ValueError(f"Invalid evaluator result:\n{completion}")
+    return extract_evaluation_result(
+        await Stage.completion(
+            MultimodalContent.of(
+                "<USER_QUERY>",
+                user_query,
+                "</USER_QUERY>\n<EVALUATED>",
+                evaluated,
+                "</EVALUATED>",
+            ),
+            instructions=INSTRUCTION.format(
+                guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
+            ),
+        ).execute()
+    )

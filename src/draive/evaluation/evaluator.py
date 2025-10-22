@@ -1,6 +1,5 @@
 import re
-from asyncio import gather
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Sequence
 from typing import Annotated, Protocol, Self, cast, overload, runtime_checkable
 
 from haiway import (
@@ -10,8 +9,10 @@ from haiway import (
     Immutable,
     Meta,
     MetaValues,
+    ObservabilityLevel,
     State,
     Validator,
+    concurrently,
     ctx,
 )
 
@@ -288,9 +289,10 @@ class Evaluator[Value, **Args](Immutable):
         evaluator: PreparedEvaluator[Value],
         /,
         *evaluators: PreparedEvaluator[Value],
+        concurrent_tasks: int = 2,
     ) -> PreparedEvaluator[Value]:
         """
-        Create an evaluator that returns the lowest scoring result.
+        Create an evaluator that returns the lowest performing result.
 
         Parameters
         ----------
@@ -298,6 +300,8 @@ class Evaluator[Value, **Args](Immutable):
             First evaluator to run
         *evaluators : PreparedEvaluator[Value]
             Additional evaluators to run
+        concurrent_tasks: int
+            Number of concurrently executed evaluators
 
         Returns
         -------
@@ -316,9 +320,10 @@ class Evaluator[Value, **Args](Immutable):
                 meta=META_EMPTY,
             )
 
-            for result in await gather(
-                evaluator(value),
-                *(evaluator(value) for evaluator in evaluators),
+            for result in await concurrently(
+                (evaluator(value), *(evaluator(value) for evaluator in evaluators)),
+                concurrent_tasks=concurrent_tasks,
+                return_exceptions=False,
             ):
                 if result.performance <= lowest.performance:
                     lowest = result
@@ -332,9 +337,10 @@ class Evaluator[Value, **Args](Immutable):
         evaluator: PreparedEvaluator[Value],
         /,
         *evaluators: PreparedEvaluator[Value],
+        concurrent_tasks: int = 2,
     ) -> PreparedEvaluator[Value]:
         """
-        Create an evaluator that returns the highest scoring result.
+        Create an evaluator that returns the highest performing result.
 
         Parameters
         ----------
@@ -342,6 +348,8 @@ class Evaluator[Value, **Args](Immutable):
             First evaluator to run
         *evaluators : PreparedEvaluator[Value]
             Additional evaluators to run
+        concurrent_tasks: int
+            Number of concurrently executed evaluators
 
         Returns
         -------
@@ -360,14 +368,64 @@ class Evaluator[Value, **Args](Immutable):
                 meta=META_EMPTY,
             )
 
-            for result in await gather(
-                evaluator(value),
-                *(evaluator(value) for evaluator in evaluators),
+            for result in await concurrently(
+                (evaluator(value), *(evaluator(value) for evaluator in evaluators)),
+                concurrent_tasks=concurrent_tasks,
+                return_exceptions=False,
             ):
                 if result.performance >= highest.performance:
                     highest = result
 
             return highest
+
+        return evaluate
+
+    @staticmethod
+    def average(
+        evaluator: PreparedEvaluator[Value],
+        /,
+        *evaluators: PreparedEvaluator[Value],
+        threshold: EvaluationScoreValue,
+        concurrent_tasks: int = 2,
+    ) -> PreparedEvaluator[Value]:
+        """
+        Create an evaluator that returns the average scoring result.
+
+        Parameters
+        ----------
+        evaluator : PreparedEvaluator[Value]
+            First evaluator to run
+        *evaluators : PreparedEvaluator[Value]
+            Additional evaluators to run
+        threshold: EvaluationScoreValue
+            Combined result threshold replacing combined thresholds
+        concurrent_tasks: int
+            Number of concurrently executed evaluators
+
+        Returns
+        -------
+        PreparedEvaluator[Value]
+            Evaluator that returns the result with average score value
+        """
+
+        async def evaluate(
+            value: Value,
+        ) -> EvaluatorResult:
+            scores: Sequence[float] = [
+                result.score
+                for result in await concurrently(
+                    (evaluator(value), *(evaluator(value) for evaluator in evaluators)),
+                    concurrent_tasks=concurrent_tasks,
+                    return_exceptions=False,
+                )
+            ]
+
+            return EvaluatorResult(
+                evaluator="average",
+                score=sum(scores) / len(scores),
+                threshold=evaluation_score_value(threshold),
+                meta=META_EMPTY,
+            )
 
         return evaluate
 
@@ -618,6 +676,7 @@ class Evaluator[Value, **Args](Immutable):
             )
 
             ctx.record(
+                ObservabilityLevel.INFO,
                 metric=f"evaluator.{result.evaluator}.performance",
                 value=result.performance,
                 unit="%",
