@@ -45,7 +45,7 @@ async def generate_case_parameters[Parameters: DataModel](
                 parameters,
                 instructions=INSTRUCTION.format(
                     guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
-                    if guidelines is not None
+                    if guidelines
                     else ""
                 ),
                 input=INPUT,

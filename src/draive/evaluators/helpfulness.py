@@ -1,50 +1,36 @@
-from typing import cast
-
-from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.utils import FORMAT_INSTRUCTION, extract_evaluation_result
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.stages import Stage
 
 __all__ = ("helpfulness_evaluator",)
 
 
-INSTRUCTION: str = """\
+INSTRUCTION: str = f"""\
 You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
-Compare the USER_QUERY and the EVALUATED content by carefully examining them, then rate\
- the EVALUATED content using solely a helpfulness metric according to the EVALUATION_CRITERIA.
+Compare the USER_QUERY and the EVALUATED content by carefully examining them, then rate the EVALUATED content using solely a helpfulness metric according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
-Evaluated metric is helpfulness - the extent to which the EVALUATED content addresses\
- the user's needs, questions, or requests effectively. Helpful content should be relevant\
- to the user's query, provide useful information or solutions, be actionable when appropriate,\
- and demonstrate understanding of what the user is trying to achieve. The content should\
- genuinely assist the user in accomplishing their goal or answering their question.
+Evaluated metric is helpfulness - the extent to which the EVALUATED content addresses the user's needs, questions, or requests effectively. Helpful content should be relevant to the user's query, provide useful information or solutions, be actionable when appropriate, and demonstrate understanding of what the user is trying to achieve. The content should genuinely assist the user in accomplishing their goal or answering their question.
 </EVALUATION_CRITERIA>
-{guidelines}
+{{guidelines}}
 <RATING>
 Assign a helpfulness score using exact name of one of the following values:
-- "poor" is very low helpfulness, the content fails to address the user's query or provides\
- irrelevant, unhelpful information.
-- "fair" is low helpfulness, the content partially addresses the query but lacks important\
- details or actionable information.
-- "good" is moderate helpfulness, the content addresses most of the user's needs but could\
- be more complete or actionable.
-- "excellent" is high helpfulness, the content effectively addresses the user's query with\
- relevant, useful information and minor gaps.
-- "perfect" is very high helpfulness, the content fully addresses the user's needs with\
- comprehensive, actionable, and highly relevant information.
+- "poor" is very low helpfulness, the content fails to address the user's query or provides irrelevant, unhelpful information.
+- "fair" is low helpfulness, the content partially addresses the query but lacks important details or actionable information.
+- "good" is moderate helpfulness, the content addresses most of the user's needs but could be more complete or actionable.
+- "excellent" is high helpfulness, the content effectively addresses the user's query with relevant, useful information and minor gaps.
+- "perfect" is very high helpfulness, the content fully addresses the user's needs with comprehensive, actionable, and highly relevant information.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 
-<FORMAT>
-The final result containing only the rating value, HAVE to be put inside a `RESULT`\
- xml tag within the result i.e. `<RESULT>good</RESULT>`.
-</FORMAT>
-"""
+{FORMAT_INSTRUCTION}
+"""  # noqa: E501
 
 
 @evaluator(name="helpfulness")
@@ -93,26 +79,17 @@ async def helpfulness_evaluator(
             meta={"comment": "User query was empty!"},
         )
 
-    completion: MultimodalContent = await Stage.completion(
-        MultimodalContent.of(
-            "<USER_QUERY>",
-            user_query,
-            "</USER_QUERY>\n<EVALUATED>",
-            evaluated,
-            "</EVALUATED>",
-        ),
-        instructions=INSTRUCTION.format(
-            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
-            if guidelines is not None
-            else ""
-        ),
-    ).execute()
-
-    if result := completion.tag("RESULT"):
-        return EvaluationScore.of(
-            cast(EvaluationScoreValue, result.content.to_str().strip().lower()),
-            meta={"comment": completion.to_str()},
-        )
-
-    else:
-        raise ValueError(f"Invalid evaluator result:\n{completion}")
+    return extract_evaluation_result(
+        await Stage.completion(
+            MultimodalContent.of(
+                "<USER_QUERY>",
+                user_query,
+                "</USER_QUERY>\n<EVALUATED>",
+                evaluated,
+                "</EVALUATED>",
+            ),
+            instructions=INSTRUCTION.format(
+                guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
+            ),
+        ).execute()
+    )

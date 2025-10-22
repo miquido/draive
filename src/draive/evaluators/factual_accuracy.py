@@ -1,51 +1,36 @@
-from typing import cast
-
-from draive.evaluation import EvaluationScore, EvaluationScoreValue, evaluator
+from draive.evaluation import EvaluationScore, evaluator
+from draive.evaluators.utils import FORMAT_INSTRUCTION, extract_evaluation_result
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.stages import Stage
 
 __all__ = ("factual_accuracy_evaluator",)
 
 
-INSTRUCTION: str = """\
+INSTRUCTION: str = f"""\
 You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine provided CONTENT, then rate it using solely a\
- factual accuracy metric according to the EVALUATION_CRITERIA.
+Carefully examine provided CONTENT, then rate it using solely a factual accuracy metric according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
-Evaluated metric is factual accuracy - the extent to which the content contains\
- factually correct information based on established knowledge, verifiable facts,\
- and reliable sources. This evaluates the correctness of claims, data, statements,\
- and assertions made in the content, regardless of any reference material.\
- The evaluation should consider well-established facts, scientific consensus,\
- historical accuracy, and generally accepted knowledge.
+Evaluated metric is factual accuracy - the extent to which the content contains factually correct information based on established knowledge, verifiable facts, and reliable sources. This evaluates the correctness of claims, data, statements, and assertions made in the content, regardless of any reference material. The evaluation should consider well-established facts, scientific consensus, historical accuracy, and generally accepted knowledge.
 </EVALUATION_CRITERIA>
-{guidelines}
+{{guidelines}}
 <RATING>
 Assign a factual accuracy score using exact name of one of the following values:
-- "poor" is very low factual accuracy, the content contains many significant\
- factual errors or false information.
-- "fair" is low factual accuracy, the content has several factual inaccuracies\
- or questionable claims mixed with some correct information.
-- "good" is moderate factual accuracy, the content is mostly factually correct\
- but contains some minor inaccuracies or unverified claims.
-- "excellent" is high factual accuracy, the content is largely factually correct\
- with minimal or very minor factual issues.
-- "perfect" is very high factual accuracy, the content is completely factually\
- accurate with all information being correct and verifiable.
+- "poor" is very low factual accuracy, the content contains many significant factual errors or false information.
+- "fair" is low factual accuracy, the content has several factual inaccuracies or questionable claims mixed with some correct information.
+- "good" is moderate factual accuracy, the content is mostly factually correct but contains some minor inaccuracies or unverified claims.
+- "excellent" is high factual accuracy, the content is largely factually correct with minimal or very minor factual issues.
+- "perfect" is very high factual accuracy, the content is completely factually accurate with all information being correct and verifiable.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 
-<FORMAT>
-The final result containing only the rating value, HAVE to be put inside a `RESULT`\
- xml tag within the result i.e. `<RESULT>good</RESULT>`.
-</FORMAT>
-"""
+{FORMAT_INSTRUCTION}
+"""  # noqa: E501
 
 
 @evaluator(name="factual_accuracy")
@@ -85,24 +70,15 @@ async def factual_accuracy_evaluator(
             meta={"comment": "Input was empty!"},
         )
 
-    completion: MultimodalContent = await Stage.completion(
-        MultimodalContent.of(
-            "<CONTENT>",
-            evaluated,
-            "</CONTENT>",
-        ),
-        instructions=INSTRUCTION.format(
-            guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
-            if guidelines is not None
-            else ""
-        ),
-    ).execute()
-
-    if result := completion.tag("RESULT"):
-        return EvaluationScore.of(
-            cast(EvaluationScoreValue, result.content.to_str().strip().lower()),
-            meta={"comment": completion.to_str()},
-        )
-
-    else:
-        raise ValueError(f"Invalid evaluator result:\n{completion}")
+    return extract_evaluation_result(
+        await Stage.completion(
+            MultimodalContent.of(
+                "<CONTENT>",
+                evaluated,
+                "</CONTENT>",
+            ),
+            instructions=INSTRUCTION.format(
+                guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
+            ),
+        ).execute()
+    )
