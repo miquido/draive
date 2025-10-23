@@ -346,6 +346,16 @@ class OpenAIRealtime(OpenAIAPI):
                         case "conversation.item.input_audio_transcription.completed":
                             await connection.conversation.item.retrieve(item_id=event.item_id)
 
+                        case "conversation.item.done":
+                            if event.item.id is None:
+                                continue  # can't use items without item id
+
+                            if event.item.type != "message":
+                                continue  # handle only messages
+
+                            if event.item.role == "assistant":
+                                await connection.conversation.item.retrieve(item_id=event.item.id)
+
                         case "conversation.item.retrieved":
                             if event.item.id is None:
                                 continue  # can't use items without item id
@@ -842,5 +852,21 @@ def _assistant_content_to_multimodal(
     for part in content:
         if part.text:
             parts.append(TextContent.of(part.text))
+
+        if part.audio:
+            parts.append(
+                ResourceContent.of(
+                    part.audio,
+                    mime_type=audio_format,
+                )
+            )
+
+        if part.transcript:
+            parts.append(
+                TextContent.of(
+                    part.transcript,
+                    meta={"transcript": True},
+                )
+            )
 
     return MultimodalContent.of(*parts)
