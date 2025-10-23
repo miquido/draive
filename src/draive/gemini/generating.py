@@ -23,6 +23,7 @@ from google.genai.types import (
     GenerateContentConfigDict,
     GenerateContentResponse,
     GenerateContentResponseUsageMetadata,
+    HarmBlockThreshold,
     HarmCategory,
     MediaResolution,
     Modality,
@@ -615,23 +616,29 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
         "safety_settings": [
             {
                 "category": HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                "threshold": safety_config.harm_category_hate_speech_threshold,
+                "threshold": HarmBlockThreshold(safety_config.harm_category_hate_speech_threshold),
             },
             {
                 "category": HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                "threshold": safety_config.harm_category_dangerous_content_threshold,
+                "threshold": HarmBlockThreshold(
+                    safety_config.harm_category_dangerous_content_threshold
+                ),
             },
             {
                 "category": HarmCategory.HARM_CATEGORY_HARASSMENT,
-                "threshold": safety_config.harm_category_harassment_threshold,
+                "threshold": HarmBlockThreshold(safety_config.harm_category_harassment_threshold),
             },
             {
                 "category": HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                "threshold": safety_config.harm_category_sexually_explicit_threshold,
+                "threshold": HarmBlockThreshold(
+                    safety_config.harm_category_sexually_explicit_threshold
+                ),
             },
             {
                 "category": HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
-                "threshold": safety_config.harm_category_civic_integrity_threshold,
+                "threshold": HarmBlockThreshold(
+                    safety_config.harm_category_civic_integrity_threshold
+                ),
             },
         ],
         "system_instruction": instructions,
