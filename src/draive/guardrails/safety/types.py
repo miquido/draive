@@ -6,12 +6,12 @@ from draive.guardrails.types import GuardrailsException
 from draive.multimodal import MultimodalContent
 
 __all__ = (
-    "GuardrailsQualityException",
-    "GuardrailsQualityVerifying",
+    "GuardrailsSafetyException",
+    "GuardrailsSafetySanitization",
 )
 
 
-class GuardrailsQualityException(GuardrailsException):
+class GuardrailsSafetyException(GuardrailsException):
     __slots__ = (
         "content",
         "reason",
@@ -30,10 +30,10 @@ class GuardrailsQualityException(GuardrailsException):
 
 
 @runtime_checkable
-class GuardrailsQualityVerifying(Protocol):
+class GuardrailsSafetySanitization(Protocol):
     async def __call__(
         self,
         content: MultimodalContent,
         /,
         **extra: Any,
-    ) -> None: ...
+    ) -> MultimodalContent: ...

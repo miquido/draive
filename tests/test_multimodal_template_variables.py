@@ -107,6 +107,7 @@ def test_resolve_text_template_detects_missing_argument() -> None:
     with raises(KeyError, match="Missing template argument: name"):
         resolve_text_template("Hello {%name%}", arguments={"other": "value"})
 
+
 def test_resolve_text_template_ignores_unused_argument() -> None:
     result = resolve_text_template("Hello world", arguments={"extra": "value"})
 

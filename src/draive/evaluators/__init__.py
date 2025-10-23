@@ -9,6 +9,7 @@ from draive.evaluators.factual_accuracy import factual_accuracy_evaluator
 from draive.evaluators.fluency import fluency_evaluator
 from draive.evaluators.groundedness import groundedness_evaluator
 from draive.evaluators.helpfulness import helpfulness_evaluator
+from draive.evaluators.jailbreak import jailbreak_evaluator
 from draive.evaluators.keywords import forbidden_keywords_evaluator, required_keywords_evaluator
 from draive.evaluators.readability import readability_evaluator
 from draive.evaluators.relevance import relevance_evaluator
@@ -35,6 +36,7 @@ __all__ = (
     "groundedness_evaluator",
     "helpfulness_evaluator",
     "image_vector_similarity_evaluator",
+    "jailbreak_evaluator",
     "readability_evaluator",
     "relevance_evaluator",
     "required_keywords_evaluator",
