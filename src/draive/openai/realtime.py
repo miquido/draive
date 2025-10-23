@@ -353,33 +353,8 @@ class OpenAIRealtime(OpenAIAPI):
                             if event.item.type != "message":
                                 continue  # handle only messages
 
-                            # Only record completed items, otherwise request once more
-                            if event.item.status != "completed":
-                                continue  # retry getting completed event
-
-                            assert event.item.content  # nosec: B101
-                            match event.item.role:
-                                case "assistant":
-                                    try:
-                                        await memory.remember(
-                                            ModelOutput.of(
-                                                _assistant_content_to_multimodal(
-                                                    event.item.content,
-                                                    audio_format=output_audio_format,
-                                                ),
-                                                meta=current_items[event.item.id],
-                                            ),
-                                        )
-
-                                    except Exception as exc:
-                                        ctx.log_error(
-                                            "Failed to remember model context",
-                                            exception=exc,
-                                        )
-                                        raise exc
-
-                                case _:
-                                    continue  # skip other
+                            if event.item.role == "assistant":
+                                await connection.conversation.item.retrieve(item_id=event.item.id)
 
                         case "conversation.item.retrieved":
                             if event.item.id is None:
@@ -402,6 +377,25 @@ class OpenAIRealtime(OpenAIAPI):
                                                 _user_content_to_multimodal(
                                                     event.item.content,
                                                     audio_format=input_audio_format,
+                                                ),
+                                                meta=current_items[event.item.id],
+                                            ),
+                                        )
+
+                                    except Exception as exc:
+                                        ctx.log_error(
+                                            "Failed to remember model context",
+                                            exception=exc,
+                                        )
+                                        raise exc
+
+                                case "assistant":
+                                    try:
+                                        await memory.remember(
+                                            ModelOutput.of(
+                                                _assistant_content_to_multimodal(
+                                                    event.item.content,
+                                                    audio_format=output_audio_format,
                                                 ),
                                                 meta=current_items[event.item.id],
                                             ),
