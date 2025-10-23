@@ -10,7 +10,13 @@ __all__ = (
     "GeminiSafetyThreshold",
 )
 
-GeminiSafetyThreshold = Literal["off", "none", "high", "medium", "low"]
+GeminiSafetyThreshold = Literal[
+    "off",
+    "block_none",
+    "block_only_high",
+    "block_medium_and_above",
+    "block_low_and_above",
+]
 
 
 class GeminiSafetyConfig(Configuration):
