@@ -9,6 +9,7 @@ from draive.evaluation import (
     PreparedEvaluatorScenario,
 )
 from draive.guardrails.quality.types import GuardrailsQualityException, GuardrailsQualityVerifying
+from draive.guardrails.types import GuardrailsException, GuardrailsFailure
 from draive.multimodal import Multimodal, MultimodalContent
 
 __all__ = ("GuardrailsQualityVerification",)
@@ -83,9 +84,29 @@ class GuardrailsQualityVerification(State):
         /,
         **extra: Any,
     ) -> None:
-        await self.verifying(
-            MultimodalContent.of(content),
-            **extra,
-        )
+        content = MultimodalContent.of(content)
+        try:
+            await self.verifying(
+                content,
+                **extra,
+            )
+
+        except GuardrailsQualityException:
+            raise
+
+        except GuardrailsException as exc:
+            raise GuardrailsQualityException(
+                f"Quality guardrails triggered: {exc}",
+                content=content,
+                reason=str(exc),
+                meta=exc.meta,
+            ) from exc
+
+        except Exception as exc:
+            raise GuardrailsFailure(
+                f"Quality guardrails failed: {exc}",
+                cause=exc,
+                meta={"error_type": exc.__class__.__name__},
+            ) from exc
 
     verifying: GuardrailsQualityVerifying = _no_verification

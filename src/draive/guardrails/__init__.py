@@ -16,12 +16,21 @@ from draive.guardrails.quality import (
     GuardrailsQualityVerification,
     GuardrailsQualityVerifying,
 )
+from draive.guardrails.safety import (
+    GuardrailsSafety,
+    GuardrailsSafetyException,
+    GuardrailsSafetySanitization,
+    regex_safety_sanitization,
+)
+from draive.guardrails.types import GuardrailsException, GuardrailsFailure
 
 __all__ = (
     "GuardrailsAnonymization",
     "GuardrailsAnonymizedContent",
     "GuardrailsContentAnonymizing",
     "GuardrailsContentDeanonymizing",
+    "GuardrailsException",
+    "GuardrailsFailure",
     "GuardrailsInputModerationException",
     "GuardrailsModeration",
     "GuardrailsModerationChecking",
@@ -30,4 +39,8 @@ __all__ = (
     "GuardrailsQualityException",
     "GuardrailsQualityVerification",
     "GuardrailsQualityVerifying",
+    "GuardrailsSafety",
+    "GuardrailsSafetyException",
+    "GuardrailsSafetySanitization",
+    "regex_safety_sanitization",
 )
