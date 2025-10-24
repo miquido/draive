@@ -1,3 +1,9 @@
+from asyncio import ALL_COMPLETED, FIRST_COMPLETED, Task, wait
+from collections.abc import (
+    AsyncIterable,
+    Collection,
+    Coroutine,
+)
 from typing import Any, overload
 
 from haiway import State, statemethod
@@ -80,6 +86,89 @@ class GuardrailsModeration(State):
                 cause=exc,
                 meta={"error_type": exc.__class__.__name__},
             ) from exc
+
+    @overload
+    @classmethod
+    async def input_guarded[Result](
+        cls,
+        content: Multimodal,
+        /,
+        feature: Coroutine[None, None, Result],
+        **extra: Any,
+    ) -> Result: ...
+
+    @overload
+    async def input_guarded[Result](
+        self,
+        content: Multimodal,
+        /,
+        feature: Coroutine[None, None, Result],
+        **extra: Any,
+    ) -> Result: ...
+
+    @statemethod
+    async def input_guarded[Result](
+        self,
+        content: Multimodal,
+        /,
+        feature: Coroutine[None, None, Result],
+        **extra: Any,
+    ) -> Result:
+        feature_task: Task[Result] = Task(feature)
+        guard_task: Task[None] = Task(self.check_input(content))
+        tasks: Collection[Task[Result | None]] = (
+            feature_task,
+            guard_task,
+        )
+        completed, tasks = await wait(
+            tasks,
+            return_when=FIRST_COMPLETED,
+        )
+
+        if completed is guard_task:
+            if exc := guard_task.exception():
+                feature_task.cancel()
+                raise exc
+
+        await wait(
+            tasks,
+            return_when=ALL_COMPLETED,
+        )
+
+        if exc := guard_task.exception():
+            raise exc
+
+        return feature_task.result()
+
+    @overload
+    @classmethod
+    async def input_guarded_stream[Result](
+        cls,
+        content: Multimodal,
+        /,
+        feature: Coroutine[None, None, AsyncIterable[Result]],
+        **extra: Any,
+    ) -> AsyncIterable[Result]: ...
+
+    @overload
+    async def input_guarded_stream[Result](
+        self,
+        content: Multimodal,
+        /,
+        feature: Coroutine[None, None, AsyncIterable[Result]],
+        **extra: Any,
+    ) -> AsyncIterable[Result]: ...
+
+    @statemethod
+    async def input_guarded_stream[Result](
+        self,
+        content: Multimodal,
+        /,
+        feature: Coroutine[None, None, AsyncIterable[Result]],
+        **extra: Any,
+    ) -> AsyncIterable[Result]:
+        # TODO: implement input modetaion guardrail check in praralell during streaming
+        return await feature
 
     @overload
     @classmethod

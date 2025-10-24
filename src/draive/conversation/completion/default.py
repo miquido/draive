@@ -2,9 +2,14 @@ from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import Any, Literal, overload
 
-from haiway import ctx
+from haiway import concurrently, ctx
 
 from draive.conversation.types import ConversationMessage, ConversationOutputChunk
+from draive.guardrails import (
+    GuardrailsModeration,
+    GuardrailsQualityVerification,
+    GuardrailsSafety,
+)
 from draive.models import (
     GenerativeModel,
     ModelContextElement,
@@ -17,7 +22,7 @@ from draive.models import (
     ModelToolRequest,
     Toolbox,
 )
-from draive.multimodal import ArtifactContent, Template, TemplatesRepository
+from draive.multimodal import ArtifactContent
 
 __all__ = ("conversation_completion",)
 
@@ -25,7 +30,7 @@ __all__ = ("conversation_completion",)
 @overload
 async def conversation_completion(
     *,
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,
@@ -37,7 +42,7 @@ async def conversation_completion(
 @overload
 async def conversation_completion(
     *,
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,
@@ -48,7 +53,7 @@ async def conversation_completion(
 
 async def conversation_completion(
     *,
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,  # noqa: A002
@@ -80,7 +85,7 @@ async def conversation_completion(
 
 
 async def _conversation_completion(
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,  # noqa: A002
@@ -91,24 +96,19 @@ async def _conversation_completion(
         memory_recall: ModelMemoryRecall = await memory.recall()
         context: list[ModelContextElement] = [
             *memory_recall.context,
-            ModelInput.of(input.content),
+            # sanitize all inputs based on safety guardrails
+            ModelInput.of(await GuardrailsSafety.sanitize(input.content)),
         ]
 
-        resolved_instructions: str = await TemplatesRepository.resolve_str(
-            instructions,
-            arguments={
-                key: value if isinstance(value, str) else str(value)
-                for key, value in memory_recall.variables.items()
-            }
-            if memory_recall.variables
-            else None,
-        )
-
-        result: ModelOutput = await GenerativeModel.loop(
-            instructions=resolved_instructions,
-            toolbox=toolbox,
-            context=context,
-            **extra,
+        # run input moderation in parallel - TODO: should we use sanitized input?
+        result: ModelOutput = await GuardrailsModeration.input_guarded(
+            input.content,
+            GenerativeModel.loop(
+                instructions=instructions,
+                toolbox=toolbox,
+                context=context,
+                **extra,
+            ),
         )
 
         ctx.log_debug("...finalizing message...")
@@ -128,12 +128,21 @@ async def _conversation_completion(
             )
             raise exc
 
+        # verify all outputs based on quality and moderation guardrails
+        await concurrently(
+            (
+                GuardrailsModeration.check_output(response_message.content),
+                GuardrailsQualityVerification.verify(response_message.content),
+            ),
+            concurrent_tasks=2,
+        )
+
         ctx.log_debug("... response message finished!")
         return response_message
 
 
 async def _conversation_completion_stream(
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,  # noqa: A002
@@ -143,24 +152,18 @@ async def _conversation_completion_stream(
         memory_recall: ModelMemoryRecall = await memory.recall()
         context: list[ModelContextElement] = [
             *memory_recall.context,
-            ModelInput.of(input.content),
+            # sanitize all inputs based on safety guardrails
+            ModelInput.of(await GuardrailsSafety.sanitize(input.content)),
         ]
 
         async for chunk in await GenerativeModel.loop(
-            instructions=await TemplatesRepository.resolve_str(
-                instructions,
-                arguments={
-                    key: value if isinstance(value, str) else str(value)
-                    for key, value in memory_recall.variables.items()
-                }
-                if memory_recall.variables
-                else None,
-            ),
+            instructions=instructions,
             toolbox=toolbox,
             context=context,
             stream=True,
             **extra,
         ):
+            # TODO: add quality guardrails for streaming
             if isinstance(chunk, ModelReasoning):
                 # Wrap reasoning as an artifact to stream alongside content
                 yield ConversationOutputChunk.of(

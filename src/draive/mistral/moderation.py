@@ -17,10 +17,7 @@ __all__ = ("MistralContentModeration",)
 
 class MistralContentModeration(MistralAPI):
     def content_guardrails(self) -> GuardrailsModeration:
-        return GuardrailsModeration(
-            input_checking=self.content_verification,
-            output_checking=self.content_verification,
-        )
+        return GuardrailsModeration(input_checking=self.content_verification)
 
     async def content_verification(  # noqa: C901, PLR0912
         self,

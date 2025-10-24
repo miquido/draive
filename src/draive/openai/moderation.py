@@ -14,10 +14,7 @@ __all__ = ("OpenAIContentModeration",)
 
 class OpenAIContentModeration(OpenAIAPI):
     def moderation_guardrails(self) -> GuardrailsModeration:
-        return GuardrailsModeration(
-            input_checking=self.content_moderation,
-            output_checking=self.content_moderation,
-        )
+        return GuardrailsModeration(input_checking=self.content_moderation)
 
     async def content_moderation(  # noqa: C901, PLR0912, PLR0915
         self,

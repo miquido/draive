@@ -2,7 +2,7 @@ from typing import Any, overload
 
 from haiway import State, statemethod
 
-from draive.guardrails.safety.default import regex_safety_sanitization
+from draive.guardrails.safety.regex import guardrails_regex_sanitizer
 from draive.guardrails.safety.types import (
     GuardrailsSafetyException,
     GuardrailsSafetySanitization,
@@ -63,4 +63,5 @@ class GuardrailsSafety(State):
                 meta={"error_type": exc.__class__.__name__},
             ) from exc
 
-    sanitization: GuardrailsSafetySanitization = regex_safety_sanitization
+    # use default set of regex rules for sanitization
+    sanitization: GuardrailsSafetySanitization = guardrails_regex_sanitizer()

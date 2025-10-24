@@ -287,7 +287,7 @@ class Stage:
     @classmethod
     def completion(
         cls,
-        input: Multimodal,  # noqa: A002
+        input: Template | Multimodal,  # noqa: A002
         /,
         *,
         instructions: Template | ModelInstructions = "",
@@ -308,7 +308,7 @@ class Stage:
 
         Parameters
         ----------
-        input : Multimodal
+        input : Template | Multimodal
             Input content to provide to the model.
         instructions : Template | ModelInstructions
             Instructions or guidance for the model.
@@ -338,7 +338,6 @@ class Stage:
         ...     tools=[calculator]
         ... )
         """
-        context_extension: ModelContext = (ModelInput.of(MultimodalContent.of(input)),)
 
         toolbox: Toolbox = Toolbox.of(tools)
 
@@ -349,7 +348,7 @@ class Stage:
             async with ctx.scope("stage.completion"):
                 context: list[ModelContextElement] = [
                     *state.context,
-                    *context_extension,
+                    ModelInput.of(await TemplatesRepository.resolve(input)),
                 ]
                 # Run loop and merge content parts into a single MultimodalContent
                 result: ModelOutput = await GenerativeModel.loop(
