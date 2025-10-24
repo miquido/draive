@@ -126,7 +126,7 @@ async def stream_generator(response: httpx.Response, endpoint: str) -> typing.As
                 streamed_obj = json.loads(base64_payload)
                 if "event_type" in streamed_obj:
                     response_type = stream_response_mapping[endpoint]
-                    parsed = typing.cast(
+                    parsed = typing.cast(  # type: ignore
                         response_type,  # type: ignore
                         construct_type(type_=response_type, object_=streamed_obj),
                     )
@@ -163,7 +163,7 @@ def map_response_from_bedrock():
             response_type = response_mapping[endpoint]
             response_obj = json.loads(await response.aread())
             response_obj["meta"] = map_token_counts(response).dict()
-            cast_obj: typing.Any = typing.cast(
+            cast_obj: typing.Any = typing.cast(  # type: ignore
                 response_type,  # type: ignore
                 construct_type(
                     type_=response_type,
@@ -173,7 +173,7 @@ def map_response_from_bedrock():
             )
 
             async def output_generator() -> typing.AsyncIterator[bytes]:
-                yield json.dumps(cast_obj.dict()).encode("utf-8")
+                yield json.dumps(cast_obj.dict()).encode("utf-8")  # type: ignore
 
             output = output_generator()
 
@@ -181,7 +181,7 @@ def map_response_from_bedrock():
 
         # reset response object to allow for re-reading
         if hasattr(response, "_content"):
-            del response._content
+            del response._content  # type: ignore
         response.is_stream_consumed = False
         response.is_closed = False
 
@@ -193,8 +193,8 @@ def map_request_to_bedrock(
     aws_region: str | None,
 ) -> EventHook:
     session = lazy_boto3().Session(region_name=aws_region)
-    aws_region = session.region_name
-    credentials = session.get_credentials()
+    aws_region = session.region_name  # type: ignore
+    credentials = session.get_credentials()  # type: ignore
     signer = lazy_botocore().auth.SigV4Auth(credentials, service, aws_region)  # pyright: ignore
 
     @asynchronous
@@ -209,7 +209,7 @@ def map_request_to_bedrock(
 
         url = get_url(
             platform=service,
-            aws_region=aws_region,
+            aws_region=aws_region,  # type: ignore
             model=model,  # type: ignore
             stream="stream" in body and body["stream"],
         )
@@ -227,7 +227,7 @@ def map_request_to_bedrock(
 
         new_body = json.dumps(body).encode("utf-8")
         request.stream = ByteStream(new_body)
-        request._content = new_body
+        request._content = new_body  # type: ignore
         headers["content-length"] = str(len(new_body))
 
         aws_request = lazy_botocore().awsrequest.AWSRequest(  # pyright: ignore
@@ -236,9 +236,9 @@ def map_request_to_bedrock(
             headers=headers,
             data=request.read(),
         )
-        signer.add_auth(aws_request)
+        signer.add_auth(aws_request)  # type: ignore
 
-        request.headers = httpx.Headers(aws_request.prepare().headers)
+        request.headers = httpx.Headers(aws_request.prepare().headers)  # type: ignore
         request.extensions["endpoint"] = endpoint
 
     return _event_hook

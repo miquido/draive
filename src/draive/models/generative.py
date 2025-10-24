@@ -175,6 +175,7 @@ class GenerativeModel(State):
                     tools=tools,
                     context=context,
                     output=output,
+                    stream=False,
                     **extra,
                 ),
                 output=output,
@@ -329,6 +330,7 @@ class GenerativeModel(State):
                 tools=toolbox.available_tools_declaration(tools_turn=tools_turn),
                 context=context,
                 output=output,
+                stream=False,
                 **extra,
             )
 

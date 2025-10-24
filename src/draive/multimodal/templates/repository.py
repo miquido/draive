@@ -168,7 +168,7 @@ class TemplatesRepository(State):
     @classmethod
     async def resolve(
         cls,
-        template: Template,
+        content: Template | Multimodal,
         /,
         *,
         default: str | None = None,
@@ -179,7 +179,7 @@ class TemplatesRepository(State):
     @overload
     async def resolve(
         self,
-        template: Template,
+        content: Template | Multimodal,
         /,
         *,
         default: str | None = None,
@@ -190,7 +190,7 @@ class TemplatesRepository(State):
     @statemethod
     async def resolve(
         self,
-        template: Template,
+        content: Template | Multimodal,
         /,
         *,
         default: str | None = None,
@@ -201,8 +201,8 @@ class TemplatesRepository(State):
 
         Parameters
         ----------
-        template
-            Template reference to resolve.
+        content
+            Template reference to resolve or straight result content.
         default
             Fallback template body used when the repository yields no content.
         arguments
@@ -220,17 +220,21 @@ class TemplatesRepository(State):
         TemplateMissing
             If neither repository content nor ``default`` is available.
         """
+        if not isinstance(content, Template):
+            return MultimodalContent.of(content)
+
         loaded: str | None = await self.loading(
-            template.identifier,
-            meta=template.meta,
+            content.identifier,
+            meta=content.meta,
             **extra,
         )
 
         merged_arguments: Mapping[str, Multimodal]
         if arguments:
-            merged_arguments = {**arguments, **template.arguments}
+            merged_arguments = {**arguments, **content.arguments}
+
         else:
-            merged_arguments = template.arguments
+            merged_arguments = content.arguments
 
         if loaded is not None:
             return resolve_multimodal_template(
@@ -245,13 +249,13 @@ class TemplatesRepository(State):
             )
 
         else:
-            raise TemplateMissing(identifier=template.identifier)
+            raise TemplateMissing(identifier=content.identifier)
 
     @overload
     @classmethod
     async def resolve_str(
         cls,
-        template: Template | str,
+        content: Template | str,
         /,
         *,
         default: str | None = None,
@@ -262,7 +266,7 @@ class TemplatesRepository(State):
     @overload
     async def resolve_str(
         self,
-        template: Template | str,
+        content: Template | str,
         /,
         *,
         default: str | None = None,
@@ -273,7 +277,7 @@ class TemplatesRepository(State):
     @statemethod
     async def resolve_str(
         self,
-        template: Template | str,
+        content: Template | str,
         /,
         *,
         default: str | None = None,
@@ -284,7 +288,7 @@ class TemplatesRepository(State):
 
         Parameters
         ----------
-        template
+        content
             Template reference or raw string to return as-is.
         default
             Fallback template body used when the repository yields no content.
@@ -303,23 +307,25 @@ class TemplatesRepository(State):
         TemplateMissing
             If neither repository content nor ``default`` is available.
         """
-        if isinstance(template, str):
-            return resolve_text_template(
-                template,
-                arguments=arguments if arguments is not None else {},
-            )
+        if not isinstance(content, Template):
+            if arguments:
+                return content.format_map({key: str(value) for key, value in arguments.items()})
+
+            else:
+                return content
 
         loaded: str | None = await self.loading(
-            template.identifier,
-            meta=template.meta,
+            content.identifier,
+            meta=content.meta,
             **extra,
         )
 
         merged_arguments: Mapping[str, Multimodal]
         if arguments:
-            merged_arguments = {**arguments, **template.arguments}
+            merged_arguments = {**arguments, **content.arguments}
+
         else:
-            merged_arguments = template.arguments
+            merged_arguments = content.arguments
 
         if loaded is not None:
             return resolve_text_template(
@@ -334,7 +340,7 @@ class TemplatesRepository(State):
             )
 
         else:
-            raise TemplateMissing(identifier=template.identifier)
+            raise TemplateMissing(identifier=content.identifier)
 
     @statemethod
     async def load(
@@ -605,7 +611,7 @@ class FileStorage(Immutable):
                     "description": declaration.description,
                     "variables": declaration.variables,
                     "content": self._contents[declaration.identifier],
-                    "meta": declaration.meta.to_mapping(),
+                    "meta": declaration.meta,
                 }
                 for declaration in self._declarations.values()
             ]

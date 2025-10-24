@@ -5,13 +5,12 @@ from datetime import UTC, datetime
 from typing import Annotated, Any, Literal, NotRequired, Required, TypedDict
 from uuid import UUID, uuid4
 
-from haiway import Default, Validator
+from haiway import Alias, Default, Description, Validator
 from pytest import mark, raises
 
 from draive import (
     MISSING,
     DataModel,
-    Field,
     GenerativeModel,
     Missing,
     ModelOutput,
@@ -33,23 +32,23 @@ def invalid_value(value: str) -> str:
 
 
 class ExampleNestedModel(DataModel):
-    nested_alias: str = Field(aliased="string", default="default")
+    nested_alias: Annotated[str, Alias("string")] = "default"
     more: Sequence[int] | None = None
 
 
 class ExampleModel(DataModel):
     string: str = "default"
-    number: int = Field(aliased="alias", description="description", default=1)
-    none_default: int | None = Field(default=None)
-    value_default: int = Field(default=9)
-    invalid: Annotated[str, Validator(invalid_value)] = Field(default="valid")
-    nested: ExampleNestedModel = Field(aliased="answer", default=ExampleNestedModel())
-    full: Literal["A", "B"] | Sequence[int] | str | bool | None = Field(
-        aliased="all",
-        description="complex",
-        default="",
+    number: Annotated[int, Alias("alias"), Description("description")] = 1
+    none_default: int | None = None
+    value_default: int = 9
+    invalid: Annotated[str, Validator(invalid_value)] = "valid"
+    nested: Annotated[ExampleNestedModel, Alias("answer")] = Default(
+        default_factory=ExampleNestedModel
     )
-    default: UUID = Default(factory=uuid4)
+    full: Annotated[
+        Literal["A", "B"] | Sequence[int] | str | bool | None, Alias("all"), Description("complex")
+    ] = ""
+    default: UUID = Default(default_factory=uuid4)
 
 
 # TODO: prepare extensive tests

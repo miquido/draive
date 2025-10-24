@@ -16,7 +16,7 @@ from uuid import uuid4
 from google.api_core.exceptions import ResourceExhausted  # pyright: ignore[reportMissingImport]
 from google.genai.types import (
     Candidate,
-    ContentListUnionDict,
+    ContentListUnionDict,  # pyright: ignore[reportUnknownVariableType]
     FinishReason,
     FunctionCallingConfigMode,
     FunctionDeclarationDict,
@@ -171,13 +171,13 @@ class GeminiGenerating(GeminiAPI):
                 output=output,
                 config=config,
             )
-            request_content: ContentListUnionDict = [
+            request_content: ContentListUnionDict = [  # pyright: ignore[reportUnknownVariableType]
                 _context_element_as_content(element) for element in context
             ]
 
             try:
                 completion: GenerateContentResponse = (
-                    await self._client.aio.models.generate_content(
+                    await self._client.aio.models.generate_content(  # pyright: ignore[reportUnknownMemberType]
                         model=config.model,
                         config=request_config,
                         contents=request_content,
@@ -322,14 +322,14 @@ class GeminiGenerating(GeminiAPI):
                 output=output,
                 config=config,
             )
-            request_content: ContentListUnionDict = [
+            request_content: ContentListUnionDict = [  # pyright: ignore[reportUnknownVariableType]
                 _context_element_as_content(element) for element in context
             ]
 
             try:
                 response_stream: AsyncIterator[
                     GenerateContentResponse
-                ] = await self._client.aio.models.generate_content_stream(
+                ] = await self._client.aio.models.generate_content_stream(  # pyright: ignore[reportUnknownMemberType]
                     model=config.model,
                     config=request_config,
                     contents=request_content,
@@ -821,6 +821,9 @@ def block_parts(
                             "thought": True,
                         }
 
+                case other:
+                    raise ValueError(f"Unsupported reasoning element: {other}")
+
         else:
             yield from content_parts(block)
 
@@ -852,18 +855,14 @@ def content_parts(
                 }
             }
 
-        elif isinstance(part, ArtifactContent):
+        else:
+            assert isinstance(part, ArtifactContent)  # nosec: B101
             # Skip artifacts that are marked as hidden
             if part.hidden:
                 continue
 
             yield {
                 "text": part.artifact.to_str(),
-            }
-
-        else:
-            yield {
-                "text": part.to_str(),
             }
 
 
@@ -879,12 +878,12 @@ def _normalized_schema_content(
     if isinstance(schema, Mapping):
         return {
             key: _normalized_schema_content(value)
-            for key, value in schema.items()
+            for key, value in cast(Mapping[str, Any], schema).items()
             # it seems gemini is not supporting `additionalProperties` key within json schema
             if key != "additionalProperties"
         }
 
     if isinstance(schema, Sequence) and not isinstance(schema, str):
-        return [_normalized_schema_content(element) for element in schema]
+        return [_normalized_schema_content(element) for element in cast(Sequence[Any], schema)]
 
     return schema

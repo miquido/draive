@@ -17,10 +17,7 @@ __all__ = ("MistralContentModeration",)
 
 class MistralContentModeration(MistralAPI):
     def content_guardrails(self) -> GuardrailsModeration:
-        return GuardrailsModeration(
-            input_checking=self.content_verification,
-            output_checking=self.content_verification,
-        )
+        return GuardrailsModeration(input_checking=self.content_verification)
 
     async def content_verification(  # noqa: C901, PLR0912
         self,
@@ -41,36 +38,29 @@ class MistralContentModeration(MistralAPI):
             content = MultimodalContent.of(content)
             moderated_content: list[str] = []
             for part in content.parts:
-                match part:
-                    case TextContent() as text:
-                        moderated_content.append(text.text)
+                if isinstance(part, TextContent):
+                    moderated_content.append(part.text)
 
-                    case ResourceContent() as media:
-                        ctx.log_warning(
-                            f"Mistral moderation: unsupported media {media.mime_type}; "
-                            "verifying as text."
-                        )
-                        moderated_content.append(media.to_str(include_data=False))
+                elif isinstance(part, ResourceContent):
+                    ctx.log_warning(
+                        f"Mistral moderation: unsupported media {part.mime_type}; "
+                        "verifying as text."
+                    )
+                    moderated_content.append(part.to_str(include_data=False))
 
-                    case ResourceReference() as media_ref:
-                        ctx.log_warning(
-                            f"Mistral moderation: unsupported media {media_ref.mime_type}; "
-                            "verifying as text."
-                        )
-                        moderated_content.append(media_ref.to_str())
+                elif isinstance(part, ResourceReference):
+                    ctx.log_warning(
+                        f"Mistral moderation: unsupported media {part.mime_type}; "
+                        "verifying as text."
+                    )
+                    moderated_content.append(part.to_str())
 
-                    case ArtifactContent() as artifact:
-                        if artifact.hidden:
-                            continue  # skip hidden
+                else:
+                    assert isinstance(part, ArtifactContent)  # nosec: B101
+                    if part.hidden:
+                        continue  # skip hidden
 
-                        moderated_content.append(artifact.artifact.to_str())
-
-                    case other:
-                        ctx.log_warning(
-                            f"Attempting to use moderation on unsupported content ({type(other)}),"
-                            " verifying as text..."
-                        )
-                        moderated_content.append(other.to_str())
+                    moderated_content.append(part.artifact.to_str())
 
             response: ModerationResponse = await self._client.classifiers.moderate_async(
                 model=moderation_config.model,

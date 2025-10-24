@@ -1,7 +1,6 @@
 import json
 import typing
 from collections.abc import (
-    Callable,
     Iterable,
     Iterator,
     Mapping,
@@ -21,7 +20,6 @@ from typing import (
     TypeVar,
     cast,
     dataclass_transform,
-    final,
     overload,
 )
 from weakref import WeakValueDictionary
@@ -30,6 +28,7 @@ from haiway import (
     MISSING,
     AttributeAnnotation,
     AttributePath,
+    Default,
     DefaultValue,
     Missing,
     State,
@@ -47,80 +46,13 @@ from haiway.attributes.specification import type_specification
 
 from draive.parameters.schema import simplified_schema
 
-__all__ = (
-    "DataModel",
-    "Field",
-)
-
-
-def Field[Value](
-    *,
-    aliased: str | None = None,
-    description: str | Missing = MISSING,
-    default: Value | Missing = MISSING,
-    default_factory: Callable[[], Value] | Missing = MISSING,
-    default_env: str | Missing = MISSING,
-    specification: TypeSpecification | Missing = MISSING,
-) -> Value:  # it is actually a DataField, but type checker has to be fooled
-    assert (  # nosec: B101
-        default is MISSING or default_factory is MISSING or default_env is MISSING
-    ), "Can't specify default value, factory and default_env"
-    assert (  # nosec: B101
-        description is MISSING or specification is MISSING
-    ), "Can't specify both description and specification"
-
-    return cast(
-        Value,
-        FieldAnnotation(
-            aliased=aliased,
-            description=description,
-            default_value=default,
-            default_factory=default_factory,
-            default_env=default_env,
-            specification=specification,
-        ),
-    )
-
-
-@final
-class FieldAnnotation:
-    def __init__(
-        self,
-        aliased: str | None,
-        description: str | Missing,
-        default_value: Any | Missing,
-        default_factory: Callable[[], Any] | Missing,
-        default_env: str | Missing,
-        specification: TypeSpecification | Missing,
-    ) -> None:
-        self.aliased: str | None = aliased
-        self.description: str | Missing = description
-        self.default_value: Any | Missing = default_value
-        self.default_factory: Callable[[], Any] | Missing = default_factory
-        self.default_env: str | Missing = default_env
-        self.specification: TypeSpecification | Missing = specification
-
-    @property
-    def required(self) -> bool:
-        return (
-            self.default_value is MISSING
-            and self.default_factory is MISSING
-            and self.default_env is MISSING
-        )
-
-    @property
-    def default(self) -> DefaultValue[Any]:
-        return DefaultValue(
-            self.default_value,
-            env=self.default_env,
-            factory=self.default_factory,
-        )
+__all__ = ("DataModel",)
 
 
 @dataclass_transform(
     kw_only_default=True,
     frozen_default=True,
-    field_specifiers=(Field,),
+    field_specifiers=(Default,),
 )
 class DataModelMeta(type):
     __SELF_ATTRIBUTE__: ObjectAttribute
@@ -128,7 +60,7 @@ class DataModelMeta(type):
     __SPECIFICATION__: TypeSpecification
     __FIELDS__: Sequence[Attribute]
 
-    def __new__(  # noqa: C901, PLR0912, PLR0915
+    def __new__(
         mcs,
         /,
         name: str,
@@ -153,37 +85,13 @@ class DataModelMeta(type):
         required_fields: MutableSequence[str] = []
         fields: MutableSequence[Attribute] = []
         for key, element in self_attribute.attributes.items():
+            default: Any = getattr(cls, key, MISSING)
             base_attribute: AttributeAnnotation = element
             attribute: AttributeAnnotation = base_attribute
             alias: str | None = attribute.alias
             description: str | None = attribute.description
             required: bool = attribute.required
             specification: TypeSpecification | None = attribute.specification
-
-            default_value: DefaultValue
-            default: Any = getattr(cls, key, MISSING)
-            if isinstance(default, FieldAnnotation):
-                if default.aliased is not None:
-                    alias = default.aliased
-
-                if not_missing(default.description):
-                    description = default.description
-
-                default_value = default.default
-                required = default.required
-
-                if not_missing(default.specification):
-                    specification = default.specification
-
-            elif isinstance(default, DefaultValue):
-                default_value = default
-
-            else:
-                default_value = DefaultValue[Any](
-                    default,
-                    env=MISSING,
-                    factory=MISSING,
-                )
 
             if specification is None:
                 specification = type_specification(
@@ -201,7 +109,7 @@ class DataModelMeta(type):
                 alias=alias,
                 annotation=attribute,
                 required=required,
-                default=default_value,
+                default=_resolve_default(default),
                 specification=specification,
             )
 
@@ -220,30 +128,28 @@ class DataModelMeta(type):
                 if field.required:
                     required_fields.append(field.name)
 
-        cls.__SELF_ATTRIBUTE__ = self_attribute
-        cls.__TYPE_PARAMETERS__ = type_parameters
+        cls.__SELF_ATTRIBUTE__ = self_attribute  # pyright: ignore[reportConstantRedefinition]
+        cls.__TYPE_PARAMETERS__ = type_parameters  # pyright: ignore[reportConstantRedefinition]
         if not bases:
             assert not type_parameters  # nosec: B101
-            cls.__FIELDS__ = ()  # pyright: ignore[reportAttributeAccessIssue]
-            cls.__SPECIFICATION__ = {  # pyright: ignore[reportAttributeAccessIssue]
+            cls.__FIELDS__ = ()  # pyright: ignore[reportAttributeAccessIssue, reportConstantRedefinition]
+            cls.__SPECIFICATION__ = {  # pyright: ignore[reportConstantRedefinition]
                 "type": "object",
                 "additionalProperties": True,
             }
 
         else:
-            cls.__FIELDS__ = tuple(fields)
-            cls.__SPECIFICATION__ = (
-                {  # pyright: ignore[reportAttributeAccessIssue]
+            cls.__FIELDS__ = tuple(fields)  # pyright: ignore[reportConstantRedefinition]
+            cls.__SPECIFICATION__ = (  # pyright: ignore[reportAttributeAccessIssue, reportConstantRedefinition]
+                {
                     "type": "object",
                     "properties": specification_fields,
                     "required": required_fields,
                     "additionalProperties": False,
                 }
-                if specification_fields is not None
-                else None
             )
-            cls.__slots__ = tuple(field.name for field in fields)  # pyright: ignore[reportAttributeAccessIssue]
-            cls.__match_args__ = cls.__slots__  # pyright: ignore[reportAttributeAccessIssue]
+            cls.__slots__ = tuple(field.name for field in fields)  # pyright: ignore[reportAttributeAccessIssue, reportConstantRedefinition]
+            cls.__match_args__ = cls.__slots__  # pyright: ignore[reportAttributeAccessIssue, reportConstantRedefinition]
 
         cls._ = AttributePath(cls, attribute=cls)  # pyright: ignore[reportCallIssue, reportUnknownMemberType, reportAttributeAccessIssue]
 
@@ -258,7 +164,7 @@ class DataModelMeta(type):
         self,
         instance: Any,
     ) -> bool:
-        instance_type: type[Any] = type(instance)
+        instance_type: Any = cast(Any, type(instance))
         if not self.__subclasscheck__(instance_type):
             return False
 
@@ -333,6 +239,19 @@ class DataModelMeta(type):
                 return False
 
         return True
+
+
+def _resolve_default(
+    value: DefaultValue | Any | Missing,
+) -> DefaultValue:
+    if isinstance(value, DefaultValue):
+        return value
+
+    return DefaultValue(
+        default=value,
+        default_factory=MISSING,
+        env=MISSING,
+    )
 
 
 _types_cache: WeakValueDictionary[
@@ -552,7 +471,7 @@ class DataModel(metaclass=DataModelMeta):
 
         else:
             # include dynamically attached attributes (when __slots__ is not defined)
-            for key, value in getattr(self, "__dict__", {}).items():
+            for key, value in vars(self).items():
                 if not_missing(value):
                     dict_result[key] = _recursive_mapping(value)
 
@@ -574,7 +493,7 @@ class DataModel(metaclass=DataModelMeta):
         if other.__class__ != self.__class__:
             return False
 
-        if self.__FIELDS__ is MISSING:
+        if not self.__FIELDS__:
             return all(value == getattr(other, key, MISSING) for key, value in vars(self).items())
 
         else:
@@ -728,10 +647,13 @@ def _recursive_mapping(  # noqa: PLR0911
         }
 
     elif isinstance(value, Mapping | typing.Mapping):
-        return {key: _recursive_mapping(element) for key, element in value.items()}
+        return {
+            key: _recursive_mapping(element)
+            for key, element in cast(Mapping[Any, Any], value).items()
+        }
 
     elif isinstance(value, Iterable | typing.Iterable):
-        return [_recursive_mapping(element) for element in value]
+        return [_recursive_mapping(element) for element in cast(Iterable[Any], value)]
 
     elif hasattr(value, "to_mapping") and callable(value.to_mapping):
         return value.to_mapping()

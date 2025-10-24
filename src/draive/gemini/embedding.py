@@ -56,7 +56,7 @@ class GeminiEmbedding(GeminiAPI):
 
             responses: list[EmbedContentResponse] = await gather(
                 *[
-                    self._client.aio.models.embed_content(
+                    self._client.aio.models.embed_content(  # pyright: ignore[reportUnknownMemberType]
                         model=embedding_config.model,
                         config=config_dict,
                         contents=as_list(

@@ -91,22 +91,19 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
         value_models: Sequence[Model] = as_tuple(values)
         selected_values: list[str | bytes] = []
         for value in value_models:
-            match value_selector(value):
-                case str() as text:
-                    selected_values.append(text)
+            selected: Value = value_selector(value)
+            if isinstance(selected, str):
+                selected_values.append(selected)
 
-                case TextContent() as text_content:
-                    selected_values.append(text_content.text)
+            elif isinstance(selected, TextContent):
+                selected_values.append(selected.text)
 
-                case ResourceContent() as resource_content:
-                    if not resource_content.mime_type.startswith("image"):
-                        raise ValueError(f"{resource_content.mime_type} embedding is not supported")
+            else:
+                assert isinstance(selected, ResourceContent)  # nosec: B101
+                if not selected.mime_type.startswith("image"):
+                    raise ValueError(f"{selected.mime_type} embedding is not supported")
 
-                    selected_values.append(b64decode(resource_content.data))
-
-                case other:
-                    # we could download items from resource references for embedding if needed
-                    raise ValueError(f"{other} embedding is not supported")
+                selected_values.append(b64decode(selected.data))
 
         embedded_values: Sequence[Embedded[Model]]
         if all(isinstance(value, str) for value in selected_values):
@@ -117,8 +114,8 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
                     meta=embedded.meta,
                 )
                 for embedded, value in zip(
-                    await TextEmbedding.embed(
-                        cast(list[str], selected_values),
+                    await TextEmbedding.embed_many(
+                        selected_values,
                         **extra,
                     ),
                     value_models,
@@ -134,7 +131,7 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
                     meta=embedded.meta,
                 )
                 for embedded, value in zip(
-                    await ImageEmbedding.embed(
+                    await ImageEmbedding.embed_many(
                         cast(list[bytes], selected_values),
                         **extra,
                     ),
@@ -214,33 +211,31 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
             return tuple(model.from_json(cast(str, result["payload"])) for result in results)
 
         query_vector: Sequence[float]
-        match query:
-            case str() as text:
-                embedded_query: Embedded[str] = await TextEmbedding.embed(text)
+        if isinstance(query, str):
+            embedded_query: Embedded[str] = await TextEmbedding.embed(query)
+            query_vector = embedded_query.vector
+
+        elif isinstance(query, TextContent):
+            embedded_query: Embedded[str] = await TextEmbedding.embed(query.text)
+            query_vector = embedded_query.vector
+
+        elif isinstance(query, ResourceContent):
+            if query.mime_type.startswith("image"):
+                embedded_image: Embedded[bytes] = await ImageEmbedding.embed(b64decode(query.data))
+                query_vector = embedded_image.vector
+
+            elif query.mime_type.startswith("text"):
+                embedded_query: Embedded[str] = await TextEmbedding.embed(
+                    b64decode(query.data).decode()
+                )
                 query_vector = embedded_query.vector
 
-            case TextContent() as text_content:
-                embedded_query: Embedded[str] = await TextEmbedding.embed(text_content.text)
-                query_vector = embedded_query.vector
+            else:
+                raise ValueError(f"{query.mime_type} embedding is not supported")
 
-            case ResourceContent() as resource_content:
-                if resource_content.mime_type.startswith("image"):
-                    embedded_image: Embedded[bytes] = await ImageEmbedding.embed(
-                        b64decode(resource_content.data)
-                    )
-                    query_vector = embedded_image.vector
-
-                elif resource_content.mime_type.startswith("text"):
-                    embedded_query: Embedded[str] = await TextEmbedding.embed(
-                        b64decode(resource_content.data).decode()
-                    )
-                    query_vector = embedded_query.vector
-
-                else:
-                    raise ValueError(f"{resource_content.mime_type} embedding is not supported")
-
-            case vector:
-                query_vector = vector
+        else:
+            assert isinstance(query, Sequence)  # nosec: B101
+            query_vector = query  # vector
 
         arguments: Sequence[Sequence[PostgresValue] | PostgresValue] = (query_vector,)
         similarity_expression: str = f"embedding <#> ${len(arguments)}"

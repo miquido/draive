@@ -46,7 +46,6 @@ from draive.multimodal import (
     MultimodalContentPart,
     TextContent,
 )
-from draive.parameters import DataModel
 from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("MistralCompletions",)
@@ -256,7 +255,7 @@ class MistralCompletions(MistralAPI):
                             )
                             accumulated_tool_calls[index].function.arguments = {
                                 **cast(
-                                    dict,
+                                    dict[str, Any],
                                     accumulated_tool_calls[index].function.arguments,
                                 ),
                                 **tool_call.function.arguments,
@@ -478,50 +477,44 @@ def _content_chunks(
     parts: Iterable[MultimodalContentPart],
 ) -> Iterable[ContentChunkTypedDict]:
     for element in parts:
-        match element:
-            case TextContent() as text:
-                yield {
-                    "type": "text",
-                    "text": text.text,
-                }
+        if isinstance(element, TextContent):
+            yield {
+                "type": "text",
+                "text": element.text,
+            }
 
-            case ResourceReference() as ref:
-                if not (ref.mime_type or "").startswith("image"):
-                    raise ValueError(f"Unsupported message content mime type: {ref.mime_type}")
+        elif isinstance(element, ResourceReference):
+            if not (element.mime_type or "").startswith("image"):
+                raise ValueError(f"Unsupported message content mime type: {element.mime_type}")
 
-                yield {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": ref.uri,
-                    },
-                }
+            yield {
+                "type": "image_url",
+                "image_url": {
+                    "url": element.uri,
+                },
+            }
 
-            case ResourceContent() as data:
-                if not (data.mime_type or "").startswith("image"):
-                    raise ValueError(f"Unsupported message content mime type: {data.mime_type}")
+        elif isinstance(element, ResourceContent):
+            if not (element.mime_type or "").startswith("image"):
+                raise ValueError(f"Unsupported message content mime type: {element.mime_type}")
 
-                yield {
-                    "type": "image_url",
-                    "image_url": {
-                        # ResourceContent.to_data_uri() returns a proper data URI
-                        "url": data.to_data_uri(),
-                    },
-                }
+            yield {
+                "type": "image_url",
+                "image_url": {
+                    # ResourceContent.to_data_uri() returns a proper data URI
+                    "url": element.to_data_uri(),
+                },
+            }
 
-            case ArtifactContent() as artifact:
-                if artifact.hidden:
-                    continue
+        else:
+            assert isinstance(element, ArtifactContent)  # nosec: B101
+            if element.hidden:
+                continue
 
-                yield {
-                    "type": "text",
-                    "text": artifact.artifact.to_str(),
-                }
-
-            case other:
-                yield {
-                    "type": "text",
-                    "text": other.to_str(),
-                }
+            yield {
+                "type": "text",
+                "text": element.artifact.to_str(),
+            }
 
 
 def _content_chunk_as_content_element(
@@ -655,16 +648,15 @@ def _response_format(
     if isinstance(output, type):
         # Structured output with DataModel schema
 
-        if issubclass(output, DataModel):
-            return cast(
-                ResponseFormatTypedDict,
-                {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": output.__name__,
-                        "schema": output.__SPECIFICATION__,
-                    },
+        return cast(
+            ResponseFormatTypedDict,
+            {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": output.__name__,
+                    "schema": output.__SPECIFICATION__,
                 },
-            )
+            },
+        )
 
     return None

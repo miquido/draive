@@ -1,6 +1,6 @@
-from typing import Any, Protocol, Self, final, runtime_checkable
+from typing import Any, Protocol, Self, final, overload, runtime_checkable
 
-from haiway import State
+from haiway import State, statemethod
 
 __all__ = (
     "Memory",
@@ -35,14 +35,14 @@ class MemoryMaintaining(Protocol):
     ) -> None: ...
 
 
-async def _remember_none(
+async def _remembering_none(
     *items: Any,
     **extra: Any,
 ) -> None:
     pass  # noop
 
 
-async def _maintenance_noop(
+async def _maintaining_noop(
     **extra: Any,
 ) -> None:
     pass  # noop
@@ -55,16 +55,79 @@ class Memory[Recalled, Remembered](State):
         cls,
         recalled: Recalled,
     ) -> Self:
-        async def recall(
+        async def recalling(
             **extra: Any,
         ) -> Recalled:
             return recalled
 
         return cls(
-            recall=recall,
-            remember=_remember_none,
+            recalling=recalling,
+            remembering=_remembering_none,
         )
 
-    recall: MemoryRecalling[Recalled]
-    remember: MemoryRemembering[Remembered]
-    maintenance: MemoryMaintaining = _maintenance_noop
+    @overload
+    @classmethod
+    async def recall(
+        cls,
+        **extra: Any,
+    ) -> Recalled: ...
+
+    @overload
+    async def recall(
+        self,
+        **extra: Any,
+    ) -> Recalled: ...
+
+    @statemethod
+    async def recall(
+        self,
+        **extra: Any,
+    ) -> Recalled:
+        return await self.recalling(**extra)
+
+    @overload
+    @classmethod
+    async def remember(
+        cls,
+        *items: Remembered,
+        **extra: Any,
+    ) -> None: ...
+
+    @overload
+    async def remember(
+        self,
+        *items: Remembered,
+        **extra: Any,
+    ) -> None: ...
+
+    @statemethod
+    async def remember(
+        self,
+        *items: Remembered,
+        **extra: Any,
+    ) -> None:
+        await self.remembering(*items, **extra)
+
+    @overload
+    @classmethod
+    async def maintenance(
+        cls,
+        **extra: Any,
+    ) -> None: ...
+
+    @overload
+    async def maintenance(
+        self,
+        **extra: Any,
+    ) -> None: ...
+
+    @statemethod
+    async def maintenance(
+        self,
+        **extra: Any,
+    ) -> None:
+        await self.maintaining(**extra)
+
+    recalling: MemoryRecalling[Recalled]
+    remembering: MemoryRemembering[Remembered]
+    maintaining: MemoryMaintaining = _maintaining_noop

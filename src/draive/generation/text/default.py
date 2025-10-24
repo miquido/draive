@@ -10,14 +10,14 @@ from draive.models import (
     ModelOutput,
     Toolbox,
 )
-from draive.multimodal import MultimodalContent, Template, TemplatesRepository
+from draive.multimodal import MultimodalContent
 
 __all__ = ("generate_text",)
 
 
 async def generate_text(
     *,
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     input: MultimodalContent,  # noqa: A002
     toolbox: Toolbox,
     examples: Iterable[tuple[MultimodalContent, str]],
@@ -25,7 +25,7 @@ async def generate_text(
 ) -> str:
     async with ctx.scope("generate_text"):
         result: ModelOutput = await GenerativeModel.loop(
-            instructions=await TemplatesRepository.resolve_str(instructions),
+            instructions=instructions,
             context=[
                 *[
                     message
@@ -39,6 +39,7 @@ async def generate_text(
             ],
             toolbox=toolbox,
             output="text",
+            stream=False,
             **extra,
         )
 

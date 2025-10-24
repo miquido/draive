@@ -1,6 +1,6 @@
 from base64 import b64decode, b64encode
 from collections.abc import Collection, Sequence
-from typing import Any, Literal, Protocol, Self, overload, runtime_checkable
+from typing import Any, Literal, Protocol, Self, final, overload, runtime_checkable
 
 from haiway import META_EMPTY, Meta, MetaValues, State
 
@@ -71,6 +71,7 @@ MimeType = (
 )
 
 
+@final
 class ResourceReference(DataModel):
     @classmethod
     def of(
@@ -123,6 +124,7 @@ class ResourceReferenceTemplate(DataModel):
     meta: Meta = META_EMPTY
 
 
+@final
 class ResourceContent(DataModel):
     @overload
     @classmethod

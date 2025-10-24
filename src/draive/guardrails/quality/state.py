@@ -27,7 +27,8 @@ class GuardrailsQualityVerification(State):
     @classmethod
     def of(
         cls,
-        evaluator: PreparedEvaluatorScenario | PreparedEvaluator,
+        evaluator: PreparedEvaluatorScenario[MultimodalContent]
+        | PreparedEvaluator[MultimodalContent],
     ) -> Self:
         async def verifying(
             content: MultimodalContent,

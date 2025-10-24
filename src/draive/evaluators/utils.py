@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Final, cast
 
 from draive.evaluation import EvaluationScore, EvaluationScoreValue

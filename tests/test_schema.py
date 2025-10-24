@@ -1,11 +1,13 @@
 from collections.abc import Sequence
-from typing import Literal
+from typing import Annotated, Literal
 
-from draive import DataModel, Field
+from haiway import Alias, Description
+
+from draive import DataModel
 
 
 class SchemaNestedModel(DataModel):
-    value: Literal["A", "B", "C"] = Field(description="selection")
+    value: Annotated[Literal["A", "B", "C"], Description("selection")]
     other_value: None
 
 
@@ -15,8 +17,8 @@ class SchemaModel(DataModel):
     float_value: float
     bool_value: bool
     list_value: Sequence[str]
-    optional_value: str | None = Field(description="alternative")
-    nested: SchemaNestedModel = Field(aliased="nested_value", description="alternative")
+    optional_value: Annotated[str | None, Description("alternative")]
+    nested: Annotated[SchemaNestedModel, Alias("nested_value"), Description("alternative")]
 
 
 json_schema: str = """\
@@ -96,7 +98,9 @@ simplified_schema: str = """\
   "int_value": "integer",
   "float_value": "number",
   "bool_value": "boolean",
-  "list_value": [],
+  "list_value": [
+    "string"
+  ],
   "optional_value": "string|null(alternative)",
   "nested_value": {
     "value": "'A'|'B'|'C'(selection)",

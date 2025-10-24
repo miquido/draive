@@ -463,7 +463,7 @@ class Evaluator[Value, **Args](Immutable):
         object.__setattr__(
             self,
             "threshold",
-            1.0 if threshold is None else threshold,
+            threshold,
         )
         object.__setattr__(
             self,
@@ -639,7 +639,7 @@ class Evaluator[Value, **Args](Immutable):
 
         else:
             assert isinstance(mapping, Callable)  # nosec: B101
-            mapper = mapping
+            mapper = cast(Callable[[Mapped], Value], mapping)
 
         async def evaluation(
             value: Mapped,

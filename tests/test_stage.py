@@ -69,7 +69,7 @@ def make_volatile_memory(initial: StageState) -> Memory[StageState, StageState]:
         if items:
             store["value"] = items[-1]
 
-    return Memory(recall=recall, remember=remember)
+    return Memory(recalling=recall, remembering=remember)
 
 
 def make_evaluator_result(*, score: float, threshold: float) -> EvaluatorResult:
@@ -445,7 +445,7 @@ async def test_stage_memory_remember():
             if items:
                 store["value"] = items[-1]
 
-        return Memory(recall=recall, remember=remember)
+        return Memory(recalling=recall, remembering=remember)
 
     memory = make_volatile_memory(empty_state)
     stage = Stage.memory_remember(memory)

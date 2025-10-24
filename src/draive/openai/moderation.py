@@ -14,10 +14,7 @@ __all__ = ("OpenAIContentModeration",)
 
 class OpenAIContentModeration(OpenAIAPI):
     def moderation_guardrails(self) -> GuardrailsModeration:
-        return GuardrailsModeration(
-            input_checking=self.content_moderation,
-            output_checking=self.content_moderation,
-        )
+        return GuardrailsModeration(input_checking=self.content_moderation)
 
     async def content_moderation(  # noqa: C901, PLR0912, PLR0915
         self,
@@ -39,76 +36,63 @@ class OpenAIContentModeration(OpenAIAPI):
             content = MultimodalContent.of(content)
             moderated_content: list[ModerationMultiModalInputParam] = []
             for part in content.parts:
-                match part:
-                    case TextContent() as text:
+                if isinstance(part, TextContent):
+                    moderated_content.append(
+                        {
+                            "type": "text",
+                            "text": part.text,
+                        }
+                    )
+
+                elif isinstance(part, ResourceContent):
+                    if part.mime_type.startswith("image"):
                         moderated_content.append(
                             {
-                                "type": "text",
-                                "text": text.text,
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": part.to_data_uri(),
+                                },
                             }
                         )
-
-                    case ResourceContent() as media:
-                        if media.mime_type.startswith("image"):
-                            moderated_content.append(
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": media.to_data_uri(),
-                                    },
-                                }
-                            )
-                        else:
-                            ctx.log_warning(
-                                f"OpenAI moderation: unsupported media {media.mime_type}; "
-                                "verifying as text."
-                            )
-                            moderated_content.append(
-                                {
-                                    "type": "text",
-                                    "text": media.to_str(include_data=False),
-                                }
-                            )
-
-                    case ResourceReference() as media_ref:
-                        if media_ref.mime_type and media_ref.mime_type.startswith("image"):
-                            moderated_content.append(
-                                {
-                                    "type": "image_url",
-                                    "image_url": {"url": media_ref.uri},
-                                }
-                            )
-                        else:
-                            ctx.log_warning(
-                                "OpenAI moderation: unsupported resource reference;"
-                                " verifying as text."
-                            )
-                            moderated_content.append(
-                                {"type": "text", "text": media_ref.uri},
-                            )
-
-                    case ArtifactContent() as artifact:
-                        if artifact.hidden:
-                            continue  # skip hidden
-
-                        moderated_content.append(
-                            {
-                                "type": "text",
-                                "text": artifact.artifact.to_str(),
-                            }
-                        )
-
-                    case other:
+                    else:
                         ctx.log_warning(
-                            f"Attempting to use moderation on unsupported content ({type(other)}),"
-                            " verifying as text..."
+                            f"OpenAI moderation: unsupported media {part.mime_type}; "
+                            "verifying as text."
                         )
                         moderated_content.append(
                             {
                                 "type": "text",
-                                "text": other.to_str(),
+                                "text": part.to_str(include_data=False),
                             }
                         )
+
+                elif isinstance(part, ResourceReference):
+                    if part.mime_type and part.mime_type.startswith("image"):
+                        moderated_content.append(
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": part.uri},
+                            }
+                        )
+                    else:
+                        ctx.log_warning(
+                            "OpenAI moderation: unsupported resource reference; verifying as text."
+                        )
+                        moderated_content.append(
+                            {"type": "text", "text": part.uri},
+                        )
+
+                else:
+                    assert isinstance(part, ArtifactContent)  # nosec: B101
+                    if part.hidden:
+                        continue  # skip hidden
+
+                    moderated_content.append(
+                        {
+                            "type": "text",
+                            "text": part.artifact.to_str(),
+                        }
+                    )
 
             response: ModerationCreateResponse = await self._client.moderations.create(
                 model=moderation_config.model,

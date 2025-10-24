@@ -17,7 +17,7 @@ from draive.models import (
     ModelToolRequest,
     Toolbox,
 )
-from draive.multimodal import ArtifactContent, Template, TemplatesRepository
+from draive.multimodal import ArtifactContent
 
 __all__ = ("conversation_completion",)
 
@@ -25,7 +25,7 @@ __all__ = ("conversation_completion",)
 @overload
 async def conversation_completion(
     *,
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,
@@ -37,7 +37,7 @@ async def conversation_completion(
 @overload
 async def conversation_completion(
     *,
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,
@@ -48,7 +48,7 @@ async def conversation_completion(
 
 async def conversation_completion(
     *,
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,  # noqa: A002
@@ -80,7 +80,7 @@ async def conversation_completion(
 
 
 async def _conversation_completion(
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,  # noqa: A002
@@ -94,20 +94,12 @@ async def _conversation_completion(
             ModelInput.of(input.content),
         ]
 
-        resolved_instructions: str = await TemplatesRepository.resolve_str(
-            instructions,
-            arguments={
-                key: value if isinstance(value, str) else str(value)
-                for key, value in memory_recall.variables.items()
-            }
-            if memory_recall.variables
-            else None,
-        )
-
+        # run input moderation in parallel - TODO: should we use sanitized input?
         result: ModelOutput = await GenerativeModel.loop(
-            instructions=resolved_instructions,
+            instructions=instructions,
             toolbox=toolbox,
             context=context,
+            stream=False,
             **extra,
         )
 
@@ -133,7 +125,7 @@ async def _conversation_completion(
 
 
 async def _conversation_completion_stream(
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     input: ConversationMessage,  # noqa: A002
@@ -147,15 +139,7 @@ async def _conversation_completion_stream(
         ]
 
         async for chunk in await GenerativeModel.loop(
-            instructions=await TemplatesRepository.resolve_str(
-                instructions,
-                arguments={
-                    key: value if isinstance(value, str) else str(value)
-                    for key, value in memory_recall.variables.items()
-                }
-                if memory_recall.variables
-                else None,
-            ),
+            instructions=instructions,
             toolbox=toolbox,
             context=context,
             stream=True,

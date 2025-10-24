@@ -336,7 +336,8 @@ def _context_messages(  # noqa: C901, PLR0912
                         }
                     )
 
-        elif isinstance(element, ModelOutput):
+        else:
+            assert isinstance(element, ModelOutput)  # nosec: B101
             if role != "assistant":
                 if message := flush(role):
                     messages.append(message)
@@ -363,16 +364,13 @@ def _context_messages(  # noqa: C901, PLR0912
                         }
                     )
 
-        else:
-            raise ValueError(f"Unsupported model context element: {type(element).__name__}")
-
     if message := flush(role):
         messages.append(message)
 
     return messages
 
 
-def _convert_content(  # noqa: C901
+def _convert_content(
     parts: Sequence[MultimodalContentPart],
 ) -> list[ChatMessageContent]:
     converted: list[ChatMessageContent] = []
@@ -420,16 +418,13 @@ def _convert_content(  # noqa: C901
                 "ResourcesRepository."
             )
 
-        elif isinstance(part, ArtifactContent):
+        else:
+            assert isinstance(part, ArtifactContent)  # nosec: B101
             # Skip artifacts that are marked as hidden
             if part.hidden:
                 continue
 
             converted.append({"text": part.artifact.to_str()})
-
-        else:
-            # Fallback: serialize unknown parts to text
-            converted.append({"text": part.to_str()})
 
     return converted
 
@@ -461,7 +456,7 @@ def _tools_as_tool_config(
     else:
         toolChoice = {
             "tool": {
-                "name": cast(str, tool_selection),
+                "name": tool_selection,
             },
         }
 

@@ -36,7 +36,7 @@ class MCPServer:
         name: str,
         version: str | None = None,
         instructions: str | None = None,
-        resources: Iterable[ResourceTemplate | Resource] | None = None,
+        resources: Iterable[ResourceTemplate[Any] | Resource] | None = None,
         tools: Toolbox | Iterable[Tool] | None = None,
         disposables: Disposables | Collection[Disposable] | None = None,
     ) -> None:
@@ -98,7 +98,7 @@ class MCPServer:
 
         sse = SseServerTransport("/messages/")
 
-        async def handle_sse(request):
+        async def handle_sse(request: Any):
             async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
                 await self.run(
                     read_stream=streams[0],
@@ -134,13 +134,13 @@ class MCPServer:
 
     def _expose_resources(  # noqa: C901
         self,
-        resources: Iterable[ResourceTemplate | Resource],
+        resources: Iterable[ResourceTemplate[...] | Resource],
         /,
     ) -> None:
         resource_declarations: list[MCPResource] = []
         resource_template_declarations: list[MCPResourceTemplate] = []
-        available_resources: dict[str, ResourceTemplate | Resource] = {}
-        available_resource_templates: list[ResourceTemplate] = []
+        available_resources: dict[str, ResourceTemplate[...] | Resource] = {}
+        available_resource_templates: list[ResourceTemplate[...]] = []
         for resource in resources:
             match resource:
                 case Resource():
@@ -261,9 +261,7 @@ class MCPServer:
                         description=tool.description,
                         inputSchema=as_dict(tool.parameters) or {},
                     )
-                    for tool in (
-                        tool.specification for tool in toolbox.tools.values() if tool.available
-                    )
+                    for tool in (tool.specification for tool in toolbox.tools.values())
                 ]
 
         @self._server.call_tool()
@@ -287,24 +285,23 @@ class MCPServer:
 def _resource_content(
     resource: Resource,
 ) -> Iterable[ReadResourceContents]:
-    match resource.content:
-        case ResourceContent() as content:
-            match content.mime_type:
-                case "text/plain" | "application/json":
-                    yield ReadResourceContents(
-                        content=urlsafe_b64decode(content.data).decode(),
-                        mime_type=content.mime_type,
-                    )
+    if isinstance(resource.content, ResourceContent):
+        match resource.content.mime_type:
+            case "text/plain" | "application/json":
+                yield ReadResourceContents(
+                    content=urlsafe_b64decode(resource.content.data).decode(),
+                    mime_type=resource.content.mime_type,
+                )
 
-                case _:
-                    yield ReadResourceContents(
-                        content=urlsafe_b64decode(content.data),
-                        mime_type=content.mime_type,
-                    )
+            case _:
+                yield ReadResourceContents(
+                    content=urlsafe_b64decode(resource.content.data),
+                    mime_type=resource.content.mime_type,
+                )
 
-        case [*_]:
-            # Multi-content resources (lists of references) are not supported for server reads
-            raise NotImplementedError("Multi-content resources are not supported yet")
+    else:
+        # Multi-content resources (lists of references) are not supported for server reads
+        raise NotImplementedError("Multi-content resources are not supported yet")
 
 
 def _convert_multimodal_content(
@@ -312,102 +309,92 @@ def _convert_multimodal_content(
 ) -> Sequence[MCPTextContent | MCPImageContent | MCPAudioContent | EmbeddedResource]:
     converted: list[MCPTextContent | MCPImageContent | MCPAudioContent | EmbeddedResource] = []
     for part in content.parts:
-        match part:
-            case TextContent() as text:
+        if isinstance(part, TextContent):
+            converted.append(
+                MCPTextContent(
+                    type="text",
+                    text=part.text,
+                )
+            )
+
+        elif isinstance(part, ResourceContent):
+            mime: str = part.mime_type
+            if mime.startswith("image"):
+                converted.append(
+                    MCPImageContent(
+                        type="image",
+                        data=part.data,
+                        mimeType=mime,
+                    )
+                )
+
+            elif mime.startswith("audio"):
+                converted.append(
+                    MCPAudioContent(
+                        type="audio",
+                        data=part.data,
+                        mimeType=mime,
+                    )
+                )
+
+            elif mime == "text/plain":
                 converted.append(
                     MCPTextContent(
                         type="text",
-                        text=text.text,
+                        text=urlsafe_b64decode(part.data).decode(),
                     )
                 )
 
-            case ResourceContent() as data:
-                mime: str = data.mime_type
-                if mime.startswith("image"):
-                    converted.append(
-                        MCPImageContent(
-                            type="image",
-                            data=data.data,
-                            mimeType=mime,
-                        )
-                    )
-
-                elif mime.startswith("audio"):
-                    converted.append(
-                        MCPAudioContent(
-                            type="audio",
-                            data=data.data,
-                            mimeType=mime,
-                        )
-                    )
-
-                elif mime == "text/plain":
-                    converted.append(
-                        MCPTextContent(
-                            type="text",
-                            text=urlsafe_b64decode(data.data).decode(),
-                        )
-                    )
-
-                elif mime == "application/json":
-                    encoded: str = data.data
-                    # Provide a data URI to satisfy required AnyUrl
-                    uri = AnyUrl(f"data:{mime};base64,{encoded}")
-                    converted.append(
-                        EmbeddedResource(
-                            type="resource",
-                            resource=BlobResourceContents(
-                                uri=uri,
-                                mimeType=mime,
-                                blob=encoded,
-                            ),
-                        )
-                    )
-
-                else:
-                    # Unknown blob types: embed as a resource blob
-                    encoded: str = data.data
-                    uri = AnyUrl(f"data:{mime};base64,{encoded}")
-                    converted.append(
-                        EmbeddedResource(
-                            type="resource",
-                            resource=BlobResourceContents(
-                                uri=uri,
-                                mimeType=mime,
-                                blob=encoded,
-                            ),
-                        )
-                    )
-
-            case ResourceReference():
-                # We don't return links yet; ask callers to provide content
-                # we could try to resolve those contextually using ResourceRepository
-                raise NotImplementedError(
-                    "MCP resource links are not supported yet; provide content blobs instead"
-                )
-
-            case ArtifactContent() as artifact:
-                encoded: str = urlsafe_b64encode(artifact.artifact.to_json().encode()).decode()
-                uri = AnyUrl(f"data:application/json;base64,{encoded}")
+            elif mime == "application/json":
+                encoded: str = part.data
+                # Provide a data URI to satisfy required AnyUrl
+                uri = AnyUrl(f"data:{mime};base64,{encoded}")
                 converted.append(
                     EmbeddedResource(
                         type="resource",
                         resource=BlobResourceContents(
                             uri=uri,
-                            mimeType="application/json",
+                            mimeType=mime,
                             blob=encoded,
                         ),
                     )
                 )
 
-            case other:
-                # Fallback: serialize unknown parts to str
+            else:
+                # Unknown blob types: embed as a resource blob
+                encoded: str = part.data
+                uri = AnyUrl(f"data:{mime};base64,{encoded}")
                 converted.append(
-                    MCPTextContent(
-                        type="text",
-                        text=other.to_str(),
+                    EmbeddedResource(
+                        type="resource",
+                        resource=BlobResourceContents(
+                            uri=uri,
+                            mimeType=mime,
+                            blob=encoded,
+                        ),
                     )
                 )
-                raise ValueError(f"Unknown content type: {type(other)}")
+
+        elif isinstance(part, ResourceReference):
+            # We don't return links yet; ask callers to provide content
+            # we could try to resolve those contextually using ResourceRepository
+            raise NotImplementedError(
+                "MCP resource links are not supported yet; provide content blobs instead"
+            )
+
+        else:
+            assert isinstance(part, ArtifactContent)  # nosec: B101
+            encoded: str = urlsafe_b64encode(part.artifact.to_json().encode()).decode()
+            uri = AnyUrl(f"data:application/json;base64,{encoded}")
+            converted.append(
+                EmbeddedResource(
+                    type="resource",
+                    resource=BlobResourceContents(
+                        uri=uri,
+                        mimeType="application/json",
+                        blob=encoded,
+                    ),
+                )
+            )
 
     return converted

@@ -255,7 +255,7 @@ class OpenAIRealtime(OpenAIAPI):
                                     if event.item.call_id is None:
                                         continue  # can't use tool calls without call id
 
-                                    if event.item.name is None:
+                                    if not event.item.name:
                                         continue  # can't use tool calls without tool name
 
                                     return ModelToolRequest.of(
@@ -287,6 +287,9 @@ class OpenAIRealtime(OpenAIAPI):
                                     )
 
                                 case "function_call_output":
+                                    continue  # ignored for now
+
+                                case _:
                                     continue  # ignored for now
 
                         case "input_audio_buffer.speech_started":
@@ -604,100 +607,86 @@ def _user_content_parts(  # noqa: C901, PLR0912
     content: MultimodalContent,
 ) -> Generator[UserContentParam]:
     for part in content.parts:
-        match part:
-            case TextContent() as text:
-                if text.meta.get("transcript", default=False):
-                    yield {
-                        "type": "input_text",
-                        "transcript": text.text,
-                    }
-                else:
-                    yield {
-                        "type": "input_text",
-                        "text": text.text,
-                    }
+        if isinstance(part, TextContent):
+            if part.meta.get("transcript", False):
+                yield {
+                    "type": "input_text",
+                    "transcript": part.text,
+                }
+            else:
+                yield {
+                    "type": "input_text",
+                    "text": part.text,
+                }
 
-            case ResourceContent() as media:
-                if media.mime_type.startswith("audio"):
-                    # convert stored base64 (possibly urlsafe) to standard base64 string
-                    try:
-                        raw = urlsafe_b64decode(media.data)
+        elif isinstance(part, ResourceContent):
+            if part.mime_type.startswith("audio"):
+                # convert stored base64 (possibly urlsafe) to standard base64 string
+                try:
+                    raw = urlsafe_b64decode(part.data)
 
-                    except Exception:
-                        raw = b64decode(media.data)
+                except Exception:
+                    raw = b64decode(part.data)
 
-                    yield {
-                        "type": "input_audio",
-                        "audio": b64encode(raw).decode(),
-                    }
-                elif media.mime_type.startswith("image"):
-                    ctx.log_error("OpenAI realtime input (image) not supported! Skipping...")
+                yield {
+                    "type": "input_audio",
+                    "audio": b64encode(raw).decode(),
+                }
 
-                elif media.mime_type.startswith("video"):
-                    ctx.log_error("OpenAI realtime input (video) not supported! Skipping...")
+            elif part.mime_type.startswith("image"):
+                ctx.log_error("OpenAI realtime input (image) not supported! Skipping...")
 
-                else:
-                    # unsupported media type
-                    ctx.log_error(
-                        f"OpenAI realtime input (media {media.mime_type}) not supported!"
-                        " Skipping..."
-                    )
+            elif part.mime_type.startswith("video"):
+                ctx.log_error("OpenAI realtime input (video) not supported! Skipping...")
 
-            case ResourceReference():
-                # skip not supported with a log to prevent connection break
+            else:
+                # unsupported media type
                 ctx.log_error(
-                    "OpenAI realtime input (ResourceReference) not supported! Skipping..."
+                    f"OpenAI realtime input (media {part.mime_type}) not supported! Skipping..."
                 )
 
-            case ArtifactContent() as artifact:
-                if artifact.hidden:
-                    continue  # skip hidden
+        elif isinstance(part, ResourceReference):
+            # skip not supported with a log to prevent connection break
+            ctx.log_error("OpenAI realtime input (ResourceReference) not supported! Skipping...")
 
-                yield {
-                    "type": "input_text",
-                    "text": artifact.artifact.to_str(),
-                }
+        else:
+            assert isinstance(part, ArtifactContent)  # nosec: B101
+            if part.hidden:
+                continue  # skip hidden
 
-            case other:  # treat other as text
-                yield {
-                    "type": "input_text",
-                    "text": other.to_str(),
-                }
+            yield {
+                "type": "input_text",
+                "text": part.artifact.to_str(),
+            }
 
 
 def _assistant_content_parts(
     content: MultimodalContent,
 ) -> Generator[AssistantContentParam]:
     for part in content.parts:
-        match part:
-            case TextContent() as text:
-                yield {
-                    "type": "output_text",
-                    "text": text.text,
-                }
+        if isinstance(part, TextContent):
+            yield {
+                "type": "output_text",
+                "text": part.text,
+            }
 
-            case ResourceContent():
-                # skip not supported with a log to prevent connection break
-                ctx.log_error("OpenAI realtime output media not supported! Skipping...")
+        elif isinstance(part, ResourceContent):
+            # skip not supported with a log to prevent connection break
+            ctx.log_error("OpenAI realtime output media not supported! Skipping...")
 
-            case ResourceReference():
-                # skip not supported with a log to prevent connection break
-                ctx.log_error("OpenAI realtime output media not supported! Skipping...")
+        elif isinstance(part, ResourceReference):
+            # skip not supported with a log to prevent connection break
+            ctx.log_error("OpenAI realtime output media not supported! Skipping...")
 
-            case ArtifactContent() as artifact:
-                if artifact.hidden:
-                    continue  # skip hidden
+        else:
+            assert isinstance(part, ArtifactContent)  # nosec: B101
+            if part.hidden:
+                continue  # skip hidden
 
-                yield {
-                    "type": "output_text",
-                    "text": artifact.artifact.to_str(),
-                }
-
-            case other:  # treat other as json text
-                yield {
-                    "type": "output_text",
-                    "text": other.to_str(),
-                }
+            yield {
+                "type": "output_text",
+                "text": part.artifact.to_str(),
+            }
 
 
 def _tool_result(
@@ -705,22 +694,19 @@ def _tool_result(
 ) -> str:
     response_output: list[str] = []
     for part in content.parts:
-        match part:
-            case TextContent() as text:
-                response_output.append(text.text)
+        if isinstance(part, TextContent):
+            response_output.append(part.text)
 
-            case ResourceContent() | ResourceReference():
-                # skip not supported with a log to prevent connection break
-                ctx.log_error("OpenAI realtime function result (media) not supported! Skipping...")
+        elif isinstance(part, ResourceContent | ResourceReference):
+            # skip not supported with a log to prevent connection break
+            ctx.log_error("OpenAI realtime function result (media) not supported! Skipping...")
 
-            case ArtifactContent() as artifact:
-                if artifact.hidden:
-                    continue  # skip hidden
+        else:
+            assert isinstance(part, ArtifactContent)  # nosec: B101
+            if part.hidden:
+                continue  # skip hidden
 
-                response_output.append(artifact.artifact.to_str())
-
-            case other:  # treat other as json text
-                response_output.append(other.to_str())
+            response_output.append(part.artifact.to_str())
 
     return "".join(response_output)
 

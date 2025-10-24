@@ -1,6 +1,6 @@
 import json
 import random
-from collections.abc import AsyncGenerator, Collection, Coroutine, Generator, Sequence
+from collections.abc import AsyncGenerator, Collection, Coroutine, Generator, Mapping, Sequence
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
@@ -509,10 +509,9 @@ class OpenAIResponses(OpenAIAPI):
                             if isinstance(event.item, ResponseFunctionToolCall):
                                 try:
                                     # arguments in DoneEvent should be a complete JSON string
-                                    args = (
+                                    args: Mapping[str, Any] = (
                                         json.loads(event.item.arguments)
-                                        if isinstance(event.item.arguments, str)
-                                        and event.item.arguments.strip()
+                                        if event.item.arguments
                                         else {}
                                     )
                                     yield ModelToolRequest.of(
@@ -704,7 +703,7 @@ def _text_output(  # noqa: PLR0911
         }
 
     # multimodal selection containing text
-    if isinstance(output, Collection) and "text" in output:
+    if "text" in output:
         if verbosity is MISSING:
             return {"format": {"type": "text"}}
 
@@ -722,7 +721,7 @@ def _tool_choice(
 ) -> ToolChoiceFunctionParam | ToolChoiceOptions:
     match tools.selection:
         case "auto" | "required" | "none":
-            return cast(ToolChoiceOptions, tools.selection)
+            return tools.selection
 
         case specification:  # specific tool name
             return {
@@ -845,6 +844,9 @@ def _model_output_to_params(
                         encrypted_content=encrypted,
                     )
 
+                case other:
+                    raise ValueError(f"Unsupported reasoning element: {other}")
+
         else:
             assert isinstance(block, ModelToolRequest)  # nosec: B101
             yield ResponseFunctionToolCallParam(
@@ -890,20 +892,14 @@ def _input_content_parts(
                 image_url=part.uri,
             )
 
-        elif isinstance(part, ArtifactContent):
+        else:
+            assert isinstance(part, ArtifactContent)  # nosec: B101
             if part.hidden:
                 continue  # skip hidden
 
             yield ResponseInputTextContentParam(
                 type="input_text",
                 text=part.artifact.to_str(),
-            )
-
-        else:
-            # Fallback: serialize unknown parts as text
-            yield ResponseInputTextContentParam(
-                type="input_text",
-                text=part.to_str(),
             )
 
 
@@ -1021,7 +1017,8 @@ def _meta_from_text_annotations(
                 }
             )
 
-        elif isinstance(annotation, ResponseTextAnnotationFilePath):
+        else:
+            assert isinstance(annotation, ResponseTextAnnotationFilePath)  # nosec: B101
             citations.append(
                 {
                     "kind": "file_path",
@@ -1029,9 +1026,6 @@ def _meta_from_text_annotations(
                     "index": int(annotation.index),
                 }
             )
-
-        else:
-            continue
 
     if not citations:
         return None
@@ -1088,7 +1082,8 @@ def _output_content_blocks(  # noqa: C901
         elif isinstance(part, ResourceReference):
             raise ValueError("Media is not supported as model output")
 
-        elif isinstance(part, ArtifactContent):
+        else:
+            assert isinstance(part, ArtifactContent)  # nosec: B101
             if part.hidden:
                 continue  # skip hidden
 
@@ -1096,15 +1091,6 @@ def _output_content_blocks(  # noqa: C901
                 ResponseOutputTextParam(
                     type="output_text",
                     text=part.artifact.to_str(),
-                    annotations=(),
-                )
-            )
-
-        else:
-            content_accumulator.append(
-                ResponseOutputTextParam(
-                    type="output_text",
-                    text=part.to_str(),
                     annotations=(),
                 )
             )

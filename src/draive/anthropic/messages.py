@@ -32,6 +32,7 @@ from haiway import (
     Meta,
     Missing,
     ObservabilityLevel,
+    as_dict,
     as_list,
     ctx,
     unwrap_missing,
@@ -374,7 +375,7 @@ class AnthropicMessages(AnthropicAPI):
                     yield block
 
 
-def _context_messages(  # noqa: C901, PLR0912
+def _context_messages(  # noqa: PLR0912
     context: ModelContext,
     /,
 ) -> Generator[MessageParam]:
@@ -419,7 +420,8 @@ def _context_messages(  # noqa: C901, PLR0912
                 "content": content,
             }
 
-        elif isinstance(element, ModelOutput):
+        else:
+            assert isinstance(element, ModelOutput)  # nosec: B101
             for block in element.blocks:
                 if isinstance(block, MultimodalContent):
                     content.extend(
@@ -451,6 +453,9 @@ def _context_messages(  # noqa: C901, PLR0912
                                 }
                             )
 
+                        case other:
+                            raise ValueError(f"Unsupported reasoning element: {other}")
+
                 else:
                     assert isinstance(block, ModelToolRequest)  # nosec: B101
                     content.append(
@@ -458,7 +463,7 @@ def _context_messages(  # noqa: C901, PLR0912
                             "id": block.identifier,
                             "type": "tool_use",
                             "name": block.tool,
-                            "input": block.arguments,
+                            "input": as_dict(block.arguments),
                         }
                     )
 
@@ -466,9 +471,6 @@ def _context_messages(  # noqa: C901, PLR0912
                 "role": "assistant",
                 "content": content,
             }
-
-        else:
-            raise ValueError(f"Unsupported model context element: {type(element).__name__}")
 
 
 def _content_elements(
@@ -519,7 +521,8 @@ def _content_elements(
             last_cacheable = image_block
             yield image_block
 
-        elif isinstance(part, ArtifactContent):
+        else:
+            assert isinstance(part, ArtifactContent)  # nosec: B101
             # Skip artifacts that are marked as hidden
             if part.hidden:
                 continue
@@ -527,15 +530,6 @@ def _content_elements(
             text_block: TextBlockParam = {
                 "type": "text",
                 "text": part.artifact.to_str(),
-            }
-            last_cacheable = text_block
-            yield text_block
-
-        else:
-            # Fallback: serialize unknown parts to text
-            text_block: TextBlockParam = {
-                "type": "text",
-                "text": part.to_str(),
             }
             last_cacheable = text_block
             yield text_block

@@ -363,7 +363,7 @@ class EvaluatorScenario[Value, **Args](Immutable):
 
         else:
             assert isinstance(mapping, Callable)  # nosec: B101
-            mapper = mapping
+            mapper = cast(Callable[[Mapped], Value], mapping)
 
         async def evaluation(
             value: Mapped,

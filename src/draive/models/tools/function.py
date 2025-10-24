@@ -381,11 +381,14 @@ def _default_result_format(result: Any) -> MultimodalContent:
         return result
 
     elif isinstance(result, Multimodal):
-        return MultimodalContent.of(result)
+        return MultimodalContent.of(cast(Multimodal, result))
 
     elif isinstance(result, Iterable):
         return MultimodalContent.of(
-            *(element if isinstance(element, Multimodal) else str(element) for element in result)
+            *(
+                cast(Multimodal, element) if isinstance(element, Multimodal) else str(element)
+                for element in cast(Iterable[Any], result)
+            )
         )
 
     else:
