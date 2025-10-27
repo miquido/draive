@@ -1,19 +1,15 @@
 <!-- markdownlint-disable-file MD046 -->
 # Multimodal data
 
-One of the most important skills while using **Draive** is to fully understand how to treat multimodal data, and model context.
+One of the most important skills when using **Draive** is fully understanding how to treat multimodal data and model context.
 
-All data can be converted into `Multimodal` (text, audio, image, artifact = any `DataModel`). Those multimodal data are usually the input and output type for most of **Draive** functions.
+Any data can be converted into the `Multimodal` alias (text, audio, image, or artifact; any `DataModel`). This multimodal representation is usually the input and output type for most **Draive** functions.
 
-You also must know that multimodal data also creates model context - user inputs and model outputs, so it is really a very important thing to understand.
-
-!!! note
-
-    After reading this section you will have all the knowledge you need to efficiently operate on model context and multimodal data
+Multimodal data creates the model context (user inputs and model outputs), so understanding it is crucial.
 
 ## Multimodal
 
-`Multimodal` class is a class merging MultimodalContent, MultimodalTag and others. In some places there is a input set to `Multimodal` type for automated transformation.
+The `Multimodal` alias merges `MultimodalContent`, `MultimodalTag`, and others. In some places input parameters are typed as `Multimodal` for automated transformation.
 
 ![Multimodal Class](../../diagrams/out/Multimodal.svg)
 
@@ -27,15 +23,15 @@ You also must know that multimodal data also creates model context - user inputs
 
 ![MultimodalContent aggregates](../../diagrams/out/MultimodalContent.svg)
 
-`MultimodalContent` is a very useful piece of code that is used as an input or output in multiple places in the **Draive** framework. It can be used for filtering, splitting, replacing and other operations.
+`MultimodalContent` serves as the input or output in multiple places in the **Draive** framework. It can be used for filtering, splitting, replacing, and other operations.
 
-**Few examples of MultimodalContent usage in Draive**:
+**A few examples of MultimodalContent usage in Draive**:
 
-* `@tool` decorator decorate functions that returns a MultimodalContent
-* `ModelInput` and `ModelOutput` classes use MultimodalContent
-* `TextGeneration.generate(...)` takes the multimodal input
+* `@tool` decorator decorates functions that return `MultimodalContent`
+* `ModelInput` and `ModelOutput` classes use `MultimodalContent`
+* `TextGeneration.generate(...)` accepts `MultimodalContent` as input
 
-`MultimodalContent` is a **easy to use and intelligent** class, that does a lot for you under the hood:
+`MultimodalContent` is an **easy-to-use and intelligent** class that does a lot for you under the hood:
 
 1. It avoids extra nesting:
 
@@ -47,7 +43,7 @@ You also must know that multimodal data also creates model context - user inputs
     # (Same as the first one despite nesting)
     ```
 
-2. It merges multiple parts if type matches:
+2. It merges multiple parts if the types match:
 
     ```python
     class User(DataModel):
@@ -97,11 +93,11 @@ You also must know that multimodal data also creates model context - user inputs
 
     !!! note
 
-        `MultimodalTag` is basically a text, so it is being merged with `TextContent`.
+        `MultimodalTag` produces text parts, so they merge with `TextContent`.
 
 !!! tip
 
-    `MultimodalContent` has ready to use methods for filtering as `images()`, `texts()`, `tags()` or `artifacts()`. This is another argument to use `MultimodalContent` rather than other data models
+    `MultimodalContent` has ready-to-use methods for filtering such as `images()`, `texts()`, `tags()` or `artifacts()`. This is another argument to use `MultimodalContent` rather than other data models
 
 ## Model Input
 
@@ -121,4 +117,4 @@ You also must know that multimodal data also creates model context - user inputs
 
 !!! tip
 
-    There are ready to use methods like `without_tools()` to get model output without blocks related to tool request and response, or `reasoning()` to get model reasoning blocks. That can help you implement your features easily.
+    There are ready-to-use methods like `without_tools()` to get model output without blocks related to tool requests and responses, or `reasoning()` to get model reasoning blocks. That can help you implement your features easily.
