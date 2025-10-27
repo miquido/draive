@@ -95,9 +95,36 @@ The `Multimodal` alias merges `MultimodalContent`, `MultimodalTag`, and others. 
 
         `MultimodalTag` produces text parts, so they merge with `TextContent`.
 
-!!! tip
+3. Comes with a set of helper functions to speed up your work. Examples:
 
-    `MultimodalContent` has ready-to-use methods for filtering such as `images()`, `texts()`, `tags()` or `artifacts()`. This is another argument to use `MultimodalContent` rather than other data models
+    ```python
+    print(multimodal.texts())
+    # (
+    #    {'text': '<outer><inner>Hello</inner>', 'meta': {}},
+    #    {'text': '</outer>', 'meta': {}}
+    # )
+    print(multimodal.tags())
+    # (
+    #    {'name': 'outer', 'content': {...}, 'meta': {}},
+    #    {'name': 'inner', 'content': {...}, 'meta': {}}
+    # )
+    print(multimodal.artifacts())
+    # (
+    #    {
+    #        'category': 'User',
+    #        'artifact': {
+    #            'first_name': 'James',
+    #            'last_name': 'Smith'
+    #        },
+    #        'hidden': False,
+    #        'meta': {}
+    #    },
+    # )
+    ```
+
+    !!! tip
+
+        `MultimodalContent` has more ready-to-use methods for filtering such as `matching_meta()`, `split_by_meta()`, `without_resources()` or `audio()`. This is another argument to use `MultimodalContent` rather than other data models
 
 ## Model Input
 
