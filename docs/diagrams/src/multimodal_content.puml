@@ -2,10 +2,23 @@
 skinparam Dpi 300
 
 class MultimodalContent {
-    appending(*parts: MultimodalContent | MultimodalTag | MultimodalContentPart | str): MultimodalContent
-    matching_meta(**values: MetaValue): MultimodalContent
+    contains_resources: bool
+    contains_artifacts: bool
+
+    of(*elements: Multimodal): MultimodalContent
+    texts(): Sequence[TextContent]
+    resources(mime_type: MimeType | None): Sequence[ResourceReference | ResourceContent]
+    without_resources(): MultimodalContent
+    images(): Sequence[ResourceReference | ResourceContent]
+    audio(): Sequence[ResourceReference | ResourceContent]
+    video(): Sequence[ResourceReference | ResourceContent]
+    artifacts(category: str | None = None, model: DataModel | None = None): Sequence[ArtifactContent[Artifact]] | Sequence[ArtifactContent[DataModel]]
+    without_artifacts(): MultimodalContent
+    appending(*parts: Multimodal): MultimodalContent
+    matching_meta(**values: MetaValue): Self
     split_by_meta(key: str): Sequence[MultimodalContent]
-    replacing_tag(name: str, replacement: Multimodal, strip_tags: bool, exhaustive: bool): MultimodalContent
+    tag(name: str | None = None): MultimodalTag | None
+    tags(name: str | None = None): Sequence[MultimodalTag]
+    replacing_tag(name: str, replacement: Multimodal, strip_tags: bool = False, exhaustive: bool = False): MultimodalContent
 }
-hide MultimodalContent attributes
 @enduml

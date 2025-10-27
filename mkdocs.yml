@@ -98,7 +98,7 @@ nav:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
       - First Steps: getting-started/first-steps.md
-      - Multimodal Data: getting-started/multimodal-data/index.md
+      - Multimodal Data: getting-started/multimodal-data.md
   - Guides:
       - Basic Usage: guides/BasicUsage.md
       - Basic Tools Use: guides/BasicToolsUse.md

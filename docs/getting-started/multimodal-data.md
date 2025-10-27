@@ -11,7 +11,7 @@ Multimodal data creates the model context (user inputs and model outputs), so un
 
 The `Multimodal` alias merges `MultimodalContent`, `MultimodalTag`, and others. In some places input parameters are typed as `Multimodal` for automated transformation.
 
-![Multimodal Class](../../diagrams/out/Multimodal.svg)
+![Multimodal Class](../diagrams/out/Multimodal.svg)
 
 !!! note
 
@@ -21,15 +21,15 @@ The `Multimodal` alias merges `MultimodalContent`, `MultimodalTag`, and others. 
 
 `MultimodalContent` is the central container bundling the different `MultimodalContentPart` blocks. Concrete parts carry concrete payloads: plain text (`TextContent`), references or embedded resources (`ResourceReference`, `ResourceContent`), artifacts (`ArtifactContent`), and tags (`MultimodalTag`). As a result any span of content can be examined as a set of selected parts or as an entire tag tree.
 
-![MultimodalContent aggregates](../../diagrams/out/MultimodalContent.svg)
+![MultimodalContent aggregates](../diagrams/out/MultimodalContent.svg)
 
 `MultimodalContent` serves as the input or output in multiple places in the **Draive** framework. It can be used for filtering, splitting, replacing, and other operations.
 
 **A few examples of MultimodalContent usage in Draive**:
 
-* `@tool` decorator decorates functions that return `MultimodalContent` (see [Basic tools use](../../guides/BasicToolsUse.md))
+* `@tool` decorator decorates functions that return `MultimodalContent` (see [Basic tools use](../guides/BasicToolsUse.md))
 * `ModelInput` and `ModelOutput` classes use `MultimodalContent`
-* `TextGeneration.generate(...)` accepts `MultimodalContent` as input (see [Basic usage](../../guides/BasicUsage.md))
+* `TextGeneration.generate(...)` accepts `MultimodalContent` as input (see [Basic usage](../guides/BasicUsage.md))
 
 `MultimodalContent` is an **easy-to-use and intelligent** class that does a lot for you under the hood:
 
@@ -130,7 +130,7 @@ The `Multimodal` alias merges `MultimodalContent`, `MultimodalTag`, and others. 
 
 `ModelInput` groups the user-provided blocks (`ModelInputBlock`). Each block is backed by `MultimodalContent`, so it preserves every part type described above. The input stream may also embed tool responses (`ModelToolResponse`), which return their payload as `MultimodalContent`, letting you treat tool output the same way as regular text-and-media blocks.
 
-![ModelInput class relationships](../../diagrams/out/ModelInput.svg){style="height:400px; margin: auto; display: block;"}
+![ModelInput class relationships](../diagrams/out/ModelInput.svg){style="height:400px; margin: auto; display: block;"}
 
 !!! note
 
@@ -140,7 +140,7 @@ The `Multimodal` alias merges `MultimodalContent`, `MultimodalTag`, and others. 
 
 `ModelOutput` mirrors the same structure on the response side. Output blocks (`ModelOutputBlock`) expose `MultimodalContent`, and both the model's reasoning trail (`ModelReasoning`) and its tool requests (`ModelToolRequest`) rely on the same container. This means the full generation flow - from visible content to internal thinking and tool invocations - can be analysed with one coherent set of helpers.
 
-![ModelOutput class relationships](../../diagrams/out/ModelOutput.svg){style="height:400px; margin: auto; display: block;"}
+![ModelOutput class relationships](../diagrams/out/ModelOutput.svg){style="height:400px; margin: auto; display: block;"}
 
 !!! tip
 
