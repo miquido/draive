@@ -1,0 +1,15 @@
+@startuml Multimodal
+skinparam Dpi 300
+hide members
+
+abstract class Multimodal
+
+class MultimodalContent <<external>>
+Multimodal <|-- MultimodalContent
+class MultimodalTag <<external>>
+Multimodal <|-- MultimodalTag
+class MultimodalContentPart <<external>>
+Multimodal <|-- MultimodalContentPart
+class str
+Multimodal <|-- str
+@enduml

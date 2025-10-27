@@ -66,6 +66,7 @@ docs = [
   "mdformat~=0.7",
   "mdformat-gfm~=0.4",
   "pymarkdownlnt~=0.9",
+  "mkdocs-build-plantuml-plugin>=1.11.0",
 ]
 
 [tool.ruff]

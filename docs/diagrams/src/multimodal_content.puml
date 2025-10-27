@@ -1,0 +1,11 @@
+@startuml MultimodalContent
+skinparam Dpi 300
+
+class MultimodalContent {
+    appending(*parts: MultimodalContent | MultimodalTag | MultimodalContentPart | str): MultimodalContent
+    matching_meta(**values: MetaValue): MultimodalContent
+    split_by_meta(key: str): Sequence[MultimodalContent]
+    replacing_tag(name: str, replacement: Multimodal, strip_tags: bool, exhaustive: bool): MultimodalContent
+}
+hide MultimodalContent attributes
+@enduml

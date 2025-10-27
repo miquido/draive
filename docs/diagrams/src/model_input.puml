@@ -1,0 +1,31 @@
+@startuml ModelInput
+skinparam dpi 300
+hide members
+
+class ModelInput {
+    blocks: Sequence[ModelInputBlock]
+    meta: Meta
+    content(): MultimodalContent
+    tools(): Sequence[ModelToolResponse]
+    without_tools(): ModelInput
+}
+show ModelInput members
+
+abstract class ModelInputBlock
+ModelInput *-- ModelInputBlock
+
+class MultimodalContent <<external>>
+ModelInputBlock <|-- MultimodalContent
+
+class ModelToolResponse {
+    identifier: str
+    tool: str
+    content: MultimodalContent
+    handling: str
+    meta: Meta
+}
+show ModelToolResponse attributes
+ModelInputBlock <|-- ModelToolResponse
+MultimodalContent <.. ModelToolResponse
+
+@enduml

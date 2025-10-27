@@ -1,0 +1,124 @@
+<!-- markdownlint-disable-file MD046 -->
+# Multimodal data
+
+One of the most important skills while using **Draive** is to fully understand how to treat multimodal data, and model context.
+
+All data can be converted into `Multimodal` (text, audio, image, artifact = any `DataModel`). Those multimodal data are usually the input and output type for most of **Draive** functions.
+
+You also must know that multimodal data also creates model context - user inputs and model outputs, so it is really a very important thing to understand.
+
+!!! note
+
+    After reading this section you will have all the knowledge you need to efficiently operate on model context and multimodal data
+
+## Multimodal
+
+`Multimodal` class is a class merging MultimodalContent, MultimodalTag and others. In some places there is a input set to `Multimodal` type for automated transformation.
+
+![Multimodal Class](../../diagrams/out/Multimodal.svg)
+
+!!! note
+
+    Constructors and helpers such as `MultimodalContent.of(*elements: "Multimodal")` use the `Multimodal` alias to normalize any mix of multimodal parts into one consistent `MultimodalContent`.
+
+## Multimodal Content
+
+`MultimodalContent` is the central container bundling the different `MultimodalContentPart` blocks. Concrete parts carry concrete payloads: plain text (`TextContent`), references or embedded resources (`ResourceReference`, `ResourceContent`), artifacts (`ArtifactContent`), and tags (`MultimodalTag`). As a result any span of content can be examined as a set of selected parts or as an entire tag tree.
+
+![MultimodalContent aggregates](../../diagrams/out/MultimodalContent.svg)
+
+`MultimodalContent` is a very useful piece of code that is used as an input or output in multiple places in the **Draive** framework. It can be used for filtering, splitting, replacing and other operations.
+
+**Few examples of MultimodalContent usage in Draive**:
+
+* `@tool` decorator decorate functions that returns a MultimodalContent
+* `ModelInput` and `ModelOutput` classes use MultimodalContent
+* `TextGeneration.generate(...)` takes the multimodal input
+
+`MultimodalContent` is a **easy to use and intelligent** class, that does a lot for you under the hood:
+
+1. It avoids extra nesting:
+
+    ```python
+    inner_multimodal = MultimodalContent.of("Hello world!")
+    print(inner_multimodal)  # {'type': 'content', 'parts': [{'text': 'Hello world!', 'meta': {}}]}
+    outer_multimodal = MultimodalContent.of(inner_multimodal)
+    print(outer_multimodal)  # {'type': 'content', 'parts': [{'text': 'Hello world!', 'meta': {}}]}
+    # (Same as the first one despite nesting)
+    ```
+
+2. It merges multiple parts if type matches:
+
+    ```python
+    class User(DataModel):
+        first_name: str
+        last_name: str
+
+    content = MultimodalContent.of(
+        MultimodalTag.of(
+            MultimodalTag.of(
+                "Hello",
+                name="inner",
+            ),
+            ArtifactContent.of(
+                User(
+                    first_name="James",
+                    last_name="Smith",
+                )
+            ),
+            name="outer",
+        )
+    )
+
+    print(content)
+    # {
+    #    'type': 'content', 
+    #    'parts': [
+    #        {
+    #            'text': '<outer><inner>Hello</inner>', 
+    #            'meta': {}
+    #        }, 
+    #        {
+    #            'category': 'User', 
+    #            'artifact': {
+    #                'first_name': 'James', 
+    #                'last_name': 'Smith'
+    #            }, 
+    #            'hidden': False, 
+    #            'meta': {}
+    #        }, 
+    #        {
+    #            'text': '</outer>', 
+    #            'meta': {}
+    #        }
+    #    ]
+    # }
+    ```
+
+    !!! note
+
+        `MultimodalTag` is basically a text, so it is being merged with `TextContent`.
+
+!!! tip
+
+    `MultimodalContent` has ready to use methods for filtering as `images()`, `texts()`, `tags()` or `artifacts()`. This is another argument to use `MultimodalContent` rather than other data models
+
+## Model Input
+
+`ModelInput` groups the user-provided blocks (`ModelInputBlock`). Each block is backed by `MultimodalContent`, so it preserves every part type described above. The input stream may also embed tool responses (`ModelToolResponse`), which return their payload as `MultimodalContent`, letting you treat tool output the same way as regular text-and-media blocks.
+
+![ModelInput class relationships](../../diagrams/out/ModelInput.svg){style="height:400px; margin: auto; display: block;"}
+
+!!! note
+
+    Note that `ModelToolResponse` has a `content` attribute of type `MultimodalContent`. This is the reason why `@tool` decorated functions must return `MultimodalContent`.
+
+## Model Output
+
+`ModelOutput` mirrors the same structure on the response side. Output blocks (`ModelOutputBlock`) expose `MultimodalContent`, and both the model's reasoning trail (`ModelReasoning`) and its tool requests (`ModelToolRequest`) rely on the same container. This means the full generation flow - from visible content to internal thinking and tool invocations - can be analysed with one coherent set of helpers.
+
+![ModelOutput class relationships](../../diagrams/out/ModelOutput.svg){style="height:400px; margin: auto; display: block;"}
+
+!!! tip
+
+    There are ready to use methods like `without_tools()` to get model output without blocks related to tool request and response, or `reasoning()` to get model reasoning blocks. That can help you implement your features easily.

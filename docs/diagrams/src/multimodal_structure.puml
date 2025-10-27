@@ -1,0 +1,62 @@
+@startuml MultimodalStructure
+skinparam Dpi 300
+hide members
+
+class MultimodalContent {
+    parts: Sequence[MultimodalContentPart]
+
+    texts(): Sequence[TextContent]
+    resources(mime_type: str):  Sequence[ResourceReference | ResourceContent]
+    images():  Sequence[ResourceReference | ResourceContent]
+    audio():  Sequence[ResourceReference | ResourceContent]
+    artifacts(category: str, model: Artifact): Sequence[ArtifactContent]
+    tag(name: str): MultimodalTag | None
+    tags(name: str): Sequence[MultimodalTag]
+}
+show MultimodalContent members
+
+abstract MultimodalContentPart
+
+class TextContent {
+    text: str
+    meta: Meta
+}
+show TextContent attributes
+
+class ResourceReference {
+    uri: str
+    mime_type: str
+    meta: Meta
+}
+show ResourceReference attributes
+
+class ResourceContent {
+    data: str
+    mime_type: str
+    meta: Meta
+}
+show ResourceContent attributes
+
+class ArtifactContent {
+    category: str
+    artifact: DataModel
+    hidden: bool
+    meta: Meta
+}
+show ArtifactContent attributes
+
+MultimodalContent *-- MultimodalContentPart
+
+MultimodalContentPart <|-- TextContent
+MultimodalContentPart <|-- ResourceReference
+MultimodalContentPart <|-- ResourceContent
+MultimodalContentPart <|-- ArtifactContent
+
+class MultimodalTag {
+    name: str
+    content: MultimodalContent
+    meta: Meta
+}
+show MultimodalTag attributes
+MultimodalContent <.. MultimodalTag
+@enduml
