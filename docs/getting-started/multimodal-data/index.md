@@ -27,9 +27,9 @@ The `Multimodal` alias merges `MultimodalContent`, `MultimodalTag`, and others. 
 
 **A few examples of MultimodalContent usage in Draive**:
 
-* `@tool` decorator decorates functions that return `MultimodalContent`
+* `@tool` decorator decorates functions that return `MultimodalContent` (see [Basic tools use](../../guides/BasicToolsUse.md))
 * `ModelInput` and `ModelOutput` classes use `MultimodalContent`
-* `TextGeneration.generate(...)` accepts `MultimodalContent` as input
+* `TextGeneration.generate(...)` accepts `MultimodalContent` as input (see [Basic usage](../../guides/BasicUsage.md))
 
 `MultimodalContent` is an **easy-to-use and intelligent** class that does a lot for you under the hood:
 
