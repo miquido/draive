@@ -5,14 +5,14 @@ class MultimodalContent {
     contains_resources: bool
     contains_artifacts: bool
 
-    of(*elements: Multimodal): MultimodalContent
+    {static}of(*elements: Multimodal): MultimodalContent
     texts(): Sequence[TextContent]
     resources(mime_type: MimeType | None): Sequence[ResourceReference | ResourceContent]
     without_resources(): MultimodalContent
     images(): Sequence[ResourceReference | ResourceContent]
     audio(): Sequence[ResourceReference | ResourceContent]
     video(): Sequence[ResourceReference | ResourceContent]
-    artifacts(category: str | None = None, model: DataModel | None = None): Sequence[ArtifactContent[Artifact]] | Sequence[ArtifactContent[DataModel]]
+    artifacts(category: str | None = None, model: type[Artifact] | None = None): Sequence[ArtifactContent[Artifact]] | Sequence[ArtifactContent[DataModel]]
     without_artifacts(): MultimodalContent
     appending(*parts: Multimodal): MultimodalContent
     matching_meta(**values: MetaValue): Self
