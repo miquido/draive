@@ -1,5 +1,5 @@
 @startuml MultimodalContent
-skinparam Dpi 300
+skinparam dpi 300
 
 class MultimodalContent {
     contains_resources: bool
