@@ -2,12 +2,12 @@
 skinparam dpi 300
 
 class MultimodalContent {
-    contains_resources: bool
-    contains_artifacts: bool
+    contains_resources: bool {readOnly}
+    contains_artifacts: bool {readOnly}
 
     {static}of(*elements: Multimodal): MultimodalContent
     texts(): Sequence[TextContent]
-    resources(mime_type: MimeType | None): Sequence[ResourceReference | ResourceContent]
+    resources(mime_type: MimeType | None = None): Sequence[ResourceReference | ResourceContent]
     without_resources(): MultimodalContent
     images(): Sequence[ResourceReference | ResourceContent]
     audio(): Sequence[ResourceReference | ResourceContent]
