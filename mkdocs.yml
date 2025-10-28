@@ -99,6 +99,7 @@ nav:
       - Quickstart: getting-started/quickstart.md
       - First Steps: getting-started/first-steps.md
       - Multimodal Data: getting-started/multimodal-data.md
+      - Printing Data: getting-started/printing-data.md
   - Guides:
       - Basic Usage: guides/BasicUsage.md
       - Basic Tools Use: guides/BasicToolsUse.md
