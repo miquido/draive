@@ -1,5 +1,5 @@
 @startuml Multimodal
-skinparam Dpi 300
+skinparam dpi 300
 hide members
 
 abstract class Multimodal
