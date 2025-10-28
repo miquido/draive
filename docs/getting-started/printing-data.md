@@ -1,18 +1,18 @@
 <!-- markdownlint-disable-file MD046 -->
 # Printing data
 
-In **Draive** there are a few option for converting multimodal data into printable objects:
+In **Draive** you often need to surface multimodal data in logs, dashboards, or CLI output. Every model state exposes a few helpers that flatten structured content into printable strings:
 
-* `x.to_mapping()` *(Default)* - converts data into python `dict` object that is printable
-* `x.to_json(indent: int | None = None)` - converts data into JSON object string
-* `x.to_str()` - converts data into string using class method (based on class implementation)
-* `str(x)` - uses default string method (`str(x.to_mapping())` for `DataModel` class)
+| Helper | Output |
+| --- | --- |
+| `x.to_mapping()` *(default)* | `dict` representation |
+| `x.to_json(indent: int \| None = None)` | JSON string |
+| `x.to_str()` | Model-defined string |
+| `str(x)` | Alias for `str(x.to_mapping())` on `DataModel` |
 
-Different Data Model objects in **Draive** will be displayed differently while using `s.to_str()` printing method.
+Different `DataModel` instances implement `.to_str()` in their own way, so the rendered view varies by content type. The sections below walk through the most common multimodal classes and show how their printing helpers behave.
 
-The rest of this page will guide you through the most important data models and provide you with examples of theirs printing method.
-
-## `TextContent`
+## TextContent
 
 Plain text output that mirrors the original `text` value without any extra
 markup or quoting.
@@ -29,102 +29,102 @@ ctx.log_info(text.to_str())
 ```
 
 ```text
-Hello World!
+Hello world!
 ```
 
-## `ResourceContent`
+## ResourceContent
 
 Generates a Markdown media reference. Depending on `include_data`, the reference either embeds the base64 payload directly or uses a redacted placeholder.
 
-!!! Note
+!!! note
 
     `kind` variable will be one of: `'image' | 'audio' | 'video' | ''`
 
-* if `include_data` parameter in `to_str()` is `True`
+When `include_data=True`, `ResourceContent.to_str()` returns the full base64 payload:
 
-    ```python
-    return f"![{kind}](data:{self.mime_type};base64,{self.data})"
-    ```
+```python
+return f"![{kind}](data:{self.mime_type};base64,{self.data})"
+```
 
-    **Example:**
+**Example:**
 
-    ```python
-    resource: ResourceContent = ResourceContent.of(b'FF', mime_type='application/octet-stream')
-    ctx.log_info(resource.to_str(include_data=True))
-    ```
+```python
+resource: ResourceContent = ResourceContent.of(b'FF', mime_type='application/octet-stream')
+ctx.log_info(resource.to_str(include_data=True))
+```
 
-    ```text
-    ![](data:application/octet-stream;base64,RkY=)
-    ```
+```text
+![](data:application/octet-stream;base64,RkY=)
+```
 
-* if `include_data` parameter in `to_str()` is `False`
+With the default `include_data=False`, it emits a placeholder that keeps the media type visible without leaking the bytes:
 
-    ```python
-    return f"![{kind}](REDACTED)"
-    ```
+```python
+return f"![{kind}](REDACTED)"
+```
 
-    **Example:**
+**Example:**
 
-    ```python
-    with open('./src/dog.jpg', 'rb') as img:
-        img_data: bytes = img.read()
-    resource: ResourceContent = ResourceContent.of(img_data, mime_type='image/jpeg')
-    ctx.log_info(resource.to_str())
-    ```
+```python
+with open('./src/dog.jpg', 'rb') as img:
+    img_data: bytes = img.read()
+resource: ResourceContent = ResourceContent.of(img_data, mime_type='image/jpeg')
+ctx.log_info(resource.to_str())
+```
 
-    ```text
-    ![image](REDACTED)
-    ```
+```text
+![image](REDACTED)
+```
 
-## `ArtifactContent`
+## ArtifactContent
 
 Produces delegated artifact output when visible, otherwise suppresses content
 entirely for hidden artifacts.
 
-* if `self.hidden` attribute is `True`
+Hidden artifacts render as an empty string:
 
-    ```python
-    return ""
-    ```
+```python
+return ""
+```
 
-* if `self.hidden` attribute is `False`
+Visible artifacts reuse the nested artifact’s `to_str()` result:
 
-    ```python
-    return f"{self.artifact.to_str()}"
-    ```
+```python
+return f"{self.artifact.to_str()}"
+```
 
-## `MultimodalTag`
+## MultimodalTag
 
 Formats XML-like tags, optionally wrapping the rendered child content. Empty
 content yields a self-closing tag.
 
-* if `self.content` is empty
+When `self.content` is empty, the printer emits a self-closing tag:
 
-    ```python
-    return f"<{self.name}{_tag_attributes(self.meta)}/>"
-    ```
+```python
+return f"<{self.name}{_tag_attributes(self.meta)}/>"
+```
 
-    **Example:**
+**Example:**
 
-    ```text
-    <TAG_NAME attr_1 attr_2="val_2"/>
-    ```
+```text
+<TAG_NAME attr_1 attr_2="val_2"/>
+```
 
-* if `self.content` is not empty
+Otherwise it wraps the rendered child content:
 
-    ```python
-    return f"<{self.name}{_tag_attributes(self.meta)}>{self.content.to_str()}</{self.name}>"
-    ```
+```python
+return f"<{self.name}{_tag_attributes(self.meta)}>{self.content.to_str()}</{self.name}>"
+```
 
-    **Example:**
+**Example:**
 
-    ```text
-    <TAG_NAME attr_1 attr_2="val_2">Hello World!</TAG_NAME>
-    ```
+```text
+<TAG_NAME attr_1 attr_2="val_2">Hello World!</TAG_NAME>
+```
 
-!!! Important
+!!! important
 
-    `MultimodalTag` is the only Multimodal element that has a visible Meta section. Data from `meta` will end up as a XML tag attributes
+    `MultimodalTag` is the only multimodal element that exposes metadata inline. Values stored in `meta` appear as XML-style tag attributes.
 
 ## MultimodalContent
 
