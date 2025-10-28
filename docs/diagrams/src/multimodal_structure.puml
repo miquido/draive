@@ -6,9 +6,9 @@ class MultimodalContent {
     parts: Sequence[MultimodalContentPart]
 
     texts(): Sequence[TextContent]
-    resources(mime_type: str):  Sequence[ResourceReference | ResourceContent]
-    images():  Sequence[ResourceReference | ResourceContent]
-    audio():  Sequence[ResourceReference | ResourceContent]
+    resources(mime_type: str): Sequence[ResourceReference | ResourceContent]
+    images(): Sequence[ResourceReference | ResourceContent]
+    audio(): Sequence[ResourceReference | ResourceContent]
     artifacts(category: str, model: Artifact): Sequence[ArtifactContent]
     tag(name: str): MultimodalTag | None
     tags(name: str): Sequence[MultimodalTag]
