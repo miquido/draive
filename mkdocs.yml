@@ -79,6 +79,17 @@ markdown_extensions:
 plugins:
   - search:
       lang: en
+  - build_plantuml:
+      render: 'server' # or "local" for local rendering
+      bin_path: '/usr/local/bin/plantuml' # ignored when render: server
+      server: 'http://www.plantuml.com/plantuml' # official plantuml server
+      disable_ssl_certificate_validation: true # for self-signed and invalid certs
+      output_format: 'svg' # or "png"
+      allow_multiple_roots: false # in case your codebase contains more locations for diagrams (all ending in diagram_root)
+      diagram_root: 'docs/diagrams' # should reside under docs_dir
+      output_folder: 'out'
+      input_folder: 'src'
+      input_extensions: '' # comma separated list of extensions to parse, by default every file is parsed
 
 nav:
   - Home: index.md
@@ -87,6 +98,8 @@ nav:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
       - First Steps: getting-started/first-steps.md
+      - Multimodal Data: getting-started/multimodal-data.md
+      - Printing Data: getting-started/printing-data.md
   - Guides:
       - Basic Usage: guides/BasicUsage.md
       - Basic Tools Use: guides/BasicToolsUse.md

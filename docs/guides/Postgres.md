@@ -85,8 +85,8 @@ Capabilities:
 
 - `templates()` returns cached `TemplateDeclaration` objects reflecting the newest revision per
   identifier.
-- `resolve(template)` and `resolve_str(template)` reuse a cached loader keyed by identifier to
-  pull the latest template body before rendering arguments.
+- `resolve(template)` and `resolve_str(template)` reuse a cached loader keyed by identifier to pull
+  the latest template body before rendering arguments.
 - `define(template, content)` persists a new revision, invalidates caches, and ensures subsequent
   reads see the updated payload.
 

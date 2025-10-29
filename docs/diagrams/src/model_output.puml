@@ -1,0 +1,39 @@
+@startuml ModelOutput
+skinparam dpi 300
+hide members
+
+class ModelOutput {
+    blocks: Sequence[ModelOutputBlock]
+    meta: Meta
+    content(): MultimodalContent
+    content_with_reasoning(): MultimodalContent
+    reasoning(): Sequence[ModelReasoning]
+    tools(): Sequence[ModelToolRequest]
+    without_tools(): ModelOutput
+}
+show ModelOutput members
+
+abstract class ModelOutputBlock
+ModelOutput *-- ModelOutputBlock
+
+class MultimodalContent <<external>>
+ModelOutputBlock <|-- MultimodalContent
+
+class ModelReasoning {
+    content: MultimodalContent
+    meta: Meta
+}
+show ModelReasoning attributes
+ModelOutputBlock <|-- ModelReasoning
+MultimodalContent <.. ModelReasoning
+
+class ModelToolRequest {
+    identifier: str
+    tool: str
+    arguments: Mapping[str, Any]
+    meta: Meta
+}
+show ModelToolRequest attributes
+ModelOutputBlock <|-- ModelToolRequest
+
+@enduml
