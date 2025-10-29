@@ -33,6 +33,27 @@ async with ctx.scope(
 Each adapter relies on the same connection scope, so you can freely mix them within a single
 context.
 
+When working with pgvector-backed components, add the Python package `pgvector` to your environment
+(`pip install pgvector`) and ensure every connection registers the codec. haiway ≥ 0.37.1 exposes an
+`initialize` callback on `PostgresConnectionPool.of(...)` so you can point to the schema where the
+extension is installed:
+
+```python
+from asyncpg.connection import Connection
+from pgvector.asyncpg import register_vector
+
+
+async def initialize_pgvector(connection: Connection) -> None:
+    await register_vector(connection, schema="public")
+
+PostgresConnectionPool.of(
+    dsn="postgresql://draive:secret@localhost:5432/draive",
+    initialize=initialize_pgvector,
+)
+```
+
+Reuse the same initializer across scopes to keep the codec registration consistent.
+
 ## ConfigurationRepository implementation
 
 `PostgresConfigurationRepository` persists configuration snapshots inside a `configurations` table
@@ -176,6 +197,9 @@ from collections.abc import Sequence
 from typing import Annotated
 
 from draive import Alias, DataModel, ctx
+from asyncpg.connection import Connection
+from pgvector.asyncpg import register_vector
+
 from draive.postgres import PostgresConnectionPool, PostgresVectorIndex
 from draive.utils import VectorIndex
 
@@ -185,11 +209,18 @@ class Chunk(DataModel):
     text: str
 
 
+async def initialize_pgvector(connection: Connection) -> None:
+    await register_vector(connection, schema="embeddings")
+
+
 async with ctx.scope(
     "pgvector-demo",
     PostgresVectorIndex(),
     disposables=(
-        PostgresConnectionPool.of(dsn="postgresql://draive:secret@localhost:5432/draive"),
+        PostgresConnectionPool.of(
+            dsn="postgresql://draive:secret@localhost:5432/draive",
+            initialize=initialize_pgvector,
+        ),
     ),
 ):
     await VectorIndex.index(

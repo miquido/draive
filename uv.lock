@@ -129,30 +129,30 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.40.61"
+version = "1.40.62"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ed/f9/6ef8feb52c3cce5ec3967a535a6114b57ac7949fd166b0f3090c2b06e4e5/boto3-1.40.61.tar.gz", hash = "sha256:d6c56277251adf6c2bdd25249feae625abe4966831676689ff23b4694dea5b12", size = 111535, upload-time = "2025-10-28T19:26:57.247Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/69/2612a06d584786500ba7ea068927e95e24719da3b6734bd23c50788f5982/boto3-1.40.62.tar.gz", hash = "sha256:3dbe7e1e7dc9127a4b1f2020a14f38ffe64fad84df00623e8ab6a5d49a82ea28", size = 111499, upload-time = "2025-10-29T21:33:13.873Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/61/24/3bf865b07d15fea85b63504856e137029b6acbc73762496064219cdb265d/boto3-1.40.61-py3-none-any.whl", hash = "sha256:6b9c57b2a922b5d8c17766e29ed792586a818098efe84def27c8f582b33f898c", size = 139321, upload-time = "2025-10-28T19:26:55.007Z" },
+    { url = "https://files.pythonhosted.org/packages/76/7d/8b67dea3e88b66b67f0ad17a3b443e498c20c6d9a49a7a079c413c624def/boto3-1.40.62-py3-none-any.whl", hash = "sha256:f422d4ae3b278832ba807059aafa553164bce2c464cd65b24c9ea8fb8a6c4192", size = 139320, upload-time = "2025-10-29T21:33:12.422Z" },
 ]
 
 [[package]]
 name = "botocore"
-version = "1.40.61"
+version = "1.40.62"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jmespath" },
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/28/a3/81d3a47c2dbfd76f185d3b894f2ad01a75096c006a2dd91f237dca182188/botocore-1.40.61.tar.gz", hash = "sha256:a2487ad69b090f9cccd64cf07c7021cd80ee9c0655ad974f87045b02f3ef52cd", size = 14393956, upload-time = "2025-10-28T19:26:46.108Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/50/d6/dc11fecf450c60175fd568791e2324e059e81bc4adac85d83f272ab293f5/botocore-1.40.62.tar.gz", hash = "sha256:1e8e57c131597dc234d67428bda1323e8f0a687ea13ea570253159ab9256fa28", size = 14389174, upload-time = "2025-10-29T21:33:03.209Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/38/c5/f6ce561004db45f0b847c2cd9b19c67c6bf348a82018a48cb718be6b58b0/botocore-1.40.61-py3-none-any.whl", hash = "sha256:17ebae412692fd4824f99cde0f08d50126dc97954008e5ba2b522eb049238aa7", size = 14055973, upload-time = "2025-10-28T19:26:42.15Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/de/be9e3d25e6d114dfd0bb2dd42c9c3ae78b693b5e519a736b76f505fdb0d1/botocore-1.40.62-py3-none-any.whl", hash = "sha256:780f1d476d4b530ce3b12fd9f7112156d97d99ebdbbd9ef60635b0432af9d3a5", size = 14056496, upload-time = "2025-10-29T21:33:00.401Z" },
 ]
 
 [[package]]
@@ -349,7 +349,7 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.91.0"
+version = "0.91.1"
 source = { editable = "." }
 dependencies = [
     { name = "haiway" },
@@ -439,7 +439,7 @@ requires-dist = [
     { name = "cohere", marker = "extra == 'cohere-bedrock'", specifier = "~=5.18" },
     { name = "google-api-core", marker = "extra == 'gemini'" },
     { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=1.41" },
-    { name = "haiway", specifier = "~=0.37.0" },
+    { name = "haiway", specifier = "~=0.37.3" },
     { name = "haiway", extras = ["httpx"], marker = "extra == 'httpx'" },
     { name = "haiway", extras = ["opentelemetry"], marker = "extra == 'opentelemetry'" },
     { name = "haiway", extras = ["postgres"], marker = "extra == 'postgres'" },
@@ -569,7 +569,7 @@ wheels = [
 
 [[package]]
 name = "google-genai"
-version = "1.46.0"
+version = "1.47.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -581,9 +581,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c7/2d/d5907af6a46fb0b660291a09bb62f9cbc1365899f7d64a74e7d8d2e056c2/google_genai-1.46.0.tar.gz", hash = "sha256:6824c31149fe3b1c7285b25f79b924c5f89fd52466f62e30f76954f8104fe3a7", size = 239561, upload-time = "2025-10-21T22:55:04.241Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9f/97/784fba9bc6c41263ff90cb9063eadfdd755dde79cfa5a8d0e397b067dcf9/google_genai-1.47.0.tar.gz", hash = "sha256:ecece00d0a04e6739ea76cc8dad82ec9593d9380aaabef078990e60574e5bf59", size = 241471, upload-time = "2025-10-29T22:01:02.88Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/db/79/8993ec6cbf56e5c8f88c165380e55de34ec74f7b928bc302ff5c370f9c4e/google_genai-1.46.0-py3-none-any.whl", hash = "sha256:879c4a260d630db0dcedb5cc84a9d7b47acd29e43e9dc63541b511b757ea7296", size = 239445, upload-time = "2025-10-21T22:55:03.072Z" },
+    { url = "https://files.pythonhosted.org/packages/89/ef/e080e8d67c270ea320956bb911a9359664fc46d3b87d1f029decd33e5c4c/google_genai-1.47.0-py3-none-any.whl", hash = "sha256:e3851237556cbdec96007d8028b4b1f2425cdc5c099a8dc36b72a57e42821b60", size = 241506, upload-time = "2025-10-29T22:01:00.982Z" },
 ]
 
 [[package]]
@@ -652,14 +652,14 @@ wheels = [
 
 [[package]]
 name = "haiway"
-version = "0.37.0"
+version = "0.37.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/42/77/fa9053a53955e885989b727e4c03e372ece38669aff4c66591b397eb1f7e/haiway-0.37.0.tar.gz", hash = "sha256:57ceda35e23aa5ea40654e6d7ac1022dfea436cdc15e1829906978866a5a0744", size = 101093, upload-time = "2025-10-29T13:02:40.851Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/10/3836df81d8564a172728882a14844d8ebdd759de5a5f9dfdc19bd847706d/haiway-0.37.3.tar.gz", hash = "sha256:73ffdfbbd241f337a3c6f323eab32aedac957079a514fc0bfbc3ed8fc7c1173e", size = 101359, upload-time = "2025-10-30T12:41:58.907Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6a/59/a74487c6358152127df460cfc8356ed51e4f0bb0d7b71a6e5b538a878c5e/haiway-0.37.0-py3-none-any.whl", hash = "sha256:e0db9a090d0dcf0b6d6ee9402032a8d3fa1ade36ae66c2e38067bbf3ab223120", size = 128588, upload-time = "2025-10-29T13:02:39.298Z" },
+    { url = "https://files.pythonhosted.org/packages/96/6c/2dc974bb7431c98569c7ab12532eb954100fc90fba08766609561a3aa55a/haiway-0.37.3-py3-none-any.whl", hash = "sha256:abe8d3174d662a6e08549286c5a44e2a400bfd6a6d059eec0f5513a5e58e50e6", size = 128875, upload-time = "2025-10-30T12:41:57.463Z" },
 ]
 
 [package.optional-dependencies]

@@ -281,7 +281,7 @@ class GeminiGenerating(GeminiAPI):
                 },
             )
 
-    async def _completion_stream(  # noqa: C901
+    async def _completion_stream(  # noqa: C901, PLR0912
         self,
         *,
         instructions: ModelInstructions,
@@ -326,6 +326,7 @@ class GeminiGenerating(GeminiAPI):
                 _context_element_as_content(element) for element in context
             ]
 
+            last_usage_meta: GenerateContentResponseUsageMetadata | None = None
             try:
                 response_stream: AsyncIterator[
                     GenerateContentResponse
@@ -340,10 +341,8 @@ class GeminiGenerating(GeminiAPI):
                 finish_message: str | None = None
 
                 async for chunk in response_stream:
-                    _record_usage_metrics(
-                        chunk.usage_metadata,
-                        model=config.model,
-                    )
+                    if chunk.usage_metadata:  # chunks provide usage summary instead of delta
+                        last_usage_meta = chunk.usage_metadata
 
                     if not chunk.candidates:
                         continue
@@ -428,6 +427,12 @@ class GeminiGenerating(GeminiAPI):
                     model=config.model,
                     reason=str(exc),
                 ) from exc
+
+            finally:
+                _record_usage_metrics(
+                    last_usage_meta,
+                    model=config.model,
+                )
 
 
 def _record_usage_metrics(
