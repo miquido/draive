@@ -399,7 +399,8 @@ print(f"Benign prompt: {benign_result.score.value} ({'✓' if benign_result.pass
 print(f"Attack prompt: {attack_result.score.value} ({'✓' if attack_result.passed else '✗'})")
 ```
 
-**Best for**: Guardrail evaluations, red-teaming pipelines, filtering jailbreak or prompt-injection attempts while keeping high safety thresholds.
+**Best for**: Guardrail evaluations, red-teaming pipelines, filtering jailbreak or prompt-injection
+attempts while keeping high safety thresholds.
 
 ### Factual Accuracy Evaluator
 
