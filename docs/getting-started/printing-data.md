@@ -1,21 +1,24 @@
 <!-- markdownlint-disable-file MD046 -->
+
 # Printing data
 
-In **Draive** you often need to surface multimodal data in logs, dashboards, or CLI output. Every model state exposes a few helpers that flatten structured content into printable strings:
+In **Draive** you often need to surface multimodal data in logs, dashboards, or CLI output. Every
+model state exposes a few helpers that flatten structured content into printable strings:
 
-| Helper | Output |
-| --- | --- |
-| `x.to_mapping()` *(default)* | `dict` representation |
-| `x.to_json(indent: int \| None = None)` | JSON string |
-| `x.to_str()` | Model-defined string |
-| `str(x)` | Alias for `str(x.to_mapping())` on `DataModel` |
+| Helper                                  | Output                                         |
+| --------------------------------------- | ---------------------------------------------- |
+| `x.to_mapping()` *(default)*            | `dict` representation                          |
+| `x.to_json(indent: int \| None = None)` | JSON string                                    |
+| `x.to_str()`                            | Model-defined string                           |
+| `str(x)`                                | Alias for `str(x.to_mapping())` on `DataModel` |
 
-Different `DataModel` instances implement `.to_str()` in their own way, so the rendered view varies by content type. The sections below walk through the most common multimodal classes and show how their printing helpers behave.
+Different `DataModel` instances implement `.to_str()` in their own way, so the rendered view varies
+by content type. The sections below walk through the most common multimodal classes and show how
+their printing helpers behave.
 
 ## TextContent
 
-Plain text output that mirrors the original `text` value without any extra
-markup or quoting.
+Plain text output that mirrors the original `text` value without any extra markup or quoting.
 
 ```python
 return f"{self.text}"
@@ -34,11 +37,14 @@ Hello world!
 
 ## ResourceContent
 
-Generates a Markdown media reference. Depending on `include_data`, the reference either embeds the base64 payload directly or uses a redacted placeholder.
+Generates a Markdown media reference. Depending on `include_data`, the reference either embeds the
+base64 payload directly or uses a redacted placeholder.
 
 !!! note
 
-    `kind` variable will be one of: `'image' | 'audio' | 'video' | ''`
+```
+`kind` variable will be one of: `'image' | 'audio' | 'video' | ''`
+```
 
 When `include_data=True`, `ResourceContent.to_str()` returns the full base64 payload:
 
@@ -57,7 +63,8 @@ ctx.log_info(resource.to_str(include_data=True))
 ![](data:application/octet-stream;base64,RkY=)
 ```
 
-With the default `include_data=False`, it emits a placeholder that keeps the media type visible without leaking the bytes:
+With the default `include_data=False`, it emits a placeholder that keeps the media type visible
+without leaking the bytes:
 
 ```python
 return f"![{kind}](REDACTED)"
@@ -78,8 +85,8 @@ ctx.log_info(resource.to_str())
 
 ## ArtifactContent
 
-Produces delegated artifact output when visible, otherwise suppresses content
-entirely for hidden artifacts.
+Produces delegated artifact output when visible, otherwise suppresses content entirely for hidden
+artifacts.
 
 Hidden artifacts render as an empty string:
 
@@ -95,8 +102,8 @@ return f"{self.artifact.to_str()}"
 
 ## MultimodalTag
 
-Formats XML-like tags, optionally wrapping the rendered child content. Empty
-content yields a self-closing tag.
+Formats XML-like tags, optionally wrapping the rendered child content. Empty content yields a
+self-closing tag.
 
 When `self.content` is empty, the printer emits a self-closing tag:
 
@@ -124,12 +131,14 @@ return f"<{self.name}{_tag_attributes(self.meta)}>{self.content.to_str()}</{self
 
 !!! important
 
-    `MultimodalTag` is the only multimodal element that exposes metadata inline. Values stored in `meta` appear as XML-style tag attributes.
+```
+`MultimodalTag` is the only multimodal element that exposes metadata inline. Values stored in `meta` appear as XML-style tag attributes.
+```
 
 ## MultimodalContent
 
-Concatenates the string form of each part, resulting in a single composite
-response without delimiters.
+Concatenates the string form of each part, resulting in a single composite response without
+delimiters.
 
 ```python
 return "".join(part.to_str() for part in self.parts)
