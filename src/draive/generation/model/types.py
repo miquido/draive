@@ -1,8 +1,8 @@
 from collections.abc import Iterable
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from draive.models import ModelInstructions, Toolbox
-from draive.multimodal import MultimodalContent, Template
+from draive.multimodal import MultimodalContent
 from draive.parameters import DataModel
 
 __all__ = (
@@ -26,9 +26,8 @@ class ModelGenerating(Protocol):
         generated: type[Generated],
         /,
         *,
-        instructions: Template | ModelInstructions,
+        instructions: ModelInstructions,
         input: MultimodalContent,  # noqa: A002
-        schema_injection: Literal["full", "simplified", "skip"],
         toolbox: Toolbox,
         examples: Iterable[tuple[MultimodalContent, Generated]],
         decoder: ModelGenerationDecoder[Generated] | None,

@@ -192,9 +192,9 @@ def PostgresModelMemory(
         ctx.log_info("...maintenance completed!")
 
     return ModelMemory(
-        recall=recall,
-        remember=remember,
-        maintenance=maintenance,
+        recalling=recall,
+        remembering=remember,
+        maintaining=maintenance,
     )
 
 

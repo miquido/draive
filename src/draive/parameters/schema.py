@@ -26,7 +26,7 @@ def simplified_schema(
             raise ValueError(f"Unsupported basic specification: {other}")
 
 
-def _simplified_schema_property(  # noqa: C901, PLR0912, PLR0911
+def _simplified_schema_property(  # noqa: C901, PLR0912, PLR0911, PLR0915
     specification: TypeSpecification,
 ) -> dict[str, Any] | list[Any] | str:
     match specification:
@@ -151,10 +151,12 @@ def _simplified_schema_property(  # noqa: C901, PLR0912, PLR0911
                 for item in items
             ]
 
-        case {"type": "array", "items": [*items], "description": str() as description}:
+        case {"type": "array", "items": items, "description": str() as description}:
+            assert items is not False  # nosec: B101
             return [_simplified_schema_property(specification=items)]  # TODO: add description?
 
-        case {"type": "array", "items": [*items]}:
+        case {"type": "array", "items": items}:
+            assert items is not False  # nosec: B101
             return [
                 _simplified_schema_property(
                     specification=items,

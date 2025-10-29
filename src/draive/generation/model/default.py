@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import Any, Literal, cast
+from typing import Any
 
 from haiway import ctx
 
@@ -11,7 +11,7 @@ from draive.models import (
     ModelOutput,
     Toolbox,
 )
-from draive.multimodal import MultimodalContent, Template, TemplatesRepository
+from draive.multimodal import MultimodalContent
 from draive.parameters import DataModel
 
 __all__ = ("generate_model",)
@@ -21,48 +21,16 @@ async def generate_model[Generated: DataModel](
     generated: type[Generated],
     /,
     *,
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     input: MultimodalContent,  # noqa: A002
-    schema_injection: Literal["full", "simplified", "skip"],
     toolbox: Toolbox,
     examples: Iterable[tuple[MultimodalContent, Generated]],
     decoder: ModelGenerationDecoder[Generated] | None,
     **extra: Any,
 ) -> Generated:
     async with ctx.scope("generate_model"):
-        resolved_instructions: ModelInstructions
-        match schema_injection:
-            case "full":
-                if isinstance(instructions, str):
-                    resolved_instructions = instructions.format(
-                        model_schema=generated.json_schema(indent=2),
-                    )
-
-                else:
-                    resolved_instructions = await TemplatesRepository.resolve_str(
-                        instructions.with_arguments(
-                            model_schema=generated.json_schema(indent=2),
-                        )
-                    )
-
-            case "simplified":
-                if isinstance(instructions, str):
-                    resolved_instructions = instructions.format(
-                        model_schema=generated.simplified_schema(indent=2),
-                    )
-
-                else:
-                    resolved_instructions = await TemplatesRepository.resolve_str(
-                        instructions.with_arguments(
-                            model_schema=generated.simplified_schema(indent=2),
-                        )
-                    )
-
-            case "skip":  # instruction is not modified
-                resolved_instructions = await TemplatesRepository.resolve_str(instructions)
-
         result: ModelOutput = await GenerativeModel.loop(
-            instructions=resolved_instructions,
+            instructions=instructions,
             toolbox=toolbox,
             context=[
                 *[
@@ -76,6 +44,7 @@ async def generate_model[Generated: DataModel](
                 ModelInput.of(input),
             ],
             output="auto" if decoder is not None else generated,
+            stream=False,
             **extra,
         )
 
@@ -86,7 +55,7 @@ async def generate_model[Generated: DataModel](
 
             elif artifacts := result.content.artifacts(generated):
                 ctx.log_debug("...direct artifact found!")
-                return cast(Generated, artifacts[0].artifact)
+                return artifacts[0].artifact
 
             else:  # fallback to default decoding
                 ctx.log_debug("...decoding result...")

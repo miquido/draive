@@ -6,7 +6,7 @@ from haiway import State, statemethod
 from draive.generation.text.default import generate_text
 from draive.generation.text.types import TextGenerating
 from draive.models import ModelInstructions, Tool, Toolbox
-from draive.multimodal import Multimodal, MultimodalContent, Template
+from draive.multimodal import Multimodal, MultimodalContent, Template, TemplatesRepository
 
 __all__ = ("TextGeneration",)
 
@@ -18,7 +18,7 @@ class TextGeneration(State):
         cls,
         *,
         instructions: Template | ModelInstructions = "",
-        input: Multimodal,
+        input: Template | Multimodal,
         tools: Toolbox | Iterable[Tool] = (),
         examples: Iterable[tuple[Multimodal, str]] = (),
         **extra: Any,
@@ -29,7 +29,7 @@ class TextGeneration(State):
         self,
         *,
         instructions: Template | ModelInstructions = "",
-        input: Multimodal,
+        input: Template | Multimodal,
         tools: Toolbox | Iterable[Tool] = (),
         examples: Iterable[tuple[Multimodal, str]] = (),
         **extra: Any,
@@ -40,14 +40,16 @@ class TextGeneration(State):
         self,
         *,
         instructions: Template | ModelInstructions = "",
-        input: Multimodal,  # noqa: A002
+        input: Template | Multimodal,  # noqa: A002
         tools: Toolbox | Iterable[Tool] = (),
         examples: Iterable[tuple[Multimodal, str]] = (),
         **extra: Any,
     ) -> str:
         return await self.generating(
-            instructions=instructions,
-            input=MultimodalContent.of(input),
+            # resolve instructions templates
+            instructions=await TemplatesRepository.resolve_str(instructions),
+            # resolve input templates
+            input=await TemplatesRepository.resolve(input),
             toolbox=Toolbox.of(tools),
             examples=((MultimodalContent.of(ex_in), ex_out) for ex_in, ex_out in examples),
             **extra,

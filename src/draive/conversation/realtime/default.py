@@ -29,14 +29,13 @@ from draive.models.types import (
     ModelToolRequest,
     ModelToolResponse,
 )
-from draive.multimodal import Template, TemplatesRepository
 
 __all__ = ("realtime_conversation_preparing",)
 
 
 async def realtime_conversation_preparing(  # noqa: C901
     *,
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     toolbox: Toolbox,
     memory: ModelMemory,
     output: ModelSessionOutputSelection,
@@ -49,7 +48,7 @@ async def realtime_conversation_preparing(  # noqa: C901
     """
     # TODO: rework RealtimeLMM interface to allow instruction and tools changes during the session
     session_scope: ModelSessionScope = await RealtimeGenerativeModel.session(
-        instructions=await TemplatesRepository.resolve_str(instructions),
+        instructions=instructions,
         memory=memory,
         tools=toolbox.available_tools_declaration(),
         output=output,
@@ -65,10 +64,10 @@ async def realtime_conversation_preparing(  # noqa: C901
         ) -> None:
             try:
                 ctx.log_debug(
-                    f"Handling tool ({tool_request.tool}) request ({tool_request.identifier}) ...",
+                    f"Handling tool ({tool_request.tool}) request ({tool_request.identifier}) ..."
                 )
                 response: ModelToolResponse = await toolbox.respond(tool_request)
-                if response.handling in ("completion", "extension"):
+                if response.handling in ("response", "output", "output_extension"):
                     ctx.log_warning(
                         f"Tool handling `{response.handling}` is not supported in"
                         " realtime conversation, using regular result handling instead"

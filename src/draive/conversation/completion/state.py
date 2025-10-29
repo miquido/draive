@@ -1,7 +1,7 @@
-from collections.abc import AsyncIterator, Generator, Iterable
+from collections.abc import AsyncIterator, Generator, Iterable, Mapping
 from typing import Any, Literal, final, overload
 
-from haiway import State, ctx
+from haiway import BasicValue, State, ctx
 
 from draive.conversation.completion.default import conversation_completion
 from draive.conversation.completion.types import ConversationCompleting
@@ -15,7 +15,7 @@ from draive.models import (
     Tool,
     Toolbox,
 )
-from draive.multimodal import Multimodal, Template
+from draive.multimodal import Multimodal, Template, TemplatesRepository
 from draive.utils import Memory
 
 __all__ = ("Conversation",)
@@ -37,7 +37,7 @@ class Conversation(State):
         instructions: Template | ModelInstructions = "",
         tools: Toolbox | Iterable[Tool] | None = None,
         memory: ModelMemory | Iterable[ConversationMessage] | None = None,
-        input: ConversationMessage | Multimodal,
+        input: ConversationMessage | Template | Multimodal,
         stream: Literal[False] = False,
         **extra: Any,
     ) -> ConversationMessage: ...
@@ -50,7 +50,7 @@ class Conversation(State):
         instructions: Template | ModelInstructions = "",
         tools: Toolbox | Iterable[Tool] = (),
         memory: ModelMemory | Iterable[ConversationMessage] = (),
-        input: ConversationMessage | Multimodal,
+        input: ConversationMessage | Template | Multimodal,
         stream: Literal[True],
         **extra: Any,
     ) -> AsyncIterator[ConversationOutputChunk]: ...
@@ -62,7 +62,7 @@ class Conversation(State):
         instructions: Template | ModelInstructions = "",
         tools: Toolbox | Iterable[Tool] | None = None,
         memory: ModelMemory | Iterable[ConversationMessage] | None = None,
-        input: ConversationMessage | Multimodal,  # noqa: A002
+        input: ConversationMessage | Template | Multimodal,  # noqa: A002
         stream: bool = False,
         **extra: Any,
     ) -> AsyncIterator[ConversationOutputChunk] | ConversationMessage:
@@ -76,8 +76,8 @@ class Conversation(State):
             Tools to expose for this turn.
         memory : ModelMemory | Iterable[ConversationMessage] | None, optional
             Conversation memory; if an iterable is provided it is converted to model context.
-        input : ConversationMessage | Multimodal
-            Input message or raw content (converted to a user message).
+        input : ConversationMessage | Template |Multimodal
+            Input message, message template or raw content (converted to a user message).
         stream : bool, optional
             When ``True``, return an async iterator of ``ConversationOutputChunk``.
         **extra : Any
@@ -93,14 +93,20 @@ class Conversation(State):
             conversation_message = input
 
         else:
-            conversation_message = ConversationMessage.user(input)
+            conversation_message = ConversationMessage.user(
+                await TemplatesRepository.resolve(input)
+            )
 
         conversation_memory: ModelMemory
+        memory_variables: Mapping[str, BasicValue] | None
         if memory is None:
             conversation_memory = ModelMemory.constant(ModelMemoryRecall.empty)
+            memory_variables = None
 
         elif isinstance(memory, Memory):
             conversation_memory = memory
+            memory_recall: ModelMemoryRecall = await memory.recall()
+            memory_variables = memory_recall.variables
 
         else:
 
@@ -115,10 +121,21 @@ class Conversation(State):
             conversation_memory = ModelMemory.constant(
                 ModelMemoryRecall.of(*model_context_elements())
             )
+            memory_variables = None
+
+        model_instructions: ModelInstructions = await TemplatesRepository.resolve_str(
+            instructions,
+            arguments={
+                key: value if isinstance(value, str) else str(value)
+                for key, value in memory_variables.items()
+            }
+            if memory_variables
+            else None,
+        )
 
         if stream:
             return await ctx.state(cls).completing(
-                instructions=instructions,
+                instructions=model_instructions,
                 toolbox=Toolbox.of(tools),
                 memory=conversation_memory,
                 input=conversation_message,
@@ -128,10 +145,11 @@ class Conversation(State):
 
         else:
             return await ctx.state(cls).completing(
-                instructions=instructions,
+                instructions=model_instructions,
                 toolbox=Toolbox.of(tools),
                 memory=conversation_memory,
                 input=conversation_message,
+                stream=False,
                 **extra,
             )
 

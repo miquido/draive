@@ -3,7 +3,7 @@ import random
 from asyncio import Lock
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
-from typing import Annotated, Protocol, Self, runtime_checkable
+from typing import Annotated, Protocol, Self, cast, runtime_checkable
 from uuid import uuid4
 
 from haiway import (
@@ -19,7 +19,6 @@ from haiway import (
 )
 
 from draive.evaluation.evaluator import EvaluatorResult
-from draive.evaluation.generator import generate_case_parameters
 from draive.evaluation.scenario import EvaluatorScenarioResult
 from draive.parameters import DataModel
 
@@ -48,7 +47,7 @@ class EvaluatorSuiteCase[Parameters: DataModel](DataModel):
         Parameters specific to this test case
     """
 
-    identifier: str = Default(factory=lambda: str(uuid4()))
+    identifier: str = Default(default_factory=lambda: str(uuid4()))
     parameters: Parameters
 
 
@@ -498,7 +497,7 @@ class EvaluatorSuite[**Args, Parameters: DataModel](Immutable):
                             raise ValueError(f"Evaluation case with ID {case} does not exists.")
 
                     elif isinstance(case, EvaluatorSuiteCase):
-                        selected_cases.append(case)
+                        selected_cases.append(cast(EvaluatorSuiteCase[Parameters], case))
 
                     else:
                         selected_cases.append(EvaluatorSuiteCase(parameters=case))
@@ -691,6 +690,8 @@ class EvaluatorSuite[**Args, Parameters: DataModel](Immutable):
         examples: Iterable[Parameters] | None = None,
     ) -> Sequence[EvaluatorSuiteCase[Parameters]]:
         async with self._lock:
+            from draive.helpers.evaluation_case_generation import generate_case_parameters
+
             current_cases: Sequence[EvaluatorSuiteCase[Parameters]] = await self._available_cases(
                 reload=True
             )

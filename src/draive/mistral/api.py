@@ -44,7 +44,7 @@ class MistralAPI:
         await self._client.__aenter__()
 
     async def _deinitialize_client(self) -> None:
-        await self._client.__aexit__(
+        await self._client.__aexit__(  # pyright: ignore[reportUnknownMemberType]
             None,
             None,
             None,

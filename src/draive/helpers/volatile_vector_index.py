@@ -14,7 +14,7 @@ from draive.embedding import (
 )
 from draive.multimodal import TextContent
 from draive.parameters import DataModel
-from draive.resources import ResourceContent, ResourceReference
+from draive.resources import ResourceContent
 from draive.utils import VectorIndex
 
 __all__ = ("VolatileVectorIndex",)
@@ -24,7 +24,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
     lock: Lock = Lock()
     storage: MutableMapping[type[Any], MutableSequence[Embedded[Any]]] = {}
 
-    async def index[Model: DataModel, Value: ResourceContent | TextContent | str](  # noqa: C901, PLR0912
+    async def index[Model: DataModel, Value: ResourceContent | TextContent | str](
         model: type[Model],
         /,
         *,
@@ -45,39 +45,38 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                     ), "Prepare parameter path by using Self._.path.to.property"
                     value_selector = cast(AttributePath[Model, Value], path).__call__
 
-            selected_values: list[str | bytes] = []
+            text_values: list[str] = []
+            image_values: list[bytes] = []
             for value in values_sequence:
-                match value_selector(value):
-                    case str() as text:
-                        selected_values.append(text)
+                selected = value_selector(value)
+                if isinstance(selected, str):
+                    text_values.append(selected)
 
-                    case TextContent() as text_content:
-                        selected_values.append(text_content.text)
+                elif isinstance(selected, TextContent):
+                    text_values.append(selected.text)
 
-                    case ResourceContent() as data:
-                        if not data.mime_type.startswith("image"):
-                            raise ValueError(f"{data.mime_type} embedding is not supported")
+                else:
+                    assert isinstance(selected, ResourceContent)  # nosec: B101
+                    if not selected.mime_type.startswith("image"):
+                        raise ValueError(f"{selected.mime_type} embedding is not supported")
 
-                        selected_values.append(urlsafe_b64decode(data.data.encode("utf-8")))
+                    image_values.append(urlsafe_b64decode(selected.data.encode("utf-8")))
 
-                    case ResourceReference():
-                        raise ValueError("Resource references are not supported")
+            if image_values and text_values:
+                raise ValueError("Selected attribute values have to be the same type")
 
             embedded_values: Sequence[Embedded[str] | Embedded[bytes]]
-            if all(isinstance(value, str) for value in selected_values):
-                embedded_values = await TextEmbedding.embed(
-                    cast(list[str], selected_values),
-                    **extra,
-                )
-
-            elif all(isinstance(value, bytes | bytearray) for value in selected_values):
-                embedded_values = await ImageEmbedding.embed(
-                    cast(list[bytes], selected_values),
+            if image_values:
+                embedded_values = await ImageEmbedding.embed_many(
+                    image_values,
                     **extra,
                 )
 
             else:
-                raise ValueError("Selected attribute values have to be the same type")
+                embedded_values = await TextEmbedding.embed_many(
+                    text_values,
+                    **extra,
+                )
 
             embedded_models: list[Embedded[Model]] = [
                 Embedded(
@@ -97,7 +96,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
             else:
                 storage[model] = embedded_models
 
-    async def search[Model: DataModel](  # noqa: C901, PLR0912
+    async def search[Model: DataModel](  # noqa: C901
         model: type[Model],
         /,
         *,
@@ -133,43 +132,39 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
             return []
 
         query_vector: Sequence[float]
-        match query:
-            case None:
-                if limit:
-                    return [embedded.value for embedded in filtered[:limit]]
+        if query is None:
+            if limit:
+                return [embedded.value for embedded in filtered[:limit]]
 
-                else:
-                    return [embedded.value for embedded in filtered]
+            return [embedded.value for embedded in filtered]
 
-            case str() as text:
-                embedded_text: Embedded[str] = await TextEmbedding.embed(
-                    text,
-                    **extra,
-                )
-                query_vector = embedded_text.vector
+        if isinstance(query, str):
+            embedded_text: Embedded[str] = await TextEmbedding.embed(
+                query,
+                **extra,
+            )
+            query_vector = embedded_text.vector
 
-            case TextContent() as text_content:
-                embedded_text: Embedded[str] = await TextEmbedding.embed(
-                    text_content.text,
-                    **extra,
-                )
-                query_vector = embedded_text.vector
+        elif isinstance(query, TextContent):
+            embedded_text = await TextEmbedding.embed(
+                query.text,
+                **extra,
+            )
+            query_vector = embedded_text.vector
 
-            case ResourceContent() as data:
-                if not data.mime_type.startswith("image"):
-                    raise ValueError(f"{data.mime_type} embedding is not supported")
+        elif isinstance(query, ResourceContent):
+            if not query.mime_type.startswith("image"):
+                raise ValueError(f"{query.mime_type} embedding is not supported")
 
-                embedded_image: Embedded[bytes] = await ImageEmbedding.embed(
-                    urlsafe_b64decode(data.data.encode("utf-8")),
-                    **extra,
-                )
-                query_vector = embedded_image.vector
+            embedded_image: Embedded[bytes] = await ImageEmbedding.embed(
+                urlsafe_b64decode(query.data.encode("utf-8")),
+                **extra,
+            )
+            query_vector = embedded_image.vector
 
-            case ResourceReference():
-                raise ValueError("Resource references are not supported")
-
-            case vector:
-                query_vector = vector
+        else:
+            assert isinstance(query, Sequence)  # nosec: B101
+            query_vector = query  # vector
 
         matching: Sequence[Embedded[Model]] = [
             filtered[index]

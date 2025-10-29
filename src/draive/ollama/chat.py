@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator, Coroutine, Iterable, Mapping, Sequen
 from typing import Any, Final, Literal, cast, overload
 from uuid import uuid4
 
-from haiway import META_EMPTY, ObservabilityLevel, ctx
+from haiway import META_EMPTY, ObservabilityLevel, as_list, ctx
 from ollama import ChatResponse, Image, Message, Options, Tool
 
 from draive.models import (
@@ -28,6 +28,7 @@ from draive.multimodal.content import MultimodalContentPart
 from draive.ollama.api import OllamaAPI
 from draive.ollama.config import OllamaChatConfig
 from draive.ollama.utils import unwrap_missing
+from draive.parameters import DataModel
 from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("OllamaChat",)
@@ -139,7 +140,7 @@ class OllamaChat(OllamaAPI):
             elif output == "json" or isinstance(output, type):
                 messages.append(_assistant_message_from_content(MultimodalContent.of("{")))
 
-            completion: ChatResponse = await self._client.chat(
+            completion: ChatResponse = await self._client.chat(  # pyright: ignore[reportUnknownMemberType]
                 model=config.model,
                 messages=messages,
                 format=_response_format(output),
@@ -217,7 +218,8 @@ class OllamaChat(OllamaAPI):
                     for part in block.parts:
                         yield part
 
-                elif isinstance(block, ModelReasoning | ModelToolRequest):
+                else:
+                    assert isinstance(block, ModelReasoning | ModelToolRequest)  # nosec: B101
                     yield block
 
 
@@ -252,14 +254,18 @@ def _message_to_blocks(  # noqa: C901
         chunk: object,
     ) -> MultimodalContentPart | None:
         if isinstance(chunk, dict):
-            ctype = chunk.get("type")
+            ctype: str | None = cast(dict[str, Any], chunk).get("type")
             if ctype == "text":
-                text = chunk.get("text")
+                text: Any = cast(dict[str, Any], chunk).get("text")
                 if isinstance(text, str) and text:
                     return TextContent.of(text)
 
             if ctype in ("image", "image_url"):
-                image = chunk.get("image") or chunk.get("image_url") or {}
+                image: dict[str, Any] = (
+                    cast(dict[str, Any], chunk).get("image")
+                    or cast(dict[str, Any], chunk).get("image_url")
+                    or {}
+                )
                 url = image.get("url")
                 if isinstance(url, str) and url:
                     return ResourceReference.of(url, mime_type="image/*")
@@ -317,7 +323,8 @@ def _context_messages(
                         content=tool_resp.content.without_resources().to_str(),
                     )
 
-        elif isinstance(element, ModelOutput):
+        else:
+            assert isinstance(element, ModelOutput)  # nosec: B101
             content = element.content
             yield Message(
                 role="assistant",
@@ -339,9 +346,6 @@ def _context_messages(
                     for request in element.tools
                 ],
             )
-
-        else:
-            raise TypeError(f"Unsupported model context element: {type(element).__name__}")
 
 
 def _tool_specification_as_tool(
@@ -389,7 +393,7 @@ def _tools_as_tool_config(
     return tools_list
 
 
-def _schema_for_ollama(output: type) -> dict[str, Any] | None:
+def _schema_for_ollama(output: type[DataModel]) -> dict[str, Any] | None:
     normalized_schema, changed = _normalize_schema_for_ollama(output.__SPECIFICATION__)
     if normalized_schema is None:
         return None
@@ -439,10 +443,7 @@ def _collapse_ollama_type_union(schema_types: Sequence[Any]) -> str | None:  # n
     return None
 
 
-def _normalize_schema_for_ollama(schema: Any) -> tuple[dict[str, Any] | None, bool]:  # noqa: C901, PLR0911, PLR0912, PLR0915
-    if not isinstance(schema, Mapping):
-        return None, False
-
+def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, Any] | None, bool]:  # noqa: C901, PLR0911, PLR0912, PLR0915
     # Remove metadata fields that Ollama rejects
     disallowed_root_keys: set[str] = {"$schema", "$id"}
     changed: bool = any(key in schema for key in disallowed_root_keys)
@@ -450,7 +451,7 @@ def _normalize_schema_for_ollama(schema: Any) -> tuple[dict[str, Any] | None, bo
     schema_type: Any = schema.get("type")
 
     if isinstance(schema_type, Sequence) and not isinstance(schema_type, (str, bytes)):
-        elements: list[Any] = list(schema_type)
+        elements: list[Any] = as_list(cast(Sequence[Any], schema_type))
         collapsed: str | None = _collapse_ollama_type_union(elements)
         if collapsed is None:
             return None, changed
@@ -464,7 +465,7 @@ def _normalize_schema_for_ollama(schema: Any) -> tuple[dict[str, Any] | None, bo
         normalized_properties: dict[str, Any] = {}
         properties_value: Any = schema.get("properties", {})
         if isinstance(properties_value, Mapping):
-            for key, value in properties_value.items():
+            for key, value in cast(Mapping[str, Any], properties_value).items():
                 property_schema, property_changed = _normalize_schema_for_ollama(value)
                 if property_schema is None:
                     return None, True
@@ -482,11 +483,13 @@ def _normalize_schema_for_ollama(schema: Any) -> tuple[dict[str, Any] | None, bo
         required_value: Any = schema.get("required")
         if isinstance(required_value, Sequence) and not isinstance(required_value, (str, bytes)):
             filtered_required: list[str] = [
-                name for name in required_value if name in normalized_properties
+                name
+                for name in cast(Sequence[Any], required_value)
+                if name in normalized_properties
             ]
             if filtered_required:
                 normalized_schema["required"] = filtered_required
-            if len(filtered_required) != len(list(required_value)):
+            if len(filtered_required) != len(as_list(cast(Sequence[Any], required_value))):
                 changed = True
 
         additional_properties: Any = schema.get("additionalProperties")
@@ -519,9 +522,11 @@ def _normalize_schema_for_ollama(schema: Any) -> tuple[dict[str, Any] | None, bo
             if (
                 isinstance(prefix_items, Sequence)
                 and not isinstance(prefix_items, (str, bytes))
-                and len(prefix_items) == 1
+                and len(cast(Sequence[Any], prefix_items)) == 1
             ):
-                item_schema, item_changed = _normalize_schema_for_ollama(prefix_items[0])
+                item_schema, item_changed = _normalize_schema_for_ollama(
+                    cast(Sequence[Any], prefix_items)[0]
+                )
                 if item_schema is not None:
                     normalized_schema["items"] = item_schema
                     changed = True
@@ -546,7 +551,7 @@ def _normalize_schema_for_ollama(schema: Any) -> tuple[dict[str, Any] | None, bo
 
         enum_value: Any = schema.get("enum")
         if isinstance(enum_value, Sequence) and not isinstance(enum_value, (str, bytes)):
-            normalized_schema["enum"] = list(enum_value)
+            normalized_schema["enum"] = list(cast(Sequence[Any], enum_value))
 
         if schema_type == "string" and isinstance(schema.get("format"), str):
             normalized_schema["format"] = schema["format"]
@@ -563,7 +568,7 @@ def _normalize_schema_for_ollama(schema: Any) -> tuple[dict[str, Any] | None, bo
             and not isinstance(enum_value, (str, bytes))
             and enum_value
         ):
-            inferred_type = type(enum_value[0])
+            inferred_type: Any = cast(Any, type(cast(Sequence[Any], enum_value)[0]))
             if inferred_type in {str, int, float, bool}:
                 mapped_type = {
                     str: "string",
@@ -573,7 +578,7 @@ def _normalize_schema_for_ollama(schema: Any) -> tuple[dict[str, Any] | None, bo
                 }[inferred_type]
                 normalized_schema = {
                     "type": mapped_type,
-                    "enum": list(enum_value),
+                    "enum": list(cast(Sequence[Any], enum_value)),
                 }
                 return normalized_schema, True
 

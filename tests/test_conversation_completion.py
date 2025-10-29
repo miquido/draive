@@ -195,21 +195,21 @@ async def test_conversation_completion_with_memory_callback():
     """Test conversation completion with memory remember callback."""
     remembered_messages: list[ConversationMessage] = []
 
-    async def remember_callback(*elements: ModelContextElement):
+    async def remember_callback(*elements: ModelContextElement, **_: Any):
         for el in elements:
             if isinstance(el, ModelInput):
                 remembered_messages.append(ConversationMessage.user(el.content))
-            elif isinstance(el, ModelOutput):
+            else:
                 remembered_messages.append(ConversationMessage.model(el.content))
 
-    async def recall_callback():
+    async def recall_callback(**_: Any):
         from draive.models import ModelMemoryRecall
 
         return ModelMemoryRecall.empty
 
     memory = ConversationMemory(
-        recall=recall_callback,
-        remember=remember_callback,
+        recalling=recall_callback,
+        remembering=remember_callback,
     )
 
     async def mock_generating(
@@ -379,7 +379,7 @@ async def test_conversation_completion_with_toolbox():
 
     async with ctx.scope("test", GenerativeModel(generating=mock_generating), Conversation()):
         result = await Conversation.completion(
-            input="What tools do you have?",
+            input="Example",
             memory=None,
             tools=toolbox,
         )

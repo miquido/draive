@@ -83,7 +83,7 @@ async def text_vector_similarity_evaluator(
     *,
     reference: str,
 ) -> float:
-    embedding: Sequence[Embedded[str]] = await TextEmbedding.embed([reference, evaluated])
+    embedding: Sequence[Embedded[str]] = await TextEmbedding.embed_many([reference, evaluated])
 
     return vector_similarity_score(
         value_vector=embedding[0].vector,
@@ -114,7 +114,7 @@ async def image_vector_similarity_evaluator(
         case raw_data:
             reference_data = raw_data
 
-    embedding: Sequence[Embedded[bytes]] = await ImageEmbedding.embed(
+    embedding: Sequence[Embedded[bytes]] = await ImageEmbedding.embed_many(
         [reference_data, evaluated_data]
     )
 

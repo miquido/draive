@@ -1,16 +1,17 @@
 import json
+from typing import Annotated
 
+from haiway import Alias
 from pytest import mark
 
-from draive.parameters import Argument
 from draive.resources import ResourceContent, resource
 
 
 def test_simple_variable_expansion():
     @resource(uri_template="https://api.example.com/users/{user_id}")
     async def template(user_id: str) -> ResourceContent:
-        return ResourceContent(
-            blob=json.dumps({"user_id": user_id}).encode(),
+        return ResourceContent.of(
+            json.dumps({"user_id": user_id}).encode(),
             mime_type="application/json",
         )
 
@@ -150,7 +151,7 @@ async def test_resolve_from_uri_with_missing_default_params():
 @mark.asyncio
 async def test_resolve_from_uri_coerces_aliased_arguments():
     @resource(uri_template="https://api.example.com/search{?language}")
-    async def search(language: str = Argument(aliased="lang")) -> ResourceContent:
+    async def search(language: Annotated[str, Alias("lang")]) -> ResourceContent:
         return ResourceContent.of(f"Search results for language '{language}'")
 
     resource_result = await search.resolve_from_uri("https://api.example.com/search?language=pl")

@@ -46,13 +46,10 @@ class CohereAPI:
                 return AsyncBedrockClientV2(aws_region=self._aws_region)
 
     async def _initialize_client(self) -> None:
-        await self._client._client_wrapper.httpx_client.httpx_client.aclose()
+        await self._deinitialize_client()
+
         self._client = self._prepare_client()
-        await self._client.__aenter__()
+        await self._client.__aenter__()  # pyright: ignore[reportUnknownMemberType]
 
     async def _deinitialize_client(self) -> None:
-        await self._client.__aexit__(
-            None,
-            None,
-            None,
-        )
+        await self._client.__aexit__(None, None, None)  # pyright: ignore[reportUnknownMemberType]

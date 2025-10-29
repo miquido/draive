@@ -63,6 +63,7 @@ class Cohere(
         )
 
     async def __aenter__(self) -> Iterable[State]:
+        await self._initialize_client()
         state: list[State] = []
 
         if TextEmbedding in self._features:

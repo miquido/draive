@@ -2,7 +2,6 @@ from collections.abc import (
     Callable,
     Collection,
     Coroutine,
-    Hashable,
     Iterable,
     Mapping,
     MutableMapping,
@@ -12,13 +11,14 @@ from typing import Any, ClassVar, Literal, Self, cast, final, overload
 from uuid import uuid4
 
 from haiway import (
+    BasicValue,
     Disposable,
     Disposables,
     Meta,
-    MetaValue,
     MetaValues,
     State,
     cache,
+    cache_externally,
     concurrently,
     ctx,
     retry,
@@ -287,7 +287,7 @@ class Stage:
     @classmethod
     def completion(
         cls,
-        input: Multimodal,  # noqa: A002
+        input: Template | Multimodal,  # noqa: A002
         /,
         *,
         instructions: Template | ModelInstructions = "",
@@ -308,7 +308,7 @@ class Stage:
 
         Parameters
         ----------
-        input : Multimodal
+        input : Template | Multimodal
             Input content to provide to the model.
         instructions : Template | ModelInstructions
             Instructions or guidance for the model.
@@ -338,7 +338,6 @@ class Stage:
         ...     tools=[calculator]
         ... )
         """
-        context_extension: ModelContext = (ModelInput.of(MultimodalContent.of(input)),)
 
         toolbox: Toolbox = Toolbox.of(tools)
 
@@ -349,7 +348,7 @@ class Stage:
             async with ctx.scope("stage.completion"):
                 context: list[ModelContextElement] = [
                     *state.context,
-                    *context_extension,
+                    ModelInput.of(await TemplatesRepository.resolve(input)),
                 ]
                 # Run loop and merge content parts into a single MultimodalContent
                 result: ModelOutput = await GenerativeModel.loop(
@@ -357,6 +356,7 @@ class Stage:
                     toolbox=toolbox,
                     context=context,
                     output=output,
+                    stream=False,
                     **extra,
                 )
 
@@ -448,6 +448,7 @@ class Stage:
                     toolbox=toolbox,
                     context=context,
                     output=output,
+                    stream=False,
                     **extra,
                 )
 
@@ -538,6 +539,7 @@ class Stage:
                     toolbox=toolbox,
                     context=context,
                     output=output,
+                    stream=False,
                     **extra,
                 )
 
@@ -607,6 +609,7 @@ class Stage:
                     toolbox=toolbox,
                     context=context,
                     output=output,
+                    stream=False,
                     **extra,
                 )
 
@@ -1389,7 +1392,7 @@ class Stage:
 
     def with_meta(
         self,
-        **values: MetaValue,
+        **values: BasicValue,
     ) -> Self:
         """
         Update metadata for this stage.
@@ -1401,7 +1404,7 @@ class Stage:
 
         Parameters
         ----------
-        **values : MetaValue
+        **values : BasicValue
             Metadata values to add or update. Common values include:
             - name: str - A unique identifier for the stage
             - description: str - A description of what the stage does
@@ -1564,32 +1567,11 @@ class Stage:
             meta=self.meta,
         )
 
-    @overload
-    def cached[Key: Hashable](
+    def cached(
         self,
         *,
         limit: int | None = None,
         expiration: float | None = None,
-        make_key: StageCacheKeyMaking[Key] | None = None,
-    ) -> Self: ...
-
-    @overload
-    def cached[Key](
-        self,
-        *,
-        make_key: StageCacheKeyMaking[Key],
-        read: StageCacheReading[Key],
-        write: StageCacheWriting[Key],
-    ) -> Self: ...
-
-    def cached[Key](
-        self,
-        *,
-        limit: int | None = None,
-        expiration: float | None = None,
-        make_key: StageCacheKeyMaking[Key] | None = None,
-        read: StageCacheReading[Key] | None = None,
-        write: StageCacheWriting[Key] | None = None,
     ) -> Self:
         """
         Enable caching for this stage.
@@ -1604,20 +1586,10 @@ class Stage:
         ----------
         limit : int | None
             Maximum number of entries to store in the cache. If None, cache size is
-            one. Ignored when using custom read and write.
+            one.
         expiration : float | None
             Time in seconds after which cache entries expire. If None, entries never
-            expire. Ignored when using custom read and write.
-        make_key : StageCacheKeyMaking[Key] | None
-            Custom function to generate cache keys from execution inputs. The function
-            should accept context and result parameters and return a hashable value
-            uniquely identifying the inputs.
-        read : StageCacheReading[Key] | None
-            Custom function to retrieve cached values. Must be provided together with
-            `write` and `make_key`.
-        write : StageCacheWriting[Key] | None
-            Custom function to store values in cache. Must be provided together with
-            `read` and `make_key`.
+            expire.
 
         Returns
         -------
@@ -1625,29 +1597,55 @@ class Stage:
             A new Stage instance with caching enabled.
         """
 
-        if read is not None and write is not None and make_key is not None:
-            return self.__class__(
-                cast(
-                    StageExecution,
-                    cache(
-                        make_key=make_key,
-                        read=read,
-                        write=write,
-                    )(self._execution),
-                ),
-                meta=self.meta,
-            )
+        return self.__class__(
+            cache(
+                limit=limit,
+                expiration=expiration,
+            )(self._execution),
+            meta=self.meta,
+        )
 
-        else:
-            assert read is None and write is None and make_key is None  # nosec: B101
-            return self.__class__(
-                cache(
-                    limit=limit,
-                    expiration=expiration,
-                    make_key=make_key,
-                )(self._execution),
-                meta=self.meta,
-            )
+    def cached_externally[Key](
+        self,
+        *,
+        make_key: StageCacheKeyMaking[Key],
+        read: StageCacheReading[Key],
+        write: StageCacheWriting[Key],
+    ) -> Self:
+        """
+        Enable external caching for this stage.
+
+        The returned Stage will provide the same context and result as the last execution
+        if cache keys match.
+        Note that the result will be the exact same context and result each time regarless
+        of cached stage actual execution assuming no side effects or processing state changes
+        are produced within cached stage.
+
+        Parameters
+        ----------
+        make_key : StageCacheKeyMaking[Key]
+            Custom function to generate cache keys from execution inputs. The function
+            should accept context and result parameters and return a hashable value
+            uniquely identifying the inputs.
+        read : StageCacheReading[Key]
+            Custom function to retrieve cached values from external source.
+        write : StageCacheWriting[Key]
+            Custom function to store values in external cache.
+
+        Returns
+        -------
+        Self
+            A new Stage instance with caching enabled.
+        """
+
+        return self.__class__(
+            cache_externally(
+                make_key=make_key,
+                read=read,
+                write=write,
+            )(self._execution),
+            meta=self.meta,
+        )
 
     def with_retry(
         self,
@@ -2019,7 +2017,7 @@ class Stage:
                 state=StageState.of(
                     *state,
                     context=initial_context,
-                    result=result if result is not None else MultimodalContent.empty,
+                    result=result,
                 )
             )
 

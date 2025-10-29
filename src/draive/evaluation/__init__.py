@@ -6,7 +6,6 @@ from draive.evaluation.evaluator import (
     PreparedEvaluator,
     evaluator,
 )
-from draive.evaluation.generator import generate_case_parameters
 from draive.evaluation.scenario import (
     EvaluatorScenario,
     EvaluatorScenarioDefinition,
@@ -49,5 +48,4 @@ __all__ = (
     "evaluator",
     "evaluator_scenario",
     "evaluator_suite",
-    "generate_case_parameters",
 )

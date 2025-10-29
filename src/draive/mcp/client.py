@@ -8,7 +8,7 @@ from typing import Any, Self, cast, final
 from urllib.parse import ParseResult, urlparse, urlunparse
 from uuid import uuid4
 
-from haiway import BasicValue, Meta, MetaTags, as_dict, as_list, ctx
+from haiway import BasicValue, Meta, MetaTags, as_dict, as_list, as_tuple, ctx
 from mcp import ClientSession, ListToolsResult, StdioServerParameters, stdio_client
 from mcp import Tool as MCPTool
 from mcp.client.sse import sse_client
@@ -128,6 +128,23 @@ class MCPClient:
         self._features: Collection[type[ResourcesRepository] | type[ToolsProvider]] = features
         self.tags: MetaTags = tags
 
+    def _meta(
+        self,
+        *,
+        include_tags: bool = True,
+        **values: BasicValue,
+    ) -> Meta:
+        base: dict[str, BasicValue] = {
+            "mcp_server": self.identifier,
+        }
+        if include_tags:
+            base["tags"] = tuple(self.tags)
+
+        if values:
+            base.update(values)
+
+        return Meta.of(base)
+
     async def resources_list(
         self,
         **extra: Any,
@@ -145,13 +162,9 @@ class MCPClient:
             ResourceReference(
                 uri=self._with_uri_identifier(resource.uri.unicode_string()),
                 mime_type=resource.mimeType,
-                meta=Meta(
-                    {
-                        "mcp_server": self.identifier,
-                        "tags": self.tags,
-                        "name": resource.name,
-                        "description": resource.description,
-                    }
+                meta=self._meta(
+                    name=resource.name,
+                    description=resource.description,
                 ),
             )
             for resource in result.resources
@@ -182,12 +195,7 @@ class MCPClient:
                     ResourceReference(
                         uri=resource.uri.unicode_string(),
                         mime_type=resource.mimeType,
-                        meta=Meta(
-                            {
-                                "mcp_server": self.identifier,
-                                "tags": self.tags,
-                            }
-                        ),
+                        meta=self._meta(),
                     )
                     for resource in resources
                 ]
@@ -333,24 +341,14 @@ class MCPClient:
                 return ResourceContent(
                     data=urlsafe_b64decode(text_resource.text.encode()).decode(),
                     mime_type=text_resource.mimeType or "text/plain",
-                    meta=Meta(
-                        {
-                            "mcp_server": self.identifier,
-                            "tags": self.tags,
-                        }
-                    ),
+                    meta=self._meta(),
                 )
 
             case BlobResourceContents() as blob_resource:
                 return ResourceContent(
                     data=blob_resource.blob,
                     mime_type=blob_resource.mimeType or "application/octet-stream",
-                    meta=Meta(
-                        {
-                            "mcp_server": self.identifier,
-                            "tags": self.tags,
-                        }
-                    ),
+                    meta=self._meta(),
                 )
 
     async def __aenter__(self) -> Sequence[ResourcesRepository | ToolsProvider]:
@@ -365,12 +363,7 @@ class MCPClient:
                     fetching=self.resource_fetch,
                     uploading=self.resource_upload,
                     deleting=self.resource_delete,
-                    meta=Meta(
-                        {
-                            "mcp_server": self.identifier,
-                            "tags": self.tags,
-                        }
-                    ),
+                    meta=self._meta(),
                 )
             )
 
@@ -378,12 +371,7 @@ class MCPClient:
             features.append(
                 ToolsProvider(
                     loading=self.tools_fetch,
-                    meta=Meta(
-                        {
-                            "mcp_server": self.identifier,
-                            "tags": self.tags,
-                        }
-                    ),
+                    meta=self._meta(),
                 )
             )
 
@@ -499,10 +487,10 @@ def _convert_tool(
         result_formatting=_format_tool_result,
         error_formatting=_format_tool_failure,
         handling="response",
-        meta=Meta(
+        meta=Meta.of(
             {
                 "mcp_server": source,
-                "tags": tags,
+                "tags": as_tuple(tags),
             }
         ),
     )
@@ -664,7 +652,7 @@ class MCPClients:
                     fetching=self.resource_fetch,
                     uploading=self.resource_upload,
                     deleting=self.resource_delete,
-                    meta=Meta({"mcp_server": "mcp_aggregate"}),
+                    meta=Meta.of({"mcp_server": "mcp_aggregate"}),
                 )
             )
 
@@ -672,7 +660,7 @@ class MCPClients:
             inherited_features.append(
                 ToolsProvider(
                     loading=self.tools_fetch,
-                    meta=Meta({"mcp_server": "mcp_aggregate"}),
+                    meta=Meta.of({"mcp_server": "mcp_aggregate"}),
                 )
             )
 

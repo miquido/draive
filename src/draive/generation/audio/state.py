@@ -5,7 +5,7 @@ from haiway import State, statemethod
 from draive.generation.audio.default import generate_audio
 from draive.generation.audio.types import AudioGenerating
 from draive.models import ModelInstructions
-from draive.multimodal import Multimodal, MultimodalContent, Template
+from draive.multimodal import Multimodal, Template, TemplatesRepository
 from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("AudioGeneration",)
@@ -18,7 +18,7 @@ class AudioGeneration(State):
         cls,
         *,
         instructions: Template | ModelInstructions = "",
-        input: Multimodal,
+        input: Template | Multimodal,
         **extra: Any,
     ) -> ResourceContent | ResourceReference: ...
 
@@ -27,7 +27,7 @@ class AudioGeneration(State):
         self,
         *,
         instructions: Template | ModelInstructions = "",
-        input: Multimodal,
+        input: Template | Multimodal,
         **extra: Any,
     ) -> ResourceContent | ResourceReference: ...
 
@@ -36,12 +36,14 @@ class AudioGeneration(State):
         self,
         *,
         instructions: Template | ModelInstructions = "",
-        input: Multimodal,  # noqa: A002
+        input: Template | Multimodal,  # noqa: A002
         **extra: Any,
     ) -> ResourceContent | ResourceReference:
         return await self.generating(
-            instructions=instructions,
-            input=MultimodalContent.of(input),
+            # resolve instructions templates
+            instructions=await TemplatesRepository.resolve_str(instructions),
+            # resolve input templates
+            input=await TemplatesRepository.resolve(input),
             **extra,
         )
 

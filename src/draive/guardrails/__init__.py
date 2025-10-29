@@ -20,7 +20,8 @@ from draive.guardrails.safety import (
     GuardrailsSafety,
     GuardrailsSafetyException,
     GuardrailsSafetySanitization,
-    regex_safety_sanitization,
+    RegexSanitizationRule,
+    guardrails_regex_sanitizer,
 )
 from draive.guardrails.types import GuardrailsException, GuardrailsFailure
 
@@ -42,5 +43,6 @@ __all__ = (
     "GuardrailsSafety",
     "GuardrailsSafetyException",
     "GuardrailsSafetySanitization",
-    "regex_safety_sanitization",
+    "RegexSanitizationRule",
+    "guardrails_regex_sanitizer",
 )

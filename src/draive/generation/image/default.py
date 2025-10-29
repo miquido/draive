@@ -8,7 +8,7 @@ from draive.models import (
     ModelInstructions,
     ModelOutput,
 )
-from draive.multimodal import MultimodalContent, Template, TemplatesRepository
+from draive.multimodal import MultimodalContent
 from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("generate_image",)
@@ -16,15 +16,16 @@ __all__ = ("generate_image",)
 
 async def generate_image(
     *,
-    instructions: Template | ModelInstructions,
+    instructions: ModelInstructions,
     input: MultimodalContent,  # noqa: A002
     **extra: Any,
 ) -> ResourceContent | ResourceReference:
     async with ctx.scope("generate_image"):
         result: ModelOutput = await GenerativeModel.completion(
-            instructions=await TemplatesRepository.resolve_str(instructions),
+            instructions=instructions,
             context=[ModelInput.of(input)],
             output="image",
+            stream=False,
             **extra,
         )
 

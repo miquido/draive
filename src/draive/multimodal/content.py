@@ -3,8 +3,7 @@ from collections.abc import Collection, Generator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import ClassVar, Literal, Self, cast, final, overload
 
-from haiway import MISSING, Meta, MetaValue, MetaValues, Missing
-from haiway.utils.metadata import META_EMPTY
+from haiway import META_EMPTY, MISSING, BasicValue, Meta, MetaValues, Missing
 
 from draive.multimodal.artifact import ArtifactContent
 from draive.multimodal.text import TextContent
@@ -320,14 +319,14 @@ class MultimodalContent(DataModel):
 
     def matching_meta(
         self,
-        **values: MetaValue,
+        **values: BasicValue,
     ) -> Self:
         """
         Select parts whose metadata exactly matches the provided values.
 
         Parameters
         ----------
-        **values : MetaValue
+        **values : BasicValue
             Key-value pairs to match. The entire ``Meta`` object of a part must
             equal the provided mapping for it to be included.
 
@@ -367,11 +366,11 @@ class MultimodalContent(DataModel):
 
         result: list[Self] = []
         current_group: list[MultimodalContentPart] = []
-        current_value: MetaValue | Missing = MISSING
+        current_value: BasicValue | Missing = MISSING
 
         for part in self.parts:
             # Get metadata value for this part
-            part_value: MetaValue | Missing = part.meta.get(key, default=MISSING)
+            part_value: BasicValue | Missing = part.meta.get(key, MISSING)
             if part_value is MISSING:
                 continue  # skip elements without explicit value
 
@@ -474,7 +473,7 @@ class MultimodalContent(DataModel):
         Self
             A content instance with the replacement applied.
         """
-        if not name or replacement is None:
+        if not name:
             return self
 
         replacement_parts: tuple[MultimodalContentPart, ...] = tuple(
@@ -665,7 +664,7 @@ class MultimodalTag(DataModel):
 
         return f"<{self.name}{_tag_attributes(self.meta)}>{self.content.to_str()}</{self.name}>"
 
-    def _parts(self) -> Sequence[MultimodalContentPart]:
+    def parts(self) -> Sequence[MultimodalContentPart]:
         if not self.content.parts:
             return (TextContent(text=f"<{self.name}{_tag_attributes(self.meta)}/>"),)
 
@@ -1162,7 +1161,7 @@ def _escape_attribute_string(value: str) -> str:
 
 
 def _formatted_tag_attribute_value(
-    value: MetaValue,
+    value: BasicValue,
     /,
 ) -> str:
     if isinstance(value, str):
@@ -1391,7 +1390,7 @@ def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915
                     yield part
 
         elif isinstance(element, MultimodalTag):
-            for part in element._parts():
+            for part in element.parts():
                 if isinstance(part, TextContent):
                     if last_text is None:
                         last_text = part

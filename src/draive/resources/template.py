@@ -57,7 +57,7 @@ class ResourceTemplate[**Args](
         # Verify URI parameters against function arguments
         template_parameters: Set[str] = self._extract_template_parameters(template_uri)
         for template_parameter in template_parameters:
-            parameter: Attribute[Any] | None = self._parameters.get(template_parameter)
+            parameter: Attribute | None = self._parameters.get(template_parameter)
             if parameter is None:
                 raise ValueError(
                     f"URI template parameter {template_parameter} not found in function arguments"
@@ -286,7 +286,7 @@ class ResourceTemplate[**Args](
         actual_path: str,
     ) -> dict[str, str]:
         params: dict[str, str] = {}
-        slash_params: list[Any] = re.findall(r"\{/([^}]+)\}", self.declaration.template_uri)
+        slash_params: list[str] = re.findall(r"\{/([^}]+)\}", self.declaration.template_uri)
         path_template: str = self._extract_path_template()
 
         # Create regex pattern
@@ -295,7 +295,7 @@ class ResourceTemplate[**Args](
             template_for_regex = template_for_regex.replace(f"{{/{param}}}", "/([^/]+)")
 
         # Handle regular {var} patterns
-        regular_params: list[Any] = re.findall(r"\{([^}]+)\}", template_for_regex)
+        regular_params: list[str] = re.findall(r"\{([^}]+)\}", template_for_regex)
         for param in regular_params:
             if not param.startswith("/"):  # Skip already handled slash patterns
                 template_for_regex = template_for_regex.replace(f"{{{param}}}", "([^/]+)")
@@ -303,10 +303,14 @@ class ResourceTemplate[**Args](
         # Match against the actual path
         match: re.Match[str] | None = re.match(f"^{template_for_regex}$", actual_path)
         if match:
-            all_params: list[Any] = slash_params + [
-                p for p in regular_params if not p.startswith("/")
+            positional_params: list[str] = [
+                *slash_params,
+                *(param for param in regular_params if not param.startswith("/")),
             ]
-            for param, value in zip(all_params, match.groups(), strict=False):
+            groups: tuple[str | None, ...] = match.groups()
+            for param, value in zip(positional_params, groups, strict=False):
+                if value is None:
+                    continue
                 params[param] = value
 
         return params
@@ -402,7 +406,7 @@ class ResourceTemplate[**Args](
         specification: TypeSpecification,
         value: str,
     ) -> tuple[Any, bool]:
-        if isinstance(specification, Mapping) and "oneOf" in specification:
+        if "oneOf" in specification:
             for option in specification["oneOf"]:
                 converted, changed = self._coerce_from_specification(option, value)
                 if changed:
@@ -410,52 +414,51 @@ class ResourceTemplate[**Args](
 
             return value, False
 
-        if isinstance(specification, Mapping):
-            type_name: Any | None = specification.get("type")
-            if type_name == "integer":
-                try:
-                    return int(value), True
-                except ValueError:
-                    return value, False
-
-            if type_name == "number":
-                try:
-                    return float(value), True
-                except ValueError:
-                    return value, False
-
-            if type_name == "boolean":
-                parsed_bool = self._parse_boolean(value)
-                if parsed_bool is not None:
-                    return parsed_bool, True
-
+        type_name: Any | None = specification.get("type")
+        if type_name == "integer":
+            try:
+                return int(value), True
+            except ValueError:
                 return value, False
 
-            if type_name == "array":
-                parsed_array = self._parse_json_sequence(value)
-                if parsed_array is not None:
-                    return parsed_array, True
-
+        if type_name == "number":
+            try:
+                return float(value), True
+            except ValueError:
                 return value, False
 
-            if type_name == "object":
-                parsed_object = self._parse_json_mapping(value)
-                if parsed_object is not None:
-                    return parsed_object, True
+        if type_name == "boolean":
+            parsed_bool = self._parse_boolean(value)
+            if parsed_bool is not None:
+                return parsed_bool, True
 
-                return value, False
+            return value, False
 
-            if type_name == "null":
-                normalised = value.strip().lower()
-                if normalised in {"null", "none"}:
-                    return None, True
+        if type_name == "array":
+            parsed_array = self._parse_json_sequence(value)
+            if parsed_array is not None:
+                return parsed_array, True
 
-                return value, False
+            return value, False
 
-            if "enum" in specification:
-                converted_enum, enum_changed = self._match_enum(specification["enum"], value)
-                if enum_changed:
-                    return converted_enum, True
+        if type_name == "object":
+            parsed_object = self._parse_json_mapping(value)
+            if parsed_object is not None:
+                return parsed_object, True
+
+            return value, False
+
+        if type_name == "null":
+            normalised = value.strip().lower()
+            if normalised in {"null", "none"}:
+                return None, True
+
+            return value, False
+
+        if "enum" in specification:
+            converted_enum, enum_changed = self._match_enum(specification["enum"], value)
+            if enum_changed:
+                return converted_enum, True
 
         return value, False
 
@@ -469,9 +472,13 @@ class ResourceTemplate[**Args](
 
         return None
 
-    def _parse_json_sequence(self, raw: str) -> Sequence[Any] | None:
+    def _parse_json_sequence(
+        self,
+        raw: str,
+    ) -> Sequence[Any] | None:
         try:
-            parsed = json.loads(raw)
+            parsed: Mapping[str, Any] | Sequence[Any] = json.loads(raw)
+
         except ValueError:
             return None
 
@@ -480,9 +487,13 @@ class ResourceTemplate[**Args](
 
         return None
 
-    def _parse_json_mapping(self, raw: str) -> Mapping[str, Any] | None:
+    def _parse_json_mapping(
+        self,
+        raw: str,
+    ) -> Mapping[str, Any] | None:
         try:
-            parsed = json.loads(raw)
+            parsed: Mapping[str, Any] | Sequence[Any] = json.loads(raw)
+
         except ValueError:
             return None
 

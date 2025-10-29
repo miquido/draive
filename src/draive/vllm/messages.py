@@ -1,6 +1,6 @@
 import json
 import random
-from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable
+from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable, Mapping
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
@@ -429,7 +429,9 @@ class VLLMMessages(VLLMAPI):
                         identifier: str = entry.get("id") or uuid4().hex
                         args_text: str = entry.get("arguments") or ""
                         try:
-                            arguments = json.loads(args_text) if args_text else {}
+                            arguments: Mapping[str, Any] = (
+                                json.loads(args_text) if args_text else {}
+                            )
 
                         except Exception:
                             arguments = {}
@@ -491,7 +493,8 @@ def _context_messages(
                 },
             )
 
-        elif isinstance(element, ModelOutput):
+        else:
+            assert isinstance(element, ModelOutput)  # nosec: B101
             for block in element.blocks:
                 if isinstance(block, MultimodalContent):
                     yield cast(
@@ -529,11 +532,7 @@ def _context_messages(
                         },
                     )
 
-        else:
-            raise ValueError(f"Unsupported model context element: {type(element).__name__}")
 
-
-# Inline helper formerly in draive.vllm.lmm
 def content_parts(  # noqa: C901
     parts: Iterable[MultimodalContentPart],
     /,
@@ -590,7 +589,7 @@ def content_parts(  # noqa: C901
                     "text": artifact.artifact.to_str(),
                 }
 
-            case other:
+            case other:  # pyright: ignore[reportUnnecessaryComparison]
                 if text_only:
                     continue  # skip with text only
 
@@ -645,7 +644,7 @@ def _tools_as_tool_config(
         {
             "type": "function",
             "function": {
-                "name": cast(str, tool_selection),
+                "name": tool_selection,
             },
         },
         tools_list,
