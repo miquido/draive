@@ -181,19 +181,25 @@ class MistralCompletions(MistralAPI):
             if usage := event.data.usage:
                 ctx.record(
                     ObservabilityLevel.INFO,
-                    metric="lmm.input_tokens",
+                    metric="model.input_tokens",
                     value=usage.prompt_tokens or 0,
                     unit="tokens",
                     kind="counter",
-                    attributes={"lmm.model": event.data.model},
+                    attributes={
+                        "model.provider": "mistral",
+                        "model.name": event.data.model,
+                    },
                 )
                 ctx.record(
                     ObservabilityLevel.INFO,
-                    metric="lmm.output_tokens",
+                    metric="model.output_tokens",
                     value=usage.completion_tokens or 0,
                     unit="tokens",
                     kind="counter",
-                    attributes={"lmm.model": event.data.model},
+                    attributes={
+                        "model.provider": "mistral",
+                        "model.name": event.data.model,
+                    },
                 )
 
             elif not event.data.choices:  # allow empty with usage data
@@ -433,7 +439,7 @@ def _context_messages(
                                 "id": block.identifier,
                                 "function": {
                                     "name": block.tool,
-                                    "arguments": json.dumps(dict(block.arguments)),
+                                    "arguments": json.dumps(block.arguments),
                                 },
                             }
                         ],

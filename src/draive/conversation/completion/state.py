@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator, Generator, Iterable, Mapping
 from typing import Any, Literal, final, overload
 
-from haiway import BasicValue, State, ctx
+from haiway import BasicValue, ObservabilityLevel, State, ctx
 
 from draive.conversation.completion.default import conversation_completion
 from draive.conversation.completion.types import ConversationCompleting
@@ -88,69 +88,76 @@ class Conversation(State):
         ConversationMessage or AsyncIterator[ConversationOutputChunk]
             Final response message or a stream of output chunks.
         """
-        conversation_message: ConversationMessage
-        if isinstance(input, ConversationMessage):
-            conversation_message = input
+        async with ctx.scope("conversation_completion"):
+            conversation_message: ConversationMessage
+            if isinstance(input, ConversationMessage):
+                conversation_message = input
 
-        else:
-            conversation_message = ConversationMessage.user(
-                await TemplatesRepository.resolve(input)
+            else:
+                conversation_message = ConversationMessage.user(
+                    await TemplatesRepository.resolve(input)
+                )
+
+            conversation_memory: ModelMemory
+            memory_variables: Mapping[str, BasicValue] | None
+            if memory is None:
+                conversation_memory = ModelMemory.constant(ModelMemoryRecall.empty)
+                memory_variables = None
+
+            elif isinstance(memory, Memory):
+                conversation_memory = memory
+                memory_recall: ModelMemoryRecall = await memory.recall()
+                memory_variables = memory_recall.variables
+
+            else:
+
+                def model_context_elements() -> Generator[ModelInput | ModelOutput]:
+                    for message in memory:
+                        if message.role == "user":
+                            yield ModelInput.of(message.content)
+
+                        else:
+                            yield ModelOutput.of(message.content)
+
+                conversation_memory = ModelMemory.constant(
+                    ModelMemoryRecall.of(*model_context_elements())
+                )
+                memory_variables = None
+
+            if isinstance(instructions, Template):
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    attributes={"instructions.template": instructions.identifier},
+                )
+
+            model_instructions: ModelInstructions = await TemplatesRepository.resolve_str(
+                instructions,
+                arguments={
+                    key: value if isinstance(value, str) else str(value)
+                    for key, value in memory_variables.items()
+                }
+                if memory_variables
+                else None,
             )
 
-        conversation_memory: ModelMemory
-        memory_variables: Mapping[str, BasicValue] | None
-        if memory is None:
-            conversation_memory = ModelMemory.constant(ModelMemoryRecall.empty)
-            memory_variables = None
+            if stream:
+                return await ctx.state(cls).completing(
+                    instructions=model_instructions,
+                    toolbox=Toolbox.of(tools),
+                    memory=conversation_memory,
+                    input=conversation_message,
+                    stream=True,
+                    **extra,
+                )
 
-        elif isinstance(memory, Memory):
-            conversation_memory = memory
-            memory_recall: ModelMemoryRecall = await memory.recall()
-            memory_variables = memory_recall.variables
-
-        else:
-
-            def model_context_elements() -> Generator[ModelInput | ModelOutput]:
-                for message in memory:
-                    if message.role == "user":
-                        yield ModelInput.of(message.content)
-
-                    else:
-                        yield ModelOutput.of(message.content)
-
-            conversation_memory = ModelMemory.constant(
-                ModelMemoryRecall.of(*model_context_elements())
-            )
-            memory_variables = None
-
-        model_instructions: ModelInstructions = await TemplatesRepository.resolve_str(
-            instructions,
-            arguments={
-                key: value if isinstance(value, str) else str(value)
-                for key, value in memory_variables.items()
-            }
-            if memory_variables
-            else None,
-        )
-
-        if stream:
-            return await ctx.state(cls).completing(
-                instructions=model_instructions,
-                toolbox=Toolbox.of(tools),
-                memory=conversation_memory,
-                input=conversation_message,
-                stream=True,
-                **extra,
-            )
-
-        else:
-            return await ctx.state(cls).completing(
-                instructions=model_instructions,
-                toolbox=Toolbox.of(tools),
-                memory=conversation_memory,
-                input=conversation_message,
-                stream=False,
-                **extra,
-            )
+            else:
+                return await ctx.state(cls).completing(
+                    instructions=model_instructions,
+                    toolbox=Toolbox.of(tools),
+                    memory=conversation_memory,
+                    input=conversation_message,
+                    stream=False,
+                    **extra,
+                )
 
     completing: ConversationCompleting = conversation_completion

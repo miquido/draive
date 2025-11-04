@@ -525,7 +525,7 @@ def _context_messages(
                                     "type": "function",
                                     "function": {
                                         "name": block.tool,
-                                        "arguments": json.dumps(dict(block.arguments)),
+                                        "arguments": json.dumps(block.arguments),
                                     },
                                 }
                             ],
@@ -587,15 +587,6 @@ def content_parts(  # noqa: C901
                 yield {
                     "type": "text",
                     "text": artifact.artifact.to_str(),
-                }
-
-            case other:  # pyright: ignore[reportUnnecessaryComparison]
-                if text_only:
-                    continue  # skip with text only
-
-                yield {
-                    "type": "text",
-                    "text": other.to_str(),
                 }
 
 

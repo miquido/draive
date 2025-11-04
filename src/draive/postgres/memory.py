@@ -3,7 +3,7 @@ from collections.abc import Generator, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
-from haiway import BasicValue, Map, ctx
+from haiway import BasicValue, Map, ObservabilityLevel, ctx
 from haiway.postgres import Postgres, PostgresRow, PostgresValue
 
 from draive.models import (
@@ -69,6 +69,11 @@ def PostgresModelMemory(
         **extra: Any,
     ) -> ModelMemoryRecall:
         ctx.log_info(f"Recalling memory for {identifier}...")
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="postgres.memory.recall",
+            attributes={"identifier": identifier},
+        )
 
         variables: Mapping[str, BasicValue] = await _load_variables(
             identifier=identifier,
@@ -97,6 +102,11 @@ def PostgresModelMemory(
             return ctx.log_info(f"No content to remember for {identifier}, skipping!")
 
         ctx.log_info(f"Remembering content for {identifier}...")
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="postgres.memory.remember",
+            attributes={"identifier": identifier},
+        )
 
         async with Postgres.acquire_connection() as connection:
             async with connection.transaction():
@@ -149,6 +159,10 @@ def PostgresModelMemory(
         **extra: Any,
     ) -> None:
         ctx.log_info(f"Performing maintenance for {identifier}...")
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="postgres.memory.maintenance",
+        )
 
         async with Postgres.acquire_connection() as connection:
             async with connection.transaction():

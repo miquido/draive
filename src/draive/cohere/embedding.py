@@ -35,6 +35,7 @@ class CohereEmbedding(CohereAPI):
                 attributes={
                     "embedding.model": embedding_config.model,
                     "embedding.purpose": embedding_config.purpose,
+                    "embedding.batch_size": embedding_config.batch_size,
                 },
             )
 
@@ -46,6 +47,36 @@ class CohereEmbedding(CohereAPI):
                 attributes = [attribute(cast(Value, value)) for value in values]
 
             assert all(isinstance(element, str) for element in attributes)  # nosec: B101
+
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="embedding.items",
+                value=len(attributes),
+                unit="count",
+                kind="counter",
+                attributes={
+                    "embedding.provider": "cohere",
+                    "embedding.model": embedding_config.model,
+                    "embedding.type": "text",
+                },
+            )
+
+            if not attributes:
+                return ()  # empty
+
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="embedding.batches",
+                value=(len(attributes) + embedding_config.batch_size - 1)
+                // embedding_config.batch_size,
+                unit="count",
+                kind="counter",
+                attributes={
+                    "embedding.provider": "cohere",
+                    "embedding.model": embedding_config.model,
+                    "embedding.type": "text",
+                },
+            )
 
             responses: list[EmbedByTypeResponse] = await gather(
                 *[
@@ -99,6 +130,7 @@ class CohereEmbedding(CohereAPI):
                 ObservabilityLevel.INFO,
                 attributes={
                     "embedding.model": embedding_config.model,
+                    "embedding.batch_size": embedding_config.batch_size,
                 },
             )
             attributes: list[bytes]
@@ -109,6 +141,36 @@ class CohereEmbedding(CohereAPI):
                 attributes = [attribute(cast(Value, value)) for value in values]
 
             assert all(isinstance(element, bytes) for element in attributes)  # nosec: B101
+
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="embedding.items",
+                value=len(attributes),
+                unit="count",
+                kind="counter",
+                attributes={
+                    "embedding.provider": "cohere",
+                    "embedding.model": embedding_config.model,
+                    "embedding.type": "image",
+                },
+            )
+
+            if not attributes:
+                return ()  # empty
+
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="embedding.batches",
+                value=(len(attributes) + embedding_config.batch_size - 1)
+                // embedding_config.batch_size,
+                unit="count",
+                kind="counter",
+                attributes={
+                    "embedding.provider": "cohere",
+                    "embedding.model": embedding_config.model,
+                    "embedding.type": "image",
+                },
+            )
 
             responses: list[EmbedByTypeResponse] = await gather(
                 *[

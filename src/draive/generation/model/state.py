@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Mapping
 from typing import Any, Literal, overload
 
-from haiway import State, statemethod
+from haiway import ObservabilityLevel, State, ctx, statemethod
 
 from draive.generation.model.default import generate_model
 from draive.generation.model.types import ModelGenerating, ModelGenerationDecoder
@@ -58,34 +58,54 @@ class ModelGeneration(State):
         decoder: ModelGenerationDecoder[Generated] | None = None,
         **extra: Any,
     ) -> Generated:
-        instruction_arguments: Mapping[str, Multimodal] | None
-        match schema_injection:
-            case "full":
-                instruction_arguments = {
-                    "model_schema": generated.json_schema(indent=2),
-                }
+        async with ctx.scope("generate_model"):
+            ctx.record(
+                ObservabilityLevel.INFO,
+                attributes={
+                    "generated.model": generated.__qualname__,
+                    "generated.schema_injection": schema_injection,
+                },
+            )
+            instruction_arguments: Mapping[str, Multimodal] | None
+            match schema_injection:
+                case "full":
+                    instruction_arguments = {
+                        "model_schema": generated.json_schema(indent=2),
+                    }
 
-            case "simplified":
-                instruction_arguments = {
-                    "model_schema": generated.simplified_schema(indent=2),
-                }
+                case "simplified":
+                    instruction_arguments = {
+                        "model_schema": generated.simplified_schema(indent=2),
+                    }
 
-            case "skip":  # instruction is not modified
-                instruction_arguments = None
+                case "skip":  # instruction is not modified
+                    instruction_arguments = None
 
-        return await self.generating(
-            generated,
-            # resolve instructions templates
-            instructions=await TemplatesRepository.resolve_str(
-                instructions,
-                arguments=instruction_arguments,
-            ),
-            # resolve input templates
-            input=await TemplatesRepository.resolve(input),
-            toolbox=Toolbox.of(tools),
-            examples=((MultimodalContent.of(ex_in), ex_out) for ex_in, ex_out in examples),
-            decoder=decoder,
-            **extra,
-        )
+            if isinstance(instructions, Template):
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    attributes={"instructions.template": instructions.identifier},
+                )
+
+            if isinstance(input, Template):
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    attributes={"input.template": input.identifier},
+                )
+
+            return await self.generating(
+                generated,
+                # resolve instructions templates
+                instructions=await TemplatesRepository.resolve_str(
+                    instructions,
+                    arguments=instruction_arguments,
+                ),
+                # resolve input templates
+                input=await TemplatesRepository.resolve(input),
+                toolbox=Toolbox.of(tools),
+                examples=((MultimodalContent.of(ex_in), ex_out) for ex_in, ex_out in examples),
+                decoder=decoder,
+                **extra,
+            )
 
     generating: ModelGenerating = generate_model

@@ -1,6 +1,6 @@
 from typing import Any, Protocol, Self, final, overload, runtime_checkable
 
-from haiway import State, statemethod
+from haiway import ObservabilityLevel, State, ctx, statemethod
 
 __all__ = (
     "Memory",
@@ -83,6 +83,10 @@ class Memory[Recalled, Remembered](State):
         self,
         **extra: Any,
     ) -> Recalled:
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="memory.recall",
+        )
         return await self.recalling(**extra)
 
     @overload
@@ -106,6 +110,10 @@ class Memory[Recalled, Remembered](State):
         *items: Remembered,
         **extra: Any,
     ) -> None:
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="memory.remember",
+        )
         await self.remembering(*items, **extra)
 
     @overload
@@ -126,6 +134,10 @@ class Memory[Recalled, Remembered](State):
         self,
         **extra: Any,
     ) -> None:
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="memory.maintenance",
+        )
         await self.maintaining(**extra)
 
     recalling: MemoryRecalling[Recalled]

@@ -1,10 +1,10 @@
 import re
 from base64 import b64decode
-from collections.abc import Callable, Iterable, MutableMapping, Sequence
+from collections.abc import Callable, Collection, MutableMapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
-from haiway import AttributePath, AttributeRequirement, as_tuple, ctx
+from haiway import AttributePath, AttributeRequirement, ObservabilityLevel, ctx
 from haiway.postgres import Postgres, PostgresRow, PostgresValue
 
 from draive.embedding import (
@@ -74,9 +74,14 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
         /,
         *,
         attribute: Callable[[Model], Value] | AttributePath[Model, Value] | Value,
-        values: Iterable[Model],
+        values: Collection[Model],
         **extra: Any,
     ) -> None:
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="postgres.vector_index.index",
+            attributes={"model": model.__qualname__},
+        )
         value_selector: Callable[[Model], Value]
         match attribute:
             case Callable() as selector:
@@ -88,9 +93,8 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
                 ), "Prepare parameter path by using Self._.path.to.property"
                 value_selector = cast(AttributePath[Model, Value], path).__call__
 
-        value_models: Sequence[Model] = as_tuple(values)
         selected_values: list[str | bytes] = []
-        for value in value_models:
+        for value in values:
             selected: Value = value_selector(value)
             if isinstance(selected, str):
                 selected_values.append(selected)
@@ -118,7 +122,7 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
                         selected_values,
                         **extra,
                     ),
-                    value_models,
+                    values,
                     strict=True,
                 )
             ]
@@ -135,7 +139,7 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
                         cast(list[bytes], selected_values),
                         **extra,
                     ),
-                    value_models,
+                    values,
                     strict=True,
                 )
             ]
@@ -182,6 +186,11 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
         rerank: bool = False,
         **extra: Any,
     ) -> Sequence[Model]:
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="postgres.vector_index.search",
+            attributes={"model": model.__qualname__},
+        )
         assert query is not None or (query is None and score_threshold is None)  # nosec: B101
         where_clause: str
         arguments: Sequence[Sequence[PostgresValue] | PostgresValue]
@@ -296,6 +305,11 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
         requirements: AttributeRequirement[Model] | None = None,
         **extra: Any,
     ) -> None:
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="postgres.vector_index.delete",
+            attributes={"model": model.__qualname__},
+        )
         if requirements is None:
             await Postgres.execute(
                 f"""

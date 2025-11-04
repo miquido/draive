@@ -8,6 +8,7 @@ from haiway import (
     Immutable,
     Meta,
     MetaValues,
+    ObservabilityLevel,
     State,
     ctx,
 )
@@ -398,16 +399,17 @@ class EvaluatorScenario[Value, **Args](Immutable):
                 **kwargs,
             )
 
-        ctx.record(
-            metric=f"evaluator.scenario.{result.scenario}.performance",
-            value=result.performance,
-            unit="%",
-            kind="histogram",
-            attributes={
-                "passed": result.passed,
-                "evaluators": [result.evaluator for result in result.results],
-            },
-        )
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric=f"evaluator.scenario.{result.scenario}.performance",
+                value=result.performance,
+                unit="%",
+                kind="histogram",
+                attributes={
+                    "passed": result.passed,
+                    "evaluators": [result.evaluator for result in result.results],
+                },
+            )
         return result
 
     async def _evaluate(

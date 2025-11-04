@@ -1,7 +1,5 @@
 from typing import Any
 
-from haiway import ctx
-
 from draive.models import (
     GenerativeModel,
     ModelInput,
@@ -20,16 +18,15 @@ async def generate_audio(
     input: MultimodalContent,  # noqa: A002
     **extra: Any,
 ) -> ResourceContent | ResourceReference:
-    async with ctx.scope("generate_audio"):
-        result: ModelOutput = await GenerativeModel.completion(
-            instructions=instructions,
-            context=[ModelInput.of(input)],
-            output="audio",
-            stream=False,
-            **extra,
-        )
+    result: ModelOutput = await GenerativeModel.completion(
+        instructions=instructions,
+        context=[ModelInput.of(input)],
+        output="audio",
+        stream=False,
+        **extra,
+    )
 
-        for audio in result.content.audio():
-            return audio
+    for audio in result.content.audio():
+        return audio
 
-        raise ValueError("Failed to generate a valid audio")
+    raise ValueError("Failed to generate a valid audio")

@@ -34,9 +34,14 @@ class OllamaEmbedding(OllamaAPI):
                 attributes={
                     "embedding.provider": "ollama",
                     "embedding.model": embedding_config.model,
+                    "embedding.batch_size": embedding_config.batch_size,
+                    "embedding.concurrent": embedding_config.concurrent,
                 },
             )
-            ctx.record(attributes=embedding_config.to_mapping())
+            ctx.record(
+                ObservabilityLevel.DEBUG,
+                attributes=embedding_config.to_mapping(),
+            )
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))
@@ -45,6 +50,36 @@ class OllamaEmbedding(OllamaAPI):
                 attributes = [attribute(cast(Value, value)) for value in values]
 
             assert all(isinstance(element, str) for element in attributes)  # nosec: B101
+
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="embedding.items",
+                value=len(attributes),
+                unit="count",
+                kind="counter",
+                attributes={
+                    "embedding.provider": "ollama",
+                    "embedding.model": embedding_config.model,
+                    "embedding.type": "text",
+                },
+            )
+
+            if not attributes:
+                return ()  # empty
+
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="embedding.batches",
+                value=(len(attributes) + embedding_config.batch_size - 1)
+                // embedding_config.batch_size,
+                unit="count",
+                kind="counter",
+                attributes={
+                    "embedding.provider": "ollama",
+                    "embedding.model": embedding_config.model,
+                    "embedding.type": "text",
+                },
+            )
 
             responses: list[EmbedResponse]
             if embedding_config.concurrent:

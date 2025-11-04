@@ -16,6 +16,7 @@ from haiway import (
     Disposables,
     Meta,
     MetaValues,
+    ObservabilityLevel,
     State,
     cache,
     cache_externally,
@@ -346,6 +347,18 @@ class Stage:
             state: StageState,
         ) -> StageState:
             async with ctx.scope("stage.completion"):
+                if isinstance(instructions, Template):
+                    ctx.record(
+                        ObservabilityLevel.INFO,
+                        attributes={"instructions.template": instructions.identifier},
+                    )
+
+                if isinstance(input, Template):
+                    ctx.record(
+                        ObservabilityLevel.INFO,
+                        attributes={"input.template": input.identifier},
+                    )
+
                 context: list[ModelContextElement] = [
                     *state.context,
                     ModelInput.of(await TemplatesRepository.resolve(input)),
@@ -443,6 +456,12 @@ class Stage:
                     ModelInput.of(MultimodalContent.of(await input())),
                 ]
                 ctx.log_debug("...prompting completion input provided")
+                if isinstance(instructions, Template):
+                    ctx.record(
+                        ObservabilityLevel.INFO,
+                        attributes={"instructions.template": instructions.identifier},
+                    )
+
                 result: ModelOutput = await GenerativeModel.loop(
                     instructions=await TemplatesRepository.resolve_str(instructions),
                     toolbox=toolbox,
@@ -534,6 +553,13 @@ class Stage:
                     *state.context[:last_input_idx],
                     ModelInput.of(last_output.content, meta={"loopback": True}),
                 ]
+
+                if isinstance(instructions, Template):
+                    ctx.record(
+                        ObservabilityLevel.INFO,
+                        attributes={"instructions.template": instructions.identifier},
+                    )
+
                 result: ModelOutput = await GenerativeModel.loop(
                     instructions=await TemplatesRepository.resolve_str(instructions),
                     toolbox=toolbox,
@@ -600,6 +626,12 @@ class Stage:
             state: StageState,
         ) -> StageState:
             async with ctx.scope("stage.completion.result"):
+                if isinstance(instructions, Template):
+                    ctx.record(
+                        ObservabilityLevel.INFO,
+                        attributes={"instructions.template": instructions.identifier},
+                    )
+
                 context: list[ModelContextElement] = [
                     *state.context,
                     ModelInput.of(state.result),
@@ -2070,7 +2102,7 @@ async def _model_routing(
     ]
 
     result: ModelOutput = await GenerativeModel.loop(
-        instructions=await TemplatesRepository.resolve_str(instructions),
+        instructions=instructions,
         context=routing_context,
         output="text",
     )

@@ -1,7 +1,14 @@
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from typing import Any, Protocol, final, overload, runtime_checkable
 
-from haiway import AttributePath, AttributeRequirement, State, statemethod
+from haiway import (
+    AttributePath,
+    AttributeRequirement,
+    ObservabilityLevel,
+    State,
+    ctx,
+    statemethod,
+)
 
 from draive.multimodal import TextContent
 from draive.parameters import DataModel
@@ -18,7 +25,7 @@ class VectorIndexing(Protocol):
         /,
         *,
         attribute: Callable[[Model], Value] | AttributePath[Model, Value] | Value,
-        values: Iterable[Model],
+        values: Collection[Model],
         **extra: Any,
     ) -> None: ...
 
@@ -60,7 +67,7 @@ class VectorIndex(State):
         /,
         *,
         attribute: Callable[[Model], Value] | AttributePath[Model, Value] | Value,
-        values: Iterable[Model],
+        values: Collection[Model],
         **extra: Any,
     ) -> None: ...
 
@@ -71,7 +78,7 @@ class VectorIndex(State):
         /,
         *,
         attribute: Callable[[Model], Value] | AttributePath[Model, Value] | Value,
-        values: Iterable[Model],
+        values: Collection[Model],
         **extra: Any,
     ) -> None: ...
 
@@ -82,9 +89,17 @@ class VectorIndex(State):
         /,
         *,
         attribute: Callable[[Model], Value] | AttributePath[Model, Value] | Value,
-        values: Iterable[Model],
+        values: Collection[Model],
         **extra: Any,
     ) -> None:
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="vector_index.index",
+            attributes={
+                "model": model.__qualname__,
+                "values": len(values),
+            },
+        )
         return await self.indexing(
             model,
             attribute=attribute,
@@ -154,6 +169,15 @@ class VectorIndex(State):
         limit: int | None = None,
         **extra: Any,
     ) -> Sequence[Model]:
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="vector_index.search",
+            attributes={
+                "model": model.__qualname__,
+                "query": query is not None,
+                "requirements": str(requirements) if requirements is not None else None,
+            },
+        )
         return await self.searching(
             model,
             query=query,
@@ -193,6 +217,14 @@ class VectorIndex(State):
         requirements: AttributeRequirement[Model] | None = None,
         **extra: Any,
     ) -> None:
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="vector_index.delete",
+            attributes={
+                "model": model.__qualname__,
+                "requirements": str(requirements) if requirements is not None else None,
+            },
+        )
         return await self.deleting(
             model,
             requirements=requirements,
