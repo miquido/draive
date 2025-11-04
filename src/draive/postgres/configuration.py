@@ -2,7 +2,7 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
-from haiway import BasicValue, ConfigurationRepository, cache, ctx
+from haiway import BasicValue, ConfigurationRepository, ObservabilityLevel, cache, ctx
 from haiway.postgres import Postgres, PostgresRow
 
 __all__ = ("PostgresConfigurationRepository",)
@@ -45,6 +45,10 @@ def PostgresConfigurationRepository(
         **extra: Any,
     ) -> Sequence[str]:
         ctx.log_info("Listing configurations...")
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="postgres.configuration.list",
+        )
         results: Sequence[PostgresRow] = await Postgres.fetch(
             """
                 SELECT DISTINCT ON (identifier)
@@ -71,6 +75,11 @@ def PostgresConfigurationRepository(
         **extra: Any,
     ) -> Mapping[str, BasicValue] | None:
         ctx.log_info(f"Loading configuration for {identifier}...")
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="postgres.configuration.load",
+            attributes={"identifier": identifier},
+        )
         loaded: PostgresRow | None = await Postgres.fetch_one(
             """
             SELECT DISTINCT ON (identifier)
@@ -108,6 +117,11 @@ def PostgresConfigurationRepository(
         **extra: Any,
     ) -> None:
         ctx.log_info(f"Defining configuration {identifier}...")
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="postgres.configuration.define",
+            attributes={"identifier": identifier},
+        )
         await Postgres.execute(
             """
             INSERT INTO
@@ -134,6 +148,11 @@ def PostgresConfigurationRepository(
         **extra: Any,
     ) -> None:
         ctx.log_info(f"Removing configuration {identifier}...")
+        ctx.record(
+            ObservabilityLevel.INFO,
+            event="postgres.configuration.remove",
+            attributes={"identifier": identifier},
+        )
         await Postgres.execute(
             """
             DELETE FROM

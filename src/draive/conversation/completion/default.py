@@ -86,42 +86,41 @@ async def _conversation_completion(
     input: ConversationMessage,  # noqa: A002
     **extra: Any,
 ) -> ConversationMessage:
-    async with ctx.scope("conversation_completion"):
-        # relying on memory recall correctness
-        memory_recall: ModelMemoryRecall = await memory.recall()
-        context: list[ModelContextElement] = [
-            *memory_recall.context,
-            ModelInput.of(input.content),
-        ]
+    # relying on memory recall correctness
+    memory_recall: ModelMemoryRecall = await memory.recall()
+    context: list[ModelContextElement] = [
+        *memory_recall.context,
+        ModelInput.of(input.content),
+    ]
 
-        # run input moderation in parallel - TODO: should we use sanitized input?
-        result: ModelOutput = await GenerativeModel.loop(
-            instructions=instructions,
-            toolbox=toolbox,
-            context=context,
-            stream=False,
-            **extra,
+    # run input moderation in parallel - TODO: should we use sanitized input?
+    result: ModelOutput = await GenerativeModel.loop(
+        instructions=instructions,
+        toolbox=toolbox,
+        context=context,
+        stream=False,
+        **extra,
+    )
+
+    ctx.log_debug("...finalizing message...")
+    response_message: ConversationMessage = ConversationMessage.model(
+        created=datetime.now(UTC),
+        content=result.content_with_reasoning,
+    )
+
+    ctx.log_debug("...remembering...")
+    try:
+        await memory.remember(*context[len(memory_recall.context) :])
+
+    except Exception as exc:
+        ctx.log_error(
+            "Failed to remember conversation context",
+            exception=exc,
         )
+        raise exc
 
-        ctx.log_debug("...finalizing message...")
-        response_message: ConversationMessage = ConversationMessage.model(
-            created=datetime.now(UTC),
-            content=result.content_with_reasoning,
-        )
-
-        ctx.log_debug("...remembering...")
-        try:
-            await memory.remember(*context[len(memory_recall.context) :])
-
-        except Exception as exc:
-            ctx.log_error(
-                "Failed to remember conversation context",
-                exception=exc,
-            )
-            raise exc
-
-        ctx.log_debug("... response message finished!")
-        return response_message
+    ctx.log_debug("... response message finished!")
+    return response_message
 
 
 async def _conversation_completion_stream(
@@ -131,43 +130,42 @@ async def _conversation_completion_stream(
     input: ConversationMessage,  # noqa: A002
     **extra: Any,
 ) -> AsyncGenerator[ConversationOutputChunk]:
-    async with ctx.scope("conversation_completion"):
-        memory_recall: ModelMemoryRecall = await memory.recall()
-        context: list[ModelContextElement] = [
-            *memory_recall.context,
-            ModelInput.of(input.content),
-        ]
+    memory_recall: ModelMemoryRecall = await memory.recall()
+    context: list[ModelContextElement] = [
+        *memory_recall.context,
+        ModelInput.of(input.content),
+    ]
 
-        async for chunk in await GenerativeModel.loop(
-            instructions=instructions,
-            toolbox=toolbox,
-            context=context,
-            stream=True,
-            **extra,
-        ):
-            if isinstance(chunk, ModelReasoning):
-                # Wrap reasoning as an artifact to stream alongside content
-                yield ConversationOutputChunk.of(
-                    ArtifactContent.of(
-                        chunk,
-                        category="reasoning",
-                        hidden=True,
-                    )
+    async for chunk in await GenerativeModel.loop(
+        instructions=instructions,
+        toolbox=toolbox,
+        context=context,
+        stream=True,
+        **extra,
+    ):
+        if isinstance(chunk, ModelReasoning):
+            # Wrap reasoning as an artifact to stream alongside content
+            yield ConversationOutputChunk.of(
+                ArtifactContent.of(
+                    chunk,
+                    category="reasoning",
+                    hidden=True,
                 )
-
-            else:
-                assert not isinstance(chunk, ModelToolRequest)  # nosec: B101
-                yield ConversationOutputChunk.of(chunk)
-
-        ctx.log_debug("...remembering...")
-        try:
-            await memory.remember(*context[len(memory_recall.context) :])
-
-        except Exception as exc:
-            ctx.log_error(
-                "Failed to remember conversation context",
-                exception=exc,
             )
-            raise exc
 
-        ctx.log_debug("... streaming message finished!")
+        else:
+            assert not isinstance(chunk, ModelToolRequest)  # nosec: B101
+            yield ConversationOutputChunk.of(chunk)
+
+    ctx.log_debug("...remembering...")
+    try:
+        await memory.remember(*context[len(memory_recall.context) :])
+
+    except Exception as exc:
+        ctx.log_error(
+            "Failed to remember conversation context",
+            exception=exc,
+        )
+        raise exc
+
+    ctx.log_debug("... streaming message finished!")

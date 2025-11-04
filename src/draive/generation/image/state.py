@@ -1,6 +1,6 @@
 from typing import Any, overload
 
-from haiway import State, statemethod
+from haiway import ObservabilityLevel, State, ctx, statemethod
 
 from draive.generation.image.default import generate_image
 from draive.generation.image.types import ImageGenerating
@@ -39,12 +39,25 @@ class ImageGeneration(State):
         input: Template | Multimodal,  # noqa: A002
         **extra: Any,
     ) -> ResourceContent | ResourceReference:
-        return await self.generating(
-            # resolve instructions templates
-            instructions=await TemplatesRepository.resolve_str(instructions),
-            # resolve input templates
-            input=await TemplatesRepository.resolve(input),
-            **extra,
-        )
+        async with ctx.scope("generate_image"):
+            if isinstance(instructions, Template):
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    attributes={"instructions.template": instructions.identifier},
+                )
+
+            if isinstance(input, Template):
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    attributes={"input.template": input.identifier},
+                )
+
+            return await self.generating(
+                # resolve instructions templates
+                instructions=await TemplatesRepository.resolve_str(instructions),
+                # resolve input templates
+                input=await TemplatesRepository.resolve(input),
+                **extra,
+            )
 
     generating: ImageGenerating = generate_image

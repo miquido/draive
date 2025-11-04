@@ -1,8 +1,6 @@
 from collections.abc import Iterable
 from typing import Any
 
-from haiway import ctx
-
 from draive.models import (
     GenerativeModel,
     ModelInput,
@@ -23,24 +21,23 @@ async def generate_text(
     examples: Iterable[tuple[MultimodalContent, str]],
     **extra: Any,
 ) -> str:
-    async with ctx.scope("generate_text"):
-        result: ModelOutput = await GenerativeModel.loop(
-            instructions=instructions,
-            context=[
-                *[
-                    message
-                    for example in examples
-                    for message in [
-                        ModelInput.of(example[0]),
-                        ModelOutput.of(MultimodalContent.of(example[1])),
-                    ]
-                ],
-                ModelInput.of(input),
+    result: ModelOutput = await GenerativeModel.loop(
+        instructions=instructions,
+        context=[
+            *[
+                message
+                for example in examples
+                for message in [
+                    ModelInput.of(example[0]),
+                    ModelOutput.of(MultimodalContent.of(example[1])),
+                ]
             ],
-            toolbox=toolbox,
-            output="text",
-            stream=False,
-            **extra,
-        )
+            ModelInput.of(input),
+        ],
+        toolbox=toolbox,
+        output="text",
+        stream=False,
+        **extra,
+    )
 
-        return result.content.to_str()
+    return result.content.to_str()

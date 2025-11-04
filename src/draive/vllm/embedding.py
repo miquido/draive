@@ -36,6 +36,7 @@ class VLLMEmbedding(VLLMAPI):
                     "embedding.provider": "vllm",
                     "embedding.model": embedding_config.model,
                     "embedding.dimensions": embedding_config.dimensions,
+                    "embedding.batch_size": embedding_config.batch_size,
                 },
             )
             attributes: list[str]
@@ -46,6 +47,36 @@ class VLLMEmbedding(VLLMAPI):
                 attributes = [attribute(cast(Value, value)) for value in values]
 
             assert all(isinstance(element, str) for element in attributes)  # nosec: B101
+
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="embedding.items",
+                value=len(attributes),
+                unit="count",
+                kind="counter",
+                attributes={
+                    "embedding.provider": "vllm",
+                    "embedding.model": embedding_config.model,
+                    "embedding.type": "text",
+                },
+            )
+
+            if not attributes:
+                return ()  # empty
+
+            ctx.record(
+                ObservabilityLevel.INFO,
+                metric="embedding.batches",
+                value=(len(attributes) + embedding_config.batch_size - 1)
+                // embedding_config.batch_size,
+                unit="count",
+                kind="counter",
+                attributes={
+                    "embedding.provider": "vllm",
+                    "embedding.model": embedding_config.model,
+                    "embedding.type": "text",
+                },
+            )
 
             responses: list[CreateEmbeddingResponse] = await gather(
                 *[

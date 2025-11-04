@@ -1,6 +1,6 @@
 from typing import Any, overload
 
-from haiway import State, statemethod
+from haiway import ObservabilityLevel, State, ctx, statemethod
 
 from draive.generation.audio.default import generate_audio
 from draive.generation.audio.types import AudioGenerating
@@ -39,12 +39,25 @@ class AudioGeneration(State):
         input: Template | Multimodal,  # noqa: A002
         **extra: Any,
     ) -> ResourceContent | ResourceReference:
-        return await self.generating(
-            # resolve instructions templates
-            instructions=await TemplatesRepository.resolve_str(instructions),
-            # resolve input templates
-            input=await TemplatesRepository.resolve(input),
-            **extra,
-        )
+        async with ctx.scope("generate_audio"):
+            if isinstance(instructions, Template):
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    attributes={"instructions.template": instructions.identifier},
+                )
+
+            if isinstance(input, Template):
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    attributes={"input.template": input.identifier},
+                )
+
+            return await self.generating(
+                # resolve instructions templates
+                instructions=await TemplatesRepository.resolve_str(instructions),
+                # resolve input templates
+                input=await TemplatesRepository.resolve(input),
+                **extra,
+            )
 
     generating: AudioGenerating = generate_audio

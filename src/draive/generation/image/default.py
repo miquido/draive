@@ -1,7 +1,5 @@
 from typing import Any
 
-from haiway import ctx
-
 from draive.models import (
     GenerativeModel,
     ModelInput,
@@ -20,16 +18,15 @@ async def generate_image(
     input: MultimodalContent,  # noqa: A002
     **extra: Any,
 ) -> ResourceContent | ResourceReference:
-    async with ctx.scope("generate_image"):
-        result: ModelOutput = await GenerativeModel.completion(
-            instructions=instructions,
-            context=[ModelInput.of(input)],
-            output="image",
-            stream=False,
-            **extra,
-        )
+    result: ModelOutput = await GenerativeModel.completion(
+        instructions=instructions,
+        context=[ModelInput.of(input)],
+        output="image",
+        stream=False,
+        **extra,
+    )
 
-        for image in result.content.images():
-            return image
+    for image in result.content.images():
+        return image
 
-        raise ValueError("Failed to generate a valid image")
+    raise ValueError("Failed to generate a valid image")

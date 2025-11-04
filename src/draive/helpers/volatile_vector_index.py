@@ -1,9 +1,9 @@
 from asyncio import Lock
 from base64 import urlsafe_b64decode
-from collections.abc import Callable, Iterable, MutableMapping, MutableSequence, Sequence
+from collections.abc import Callable, Collection, MutableMapping, MutableSequence, Sequence
 from typing import Any, cast
 
-from haiway import AttributePath, AttributeRequirement, as_tuple
+from haiway import AttributePath, AttributeRequirement
 
 from draive.embedding import (
     Embedded,
@@ -29,10 +29,9 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
         /,
         *,
         attribute: Callable[[Model], Value] | AttributePath[Model, Value] | Value,
-        values: Iterable[Model],
+        values: Collection[Model],
         **extra: Any,
     ) -> None:
-        values_sequence: Sequence[Model] = as_tuple(values)
         async with lock:
             value_selector: Callable[[Model], Value]
             match attribute:
@@ -47,7 +46,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
 
             text_values: list[str] = []
             image_values: list[bytes] = []
-            for value in values_sequence:
+            for value in values:
                 selected = value_selector(value)
                 if isinstance(selected, str):
                     text_values.append(selected)
@@ -84,7 +83,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                     vector=embedded.vector,
                 )
                 for value, embedded in zip(
-                    values_sequence,
+                    values,
                     embedded_values,
                     strict=True,
                 )

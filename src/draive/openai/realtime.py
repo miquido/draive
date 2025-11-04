@@ -107,13 +107,14 @@ class OpenAIRealtime(OpenAIAPI):
             # enter scope
             await scope.__aenter__()
             ctx.record(
+                ObservabilityLevel.INFO,
                 attributes={
                     "model.provider": "openai",
                     "model.name": config.model,
                     "model.tools": [tool.name for tool in tools.specifications],
                     "model.tool_selection": f"{tools.selection}",
                     "model.output": f"{output}",
-                }
+                },
             )
             # open connection
             connection: AsyncRealtimeConnection = await connection_manager.__aenter__()

@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from typing import Any, overload
 
-from haiway import State, statemethod
+from haiway import ObservabilityLevel, State, ctx, statemethod
 
 from draive.generation.text.default import generate_text
 from draive.generation.text.types import TextGenerating
@@ -45,14 +45,27 @@ class TextGeneration(State):
         examples: Iterable[tuple[Multimodal, str]] = (),
         **extra: Any,
     ) -> str:
-        return await self.generating(
-            # resolve instructions templates
-            instructions=await TemplatesRepository.resolve_str(instructions),
-            # resolve input templates
-            input=await TemplatesRepository.resolve(input),
-            toolbox=Toolbox.of(tools),
-            examples=((MultimodalContent.of(ex_in), ex_out) for ex_in, ex_out in examples),
-            **extra,
-        )
+        async with ctx.scope("generate_text"):
+            if isinstance(instructions, Template):
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    attributes={"instructions.template": instructions.identifier},
+                )
+
+            if isinstance(input, Template):
+                ctx.record(
+                    ObservabilityLevel.INFO,
+                    attributes={"input.template": input.identifier},
+                )
+
+            return await self.generating(
+                # resolve instructions templates
+                instructions=await TemplatesRepository.resolve_str(instructions),
+                # resolve input templates
+                input=await TemplatesRepository.resolve(input),
+                toolbox=Toolbox.of(tools),
+                examples=((MultimodalContent.of(ex_in), ex_out) for ex_in, ex_out in examples),
+                **extra,
+            )
 
     generating: TextGenerating = generate_text
