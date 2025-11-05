@@ -4,7 +4,7 @@ from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable, Mapp
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
-from haiway import META_EMPTY, MISSING, ObservabilityLevel, as_list, ctx
+from haiway import META_EMPTY, MISSING, Missing, ObservabilityLevel, as_list, ctx
 from openai import Omit, omit
 from openai import RateLimitError as OpenAIRateLimitError
 from openai.types.chat import (
@@ -474,7 +474,7 @@ def _context_messages(
     context: ModelContext,
     /,
     *,
-    vision_details: Literal["auto", "low", "high"] | Any,
+    vision_details: Literal["auto", "low", "high"] | Missing,
 ) -> Iterable[ChatCompletionMessageParam]:
     for element in context:
         if isinstance(element, ModelInput):
@@ -533,11 +533,11 @@ def _context_messages(
                     )
 
 
-def content_parts(  # noqa: C901
+def content_parts(  # noqa: C901, PLR0912
     parts: Iterable[MultimodalContentPart],
     /,
     *,
-    vision_details: Literal["auto", "low", "high"] | Any,
+    vision_details: Literal["auto", "low", "high"] | Missing,
     text_only: bool,
 ) -> Iterable[dict[str, Any]]:
     for element in parts:
@@ -557,13 +557,22 @@ def content_parts(  # noqa: C901
                         f"Unsupported message content mime type: {reference.mime_type}"
                     )
 
-                yield {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": reference.uri,
-                    },
-                    "detail": vision_details,
-                }
+                if vision_details is MISSING:
+                    yield {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": reference.uri,
+                        },
+                    }
+
+                else:
+                    yield {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": reference.uri,
+                            "detail": vision_details,
+                        },
+                    }
 
             case ResourceContent() as data:
                 if text_only:
@@ -572,13 +581,22 @@ def content_parts(  # noqa: C901
                 if not data.mime_type.startswith("image"):
                     raise ValueError(f"Unsupported message content mime type: {data.mime_type}")
 
-                yield {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": data.to_data_uri(),
-                    },
-                    "detail": vision_details,
-                }
+                if vision_details is MISSING:
+                    yield {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": data.to_data_uri(),
+                        },
+                    }
+
+                else:
+                    yield {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": data.to_data_uri(),
+                            "detail": vision_details,
+                        },
+                    }
 
             case ArtifactContent() as artifact:
                 if artifact.hidden or text_only:

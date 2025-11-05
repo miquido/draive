@@ -2,7 +2,6 @@ from collections.abc import Callable, Coroutine, Iterable
 from typing import Any, Protocol, Self, cast, final, overload
 
 from haiway import Meta, MetaValues, ObservabilityLevel, TypeSpecification, ctx
-from haiway.utils import format_str
 
 from draive.models.tools.types import (
     ToolAvailabilityChecking,
@@ -277,25 +276,11 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
                 ObservabilityLevel.INFO,
                 attributes={"call_id": call_id},
             )
-            if __debug__:
-                ctx.record(
-                    ObservabilityLevel.DEBUG,
-                    attributes={**{key: f"{arg}" for key, arg in arguments.items()}},
-                )
 
             try:
                 result: Result = await super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
-                if __debug__:
-                    ctx.record(
-                        ObservabilityLevel.DEBUG,
-                        attributes={"result": format_str(result)},
-                    )
 
-                formatted_result: MultimodalContent = MultimodalContent.of(
-                    self.format_result(result)
-                )
-
-                return formatted_result
+                return MultimodalContent.of(self.format_result(result))
 
             except Exception as exc:
                 ctx.record(
