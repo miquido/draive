@@ -57,6 +57,7 @@ coverage.xml
 .env
 .venv
 .dev_venv
+.act*
 env/
 venv/
 ENV/
