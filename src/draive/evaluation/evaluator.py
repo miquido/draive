@@ -685,7 +685,6 @@ class Evaluator[Value, **Args](Immutable):
                     "passed": result.passed,
                     "threshold": result.threshold,
                     "score": result.score,
-                    "comment": result.meta.get_str("comment", default="N/A"),
                 },
             )
             return result
