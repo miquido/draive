@@ -113,6 +113,7 @@ nav:
       - Multimodal Content: guides/MultimodalContent.md
       - Templates: guides/Templates.md
       - Postgres: guides/Postgres.md
+      - Qdrant: guides/Qdrant.md
       - Basics: guides/Basics.md
   - Cookbooks:
       - Basic RAG: cookbooks/BasicRAG.md

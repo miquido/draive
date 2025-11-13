@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Generator, Iterable, Mapping
+from collections.abc import AsyncIterable, Generator, Iterable, Mapping
 from typing import Any, Literal, final, overload
 
 from haiway import BasicValue, ObservabilityLevel, State, ctx
@@ -53,7 +53,7 @@ class Conversation(State):
         input: ConversationMessage | Template | Multimodal,
         stream: Literal[True],
         **extra: Any,
-    ) -> AsyncIterator[ConversationOutputChunk]: ...
+    ) -> AsyncIterable[ConversationOutputChunk]: ...
 
     @classmethod
     async def completion(
@@ -65,7 +65,7 @@ class Conversation(State):
         input: ConversationMessage | Template | Multimodal,  # noqa: A002
         stream: bool = False,
         **extra: Any,
-    ) -> AsyncIterator[ConversationOutputChunk] | ConversationMessage:
+    ) -> AsyncIterable[ConversationOutputChunk] | ConversationMessage:
         """Run a single conversational completion.
 
         Parameters
@@ -85,7 +85,7 @@ class Conversation(State):
 
         Returns
         -------
-        ConversationMessage or AsyncIterator[ConversationOutputChunk]
+        ConversationMessage or AsyncIterable[ConversationOutputChunk]
             Final response message or a stream of output chunks.
         """
         async with ctx.scope("conversation_completion"):

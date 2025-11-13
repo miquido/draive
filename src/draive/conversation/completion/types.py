@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncIterable
 from typing import Any, Literal, Protocol, overload, runtime_checkable
 
 from draive.conversation.types import (
@@ -40,7 +40,7 @@ class ConversationCompleting(Protocol):
         input: ConversationMessage,
         stream: Literal[True],
         **extra: Any,
-    ) -> AsyncGenerator[ConversationOutputChunk]: ...
+    ) -> AsyncIterable[ConversationOutputChunk]: ...
 
     async def __call__(
         self,
@@ -51,4 +51,4 @@ class ConversationCompleting(Protocol):
         input: ConversationMessage,  # noqa: A002
         stream: bool = False,
         **extra: Any,
-    ) -> AsyncGenerator[ConversationOutputChunk] | ConversationMessage: ...
+    ) -> AsyncIterable[ConversationOutputChunk] | ConversationMessage: ...

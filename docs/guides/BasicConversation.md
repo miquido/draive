@@ -6,7 +6,7 @@ simple tools, and request a response from the model inside a managed Haiway cont
 
 ## Prerequisites
 
-- Python 3.12 or newer.
+- Python 3.13 or newer.
 - Project dependencies installed (for example `uv sync`).
 - An `.env` file with `OPENAI_API_KEY` set so Draive can authenticate against OpenAI.
 

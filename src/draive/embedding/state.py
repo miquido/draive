@@ -58,18 +58,14 @@ class TextEmbedding(State):
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]] | Embedded[Value] | Embedded[str]:
         str_selector: Callable[[Value], str] | None
-        match attribute:
-            case None:
-                str_selector = None
+        if attribute is None:
+            str_selector = None
 
-            case Callable() as function:  # pyright: ignore[reportUnknownVariableType]
-                str_selector = function
-
-            case path:
-                assert isinstance(  # nosec: B101
-                    path, AttributePath
-                ), "Prepare parameter path by using Self._.path.to.property"
-                str_selector = cast(AttributePath[Value, str], path).__call__
+        else:
+            assert isinstance(  # nosec: B101
+                attribute, AttributePath | Callable
+            ), "Prepare parameter path by using Type._.path.to.property"
+            str_selector = cast(Callable[[Value], str], attribute)
 
         return (
             await self.embedding(
@@ -123,19 +119,18 @@ class TextEmbedding(State):
         attribute: Callable[[Value], str] | AttributePath[Value, str] | str | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
+        if not content:
+            return ()
+
         str_selector: Callable[[Value], str] | None
-        match attribute:
-            case None:
-                str_selector = None
+        if attribute is None:
+            str_selector = None
 
-            case Callable() as function:  # pyright: ignore[reportUnknownVariableType]
-                str_selector = function
-
-            case path:
-                assert isinstance(  # nosec: B101
-                    path, AttributePath
-                ), "Prepare parameter path by using Self._.path.to.property"
-                str_selector = cast(AttributePath[Value, str], path).__call__
+        else:
+            assert isinstance(  # nosec: B101
+                attribute, AttributePath | Callable
+            ), "Prepare parameter path by using Type._.path.to.property"
+            str_selector = cast(Callable[[Value], str], attribute)
 
         return await self.embedding(
             content,
@@ -192,18 +187,14 @@ class ImageEmbedding(State):
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[bytes]] | Embedded[Value] | Embedded[bytes]:
         bytes_selector: Callable[[Value], bytes] | None
-        match attribute:
-            case None:
-                bytes_selector = None
+        if attribute is None:
+            bytes_selector = None
 
-            case Callable() as function:  # pyright: ignore[reportUnknownVariableType]
-                bytes_selector = function
-
-            case path:
-                assert isinstance(  # nosec: B101
-                    path, AttributePath
-                ), "Prepare parameter path by using Self._.path.to.property"
-                bytes_selector = cast(AttributePath[Value, bytes], path).__call__
+        else:
+            assert isinstance(  # nosec: B101
+                attribute, AttributePath | Callable
+            ), "Prepare parameter path by using Type._.path.to.property"
+            bytes_selector = cast(Callable[[Value], bytes], attribute)
 
         return (
             await self.embedding(
@@ -257,19 +248,18 @@ class ImageEmbedding(State):
         attribute: Callable[[Value], bytes] | AttributePath[Value, bytes] | bytes | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[bytes]]:
+        if not content:
+            return ()
+
         bytes_selector: Callable[[Value], bytes] | None
-        match attribute:
-            case None:
-                bytes_selector = None
+        if attribute is None:
+            bytes_selector = None
 
-            case Callable() as function:  # pyright: ignore[reportUnknownVariableType]
-                bytes_selector = function
-
-            case path:
-                assert isinstance(  # nosec: B101
-                    path, AttributePath
-                ), "Prepare parameter path by using Self._.path.to.property"
-                bytes_selector = cast(AttributePath[Value, bytes], path).__call__
+        else:
+            assert isinstance(  # nosec: B101
+                attribute, AttributePath | Callable
+            ), "Prepare parameter path by using Type._.path.to.property"
+            bytes_selector = cast(Callable[[Value], bytes], attribute)
 
         return await self.embedding(
             content,

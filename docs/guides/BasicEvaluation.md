@@ -6,7 +6,7 @@ highlights practical patterns for running repeatable quality checks.
 
 ## Prerequisites
 
-- Python 3.12+ with Draive installed and your project configured to use the shared Haiway context
+- Python 3.13+ with Draive installed and your project configured to use the shared Haiway context
   (`ctx`).
 - Provider credentials available through `load_env()` or your preferred secrets loader.
 - Familiarity with async/await. All evaluation APIs are asynchronous.

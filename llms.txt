@@ -3,7 +3,7 @@
 This guide explains how to use Draive to orchestrate language model workloads. It focuses on runtime usage and omits repository contribution details.
 
 ## 1. Installation & Environment
-- Install Draive in your Python 3.12+ environment: `pip install draive` or `pip install -e .` from a cloned repository.
+- Install Draive in your Python 3.13+ environment: `pip install draive` or `pip install -e .` from a cloned repository.
 - Provide provider credentials through environment variables or a `.env` file (e.g., `OPENAI_API_KEY`).
 - Call `draive.load_env()` once during application startup to hydrate configuration from the environment.
 

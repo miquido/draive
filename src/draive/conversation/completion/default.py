@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterable
 from datetime import UTC, datetime
 from typing import Any, Literal, overload
 
@@ -43,7 +43,7 @@ async def conversation_completion(
     input: ConversationMessage,
     stream: Literal[True],
     **extra: Any,
-) -> AsyncGenerator[ConversationOutputChunk]: ...
+) -> AsyncIterable[ConversationOutputChunk]: ...
 
 
 async def conversation_completion(
@@ -54,14 +54,15 @@ async def conversation_completion(
     input: ConversationMessage,  # noqa: A002
     stream: bool = False,
     **extra: Any,
-) -> AsyncGenerator[ConversationOutputChunk] | ConversationMessage:
+) -> AsyncIterable[ConversationOutputChunk] | ConversationMessage:
     """Default conversation completion using ``GenerativeModel.loop``.
 
     Normalizes memory, resolves instructions, and runs a tool-enabled loop over the
     generative model, returning a message or streaming output chunks.
     """
     if stream:
-        return _conversation_completion_stream(
+        return ctx.stream(
+            _conversation_completion_stream,
             instructions=instructions,
             toolbox=toolbox,
             memory=memory,
