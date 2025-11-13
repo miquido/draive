@@ -2,7 +2,7 @@ import re
 from collections.abc import Callable, MutableSequence, Sequence
 from typing import Any, Final
 
-from haiway import Immutable, ObservabilityLevel, ctx
+from haiway import Immutable, ctx
 
 from draive.guardrails.safety.types import GuardrailsSafetyException, GuardrailsSafetySanitization
 from draive.multimodal import MultimodalContent, MultimodalContentPart, TextContent
@@ -274,17 +274,6 @@ def _sanitize_text(
 ) -> str:
     sanitized_text: str = text
     for rule in rules:
-        ctx.record(
-            ObservabilityLevel.INFO,
-            metric="guardrails.safety.regex.invocations",
-            value=1,
-            unit="count",
-            kind="counter",
-            attributes={
-                "guardrails.safety.method": "regex",
-                "guardrails.safety.rule": rule.identifier,
-            },
-        )
         match rule.mask:
             case None:
                 for match in rule.pattern.finditer(sanitized_text):
@@ -295,17 +284,6 @@ def _sanitize_text(
                         continue
 
                     ctx.log_warning(f"Guardrails safety rule triggered: {rule.identifier}")
-                    ctx.record(
-                        ObservabilityLevel.INFO,
-                        metric="guardrails.safety.regex.blocks",
-                        value=1,
-                        unit="count",
-                        kind="counter",
-                        attributes={
-                            "guardrails.safety.method": "regex",
-                            "guardrails.safety.rule": rule.identifier,
-                        },
-                    )
 
                     raise GuardrailsSafetyException(
                         f"Guardrails safety blocked content by rule `{rule.identifier}`.",
@@ -328,17 +306,6 @@ def _sanitize_text(
                         return match.group(0)
 
                     ctx.log_warning(f"Guardrails safety rule triggered: {current_rule.identifier}")
-                    ctx.record(
-                        ObservabilityLevel.INFO,
-                        metric="guardrails.safety.regex.masks",
-                        value=1,
-                        unit="count",
-                        kind="counter",
-                        attributes={
-                            "guardrails.safety.method": "regex",
-                            "guardrails.safety.rule": current_rule.identifier,
-                        },
-                    )
 
                     return mask
 
