@@ -40,11 +40,9 @@ Hello world!
 Generates a Markdown media reference. Depending on `include_data`, the reference either embeds the
 base64 payload directly or uses a redacted placeholder.
 
-!!! note
+!!! Note
 
-```
-`kind` variable will be one of: `'image' | 'audio' | 'video' | ''`
-```
+    `kind` variable will be one of: `'image' | 'audio' | 'video' | ''`
 
 When `include_data=True`, `ResourceContent.to_str()` returns the full base64 payload:
 
@@ -129,11 +127,9 @@ return f"<{self.name}{_tag_attributes(self.meta)}>{self.content.to_str()}</{self
 <TAG_NAME attr_1 attr_2="val_2">Hello World!</TAG_NAME>
 ```
 
-!!! important
+!!! Important
 
-```
-`MultimodalTag` is the only multimodal element that exposes metadata inline. Values stored in `meta` appear as XML-style tag attributes.
-```
+    `MultimodalTag` is the only multimodal element that exposes metadata inline. Values stored in `meta` appear as XML-style tag attributes.
 
 ## MultimodalContent
 
