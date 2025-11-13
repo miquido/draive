@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterable
 from types import TracebackType
 from typing import Any, Protocol, Self, runtime_checkable
 
@@ -65,7 +65,7 @@ class RealtimeConversationSession(State):
     @classmethod
     async def writer(
         cls,
-        input: AsyncIterator[ConversationInputChunk | ConversationEvent],  # noqa: A002
+        input: AsyncIterable[ConversationInputChunk | ConversationEvent],  # noqa: A002
     ) -> None:
         """Consume an async iterator and write its chunks to the session."""
         session: Self = ctx.state(cls)

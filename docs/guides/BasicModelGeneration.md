@@ -6,7 +6,7 @@ highlights a few customisation knobs you can try right away.
 
 ## Prerequisites
 
-- Python 3.12+ with Draive installed and activated in the project virtual environment (`.venv`).
+- Python 3.13+ with Draive installed and activated in the project virtual environment (`.venv`).
 - An `.env` file containing a valid `OPENAI_API_KEY`. The key stays local; Draive loads it at
   runtime.
 - Familiarity with Python's async/await syntax. All generation APIs are asynchronous.

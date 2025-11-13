@@ -2,7 +2,7 @@ import random
 from base64 import b64decode, b64encode, urlsafe_b64decode
 from collections.abc import (
     AsyncGenerator,
-    AsyncIterator,
+    AsyncIterable,
     Coroutine,
     Generator,
     Iterable,
@@ -328,7 +328,7 @@ class GeminiGenerating(GeminiAPI):
 
             last_usage_meta: GenerateContentResponseUsageMetadata | None = None
             try:
-                response_stream: AsyncIterator[
+                response_stream: AsyncIterable[
                     GenerateContentResponse
                 ] = await self._client.aio.models.generate_content_stream(  # pyright: ignore[reportUnknownMemberType]
                     model=config.model,

@@ -1,7 +1,7 @@
 # Draive
 
 [![PyPI](https://img.shields.io/pypi/v/draive)](https://pypi.org/project/draive/)
-![Python Version](https://img.shields.io/badge/Python-3.12+-blue)
+![Python Version](https://img.shields.io/badge/Python-3.13+-blue)
 [![License](https://img.shields.io/github/license/miquido/draive)](https://github.com/miquido/draive/blob/main/LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/miquido/draive?style=social)](https://github.com/miquido/draive)
 

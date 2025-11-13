@@ -4,7 +4,7 @@ Rules for coding agents to contribute correctly and safely.
 
 ## Development Toolchain
 
-- Python: 3.12+
+- Python: 3.13+
 - Virtualenv: managed by uv, available at `./.venv`, assume already set up and working within venv
 - Formatting: Ruff formatter (`make format`), no other formatter
 - Linters/Type-checkers: Ruff, Bandit, Pyright (strict). Run via `make lint`
@@ -42,7 +42,7 @@ Public exports are centralized in `src/draive/__init__.py`.
 
 ### Typing & Immutability
 
-- Ensure latest, most strict typing syntax available from python 3.12+
+- Ensure latest, most strict typing syntax available from python 3.13+
 - Strict typing only: no untyped public APIs, no loose `Any` unless required by third-party boundaries
 - Prefer explicit attribute access with static types. Avoid dynamic `getattr` except at narrow boundaries.
 - Prefer abstract immutable protocols: `Mapping`, `Sequence`, `Iterable` over `dict`/`list`/`set` in public types

@@ -1,6 +1,6 @@
 # Installation
 
-Install Draive into a dedicated Python 3.12+ environment so your project dependencies remain
+Install Draive into a dedicated Python 3.13+ environment so your project dependencies remain
 isolated. We recommend [uv](https://github.com/astral-sh/uv) for deterministic installs, but
 standard `pip` works as well.
 

@@ -82,16 +82,10 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
             event="postgres.vector_index.index",
             attributes={"model": model.__qualname__},
         )
-        value_selector: Callable[[Model], Value]
-        match attribute:
-            case Callable() as selector:
-                value_selector = selector
-
-            case path:
-                assert isinstance(  # nosec: B101
-                    path, AttributePath
-                ), "Prepare parameter path by using Self._.path.to.property"
-                value_selector = cast(AttributePath[Model, Value], path).__call__
+        assert isinstance(  # nosec: B101
+            attribute, AttributePath | Callable
+        ), f"Prepare parameter path by using {model.__name__}._.path.to.property"
+        value_selector: Callable[[Model], Value] = cast(Callable[[Model], Value], attribute)
 
         selected_values: list[str | bytes] = []
         for value in values:
@@ -107,7 +101,7 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
                 if not selected.mime_type.startswith("image"):
                     raise ValueError(f"{selected.mime_type} embedding is not supported")
 
-                selected_values.append(b64decode(selected.data))
+                selected_values.append(selected.to_bytes())
 
         embedded_values: Sequence[Embedded[Model]]
         if all(isinstance(value, str) for value in selected_values):
@@ -230,7 +224,7 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
 
         elif isinstance(query, ResourceContent):
             if query.mime_type.startswith("image"):
-                embedded_image: Embedded[bytes] = await ImageEmbedding.embed(b64decode(query.data))
+                embedded_image: Embedded[bytes] = await ImageEmbedding.embed(query.to_bytes())
                 query_vector = embedded_image.vector
 
             elif query.mime_type.startswith("text"):

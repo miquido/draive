@@ -1,5 +1,4 @@
 from asyncio import Lock
-from base64 import urlsafe_b64decode
 from collections.abc import Callable, Collection, MutableMapping, MutableSequence, Sequence
 from typing import Any, cast
 
@@ -33,16 +32,10 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
         **extra: Any,
     ) -> None:
         async with lock:
-            value_selector: Callable[[Model], Value]
-            match attribute:
-                case Callable() as selector:
-                    value_selector = selector
-
-                case path:
-                    assert isinstance(  # nosec: B101
-                        path, AttributePath
-                    ), "Prepare parameter path by using Self._.path.to.property"
-                    value_selector = cast(AttributePath[Model, Value], path).__call__
+            assert isinstance(  # nosec: B101
+                attribute, AttributePath | Callable
+            ), f"Prepare parameter path by using {model.__name__}._.path.to.property"
+            value_selector: Callable[[Model], Value] = cast(Callable[[Model], Value], attribute)
 
             text_values: list[str] = []
             image_values: list[bytes] = []
@@ -59,7 +52,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                     if not selected.mime_type.startswith("image"):
                         raise ValueError(f"{selected.mime_type} embedding is not supported")
 
-                    image_values.append(urlsafe_b64decode(selected.data.encode("utf-8")))
+                    image_values.append(selected.to_bytes())
 
             if image_values and text_values:
                 raise ValueError("Selected attribute values have to be the same type")
@@ -156,7 +149,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                 raise ValueError(f"{query.mime_type} embedding is not supported")
 
             embedded_image: Embedded[bytes] = await ImageEmbedding.embed(
-                urlsafe_b64decode(query.data.encode("utf-8")),
+                query.to_bytes(),
                 **extra,
             )
             query_vector = embedded_image.vector

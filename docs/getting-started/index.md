@@ -25,7 +25,7 @@ Throughout the getting-started journey you will assemble:
 
 ## Prerequisites
 
-- Python 3.12+ with `uv` managing the virtual environment at `./.venv` (this repository includes a
+- Python 3.13+ with `uv` managing the virtual environment at `./.venv` (this repository includes a
   ready-to-use setup).
 - Familiarity with `async`/`await` and running `pytest` from the command line.
 - Access tokens for the model providers you plan to use (store them in environment variables—never
