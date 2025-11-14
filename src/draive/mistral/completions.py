@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
-from haiway import META_EMPTY, ObservabilityLevel, as_list, ctx, unwrap_missing
+from haiway import META_EMPTY, as_list, ctx, unwrap_missing
 from mistralai import ContentChunkTypedDict, ImageURLChunk, TextChunk, ThinkChunk, ToolTypedDict
 from mistralai.models import (
     AssistantMessage,
@@ -126,8 +126,7 @@ class MistralCompletions(MistralAPI):
         prefill: Multimodal | None,
         **extra: Any,
     ) -> AsyncGenerator[ModelStreamOutput]:
-        ctx.record(
-            ObservabilityLevel.INFO,
+        ctx.record_info(
             attributes={
                 "model.provider": "mistral",
                 "model.name": config.model,
@@ -139,8 +138,7 @@ class MistralCompletions(MistralAPI):
                 "model.stream": True,
             },
         )
-        ctx.record(
-            ObservabilityLevel.DEBUG,
+        ctx.record_debug(
             attributes={
                 "model.instructions": instructions,
                 "model.tools": [tool.name for tool in tools.specifications],
@@ -179,8 +177,7 @@ class MistralCompletions(MistralAPI):
 
         async for event in stream:
             if usage := event.data.usage:
-                ctx.record(
-                    ObservabilityLevel.INFO,
+                ctx.record_info(
                     metric="model.input_tokens",
                     value=usage.prompt_tokens or 0,
                     unit="tokens",
@@ -190,8 +187,7 @@ class MistralCompletions(MistralAPI):
                         "model.name": event.data.model,
                     },
                 )
-                ctx.record(
-                    ObservabilityLevel.INFO,
+                ctx.record_info(
                     metric="model.output_tokens",
                     value=usage.completion_tokens or 0,
                     unit="tokens",
@@ -312,8 +308,7 @@ class MistralCompletions(MistralAPI):
         prefill: Multimodal | None,
     ) -> ModelOutput:
         async with ctx.scope("model.completion"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "model.provider": "mistral",
                     "model.name": config.model,
@@ -325,8 +320,7 @@ class MistralCompletions(MistralAPI):
                     "model.stream": False,
                 },
             )
-            ctx.record(
-                ObservabilityLevel.DEBUG,
+            ctx.record_debug(
                 attributes={
                     "model.instructions": instructions,
                     "model.tools": [tool.name for tool in tools.specifications],
@@ -552,16 +546,14 @@ def _record_usage_metrics(
     completion: ChatCompletionResponse,
 ) -> None:
     if usage := completion.usage:
-        ctx.record(
-            ObservabilityLevel.INFO,
+        ctx.record_info(
             metric="model.input_tokens",
             value=usage.prompt_tokens or 0,
             unit="tokens",
             kind="counter",
             attributes={"model.provider": "mistral", "model.name": completion.model},
         )
-        ctx.record(
-            ObservabilityLevel.INFO,
+        ctx.record_info(
             metric="model.output_tokens",
             value=usage.completion_tokens or 0,
             unit="tokens",

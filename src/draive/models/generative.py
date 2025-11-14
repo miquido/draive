@@ -18,7 +18,6 @@ from draive.models.types import (
     ModelInput,
     ModelInstructions,
     ModelMemory,
-    ModelMemoryRecall,
     ModelOutput,
     ModelOutputBlock,
     ModelOutputSelection,
@@ -680,13 +679,7 @@ class RealtimeGenerativeModel(State):
         """
         session_memory: ModelMemory
         if isinstance(memory, Sequence):
-            session_memory = ModelMemory.constant(
-                ModelMemoryRecall(
-                    context=memory,
-                    variables={},
-                    meta=META_EMPTY,
-                )
-            )
+            session_memory = ModelMemory.constant(*memory)
 
         else:
             session_memory = memory

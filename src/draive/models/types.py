@@ -22,11 +22,19 @@ from typing import (
     runtime_checkable,
 )
 
-from haiway import META_EMPTY, BasicValue, Meta, MetaValues, State, TypeSpecification, ctx
+from haiway import (
+    META_EMPTY,
+    BasicValue,
+    Meta,
+    MetaValues,
+    State,
+    TypeSpecification,
+    ctx,
+    statemethod,
+)
 
 from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, MultimodalContentPart
 from draive.parameters import DataModel
-from draive.utils import Memory
 
 __all__ = (
     "ModelContext",
@@ -40,7 +48,10 @@ __all__ = (
     "ModelInputInvalid",
     "ModelInstructions",
     "ModelMemory",
+    "ModelMemoryMaintaining",
     "ModelMemoryRecall",
+    "ModelMemoryRecalling",
+    "ModelMemoryRemembering",
     "ModelOutput",
     "ModelOutputBlock",
     "ModelOutputBlocks",
@@ -768,8 +779,148 @@ class ModelMemoryRecall(DataModel):
 
 ModelMemoryRecall.empty = ModelMemoryRecall(context=())
 
-ModelMemory = Memory[ModelMemoryRecall, ModelContextElement]
-"""Memory abstraction for managing conversation context and variables."""
+
+@runtime_checkable
+class ModelMemoryRecalling(Protocol):
+    async def __call__(
+        self,
+        **extra: Any,
+    ) -> ModelMemoryRecall: ...
+
+
+@runtime_checkable
+class ModelMemoryRemembering(Protocol):
+    async def __call__(
+        self,
+        *elements: ModelContextElement,
+        variables: Mapping[str, BasicValue] | None,
+        **extra: Any,
+    ) -> None: ...
+
+
+@runtime_checkable
+class ModelMemoryMaintaining(Protocol):
+    async def __call__(
+        self,
+        **extra: Any,
+    ) -> None: ...
+
+
+async def _remembering_none(
+    *elements: ModelContextElement,
+    variables: Mapping[str, BasicValue] | None,
+    **extra: Any,
+) -> None:
+    pass  # noop
+
+
+async def _maintaining_noop(
+    **extra: Any,
+) -> None:
+    pass  # noop
+
+
+@final
+class ModelMemory(State):
+    @classmethod
+    def constant(
+        cls,
+        *elements: ModelContextElement,
+        variables: Mapping[str, BasicValue] | None = None,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        recall: ModelMemoryRecall = ModelMemoryRecall.of(
+            *elements,
+            variables=variables,
+            meta=meta,
+        )
+
+        async def recalling(
+            **extra: Any,
+        ) -> ModelMemoryRecall:
+            return recall
+
+        return cls(
+            recalling=recalling,
+            remembering=_remembering_none,
+            maintaining=_maintaining_noop,
+            meta=Meta.of({"source": "constant"}),
+        )
+
+    @overload
+    @classmethod
+    async def recall(
+        cls,
+        **extra: Any,
+    ) -> ModelMemoryRecall: ...
+
+    @overload
+    async def recall(
+        self,
+        **extra: Any,
+    ) -> ModelMemoryRecall: ...
+
+    @statemethod
+    async def recall(
+        self,
+        **extra: Any,
+    ) -> ModelMemoryRecall:
+        return await self.recalling(**extra)
+
+    @overload
+    @classmethod
+    async def remember(
+        cls,
+        *elements: ModelContextElement,
+        variables: Mapping[str, BasicValue] | None = None,
+        **extra: Any,
+    ) -> None: ...
+
+    @overload
+    async def remember(
+        self,
+        *elements: ModelContextElement,
+        variables: Mapping[str, BasicValue] | None = None,
+        **extra: Any,
+    ) -> None: ...
+
+    @statemethod
+    async def remember(
+        self,
+        *elements: ModelContextElement,
+        variables: Mapping[str, BasicValue] | None = None,
+        **extra: Any,
+    ) -> None:
+        await self.remembering(
+            *elements,
+            variables=variables,
+            **extra,
+        )
+
+    @overload
+    @classmethod
+    async def maintenance(
+        cls,
+        **extra: Any,
+    ) -> None: ...
+
+    @overload
+    async def maintenance(
+        self,
+        **extra: Any,
+    ) -> None: ...
+
+    @statemethod
+    async def maintenance(
+        self,
+        **extra: Any,
+    ) -> None:
+        await self.maintaining(**extra)
+
+    recalling: ModelMemoryRecalling
+    remembering: ModelMemoryRemembering
+    maintaining: ModelMemoryMaintaining
+    meta: Meta
 
 
 @final

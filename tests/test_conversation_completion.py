@@ -5,6 +5,7 @@ from uuid import uuid4
 from pytest import mark
 
 from draive import (
+    META_EMPTY,
     GenerativeModel,
     MultimodalContent,
     Toolbox,
@@ -15,11 +16,12 @@ from draive.conversation import Conversation, ConversationMessage
 from draive.models import (
     ModelContextElement,
     ModelInput,
+    ModelMemory,
+    ModelMemoryRecall,
     ModelOutput,
     ModelToolRequest,
     ModelToolsDeclaration,
 )
-from draive.utils import Memory as ConversationMemory
 
 
 class MockLMMTracker:
@@ -203,13 +205,16 @@ async def test_conversation_completion_with_memory_callback():
                 remembered_messages.append(ConversationMessage.model(el.content))
 
     async def recall_callback(**_: Any):
-        from draive.models import ModelMemoryRecall
-
         return ModelMemoryRecall.empty
 
-    memory = ConversationMemory(
+    async def maintenance_callback(**_: Any):
+        pass
+
+    memory = ModelMemory(
         recalling=recall_callback,
         remembering=remember_callback,
+        maintaining=maintenance_callback,
+        meta=META_EMPTY,
     )
 
     async def mock_generating(

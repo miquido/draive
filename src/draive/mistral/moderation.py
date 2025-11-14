@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from typing import Any, cast
 
-from haiway import MISSING, ObservabilityLevel, ctx
+from haiway import MISSING, ctx
 from mistralai import ModerationResponse
 
 from draive.guardrails import GuardrailsModeration, GuardrailsModerationException
@@ -28,8 +28,7 @@ class MistralContentModeration(MistralAPI):
     ) -> None:
         moderation_config: MistralModerationConfig = config or ctx.state(MistralModerationConfig)
         async with ctx.scope("moderation"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "guardrails.provider": "mistral",
                     "guardrails.model": moderation_config.model,

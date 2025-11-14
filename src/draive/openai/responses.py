@@ -4,7 +4,7 @@ from collections.abc import AsyncGenerator, Collection, Coroutine, Generator, Ma
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
-from haiway import MISSING, Meta, Missing, ObservabilityLevel, as_dict, ctx, unwrap_missing
+from haiway import MISSING, Meta, Missing, as_dict, ctx, unwrap_missing
 from openai import Omit, omit
 from openai import RateLimitError as OpenAIRateLimitError
 from openai.types.responses import (
@@ -176,8 +176,7 @@ class OpenAIResponses(OpenAIAPI):
         **extra: Any,
     ) -> ModelOutput:
         async with ctx.scope("model.completion"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "model.provider": "openai",
                     "model.name": config.model,
@@ -190,8 +189,7 @@ class OpenAIResponses(OpenAIAPI):
                     "model.stream": False,
                 },
             )
-            ctx.record(
-                ObservabilityLevel.DEBUG,
+            ctx.record_debug(
                 attributes={
                     "model.instructions": instructions,
                     "model.tools": [tool.name for tool in tools.specifications],
@@ -271,8 +269,7 @@ class OpenAIResponses(OpenAIAPI):
                 ) from exc
 
             if usage := response.usage:
-                ctx.record(
-                    ObservabilityLevel.INFO,
+                ctx.record_info(
                     metric="model.input_tokens",
                     value=getattr(usage, "input_tokens", 0),
                     unit="tokens",
@@ -282,8 +279,7 @@ class OpenAIResponses(OpenAIAPI):
                         "model.name": config.model,
                     },
                 )
-                ctx.record(
-                    ObservabilityLevel.INFO,
+                ctx.record_info(
                     metric="model.output_tokens",
                     value=getattr(usage, "output_tokens", 0),
                     unit="tokens",
@@ -422,8 +418,7 @@ class OpenAIResponses(OpenAIAPI):
         **extra: Any,
     ) -> AsyncGenerator[ModelStreamOutput]:
         async with ctx.scope("model.completion.stream"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "model.provider": "openai",
                     "model.name": config.model,
@@ -436,8 +431,7 @@ class OpenAIResponses(OpenAIAPI):
                     "model.stream": True,
                 },
             )
-            ctx.record(
-                ObservabilityLevel.DEBUG,
+            ctx.record_debug(
                 attributes={
                     "model.instructions": instructions,
                     "model.tools": [tool.name for tool in tools.specifications],
@@ -577,8 +571,7 @@ class OpenAIResponses(OpenAIAPI):
                             ResponseCompletedEvent | ResponseFailedEvent | ResponseIncompleteEvent,
                         ):
                             if usage := event.response.usage:
-                                ctx.record(
-                                    ObservabilityLevel.INFO,
+                                ctx.record_info(
                                     metric="model.input_tokens",
                                     value=getattr(usage, "input_tokens", 0),
                                     unit="tokens",
@@ -588,8 +581,7 @@ class OpenAIResponses(OpenAIAPI):
                                         "model.name": config.model,
                                     },
                                 )
-                                ctx.record(
-                                    ObservabilityLevel.INFO,
+                                ctx.record_info(
                                     metric="model.output_tokens",
                                     value=getattr(usage, "output_tokens", 0),
                                     unit="tokens",

@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterable, Generator, Iterable, Mapping
 from typing import Any, Literal, final, overload
 
-from haiway import BasicValue, ObservabilityLevel, State, ctx
+from haiway import BasicValue, State, ctx
 
 from draive.conversation.completion.default import conversation_completion
 from draive.conversation.completion.types import ConversationCompleting
@@ -16,7 +16,6 @@ from draive.models import (
     Toolbox,
 )
 from draive.multimodal import Multimodal, Template, TemplatesRepository
-from draive.utils import Memory
 
 __all__ = ("Conversation",)
 
@@ -101,10 +100,10 @@ class Conversation(State):
             conversation_memory: ModelMemory
             memory_variables: Mapping[str, BasicValue] | None
             if memory is None:
-                conversation_memory = ModelMemory.constant(ModelMemoryRecall.empty)
+                conversation_memory = ModelMemory.constant()
                 memory_variables = None
 
-            elif isinstance(memory, Memory):
+            elif isinstance(memory, ModelMemory):
                 conversation_memory = memory
                 memory_recall: ModelMemoryRecall = await memory.recall()
                 memory_variables = memory_recall.variables
@@ -119,14 +118,11 @@ class Conversation(State):
                         else:
                             yield ModelOutput.of(message.content)
 
-                conversation_memory = ModelMemory.constant(
-                    ModelMemoryRecall.of(*model_context_elements())
-                )
+                conversation_memory = ModelMemory.constant(*model_context_elements())
                 memory_variables = None
 
             if isinstance(instructions, Template):
-                ctx.record(
-                    ObservabilityLevel.INFO,
+                ctx.record_info(
                     attributes={"instructions.template": instructions.identifier},
                 )
 

@@ -4,7 +4,7 @@ from collections.abc import Callable, Collection, MutableMapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
-from haiway import AttributePath, AttributeRequirement, ObservabilityLevel, ctx
+from haiway import AttributePath, AttributeRequirement, ctx
 from haiway.postgres import Postgres, PostgresRow, PostgresValue
 
 from draive.embedding import (
@@ -19,24 +19,6 @@ from draive.resources import ResourceContent
 from draive.utils import VectorIndex
 
 __all__ = ("PostgresVectorIndex",)
-
-
-# POSTGRES SCHEMA TEMPLATE
-#
-# CREATE TABLE IF NOT EXISTS your_table_name (
-#     id UUID NOT NULL DEFAULT gen_random_uuid(),
-#     embedding VECTOR(<dimension>) NOT NULL,
-#     payload JSONB NOT NULL,
-#     meta JSONB NOT NULL,
-#     created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-# );
-#
-# -- Recommended for cosine similarity
-# CREATE INDEX IF NOT EXISTS your_table_name_embedding_idx
-#     ON your_table_name
-#     USING ivfflat (embedding vector_cosine_ops)
-#     WITH (lists = 100);
-#
 
 
 def PostgresVectorIndex(  # noqa: C901, PLR0915
@@ -55,6 +37,26 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
     -------
     VectorIndex
         A VectorIndex implementation persisting entries in Postgres.
+
+    Notes
+    ------
+    Example schema:
+    ```
+    CREATE TABLE IF NOT EXISTS your_table_name (
+        id UUID NOT NULL DEFAULT gen_random_uuid(),
+        embedding VECTOR(<dimension>) NOT NULL,
+        payload JSONB NOT NULL,
+        meta JSONB NOT NULL,
+        created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Recommended for cosine similarity
+    CREATE INDEX IF NOT EXISTS your_table_name_embedding_idx
+        ON your_table_name
+        USING ivfflat (embedding vector_cosine_ops)
+        WITH (lists = 100);
+
+    ```
     """
     assert mmr_multiplier > 0  # nosec: B101
 
@@ -77,11 +79,6 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
         values: Collection[Model],
         **extra: Any,
     ) -> None:
-        ctx.record(
-            ObservabilityLevel.INFO,
-            event="postgres.vector_index.index",
-            attributes={"model": model.__qualname__},
-        )
         assert isinstance(  # nosec: B101
             attribute, AttributePath | Callable
         ), f"Prepare parameter path by using {model.__name__}._.path.to.property"
@@ -180,11 +177,6 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
         rerank: bool = False,
         **extra: Any,
     ) -> Sequence[Model]:
-        ctx.record(
-            ObservabilityLevel.INFO,
-            event="postgres.vector_index.search",
-            attributes={"model": model.__qualname__},
-        )
         assert query is not None or (query is None and score_threshold is None)  # nosec: B101
         where_clause: str
         arguments: Sequence[Sequence[PostgresValue] | PostgresValue]
@@ -299,11 +291,6 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
         requirements: AttributeRequirement[Model] | None = None,
         **extra: Any,
     ) -> None:
-        ctx.record(
-            ObservabilityLevel.INFO,
-            event="postgres.vector_index.delete",
-            attributes={"model": model.__qualname__},
-        )
         if requirements is None:
             await Postgres.execute(
                 f"""

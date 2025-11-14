@@ -1,7 +1,7 @@
 from collections.abc import Callable, Coroutine, Iterable
 from typing import Any, Protocol, Self, cast, final, overload
 
-from haiway import Meta, MetaValues, ObservabilityLevel, TypeSpecification, ctx
+from haiway import Meta, MetaValues, TypeSpecification, ctx
 
 from draive.models.tools.types import (
     ToolAvailabilityChecking,
@@ -272,8 +272,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
             When the wrapped function raises an exception that should be surfaced to the model.
         """
         async with ctx.scope(f"tool.{self.name}"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={"call_id": call_id},
             )
 
@@ -283,8 +282,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
                 return MultimodalContent.of(self.format_result(result))
 
             except Exception as exc:
-                ctx.record(
-                    ObservabilityLevel.ERROR,
+                ctx.record_error(
                     event="error",
                     attributes={
                         "exception": f"{type(exc)}",
@@ -304,8 +302,7 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
 
             # do not catch and format BaseExceptions, rethrow instead
             except BaseException as exc:
-                ctx.record(
-                    ObservabilityLevel.ERROR,
+                ctx.record_error(
                     event="error",
                     attributes={
                         "exception": f"{type(exc)}",

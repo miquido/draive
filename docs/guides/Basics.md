@@ -186,7 +186,7 @@ async with ctx.scope("logging"):
     ctx.log_info("We can use associated logger with additional metadata")
     # finally we can record custom metrics based on the state we already know
     # by using a subclass of `State`
-    ctx.record(BasicState(identifier="recorded", value=42))
+    ctx.record_info(BasicState(identifier="recorded", value=42))
 ```
 
 Nice, but we can't see anything here. How about configuring the loggers first? Draive comes with a
@@ -225,14 +225,14 @@ async with ctx.scope(
 ):
     ctx.log_info("Now we can see the logs!")
     # we can see recorded custom metrics for the context scope as well
-    ctx.record(BasicState(identifier="recorded", value=42))
+    ctx.record_info(BasicState(identifier="recorded", value=42))
 
     # or we can create nested context scope which creates
     # a separate subtree for metrics
     with ctx.scope("nested"):
         # now we can record the same thing again
         # but this time it will be associated with the nested context scope
-        ctx.record(BasicState(identifier="recorded-nested", value=11))
+        ctx.record_info(BasicState(identifier="recorded-nested", value=11))
 
 # additionally when we exit the context scope we get the execution summary
 # including all recorded metrics

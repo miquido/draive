@@ -16,7 +16,6 @@ from haiway import (
     Disposables,
     Meta,
     MetaValues,
-    ObservabilityLevel,
     State,
     cache,
     cache_externally,
@@ -64,7 +63,6 @@ from draive.stages.types import (
     StageRouting,
     StageState,
 )
-from draive.utils.memory import Memory
 
 __all__ = (
     "Stage",
@@ -348,14 +346,12 @@ class Stage:
         ) -> StageState:
             async with ctx.scope("stage.completion"):
                 if isinstance(instructions, Template):
-                    ctx.record(
-                        ObservabilityLevel.INFO,
+                    ctx.record_info(
                         attributes={"instructions.template": instructions.identifier},
                     )
 
                 if isinstance(input, Template):
-                    ctx.record(
-                        ObservabilityLevel.INFO,
+                    ctx.record_info(
                         attributes={"input.template": input.identifier},
                     )
 
@@ -457,8 +453,7 @@ class Stage:
                 ]
                 ctx.log_debug("...prompting completion input provided")
                 if isinstance(instructions, Template):
-                    ctx.record(
-                        ObservabilityLevel.INFO,
+                    ctx.record_info(
                         attributes={"instructions.template": instructions.identifier},
                     )
 
@@ -555,8 +550,7 @@ class Stage:
                 ]
 
                 if isinstance(instructions, Template):
-                    ctx.record(
-                        ObservabilityLevel.INFO,
+                    ctx.record_info(
                         attributes={"instructions.template": instructions.identifier},
                     )
 
@@ -627,8 +621,7 @@ class Stage:
         ) -> StageState:
             async with ctx.scope("stage.completion.result"):
                 if isinstance(instructions, Template):
-                    ctx.record(
-                        ObservabilityLevel.INFO,
+                    ctx.record_info(
                         attributes={"instructions.template": instructions.identifier},
                     )
 
@@ -2038,7 +2031,7 @@ class Stage:
         """
         async with ctx.scope("stage.execution"):
             initial_context: ModelContext
-            if isinstance(memory, Memory):
+            if isinstance(memory, ModelMemory):
                 recalled: ModelMemoryRecall = await memory.recall()
                 initial_context = recalled.context
 
@@ -2053,7 +2046,7 @@ class Stage:
                 )
             )
 
-            if isinstance(memory, Memory):
+            if isinstance(memory, ModelMemory):
                 # Persist only newly produced context elements to the model memory
                 # (compute the suffix after the common prefix with the recalled context)
                 common_prefix: ModelContext = tuple(

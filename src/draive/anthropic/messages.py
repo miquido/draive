@@ -31,7 +31,6 @@ from haiway import (
     MISSING,
     Meta,
     Missing,
-    ObservabilityLevel,
     as_dict,
     as_list,
     ctx,
@@ -142,8 +141,7 @@ class AnthropicMessages(AnthropicAPI):
         **extra: Any,
     ) -> ModelOutput:
         async with ctx.scope("model.completion"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "model.provider": self._provider,
                     "model.name": config.model,
@@ -157,8 +155,7 @@ class AnthropicMessages(AnthropicAPI):
                     "model.stream": False,
                 },
             )
-            ctx.record(
-                ObservabilityLevel.DEBUG,
+            ctx.record_debug(
                 attributes={
                     "model.instructions": instructions,
                     "model.tools": [tool.name for tool in tools.specifications],
@@ -231,8 +228,7 @@ class AnthropicMessages(AnthropicAPI):
 
             except AnthropicRateLimitError as exc:  # retry on rate limit after delay
                 if retry_after := exc.response.headers.get("Retry-After"):
-                    ctx.record(
-                        ObservabilityLevel.WARNING,
+                    ctx.record_warning(
                         event="model.rate_limit",
                         attributes={
                             "model.provider": self._provider,
@@ -257,8 +253,7 @@ class AnthropicMessages(AnthropicAPI):
                         ) from exc
 
                 else:
-                    ctx.record(
-                        ObservabilityLevel.WARNING,
+                    ctx.record_warning(
                         event="model.rate_limit",
                         attributes={
                             "model.provider": self._provider,
@@ -279,8 +274,7 @@ class AnthropicMessages(AnthropicAPI):
                     reason=str(exc),
                 ) from exc
 
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric="model.input_tokens",
                 value=completion.usage.input_tokens,
                 unit="tokens",
@@ -291,8 +285,7 @@ class AnthropicMessages(AnthropicAPI):
                 },
             )
             # Tokens served from cache (input side)
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric="model.input_tokens.cached",
                 value=completion.usage.cache_read_input_tokens or 0,
                 unit="tokens",
@@ -302,8 +295,7 @@ class AnthropicMessages(AnthropicAPI):
                     "model.name": completion.model,
                 },
             )
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric="model.output_tokens",
                 value=completion.usage.output_tokens,
                 unit="tokens",

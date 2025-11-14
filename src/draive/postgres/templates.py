@@ -2,27 +2,13 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
-from haiway import Meta, ObservabilityLevel, cache, ctx
+from haiway import Meta, cache, ctx
 from haiway.postgres import Postgres, PostgresRow
 
 from draive.multimodal.templates.repository import TemplatesRepository
 from draive.multimodal.templates.types import TemplateDeclaration
 
 __all__ = ("PostgresTemplatesRepository",)
-
-
-# POSTGRES SCHEMA
-#
-# CREATE TABLE templates (
-#     identifier TEXT NOT NULL,
-#     description TEXT DEFAULT NULL,
-#     content TEXT NOT NULL,
-#     variables JSONB NOT NULL DEFAULT '{}'::jsonb,
-#     meta JSONB NOT NULL DEFAULT '{}'::jsonb,
-#     created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-#     PRIMARY KEY (identifier, created)
-# );
-#
 
 
 def PostgresTemplatesRepository(
@@ -42,6 +28,27 @@ def PostgresTemplatesRepository(
     -------
     TemplatesRepository
         Repository facade operating on the ``templates`` Postgres table.
+
+    Notes
+    ------
+    Example schema:
+    ```
+    CREATE TABLE templates (
+        identifier TEXT NOT NULL,
+        description TEXT DEFAULT NULL,
+        content TEXT NOT NULL,
+        variables JSONB NOT NULL DEFAULT '{}'::jsonb,
+        meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (identifier, created)
+    );
+
+    CREATE INDEX IF NOT EXISTS
+        templates_idx
+
+    ON
+        templates (identifier, created DESC);
+    ```
     """
 
     @cache(
@@ -52,10 +59,7 @@ def PostgresTemplatesRepository(
         **extra: Any,
     ) -> Sequence[TemplateDeclaration]:
         ctx.log_info("Listing templates...")
-        ctx.record(
-            ObservabilityLevel.INFO,
-            event="postgres.templates.list",
-        )
+
         results: Sequence[PostgresRow] = await Postgres.fetch(
             """
             SELECT DISTINCT ON (identifier)
@@ -94,11 +98,6 @@ def PostgresTemplatesRepository(
         /,
     ) -> str | None:
         ctx.log_info(f"Loading '{identifier}' template ...")
-        ctx.record(
-            ObservabilityLevel.INFO,
-            event="postgres.templates.load",
-            attributes={"identifier": identifier},
-        )
         result = await Postgres.fetch_one(
             """
             SELECT DISTINCT ON (identifier)
@@ -143,11 +142,6 @@ def PostgresTemplatesRepository(
         **extra: Any,
     ) -> None:
         ctx.log_info(f"Defining '{identifier}' template...")
-        ctx.record(
-            ObservabilityLevel.INFO,
-            event="postgres.templates.define",
-            attributes={"identifier": identifier},
-        )
         await Postgres.execute(
             """
             INSERT INTO
