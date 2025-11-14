@@ -9,7 +9,6 @@ from haiway import (
     Immutable,
     Meta,
     MetaValues,
-    ObservabilityLevel,
     State,
     Validator,
     concurrently,
@@ -675,8 +674,7 @@ class Evaluator[Value, **Args](Immutable):
                 **kwargs,
             )
 
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric=f"evaluator.{result.evaluator}.performance",
                 value=result.performance,
                 unit="%",

@@ -1,7 +1,7 @@
 from base64 import urlsafe_b64decode
 from typing import Any, Literal
 
-from haiway import ObservabilityLevel, asynchronous, ctx
+from haiway import asynchronous, ctx
 
 from draive.bedrock.api import BedrockAPI
 from draive.bedrock.config import BedrockInputGuardraisConfig, BedrockOutputGuardraisConfig
@@ -80,8 +80,7 @@ class BedrockGuardrails(BedrockAPI):
             BedrockOutputGuardraisConfig
         )
         async with ctx.scope("bedrock_guardrails"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "guardrails.provider": "bedrock",
                     "guardrails.identifier": guardrails_config.guardrail_identifier,

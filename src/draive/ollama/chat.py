@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator, Coroutine, Iterable, Mapping, Sequen
 from typing import Any, Final, Literal, cast, overload
 from uuid import uuid4
 
-from haiway import META_EMPTY, ObservabilityLevel, as_list, ctx
+from haiway import META_EMPTY, as_list, ctx
 from ollama import ChatResponse, Image, Message, Options, Tool
 
 from draive.models import (
@@ -111,8 +111,7 @@ class OllamaChat(OllamaAPI):
         **extra: Any,
     ) -> ModelOutput:
         async with ctx.scope("model.completion"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "model.provider": "ollama",
                     "model.name": config.model,
@@ -123,8 +122,7 @@ class OllamaChat(OllamaAPI):
                     "model.stream": False,
                 },
             )
-            ctx.record(
-                ObservabilityLevel.DEBUG,
+            ctx.record_debug(
                 attributes={
                     "model.instructions": instructions,
                     "model.tools": [tool.name for tool in tools.specifications],

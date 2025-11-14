@@ -2,9 +2,10 @@ import json
 from collections.abc import Generator, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
+from uuid import UUID
 
-from haiway import BasicValue, Map, ObservabilityLevel, ctx
-from haiway.postgres import Postgres, PostgresRow, PostgresValue
+from haiway import BasicValue, Map, Meta, ctx
+from haiway.postgres import Postgres, PostgresRow
 
 from draive.models import (
     ModelContextElement,
@@ -17,40 +18,18 @@ from draive.models import (
 __all__ = ("PostgresModelMemory",)
 
 
-# POSTGRES SCHEMA
-#
-# CREATE TABLE memories (
-#     identifier TEXT NOT NULL,
-#     created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-#     PRIMARY KEY (identifier)
-# );
-#
-# CREATE TABLE memories_variables (
-#     identifier TEXT NOT NULL REFERENCES memories (identifier) ON DELETE CASCADE,
-#     variables JSONB NOT NULL DEFAULT '{}'::jsonb,
-#     created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-# );
-#
-# CREATE TABLE memories_elements (
-#     identifier TEXT NOT NULL REFERENCES memories (identifier) ON DELETE CASCADE,
-#     content JSONB NOT NULL,
-#     created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-# );
-#
-
-
 def PostgresModelMemory(
-    identifier: str,
+    identifier: UUID,
     *,
-    recall_limit: int | None = None,
+    recall_limit: int = 0,
 ) -> ModelMemory:
     """Create a model memory bound to a Postgres-backed storage.
 
     Parameters
     ----------
-    identifier
+    identifier: UUID
         Key identifying the memory records grouping in the ``memories`` tables.
-    recall_limit
+    recall_limit: int
         Optional maximum number of context elements returned during recall.
 
     Returns
@@ -58,23 +37,53 @@ def PostgresModelMemory(
     ModelMemory
         Memory interface persisting variables and context elements in Postgres.
 
-    Raises
+    Notes
     ------
-    AssertionError
-        If ``recall_limit`` is provided with a non-positive value.
+    Example schema:
+    ```
+    CREATE TABLE memories (
+        identifier UUID NOT NULL DEFAULT gen_random_uuid(),
+        created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (identifier)
+    );
+
+    CREATE TABLE memories_variables (
+        identifier UUID NOT NULL DEFAULT gen_random_uuid(),
+        memories UUID NOT NULL REFERENCES memories (identifier) ON DELETE CASCADE,
+        variables JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (identifier)
+    );
+
+    CREATE INDEX IF NOT EXISTS
+        memories_variables_idx
+
+    ON
+        memories_variables (memories, created DESC);
+
+    CREATE TABLE memories_elements (
+        identifier UUID NOT NULL DEFAULT gen_random_uuid(),
+        memories UUID NOT NULL REFERENCES memories (identifier) ON DELETE CASCADE,
+        content JSONB NOT NULL,
+        created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (identifier)
+    );
+
+    CREATE INDEX IF NOT EXISTS
+        memories_elements_idx
+
+    ON
+        memories_elements (memories, created DESC);
+    ```
     """
-    assert recall_limit is None or recall_limit > 0  # nosec: B101
+    assert recall_limit >= 0  # nosec: B101
 
     async def recall(
         **extra: Any,
     ) -> ModelMemoryRecall:
         ctx.log_info(f"Recalling memory for {identifier}...")
-        ctx.record(
-            ObservabilityLevel.INFO,
-            event="postgres.memory.recall",
-            attributes={"identifier": identifier},
-        )
 
+        ctx.log_info("...loading variables...")
         variables: Mapping[str, BasicValue] = await _load_variables(
             identifier=identifier,
         )
@@ -83,10 +92,19 @@ def PostgresModelMemory(
 
         context_elements: Sequence[ModelContextElement] = await _load_context(
             identifier=identifier,
-            limit=extra.get("limit", recall_limit),
+            limit=recall_limit,
         )
 
         ctx.log_info(f"...{len(context_elements)} context elements recalled!")
+        ctx.record_info(
+            event="postgres.memory.recall",
+            attributes={
+                "identifier": str(identifier),
+                "limit": recall_limit,
+                "elements": len(context_elements),
+                "variables": len(variables),
+            },
+        )
 
         return ModelMemoryRecall(
             context=context_elements,
@@ -102,11 +120,6 @@ def PostgresModelMemory(
             return ctx.log_info(f"No content to remember for {identifier}, skipping!")
 
         ctx.log_info(f"Remembering content for {identifier}...")
-        ctx.record(
-            ObservabilityLevel.INFO,
-            event="postgres.memory.remember",
-            attributes={"identifier": identifier},
-        )
 
         async with Postgres.acquire_connection() as connection:
             async with connection.transaction():
@@ -116,12 +129,12 @@ def PostgresModelMemory(
                         """
                         INSERT INTO
                             memories_variables (
-                                identifier,
+                                memories,
                                 variables
                             )
 
                         VALUES (
-                            $1::TEXT,
+                            $1::UUID,
                             $2::JSONB
                         );
                         """,
@@ -136,13 +149,13 @@ def PostgresModelMemory(
                         """
                         INSERT INTO
                             memories_elements (
-                                identifier,
+                                memories,
                                 content,
                                 created
                             )
 
                         VALUES (
-                            $1::TEXT,
+                            $1::UUID,
                             $2::JSONB,
                             $3::TIMESTAMPTZ
                         );
@@ -152,6 +165,14 @@ def PostgresModelMemory(
                         created_timestamp + timedelta(microseconds=idx),
                     )
 
+        ctx.record_info(
+            event="postgres.memory.remember",
+            attributes={
+                "identifier": str(identifier),
+                "elements": len(elements),
+                "variables": len(variables) if variables is not None else 0,
+            },
+        )
         ctx.log_info("...memory persisted!")
 
     async def maintenance(
@@ -159,11 +180,6 @@ def PostgresModelMemory(
         **extra: Any,
     ) -> None:
         ctx.log_info(f"Performing maintenance for {identifier}...")
-        ctx.record(
-            ObservabilityLevel.INFO,
-            event="postgres.memory.maintenance",
-        )
-
         async with Postgres.acquire_connection() as connection:
             async with connection.transaction():
                 ctx.log_info("...ensuring memory entry exists...")
@@ -175,7 +191,7 @@ def PostgresModelMemory(
                             )
 
                         VALUES (
-                            $1::TEXT
+                            $1::UUID
                         )
 
                         ON CONFLICT (identifier)
@@ -195,7 +211,7 @@ def PostgresModelMemory(
                             )
 
                         VALUES (
-                            $1::TEXT,
+                            $1::UUID,
                             $2::JSONB
                         );
                         """,
@@ -209,56 +225,56 @@ def PostgresModelMemory(
         recalling=recall,
         remembering=remember,
         maintaining=maintenance,
+        meta=Meta.of({"source": "postgres"}),
     )
 
 
 async def _load_context(
     *,
-    identifier: str,
-    limit: int | None,
+    identifier: UUID,
+    limit: int,
 ) -> Sequence[ModelContextElement]:
-    statement: str
-    parameters: Sequence[PostgresValue]
+    rows: Sequence[PostgresRow]
     if limit:
-        statement = """
-        SELECT
-            content::TEXT
+        rows = await Postgres.fetch(
+            """
+            SELECT
+                content::JSONB
 
-        FROM
-            memories_elements
+            FROM
+                memories_elements
 
-        WHERE
-            identifier = $1
+            WHERE
+                memories = $1::UUID
 
-        ORDER BY
-            created
-        DESC
+            ORDER BY
+                created
+            DESC
 
-        LIMIT $2;
-        """
-        parameters = (identifier, limit)
+            LIMIT $2;
+            """,
+            identifier,
+            limit,
+        )
 
     else:
-        statement = """
-        SELECT
-            content::TEXT
+        rows = await Postgres.fetch(
+            """
+            SELECT
+                content::JSONB
 
-        FROM
-            memories_elements
+            FROM
+                memories_elements
 
-        WHERE
-            identifier = $1
+            WHERE
+                memories = $1::UUID
 
-        ORDER BY
-            created
-        DESC;
-        """
-        parameters = (identifier,)
-
-    rows: Sequence[PostgresRow] = await Postgres.fetch(
-        statement,
-        *parameters,
-    )
+            ORDER BY
+                created
+            DESC;
+            """,
+            identifier,
+        )
 
     return tuple(_decode_context(rows))
 
@@ -305,18 +321,18 @@ def _decode_context(
 
 async def _load_variables(
     *,
-    identifier: str,
+    identifier: UUID,
 ) -> Mapping[str, BasicValue]:
     row: PostgresRow | None = await Postgres.fetch_one(
         """
         SELECT DISTINCT ON (identifier)
-            variables::TEXT
+            variables::JSONB
 
         FROM
             memories_variables
 
         WHERE
-            identifier = $1
+            memories = $1::UUID
 
         ORDER BY
             identifier,

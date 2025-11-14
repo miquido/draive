@@ -2,7 +2,7 @@ from base64 import urlsafe_b64decode
 from collections.abc import AsyncGenerator, Coroutine, Iterable, Mapping, Sequence
 from typing import Any, Literal, cast, overload
 
-from haiway import META_EMPTY, MISSING, ObservabilityLevel, asynchronous, ctx, unwrap_missing
+from haiway import META_EMPTY, MISSING, asynchronous, ctx, unwrap_missing
 
 from draive.bedrock.api import BedrockAPI
 from draive.bedrock.config import BedrockChatConfig
@@ -120,8 +120,7 @@ class BedrockConverse(BedrockAPI):
         **extra: Any,
     ) -> ModelOutput:
         async with ctx.scope("model.completion"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "model.provider": "bedrock",
                     "model.name": config.model,
@@ -134,8 +133,7 @@ class BedrockConverse(BedrockAPI):
                     "model.stream": False,
                 },
             )
-            ctx.record(
-                ObservabilityLevel.DEBUG,
+            ctx.record_debug(
                 attributes={
                     "model.instructions": instructions,
                     "model.tools": [tool.name for tool in tools.specifications],
@@ -193,8 +191,7 @@ class BedrockConverse(BedrockAPI):
 
             completion: ChatCompletionResponse = await self._converse(parameters)
 
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric="model.input_tokens",
                 value=completion["usage"]["inputTokens"],
                 unit="tokens",
@@ -204,8 +201,7 @@ class BedrockConverse(BedrockAPI):
                     "model.name": config.model,
                 },
             )
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric="model.output_tokens",
                 value=completion["usage"]["outputTokens"],
                 unit="tokens",

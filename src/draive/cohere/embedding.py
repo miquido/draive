@@ -5,7 +5,7 @@ from itertools import chain
 from typing import Any, cast
 
 from cohere import EmbedByTypeResponse
-from haiway import ObservabilityLevel, State, as_list, ctx
+from haiway import State, as_list, ctx
 
 from draive.cohere.api import CohereAPI
 from draive.cohere.config import CohereImageEmbeddingConfig, CohereTextEmbeddingConfig
@@ -30,8 +30,7 @@ class CohereEmbedding(CohereAPI):
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
         embedding_config: CohereTextEmbeddingConfig = config or ctx.state(CohereTextEmbeddingConfig)
         async with ctx.scope("cohere_text_embedding"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "embedding.model": embedding_config.model,
                     "embedding.purpose": embedding_config.purpose,
@@ -48,8 +47,7 @@ class CohereEmbedding(CohereAPI):
 
             assert all(isinstance(element, str) for element in attributes)  # nosec: B101
 
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric="embedding.items",
                 value=len(attributes),
                 unit="count",
@@ -64,8 +62,7 @@ class CohereEmbedding(CohereAPI):
             if not attributes:
                 return ()  # empty
 
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric="embedding.batches",
                 value=(len(attributes) + embedding_config.batch_size - 1)
                 // embedding_config.batch_size,
@@ -126,8 +123,7 @@ class CohereEmbedding(CohereAPI):
             CohereImageEmbeddingConfig
         )
         async with ctx.scope("cohere_image_embedding"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "embedding.model": embedding_config.model,
                     "embedding.batch_size": embedding_config.batch_size,
@@ -142,8 +138,7 @@ class CohereEmbedding(CohereAPI):
 
             assert all(isinstance(element, bytes) for element in attributes)  # nosec: B101
 
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric="embedding.items",
                 value=len(attributes),
                 unit="count",
@@ -158,8 +153,7 @@ class CohereEmbedding(CohereAPI):
             if not attributes:
                 return ()  # empty
 
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric="embedding.batches",
                 value=(len(attributes) + embedding_config.batch_size - 1)
                 // embedding_config.batch_size,

@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.92.1"
+version = "0.93.1"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
@@ -24,7 +24,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 license = { file = "LICENSE" }
-dependencies = ["numpy~=2.3", "haiway~=0.37.7"]
+dependencies = ["numpy~=2.3", "haiway~=0.38.1"]
 
 [project.urls]
 Homepage = "https://miquido.com"
@@ -33,15 +33,15 @@ Repository = "https://github.com/miquido/draive.git"
 [project.optional-dependencies]
 cohere = ["cohere~=5.18"]
 cohere_bedrock = ["cohere~=5.18", "boto3~=1.40"]
-openai = ["openai~=2.7"]
-openai_realtime = ["openai[realtime]~=2.7"]
+openai = ["openai~=2.8"]
+openai_realtime = ["openai[realtime]~=2.8"]
 anthropic = ["anthropic~=0.72"]
 anthropic_bedrock = ["anthropic[bedrock]~=0.72"]
 mistral = ["mistralai~=1.9"]
 gemini = ["google-genai~=1.50", "google-api-core"]
 ollama = ["ollama~=0.6.0"]
 bedrock = ["boto3~=1.40"]
-vllm = ["openai~=2.7"]
+vllm = ["openai~=2.8"]
 mcp = ["mcp~=1.21"]
 opentelemetry = [
   "haiway[opentelemetry]",
@@ -51,7 +51,7 @@ opentelemetry = [
 ]
 httpx = ["haiway[httpx]", "httpx"]
 postgres = ["haiway[postgres]", "asyncpg"]
-qdrant = ["qdrant-client~=1.15"]
+qdrant = ["qdrant-client~=1.15.0"]
 dev = [
   "bandit~=1.8",
   "pyright~=1.1",

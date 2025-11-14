@@ -1,5 +1,6 @@
 from haiway.postgres import (
     Postgres,
+    PostgresConfigurationRepository,
     PostgresConnection,
     PostgresConnectionPool,
     PostgresException,
@@ -7,7 +8,6 @@ from haiway.postgres import (
     PostgresValue,
 )
 
-from draive.postgres.configuration import PostgresConfigurationRepository
 from draive.postgres.memory import PostgresModelMemory
 from draive.postgres.templates import PostgresTemplatesRepository
 from draive.postgres.vector_index import PostgresVectorIndex

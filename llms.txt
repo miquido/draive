@@ -212,7 +212,7 @@ async with ctx.scope(
 
 ## 11. Observability
 - Log with `ctx.log_debug/info/warn/error`.
-- Record metrics via `ctx.record(metric_name, value=...)`.
+- Record metrics via `ctx.record_info(metric_name, value=...)`.
 - Wrap long-lived processes in descriptive scope identifiers to aid tracing.
 
 ## 12. Error Translation

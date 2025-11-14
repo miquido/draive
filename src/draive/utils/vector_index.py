@@ -4,7 +4,6 @@ from typing import Any, Protocol, final, overload, runtime_checkable
 from haiway import (
     AttributePath,
     AttributeRequirement,
-    ObservabilityLevel,
     State,
     ctx,
     statemethod,
@@ -92,8 +91,7 @@ class VectorIndex(State):
         values: Collection[Model],
         **extra: Any,
     ) -> None:
-        ctx.record(
-            ObservabilityLevel.INFO,
+        ctx.record_info(
             event="vector_index.index",
             attributes={
                 "model": model.__qualname__,
@@ -169,16 +167,11 @@ class VectorIndex(State):
         limit: int | None = None,
         **extra: Any,
     ) -> Sequence[Model]:
-        ctx.record(
-            ObservabilityLevel.INFO,
+        ctx.record_info(
             event="vector_index.search",
-            attributes={
-                "model": model.__qualname__,
-                "query": query is not None,
-                "requirements": str(requirements) if requirements is not None else None,
-            },
+            attributes={"model": model.__qualname__},
         )
-        return await self.searching(
+        results: Sequence[Model] = await self.searching(
             model,
             query=query,
             score_threshold=score_threshold,
@@ -186,6 +179,8 @@ class VectorIndex(State):
             limit=limit,
             **extra,
         )
+
+        return results
 
     @overload
     @classmethod
@@ -217,13 +212,9 @@ class VectorIndex(State):
         requirements: AttributeRequirement[Model] | None = None,
         **extra: Any,
     ) -> None:
-        ctx.record(
-            ObservabilityLevel.INFO,
+        ctx.record_info(
             event="vector_index.delete",
-            attributes={
-                "model": model.__qualname__,
-                "requirements": str(requirements) if requirements is not None else None,
-            },
+            attributes={"model": model.__qualname__},
         )
         return await self.deleting(
             model,
