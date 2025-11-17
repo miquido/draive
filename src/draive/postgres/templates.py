@@ -2,7 +2,7 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
-from haiway import Meta, cache, ctx
+from haiway import Meta, MetaValues, cache, ctx
 from haiway.postgres import Postgres, PostgresRow
 
 from draive.multimodal.templates.repository import TemplatesRepository
@@ -14,6 +14,7 @@ __all__ = ("PostgresTemplatesRepository",)
 def PostgresTemplatesRepository(
     cache_limit: int = 32,
     cache_expiration: float = 600.0,  # 10 min
+    meta: Meta | MetaValues | None = None,
 ) -> TemplatesRepository:
     """Return a Postgres-backed templates repository with caching.
 
@@ -65,8 +66,8 @@ def PostgresTemplatesRepository(
             SELECT DISTINCT ON (identifier)
                 identifier::TEXT,
                 description::TEXT,
-                variables::TEXT,
-                meta::TEXT
+                variables::JSONB,
+                meta::JSONB,
 
             FROM
                 templates
@@ -101,13 +102,13 @@ def PostgresTemplatesRepository(
         result = await Postgres.fetch_one(
             """
             SELECT DISTINCT ON (identifier)
-                content
+                content::TEXT,
 
             FROM
                 templates
 
             WHERE
-                identifier = $1
+                identifier = $1::TEXT
 
             ORDER BY
                 identifier,
@@ -177,5 +178,5 @@ def PostgresTemplatesRepository(
         listing=listing,
         loading=loading,
         defining=defining,
-        meta=Meta({"source": "postgres"}),
+        meta=Meta.of(meta if meta is not None else {"source": "postgres"}),
     )

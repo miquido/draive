@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID
 
-from haiway import BasicValue, Map, Meta, ctx
+from haiway import BasicValue, Map, Meta, MetaValues, ctx
 from haiway.postgres import Postgres, PostgresRow
 
 from draive.models import (
@@ -22,6 +22,7 @@ def PostgresModelMemory(
     identifier: UUID,
     *,
     recall_limit: int = 0,
+    meta: Meta | MetaValues | None = None,
 ) -> ModelMemory:
     """Create a model memory bound to a Postgres-backed storage.
 
@@ -225,7 +226,7 @@ def PostgresModelMemory(
         recalling=recall,
         remembering=remember,
         maintaining=maintenance,
-        meta=Meta.of({"source": "postgres"}),
+        meta=Meta.of(meta if meta is not None else {"source": "postgres"}),
     )
 
 
@@ -239,7 +240,7 @@ async def _load_context(
         rows = await Postgres.fetch(
             """
             SELECT
-                content::TEXT
+                content::JSONB
 
             FROM
                 memories_elements
@@ -261,7 +262,7 @@ async def _load_context(
         rows = await Postgres.fetch(
             """
             SELECT
-                content::TEXT
+                content::JSONB
 
             FROM
                 memories_elements
@@ -326,7 +327,7 @@ async def _load_variables(
     row: PostgresRow | None = await Postgres.fetch_one(
         """
         SELECT DISTINCT ON (identifier)
-            variables::TEXT
+            variables::JSONB
 
         FROM
             memories_variables

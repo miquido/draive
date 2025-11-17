@@ -450,7 +450,7 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.93.0"
+version = "0.93.1"
 source = { editable = "." }
 dependencies = [
     { name = "haiway" },
@@ -543,7 +543,7 @@ requires-dist = [
     { name = "cohere", marker = "extra == 'cohere-bedrock'", specifier = "~=5.18" },
     { name = "google-api-core", marker = "extra == 'gemini'" },
     { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=1.50" },
-    { name = "haiway", specifier = "~=0.38.0" },
+    { name = "haiway", specifier = "~=0.38.1" },
     { name = "haiway", extras = ["httpx"], marker = "extra == 'httpx'" },
     { name = "haiway", extras = ["opentelemetry"], marker = "extra == 'opentelemetry'" },
     { name = "haiway", extras = ["postgres"], marker = "extra == 'postgres'" },
@@ -569,7 +569,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = "~=8.4" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "~=1.2" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = "~=7.0" },
-    { name = "qdrant-client", marker = "extra == 'qdrant'", specifier = "~=1.15" },
+    { name = "qdrant-client", marker = "extra == 'qdrant'", specifier = "~=1.15.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "~=0.14" },
 ]
 provides-extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "vllm", "mcp", "opentelemetry", "httpx", "postgres", "qdrant", "dev", "docs"]
@@ -770,14 +770,14 @@ wheels = [
 
 [[package]]
 name = "haiway"
-version = "0.38.0"
+version = "0.38.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/31/d9/34ef5089837a824f1838ba0da0892568bb6ce255659697b3fac94adc8b8d/haiway-0.38.0.tar.gz", hash = "sha256:15c4a41e54f4b4a534d1b59d38e199527a0da5f7a3f060671e34fa6322c8719b", size = 104200, upload-time = "2025-11-14T14:37:30.051Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a9/49/0d1cf4a6724277e9b72f79b23cb7488476030a0a953b1583c60e0deb1f64/haiway-0.38.1.tar.gz", hash = "sha256:f09695d8a20d4366627b8b35dcb78cdd8ace7809a784610eac83ff1ac3c7f611", size = 104222, upload-time = "2025-11-17T15:34:48.786Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/31/2e/087a55c0bed9707a79827ef3fbcea0452534753f44a5edd7929c8b93a1b0/haiway-0.38.0-py3-none-any.whl", hash = "sha256:790fbb95d228fd1c29c35a611be613dfe087a5164feea73fc5aa170a29c8b26c", size = 131986, upload-time = "2025-11-14T14:37:28.73Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/99/43eb30f558df15554dcbad2833d88ceeeeb197d8b3554fa7369d763c0f18/haiway-0.38.1-py3-none-any.whl", hash = "sha256:fca3179098abd78237a866c7f2da003f463c899d63dda17972fd1cd7733db5da", size = 132010, upload-time = "2025-11-17T15:34:47.49Z" },
 ]
 
 [package.optional-dependencies]
@@ -1128,7 +1128,7 @@ wheels = [
 
 [[package]]
 name = "mcp"
-version = "1.21.1"
+version = "1.21.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -1146,9 +1146,9 @@ dependencies = [
     { name = "typing-inspection" },
     { name = "uvicorn", marker = "sys_platform != 'emscripten'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f7/25/4df633e7574254ada574822db2245bbee424725d1b01bccae10bf128794e/mcp-1.21.1.tar.gz", hash = "sha256:540e6ac4b12b085c43f14879fde04cbdb10148a09ea9492ff82d8c7ba651a302", size = 469071, upload-time = "2025-11-13T20:33:46.139Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/15/bb/147bf5d47b8d6f3fb315204cd2f567b1ad85511acd8d59e85cccf7cce65c/mcp-1.21.2.tar.gz", hash = "sha256:b6497b7f7a77aabe263931a3335956dfd45fe8b1e2168931e455914ba1a7f4c9", size = 470799, upload-time = "2025-11-17T13:56:06.397Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/49/af/01fb42df59ad15925ffc1e2e609adafddd3ac4572f606faae0dc8b55ba0c/mcp-1.21.1-py3-none-any.whl", hash = "sha256:dd35abe36d68530a8a1291daa25d50276d8731e545c0434d6e250a3700dd2a6d", size = 174852, upload-time = "2025-11-13T20:33:44.502Z" },
+    { url = "https://files.pythonhosted.org/packages/67/0f/669ecbe78a0ba192afcc0b026ae62d1005779e91bad27ab9d703401510bf/mcp-1.21.2-py3-none-any.whl", hash = "sha256:59413ef15db757a785e3859548c1a7ffc7be57bf162c3c24afc0e04fd9f4181c", size = 174854, upload-time = "2025-11-17T13:56:04.987Z" },
 ]
 
 [[package]]
