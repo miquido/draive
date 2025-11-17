@@ -43,17 +43,15 @@ def PostgresModelMemory(
     Example schema:
     ```
     CREATE TABLE memories (
-        identifier UUID NOT NULL DEFAULT gen_random_uuid(),
+        identifier UUID NOT NULL,
         created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (identifier)
     );
 
     CREATE TABLE memories_variables (
-        identifier UUID NOT NULL DEFAULT gen_random_uuid(),
         memories UUID NOT NULL REFERENCES memories (identifier) ON DELETE CASCADE,
         variables JSONB NOT NULL DEFAULT '{}'::jsonb,
-        created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (identifier)
+        created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE INDEX IF NOT EXISTS
@@ -74,7 +72,10 @@ def PostgresModelMemory(
         memories_elements_idx
 
     ON
-        memories_elements (memories, created DESC);
+        memories_elements (
+            memories,
+            created DESC
+        );
     ```
     """
     assert recall_limit >= 0  # nosec: B101
@@ -144,12 +145,15 @@ def PostgresModelMemory(
                     )
 
                 ctx.log_info(f"...remembering {len(elements)} context elements...")
-                created_timestamp: datetime = datetime.now(UTC)
+                timestamp: datetime = datetime.now(UTC)
                 for idx, element in enumerate(elements):
+                    created: datetime = timestamp + timedelta(microseconds=idx)
+
                     await connection.execute(
                         """
                         INSERT INTO
                             memories_elements (
+                                identifier,
                                 memories,
                                 content,
                                 created
@@ -157,13 +161,22 @@ def PostgresModelMemory(
 
                         VALUES (
                             $1::UUID,
-                            $2::JSONB,
-                            $3::TIMESTAMPTZ
-                        );
+                            $2::UUID,
+                            $3::JSONB,
+                            $4::TIMESTAMPTZ
+                        )
+
+                        ON CONFLICT (identifier) DO UPDATE
+                            SET
+                                content = EXCLUDED.content
+
+                            WHERE
+                                memories_elements.memories = EXCLUDED.memories;
                         """,
+                        element.identifier,
                         identifier,
                         element.to_json(),
-                        created_timestamp + timedelta(microseconds=idx),
+                        created,
                     )
 
         ctx.record_info(
@@ -207,7 +220,7 @@ def PostgresModelMemory(
                         """
                         INSERT INTO
                             memories_variables (
-                                identifier,
+                                memories,
                                 variables
                             )
 
@@ -249,8 +262,7 @@ async def _load_context(
                 memories = $1::UUID
 
             ORDER BY
-                created
-            DESC
+                created DESC
 
             LIMIT $2;
             """,
@@ -271,8 +283,7 @@ async def _load_context(
                 memories = $1::UUID
 
             ORDER BY
-                created
-            DESC;
+                created DESC;
             """,
             identifier,
         )
@@ -326,7 +337,7 @@ async def _load_variables(
 ) -> Mapping[str, BasicValue]:
     row: PostgresRow | None = await Postgres.fetch_one(
         """
-        SELECT DISTINCT ON (identifier)
+        SELECT
             variables::JSONB
 
         FROM
@@ -335,10 +346,7 @@ async def _load_variables(
         WHERE
             memories = $1::UUID
 
-        ORDER BY
-            identifier,
-            created
-        DESC
+        ORDER BY created DESC
 
         LIMIT 1;
         """,
