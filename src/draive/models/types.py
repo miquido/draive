@@ -844,7 +844,7 @@ class ModelMemory(State):
             recalling=recalling,
             remembering=_remembering_none,
             maintaining=_maintaining_noop,
-            meta=Meta.of({"source": "constant"}),
+            meta=Meta.of(meta if meta is not None else {"source": "constant"}),
         )
 
     @overload
