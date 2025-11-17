@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from typing import Any, overload
 
-from haiway import ObservabilityLevel, State, ctx, statemethod
+from haiway import State, ctx, statemethod
 
 from draive.generation.text.default import generate_text
 from draive.generation.text.types import TextGenerating
@@ -47,14 +47,12 @@ class TextGeneration(State):
     ) -> str:
         async with ctx.scope("generate_text"):
             if isinstance(instructions, Template):
-                ctx.record(
-                    ObservabilityLevel.INFO,
+                ctx.record_info(
                     attributes={"instructions.template": instructions.identifier},
                 )
 
             if isinstance(input, Template):
-                ctx.record(
-                    ObservabilityLevel.INFO,
+                ctx.record_info(
                     attributes={"input.template": input.identifier},
                 )
 

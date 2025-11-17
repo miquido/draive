@@ -3,7 +3,7 @@ from collections.abc import Callable, Sequence
 from itertools import chain
 from typing import Any, cast
 
-from haiway import ObservabilityLevel, State, as_list, ctx
+from haiway import State, as_list, ctx
 from openai.types.create_embedding_response import CreateEmbeddingResponse
 
 from draive.embedding import Embedded, TextEmbedding
@@ -30,8 +30,7 @@ class OpenAIEmbedding(OpenAIAPI):
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
         embedding_config: OpenAIEmbeddingConfig = config or ctx.state(OpenAIEmbeddingConfig)
         async with ctx.scope("openai_text_embedding"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "embedding.provider": "openai",
                     "embedding.model": embedding_config.model,
@@ -49,8 +48,7 @@ class OpenAIEmbedding(OpenAIAPI):
 
             assert all(isinstance(element, str) for element in attributes)  # nosec: B101
 
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric="embedding.items",
                 value=len(attributes),
                 unit="count",
@@ -65,8 +63,7 @@ class OpenAIEmbedding(OpenAIAPI):
             if not attributes:
                 return ()  # empty
 
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric="embedding.batches",
                 value=(len(attributes) + embedding_config.batch_size - 1)
                 // embedding_config.batch_size,

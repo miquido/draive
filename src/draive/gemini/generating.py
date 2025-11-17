@@ -32,7 +32,7 @@ from google.genai.types import (
     SchemaDict,
     SpeechConfigDict,
 )
-from haiway import META_EMPTY, MISSING, ObservabilityLevel, as_dict, as_list, ctx
+from haiway import META_EMPTY, MISSING, as_dict, as_list, ctx
 
 from draive.gemini.api import GeminiAPI
 from draive.gemini.config import (
@@ -142,8 +142,7 @@ class GeminiGenerating(GeminiAPI):
         **extra: Any,
     ) -> ModelOutput:
         async with ctx.scope("model.completion"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "model.provider": "gemini",
                     "model.name": config.model,
@@ -156,8 +155,7 @@ class GeminiGenerating(GeminiAPI):
                     "model.stream": False,
                 },
             )
-            ctx.record(
-                ObservabilityLevel.DEBUG,
+            ctx.record_debug(
                 attributes={
                     "model.instructions": instructions,
                     "model.tools": [tool.name for tool in tools.specifications],
@@ -185,8 +183,7 @@ class GeminiGenerating(GeminiAPI):
                 )
 
             except ResourceExhausted as exc:
-                ctx.record(
-                    ObservabilityLevel.WARNING,
+                ctx.record_warning(
                     event="model.rate_limit",
                     attributes={
                         "model.provider": "gemini",
@@ -221,8 +218,7 @@ class GeminiGenerating(GeminiAPI):
             completion_candidate: Candidate = completion.candidates[0]  # we always request only one
 
             if completion_candidate.safety_ratings:
-                ctx.record(
-                    ObservabilityLevel.INFO,
+                ctx.record_info(
                     event="model.safety.results",
                     attributes={
                         "results": [
@@ -292,8 +288,7 @@ class GeminiGenerating(GeminiAPI):
         **extra: Any,
     ) -> AsyncGenerator[ModelStreamOutput]:
         async with ctx.scope("model.completion.stream"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "model.provider": "gemini",
                     "model.name": config.model,
@@ -306,8 +301,7 @@ class GeminiGenerating(GeminiAPI):
                     "model.stream": True,
                 },
             )
-            ctx.record(
-                ObservabilityLevel.DEBUG,
+            ctx.record_debug(
                 attributes={
                     "model.instructions": instructions,
                     "model.tools": [tool.name for tool in tools.specifications],
@@ -352,8 +346,7 @@ class GeminiGenerating(GeminiAPI):
                     finish_message = chunk_candidate.finish_message
 
                     if chunk_candidate.safety_ratings:
-                        ctx.record(
-                            ObservabilityLevel.INFO,
+                        ctx.record_info(
                             event="model.safety.results",
                             attributes={
                                 "results": [
@@ -405,8 +398,7 @@ class GeminiGenerating(GeminiAPI):
                     )
 
             except ResourceExhausted as exc:
-                ctx.record(
-                    ObservabilityLevel.WARNING,
+                ctx.record_warning(
                     event="model.rate_limit",
                     attributes={
                         "model.provider": "gemini",
@@ -443,8 +435,7 @@ def _record_usage_metrics(
     if usage is None:
         return
 
-    ctx.record(
-        ObservabilityLevel.INFO,
+    ctx.record_info(
         metric="model.input_tokens",
         value=usage.prompt_token_count or 0,
         unit="tokens",
@@ -454,8 +445,7 @@ def _record_usage_metrics(
             "model.name": model,
         },
     )
-    ctx.record(
-        ObservabilityLevel.INFO,
+    ctx.record_info(
         metric="model.input_tokens.cached",
         value=usage.cached_content_token_count or 0,
         unit="tokens",
@@ -465,8 +455,7 @@ def _record_usage_metrics(
             "model.name": model,
         },
     )
-    ctx.record(
-        ObservabilityLevel.INFO,
+    ctx.record_info(
         metric="model.output_tokens",
         value=usage.candidates_token_count or 0,
         unit="tokens",

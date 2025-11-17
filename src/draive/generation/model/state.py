@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Mapping
 from typing import Any, Literal, overload
 
-from haiway import ObservabilityLevel, State, ctx, statemethod
+from haiway import State, ctx, statemethod
 
 from draive.generation.model.default import generate_model
 from draive.generation.model.types import ModelGenerating, ModelGenerationDecoder
@@ -59,8 +59,7 @@ class ModelGeneration(State):
         **extra: Any,
     ) -> Generated:
         async with ctx.scope("generate_model"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "generated.model": generated.__qualname__,
                     "generated.schema_injection": schema_injection,
@@ -82,14 +81,12 @@ class ModelGeneration(State):
                     instruction_arguments = None
 
             if isinstance(instructions, Template):
-                ctx.record(
-                    ObservabilityLevel.INFO,
+                ctx.record_info(
                     attributes={"instructions.template": instructions.identifier},
                 )
 
             if isinstance(input, Template):
-                ctx.record(
-                    ObservabilityLevel.INFO,
+                ctx.record_info(
                     attributes={"input.template": input.identifier},
                 )
 

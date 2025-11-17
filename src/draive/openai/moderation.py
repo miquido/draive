@@ -1,6 +1,6 @@
 from typing import Any
 
-from haiway import ObservabilityLevel, ctx, not_missing
+from haiway import ctx, not_missing
 from openai.types import ModerationCreateResponse, ModerationMultiModalInputParam
 
 from draive.guardrails import GuardrailsModeration, GuardrailsModerationException
@@ -26,8 +26,7 @@ class OpenAIContentModeration(OpenAIAPI):
     ) -> None:
         moderation_config: OpenAIModerationConfig = config or ctx.state(OpenAIModerationConfig)
         async with ctx.scope("moderation"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "guardrails.provider": "openai",
                     "guardrails.model": moderation_config.model,

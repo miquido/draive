@@ -4,7 +4,7 @@ from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable, Mapp
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
-from haiway import META_EMPTY, MISSING, Missing, ObservabilityLevel, as_list, ctx
+from haiway import META_EMPTY, MISSING, Missing, as_list, ctx
 from openai import Omit, omit
 from openai import RateLimitError as OpenAIRateLimitError
 from openai.types.chat import (
@@ -121,8 +121,7 @@ class VLLMMessages(VLLMAPI):
         **extra: Any,
     ) -> ModelOutput:
         async with ctx.scope("model.completion"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "model.provider": "vllm",
                     "model.name": config.model,
@@ -134,8 +133,7 @@ class VLLMMessages(VLLMAPI):
                     "model.stream": False,
                 },
             )
-            ctx.record(
-                ObservabilityLevel.DEBUG,
+            ctx.record_debug(
                 attributes={
                     "model.instructions": instructions,
                     "model.tools": [tool.name for tool in tools.specifications],
@@ -238,16 +236,14 @@ class VLLMMessages(VLLMAPI):
                 ) from exc
 
             if usage := completion.usage:
-                ctx.record(
-                    ObservabilityLevel.INFO,
+                ctx.record_info(
                     metric="model.input_tokens",
                     value=usage.prompt_tokens,
                     unit="tokens",
                     kind="counter",
                     attributes={"model.provider": "vllm", "model.name": completion.model},
                 )
-                ctx.record(
-                    ObservabilityLevel.INFO,
+                ctx.record_info(
                     metric="model.output_tokens",
                     value=usage.completion_tokens,
                     unit="tokens",
@@ -274,8 +270,7 @@ class VLLMMessages(VLLMAPI):
         config: VLLMChatConfig,
         **extra: Any,
     ) -> AsyncGenerator[ModelStreamOutput]:
-        ctx.record(
-            ObservabilityLevel.INFO,
+        ctx.record_info(
             attributes={
                 "model.provider": "vllm",
                 "model.name": config.model,
@@ -287,8 +282,7 @@ class VLLMMessages(VLLMAPI):
                 "model.stream": True,
             },
         )
-        ctx.record(
-            ObservabilityLevel.DEBUG,
+        ctx.record_debug(
             attributes={
                 "model.instructions": instructions,
                 "model.tools": [tool.name for tool in tools.specifications],

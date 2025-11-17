@@ -27,7 +27,7 @@ from openai.types.realtime.realtime_conversation_item_user_message_param import 
     Content as UserContentParam,
 )
 
-from draive import MISSING, Meta, Missing, ObservabilityLevel, ctx, without_missing
+from draive import MISSING, Meta, Missing, ctx, without_missing
 from draive.models import (
     ModelContext,
     ModelException,
@@ -106,8 +106,7 @@ class OpenAIRealtime(OpenAIAPI):
         async def open_session() -> ModelSession:  # noqa: C901, PLR0915
             # enter scope
             await scope.__aenter__()
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "model.provider": "openai",
                     "model.name": config.model,
@@ -220,8 +219,7 @@ class OpenAIRealtime(OpenAIAPI):
                         case "response.done":
                             # record token usage if able - it should appear within this event
                             if usage := event.response.usage:
-                                ctx.record(
-                                    ObservabilityLevel.INFO,
+                                ctx.record_info(
                                     metric="model.input_tokens",
                                     value=usage.input_tokens
                                     if usage.input_tokens is not None
@@ -233,8 +231,7 @@ class OpenAIRealtime(OpenAIAPI):
                                         "model.provider": "openai",
                                     },
                                 )
-                                ctx.record(
-                                    ObservabilityLevel.INFO,
+                                ctx.record_info(
                                     metric="model.output_tokens",
                                     value=usage.output_tokens
                                     if usage.output_tokens is not None

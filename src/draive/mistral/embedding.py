@@ -3,7 +3,7 @@ from collections.abc import Callable, Sequence
 from itertools import chain
 from typing import Any, cast
 
-from haiway import ObservabilityLevel, State, as_list, ctx
+from haiway import State, as_list, ctx
 from mistralai import EmbeddingResponse
 
 from draive.embedding import Embedded, TextEmbedding
@@ -29,8 +29,7 @@ class MistralEmbedding(MistralAPI):
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
         embedding_config: MistralEmbeddingConfig = config or ctx.state(MistralEmbeddingConfig)
         async with ctx.scope("mistral_text_embedding"):
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 attributes={
                     "embedding.provider": "mistral",
                     "embedding.model": embedding_config.model,
@@ -46,8 +45,7 @@ class MistralEmbedding(MistralAPI):
 
             assert all(isinstance(element, str) for element in attributes)  # nosec: B101
 
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric="embedding.items",
                 value=len(attributes),
                 unit="count",
@@ -62,8 +60,7 @@ class MistralEmbedding(MistralAPI):
             if not attributes:
                 return ()  # empty
 
-            ctx.record(
-                ObservabilityLevel.INFO,
+            ctx.record_info(
                 metric="embedding.batches",
                 value=(len(attributes) + embedding_config.batch_size - 1)
                 // embedding_config.batch_size,

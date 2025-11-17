@@ -1,7 +1,7 @@
 from collections.abc import Generator, Iterable, Mapping
 from typing import Any, final
 
-from haiway import BasicValue, ObservabilityLevel, State, ctx
+from haiway import BasicValue, State, ctx
 
 from draive.conversation.realtime.default import realtime_conversation_preparing
 from draive.conversation.realtime.types import (
@@ -20,7 +20,6 @@ from draive.models import (
     Toolbox,
 )
 from draive.multimodal import Template, TemplatesRepository
-from draive.utils import Memory
 
 __all__ = ("RealtimeConversation",)
 
@@ -64,7 +63,7 @@ class RealtimeConversation(State):
 
             conversation_memory: ModelMemory
             memory_variables: Mapping[str, BasicValue] | None
-            if isinstance(memory, Memory):
+            if isinstance(memory, ModelMemory):
                 conversation_memory = memory
                 memory_recall: ModelMemoryRecall = await memory.recall()
                 memory_variables = memory_recall.variables
@@ -79,14 +78,11 @@ class RealtimeConversation(State):
                         else:
                             yield ModelOutput.of(message.content)
 
-                conversation_memory = ModelMemory.constant(
-                    ModelMemoryRecall.of(*model_context_elements())
-                )
+                conversation_memory = ModelMemory.constant(*model_context_elements())
                 memory_variables = None
 
             if isinstance(instructions, Template):
-                ctx.record(
-                    ObservabilityLevel.INFO,
+                ctx.record_info(
                     attributes={"instructions.template": instructions.identifier},
                 )
 
