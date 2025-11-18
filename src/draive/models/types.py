@@ -21,6 +21,7 @@ from typing import (
     overload,
     runtime_checkable,
 )
+from uuid import UUID, uuid4
 
 from haiway import (
     META_EMPTY,
@@ -456,6 +457,7 @@ class ModelInput(DataModel):
         cls,
         /,
         *blocks: ModelInputBlock,
+        identifier: UUID | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create a model input from blocks.
@@ -464,7 +466,9 @@ class ModelInput(DataModel):
         ----------
         blocks : ModelInputBlock
             Multimodal content and/or tool responses.
-        meta : Meta | MetaValues | None, optional
+        identifier: UUID | None = None
+            custom element identifier, will be randomly generated if not provided.
+        meta : Meta | MetaValues | None = None
             Additional metadata.
 
         Returns
@@ -473,11 +477,14 @@ class ModelInput(DataModel):
             Constructed model input.
         """
         return cls(
+            type="model_input",
+            identifier=identifier if identifier is not None else uuid4(),
             blocks=blocks,
             meta=Meta.of(meta),
         )
 
     type: Literal["model_input"] = "model_input"
+    identifier: UUID
     blocks: ModelInputBlocks
     meta: Meta = META_EMPTY
 
@@ -501,6 +508,7 @@ class ModelInput(DataModel):
     def without_tools(self) -> Self:
         """Return a copy of this input without tool responses."""
         return self.__class__(
+            identifier=self.identifier,
             blocks=tuple(
                 block for block in self.blocks if not isinstance(block, ModelToolResponse)
             ),
@@ -599,6 +607,7 @@ class ModelOutput(DataModel):
         cls,
         /,
         *blocks: ModelOutputBlock,
+        identifier: UUID | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create a model output from blocks.
@@ -607,8 +616,9 @@ class ModelOutput(DataModel):
         ----------
         blocks : ModelOutputBlock
             Multimodal content and/or tool requests.
-
-        meta : Meta | MetaValues | None, optional
+        identifier: UUID | None = None
+            custom element identifier, will be randomly generated if not provided.
+        meta : Meta | MetaValues | None = None
             Additional metadata.
 
         Returns
@@ -617,11 +627,14 @@ class ModelOutput(DataModel):
             Constructed model output.
         """
         return cls(
+            type="model_output",
+            identifier=identifier if identifier is not None else uuid4(),
             blocks=blocks,
             meta=Meta.of(meta),
         )
 
     type: Literal["model_output"] = "model_output"
+    identifier: UUID
     blocks: ModelOutputBlocks
     meta: Meta = META_EMPTY
 
@@ -674,6 +687,7 @@ class ModelOutput(DataModel):
     def without_tools(self) -> Self:
         """Return a copy of this output without tool requests."""
         return self.__class__(
+            identifier=self.identifier,
             blocks=tuple(block for block in self.blocks if not isinstance(block, ModelToolRequest)),
             meta=self.meta,
         )
