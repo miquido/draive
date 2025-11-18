@@ -67,7 +67,7 @@ def PostgresTemplatesRepository(
                 identifier::TEXT,
                 description::TEXT,
                 variables::JSONB,
-                meta::JSONB,
+                meta::JSONB
 
             FROM
                 templates
