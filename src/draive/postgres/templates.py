@@ -102,7 +102,7 @@ def PostgresTemplatesRepository(
         result = await Postgres.fetch_one(
             """
             SELECT DISTINCT ON (identifier)
-                content::TEXT,
+                content::TEXT
 
             FROM
                 templates
