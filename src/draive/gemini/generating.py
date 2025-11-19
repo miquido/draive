@@ -6,8 +6,6 @@ from collections.abc import (
     Coroutine,
     Generator,
     Iterable,
-    Mapping,
-    Sequence,
 )
 from itertools import chain
 from typing import Any, Literal, cast, overload
@@ -61,7 +59,6 @@ from draive.models import (
     ModelToolsDeclaration,
 )
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
-from draive.parameters.model import DataModel
 from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("GeminiGenerating",)
@@ -478,36 +475,33 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
     max_output_tokens: int | None = unwrap_missing(config.max_output_tokens)
     seed: int | None = unwrap_missing(config.seed)
 
-    response_schema: SchemaDict | None
+    response_json_schema: dict[str, Any] | None
     response_modalities: list[Modality] | None
     response_mime_type: str | None
 
     # Prefer explicit isinstance check for structured output to satisfy typing
     if isinstance(output, type):
-        response_schema = _normalized_schema(output)
+        response_json_schema = cast(dict[str, Any], output.__SPECIFICATION__)
         response_modalities = [Modality.TEXT]
         response_mime_type = "application/json"
 
     else:
+        response_json_schema = None
         match output:
             case "auto":
                 # not specified at all - use defaults
-                response_schema = None
                 response_modalities = None
                 response_mime_type = None
 
             case "text":
-                response_schema = None
                 response_modalities = [Modality.TEXT]
                 response_mime_type = "text/plain"
 
             case "json":
-                response_schema = None
                 response_modalities = [Modality.TEXT]
                 response_mime_type = "application/json"
 
             case "image":
-                response_schema = None
                 response_modalities = [
                     Modality.TEXT,
                     Modality.IMAGE,
@@ -515,7 +509,6 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
                 response_mime_type = None
 
             case "audio":
-                response_schema = None
                 response_modalities = [Modality.AUDIO]
                 response_mime_type = None
 
@@ -523,7 +516,6 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
                 raise NotImplementedError("video output is not supported by Gemini")
 
             case ["text", "image"] | ["image", "text"]:
-                response_schema = None
                 response_modalities = [
                     Modality.TEXT,
                     Modality.IMAGE,
@@ -659,7 +651,7 @@ def _prepare_request_config(  # noqa: C901, PLR0912, PLR0915
         "media_resolution": media_resolution,
         "response_modalities": response_modalities,
         "response_mime_type": response_mime_type,
-        "response_schema": response_schema,
+        "response_json_schema": response_json_schema,
         "speech_config": speech_config,
         "thinking_config": {
             "include_thoughts": (cast(int, config.thinking_budget) > 0),
@@ -858,26 +850,3 @@ def content_parts(
             yield {
                 "text": part.artifact.to_str(),
             }
-
-
-def _normalized_schema(
-    output: type[DataModel],
-) -> SchemaDict:
-    return cast(SchemaDict, _normalized_schema_content(output.__SPECIFICATION__))
-
-
-def _normalized_schema_content(
-    schema: Any,
-) -> Any:
-    if isinstance(schema, Mapping):
-        return {
-            key: _normalized_schema_content(value)
-            for key, value in cast(Mapping[str, Any], schema).items()
-            # it seems gemini is not supporting `additionalProperties` key within json schema
-            if key != "additionalProperties"
-        }
-
-    if isinstance(schema, Sequence) and not isinstance(schema, str):
-        return [_normalized_schema_content(element) for element in cast(Sequence[Any], schema)]
-
-    return schema
