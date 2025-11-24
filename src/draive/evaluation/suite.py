@@ -17,6 +17,7 @@ from haiway import (
     ctx,
     execute_concurrently,
 )
+from haiway.attributes import AttributesJSONEncoder
 
 from draive.evaluation.evaluator import EvaluatorResult
 from draive.evaluation.scenario import EvaluatorScenarioResult
@@ -945,4 +946,9 @@ class _EvaluatorSuiteFileStorage[Parameters: DataModel](Immutable):
     ) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with open(self._path, mode="wb+") as file:
-            file.write(json.dumps([case.to_mapping() for case in cases]).encode("utf-8"))
+            file.write(
+                json.dumps(
+                    [case.to_mapping() for case in cases],
+                    cls=AttributesJSONEncoder,
+                ).encode("utf-8")
+            )

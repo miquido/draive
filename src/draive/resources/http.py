@@ -38,7 +38,7 @@ async def http_resource_fetching(
         raise ResourceCorrupted(uri=uri)
 
     return ResourceContent.of(
-        response.body,
+        await response.body(),
         mime_type=response.headers.get(
             "Content-Type",
             default="application/octet-stream",
