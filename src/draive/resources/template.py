@@ -4,10 +4,9 @@ from collections.abc import Callable, Coroutine, Mapping, Sequence, Set
 from typing import Any, Protocol, final
 from urllib.parse import ParseResult, parse_qs, quote, urlencode, urlparse
 
-from haiway import MISSING, Meta, MetaValues, TypeSpecification
+from haiway import MISSING, Function, Meta, MetaValues, TypeSpecification
 from haiway.attributes import Attribute
 
-from draive.parameters import ParametrizedFunction
 from draive.resources.types import (
     MimeType,
     Resource,
@@ -30,7 +29,7 @@ class ResourceAvailabilityCheck(Protocol):
 
 @final
 class ResourceTemplate[**Args](
-    ParametrizedFunction[Args, Coroutine[None, None, Sequence[ResourceReference] | ResourceContent]]
+    Function[Args, Coroutine[None, None, Sequence[ResourceReference] | ResourceContent]]
 ):
     __slots__ = (
         "_check_availability",
@@ -53,12 +52,22 @@ class ResourceTemplate[**Args](
         ],
     ) -> None:
         super().__init__(function)
+        assert all(arg.name in self._keyword_arguments for arg in self._positional_arguments)  # nosec: B101
+        assert self._variadic_positional_arguments is None  # nosec: B101
 
         # Verify URI parameters against function arguments
         template_parameters: Set[str] = self._extract_template_parameters(template_uri)
+        parameters_by_alias: dict[str, Attribute] = {
+            attribute.alias: attribute
+            for attribute in self._keyword_arguments.values()
+            if attribute.alias is not None
+        }
         for template_parameter in template_parameters:
-            parameter: Attribute | None = self._parameters.get(template_parameter)
-            if parameter is None:
+            parameter: Attribute | None = (
+                self._keyword_arguments.get(template_parameter)
+                or parameters_by_alias.get(template_parameter)
+            )
+            if parameter is None and self._variadic_keyword_arguments is None:
                 raise ValueError(
                     f"URI template parameter {template_parameter} not found in function arguments"
                 )
@@ -100,19 +109,24 @@ class ResourceTemplate[**Args](
         except Exception:
             return False
 
+    @property
+    def has_args(self) -> bool:
+        return self._match_pattern is not None
+
     async def resolve(
         self,
         *args: Args.args,
         **kwargs: Args.kwargs,
     ) -> Resource:
-        values: Mapping[str, Any] = self.validate_arguments(**kwargs)
+        assert not args  # nosec: B101
+        _, v_kwargs = self.validate_arguments(*args, **kwargs)
         provided_names: Set[str] = {
             parameter.name
-            for parameter in self._parameters.values()
-            if parameter.name in kwargs
-            or (parameter.alias is not None and parameter.alias in kwargs)
+            for parameter in self._keyword_arguments.values()
+            if parameter.name in v_kwargs
+            or (parameter.alias is not None and parameter.alias in v_kwargs)
         }
-        resolved_uri: str = self._expand_uri(values, provided_names)
+        resolved_uri: str = self._expand_uri(v_kwargs, provided_names)
 
         try:
             return Resource(
@@ -361,31 +375,24 @@ class ResourceTemplate[**Args](
         self,
         uri_params: Mapping[str, str],
     ) -> dict[str, Any]:
-        coerced: dict[str, Any] = dict(uri_params)
-        for parameter in self._parameters.values():
+        coerced: dict[str, Any] = {}
+        for argument in self._keyword_arguments.values():
             raw_value: Any
-            if parameter.alias is None:
-                raw_value = uri_params.get(
-                    parameter.name,
-                    parameter.default(),
-                )
+            if argument.alias is not None and argument.alias in uri_params:
+                raw_value = uri_params[argument.alias]
+
+            elif argument.name in uri_params:
+                raw_value = uri_params[argument.name]
 
             else:
-                raw_value = uri_params.get(
-                    parameter.alias,
-                    uri_params.get(
-                        parameter.name,
-                        parameter.default(),
-                    ),
-                )
+                raw_value = argument.default()
 
             if raw_value is MISSING:
                 continue
 
-            converted: Any = self._coerce_parameter_value(parameter, raw_value)
-            coerced[parameter.name] = converted
-            if parameter.alias:
-                coerced[parameter.alias] = converted
+            converted: Any = self._coerce_parameter_value(argument, raw_value)
+            # Pass only the canonical parameter name to avoid duplicate alias/name kwargs
+            coerced[argument.name] = converted
 
         return coerced
 

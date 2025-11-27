@@ -162,7 +162,7 @@ class MCPServer:
                             )
 
                 case ResourceTemplate():
-                    if resource.arguments:
+                    if resource.has_args:
                         resource_template_declarations.append(
                             MCPResourceTemplate(
                                 uriTemplate=resource.declaration.template_uri,

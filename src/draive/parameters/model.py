@@ -6,7 +6,9 @@ from collections.abc import (
     Mapping,
     MutableMapping,
     MutableSequence,
+    MutableSet,
     Sequence,
+    Set,
 )
 from copy import deepcopy
 from dataclasses import fields as dataclass_fields
@@ -26,7 +28,6 @@ from weakref import WeakValueDictionary
 
 from haiway import (
     MISSING,
-    AttributeAnnotation,
     AttributePath,
     Default,
     DefaultValue,
@@ -34,15 +35,10 @@ from haiway import (
     State,
     TypeSpecification,
     ValidationContext,
-    ValidationError,
     not_missing,
 )
 from haiway.attributes import Attribute, AttributesJSONEncoder
-from haiway.attributes.annotations import (
-    ObjectAttribute,
-    resolve_self_attribute,
-)
-from haiway.attributes.specification import type_specification
+from haiway.attributes.annotations import ObjectAttribute, resolve_self_attribute
 
 from draive.parameters.schema import simplified_schema
 
@@ -59,6 +55,7 @@ class DataModelMeta(type):
     __TYPE_PARAMETERS__: Mapping[str, Any] | None
     __SPECIFICATION__: TypeSpecification
     __FIELDS__: Sequence[Attribute]
+    __ALLOWED_FIELDS__: Set[str]
 
     def __new__(
         mcs,
@@ -83,35 +80,26 @@ class DataModelMeta(type):
 
         specification_fields: MutableMapping[str, TypeSpecification] = {}
         required_fields: MutableSequence[str] = []
+        allowed_fields: MutableSet[str] = set()
         fields: MutableSequence[Attribute] = []
-        for key, element in self_attribute.attributes.items():
-            default: Any = getattr(cls, key, MISSING)
-            base_attribute: AttributeAnnotation = element
-            attribute: AttributeAnnotation = base_attribute
-            alias: str | None = attribute.alias
-            description: str | None = attribute.description
-            required: bool = attribute.required
-            specification: TypeSpecification | None = attribute.specification
+        for key, attribute in self_attribute.attributes.items():
+            field: Attribute = Attribute(
+                name=key,
+                annotation=attribute,
+                default=_resolve_default(getattr(cls, key, MISSING)),
+            )
 
-            if specification is None:
-                specification = type_specification(
-                    attribute,
-                    description=description,
-                )
-
+            specification: TypeSpecification | None = field.specification
             if specification is None:
                 raise RuntimeError(
                     f"Attribute {key} of {name} does not provide a valid specification"
                 )
 
-            field: Attribute = Attribute(
-                name=key,
-                alias=alias,
-                annotation=attribute,
-                required=required,
-                default=_resolve_default(default),
-                specification=specification,
-            )
+            assert key not in allowed_fields  # nosec: B101
+            allowed_fields.add(key)
+            if attribute.alias:
+                assert attribute.alias not in allowed_fields  # nosec: B101
+                allowed_fields.add(attribute.alias)
 
             fields.append(field)
 
@@ -133,6 +121,7 @@ class DataModelMeta(type):
         if not bases:
             assert not type_parameters  # nosec: B101
             cls.__FIELDS__ = ()  # pyright: ignore[reportAttributeAccessIssue, reportConstantRedefinition]
+            cls.__ALLOWED_FIELDS__ = frozenset()  # pyright: ignore[reportConstantRedefinition]
             cls.__SPECIFICATION__ = {  # pyright: ignore[reportConstantRedefinition]
                 "type": "object",
                 "additionalProperties": True,
@@ -140,6 +129,7 @@ class DataModelMeta(type):
 
         else:
             cls.__FIELDS__ = tuple(fields)  # pyright: ignore[reportConstantRedefinition]
+            cls.__ALLOWED_FIELDS__ = frozenset(allowed_fields)  # pyright: ignore[reportConstantRedefinition]
             cls.__SPECIFICATION__ = (  # pyright: ignore[reportAttributeAccessIssue, reportConstantRedefinition]
                 {
                     "type": "object",
@@ -164,16 +154,14 @@ class DataModelMeta(type):
         self,
         instance: Any,
     ) -> bool:
-        instance_type: Any = cast(Any, type(instance))
+        instance_type: type[Any] = type(instance)  # pyright: ignore[reportUnknownVariableType]
         if not self.__subclasscheck__(instance_type):
             return False
 
         if hasattr(self, "__origin__") or hasattr(instance_type, "__origin__"):
-            try:  # TODO: find a better way to validate partially typed instances
-                self(**vars(instance))
-
-            except ValidationError:
-                return False
+            return all(
+                field.annotation.check(getattr(instance, field.name)) for field in self.__FIELDS__
+            )
 
         return True
 
@@ -335,6 +323,23 @@ class DataModel(metaclass=DataModelMeta):
             return value
 
         elif isinstance(value, Mapping | typing.Mapping):
+            if not getattr(cls, "__slots__", ()):
+                return cls(**value)
+
+            for key in cast(Mapping[Any, Any], value.keys()):
+                if key not in cls.__ALLOWED_FIELDS__:
+                    raise TypeError(f"Unexpected attribute '{key}' for {cls.__name__}")
+
+            for field in cls.__FIELDS__:
+                if field.alias is None:
+                    continue
+
+                if field.alias in value and field.name in value:
+                    raise TypeError(
+                        f"Duplicate attribute '{field.name}'"
+                        f" with alias '{field.alias}' for {cls.__name__}"
+                    )
+
             return cls(**value)
 
         else:
@@ -346,7 +351,7 @@ class DataModel(metaclass=DataModelMeta):
         value: Mapping[str, Any],
         /,
     ) -> Self:
-        return cls(**value)
+        return cls.validate(value)
 
     @classmethod
     def simplified_schema(
@@ -377,8 +382,8 @@ class DataModel(metaclass=DataModelMeta):
         decoder: type[json.JSONDecoder] = json.JSONDecoder,
     ) -> Self:
         try:
-            return cls(
-                **json.loads(
+            return cls.validate(
+                json.loads(
                     value,
                     cls=decoder,
                 )
@@ -407,7 +412,7 @@ class DataModel(metaclass=DataModelMeta):
         match payload:
             case [*elements]:
                 try:
-                    return tuple(cls(**element) for element in elements)
+                    return tuple(cls.validate(element) for element in elements)
 
                 except Exception as exc:
                     raise ValueError(
@@ -439,14 +444,6 @@ class DataModel(metaclass=DataModelMeta):
         self,
         **kwargs: Any,
     ) -> None:
-        for parameter in self.__FIELDS__:
-            with ValidationContext.scope(f".{parameter.name}"):
-                object.__setattr__(
-                    self,  # pyright: ignore[reportUnknownArgumentType]
-                    parameter.name,
-                    parameter.validate_from(kwargs),
-                )
-
         if not getattr(self, "__slots__", ()):  # if we do not have slots accept everything
             assert not self.__FIELDS__  # nosec: B101
             for key, value in kwargs.items():
@@ -455,6 +452,15 @@ class DataModel(metaclass=DataModelMeta):
                     key,
                     value,
                 )
+
+        else:
+            for parameter in self.__FIELDS__:
+                with ValidationContext.scope(f".{parameter.name}"):
+                    object.__setattr__(
+                        self,  # pyright: ignore[reportUnknownArgumentType]
+                        parameter.name,
+                        parameter.validate_from(kwargs),
+                    )
 
     def to_str(self) -> str:
         return self.__str__()

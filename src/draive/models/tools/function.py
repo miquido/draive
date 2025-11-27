@@ -1,7 +1,7 @@
 from collections.abc import Callable, Coroutine, Iterable
 from typing import Any, Protocol, Self, cast, final, overload
 
-from haiway import Meta, MetaValues, TypeSpecification, ctx
+from haiway import Function, Meta, MetaValues, TypeSpecification, ctx
 
 from draive.models.tools.types import (
     ToolAvailabilityChecking,
@@ -19,7 +19,6 @@ from draive.multimodal import (
     Multimodal,
     MultimodalContent,
 )
-from draive.parameters import ParametrizedFunction
 
 __all__ = (
     "FunctionTool",
@@ -28,7 +27,7 @@ __all__ = (
 
 
 @final
-class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, None, Result]]):
+class FunctionTool[**Args, Result](Function[Args, Coroutine[None, None, Result]]):
     """Wraps an async function and exposes it as a Tool.
 
     Builds the tool specification from the function signature (or provided parameters),
@@ -87,21 +86,23 @@ class FunctionTool[**Args, Result](ParametrizedFunction[Args, Coroutine[None, No
             "description",
             description,
         )
+        assert all(arg.name in self._keyword_arguments for arg in self._positional_arguments)  # nosec: B101
+        assert self._variadic_positional_arguments is None  # nosec: B101
 
         if parameters is None:
             aliased_required: list[str] = []
             specifications: dict[str, TypeSpecification] = {}
-            for parameter in self._parameters.values():
-                specification: TypeSpecification | None = parameter.specification
+            for argument in self._keyword_arguments.values():
+                specification: TypeSpecification | None = argument.specification
                 if specification is None:
                     raise RuntimeError(
-                        f"Function argument {parameter.name} does not provide a valid specification"
+                        f"Function argument {argument.name} does not provide a valid specification"
                     )
 
-                specifications[parameter.alias or parameter.name] = specification
+                specifications[argument.alias or argument.name] = specification
 
-                if parameter.required:
-                    aliased_required.append(parameter.alias or parameter.name)
+                if argument.required:
+                    aliased_required.append(argument.alias or argument.name)
 
             parameters = {
                 "type": "object",
