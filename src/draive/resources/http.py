@@ -19,7 +19,8 @@ HTTP_OK: Final[int] = 200
 async def http_resource_list_fetching(
     **extra: Any,
 ) -> Sequence[ResourceReference]:
-    return ()  # no listing available - use empty
+    # no listing available
+    raise NotImplementedError("Resource listing is not implemented")
 
 
 async def http_resource_fetching(
@@ -52,7 +53,7 @@ async def http_resource_uploading(
     **extra: Any,
 ) -> Meta:
     # no upload available
-    raise NotImplementedError("Resource uploading is not available with default implementation")
+    raise NotImplementedError("Resource uploading is not implemented")
 
 
 async def http_resource_deleting(
@@ -60,4 +61,4 @@ async def http_resource_deleting(
     **extra: Any,
 ) -> None:
     # no delete available
-    raise NotImplementedError("Resource deleting is not available with default implementation")
+    raise NotImplementedError("Resource deleting is not implemented")

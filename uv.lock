@@ -466,7 +466,7 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.93.4"
+version = "0.94.0"
 source = { editable = "." }
 dependencies = [
     { name = "haiway" },
@@ -479,6 +479,9 @@ anthropic = [
 ]
 anthropic-bedrock = [
     { name = "anthropic", extra = ["bedrock"] },
+]
+aws = [
+    { name = "boto3" },
 ]
 bedrock = [
     { name = "boto3" },
@@ -553,6 +556,7 @@ requires-dist = [
     { name = "anthropic", extras = ["bedrock"], marker = "extra == 'anthropic-bedrock'", specifier = "~=0.72" },
     { name = "asyncpg", marker = "extra == 'postgres'" },
     { name = "bandit", marker = "extra == 'dev'", specifier = "~=1.8" },
+    { name = "boto3", marker = "extra == 'aws'", specifier = "~=1.40" },
     { name = "boto3", marker = "extra == 'bedrock'", specifier = "~=1.40" },
     { name = "boto3", marker = "extra == 'cohere-bedrock'", specifier = "~=1.40" },
     { name = "cohere", marker = "extra == 'cohere'", specifier = "~=5.18" },
@@ -588,7 +592,7 @@ requires-dist = [
     { name = "qdrant-client", marker = "extra == 'qdrant'", specifier = "~=1.15.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "~=0.14" },
 ]
-provides-extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "vllm", "mcp", "opentelemetry", "httpx", "postgres", "qdrant", "dev", "docs"]
+provides-extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "aws", "vllm", "mcp", "opentelemetry", "httpx", "postgres", "qdrant", "dev", "docs"]
 
 [[package]]
 name = "eval-type-backport"
