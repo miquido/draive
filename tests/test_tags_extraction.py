@@ -420,6 +420,62 @@ def test_handles_self_closing_tags():
     assert tags[2].content == MultimodalContent.empty
 
 
+def test_handles_self_closing_tags_with_attributes():
+    content = MultimodalContent.of('<img src="path/to.png" alt="logo"/>')
+
+    tags = list(content.tags("img"))
+
+    assert len(tags) == 1
+    assert tags[0].content == MultimodalContent.empty
+    assert tags[0].meta.get("src") == "path/to.png"
+    assert tags[0].meta.get("alt") == "logo"
+
+
+def test_self_closing_tag_with_attributes_mixed_text():
+    content = MultimodalContent.of(
+        "Intro ",
+        '<img src="a/b.svg"/>',
+        " middle ",
+        "<test>keep</test>",
+        " end",
+    )
+
+    img_tags = list(content.tags("img"))
+    test_tags = list(content.tags("test"))
+
+    assert len(img_tags) == 1
+    assert img_tags[0].content == MultimodalContent.empty
+    assert img_tags[0].meta.get("src") == "a/b.svg"
+
+    assert len(test_tags) == 1
+    assert test_tags[0].content == MultimodalContent.of("keep")
+
+
+def test_self_closing_tag_with_attributes_and_space_before_slash():
+    content = MultimodalContent.of('<img src="hero.png" alt="hero" />')
+
+    tags = list(content.tags("img"))
+
+    assert len(tags) == 1
+    assert tags[0].content == MultimodalContent.empty
+    assert tags[0].meta.get("src") == "hero.png"
+    assert tags[0].meta.get("alt") == "hero"
+
+
+def test_invalid_self_closing_tag_with_malformed_attributes_is_skipped():
+    content = MultimodalContent.of('<img src=hero/>')
+
+    assert content.tag("img") is None
+
+    # Surrounding valid tag should still be found
+    content = MultimodalContent.of('<img src=hero/>', '<img src="ok.png"/>')
+
+    tags = list(content.tags("img"))
+
+    assert len(tags) == 1
+    assert tags[0].meta.get("src") == "ok.png"
+
+
 def test_handles_tags_with_numbers():
     tag = MultimodalContent.of("<test123>content</test123>").tag("test123")
     assert tag is not None

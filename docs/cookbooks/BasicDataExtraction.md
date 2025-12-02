@@ -52,7 +52,7 @@ from draive.openai import OpenAIResponsesConfig, OpenAI
 
 async with ctx.scope(
     "data_extraction",
-    OpenAIResponsesConfig(model="gpt-4o-mini"),
+    OpenAIResponsesConfig(model="gpt-5-mini"),
     disposables=(OpenAI(),),
 ):
     result: PersonalData = await ModelGeneration.generate(
@@ -79,7 +79,7 @@ from draive.openai import OpenAIResponsesConfig, OpenAI
 
 async with ctx.scope(
     "customized_extraction",
-    OpenAIResponsesConfig(model="gpt-4o-mini"),
+    OpenAIResponsesConfig(model="gpt-5-mini"),
     disposables=(OpenAI(),),
 ):
     result: PersonalData = await ModelGeneration.generate(

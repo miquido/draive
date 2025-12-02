@@ -33,6 +33,7 @@ class AWS(
         Collection of repository feature classes to activate while the
         client is bound in a context manager.
     """
+
     __slots__ = ("_features",)
 
     def __init__(

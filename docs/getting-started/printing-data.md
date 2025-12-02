@@ -42,7 +42,9 @@ base64 payload directly or uses a redacted placeholder.
 
 !!! Note
 
-    `kind` variable will be one of: `'image' | 'audio' | 'video' | ''`
+```
+`kind` variable will be one of: `'image' | 'audio' | 'video' | ''`
+```
 
 When `include_data=True`, `ResourceContent.to_str()` returns the full base64 payload:
 
@@ -129,7 +131,9 @@ return f"<{self.name}{_tag_attributes(self.meta)}>{self.content.to_str()}</{self
 
 !!! Important
 
-    `MultimodalTag` is the only multimodal element that exposes metadata inline. Values stored in `meta` appear as XML-style tag attributes.
+```
+`MultimodalTag` is the only multimodal element that exposes metadata inline. Values stored in `meta` appear as XML-style tag attributes.
+```
 
 ## MultimodalContent
 

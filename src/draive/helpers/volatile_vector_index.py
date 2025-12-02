@@ -8,13 +8,13 @@ from draive.embedding import (
     Embedded,
     ImageEmbedding,
     TextEmbedding,
+    VectorIndex,
     mmr_vector_similarity_search,
     vector_similarity_search,
 )
 from draive.multimodal import TextContent
 from draive.parameters import DataModel
 from draive.resources import ResourceContent
-from draive.utils import VectorIndex
 
 __all__ = ("VolatileVectorIndex",)
 
@@ -31,57 +31,57 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
         values: Collection[Model],
         **extra: Any,
     ) -> None:
-        async with lock:
-            assert isinstance(  # nosec: B101
-                attribute, AttributePath | Callable
-            ), f"Prepare parameter path by using {model.__name__}._.path.to.property"
-            value_selector: Callable[[Model], Value] = cast(Callable[[Model], Value], attribute)
+        assert isinstance(  # nosec: B101
+            attribute, AttributePath | Callable
+        ), f"Prepare parameter path by using {model.__name__}._.path.to.property"
+        value_selector: Callable[[Model], Value] = cast(Callable[[Model], Value], attribute)
 
-            text_values: list[str] = []
-            image_values: list[bytes] = []
-            for value in values:
-                selected = value_selector(value)
-                if isinstance(selected, str):
-                    text_values.append(selected)
+        text_values: list[str] = []
+        image_values: list[bytes] = []
+        for value in values:
+            selected = value_selector(value)
+            if isinstance(selected, str):
+                text_values.append(selected)
 
-                elif isinstance(selected, TextContent):
-                    text_values.append(selected.text)
-
-                else:
-                    assert isinstance(selected, ResourceContent)  # nosec: B101
-                    if not selected.mime_type.startswith("image"):
-                        raise ValueError(f"{selected.mime_type} embedding is not supported")
-
-                    image_values.append(selected.to_bytes())
-
-            if image_values and text_values:
-                raise ValueError("Selected attribute values have to be the same type")
-
-            embedded_values: Sequence[Embedded[str] | Embedded[bytes]]
-            if image_values:
-                embedded_values = await ImageEmbedding.embed_many(
-                    image_values,
-                    **extra,
-                )
+            elif isinstance(selected, TextContent):
+                text_values.append(selected.text)
 
             else:
-                embedded_values = await TextEmbedding.embed_many(
-                    text_values,
-                    **extra,
-                )
+                assert isinstance(selected, ResourceContent)  # nosec: B101
+                if not selected.mime_type.startswith("image"):
+                    raise ValueError(f"{selected.mime_type} embedding is not supported")
 
-            embedded_models: list[Embedded[Model]] = [
-                Embedded(
-                    value=value,
-                    vector=embedded.vector,
-                )
-                for value, embedded in zip(
-                    values,
-                    embedded_values,
-                    strict=True,
-                )
-            ]
+                image_values.append(selected.to_bytes())
 
+        if image_values and text_values:
+            raise ValueError("Selected attribute values have to be the same type")
+
+        embedded_values: Sequence[Embedded[str] | Embedded[bytes]]
+        if image_values:
+            embedded_values = await ImageEmbedding.embed_many(
+                image_values,
+                **extra,
+            )
+
+        else:
+            embedded_values = await TextEmbedding.embed_many(
+                text_values,
+                **extra,
+            )
+
+        embedded_models: list[Embedded[Model]] = [
+            Embedded(
+                value=value,
+                vector=embedded.vector,
+            )
+            for value, embedded in zip(
+                values,
+                embedded_values,
+                strict=True,
+            )
+        ]
+
+        async with lock:
             if model in storage:
                 storage[model].extend(embedded_models)
 

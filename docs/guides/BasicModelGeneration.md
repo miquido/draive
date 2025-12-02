@@ -60,7 +60,7 @@ correctly. In this scope you pass:
 from draive import ctx
 from draive.openai import OpenAI, OpenAIResponsesConfig
 
-responses_config = OpenAIResponsesConfig(model="gpt-4o-mini")
+responses_config = OpenAIResponsesConfig(model="gpt-5-mini")
 
 async with ctx.scope(
     "basic_generation",  # label shown in logs/metrics
@@ -83,7 +83,7 @@ from draive import ModelGeneration
 
 async with ctx.scope(
     "basic_generation",
-    OpenAIResponsesConfig(model="gpt-4o-mini"),
+    OpenAIResponsesConfig(model="gpt-5-mini"),
     disposables=(OpenAI(),),
 ):
     place: InterestingPlace = await ModelGeneration.generate(
@@ -107,8 +107,8 @@ InterestingPlace(name='The British Museum', description='A world-famous museum d
 
 ## Customise the Call
 
-- **Model choice:** Swap `gpt-4o-mini` for any supported JSON mode model (`gpt-4o`, `gpt-4.1-mini`,
-  etc.) via `OpenAIResponsesConfig`.
+- **Model choice:** Swap `gpt-5-mini` for any supported JSON-mode model (`gpt-5`, `gpt-5-mini`,
+  `gpt-5-nano`, or a custom name) via `OpenAIResponsesConfig`.
 - **System behaviour:** Adjust `instructions` to inject tone, guardrails, or extra context such as
   "Respond in 2 short sentences".
 - **User input:** Pass any serialisable payload. For complex prompts consider building a

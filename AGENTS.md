@@ -1,6 +1,4 @@
-# AGENTS.md
-
-Rules for coding agents to contribute correctly and safely.
+Draive is a python framework helping to build high-quality Gen-AI applications. Focuses on strict typing and functional programming principles extended with structured concurrency concepts. Delivers opinionated, strict rules and patterns resulting in modular, safe and highly maintainable applications.
 
 ## Development Toolchain
 
@@ -8,14 +6,7 @@ Rules for coding agents to contribute correctly and safely.
 - Virtualenv: managed by uv, available at `./.venv`, assume already set up and working within venv
 - Formatting: Ruff formatter (`make format`), no other formatter
 - Linters/Type-checkers: Ruff, Bandit, Pyright (strict). Run via `make lint`
-- Tests: `make test` or targeted `pytest tests/test_...::test_...`
-
-## Framework Foundation (Haiway)
-
-- Draive is built on top of Haiway (state, context, observability, config). See: https://github.com/miquido/haiway
-- Import symbols from `haiway` directly: `from haiway import State, ctx`
-- Use context scoping (`ctx.scope(...)`) to bind scoped `Disposables`, active `State` instances and avoid global state
-- All logs go through `ctx.log_*`; do not use `print`.
+- Tests: using pytest, run using `make test` or targeted `pytest tests/test_...::test_...`
 
 ## Project Layout
 
@@ -34,11 +25,15 @@ Top-level code lives under `src/draive/`, key packages and what they contain:
 - Provider adapters — unified shape per provider:
   - `draive/openai/`, `draive/anthropic/`, `draive/mistral/`, `draive/gemini/`, `draive/vllm/`, `draive/ollama/`, `draive/bedrock/`, `draive/cohere/`
   - Each has `config.py`, `client.py`, `api.py`, and feature-specific modules.
-- Integrations: `draive/httpx/`, `draive/mcp/`, `draive/postgres/`, `draive/opentelemetry/` (opt-in extras)
+- Integrations: `draive/httpx/`, `draive/aws/`, `draive/qdrant/`, `draive/mcp/`, `draive/postgres/`, `draive/opentelemetry/` (opt-in extras)
 
 Public exports are centralized in `src/draive/__init__.py`.
 
 ## Style & Patterns
+
+- Draive is built on top of Haiway (state, context, observability, config). See: [Haiway](https://github.com/miquido/haiway)
+- Import symbols from `draive` directly: `from draive import State, ctx`
+- Use context scoping (`ctx.scope(...)`) to bind scoped `Disposables`, active `State` instances and avoid global state
 
 ### Typing & Immutability
 
@@ -48,81 +43,26 @@ Public exports are centralized in `src/draive/__init__.py`.
 - Prefer abstract immutable protocols: `Mapping`, `Sequence`, `Iterable` over `dict`/`list`/`set` in public types
 - Use `final` where applicable; avoid inheritance, prefer type composition
 - Use precise unions (`|`) and narrow with `match`/`isinstance`, avoid `cast` unless provably safe and localized
-
-### State & Context
-
-- Use `haiway.State` for immutable data/config and service facades. Construct with classmethods like `of(...)` when ergonomic.
-- Avoid in-place mutation; use `State.updated(...)`/functional builders to create new instances.
-- Access active state through `haiway.ctx` inside async scopes (`ctx.scope(...)`).
-- Public state methods that dispatch on the active instance should use `@statemethod` (see `GenerativeModel`).
-
-#### Examples:
-
-State with instantiation helper:
-```python
-from typing import Self
-from haiway import State, statemethod, Meta, MetaValues
-
-class Counter(State):
-    @classmethod
-    def of(
-        cls,
-        *,
-        start: int = 0,
-        meta: Meta | MetaValues | None = None,
-    ) -> Self:
-        return cls(
-            value=start,
-            meta=Meta.of(meta),
-        )
-
-    value: int
-    meta: Meta
-```
-
-State with statemethod helper:
-```python
-from typing import Self, Protocol
-from haiway import State, statemethod
-
-class Printing(Protocol):
-    async def __call__(self, text: str) -> None: ...
-
-class Printer(State):
-    @statemethod
-    async def print(
-        self,
-        *,
-        value: str | int | float,
-    ) -> None:
-        await self.printing(str(value))
-
-    printing: Printing
-```
-
-### Observability & Logging
-
-- Use `ctx.log_debug/info/warn/error` for logs; do not use `print`
-- Log around generation calls, tool dispatch, provider requests/responses (without leaking secrets)
-- Add appropriate metrics tracking using `ctx.record` where applicable
-- Prefer structured/concise messages; avoid excessive verbosity in hot paths
+- Favor structural typing (Protocols) for async clients and adapters; runtime-checkable protocols like `HTTPRequesting` keep boundaries explicit.
+- Guard immutability with assertions when crossing context boundaries; failure messages should aid debugging but never leak secrets.
 
 ### Concurrency & Async
 
 - All I/O is async, keep boundaries async and use `ctx.spawn` for detached tasks
 - Ensure structured concurrency concepts and valid coroutine usage
 - Rely on haiway and asyncio packages with coroutines, avoid custom threading
+- Await long-running operations directly; never block the event loop with sync calls.
 
 ### Exceptions & Error Translation
 
 - Translate provider/SDK errors into appropriate typed exceptions
 - Don’t raise bare `Exception`, preserve contextual information in exception construction
+- Wrap third-party exceptions at the boundary and include actionable context (`provider`, `operation`, identifiers) while redacting sensitive payloads.
 
-### Multimodal
+### Logging & Observability
 
-- Build content with `MultimodalContent.of(...)` and prefer composing content blocks explicitly
-- Use ResourceContent/Reference for media and data blobs
-- Wrap custom types and data within ArtifactContent, use hidden when needed
+- Use observability hooks (logs, metrics, traces) from `ctx` helper (`ctx.log_*`, `ctx.record`) instead of `print`/`logging`—tests assert on emitted events.
+- Surface user-facing errors via structured events before raising typed exceptions.
 
 ## Testing & CI
 
@@ -130,52 +70,32 @@ class Printer(State):
 - Keep tests fast and specific to the code you change, start with unit tests around new types/functions and adapters
 - Use fixtures from `tests/` or add focused ones; avoid heavy integration scaffolding
 - Linting/type gates must be clean: `make format` then `make lint`
+- Mirror package layout in `tests/`; colocate new tests alongside features and prefer `pytest` parametrization over loops.
+- Test async flows with `pytest.mark.asyncio`; use `ctx.scope` in tests to isolate state and avoid leaking globals.
+- Use `pyright`-style type assertions (e.g., `reveal_type`) only locally and delete them before committing.
 
-### Async tests
-
-- Use `pytest-asyncio` for coroutine tests (`@pytest.mark.asyncio`).
-- Prefer scoping with `ctx.scope(...)` and bind required `State` instances explicitly.
-- Avoid real I/O and network; stub provider calls and HTTP.
-
-#### Examples
-
-```python
-import pytest
-from draive import State, ctx
-
-class Example(State):
-    name: str
-
-@pytest.mark.asyncio
-async def test_greeter_returns_greeting() -> None:
-    async with ctx.scope(Example(name="Ada")):
-        example: Example = ctx.state(Example)
-        assert example.name == "Ada"
-```
-
-### Self verification
+### Self-verification
 
 - Ensure type checking soundness as a part of the workflow
-- Do not mute or ignore errors, double check correctness and seek for solutions
+- Do not mute or ignore errors, double-check correctness and seek for solutions
 - Verify code correctness with unit tests or by running ad-hoc scripts
-- Ask for additional guidance and confirmation when uncertain or about to modify additional elements
+- Capture tricky edge cases in regression tests before fixing them to prevent silent behaviour changes.
 
 ## Documentation
 
-- Public symbols: add NumPy-style docstrings. Include Parameters/Returns/Raises sections and rationale when not obvious
-- Internal helpers: avoid docstrings, keep names self-explanatory
+- Public symbols: add NumPy-style docstrings. Include Parameters/Returns/Raises sections and rationale
+- Internal and private helpers: avoid docstrings, keep names self-explanatory
 - If behavior/API changes, update relevant docs under `docs/` and examples if applicable
 - Skip module docstrings
+- Add usage snippets that exercise async scopes; readers should see how to wire states through `ctx`.
 
 ### Docs (MkDocs)
 
 - Site is built with MkDocs + Material and `mkdocstrings` for API docs.
 - Author pages under `docs/` and register navigation in `mkdocs.yml` (`nav:` section).
-- Preview locally: `make docs-server` (serves at http://127.0.0.1:8000).
 - Lint `make docs-lint` and format `make docs-format` after editing.
-- Build static site: `make docs` (outputs to `site/`).
 - Keep docstrings high‑quality; `mkdocstrings` pulls them into reference pages.
-- When adding public APIs, update examples/guides as needed and ensure cross‑links render.
+- When adding public APIs, update examples/guides as needed and ensure cross-links render.
 
 ## Security & Secrets
 

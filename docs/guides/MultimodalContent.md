@@ -165,7 +165,7 @@ from draive.openai import OpenAI, OpenAIResponsesConfig
 async def analyze_image(image_bytes: bytes) -> str:
     async with ctx.scope(
         "image_analysis",
-        OpenAIResponsesConfig(model="gpt-4o"),
+        OpenAIResponsesConfig(model="gpt-5"),
         disposables=(OpenAI(),),
     ):
         prompt = MultimodalContent.of(

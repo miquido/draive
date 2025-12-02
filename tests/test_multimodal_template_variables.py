@@ -12,19 +12,19 @@ from draive.multimodal.text import TextContent
 def test_parse_template_variables_finds_unique_names() -> None:
     template = "Hello {%name%}, you have {%count%} new messages from {%name%}."
 
-    variables = parse_template_variables(template)
+    variables = set(parse_template_variables(template))
 
     assert variables == {"name", "count"}
 
 
 def test_parse_template_variables_without_placeholders_returns_empty() -> None:
-    assert parse_template_variables("No placeholders here.") == set()
+    assert set(parse_template_variables("No placeholders here.")) == set()
 
 
 def test_parse_template_variables_skips_unmatched_closing() -> None:
     template = "Hello %} stray closing"
 
-    variables = parse_template_variables(template)
+    variables = set(parse_template_variables(template))
 
     assert variables == set()
 
@@ -32,7 +32,7 @@ def test_parse_template_variables_skips_unmatched_closing() -> None:
 def test_parse_template_variables_skips_unclosed_opening() -> None:
     template = "Hello {%name"
 
-    variables = parse_template_variables(template)
+    variables = set(parse_template_variables(template))
 
     assert variables == set()
 
@@ -40,7 +40,7 @@ def test_parse_template_variables_skips_unclosed_opening() -> None:
 def test_parse_template_variables_skips_empty_name() -> None:
     template = "Hello {% %}"
 
-    variables = parse_template_variables(template)
+    variables = set(parse_template_variables(template))
 
     assert variables == set()
 
@@ -48,7 +48,7 @@ def test_parse_template_variables_skips_empty_name() -> None:
 def test_parse_template_variables_skips_whitespace_in_name() -> None:
     template = "Hello {%bad name%}"
 
-    variables = parse_template_variables(template)
+    variables = set(parse_template_variables(template))
 
     assert variables == set()
 
@@ -56,7 +56,7 @@ def test_parse_template_variables_skips_whitespace_in_name() -> None:
 def test_parse_template_variables_skips_padded_name() -> None:
     template = "Hello {% name %}"
 
-    variables = parse_template_variables(template)
+    variables = set(parse_template_variables(template))
 
     assert variables == set()
 
@@ -64,7 +64,7 @@ def test_parse_template_variables_skips_padded_name() -> None:
 def test_parse_template_variables_handles_adjacent_placeholders() -> None:
     template = "{%first%}{%second%}"
 
-    variables = parse_template_variables(template)
+    variables = set(parse_template_variables(template))
 
     assert variables == {"first", "second"}
 
@@ -72,7 +72,7 @@ def test_parse_template_variables_handles_adjacent_placeholders() -> None:
 def test_parse_template_variables_supports_symbolic_names() -> None:
     template = "{%section-2%}"
 
-    variables = parse_template_variables(template)
+    variables = set(parse_template_variables(template))
 
     assert variables == {"section-2"}
 
@@ -80,7 +80,7 @@ def test_parse_template_variables_supports_symbolic_names() -> None:
 def test_parse_template_variables_handles_literal_braces() -> None:
     template = "{{ not a placeholder }}"
 
-    variables = parse_template_variables(template)
+    variables = set(parse_template_variables(template))
 
     assert variables == set()
 

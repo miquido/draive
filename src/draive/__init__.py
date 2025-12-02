@@ -94,6 +94,7 @@ from draive.embedding import (
     ImageEmbedding,
     TextEmbedding,
     ValueEmbedding,
+    VectorIndex,
     mmr_vector_similarity_search,
     vector_similarity_score,
     vector_similarity_search,
@@ -209,10 +210,7 @@ from draive.stages import (
     StageState,
     stage,
 )
-from draive.utils import (
-    Memory,
-    VectorIndex,
-)
+from draive.utils import Memory
 
 __all__ = (
     "META_EMPTY",

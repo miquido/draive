@@ -23,6 +23,7 @@ class AWSError(Exception):
     message
         Human readable error message returned by AWS.
     """
+
     __slots__ = (
         "code",
         "message",

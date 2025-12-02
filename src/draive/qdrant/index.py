@@ -3,13 +3,18 @@ from typing import Any, Literal, cast
 
 from haiway import AttributePath, AttributeRequirement
 
-from draive.embedding import Embedded, ImageEmbedding, TextEmbedding, mmr_vector_similarity_search
+from draive.embedding import (
+    Embedded,
+    ImageEmbedding,
+    TextEmbedding,
+    VectorIndex,
+    mmr_vector_similarity_search,
+)
 from draive.multimodal import TextContent
 from draive.parameters import DataModel
 from draive.qdrant.state import Qdrant
 from draive.qdrant.types import QdrantResult
 from draive.resources import ResourceContent
-from draive.utils import VectorIndex
 
 __all__ = ("QdrantVectorIndex",)
 

@@ -59,7 +59,7 @@ async def _noop_defining(
 
 @final
 class TemplatesRepository(State):
-    """State facade orchestrating template storage and resolution backends.
+    """Template storage and resolution backend.
 
     A repository aggregates callables responsible for listing template metadata,
     loading template bodies, and persisting updates. Convenience constructors

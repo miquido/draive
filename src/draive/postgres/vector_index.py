@@ -11,12 +11,12 @@ from draive.embedding import (
     Embedded,
     ImageEmbedding,
     TextEmbedding,
+    VectorIndex,
     mmr_vector_similarity_search,
 )
 from draive.multimodal import TextContent
 from draive.parameters import DataModel
 from draive.resources import ResourceContent
-from draive.utils import VectorIndex
 
 __all__ = ("PostgresVectorIndex",)
 

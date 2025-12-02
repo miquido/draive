@@ -1,234 +1,193 @@
-# Draive LLM Usage Guide
+# Draive + Haiway LLM Integration Cheat Sheet
 
-This guide explains how to use Draive to orchestrate language model workloads. It focuses on runtime usage and omits repository contribution details.
+Authoritative, concise runtime notes for wiring Draive apps. Targets Python 3.13+, strict typing, async-only I/O.
 
-## 1. Installation & Environment
-- Install Draive in your Python 3.13+ environment: `pip install draive` or `pip install -e .` from a cloned repository.
-- Provide provider credentials through environment variables or a `.env` file (e.g., `OPENAI_API_KEY`).
-- Call `draive.load_env()` once during application startup to hydrate configuration from the environment.
-
+## Setup
+- Install: `pip install draive` (or uv/pip with extras). Common extras: `draive[openai]`, `draive[openai_realtime]`, `draive[anthropic]`, `draive[mistral]`, `draive[gemini]`, `draive[cohere]`, `draive[vllm]`, `draive[ollama]`, `draive[qdrant]`, `draive[postgres]`.
+- Environment: store provider keys in env or `.env`. Call `load_env()` once at startup; Draive never auto-loads secrets.
 ```python
 from draive import load_env
-
-load_env()  # safely loads .env entries into the process environment
+load_env()
 ```
 
-## 2. Core Concepts
-- **State**: Immutable runtime configuration and services (`haiway.State`).
-- **Scope**: Context manager that activates state, disposables, and observability (`ctx.scope(...)`).
-- **Disposables**: Async resources that are started/stopped with the scope lifetime (e.g., API clients).
-- **Generation APIs**: Typed facades for text, tool, and multimodal generation.
+## Core primitives
+- `State` (from haiway): immutable runtime config/resources. Update via `.updated(...)`.
+- `ctx.scope(label, *state, disposables=(...), observability=...)`: structured async context that activates states and disposables; nests safely.
+- `Disposables`: async resources (e.g., `OpenAI()`, `QdrantClient()`) auto-cleaned on scope exit.
+- `DataModel`: immutable, validated data containers with `.json_schema()` / `.simplified_schema()` and `.to_str()`.
+- `MultimodalContent`: ordered parts (`TextContent`, `ResourceContent`/`ResourceReference`, `ArtifactContent`, `MultimodalTag`). Use `MultimodalContent.of(...)`; `.to_str()` redacts binary by default.
 
-## 3. Minimal Text Generation
+## Provider wiring (OpenAI example)
 ```python
 import asyncio
-from draive import TextGeneration, ctx, load_env
+from draive import ctx, TextGeneration
 from draive.openai import OpenAI, OpenAIResponsesConfig
-
-load_env()
 
 async def main() -> None:
     async with ctx.scope(
-        "demo.text",
-        OpenAIResponsesConfig(model="gpt-4o-mini"),
+        "quickstart",
+        OpenAIResponsesConfig(model="gpt-5-mini"),
         disposables=(OpenAI(),),
     ):
         reply = await TextGeneration.generate(
-            instructions="You are a concise assistant.",
+            instructions="You are concise.",
             input="List three benefits of typed prompts.",
             temperature=0.2,
         )
-        ctx.log_info("reply", value=reply)
+        ctx.log_info("reply", content=reply)
 
 asyncio.run(main())
 ```
+*Models*: `OpenAIResponsesConfig.model` literals: `gpt-5`, `gpt-5-mini`, `gpt-5-nano` (or custom string). Key knobs: `temperature`, `parallel_tool_calls` (bool), `max_output_tokens`, `service_tier`, `truncation`.
 
-## 4. Managing State and Configuration
-1. Define typed configuration states.
-2. Use constructor helpers (`.of`, `.from_env`) to validate inputs.
-3. Read the active state inside scopes with `ctx.state(MyState)`.
-
-```python
-from typing import Annotated, Self
-from haiway import Description, State, ctx
-
-class AppConfig(State):
-    default_temperature: Annotated[
-        float,
-        Description("Fallback sampling temperature for text generation"),
-    ]
-
-    @classmethod
-    def of(cls, *, default_temperature: float) -> Self:
-        return cls(default_temperature=default_temperature)
-
-async def run_with_config() -> None:
-    async with ctx.scope(
-        "demo.config",
-        AppConfig.of(default_temperature=0.3),
-    ):
-        config = ctx.state(AppConfig)
-        ctx.log_info("temperature", value=config.default_temperature)
-```
-
-## 5. Provider Adapters
-- Import provider configs from `draive.<provider>.config` modules (e.g., `OpenAIResponsesConfig`, `AnthropicConfig`).
-- Place configs and clients into the scope: configs as state, clients as disposables.
-- Combine multiple providers by nesting or sequencing scopes.
-
-```python
-from draive.openai import OpenAI, OpenAIResponsesConfig
-from draive.anthropic import Anthropic, AnthropicConfig
-
-async def dual_provider() -> str:
-    async with ctx.scope(
-        "primary",
-        OpenAIResponsesConfig(model="gpt-4o-mini"),
-        disposables=(OpenAI(),),
-    ):
-        try:
-            return await TextGeneration.generate(
-                instructions="Primary responder.",
-                input="Explain embeddings in one paragraph.",
-            )
-        except Exception as exc:
-            ctx.log_warning("primary_failed", exception=exc)
-            async with ctx.scope(
-                "fallback",
-                AnthropicConfig(model="claude-3-haiku"),
-                disposables=(Anthropic(),),
-            ):
-                return await TextGeneration.generate(
-                    instructions="Fallback responder.",
-                    input="Explain embeddings in one paragraph.",
-                )
-```
-
-## 6. Tool Calling
-- Wrap callable tools with `@tool` and register them in scope.
-- Tools can access active state with `ctx.state(...)`.
-- Pass tools to `Conversation.completion()` or `TextGeneration.generate()` where supported.
-
-```python
-from draive import Conversation
-from draive.models.tools import tool
-from draive.resources import ResourceReference
-
-@tool(name="lookup_document")
-async def lookup_document(doc_id: str) -> ResourceReference:
-    # Resolve and return references; implement custom storage logic here.
-    return ResourceReference(uri=f"s3://docs/{doc_id}.txt")
-
-async def answer_with_tools(question: str) -> str:
-    async with ctx.scope(
-        "tools.chat",
-        OpenAIResponsesConfig(model="gpt-4o-mini"),
-        disposables=(OpenAI(),),
-    ):
-        return await Conversation.completion(
-            instructions="Use tools when necessary.",
-            input=question,
-            tools=[lookup_document],
-        )
-```
-
-## 7. Structured Outputs
-- Use `ModelGeneration.generate()` with `DataModel` schemas for validated responses.
-- Declare attributes with `typing.Annotated` and Haiway annotations (`Description`, `Alias`, `Specification`, `Validator`, etc.). Avoid `Field`, which is deprecated and will be removed.
-- Optionally enable schema injection (`"full"`/`"simplified"`) to steer model formatting; defaults to `"skip"` for provider-agnostic prompts.
-
+## Structured generation
+Use `ModelGeneration.generate` with a `DataModel`; optional `schema_injection={"full","simplified","skip"}` (default `"skip"`).
 ```python
 from collections.abc import Sequence
-from typing import Annotated
-
-from draive import Alias, DataModel, Description, ModelGeneration, TextContent
-
+from draive import DataModel, ModelGeneration
+from draive.openai import OpenAIResponsesConfig, OpenAI
 
 class Summary(DataModel):
-    topic: Annotated[str, Description("Topic of the summary")]
-    bullets: Annotated[Sequence[str], Description("Key takeaways")]
-    style: Annotated[str, Alias("format"), Description("Preferred presentation style")] = "bullet"
-
-async def generate_summary(text: str) -> Summary:
-    async with ctx.scope(
-        "structured.output",
-        OpenAIResponsesConfig(model="gpt-4o-mini"),
-        disposables=(OpenAI(),),
-    ):
-        return await ModelGeneration.generate(
-            Summary,
-            instructions="Summarize the document precisely.",
-            input=TextContent.of(text=text),
-            schema_injection="simplified",
-        )
-```
-
-## 8. Multimodal Payloads
-- Compose content with `MultimodalContent.of(...)` using `TextContent`, `ArtifactContent`, and `ResourceContent`.
-- Ensure binary data is stored externally and referenced with `ResourceReference` when large.
-
-```python
-from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
-
-async def multimodal_prompt(image_bytes: bytes) -> str:
-    async with ctx.scope(
-        "multimodal.demo",
-        OpenAIResponsesConfig(model="gpt-4o-realtime-preview"),
-        disposables=(OpenAI(),),
-    ):
-        content = MultimodalContent.of(
-            TextContent.of(text="Describe the uploaded image."),
-            ArtifactContent.of(data=image_bytes, mime_type="image/png"),
-        )
-        return await TextGeneration.generate(
-            instructions="Respond with a single paragraph.",
-            input=content,
-        )
-```
-
-## 9. Conversation Memory
-- Use `ConversationMemory.constant()` for stateless replies and `.accumulative_volatile()` for rolling transcripts.
-
-```python
-from draive.conversation import ConversationMemory
-
-memory = ConversationMemory.accumulative_volatile()
+    topic: str
+    bullets: Sequence[str]
 
 async with ctx.scope(
-    "chat.session",
-    OpenAIResponsesConfig(model="gpt-4o-mini"),
+    "structured",
+    OpenAIResponsesConfig(model="gpt-5-mini"),
     disposables=(OpenAI(),),
-    states=(memory,),
 ):
-    response = await Conversation.completion(
-        instructions="Be helpful and brief.",
-        input="How do I track conversation state in Draive?",
+    summary = await ModelGeneration.generate(
+        Summary,
+        instructions="Summarize clearly in bullets.",
+        input="Typed prompts improve clarity and tooling.",
+        schema_injection="simplified",
     )
 ```
 
-## 10. Guardrails and Evaluations
-- Attach moderation, privacy, or quality states (`draive.guardrails`) to a scope to enforce policies.
-- Run evaluators via `draive.evaluation` helpers before committing responses to downstream systems.
+## Tool calling
+Decorate async functions with `@tool`; pass to generation APIs via list or `Toolbox`.
+```python
+from draive import tool, TextGeneration
+from draive.openai import OpenAI, OpenAIResponsesConfig
 
-## 11. Observability
-- Log with `ctx.log_debug/info/warn/error`.
-- Record metrics via `ctx.record_info(metric_name, value=...)`.
-- Wrap long-lived processes in descriptive scope identifiers to aid tracing.
+@tool(description="Return UTC timestamp")
+async def now_utc() -> str:
+    from datetime import datetime, UTC
+    return datetime.now(UTC).isoformat()
 
-## 12. Error Translation
-- Catch provider-specific exceptions and raise domain-specific errors with context.
-- Avoid bare `Exception`; include actionable metadata for operators (e.g., model name, request id).
+async with ctx.scope(
+    "tools",
+    OpenAIResponsesConfig(model="gpt-5-mini"),
+    disposables=(OpenAI(),),
+):
+    result = await TextGeneration.generate(
+        instructions="Use tools when helpful.",
+        input="What time is it?",
+        tools=[now_utc],
+    )
+```
 
-## 13. Testing Your Usage
-- Write async unit tests using `pytest-asyncio` or similar frameworks.
-- Stub provider clients; do not make real network calls in tests.
-- Validate structured outputs with the same `DataModel` classes you use in production.
+## Conversations
+`Conversation.completion` handles chat-style turns; accepts tools and memory.
+```python
+from draive import Conversation
+from draive.models import ModelMemory
+from draive.openai import OpenAI, OpenAIResponsesConfig
 
-## 14. Deployment Tips
-- Keep scopes short-lived for per-request work; share expensive disposables by creating higher-level scopes that manage resource pools.
-- Rotate provider credentials via environment changes; restart scopes to pick up new configs.
-- Monitor latency and cost metrics through logs and `ctx.record` hooks.
+memory = ModelMemory.constant()  # static or replace with persistent implementation
 
----
+async with ctx.scope(
+    "chat",
+    OpenAIResponsesConfig(model="gpt-5-mini"),
+    memory,
+    disposables=(OpenAI(),),
+):
+    msg = await Conversation.completion(
+        instructions="Be brief.",
+        input="Hello!",
+    )
+    text_only = msg.content.to_str()
+```
 
-Use this guide as a checklist when embedding Draive into applications: configure scopes, activate the right states, call the higher-level generation APIs, and wrap everything with observability and guardrails for safe production usage.
+## Multimodal prompts
+```python
+from draive import TextGeneration
+from draive.multimodal import MultimodalContent, ResourceContent, TextContent
+
+prompt = MultimodalContent.of(
+    TextContent.of("Describe this image"),
+    ResourceContent.of(image_bytes, mime_type="image/png"),
+)
+await TextGeneration.generate(
+    instructions="Respond in one sentence.",
+    input=prompt,
+)
+```
+
+## Embeddings & retrieval
+- `VectorIndex` state abstracts indexing/search; provide embedding config + client in scope.
+- `draive.helpers.VolatileVectorIndex()` gives in-memory index for tests.
+```python
+from draive import VectorIndex
+from draive.helpers import VolatileVectorIndex
+from draive.openai import OpenAI, OpenAIEmbeddingConfig
+from draive.parameters import DataModel
+
+class Chunk(DataModel):
+    id: str
+    content: str
+
+index = VolatileVectorIndex()
+async with ctx.scope(
+    "rag",
+    index,
+    OpenAIEmbeddingConfig(model="text-embedding-3-small"),
+    disposables=(OpenAI(),),
+):
+    await index.index(Chunk, values=[Chunk(id="1", content="hello world")], attribute=Chunk._.content)
+    hits = await index.search(Chunk, query="hello", limit=3)
+```
+
+## Guardrails
+Attach guardrail states to a scope; exceptions raised on violations.
+```python
+from draive.guardrails import GuardrailsModeration
+
+async with ctx.scope("moderated", GuardrailsModeration.of(provider="openai")):
+    ...
+```
+Other guardrails: privacy, safety, quality; all live under `draive.guardrails`.
+
+## Evaluation
+Use `@evaluator` to score outputs; returned `EvaluatorResult` exposes `.passed` and `.performance` (%).
+```python
+from draive.evaluation import evaluator, evaluate
+from draive.evaluators import readability_evaluator
+
+@evaluator(name="keyword", threshold=0.8)
+async def keyword_eval(content: str, required: list[str]) -> float:
+    return sum(k in content for k in required) / len(required)
+
+results = await evaluate(
+    "AI improves productivity",
+    readability_evaluator.prepared(),
+    keyword_eval.prepared(required=["AI", "productivity"]),
+)
+all_ok = all(r.passed for r in results)
+```
+
+## Observability
+- Prefer `ctx.log_debug/info/warn/error` over `print`.
+- Emit metrics via `ctx.record_info(metric, value=..., attributes=...)`.
+- Use meaningful `ctx.scope` labels; they appear in traces/metrics.
+
+## Error handling
+- Keep boundaries strict: catch provider SDK errors and rethrow typed exceptions with redacted context.
+- Never log secrets or raw payloads; rely on env vars (`getenv_str`, etc.).
+
+## Execution rules (apply everywhere)
+- Always run inside `ctx.scope`.
+- Keep public APIs strictly typed (no implicit `Any`).
+- Avoid blocking calls; everything I/O is async.
+- Mutate state via `.updated(...)`; states and data models are immutable by design.
+- Use `MultimodalContent` for any model input/output that mixes text/media/tools; use `.to_str()` for safe logging (binary redacted).
