@@ -31,7 +31,7 @@ setup_logging("mcp")
 # initialize dependencies and configuration
 async with ctx.scope(
     "mcp",
-    OpenAIResponsesConfig(model="gpt-4o-mini"),  # configure OpenAI model
+    OpenAIResponsesConfig(model="gpt-5-mini"),  # configure OpenAI model
     # prepare MCPClient, it will handle connection lifetime through context
     # and provide associated state with MCP functionalities
     disposables=(

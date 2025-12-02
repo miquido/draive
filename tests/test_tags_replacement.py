@@ -665,6 +665,22 @@ def test_handles_self_closing_with_exhaustive():
     assert results[3].content == MultimodalContent.empty
 
 
+def test_replacing_self_closing_tag_with_attributes():
+    content = MultimodalContent.of('start <img src="logo.png" alt="l"/> end')
+
+    replaced = content.replacing_tag("img", replacement="X")
+    stripped = content.replacing_tag("img", replacement="X", strip_tags=True)
+
+    assert replaced == MultimodalContent.of('start <img src="logo.png" alt="l">X</img> end')
+    assert stripped == MultimodalContent.of("start X end")
+
+
+def test_replacing_ignores_malformed_self_closing_tag():
+    content = MultimodalContent.of('a <img src=logo/> b')
+
+    assert content.replacing_tag("img", replacement="X") == content
+
+
 def test_ignores_attributes_without_values():
     results = list(MultimodalContent.of("<test solo>content</test>").tags("test"))
     # Should not parse due to attribute without value

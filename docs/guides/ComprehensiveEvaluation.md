@@ -10,7 +10,7 @@ building end-to-end evaluation flows.
   compatible numeric value.
 - Thresholds determine whether an evaluation passes; named levels (`"perfect"`, `"excellent"`,
   `"good"`, `"fair"`, `"poor"`) are easier to reason about than raw floats.
-- `EvaluationScore.performance` is reported as a percentage and can exceed 100 when a score
+- `EvaluatorResult.performance` is reported as a percentage and can exceed 100 when a score
   comfortably beats its threshold.
 
 ### Working with `EvaluationScore`
@@ -234,7 +234,7 @@ async def evaluate_with_context(response: str) -> EvaluationScore:
         meta={
             "timestamp": datetime.now().isoformat(),
             "issues_found": issues,
-            "evaluation_model": "gpt-4",
+            "evaluation_model": "gpt-5",
             "confidence": 0.85,
         },
     )

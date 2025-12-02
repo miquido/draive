@@ -33,7 +33,7 @@ from draive.openai import OpenAI, OpenAIResponsesConfig
 async def main() -> None:
     async with ctx.scope(
         "quickstart",
-        OpenAIResponsesConfig(model="gpt-4o-mini"),
+        OpenAIResponsesConfig(model="gpt-5-mini"),
         disposables=(OpenAI(),),
     ):
         result = await TextGeneration.generate(
@@ -60,7 +60,7 @@ async def current_time() -> str:
 async def with_tools() -> None:
     async with ctx.scope(
         "assistant",
-        OpenAIResponsesConfig(model="gpt-4o-mini"),
+        OpenAIResponsesConfig(model="gpt-5-mini"),
         disposables=(OpenAI(),),
     ):
         result = await TextGeneration.generate(
@@ -87,7 +87,7 @@ class PersonInfo(DataModel):
 async def extract_person() -> None:
     async with ctx.scope(
         "extraction",
-        OpenAIResponsesConfig(model="gpt-4o-mini"),
+        OpenAIResponsesConfig(model="gpt-5-mini"),
         disposables=(OpenAI(),),
     ):
         person = await ModelGeneration.generate(

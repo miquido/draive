@@ -40,7 +40,7 @@ load_env()
 async with ctx.scope(
     "basics",
     # initialize OpenAI client within the context
-    OpenAIResponsesConfig(model="gpt-4o-mini"),
+    OpenAIResponsesConfig(model="gpt-5-mini"),
     disposables=(OpenAI(),),
 ):
     result: str = await TextGeneration.generate(
@@ -103,7 +103,7 @@ from draive import Toolbox
 async with ctx.scope(
     "basics",
     # initialize OpenAI client within the context
-    OpenAIResponsesConfig(model="gpt-4o-mini"),
+    OpenAIResponsesConfig(model="gpt-5-mini"),
     disposables=(OpenAI(),),
 ):
     result: str = await TextGeneration.generate(
@@ -133,7 +133,7 @@ setup_logging("basics")
 async with ctx.scope(
     "basics",
     # initialize OpenAI client within the context
-    OpenAIResponsesConfig(model="gpt-4o-mini"),
+    OpenAIResponsesConfig(model="gpt-5-mini"),
     disposables=(OpenAI(),),
     observability=LoggerObservability(),
 ):
@@ -220,12 +220,12 @@ One funny thing about LLMs (Large Language Models) is that they can generate tex
 |  |  |  |  |  [output]: "text"
 |  |  |  ⌊
 |  |  |  ⎡ •OpenAIResponsesConfig:
-|  |  |  |  ├ model: "gpt-4o-mini"
+|  |  |  |  ├ model: "gpt-5-mini"
 |  |  |  |  ├ temperature: 1.0
 |  |  |  ⌊
 |  |  |  ⎡ •TokenUsage:
 |  |  |  |  ├ usage:
-|  |  |  |  |  [gpt-4o-mini-2024-07-18]:
+|  |  |  |  |  [gpt-5-mini]:
 |  |  |  |  |  ├ input_tokens: 93
 |  |  |  |  |  ├ cached_tokens: 0
 |  |  |  |  |  ├ output_tokens: 7
@@ -302,12 +302,12 @@ One funny thing about LLMs (Large Language Models) is that they can generate tex
 |  |  |  |  |  [output]: "text"
 |  |  |  ⌊
 |  |  |  ⎡ •OpenAIResponsesConfig:
-|  |  |  |  ├ model: "gpt-4o-mini"
+|  |  |  |  ├ model: "gpt-5-mini"
 |  |  |  |  ├ temperature: 1.0
 |  |  |  ⌊
 |  |  |  ⎡ •TokenUsage:
 |  |  |  |  ├ usage:
-|  |  |  |  |  [gpt-4o-mini-2024-07-18]:
+|  |  |  |  |  [gpt-5-mini]:
 |  |  |  |  |  ├ input_tokens: 116
 |  |  |  |  |  ├ cached_tokens: 0
 |  |  |  |  |  ├ output_tokens: 95

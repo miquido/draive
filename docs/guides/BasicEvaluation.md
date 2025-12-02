@@ -17,11 +17,11 @@ highlights practical patterns for running repeatable quality checks.
 ## 1. Write Your First Evaluator
 
 Evaluators are async callables decorated with `@evaluator`. They receive the content you want to
-check, optional parameters, and return an `EvaluationScore` with a numeric score (0.0–1.0) and
-metadata about the decision.
+check, optional parameters, and return a raw score (0.0–1.0). The decorator then wraps that score
+into an `EvaluatorResult` so you always get pass/fail metadata alongside the score.
 
 ```python
-from draive.evaluation import evaluator, EvaluationScore
+from draive.evaluation import evaluator, EvaluationScore, EvaluatorResult
 from draive import Multimodal
 
 @evaluator(name="keyword_presence", threshold=0.8)
@@ -38,6 +38,7 @@ async def keyword_evaluator(
     found = sum(1 for keyword in required_keywords if keyword.lower() in text)
     score = found / len(required_keywords)
 
+    # `@evaluator` wraps this score into an EvaluatorResult with the active threshold
     return EvaluationScore.of(
         score,
         comment=f"Matched {found}/{len(required_keywords)} required keywords",
@@ -58,28 +59,30 @@ content to evaluate, and await your evaluator.
 
 ```python
 from draive import ctx, load_env
+from draive.evaluation import EvaluatorResult
 from draive.openai import OpenAI, OpenAIResponsesConfig
 
 load_env()
 
 async with ctx.scope(
     "evaluation_example",
-    OpenAIResponsesConfig(model="gpt-4o-mini"),
+    OpenAIResponsesConfig(model="gpt-5-mini"),
     disposables=(OpenAI(),),
 ):
     content = "AI and machine learning are transforming technology"
 
-    result = await keyword_evaluator(
+    result: EvaluatorResult = await keyword_evaluator(
         content,
         required_keywords=["AI", "machine learning", "technology"],
     )
 
-    print(f"Score: {result.score.value:.2f}")
+    print(f"Score: {result.score:.2f}")
     print(f"Passed default threshold: {result.passed}")
+    print(f"Comment: {result.meta.get('comment')}")
 ```
 
-`EvaluationScore.passed` compares the computed score with the evaluator's active threshold. Use
-`.comment` for human-readable feedback when showing results to reviewers.
+Each call returns an `EvaluatorResult`; use `.passed` to compare the score with the active threshold
+and `.comment` (when set in your evaluator) for human-readable feedback.
 
 ## 3. Explore Built-in Evaluators
 
@@ -146,7 +149,7 @@ for label, result in {
     "Coherence": coherence,
     "Coverage": coverage,
 }.items():
-    print(f"{label}: {result.score.value:.2f} ({'✓' if result.passed else '✗'})")
+    print(f"{label}: {result.score:.2f} ({'✓' if result.passed else '✗'})")
 ```
 
 Adjust thresholds by chaining `.with_threshold("good")`, `.with_threshold("excellent")`, etc. Each
@@ -194,7 +197,7 @@ results = await user_response_scenario(
 all_passed = all(result.passed for result in results)
 print(f"All checks passed: {all_passed}")
 for item in results:
-    print(f"- {item.evaluator}: {item.score.value:.2f} ({'✓' if item.passed else '✗'})")
+    print(f"- {item.evaluator}: {item.score:.2f} ({'✓' if item.passed else '✗'})")
 ```
 
 ## 5. Automate Regression Checks with Suites

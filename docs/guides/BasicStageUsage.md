@@ -312,7 +312,7 @@ async def word_count(text: str) -> int:
 async def process_document(document: str) -> str:
     async with ctx.scope(
         "document_processor",
-        OpenAIResponsesConfig(model="gpt-4o"),
+        OpenAIResponsesConfig(model="gpt-5"),
         disposables=(OpenAI(),),
     ):
         pipeline = Stage.sequence(

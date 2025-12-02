@@ -40,7 +40,7 @@ from draive.openai import OpenAIResponsesConfig, OpenAI
 async with ctx.scope(  # prepare new context
     "basics",
     disposables=(OpenAI(),),  # initialize OpenAI client
-    OpenAIResponsesConfig(model="gpt-4o-mini"), # select used model
+    OpenAIResponsesConfig(model="gpt-5-mini"), # select used model
 ):
     result: str = await text_completion(
         text="Roses are red...",
@@ -66,7 +66,7 @@ async with ctx.scope(  # prepare the new context
     disposables=(OpenAI(),),
     # define GPT model configuration as a context scope state
     OpenAIResponsesConfig(
-        model="gpt-3.5-turbo",
+        model="gpt-5-mini",
         temperature=0.4,
     ),
 ):
@@ -82,10 +82,10 @@ async with ctx.scope(  # prepare the new context
         # we are updating the current context value instead of making a new one
         # this allows to preserve other elements of the configuration
         ctx.state(OpenAIResponsesConfig).updated(
-            model="gpt-4o",
+            model="gpt-5",
         ),
     ):
-        # now we are using gpt-4o with temperature of 0.4
+        # now we are using gpt-5 with temperature of 0.4
         result = await text_completion(
             text="Roses are red...",
         )
@@ -126,7 +126,7 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
     "basics",
     disposables=(OpenAI(),),
     OpenAIResponsesConfig(  # define model configuration for OpenAI Responses API
-        model="gpt-3.5-turbo",
+        model="gpt-5-mini",
         temperature=0.4,
     ),
     observability=LoggerObservability(),
@@ -137,7 +137,7 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
 
     with ctx.updated(
         ctx.state(OpenAIResponsesConfig).updated(
-            model="gpt-4o",
+            model="gpt-5",
         ),
     ):
         await text_completion(
@@ -203,12 +203,12 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
 |  |  |  |  |  [output]: "text"
 |  |  |  ⌊
 |  |  |  ⎡ •OpenAIResponsesConfig:
-|  |  |  |  ├ model: "gpt-4o"
+|  |  |  |  ├ model: "gpt-5"
 |  |  |  |  ├ temperature: 0.4
 |  |  |  ⌊
 |  |  |  ⎡ •TokenUsage:
 |  |  |  |  ├ usage:
-|  |  |  |  |  [gpt-4o-2024-08-06]:
+|  |  |  |  |  [gpt-5]:
 |  |  |  |  |  ├ input_tokens: 24
 |  |  |  |  |  ├ cached_tokens: 0
 |  |  |  |  |  ├ output_tokens: 7

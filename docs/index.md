@@ -76,7 +76,7 @@ from draive.openai import OpenAI, OpenAIResponsesConfig
 async def main() -> None:
     async with ctx.scope(
         "quickstart",
-        OpenAIResponsesConfig(model="gpt-4o-mini"),
+        OpenAIResponsesConfig(model="gpt-5-mini"),
         disposables=(OpenAI(),),
     ):
         response = await TextGeneration.generate(

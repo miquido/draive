@@ -12,7 +12,7 @@ from draive.openai import OpenAI, OpenAIResponsesConfig
 async def main() -> None:
     async with ctx.scope(
         "quickstart",
-        OpenAIResponsesConfig(model="gpt-4o-mini"),
+        OpenAIResponsesConfig(model="gpt-5-mini"),
         disposables=(OpenAI(),),
     ):
         ...
@@ -61,7 +61,7 @@ from draive import TextGeneration
 async def tagline() -> str:
     async with ctx.scope(
         "tagline",
-        OpenAIResponsesConfig(model="gpt-4o-mini"),
+        OpenAIResponsesConfig(model="gpt-5-mini"),
         disposables=(OpenAI(),),
     ):
         return await TextGeneration.generate(
@@ -108,19 +108,19 @@ Pass `content` into generation APIs to mix text, images, and other artifacts.
 ## Wire retrieval
 
 ```python
-from draive.embedding import VectorIndex
+from draive.helpers import VolatileVectorIndex
 from draive.resources import ResourceContent
 
-index = VectorIndex.with_hnsw()
+index = VolatileVectorIndex()
 await index.add(ResourceContent.text("internal-notes", "Use fallback provider after 3 retries."))
 ```
 
 ## Evaluate quality
 
 ```python
-from draive.guardrails import ModerationState
+from draive.guardrails import GuardrailsModeration
 
-async with ctx.scope("moderated", ModerationState.of(provider="openai")):
+async with ctx.scope("moderated", GuardrailsModeration.of(provider="openai")):
     ...
 ```
 

@@ -51,7 +51,7 @@ from draive.openai import OpenAI, OpenAIResponsesConfig
 
 async with ctx.scope(
     "basics",  # scope name visible in logs and traces
-    OpenAIResponsesConfig(model="gpt-3.5-turbo-0125"),  # model configuration
+    OpenAIResponsesConfig(model="gpt-5-mini"),  # model configuration
     disposables=(OpenAI(),),  # lifecycle-managed OpenAI client
 ):
     response: ConversationMessage = await Conversation.completion(
@@ -74,8 +74,8 @@ content:
     - text: The current UTC time and date is Friday, 7th March 2025, 12:40:29.
 ```
 
-The `ConversationMessage` object contains structured parts that you can inspect or render. If you
-prefer to display only the assistant text, use `response.text`.
+The `ConversationMessage` object contains structured parts that you can inspect or render. To render
+only the assistant text, call `response.content.to_str()`.
 
 ## Next steps
 

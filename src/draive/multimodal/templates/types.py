@@ -85,7 +85,7 @@ class Template(State):
 
     identifier: str
     arguments: Mapping[str, Multimodal]
-    meta: Meta
+    meta: Meta = META_EMPTY
 
     def with_arguments(
         self,

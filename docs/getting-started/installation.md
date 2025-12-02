@@ -40,10 +40,16 @@ uv sync --all-groups --all-extras --frozen
 
 ## Optional extras
 
-- `draive[ollama]` for local Ollama deployments.
-- `draive[cohere]` or `draive[cohere_bedrock]` for Cohere hosted or AWS Bedrock access.
-- `draive[postgres]` when you need the PostgreSQL resource backend.
-- `draive[docs]` to render documentation locally with MkDocs.
+- `draive[openai]`, `draive[openai_realtime]` for OpenAI Responses/Realtime.
+- `draive[anthropic]`, `draive[anthropic_bedrock]` for Claude models (direct or via Bedrock).
+- `draive[mistral]`, `draive[gemini]`, `draive[cohere]`, `draive[cohere_bedrock]` for other hosted
+  LLMs.
+- `draive[bedrock]`, `draive[aws]` for AWS model/runtime integrations.
+- `draive[ollama]`, `draive[vllm]` for local or self-hosted deployments.
+- `draive[qdrant]`, `draive[postgres]` for vector/storage backends; add `pgvector` separately where
+  needed.
+- `draive[httpx]`, `draive[mcp]`, `draive[opentelemetry]`, `draive[docs]` for HTTP utilities, MCP,
+  tracing, and docs site builds.
 
 ## Verify your environment
 

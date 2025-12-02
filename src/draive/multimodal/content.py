@@ -17,6 +17,7 @@ __all__ = (
     "MultimodalTag",
 )
 
+
 MultimodalContentPart = TextContent | ResourceReference | ResourceContent | ArtifactContent
 
 
@@ -713,13 +714,13 @@ Multimodal = (
 type Token = "_TextToken | _OpenToken | _CloseToken | _SelfClosingToken | MultimodalContentPart"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _TextToken:
     text: str
     meta: Meta
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _OpenToken:
     name: str
     attrs: Meta
@@ -727,14 +728,14 @@ class _OpenToken:
     raw: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _CloseToken:
     name: str
     meta: Meta
     raw: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _SelfClosingToken:
     name: str
     attrs: Meta
@@ -884,90 +885,233 @@ def _tokenize_content(
     return tokens
 
 
-def _tokenize_text(  # noqa: PLR0912
+def _tokenize_text(
     text: str,
     meta: Meta,
 ) -> list[Token]:
+    if "<" not in text:
+        return [_TextToken(text=text, meta=meta)] if text else []
+
     tokens: list[Token] = []
-    i = 0
+    append = tokens.append
+    length = len(text)
+    pos = 0
 
-    while i < len(text):
-        lt = text.find("<", i)
-        if lt == -1:
-            if i < len(text):
-                tokens.append(_TextToken(text=text[i:], meta=meta))
+    while pos < length:
+        lt_pos = text.find("<", pos)
+        if lt_pos == -1:
+            if pos < length:
+                append(_TextToken(text=text[pos:], meta=meta))
             break
 
-        if lt > i:
-            tokens.append(_TextToken(text=text[i:lt], meta=meta))
+        if lt_pos > pos:
+            append(_TextToken(text=text[pos:lt_pos], meta=meta))
 
-        if lt == len(text) - 1:
-            tokens.append(_TextToken(text="<", meta=meta))
-            break
+        parsed = _parse_tag_at(text, lt_pos, meta)
+        if parsed is None:
+            append(_TextToken(text="<", meta=meta))
+            pos = lt_pos + 1
+            continue
 
-        if text[lt + 1] == "/":
-            closing = _parse_closing_tag_token(text, lt, meta)
-            if closing is None:
-                tokens.append(_TextToken(text="<", meta=meta))
-                i = lt + 1
-            else:
-                token, end_pos = closing
-                tokens.append(token)
-                i = end_pos
-
-        else:
-            match = _match_opening_tag(text, lt, filter_name=None)
-            if match is None:
-                tokens.append(_TextToken(text="<", meta=meta))
-                i = lt + 1
-            else:
-                tag_name, attrs_meta, is_self_closing, end_pos = match
-                raw = text[lt:end_pos]
-                if is_self_closing:
-                    tokens.append(
-                        _SelfClosingToken(
-                            name=tag_name,
-                            attrs=attrs_meta,
-                            meta=meta,
-                            raw=raw,
-                        )
-                    )
-                else:
-                    tokens.append(
-                        _OpenToken(
-                            name=tag_name,
-                            attrs=attrs_meta,
-                            meta=meta,
-                            raw=raw,
-                        )
-                    )
-
-                i = end_pos
+        token, new_pos = parsed
+        append(token)
+        pos = new_pos
 
     return tokens
 
 
-def _parse_closing_tag_token(
+def _parse_tag_at(  # noqa: C901, PLR0911, PLR0912
+    text: str,
+    start: int,
+    meta: Meta,
+) -> tuple[Token, int] | None:
+    """Parse a tag starting at ``start``.
+
+    Returns
+    -------
+    tuple[Token, int] | None
+        Parsed token and next cursor position when well-formed, ``None`` when malformed.
+    """
+    length = len(text)
+    pos = start + 1
+    if pos >= length:
+        return None
+
+    is_closing = text[pos] == "/"
+    if is_closing:
+        pos += 1
+
+    name, pos = _parse_tag_name(text, pos)
+    if name is None:
+        return None
+
+    pos = _skip_whitespace(text, pos)
+
+    if is_closing:
+        pos = _skip_whitespace(text, pos)
+        if pos >= length or text[pos] != ">":
+            return None
+
+        end = pos + 1
+        return _CloseToken(name=name, meta=meta, raw=text[start:end]), end
+
+    # Fast path: no attributes
+    if pos < length and text[pos] == ">":
+        end = pos + 1
+        return _OpenToken(name=name, attrs=META_EMPTY, meta=meta, raw=text[start:end]), end
+    if pos + 1 < length and text[pos] == "/" and text[pos + 1] == ">":
+        end = pos + 2
+        return _SelfClosingToken(name=name, attrs=META_EMPTY, meta=meta, raw=text[start:end]), end
+
+    first_key: str | None = None
+    first_val: str = ""
+    attrs: dict[str, str] = {}
+    has_attrs = False
+
+    while pos < length:
+        pos = _skip_whitespace(text, pos)
+        if pos >= length:
+            return None
+
+        ch = text[pos]
+        if ch == ">":
+            end = pos + 1
+            meta_attrs = _meta_from_attrs(first_key, first_val, attrs if has_attrs else None)
+            return _OpenToken(name=name, attrs=meta_attrs, meta=meta, raw=text[start:end]), end
+
+        if ch == "/":
+            if pos + 1 < length and text[pos + 1] == ">":
+                end = pos + 2
+                meta_attrs = _meta_from_attrs(first_key, first_val, attrs if has_attrs else None)
+                return _SelfClosingToken(
+                    name=name,
+                    attrs=meta_attrs,
+                    meta=meta,
+                    raw=text[start:end],
+                ), end
+            return None
+
+        attr_name, pos = _parse_attr_name(text, pos)
+        if attr_name is None:
+            return None
+
+        pos = _skip_whitespace(text, pos)
+        if pos >= length or text[pos] != "=":
+            return None
+        pos += 1
+
+        pos = _skip_whitespace(text, pos)
+        if pos >= length:
+            return None
+
+        attr_value, pos = _parse_attr_value(text, pos)
+        if attr_value is None:
+            return None
+
+        if first_key is None:
+            first_key, first_val = attr_name, attr_value
+        else:
+            if not has_attrs:
+                attrs = {first_key: first_val}
+                has_attrs = True
+            attrs[attr_name] = attr_value
+
+    return None
+
+
+def _parse_tag_name(
     text: str,
     pos: int,
-    meta: Meta,
-) -> tuple[_CloseToken, int] | None:
-    if pos + 2 > len(text) or text[pos : pos + 2] != "</":
-        return None
+) -> tuple[str | None, int]:
+    if pos >= len(text) or not (text[pos].isalpha() or text[pos] == "_"):
+        return None, pos
 
-    name, name_end = _extract_tag_name(text, pos + 2)
-    if not name:
-        return None
+    start = pos
+    pos += 1
+    while pos < len(text) and (text[pos].isalnum() or text[pos] in "._:-"):
+        pos += 1
 
-    end_pos = name_end
-    while end_pos < len(text) and text[end_pos].isspace():
-        end_pos += 1
+    return text[start:pos], pos
 
-    if end_pos >= len(text) or text[end_pos] != ">":
-        return None
 
-    closing_end = end_pos + 1
-    return _CloseToken(name=name, meta=meta, raw=text[pos:closing_end]), closing_end
+def _meta_from_attrs(
+    first_key: str | None,
+    first_val: str,
+    rest: dict[str, str] | None,
+) -> Meta:
+    if first_key is None:
+        return META_EMPTY
+
+    if rest is None:
+        return Meta.of({first_key: first_val})
+
+    return Meta.of({first_key: first_val} | rest)
+
+
+def _parse_attr_name(
+    text: str,
+    pos: int,
+) -> tuple[str | None, int]:
+    if pos >= len(text) or not (text[pos].isalpha() or text[pos] == "_"):
+        return None, pos
+
+    start = pos
+    pos += 1
+    while pos < len(text) and (text[pos].isalnum() or text[pos] in "_-"):
+        pos += 1
+
+    return text[start:pos], pos
+
+
+def _parse_attr_value(  # noqa: C901, PLR0912
+    text: str,
+    pos: int,
+) -> tuple[str | None, int]:
+    if pos >= len(text) or text[pos] not in "\"'":
+        return None, pos
+
+    quote = text[pos]
+    pos += 1
+    length = len(text)
+    i = pos
+    last = pos
+    parts: list[str] = []
+
+    while i < length:
+        ch = text[i]
+        if ch == quote:
+            if last < i:
+                parts.append(text[last:i])
+            return "".join(parts), i + 1
+
+        if ch in {"\n", "\r"}:
+            return None, i
+
+        if ch == "\\":
+            if last < i:
+                parts.append(text[last:i])
+            i += 1
+            if i >= length:
+                return None, i
+            esc = text[i]
+            if esc == "n":
+                parts.append("\n")
+            elif esc == "t":
+                parts.append("\t")
+            elif esc == "r":
+                parts.append("\r")
+            elif esc in ('"', "'", "\\"):
+                parts.append(esc)
+            else:
+                parts.append("\\")
+                parts.append(esc)
+            i += 1
+            last = i
+            continue
+
+        i += 1
+
+    return None, i
 
 
 def _current_parts(
@@ -985,140 +1129,6 @@ def _find_matching_context(
         if stack[index].name == name:
             return index
     return None
-
-
-def _parse_attributes_from_string(
-    attr_text: str,
-    /,
-) -> Meta:
-    """Parse tag attributes from text using strict char-by-char parsing."""
-    if not attr_text.strip():
-        return META_EMPTY
-
-    attrs: dict[str, str] = {}
-    i = 0
-
-    while i < len(attr_text):
-        i = _skip_whitespace(attr_text, i)
-        if i >= len(attr_text):
-            break
-
-        # Parse single attribute
-        name, value, i = _parse_single_attribute(attr_text, i)
-        attrs[name] = value
-
-    return Meta.of(attrs)
-
-
-def _parse_single_attribute(
-    attr_text: str,
-    pos: int,
-    /,
-) -> tuple[str, str, int]:
-    """Parse a single attribute and return (name, value, new_pos)."""
-    # Parse attribute name
-    name, pos = _parse_strict_attr_name(attr_text, pos)
-
-    # Expect equals
-    pos = _expect_equals_sign(attr_text, pos)
-
-    # Parse quoted value
-    value, pos = _parse_quoted_attr_value(attr_text, pos)
-
-    return name, value, pos
-
-
-def _parse_strict_attr_name(
-    attr_text: str,
-    pos: int,
-    /,
-) -> tuple[str, int]:
-    """Parse attribute name with strict validation."""
-    if pos >= len(attr_text) or not (attr_text[pos].isalpha() or attr_text[pos] in "_"):
-        raise ValueError("Invalid attribute name")
-
-    start = pos
-    while pos < len(attr_text) and (attr_text[pos].isalnum() or attr_text[pos] in "_-"):
-        pos += 1
-
-    if pos == start:
-        raise ValueError("Empty attribute name")
-
-    return attr_text[start:pos], pos
-
-
-def _expect_equals_sign(
-    attr_text: str,
-    pos: int,
-    /,
-) -> int:
-    """Expect equals sign and return position after it."""
-    if pos >= len(attr_text):
-        raise ValueError("Attribute without value")
-
-    if attr_text[pos] != "=":
-        if not attr_text[pos].isspace():
-            raise ValueError("Invalid character after attribute name")
-
-        pos = _skip_whitespace(attr_text, pos)
-        if pos >= len(attr_text) or attr_text[pos] != "=":
-            raise ValueError("Attribute without value")
-
-    return pos + 1
-
-
-def _parse_quoted_attr_value(
-    attr_text: str,
-    pos: int,
-    /,
-) -> tuple[str, int]:
-    """Parse quoted attribute value."""
-    if pos >= len(attr_text) or attr_text[pos] not in "\"'":
-        raise ValueError("Attribute value must be quoted")
-
-    quote_char = attr_text[pos]
-    pos += 1  # Skip opening quote
-    value = ""
-
-    while pos < len(attr_text):
-        if attr_text[pos] == quote_char:
-            return value, pos + 1
-        elif attr_text[pos] == "\\":
-            value, pos = _handle_escape_sequence(attr_text, pos, value)
-        elif attr_text[pos] == "\n":
-            raise ValueError("Literal newline in attribute value")
-        else:
-            value += attr_text[pos]
-            pos += 1
-
-    raise ValueError("Unterminated attribute value")
-
-
-def _handle_escape_sequence(
-    attr_text: str,
-    pos: int,
-    value: str,
-    /,
-) -> tuple[str, int]:
-    """Handle escape sequence in attribute value."""
-    if pos + 1 >= len(attr_text):
-        raise ValueError("Unterminated escape sequence")
-
-    pos += 1
-    next_char = attr_text[pos]
-
-    if next_char == "n":
-        value += "\n"
-    elif next_char == "t":
-        value += "\t"
-    elif next_char == "r":
-        value += "\r"
-    elif next_char in '"\\':
-        value += next_char
-    else:
-        value += "\\" + next_char
-
-    return value, pos + 1
 
 
 def _skip_whitespace(
@@ -1174,149 +1184,6 @@ def _formatted_tag_attribute_value(
         raise ValueError("Mappings are not allowed as tag attributes")
 
     return str(value)
-
-
-def _parse_attrs(
-    attrs_text: str,
-    /,
-) -> Meta:
-    # Use the new char-by-char parser
-    return _parse_attributes_from_string(attrs_text)
-
-
-def _match_opening_tag(
-    text: str,
-    pos: int,
-    *,
-    filter_name: str | None,
-) -> tuple[str, Meta, bool, int] | None:
-    """Parse opening tag at position and return (tag_name, attributes, is_self_closing, end_pos)."""
-    if pos >= len(text) or text[pos] != "<":
-        return None
-
-    i = pos + 1
-    if i >= len(text) or text[i] == "/":
-        return None  # Closing tag or incomplete
-
-    # Parse tag name
-    tag_name, i = _extract_tag_name(text, i)
-    if not tag_name or (filter_name is not None and tag_name != filter_name):
-        return None
-
-    # Parse rest of tag
-    attrs_text, is_self_closing, end_pos = _parse_tag_remainder(text, i)
-    if end_pos is None:
-        return None
-
-    try:
-        attrs_meta = _parse_attrs(attrs_text)
-    except Exception:
-        return None
-
-    return (tag_name, attrs_meta, is_self_closing, end_pos)
-
-
-def _extract_tag_name(
-    text: str,
-    pos: int,
-    /,
-) -> tuple[str, int]:
-    """Extract tag name starting at position."""
-    if pos >= len(text) or not (text[pos].isalpha() or text[pos] in "_:"):
-        return "", pos
-
-    start = pos
-    while pos < len(text) and (text[pos].isalnum() or text[pos] in "_:.-"):
-        pos += 1
-
-    return text[start:pos], pos
-
-
-def _is_quote_escaped(
-    text: str,
-    pos: int,
-    /,
-) -> bool:
-    """Check if quote at pos is escaped by counting preceding backslashes."""
-    if pos == 0 or text[pos - 1] != "\\":
-        return False
-    # Count consecutive backslashes
-    backslash_count = 0
-    check_pos = pos - 1
-    while check_pos >= 0 and text[check_pos] == "\\":
-        backslash_count += 1
-        check_pos -= 1
-    # If odd number of backslashes, the quote is escaped
-    return backslash_count % 2 == 1
-
-
-def _handle_quoted_char(
-    text: str,
-    pos: int,
-    in_quote: str | None,
-    /,
-) -> tuple[str | None, int]:
-    """Handle character when inside a quoted string."""
-    char = text[pos]
-    if char == in_quote and not _is_quote_escaped(text, pos):
-        return None, pos + 1  # End quote
-    return in_quote, pos + 1  # Continue in quote
-
-
-def _parse_tag_remainder(
-    text: str,
-    pos: int,
-    /,
-) -> tuple[str, bool, int | None]:
-    """Parse attributes and closing of tag, return (attrs_text, is_self_closing, end_pos)."""
-    # Skip whitespace
-    while pos < len(text) and text[pos].isspace():
-        pos += 1
-
-    attrs_start = pos
-    is_self_closing = False
-    in_quote = None  # Track if we're inside a quoted string
-
-    # Find end of tag, being aware of quoted attribute values
-    while pos < len(text):
-        char = text[pos]
-
-        if in_quote:
-            in_quote, pos = _handle_quoted_char(text, pos, in_quote)
-        elif char in "\"'":
-            # Start of a quoted string
-            in_quote = char
-            pos += 1
-        elif char == ">":
-            # End of tag (only if not in quotes)
-            break
-        elif char == "/" and _is_self_closing_at(text, pos):
-            is_self_closing = True
-            # Skip to the >
-            while pos < len(text) and text[pos] != ">":
-                pos += 1
-            break
-        else:
-            pos += 1
-
-    if pos >= len(text):
-        return "", False, None
-
-    # Extract attributes text
-    attrs_text = text[attrs_start:pos].rstrip("/ \t\n\r")
-    return attrs_text, is_self_closing, pos + 1
-
-
-def _is_self_closing_at(
-    text: str,
-    pos: int,
-    /,
-) -> bool:
-    """Check if the '/' at pos indicates a self-closing tag."""
-    next_pos = pos + 1
-    while next_pos < len(text) and text[next_pos].isspace():
-        next_pos += 1
-    return next_pos < len(text) and text[next_pos] == ">"
 
 
 def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915

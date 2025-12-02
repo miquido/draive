@@ -3,9 +3,7 @@ from typing import Any
 from boto3 import Session  # pyright: ignore[reportMissingTypeStubs]
 from haiway import asynchronous
 
-__all__ = [
-    "AWSAPI",
-]
+__all__ = ("AWSAPI",)
 
 
 class AWSAPI:

@@ -116,7 +116,7 @@ async with ctx.scope(
     # use our vector index
     vector_index,
     # define used dependencies and services
-    OpenAIResponsesConfig(model="gpt-4o-mini"),
+    OpenAIResponsesConfig(model="gpt-5-mini"),
     OpenAIEmbeddingConfig(model="text-embedding-3-small"),
     disposables=(OpenAI(),),
 ):

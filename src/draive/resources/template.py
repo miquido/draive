@@ -63,10 +63,9 @@ class ResourceTemplate[**Args](
             if attribute.alias is not None
         }
         for template_parameter in template_parameters:
-            parameter: Attribute | None = (
-                self._keyword_arguments.get(template_parameter)
-                or parameters_by_alias.get(template_parameter)
-            )
+            parameter: Attribute | None = self._keyword_arguments.get(
+                template_parameter
+            ) or parameters_by_alias.get(template_parameter)
             if parameter is None and self._variadic_keyword_arguments is None:
                 raise ValueError(
                     f"URI template parameter {template_parameter} not found in function arguments"
