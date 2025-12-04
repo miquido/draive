@@ -17,8 +17,6 @@ __all__ = ("AWSS3Mixin",)
 
 
 class AWSS3Mixin(AWSAPI):
-    """S3 helper mixin that implements fetch, download, and upload APIs."""
-
     async def fetch(
         self,
         uri: str,
@@ -177,9 +175,6 @@ class AWSS3Mixin(AWSAPI):
         else:
             return response.get("ContentType"), Meta.of(response.get("Metadata"))
 
-        # Satisfy the type checker; control flow always leaves in try/except/else.
-        return None, META_EMPTY
-
     async def upload(
         self,
         uri: str,
@@ -254,6 +249,49 @@ class AWSS3Mixin(AWSAPI):
             ) from exc
 
 
+def _sanitize_metadata_value(value: Any) -> str:
+    # Convert to string first
+    text: str = str(value)
+
+    # Replace newlines and tabs with spaces
+    text = re.sub(r"[\n\r\t]+", " ", text)
+
+    # Remove any control characters
+    text = re.sub(r"[\x00-\x1F\x7F-\x9F]", "", text)
+
+    # Collapse multiple spaces
+    text = re.sub(r"\s+", " ", text).strip()
+
+    # S3 metadata value limit is 1,024 bytes per value
+    max_bytes = 1021  # Reserve 3 bytes for "..."
+    text_bytes = text.encode("utf-8")
+
+    if len(text_bytes) > max_bytes:
+        # Truncate at byte level and ensure valid UTF-8
+        truncated_bytes = text_bytes[:max_bytes]
+        # Decode with 'ignore' to handle partial characters at the end
+        text = truncated_bytes.decode("utf-8", "ignore") + "..."
+
+    return text
+
+
+def _sanitize_metadata(
+    meta: Mapping[str, BasicValue] | None,
+) -> dict[str, str]:
+    if not meta:
+        return {}
+
+    sanitized: dict[str, str] = {}
+    for key, value in meta.items():
+        # Sanitize both key and value
+        sanitized_key = _sanitize_metadata_value(key)
+        sanitized_value = _sanitize_metadata_value(value)
+        if sanitized_key and sanitized_value:  # Skip empty keys/values
+            sanitized[sanitized_key] = sanitized_value
+
+    return sanitized
+
+
 def _translate_client_error(
     *,
     error: ClientError,
@@ -305,49 +343,3 @@ def _translate_client_error(
         code=code or None,
         message=message,
     )
-
-
-def _sanitize_metadata_value(value: Any) -> str:
-    # Convert to string first
-    text: str = str(value)
-
-    # Remove non-ASCII characters
-    text = text.encode("ascii", "ignore").decode("ascii")
-
-    # Replace newlines and tabs with spaces
-    text = re.sub(r"[\n\r\t]+", " ", text)
-
-    # Remove any control characters
-    text = re.sub(r"[\x00-\x1F\x7F-\x9F]", "", text)
-
-    # Collapse multiple spaces
-    text = re.sub(r"\s+", " ", text).strip()
-
-    # S3 metadata value limit is 1,024 bytes per value
-    max_bytes = 1021  # Reserve 3 bytes for "..."
-    text_bytes = text.encode("utf-8")
-
-    if len(text_bytes) > max_bytes:
-        # Truncate at byte level and ensure valid UTF-8
-        truncated_bytes = text_bytes[:max_bytes]
-        # Decode with 'ignore' to handle partial characters at the end
-        text = truncated_bytes.decode("utf-8", "ignore") + "..."
-
-    return text
-
-
-def _sanitize_metadata(
-    meta: Mapping[str, BasicValue] | None,
-) -> dict[str, str]:
-    if not meta:
-        return {}
-
-    sanitized: dict[str, str] = {}
-    for key, value in meta.items():
-        # Sanitize both key and value
-        sanitized_key = _sanitize_metadata_value(key)
-        sanitized_value = _sanitize_metadata_value(value)
-        if sanitized_key and sanitized_value:  # Skip empty keys/values
-            sanitized[sanitized_key] = sanitized_value
-
-    return sanitized

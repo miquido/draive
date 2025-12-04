@@ -676,7 +676,7 @@ def test_replacing_self_closing_tag_with_attributes():
 
 
 def test_replacing_ignores_malformed_self_closing_tag():
-    content = MultimodalContent.of('a <img src=logo/> b')
+    content = MultimodalContent.of("a <img src=logo/> b")
 
     assert content.replacing_tag("img", replacement="X") == content
 

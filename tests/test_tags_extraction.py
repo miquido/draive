@@ -463,12 +463,12 @@ def test_self_closing_tag_with_attributes_and_space_before_slash():
 
 
 def test_invalid_self_closing_tag_with_malformed_attributes_is_skipped():
-    content = MultimodalContent.of('<img src=hero/>')
+    content = MultimodalContent.of("<img src=hero/>")
 
     assert content.tag("img") is None
 
     # Surrounding valid tag should still be found
-    content = MultimodalContent.of('<img src=hero/>', '<img src="ok.png"/>')
+    content = MultimodalContent.of("<img src=hero/>", '<img src="ok.png"/>')
 
     tags = list(content.tags("img"))
 

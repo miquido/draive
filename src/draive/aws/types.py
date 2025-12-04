@@ -1,13 +1,14 @@
-"""
-AWS specific exception types.
-"""
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
+from typing import Any, Protocol, runtime_checkable
 
-from __future__ import annotations
+from haiway import MQQueue
 
 __all__ = (
     "AWSAccessDenied",
     "AWSError",
     "AWSResourceNotFound",
+    "AWSSQSQueueAccessing",
 )
 
 
@@ -79,3 +80,14 @@ class AWSResourceNotFound(AWSError):
             code=code or "ResourceNotFound",
             message=message or "Resource not found",
         )
+
+
+@runtime_checkable
+class AWSSQSQueueAccessing(Protocol):
+    async def __call__[Content](
+        self,
+        queue: str,
+        content_encoder: Callable[[Content], str],
+        content_decoder: Callable[[str], Content],
+        **extra: Any,
+    ) -> AbstractAsyncContextManager[MQQueue[Content]]: ...

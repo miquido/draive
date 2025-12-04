@@ -9,13 +9,14 @@ __all__ = ("AWSAPI",)
 class AWSAPI:
     """Low-level AWS session and client management.
 
-    Provides an asynchronous S3 client initializer that other mixins
+    Provides an asynchronous S3 and SQS client initializers that other mixins
     can rely on without duplicating boto3 session wiring.
     """
 
     __slots__ = (
         "_s3_client",
         "_session",
+        "_sqs_client",
     )
 
     def __init__(
@@ -52,11 +53,18 @@ class AWSAPI:
 
         self._session: Session = Session(**kwargs)
         self._s3_client: Any
+        self._sqs_client: Any
 
     @asynchronous
-    def _prepare_client(self) -> None:
+    def _prepare_s3_client(self) -> None:
         self._s3_client = self._session.client(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             service_name="s3",
+        )
+
+    @asynchronous
+    def _prepare_sqs_client(self) -> None:
+        self._sqs_client = self._session.client(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            service_name="sqs",
         )
 
     @property
