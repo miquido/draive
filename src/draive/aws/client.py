@@ -6,6 +6,8 @@ from haiway import State
 
 from draive.aws.api import AWSAPI
 from draive.aws.s3 import AWSS3Mixin
+from draive.aws.sqs import AWSSQSMixin
+from draive.aws.state import AWSSQS
 from draive.resources import ResourcesRepository
 
 __all__ = ("AWS",)
@@ -14,9 +16,10 @@ __all__ = ("AWS",)
 @final
 class AWS(
     AWSS3Mixin,
+    AWSSQSMixin,
     AWSAPI,
 ):
-    """AWS service facade bundling S3 and repository integrations.
+    """AWS service facade bundling S3 and SQS integrations.
 
     Parameters
     ----------
@@ -30,7 +33,8 @@ class AWS(
         Secret key paired with ``access_key_id`` when overriding
         credentials.
     features
-        Collection of repository feature classes to activate while the
+        Collection of feature state classes (for example
+        :class:`ResourcesRepository`, :class:`AWSSQS`) to activate while the
         client is bound in a context manager.
     """
 
@@ -41,7 +45,7 @@ class AWS(
         region_name: str | None = None,
         access_key_id: str | None = None,
         secret_access_key: str | None = None,
-        features: Collection[type[ResourcesRepository]] | None = None,
+        features: Collection[type[ResourcesRepository | AWSSQS]] | None = None,
     ) -> None:
         super().__init__(
             region_name=region_name,
@@ -49,26 +53,33 @@ class AWS(
             secret_access_key=secret_access_key,
         )
 
-        self._features: Collection[type[ResourcesRepository]]
+        self._features: Collection[type[ResourcesRepository | AWSSQS]]
         if features is not None:
             self._features = features
 
         else:
-            self._features = (ResourcesRepository,)
+            self._features = ()
 
     async def __aenter__(self) -> Iterable[State]:
-        """Prepare the AWS client and bind selected features to context."""
-        await self._prepare_client()
+        features: list[State] = []
 
         if ResourcesRepository in self._features:
-            return (
+            await self._prepare_s3_client()
+            features.append(
                 ResourcesRepository(
                     fetching=self.fetch,
                     uploading=self.upload,
                 ),
             )
 
-        return ()
+        if AWSSQS in self._features:
+            await self._prepare_sqs_client()
+
+            features.append(
+                AWSSQS(queue_accessing=self._queue_access),
+            )
+
+        return features
 
     async def __aexit__(
         self,
@@ -76,4 +87,4 @@ class AWS(
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        """No-op cleanup to satisfy the async context manager protocol."""
+        pass
