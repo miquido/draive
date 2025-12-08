@@ -67,17 +67,17 @@ documents, handling audio or images — Draive has your back.
 ### Why you'll like it
 
 - **Instruction Optimization**: Draive gives you clean ways to write and refine prompts, including
-  metaprompts, instruction helpers, and optimizers. You can go from raw prompt text to a reusable,
-  structured config in no time.
+    metaprompts, instruction helpers, and optimizers. You can go from raw prompt text to a reusable,
+    structured config in no time.
 - **Composable Workflows**: Build modular flows using Stages and Tools. Every piece is reusable,
-  testable, and fits together seamlessly.
+    testable, and fits together seamlessly.
 - **Tooling = Just Python**: Define a tool by writing a function. Annotate it. That’s it. Draive
-  handles the rest — serialization, context, and integration with LLMs.
+    handles the rest — serialization, context, and integration with LLMs.
 - **Structured Outputs** - use Python classes for JSON outputs and flexible multimodal XML parser
-  for custom results transformations.
+    for custom results transformations.
 - **Telemetry + Evaluators**: Draive logs everything you care about: timing, output shape, tool
-  usage, error cases. Evaluators let you benchmark or regression-test LLM behavior like a normal
-  part of your CI.
+    usage, error cases. Evaluators let you benchmark or regression-test LLM behavior like a normal
+    part of your CI.
 - **Model-Agnostic by Design**: Built-in support for most major providers.
 
 ## 🖥️ Install

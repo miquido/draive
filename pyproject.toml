@@ -70,6 +70,7 @@ docs = [
   "mdformat-gfm~=0.4",
   "pymarkdownlnt~=0.9",
   "mkdocs-build-plantuml-plugin~=1.11",
+  "mdformat-mkdocs>=5.1.1",
 ]
 
 [tool.ruff]

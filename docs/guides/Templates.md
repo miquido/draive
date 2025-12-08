@@ -42,10 +42,10 @@ volatile_repository = TemplatesRepository.volatile(
 ```
 
 - `TemplatesRepository.file(...)` reads templates from `.tmpl` files on disk. It automatically
-  infers variables by scanning for `{% variable %}` markers.
+    infers variables by scanning for `{% variable %}` markers.
 - `TemplatesRepository.volatile(...)` keeps definitions in memory, ideal for tests or quick demos.
 - Custom backends only need to provide the `listing`, `loading`, and `defining` callables. See
-  `PostgresTemplatesRepository` for a production-ready example.
+    `PostgresTemplatesRepository` for a production-ready example.
 
 After constructing the repository, make it available in your Haiway context:
 
@@ -97,9 +97,9 @@ for declaration in declarations:
 ```
 
 - `templates()` returns `TemplateDeclaration` objects containing the identifier, optional
-  description, discovered variables, and metadata.
+    description, discovered variables, and metadata.
 - `TemplatesRepository.define(...)` (available on custom backends) persists a new revision and
-  invalidates caches. File/volatile repositories expose it automatically through the state.
+    invalidates caches. File/volatile repositories expose it automatically through the state.
 
 When defining templates programmatically, pass `variables={"user": "User name"}` to document
 expected arguments. This metadata is surfaced in listings and downstream tooling.
@@ -110,13 +110,13 @@ expected arguments. This metadata is surfaced in listings and downstream tooling
 code:
 
 - Replace instruction names with template identifiers (`InstructionDeclaration` →
-  `TemplateDeclaration`).
+    `TemplateDeclaration`).
 - Swap `InstructionsRepository.resolve(...)` with `TemplatesRepository.resolve_str(...)` or
-  `resolve(...)` if you now need multimodal payloads.
+    `resolve(...)` if you now need multimodal payloads.
 - Update placeholders from legacy `{{ variable }}` markers to `{% variable %}`. The new syntax
-  distinguishes literal braces from arguments and supports multimodal values.
+    distinguishes literal braces from arguments and supports multimodal values.
 - Remove instruction-specific argument lists; template arguments are simple mappings keyed by the
-  placeholder name.
+    placeholder name.
 
 Combining Templates with `PostgresTemplatesRepository` or other storage adapters gives you revision
 history, cache controls, and shared access across services while keeping the runtime API consistent.

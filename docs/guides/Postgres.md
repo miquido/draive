@@ -72,12 +72,12 @@ CREATE TABLE configurations (
 Key capabilities:
 
 - `configurations()` returns every known identifier using cached results (limit 1, default 10 minute
-  TTL).
+    TTL).
 - `load(config, identifier)` fetches the newest JSON document per identifier and parses it into a
-  requested configuration type.
+    requested configuration type.
 - `load_raw(identifier)` fetches raw Mapping for given identifier.
 - `define(config)` upserts a new configuration snapshot and clears both caches, guaranteeing fresh
-  reads on the next call.
+    reads on the next call.
 - `remove(identifier)` deletes all historical snapshots for the identifier and purges caches.
 
 Tune memory pressure through `cache_limit` and `cache_expiration` arguments when instantiating the
@@ -105,11 +105,11 @@ CREATE TABLE templates (
 Capabilities:
 
 - `templates()` returns cached `TemplateDeclaration` objects reflecting the newest revision per
-  identifier.
+    identifier.
 - `resolve(template)` and `resolve_str(template)` reuse a cached loader keyed by identifier to pull
-  the latest template body before rendering arguments.
+    the latest template body before rendering arguments.
 - `define(template, content)` persists a new revision, invalidates caches, and ensures subsequent
-  reads see the updated payload.
+    reads see the updated payload.
 
 Use this adapter whenever your multimodal templates live alongside other structured content in
 Postgres and you want on-demand caching with revision history.
@@ -142,11 +142,11 @@ CREATE TABLE memories_elements (
 Capabilities:
 
 - `recall(limit=...)` fetches the latest variables and replayable context elements (inputs/outputs)
-  respecting the optional `recall_limit` supplied to the factory.
+    respecting the optional `recall_limit` supplied to the factory.
 - `remember(*items, variables=...)` persists new context elements and optionally a fresh variable
-  snapshot in a single transaction.
+    snapshot in a single transaction.
 - `maintenance(variables=...)` ensures the base `memories` row exists and can seed default variables
-  without appending messages.
+    without appending messages.
 
 Use the memory helper when you need stateful chat sessions, per-user progressive profiling, or
 auditable interaction logs. Set `recall_limit` to bound the amount of context loaded back into

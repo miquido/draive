@@ -81,7 +81,7 @@ lint:
 # Format Markdown docs and README
 docs-format:
 	@echo '# Formatting Markdown...'
-	@uv run mdformat --wrap 100 README.md docs
+	@uv run mdformat README.md docs
 	@echo '...finished!'
 
 # Lint Markdown docs and README

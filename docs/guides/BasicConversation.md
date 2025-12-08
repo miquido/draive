@@ -80,7 +80,7 @@ only the assistant text, call `response.content.to_str()`.
 ## Next steps
 
 - Swap `OpenAIResponsesConfig` for another provider module (for example `draive.mistral`) to try
-  different models.
+    different models.
 - Add more tools to give the model controlled access to proprietary data or services.
 - Wrap the code in an async function and trigger it from your application entrypoint or a CLI
-  script.
+    script.

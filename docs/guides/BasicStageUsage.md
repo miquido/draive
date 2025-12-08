@@ -9,11 +9,11 @@ reliable pipelines with confidence.
 
 - **Stage** – an async callable that produces or transforms multimodal content.
 - **StageState** – an immutable snapshot holding context entries and the latest result. Always
-  return `state.updated(...)` instead of mutating in place.
+    return `state.updated(...)` instead of mutating in place.
 - **MultimodalContent** – container for text, images, artifacts, and resources used as model inputs
-  or outputs.
+    or outputs.
 - **`ctx.scope(...)`** – binds providers, disposables, and logging/metrics for the lifetime of your
-  pipeline. All observability flows through `ctx`.
+    pipeline. All observability flows through `ctx`.
 
 ## Creating Your First Completion
 
