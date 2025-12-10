@@ -7,7 +7,7 @@ highlights practical patterns for running repeatable quality checks.
 ## Prerequisites
 
 - Python 3.13+ with Draive installed and your project configured to use the shared Haiway context
-  (`ctx`).
+    (`ctx`).
 - Provider credentials available through `load_env()` or your preferred secrets loader.
 - Familiarity with async/await. All evaluation APIs are asynchronous.
 
@@ -49,7 +49,7 @@ Key ideas:
 
 - `name` identifies the evaluator in reports.
 - `threshold` defines the default pass/fail cutoff. You can override it later with
-  `.with_threshold(...)`.
+    `.with_threshold(...)`.
 - Always return an `EvaluationScore` so downstream tooling has consistent metadata.
 
 ## 2. Run an Evaluator Inside a Context Scope
@@ -105,7 +105,7 @@ Draive ships ready-to-use evaluators that cover most quality axes. Import them f
 **Interaction Quality**
 
 - `helpfulness_evaluator`, `completeness_evaluator`, `tone_style_evaluator` – score responses to
-  user prompts.
+    user prompts.
 - `required_keywords_evaluator` / `forbidden_keywords_evaluator` – enforce terminology.
 - `similarity_evaluator` – compares semantic similarity to a reference.
 
@@ -269,32 +269,32 @@ artifacts, or team reports.
 ## 6. Advanced Patterns
 
 - **Attach metadata**: `keyword_evaluator.with_meta({"version": "1.0"})` adds context that surfaces
-  in result payloads.
+    in result payloads.
 - **Compose evaluators**: `Evaluator.highest(...)` and `Evaluator.lowest(...)` let you compare
-  multiple evaluators and keep the best/worst outcome.
+    multiple evaluators and keep the best/worst outcome.
 - **Adapt inputs**: `.contra_map(lambda doc: doc.body)` transforms incoming data before evaluation,
-  perfect for domain models.
+    perfect for domain models.
 - **Control concurrency**: `evaluate(..., concurrent_tasks=2)` balances throughput with provider
-  rate limits when running many checks at once.
+    rate limits when running many checks at once.
 - **Tune thresholds per run**: Choose qualitative targets (`"good"`, `"excellent"`, etc.) or numeric
-  thresholds when converting results into pass/fail signals for CI.
+    thresholds when converting results into pass/fail signals for CI.
 
 ## 7. Troubleshooting and Best Practices
 
 - Start with generous thresholds to establish a baseline, then tighten as you collect data.
 - Log both scores and comments so reviewers understand failures quickly.
 - Use scenarios for deterministic evaluations and suites when content generation is part of the
-  test.
+    test.
 - Mock provider calls in unit tests; evaluation functions themselves remain pure async callables.
 - Keep evaluators small and single-purpose. Compose rather than creating monoliths.
 
 ## Next Steps
 
 - Dive into the full API reference in `docs/reference/evaluation.md` (or run `make docs-server` to
-  explore locally).
+    explore locally).
 - Explore domain-specific evaluators under `draive/evaluators/` for inspiration.
 - Extend scenarios with custom analytics by post-processing `EvaluatorResult.performance` across
-  runs.
+    runs.
 
 With these building blocks you can turn qualitative reviews into automated guardrails that keep your
 agents and workflows on target.

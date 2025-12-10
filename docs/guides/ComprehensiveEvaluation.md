@@ -7,11 +7,11 @@ building end-to-end evaluation flows.
 ## Evaluator Basics
 
 - Evaluators are async callables decorated with `@evaluator` that return an `EvaluationScore` or a
-  compatible numeric value.
+    compatible numeric value.
 - Thresholds determine whether an evaluation passes; named levels (`"perfect"`, `"excellent"`,
-  `"good"`, `"fair"`, `"poor"`) are easier to reason about than raw floats.
+    `"good"`, `"fair"`, `"poor"`) are easier to reason about than raw floats.
 - `EvaluatorResult.performance` is reported as a percentage and can exceed 100 when a score
-  comfortably beats its threshold.
+    comfortably beats its threshold.
 
 ### Working with `EvaluationScore`
 

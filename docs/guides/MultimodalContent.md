@@ -17,9 +17,9 @@ report = MultimodalContent.of(
 ```
 
 - Input accepts plain strings, `TextContent`, `ResourceContent`, `ResourceReference`,
-  `ArtifactContent`, other `MultimodalContent`, and `MultimodalTag` instances.
+    `ArtifactContent`, other `MultimodalContent`, and `MultimodalTag` instances.
 - Construction is normalized: adjacent text fragments are merged and existing `MultimodalContent`
-  instances are reused.
+    instances are reused.
 - The resulting object is immutable; every mutating-style call returns a new instance.
 
 ## Building Blocks
@@ -82,7 +82,7 @@ section_groups = content.split_by_meta(key="section")
 Common patterns:
 
 - Tag user-generated vs. system-generated text with `{ "source": "user" }` and
-  `{ "source": "assistant" }`.
+    `{ "source": "assistant" }`.
 - Store structured routing hints like `{ "stage": "retrieval" }` to drive downstream stages.
 
 ## Working with Resources and Artifacts
@@ -104,7 +104,7 @@ content_without_artifacts = content.without_artifacts()
 
 - `resources(mime_type=...)` narrows by MIME type (exact match).
 - `artifacts(model=..., category=...)` lets you filter by wrapped `DataModel` type and logical
-  category.
+    category.
 
 ## Tagging & Lightweight Markup
 
@@ -137,7 +137,7 @@ updated = document.replacing_tag(
 
 - `tag(name)` returns the first matching tag; `tags(name)` returns all.
 - `replacing_tag(...)` swaps one or all occurrences. Pass `strip_tags=True` to unwrap the original
-  tag markers.
+    tag markers.
 
 ## Transformations & Utilities
 
@@ -189,12 +189,12 @@ when handling model outputs.
 
 - Keep metadata small and serializable; prefer strings, numbers, and tuples of primitives.
 - Embed only assets that must travel with the request. Use `ResourceReference` for large, cacheable
-  files.
+    files.
 - Normalize user content early to attach provenance metadata and validate MIME types.
 - When chaining transformations, retain the original content for auditing by storing both the source
-  and derived instances.
+    and derived instances.
 - Use `ArtifactContent` to bridge typed internal data (e.g. summaries, retrieval chunks) rather than
-  serializing to JSON manually.
+    serializing to JSON manually.
 
 With these patterns you can confidently build, inspect, and transform rich multimodal payloads while
 preserving structure for downstream Draive stages.

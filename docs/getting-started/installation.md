@@ -43,13 +43,13 @@ uv sync --all-groups --all-extras --frozen
 - `draive[openai]`, `draive[openai_realtime]` for OpenAI Responses/Realtime.
 - `draive[anthropic]`, `draive[anthropic_bedrock]` for Claude models (direct or via Bedrock).
 - `draive[mistral]`, `draive[gemini]`, `draive[cohere]`, `draive[cohere_bedrock]` for other hosted
-  LLMs.
+    LLMs.
 - `draive[bedrock]`, `draive[aws]` for AWS model/runtime integrations.
 - `draive[ollama]`, `draive[vllm]` for local or self-hosted deployments.
 - `draive[qdrant]`, `draive[postgres]` for vector/storage backends; add `pgvector` separately where
-  needed.
+    needed.
 - `draive[httpx]`, `draive[mcp]`, `draive[opentelemetry]`, `draive[docs]` for HTTP utilities, MCP,
-  tracing, and docs site builds.
+    tracing, and docs site builds.
 
 ## Verify your environment
 

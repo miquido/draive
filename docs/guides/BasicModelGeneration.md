@@ -8,7 +8,7 @@ highlights a few customisation knobs you can try right away.
 
 - Python 3.13+ with Draive installed and activated in the project virtual environment (`.venv`).
 - An `.env` file containing a valid `OPENAI_API_KEY`. The key stays local; Draive loads it at
-  runtime.
+    runtime.
 - Familiarity with Python's async/await syntax. All generation APIs are asynchronous.
 
 > Tip: `print(...)` is perfectly fine for quick experiments. When you integrate the code into an
@@ -108,18 +108,18 @@ InterestingPlace(name='The British Museum', description='A world-famous museum d
 ## Customise the Call
 
 - **Model choice:** Swap `gpt-5-mini` for any supported JSON-mode model (`gpt-5`, `gpt-5-mini`,
-  `gpt-5-nano`, or a custom name) via `OpenAIResponsesConfig`.
+    `gpt-5-nano`, or a custom name) via `OpenAIResponsesConfig`.
 - **System behaviour:** Adjust `instructions` to inject tone, guardrails, or extra context such as
-  "Respond in 2 short sentences".
+    "Respond in 2 short sentences".
 - **User input:** Pass any serialisable payload. For complex prompts consider building a
-  `MultimodalContent` with references, images, and text snippets.
+    `MultimodalContent` with references, images, and text snippets.
 - **Validation strategy:** Add `validators=` to `ModelGeneration.generate` if you want to run
-  post-generation checks (see the evaluation guide).
+    post-generation checks (see the evaluation guide).
 
 ## Where to Go Next
 
 - Return multiple locations by switching to a `DataModel` that wraps a `Sequence[InterestingPlace]`.
 - Chain the generation result into downstream stages (for example, rendering a personalised
-  itinerary) by leaving the scope open and calling additional async helpers.
+    itinerary) by leaving the scope open and calling additional async helpers.
 - Explore `draive/models/tools` if you need the model to call tools or use retrieval augmentation
-  while producing structured data.
+    while producing structured data.

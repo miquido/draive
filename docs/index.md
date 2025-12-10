@@ -22,16 +22,16 @@ observability so that teams can ship reliable AI features faster.
 ## Key capabilities
 
 - **Multimodal content**: Work with text, images, audio, documents, and artifacts in a single, typed
-  API.
+    API.
 - **Conversation flows**: Maintain contextual, stateful chat sessions tuned for completion and
-  realtime use cases.
+    realtime use cases.
 - **Retrieval & memory**: Include vector search, resource repositories, and memory utilities for RAG
-  pipelines.
+    pipelines.
 - **Tooling & orchestration**: Model execution, tool calling, retries, and error handling patterns
-  that keep agents resilient.
+    that keep agents resilient.
 - **Safety & governance**: Moderation, privacy, and quality guardrails configurable per workflow.
 - **Operational excellence**: First-class observability, metrics, and structured concurrency to run
-  AI in production.
+    AI in production.
 
 ## Provider coverage
 
@@ -45,9 +45,9 @@ Draive ships adapters with a shared interface for:
 
 - Built on Haiway state containers (`State`, `ctx.scope`) for dependency injection without globals.
 - Modules such as `draive/generation`, `draive/conversation`, `draive/embedding`, and
-  `draive/guardrails` keep concerns separated and discoverable.
+    `draive/guardrails` keep concerns separated and discoverable.
 - Provider adapters live under `draive/<provider>/` and expose consistent config, client, and API
-  layers.
+    layers.
 - Utilities, resources, and multimodal helpers are ready to mix into your own stages and agents.
 
 ## Quick start
@@ -96,9 +96,9 @@ configuration to another provider (e.g., Cohere, Gemini) without changing the re
 
 - Use `draive.embedding` with `VectorIndex` to ingest documents and power RAG pipelines.
 - Wire external actions with `draive.models.tools` and invoke them from `TextGeneration` or custom
-  stages.
+    stages.
 - Combine guardrails from `draive.guardrails` to validate outputs before returning them to end
-  users.
+    users.
 
 ## Where to go next
 
