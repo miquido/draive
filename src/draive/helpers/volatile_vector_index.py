@@ -88,7 +88,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
             else:
                 storage[model] = embedded_models
 
-    async def search[Model: DataModel](  # noqa: C901
+    async def search[Model: DataModel](  # noqa: C901, PLR0911, PLR0912
         model: type[Model],
         /,
         *,
@@ -96,6 +96,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
         score_threshold: float | None = None,
         requirements: AttributeRequirement[Model] | None = None,
         limit: int | None = None,
+        rerank: bool = False,
         **extra: Any,
     ) -> Sequence[Model]:
         assert query is not None or (query is None and score_threshold is None)  # nosec: B101
@@ -173,14 +174,17 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
         if not matching:
             return []
 
-        return [
+        if not rerank:
+            return tuple(element.value for element in matching)
+
+        return tuple(
             matching[index].value
             for index in mmr_vector_similarity_search(
                 query_vector=query_vector,
                 values_vectors=[element.vector for element in matching],
                 limit=limit,
             )
-        ]
+        )
 
     async def delete[Model: DataModel](
         model: type[Model],
