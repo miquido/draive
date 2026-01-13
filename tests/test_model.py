@@ -61,7 +61,7 @@ def test_validated_passes_with_valid_values() -> None:
         "invalid": "valid",
         "answer": {"string": "value", "more": None},
         "all": True,
-        "default": "12345678123456781234567812345678",
+        "default": "12345678-1234-5678-1234-567812345678",
     }
     assert json.loads(ExampleModel(**values_dict).to_json()) == values_dict
 
@@ -99,7 +99,7 @@ class UUIDModel(DataModel):
 uuid_model_instance: UUIDModel = UUIDModel(
     value=UUID("0cf728c0369348e78552e8d86d35e8b0"),
 )
-uuid_model_json: str = '{"value": "0cf728c0369348e78552e8d86d35e8b0"}'
+uuid_model_json: str = '{"value": "0cf728c0-3693-48e7-8552-e8d86d35e8b0"}'
 
 
 def test_uuid_encoding() -> None:
@@ -272,7 +272,7 @@ basic_conversation_message_instance: ConversationMessage = ConversationMessage.m
 )
 basic_conversation_message_json: str = """\
 {
-    "identifier": "f6da0a47556744cdb8334d263020907f",
+    "identifier": "f6da0a47-5567-44cd-b833-4d263020907f",
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",
     "content": {
@@ -297,7 +297,7 @@ media_url_conversation_message_instance: ConversationMessage = ConversationMessa
 )
 media_url_conversation_message_json: str = """\
 {
-    "identifier": "f6da0a47556744cdb8334d263020907f",
+    "identifier": "f6da0a47-5567-44cd-b833-4d263020907f",
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",
     "content": {
@@ -324,7 +324,7 @@ media_data_conversation_message_instance: ConversationMessage = ConversationMess
 )
 media_data_conversation_message_json: str = """\
 {
-    "identifier": "f6da0a47556744cdb8334d263020907f",
+    "identifier": "f6da0a47-5567-44cd-b833-4d263020907f",
     "role": "model",
     "created": "2025-06-03T18:15:58.985599",
     "content": {

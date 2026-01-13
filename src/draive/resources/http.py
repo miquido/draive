@@ -42,7 +42,7 @@ async def http_resource_fetching(
         await response.body(),
         mime_type=response.headers.get(
             "Content-Type",
-            default="application/octet-stream",
+            "application/octet-stream",
         ),
     )
 
