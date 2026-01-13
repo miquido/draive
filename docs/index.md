@@ -3,75 +3,62 @@
 [![PyPI](https://img.shields.io/pypi/v/draive)](https://pypi.org/project/draive/)
 ![Python Version](https://img.shields.io/badge/Python-3.13+-blue)
 [![License](https://img.shields.io/github/license/miquido/draive)](https://github.com/miquido/draive/blob/main/LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/miquido/draive?style=social)](https://github.com/miquido/draive)
 
-> **🏎️ Build production-grade LLM workflows and AI applications with confidence.**
+Draive is a typed Python framework for building GenAI applications with strict state modeling,
+scoped context management, and composable async workflows.
 
-Draive is a batteries-included Python framework for composing multi-model AI systems. It combines
-structured state management, typed parameters, multimodal content handling, and comprehensive
-observability so that teams can ship reliable AI features faster.
+It is designed for teams that want predictable, testable AI systems instead of prompt scripts with
+hidden global state.
 
-## Why teams choose Draive
+## Why Draive
 
-- Unified abstraction layer across cloud, on-prem, and local LLM providers
-- Immutable, strongly typed state powered by [Haiway](https://github.com/miquido/haiway)
-- Guardrails, tool orchestration, RAG, and conversation management out of the box
-- Seamless logging, metrics, and tracing via `ctx.log_*` and `ctx.record`
-- Composable building blocks that scale from prototypes to mission-critical services
+- Explicitly typed API surface built on `State`, with runtime validation and JSON schema support.
+- Unified generation interfaces:
+    `TextGeneration`, `ModelGeneration`, `ImageGeneration`, and `AudioGeneration`.
+- Built-in tool orchestration through `@tool` and `Toolbox` with model-managed tool turns.
+- Shared multimodal model for text, resources, and artifacts across generation and retrieval flows.
+- First-class evaluation and guardrails integrated in the same context/state model.
+- Provider adapters for OpenAI, Anthropic, Gemini, Mistral, Cohere, Bedrock, Ollama, and vLLM.
 
-## Key capabilities
+## Architecture At A Glance
 
-- **Multimodal content**: Work with text, images, audio, documents, and artifacts in a single, typed
-    API.
-- **Conversation flows**: Maintain contextual, stateful chat sessions tuned for completion and
-    realtime use cases.
-- **Retrieval & memory**: Include vector search, resource repositories, and memory utilities for RAG
-    pipelines.
-- **Tooling & orchestration**: Model execution, tool calling, retries, and error handling patterns
-    that keep agents resilient.
-- **Safety & governance**: Moderation, privacy, and quality guardrails configurable per workflow.
-- **Operational excellence**: First-class observability, metrics, and structured concurrency to run
-    AI in production.
+- `ctx.scope(...)` defines an execution boundary and binds state/disposables.
+- `draive.generation` provides high-level typed generation facades.
+- `draive.steps` provides composable pipeline execution (`Step`, `StepState`).
+- `draive.multimodal` standardizes text/resources/artifacts/tagged content.
+- `draive.embedding` and `VectorIndex` power retrieval workloads.
+- `draive.evaluation` and `draive.evaluators` power quality verification.
 
-## Provider coverage
-
-Draive ships adapters with a shared interface for:
-
-- OpenAI, Anthropic, Mistral (including Azure), Cohere (including Bedrock)
-- Google Gemini (AI Studio), AWS Bedrock models, vLLM, Ollama for local models
-- Bring-your-own providers by implementing the `GenerativeModel` protocol
-
-## Architecture essentials
-
-- Built on Haiway state containers (`State`, `ctx.scope`) for dependency injection without globals.
-- Modules such as `draive/generation`, `draive/conversation`, `draive/embedding`, and
-    `draive/guardrails` keep concerns separated and discoverable.
-- Provider adapters live under `draive/<provider>/` and expose consistent config, client, and API
-    layers.
-- Utilities, resources, and multimodal helpers are ready to mix into your own stages and agents.
-
-## Quick start
+## Quick Start
 
 ### Installation
 
 ```bash
-pip install draive
+pip install "draive[openai]"
 ```
 
-Using [uv](https://github.com/astral-sh/uv)? Create an isolated environment and install Draive in
-one step:
+Create `.env` and provide your provider key:
 
-```bash
-uv venv
-uv pip install draive
+```env
+OPENAI_API_KEY=your-api-key
 ```
 
-### Minimal example
+### Minimal Text Generation
+
+The snippet below shows the core execution pattern used throughout Draive:
+
+- load environment variables once,
+- open a scoped context with provider config and client disposable,
+- call generation API from inside that scope.
 
 ```python
 import asyncio
-from draive import TextGeneration, ctx
+
+from draive import TextGeneration, ctx, load_env
 from draive.openai import OpenAI, OpenAIResponsesConfig
+
+load_env()
+
 
 async def main() -> None:
     async with ctx.scope(
@@ -79,39 +66,108 @@ async def main() -> None:
         OpenAIResponsesConfig(model="gpt-5-mini"),
         disposables=(OpenAI(),),
     ):
-        response = await TextGeneration.generate(
-            instructions="You are a branding assistant",
-            input="Give me three tagline ideas for an AI travel app",
+        result: str = await TextGeneration.generate(
+            instructions="You are a helpful assistant",
+            input="Give me three taglines for an AI travel app.",
         )
-        ctx.log_info("generated.response", content=response)
+        print(result)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-Run the script with your preferred OpenAI credentials set via environment variables. Swap the
-configuration to another provider (e.g., Cohere, Gemini) without changing the rest of the code.
+How this works:
 
-### Add retrieval or tools
+- `ctx.scope("quickstart", ...)` opens an execution scope used for tracing, state lookup, and
+    dependency lifetime.
+- `OpenAIResponsesConfig(...)` selects model and generation defaults for this scope.
+- `disposables=(OpenAI(),)` registers the provider client and closes it automatically.
+- `TextGeneration.generate(...)` resolves active provider + model from context and returns `str`.
 
-- Use `draive.embedding` with `VectorIndex` to ingest documents and power RAG pipelines.
-- Wire external actions with `draive.models.tools` and invoke them from `TextGeneration` or custom
-    stages.
-- Combine guardrails from `draive.guardrails` to validate outputs before returning them to end
-    users.
+### Typed Structured Generation
 
-## Where to go next
+`ModelGeneration` turns model output into a typed `State`. This is useful when downstream code needs
+strong contracts instead of plain text.
 
-- Explore the [getting started guide](./getting-started/index.md) to build your first workflows.
-- Dive into architecture guides under `docs/` to understand stages, state, and context patterns.
-- Run `make format && make lint && make test` to verify your contributions before submitting a PR.
-- Extend the framework by creating a new provider adapter or resource backend.
+```python
+from collections.abc import Sequence
 
-## Community & support
+from draive import ModelGeneration, State, ctx
+from draive.openai import OpenAI, OpenAIResponsesConfig
 
-- File issues and track roadmap items on [GitHub](https://github.com/miquido/draive/issues).
-- Join discussions, propose enhancements, or share your integrations via pull requests.
-- Follow [Miquido](https://miquido.com) for updates and case studies powered by Draive.
 
-**Built by [Miquido](https://miquido.com)** — empowering developers to build amazing AI
-applications.
+class PersonInfo(State, serializable=True):
+    name: str
+    role: str
+    skills: Sequence[str]
+
+
+async with ctx.scope(
+    "typed-extraction",
+    OpenAIResponsesConfig(model="gpt-5-mini"),
+    disposables=(OpenAI(),),
+):
+    person: PersonInfo = await ModelGeneration.generate(
+        PersonInfo,
+        instructions="Extract person details from the sentence.",
+        input="Ava is a backend engineer experienced in Python and Postgres.",
+        schema_injection="simplified",
+    )
+```
+
+Notes:
+
+- `serializable=True` is required for schema-based decoding into your `State`.
+- `schema_injection="simplified"` appends a compact schema description to your instructions.
+- Returned value is a validated `PersonInfo`, not raw JSON.
+
+### Tool Use In One Scope
+
+Tools are regular async functions decorated with `@tool`. They can be passed to generation calls and
+invoked by the model when appropriate.
+
+```python
+from datetime import datetime, timezone
+
+from draive import TextGeneration, ctx, tool
+from draive.openai import OpenAI, OpenAIResponsesConfig
+
+
+@tool(description="Returns current UTC timestamp in ISO-8601 format")
+async def current_utc_time() -> str:
+    return datetime.now(tz=timezone.utc).isoformat()
+
+
+async with ctx.scope(
+    "tools-demo",
+    OpenAIResponsesConfig(model="gpt-5-mini"),
+    disposables=(OpenAI(),),
+):
+    reply: str = await TextGeneration.generate(
+        instructions="Use available tools when they improve accuracy.",
+        input="What is the current UTC time?",
+        tools=[current_utc_time],
+    )
+```
+
+This lets you keep model reasoning and side-effectful capabilities separated and typed.
+
+### Step Pipelines (Refactor-Aligned)
+
+The refactored pipeline abstraction is `Step` + `StepState` (from `draive.steps`). Use it when
+single-call generation is no longer enough and you need multi-stage flows.
+
+Common patterns include:
+
+- sequential orchestration (`Step.sequence(...)`),
+- guarded loops (`Step.loop(...)`),
+- explicit state preservation/restoration across phases.
+
+For complete walkthroughs, see the dedicated step guides.
+
+## Where Next
+
+- [Getting started](./getting-started/index.md)
+- [Guides](./guides/BasicUsage.md)
+- [Cookbooks](./cookbooks/BasicRAG.md)

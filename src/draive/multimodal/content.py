@@ -1,13 +1,11 @@
-import builtins
 from collections.abc import Collection, Generator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import ClassVar, Literal, Self, cast, final, overload
+from typing import ClassVar, Literal, Self, cast, final
 
-from haiway import META_EMPTY, MISSING, BasicValue, Meta, MetaValues, Missing
+from haiway import MISSING, BasicValue, Meta, MetaValues, Missing, State
 
 from draive.multimodal.artifact import ArtifactContent
 from draive.multimodal.text import TextContent
-from draive.parameters import DataModel
 from draive.resources import MimeType, ResourceContent, ResourceReference
 
 __all__ = (
@@ -19,10 +17,16 @@ __all__ = (
 
 
 MultimodalContentPart = TextContent | ResourceReference | ResourceContent | ArtifactContent
+"""Atomic multimodal element accepted by :class:`MultimodalContent`.
+
+This union covers all non-container part types that can appear in content
+sequences: plain text, resource references, embedded resources, and typed
+artifacts.
+"""
 
 
 @final
-class MultimodalContent(DataModel):
+class MultimodalContent(State, serializable=True):
     """
     Immutable sequence of multimodal parts with normalization utilities.
 
@@ -154,7 +158,6 @@ class MultimodalContent(DataModel):
             part
             for part in self.parts
             if isinstance(part, ResourceReference | ResourceContent)
-            and part.mime_type is not None
             and part.mime_type.startswith("image")
         )
 
@@ -171,7 +174,6 @@ class MultimodalContent(DataModel):
             part
             for part in self.parts
             if isinstance(part, ResourceReference | ResourceContent)
-            and part.mime_type is not None
             and part.mime_type.startswith("audio")
         )
 
@@ -188,7 +190,6 @@ class MultimodalContent(DataModel):
             part
             for part in self.parts
             if isinstance(part, ResourceReference | ResourceContent)
-            and part.mime_type is not None
             and part.mime_type.startswith("video")
         )
 
@@ -204,72 +205,33 @@ class MultimodalContent(DataModel):
         """
         return any(isinstance(part, ArtifactContent) for part in self.parts)
 
-    @overload
     def artifacts(
         self,
-        /,
         *,
         category: str | None = None,
-    ) -> Sequence[ArtifactContent[DataModel]]: ...
-
-    @overload
-    def artifacts[Artifact: DataModel](
-        self,
-        model: builtins.type[Artifact],
-        /,
-        *,
-        category: str | None = None,
-    ) -> Sequence[ArtifactContent[Artifact]]: ...
-
-    def artifacts[Artifact: DataModel](
-        self,
-        model: builtins.type[Artifact] | None = None,
-        /,
-        *,
-        category: str | None = None,
-    ) -> Sequence[ArtifactContent[Artifact]] | Sequence[ArtifactContent[DataModel]]:
+    ) -> Sequence[ArtifactContent]:
         """
-        Return artifact parts, optionally filtered by model type and category.
+        Return artifact parts, optionally filtered by category.
 
         Parameters
         ----------
-        model : type[Artifact] | None, optional
-            When provided, only artifacts whose wrapped ``artifact`` is an
-            instance of this type are returned.
         category : str | None, optional
             When provided, only artifacts whose ``category`` equals this value
             are returned.
 
         Returns
         -------
-        Sequence[ArtifactContent[Artifact]] | Sequence[ArtifactContent[DataModel]]
+        Sequence[ArtifactContent]
             Artifact parts in order, narrowed by the provided filters.
         """
-        if model is None:
-            if category is None:
-                return tuple(part for part in self.parts if isinstance(part, ArtifactContent))
-
-            else:
-                return tuple(
-                    part
-                    for part in self.parts
-                    if isinstance(part, ArtifactContent) and part.category == category
-                )
-
-        elif category is None:
-            return tuple(
-                part
-                for part in self.parts
-                if isinstance(part, ArtifactContent) and isinstance(part.artifact, model)
-            )
+        if category is None:
+            return tuple(part for part in self.parts if isinstance(part, ArtifactContent))
 
         else:
             return tuple(
                 part
                 for part in self.parts
-                if isinstance(part, ArtifactContent)
-                and part.category == category
-                and isinstance(part.artifact, model)
+                if isinstance(part, ArtifactContent) and part.category == category
             )
 
     def without_artifacts(self) -> Self:
@@ -596,7 +558,7 @@ MultimodalContent.empty = MultimodalContent(parts=())
 
 
 @final
-class MultimodalTag(DataModel):
+class MultimodalTag(State, serializable=True):
     """
     Lightweight tag that wraps multimodal content with attributes.
 
@@ -666,6 +628,19 @@ class MultimodalTag(DataModel):
         return f"<{self.name}{_tag_attributes(self.meta)}>{self.content.to_str()}</{self.name}>"
 
     def parts(self) -> Sequence[MultimodalContentPart]:
+        """
+        Return this tag represented as multimodal parts.
+
+        The sequence is suitable for embedding inside a larger
+        ``MultimodalContent`` build operation and preserves this tag's
+        attributes and inner content.
+
+        Returns
+        -------
+        Sequence[MultimodalContentPart]
+            A self-closing tag as a single text part when empty, otherwise
+            opening tag text, inner content parts, and closing tag text.
+        """
         if not self.content.parts:
             return (TextContent(text=f"<{self.name}{_tag_attributes(self.meta)}/>"),)
 
@@ -709,6 +684,12 @@ Multimodal = (
     | ArtifactContent
     | str
 )
+"""Any supported multimodal input accepted by public multimodal APIs.
+
+The alias includes container forms (``MultimodalContent``, ``MultimodalTag``),
+atomic parts, and raw ``str`` values that are normalized into
+``TextContent`` during content construction.
+"""
 
 
 type Token = "_TextToken | _OpenToken | _CloseToken | _SelfClosingToken | MultimodalContentPart"
@@ -958,10 +939,10 @@ def _parse_tag_at(  # noqa: C901, PLR0911, PLR0912
     # Fast path: no attributes
     if pos < length and text[pos] == ">":
         end = pos + 1
-        return _OpenToken(name=name, attrs=META_EMPTY, meta=meta, raw=text[start:end]), end
+        return _OpenToken(name=name, attrs=Meta.empty, meta=meta, raw=text[start:end]), end
     if pos + 1 < length and text[pos] == "/" and text[pos + 1] == ">":
         end = pos + 2
-        return _SelfClosingToken(name=name, attrs=META_EMPTY, meta=meta, raw=text[start:end]), end
+        return _SelfClosingToken(name=name, attrs=Meta.empty, meta=meta, raw=text[start:end]), end
 
     first_key: str | None = None
     first_val: str = ""
@@ -1040,7 +1021,7 @@ def _meta_from_attrs(
     rest: dict[str, str] | None,
 ) -> Meta:
     if first_key is None:
-        return META_EMPTY
+        return Meta.empty
 
     if rest is None:
         return Meta.of({first_key: first_val})
@@ -1196,20 +1177,20 @@ def _parts_from_elements(  # noqa: C901, PLR0912, PLR0915
             if last_text is None:
                 last_text = TextContent(
                     text=element,
-                    meta=META_EMPTY,
+                    meta=Meta.empty,
                 )
 
             elif not last_text.meta:
                 last_text = TextContent(
                     text=last_text.text + element,
-                    meta=META_EMPTY,
+                    meta=Meta.empty,
                 )
 
             else:
                 yield last_text
                 last_text = TextContent(
                     text=element,
-                    meta=META_EMPTY,
+                    meta=Meta.empty,
                 )
 
         elif isinstance(element, TextContent):

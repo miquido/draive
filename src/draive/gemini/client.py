@@ -50,10 +50,10 @@ class Gemini(
     async def __aenter__(self) -> Iterable[State]:
         state: list[State] = []
         if GenerativeModel in self._features:
-            state.append(self.generative_model())
+            state.append(GenerativeModel(generating=self.completion))
 
         if TextEmbedding in self._features:
-            state.append(self.text_embedding())
+            state.append(TextEmbedding(embedding=self.create_texts_embedding))
 
         return state
 
@@ -63,4 +63,5 @@ class Gemini(
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        pass
+        await self._client.aio.aclose()
+        self._client.close()

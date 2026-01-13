@@ -11,7 +11,7 @@ __all__ = (
 
 class VLLMChatConfig(Configuration):
     model: str
-    temperature: float = 1.0
+    temperature: float | Missing = MISSING
     top_p: float | Missing = MISSING
     frequency_penalty: float | Missing = MISSING
     max_output_tokens: int | Missing = MISSING
@@ -24,4 +24,4 @@ class VLLMChatConfig(Configuration):
 class VLLMEmbeddingConfig(Configuration):
     model: str
     dimensions: int | Missing = MISSING
-    batch_size: int = 128
+    batch_size: int = 32

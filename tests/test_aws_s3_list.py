@@ -5,6 +5,8 @@ from collections.abc import Generator
 
 import pytest
 
+from draive import Pagination
+
 
 class _FakePaginator:
     def __init__(self, pages: list[dict[str, object]], client: "_FakeS3Client") -> None:
@@ -142,3 +144,19 @@ async def test_list_without_uri_lists_buckets(patched_aws_modules: type) -> None
     assert references[0].meta["type"] == "bucket"
     assert references[0].meta["creation_date"] == "2024-01-01T00:00:00Z"
     assert client._s3_client.request == {}
+
+
+@pytest.mark.asyncio
+async def test_list_paginated_uses_default_pagination_when_missing(
+    patched_aws_modules: type,
+) -> None:
+    class DummyS3(patched_aws_modules):
+        def __init__(self) -> None:
+            super().__init__()
+            self._s3_client = _FakeS3Client([])
+
+    client = DummyS3()
+    page = await client.list_paginated(pagination=None)
+
+    assert [reference.uri for reference in page.items] == ["s3://alpha", "s3://beta"]
+    assert page.pagination == Pagination.of(limit=32)

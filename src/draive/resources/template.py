@@ -1,8 +1,8 @@
 import json
 import re
-from collections.abc import Callable, Coroutine, Mapping, Sequence, Set
-from typing import Any, Protocol, final
-from urllib.parse import ParseResult, parse_qs, quote, urlencode, urlparse
+from collections.abc import Callable, Collection, Coroutine, Mapping, Sequence, Set
+from typing import Any, Protocol, final, runtime_checkable
+from urllib.parse import ParseResult, parse_qs, quote, unquote, urlencode, urlparse
 
 from haiway import MISSING, Function, Meta, MetaValues, TypeSpecification
 from haiway.attributes import Attribute
@@ -23,13 +23,14 @@ __all__ = (
 )
 
 
+@runtime_checkable
 class ResourceAvailabilityCheck(Protocol):
     def __call__(self) -> bool: ...
 
 
 @final
 class ResourceTemplate[**Args](
-    Function[Args, Coroutine[None, None, Sequence[ResourceReference] | ResourceContent]]
+    Function[Args, Coroutine[None, None, Collection[ResourceReference] | ResourceContent]]
 ):
     __slots__ = (
         "_check_availability",
@@ -75,13 +76,12 @@ class ResourceTemplate[**Args](
         object.__setattr__(
             self,
             "declaration",
-            ResourceReferenceTemplate(
+            ResourceReferenceTemplate.of(
                 template_uri=template_uri,
+                name=name,
+                description=description,
                 mime_type=mime_type,
-                meta=meta.updating(
-                    name=name,
-                    description=description,
-                ),
+                meta=meta,
             ),
         )
         self._check_availability: ResourceAvailabilityCheck
@@ -130,8 +130,7 @@ class ResourceTemplate[**Args](
         try:
             return Resource(
                 uri=resolved_uri,
-                content=await super().__call__(*args, **kwargs),
-                meta=self.declaration.meta,
+                resource=await super().__call__(*args, **kwargs),
             )
 
         except Exception as exc:
@@ -275,7 +274,7 @@ class ResourceTemplate[**Args](
                 fragment_end = self.declaration.template_uri.find("}", fragment_start)
                 if fragment_end != -1:
                     param_name = self.declaration.template_uri[fragment_start + 2 : fragment_end]
-                    params[param_name] = parsed_uri.fragment
+                    params[param_name] = unquote(parsed_uri.fragment)
 
         return params
 
@@ -324,7 +323,7 @@ class ResourceTemplate[**Args](
             for param, value in zip(positional_params, groups, strict=False):
                 if value is None:
                     continue
-                params[param] = value
+                params[param] = unquote(value)
 
         return params
 
@@ -344,7 +343,7 @@ class ResourceTemplate[**Args](
                 if param_name.startswith("?") or param_name.startswith("#"):
                     continue
 
-                params[param_name] = actual_part
+                params[param_name] = unquote(actual_part)
 
         return params
 
@@ -555,7 +554,16 @@ class ResourceTemplate[**Args](
             return self.declaration.template_uri == uri
 
         try:
-            return bool(re.match(self._match_pattern, uri))
+            parsed_uri: ParseResult = urlparse(uri)
+            parsed_template: ParseResult = urlparse(self.declaration.template_uri)
+            if parsed_template.scheme and parsed_uri.scheme != parsed_template.scheme:
+                return False
+
+            if parsed_template.netloc and parsed_uri.netloc != parsed_template.netloc:
+                return False
+
+            stripped_uri: str = parsed_uri._replace(query="", fragment="").geturl()
+            return bool(re.match(self._match_pattern, stripped_uri))
 
         except re.error:
             return False
@@ -566,6 +574,9 @@ class ResourceTemplate[**Args](
         /,
     ) -> Resource:
         try:
+            if not self.matches_uri(uri):
+                raise ResourceCorrupted(uri=uri)
+
             # Extract parameters from the URI using RFC 6570 template matching
             uri_params: Mapping[str, str] = self._extract_uri_parameters(uri)
 
@@ -574,12 +585,9 @@ class ResourceTemplate[**Args](
                 self._coerce_uri_arguments(uri_params) if uri_params else {}
             )
 
-            content = await self.__call__(**call_kwargs)  # pyright: ignore[reportCallIssue]
-
             return Resource(
                 uri=uri,  # Use the actual URI provided, not the template
-                content=content,
-                meta=self.declaration.meta,
+                resource=await self.__call__(**call_kwargs),  # pyright: ignore[reportCallIssue]
             )
 
         except Exception as exc:

@@ -74,19 +74,19 @@ class OpenAI(
         await self._initialize_client()
         state: list[State] = []
         if GenerativeModel in self._features:
-            state.append(self.generative_model())
+            state.append(GenerativeModel(generating=self.completion))
 
         if RealtimeGenerativeModel in self._features:
-            state.append(self.realtime_generative_model())
+            state.append(RealtimeGenerativeModel(session_preparing=self.session_prepare))
 
         if TextEmbedding in self._features:
-            state.append(self.text_embedding())
+            state.append(TextEmbedding(embedding=self.create_texts_embedding))
 
         if ImageGeneration in self._features:
-            state.append(self.image_generation())
+            state.append(ImageGeneration(generating=self.generate_image))
 
         if GuardrailsModeration in self._features:
-            state.append(self.moderation_guardrails())
+            state.append(GuardrailsModeration(input_checking=self.content_moderation))
 
         return state
 

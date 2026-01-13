@@ -2,11 +2,11 @@ import re
 
 import pytest
 
-from draive import (
+from draive.guardrails.safety.regex import (
+    DEFAULT_REGEX_RULES,
     RegexSanitizationRule,
     guardrails_regex_sanitizer,
 )
-from draive.guardrails.safety.regex import DEFAULT_REGEX_RULES
 from draive.guardrails.safety.types import (
     GuardrailsSafetyException,
     GuardrailsSafetySanitization,

@@ -1,8 +1,8 @@
+import json
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from collections.abc import AsyncGenerator, Collection, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from typing import Any, final
-from uuid import uuid4
 
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from haiway import Disposable, Disposables, State, as_dict, ctx
@@ -19,9 +19,9 @@ from mcp.types import Tool as MCPTool
 from pydantic import AnyUrl
 from starlette.types import ASGIApp
 
-from draive.models import Tool, Toolbox
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 from draive.resources import Resource, ResourceContent, ResourceReference, ResourceTemplate
+from draive.tools import Tool, Toolbox
 
 __all__ = ("MCPServer",)
 
@@ -37,7 +37,7 @@ class MCPServer:
         version: str | None = None,
         instructions: str | None = None,
         resources: Iterable[ResourceTemplate[Any] | Resource] = (),
-        tools: Toolbox | Iterable[Tool] = (),
+        tools: Toolbox | Iterable[Tool] = Toolbox.empty,
         disposables: Collection[Disposable] = (),
     ) -> None:
         @asynccontextmanager
@@ -131,14 +131,14 @@ class MCPServer:
             match resource:
                 case Resource():
                     available_resources[resource.uri] = resource
-                    match resource.content:
+                    match resource.resource:
                         case ResourceContent() as content:
                             resource_declarations.append(
                                 MCPResource(
                                     uri=AnyUrl(resource.uri),
                                     mimeType=content.mime_type,
-                                    name=resource.meta.name or resource.uri,
-                                    description=resource.meta.description,
+                                    name=resource.resource.meta.name or resource.uri,
+                                    description=resource.resource.meta.description,
                                 )
                             )
 
@@ -260,9 +260,8 @@ class MCPServer:
                 *self._server.request_context.lifespan_context,
             ):
                 return _convert_multimodal_content(
-                    await toolbox.call_tool(
+                    await toolbox.call(
                         name,
-                        call_id=uuid4().hex,
                         arguments=arguments,
                     )
                 )
@@ -271,18 +270,18 @@ class MCPServer:
 def _resource_content(
     resource: Resource,
 ) -> Iterable[ReadResourceContents]:
-    if isinstance(resource.content, ResourceContent):
-        match resource.content.mime_type:
+    if isinstance(resource.resource, ResourceContent):
+        match resource.resource.mime_type:
             case "text/plain" | "application/json":
                 yield ReadResourceContents(
-                    content=urlsafe_b64decode(resource.content.data).decode(),
-                    mime_type=resource.content.mime_type,
+                    content=urlsafe_b64decode(resource.resource.data).decode(),
+                    mime_type=resource.resource.mime_type,
                 )
 
             case _:
                 yield ReadResourceContents(
-                    content=urlsafe_b64decode(resource.content.data),
-                    mime_type=resource.content.mime_type,
+                    content=urlsafe_b64decode(resource.resource.data),
+                    mime_type=resource.resource.mime_type,
                 )
 
     else:
@@ -370,7 +369,7 @@ def _convert_multimodal_content(
 
         else:
             assert isinstance(part, ArtifactContent)  # nosec: B101
-            encoded: str = urlsafe_b64encode(part.artifact.to_json().encode()).decode()
+            encoded: str = urlsafe_b64encode(json.dumps(part.artifact).encode()).decode()
             uri = AnyUrl(f"data:application/json;base64,{encoded}")
             converted.append(
                 EmbeddedResource(

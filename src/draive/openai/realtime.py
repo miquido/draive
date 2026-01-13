@@ -1,11 +1,13 @@
 import json
 from base64 import b64decode, b64encode, urlsafe_b64decode
-from collections.abc import Generator, Mapping, MutableMapping, Sequence
+from collections.abc import Generator, Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
+from copy import copy
 from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import uuid4
 
+from haiway import MISSING, Meta, Missing, State, ctx, without_missing
 from openai.resources.realtime.realtime import (
     AsyncRealtimeConnection,
     AsyncRealtimeConnectionManager,
@@ -14,41 +16,30 @@ from openai.types.realtime import (
     RealtimeServerEvent,
     RealtimeSessionCreateRequestParam,
 )
-from openai.types.realtime.realtime_conversation_item_assistant_message import (
-    Content as AssistantContent,
-)
 from openai.types.realtime.realtime_conversation_item_assistant_message_param import (
     Content as AssistantContentParam,
-)
-from openai.types.realtime.realtime_conversation_item_user_message import (
-    Content as UserContent,
 )
 from openai.types.realtime.realtime_conversation_item_user_message_param import (
     Content as UserContentParam,
 )
 
-from draive import MISSING, Meta, Missing, ctx, without_missing
 from draive.models import (
     ModelContext,
     ModelException,
     ModelInput,
-    ModelInputChunk,
     ModelInstructions,
-    ModelMemory,
-    ModelMemoryRecall,
     ModelOutput,
-    ModelOutputChunk,
     ModelSession,
     ModelSessionEvent,
-    ModelSessionInput,
-    ModelSessionOutput,
+    ModelSessionInputChunk,
+    ModelSessionOutputChunk,
     ModelSessionOutputSelection,
     ModelSessionScope,
     ModelToolRequest,
     ModelToolResponse,
-    ModelToolsDeclaration,
-    RealtimeGenerativeModel,
+    ModelTools,
 )
+from draive.models.metrics import record_model_invocation, record_usage_metrics
 from draive.multimodal import ArtifactContent, MultimodalContent, MultimodalContentPart, TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIRealtimeConfig
@@ -58,15 +49,12 @@ __all__ = ("OpenAIRealtime",)
 
 
 class OpenAIRealtime(OpenAIAPI):
-    def realtime_generative_model(self) -> RealtimeGenerativeModel:
-        return RealtimeGenerativeModel(session_preparing=self.session_prepare)
-
     async def session_prepare(  # noqa: C901, PLR0915
         self,
         *,
         instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
-        memory: ModelMemory,
+        tools: ModelTools,
+        context: ModelContext,
         output: ModelSessionOutputSelection,
         config: OpenAIRealtimeConfig | None = None,
         **extra: Any,
@@ -79,7 +67,7 @@ class OpenAIRealtime(OpenAIAPI):
             output=output,
         )
         # managing scope manually
-        scope: AbstractAsyncContextManager[str] = ctx.scope("openai_realtime")
+        scope: AbstractAsyncContextManager[str] = ctx.scope("model.session")
         # prepare connection
         connection_manager: AsyncRealtimeConnectionManager = self._client.realtime.connect(
             model=config.model,
@@ -87,13 +75,6 @@ class OpenAIRealtime(OpenAIAPI):
                 "max_size": None,  # explicitly define no size limit
             },
         )
-        input_audio_format: str
-        match config.input_parameters:
-            case {"format": {"type": str() as audio_input}}:
-                input_audio_format = audio_input
-
-            case _:
-                input_audio_format = "audio/pcm"
 
         output_audio_format: str
         match config.output_parameters:
@@ -106,219 +87,122 @@ class OpenAIRealtime(OpenAIAPI):
         async def open_session() -> ModelSession:  # noqa: C901, PLR0915
             # enter scope
             await scope.__aenter__()
-            ctx.record_info(
-                attributes={
-                    "model.provider": "openai",
-                    "model.name": config.model,
-                    "model.tools": [tool.name for tool in tools.specifications],
-                    "model.tool_selection": f"{tools.selection}",
-                    "model.output": f"{output}",
-                },
+            record_model_invocation(
+                provider="openai",
+                model=config.model,
+                tools=tools,
+                output=output,
             )
             # open connection
             connection: AsyncRealtimeConnection = await connection_manager.__aenter__()
             # setup connection
             await connection.session.update(session=session_config)
 
-            # initialize context
             current_items: MutableMapping[str, Meta] = {}
 
-            def message_identifier(item_id: str) -> str:
-                nonlocal current_items
-
-                if meta := current_items.get(item_id):
-                    if identifier := meta.get_str("identifier"):
-                        return identifier
-
-                message_identifier: str = str(uuid4())
-                current_items[item_id] = Meta.of(
-                    {
-                        "identifier": message_identifier,
-                        "created": datetime.now(UTC).isoformat(),
-                        "item_id": item_id,
-                    }
-                )
-                return message_identifier
-
-            memory_recall: ModelMemoryRecall = await memory.recall()
-            if memory_recall.context:
+            if context:
                 await _send_context(
-                    memory_recall.context,
+                    context,
                     current_items=current_items,
                     connection=connection,
                 )
 
-            async def read() -> ModelSessionOutput:  # noqa: C901, PLR0911, PLR0912, PLR0915
+            async def read() -> ModelSessionOutputChunk:  # noqa: C901, PLR0911, PLR0912, PLR0915
                 nonlocal current_items
                 while True:
                     event: RealtimeServerEvent = await connection.recv()
                     match event.type:
                         case "response.output_audio.delta":
                             # send the audio chunk
-                            return ModelOutputChunk.of(
-                                ResourceContent.of(
-                                    b64decode(event.delta),
-                                    mime_type=output_audio_format,
-                                ),
+                            return ResourceContent.of(
+                                b64decode(event.delta),
+                                mime_type=output_audio_format,
                                 meta={
-                                    "message_identifier": message_identifier(event.item_id),
-                                    "created": datetime.now(UTC).isoformat(),
-                                },
-                            )
-
-                        case "response.output_audio.done":
-                            # send the audio end event
-                            return ModelSessionEvent.of(
-                                "output.audio.completed",
-                                meta={
-                                    "message_identifier": message_identifier(event.item_id),
+                                    "identifier": event.item_id,
+                                    "item_id": event.item_id,
+                                    "response_id": event.response_id,
+                                    "output_index": event.output_index,
                                     "created": datetime.now(UTC).isoformat(),
                                 },
                             )
 
                         case "response.output_text.delta":
                             # send the text chunk
-                            return ModelOutputChunk.of(
-                                TextContent.of(event.delta),
+                            return TextContent.of(
+                                event.delta,
                                 meta={
-                                    "message_identifier": message_identifier(event.item_id),
+                                    "identifier": event.item_id,
+                                    "item_id": event.item_id,
+                                    "response_id": event.response_id,
+                                    "output_index": event.output_index,
                                     "created": datetime.now(UTC).isoformat(),
                                 },
                             )
-
-                        case "response.output_text.done":
-                            # send the text end event
-                            return ModelSessionEvent.of(
-                                "output.text.completed",
-                                meta={
-                                    "message_identifier": message_identifier(event.item_id),
-                                    "created": datetime.now(UTC).isoformat(),
-                                },
-                            )
-
-                        case "response.output_audio_transcript.delta":
-                            # send the transcript text chunk (mark via meta)
-                            return ModelOutputChunk.of(
-                                TextContent.of(event.delta, meta={"transcript": True}),
-                                meta={
-                                    "message_identifier": message_identifier(event.item_id),
-                                    "created": datetime.now(UTC).isoformat(),
-                                },
-                            )
-
-                        case "response.output_audio_transcript.done":
-                            # send the transcript end event
-                            return ModelSessionEvent.of(
-                                "output.transcript.completed",
-                                meta={
-                                    "message_identifier": message_identifier(event.item_id),
-                                    "created": datetime.now(UTC).isoformat(),
-                                },
-                            )
-
-                        case "response.done":
-                            # record token usage if able - it should appear within this event
-                            if usage := event.response.usage:
-                                ctx.record_info(
-                                    metric="model.input_tokens",
-                                    value=usage.input_tokens
-                                    if usage.input_tokens is not None
-                                    else 0,
-                                    unit="tokens",
-                                    kind="counter",
-                                    attributes={
-                                        "model.name": config.model,
-                                        "model.provider": "openai",
-                                    },
-                                )
-                                ctx.record_info(
-                                    metric="model.output_tokens",
-                                    value=usage.output_tokens
-                                    if usage.output_tokens is not None
-                                    else 0,
-                                    unit="tokens",
-                                    kind="counter",
-                                    attributes={
-                                        "model.name": config.model,
-                                        "model.provider": "openai",
-                                    },
-                                )
-
-                            continue  # keep going, nothing to send here
 
                         case "response.output_item.done":
+                            assert event.item.id is not None  # nosec: B101
+
                             match event.item.type:
                                 # received tool call
                                 case "function_call":
-                                    if event.item.call_id is None:
-                                        continue  # can't use tool calls without call id
-
-                                    if not event.item.name:
-                                        continue  # can't use tool calls without tool name
+                                    assert event.item.status == "completed"  # nosec: B101
 
                                     return ModelToolRequest.of(
-                                        event.item.call_id,
+                                        event.item.call_id or str(uuid4()),
                                         tool=event.item.name,
                                         arguments=json.loads(event.item.arguments)
                                         if event.item.arguments
                                         else None,
                                         meta={  # using predefined meta keys
+                                            "identifier": event.item.id,
+                                            "item_id": event.item.id,
+                                            "call_id": event.item.call_id,
+                                            "response_id": event.response_id,
+                                            "output_index": event.output_index,
                                             "created": datetime.now(UTC).isoformat(),
                                         },
                                     )
 
                                 case "message":
-                                    if event.item.id is None:
-                                        continue  # can't use messages without item id
-
                                     if event.item.role != "assistant":
                                         continue  # skip other events
 
-                                    # send empty eod chunk - ends the response
-                                    return ModelOutputChunk.of(
-                                        MultimodalContent.empty,
-                                        eod=True,
+                                    # send eod event - ends the response
+                                    return ModelSessionEvent.turn_finished(
                                         meta={
-                                            "message_identifier": message_identifier(event.item.id),
-                                            "created": datetime.now(UTC).isoformat(),
+                                            "identifier": event.item.id,
+                                            "item_id": event.item.id,
+                                            "response_id": event.response_id,
+                                            "output_index": event.output_index,
                                         },
                                     )
-
-                                case "function_call_output":
-                                    continue  # ignored for now
 
                                 case _:
                                     continue  # ignored for now
 
                         case "input_audio_buffer.speech_started":
                             # send event that VAD detected input speach
-                            return ModelSessionEvent.of(
-                                "input.audio.started",
+                            return ModelSessionEvent.turn_started(
                                 meta={
-                                    "message_identifier": message_identifier(event.item_id),
+                                    "identifier": event.item_id,
                                     "created": datetime.now(UTC).isoformat(),
                                 },
                             )
 
                         case "input_audio_buffer.committed":
                             # send event that input speech has ended
-                            return ModelSessionEvent.of(
-                                "input.audio.completed",
+                            return ModelSessionEvent.turn_commited(
                                 meta={
-                                    "message_identifier": message_identifier(event.item_id),
+                                    "identifier": event.item_id,
                                     "created": datetime.now(UTC).isoformat(),
                                 },
                             )
 
                         case "conversation.item.created":
-                            if event.item.id is None:
-                                continue  # can't use items without item id
+                            assert event.item.id is not None  # nosec: B101
 
                             if event.item.type != "message":
                                 continue  # skip non-message items
-
-                            if event.item.role == "system":
-                                continue  # skip system messages
 
                             if event.item.id in current_items:
                                 continue  # we are already handling it
@@ -326,25 +210,45 @@ class OpenAIRealtime(OpenAIAPI):
                             if event.item.role == "user":
                                 current_items[event.item.id] = Meta.of(
                                     {  # using predefined meta keys
-                                        "item_id": event.item.id,
-                                        "identifier": str(uuid4()),
+                                        "identifier": event.item.id,
                                         "created": datetime.now(UTC).isoformat(),
                                     }
                                 )
+                                # request the full item to be stored in the memory
+                                await connection.conversation.item.retrieve(item_id=event.item.id)
 
                             elif event.item.role == "assistant":
                                 current_items[event.item.id] = Meta.of(
                                     {  # using predefined meta keys
-                                        "item_id": event.item.id,
-                                        "identifier": str(uuid4()),
+                                        "identifier": event.item.id,
                                         "created": datetime.now(UTC).isoformat(),
                                     }
                                 )
+                                # request the full item to be stored in the memory
+                                await connection.conversation.item.retrieve(item_id=event.item.id)
 
-                            # request the full item to be stored in the memory
-                            await connection.conversation.item.retrieve(item_id=event.item.id)
+                            else:
+                                continue  # skip other
+
+                        case "response.done":
+                            # record token usage if able - it should appear within this event
+                            if usage := event.response.usage:
+                                record_usage_metrics(
+                                    provider="openai",
+                                    model=config.model,
+                                    input_tokens=usage.input_tokens or 0,
+                                    cached_input_tokens=(
+                                        usage.input_token_details.cached_tokens
+                                        if usage.input_token_details is not None
+                                        else None
+                                    ),
+                                    output_tokens=usage.output_tokens or 0,
+                                )
+
+                            continue  # keep going, nothing to send here
 
                         case "conversation.item.input_audio_transcription.completed":
+                            # request the full item to be stored in the memory
                             await connection.conversation.item.retrieve(item_id=event.item_id)
 
                         case "conversation.item.done":
@@ -361,7 +265,7 @@ class OpenAIRealtime(OpenAIAPI):
                             if event.item.id is None:
                                 continue  # can't use items without item id
 
-                            if not event.item.type == "message":
+                            if event.item.type != "message":
                                 continue  # handle only messages
 
                             # Only record completed items, otherwise request once more
@@ -370,47 +274,57 @@ class OpenAIRealtime(OpenAIAPI):
                                 continue  # retry getting completed event
 
                             assert event.item.content  # nosec: B101
-                            match event.item.role:
-                                case "user":
-                                    try:
-                                        await memory.remember(
-                                            ModelInput.of(
-                                                _user_content_to_multimodal(
-                                                    event.item.content,
-                                                    audio_format=input_audio_format,
-                                                ),
-                                                meta=current_items[event.item.id],
-                                            ),
-                                        )
 
-                                    except Exception as exc:
-                                        ctx.log_error(
-                                            "Failed to remember model context",
-                                            exception=exc,
-                                        )
-                                        raise exc
+                            if event.item.role == "user":
+                                item_meta: Meta = current_items.get(
+                                    event.item.id,
+                                    Meta.of(
+                                        {
+                                            "identifier": event.item.id,
+                                            "created": datetime.now(UTC).isoformat(),
+                                        }
+                                    ),
+                                )
 
-                                case "assistant":
-                                    try:
-                                        await memory.remember(
-                                            ModelOutput.of(
-                                                _assistant_content_to_multimodal(
-                                                    event.item.content,
-                                                    audio_format=output_audio_format,
-                                                ),
-                                                meta=current_items[event.item.id],
-                                            ),
-                                        )
+                                return ModelSessionEvent.turn_completed(
+                                    ModelInput.of(
+                                        MultimodalContent.of(
+                                            *_content_to_multimodal(
+                                                event.item.content,
+                                                audio_format="audio/pcm",
+                                            )
+                                        ),
+                                        meta=item_meta,
+                                    ),
+                                    meta=item_meta,
+                                )
 
-                                    except Exception as exc:
-                                        ctx.log_error(
-                                            "Failed to remember model context",
-                                            exception=exc,
-                                        )
-                                        raise exc
+                            elif event.item.role == "assistant":
+                                item_meta: Meta = current_items.get(
+                                    event.item.id,
+                                    Meta.of(
+                                        {
+                                            "identifier": event.item.id,
+                                            "created": datetime.now(UTC).isoformat(),
+                                        }
+                                    ),
+                                )
 
-                                case _:
-                                    continue  # skip other
+                                return ModelSessionEvent.turn_completed(
+                                    ModelOutput.of(
+                                        MultimodalContent.of(
+                                            *_content_to_multimodal(
+                                                event.item.content,
+                                                audio_format=output_audio_format,
+                                            )
+                                        ),
+                                        meta=item_meta,
+                                    ),
+                                    meta=item_meta,
+                                )
+
+                            else:
+                                continue  # skip other items
 
                         case "error":
                             raise ModelException(
@@ -423,15 +337,21 @@ class OpenAIRealtime(OpenAIAPI):
                         case _:
                             continue  # skip other events
 
-            async def write(
-                input: ModelSessionInput,  # noqa: A002
+            async def send_input_part(
+                part: MultimodalContentPart,
+                /,
             ) -> None:
-                nonlocal current_items
-                if isinstance(input, ModelInputChunk):
-                    await _send_input_chunk(
-                        input,
-                        connection=connection,
-                    )
+                if isinstance(part, ResourceContent):
+                    await connection.input_audio_buffer.append(audio=part.data)
+
+                else:
+                    ctx.log_error("OpenAI realtime input not supported! Skipping...")
+
+            async def write(
+                input: ModelSessionInputChunk,  # noqa: A002
+            ) -> None:
+                if isinstance(input, MultimodalContentPart):
+                    await send_input_part(input)
 
                 elif isinstance(input, ModelToolResponse):
                     await _send_tool_response(
@@ -439,20 +359,21 @@ class OpenAIRealtime(OpenAIAPI):
                         connection=connection,
                     )
 
-                else:  # session event
-                    match input.category:
-                        case "memory.update":
-                            ctx.log_debug("Received memory update event")
+                else:
+                    assert isinstance(input, ModelSessionEvent)  # nosec: B101
+                    if input.event == "turn_commited":
+                        await connection.input_audio_buffer.commit()
 
-                            await _reset_context(
-                                (await memory.recall()).context,
-                                current_items=current_items,
-                                connection=connection,
-                            )
-                            current_items = {}
+                    elif input.event == "context_updated":
+                        ctx.log_debug("Context memory update event")
+                        await _reset_context(
+                            _event_context(input),
+                            current_items=current_items,
+                            connection=connection,
+                        )
 
-                        case other:
-                            ctx.log_debug(f"Received unsupported input event: {other}")
+                    else:
+                        ctx.log_debug(f"Received unsupported input event: {input.event}")
 
             return ModelSession(
                 reading=read,
@@ -480,40 +401,6 @@ class OpenAIRealtime(OpenAIAPI):
         )
 
 
-async def _send_input_chunk(
-    chunk: ModelInputChunk,
-    /,
-    *,
-    connection: AsyncRealtimeConnection,
-) -> None:
-    # stream audio if we got only audio resources
-    audio_parts = chunk.content.audio()
-    if audio_parts and len(audio_parts) == len(chunk.content.parts):
-        for part in audio_parts:
-            match part:
-                case ResourceContent() as media:
-                    await connection.input_audio_buffer.append(audio=media.data)
-
-                case ResourceReference():
-                    # skip not supported with a log to prevent connection break
-                    ctx.log_error(
-                        "OpenAI realtime input (ResourceReference audio) not supported! Skipping..."
-                    )
-
-        if chunk.eod:
-            await connection.input_audio_buffer.commit()
-
-    else:
-        await connection.conversation.item.create(
-            item={
-                "type": "message",
-                "role": "user",
-                "status": "completed" if chunk.eod else "incomplete",
-                "content": _user_content_parts(chunk.content),
-            },
-        )
-
-
 async def _send_context(
     context: ModelContext,
     /,
@@ -524,7 +411,7 @@ async def _send_context(
     for element in context:
         match element:
             case ModelInput() as input_element:
-                identifier: str = (input_element.meta.identifier or uuid4()).hex
+                identifier: str = str(input_element.meta.identifier or uuid4())
                 current_items[identifier] = input_element.meta
                 await connection.conversation.item.create(
                     item={
@@ -538,18 +425,26 @@ async def _send_context(
                     },
                 )
                 # include tool responses following the output
-                for response in input_element.tools:
+                for response in input_element.tool_responses:
+                    item_id: str = str(response.meta.identifier or uuid4())
+                    current_items[item_id] = Meta.of(
+                        {
+                            "item_id": item_id,
+                            "identifier": item_id,
+                            "created": datetime.now(UTC).isoformat(),
+                        }
+                    )
                     await connection.conversation.item.create(
                         item={
-                            "id": (response.meta.identifier or uuid4()).hex,
+                            "id": item_id,
                             "type": "function_call_output",
                             "call_id": response.identifier,
-                            "output": _tool_result(response.content),
+                            "output": _tool_result(response.result),
                         },
                     )
 
             case ModelOutput() as output_element:
-                identifier: str = (output_element.meta.identifier or uuid4()).hex
+                identifier: str = str(output_element.meta.identifier or uuid4())
                 current_items[identifier] = output_element.meta
                 # prior assistant content
                 await connection.conversation.item.create(
@@ -564,10 +459,18 @@ async def _send_context(
                     },
                 )
                 # include tool requests following the output
-                for request in output_element.tools:
+                for request in output_element.tool_requests:
+                    item_id: str = str(request.meta.identifier or uuid4())
+                    current_items[item_id] = Meta.of(
+                        {
+                            "item_id": item_id,
+                            "identifier": item_id,
+                            "created": datetime.now(UTC).isoformat(),
+                        }
+                    )
                     await connection.conversation.item.create(
                         item={
-                            "id": (request.meta.identifier or uuid4()).hex,
+                            "id": item_id,
                             "type": "function_call",
                             "call_id": request.identifier,
                             "name": request.tool,
@@ -583,7 +486,7 @@ async def _reset_context(
     *,
     connection: AsyncRealtimeConnection,
 ) -> None:
-    for item_id in current_items.keys():
+    for item_id in copy(current_items).keys():
         try:
             await connection.conversation.item.delete(item_id=item_id)
             del current_items[item_id]
@@ -606,11 +509,12 @@ def _user_content_parts(  # noqa: C901, PLR0912
 ) -> Generator[UserContentParam]:
     for part in content.parts:
         if isinstance(part, TextContent):
-            if part.meta.get("transcript", False):
+            if part.meta.get("transcript"):
                 yield {
                     "type": "input_text",
                     "transcript": part.text,
                 }
+
             else:
                 yield {
                     "type": "input_text",
@@ -620,15 +524,16 @@ def _user_content_parts(  # noqa: C901, PLR0912
         elif isinstance(part, ResourceContent):
             if part.mime_type.startswith("audio"):
                 # convert stored base64 (possibly urlsafe) to standard base64 string
+                raw_data: bytes
                 try:
-                    raw = urlsafe_b64decode(part.data)
+                    raw_data = urlsafe_b64decode(part.data)
 
                 except Exception:
-                    raw = b64decode(part.data)
+                    raw_data = b64decode(part.data)
 
                 yield {
                     "type": "input_audio",
-                    "audio": b64encode(raw).decode(),
+                    "audio": b64encode(raw_data).decode(),
                 }
 
             elif part.mime_type.startswith("image"):
@@ -654,7 +559,7 @@ def _user_content_parts(  # noqa: C901, PLR0912
 
             yield {
                 "type": "input_text",
-                "text": part.artifact.to_str(),
+                "text": part.to_str(),
             }
 
 
@@ -683,7 +588,7 @@ def _assistant_content_parts(
 
             yield {
                 "type": "output_text",
-                "text": part.artifact.to_str(),
+                "text": part.to_str(),
             }
 
 
@@ -704,7 +609,7 @@ def _tool_result(
             if part.hidden:
                 continue  # skip hidden
 
-            response_output.append(part.artifact.to_str())
+            response_output.append(part.to_str())
 
     return "".join(response_output)
 
@@ -719,7 +624,7 @@ async def _send_tool_response(
         item={
             "type": "function_call_output",
             "call_id": response.identifier,
-            "output": _tool_result(response.content),
+            "output": _tool_result(response.result),
         },
     )
 
@@ -730,7 +635,7 @@ def _prepare_session_config(
     *,
     instructions: ModelInstructions | None,
     config: OpenAIRealtimeConfig,
-    tools: ModelToolsDeclaration,
+    tools: ModelTools,
     output: ModelSessionOutputSelection,
 ) -> RealtimeSessionCreateRequestParam:
     modalities: list[Literal["text", "audio"]]
@@ -750,7 +655,7 @@ def _prepare_session_config(
         case _:
             raise ValueError(f"Unsupported output: {output}")
 
-    tool_choice: str
+    tool_choice: str | Mapping[str, str]
     match tools.selection:
         case "auto":
             tool_choice = "auto"
@@ -762,7 +667,10 @@ def _prepare_session_config(
             tool_choice = "none"
 
         case tool:
-            tool_choice = tool
+            tool_choice = {
+                "type": "function",
+                "name": tool.name,
+            }
 
     session_tools: list[Mapping[str, Any]] | Missing
     if tools:
@@ -775,7 +683,7 @@ def _prepare_session_config(
                     "parameters": tool.parameters or MISSING,
                 },
             )
-            for tool in tools.specifications
+            for tool in tools.specification
         ]
 
     else:
@@ -798,59 +706,47 @@ def _prepare_session_config(
     )
 
 
-def _user_content_to_multimodal(
-    content: Sequence[UserContent],
+def _event_context(
+    event: ModelSessionEvent,
     /,
-    audio_format: str,
-) -> MultimodalContent:
-    parts: list[MultimodalContentPart] = []
-    for part in content:
-        if part.text:
-            parts.append(TextContent.of(part.text))
+) -> ModelContext:
+    if event.content is None:
+        return ()
 
-        if part.audio:
-            parts.append(
-                ResourceContent.of(
-                    part.audio,
-                    mime_type=audio_format,
-                )
-            )
+    if isinstance(event.content, State):
+        return ()
 
-        if part.transcript:
-            parts.append(
-                TextContent.of(
-                    part.transcript,
-                    meta={"transcript": True},
-                )
-            )
-
-    return MultimodalContent.of(*parts)
+    return event.content
 
 
-def _assistant_content_to_multimodal(
-    content: Sequence[AssistantContent],
+def _content_to_multimodal(
+    content: Any,
     /,
+    *,
     audio_format: str,
-) -> MultimodalContent:
-    parts: list[MultimodalContentPart] = []
-    for part in content:
-        if part.text:
-            parts.append(TextContent.of(part.text))
+) -> Generator[MultimodalContentPart]:
+    for element in content:
+        match element.get("type"):
+            case "output_audio" | "input_audio" | "audio":
+                if encoded_audio := element.get("audio"):
+                    try:
+                        yield ResourceContent.of(
+                            b64decode(encoded_audio),
+                            mime_type=audio_format,
+                        )
 
-        if part.audio:
-            parts.append(
-                ResourceContent.of(
-                    part.audio,
-                    mime_type=audio_format,
-                )
-            )
+                    except Exception as exc:
+                        ctx.log_warning(
+                            "Failed to decode audio content",
+                            exception=exc,
+                        )
 
-        if part.transcript:
-            parts.append(
-                TextContent.of(
-                    part.transcript,
-                    meta={"transcript": True},
-                )
-            )
+            case "output_text" | "input_text":
+                if text := element.get("text"):
+                    yield TextContent.of(text)
 
-    return MultimodalContent.of(*parts)
+                if transcript := element.get("transcript"):
+                    yield TextContent.of(transcript, meta={"transcript": True})
+
+            case other:
+                ctx.log_warning(f"Unsupported message content - {other}")

@@ -67,7 +67,8 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from draive import Disposable, State, ctx, load_env, setup_logging
+from haiway import Disposable, State, ctx, load_env, setup_logging
+
 from draive.anthropic import Anthropic, AnthropicConfig
 from draive.gemini import Gemini, GeminiConfig
 from draive.helpers import InstructionPreparationAmbiguity, prepare_instructions

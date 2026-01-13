@@ -11,7 +11,7 @@ __all__ = (
 
 class MistralChatConfig(Configuration):
     model: str
-    temperature: float = 1.0
+    temperature: float | Missing = MISSING
     top_p: float | Missing = MISSING
     seed: int | Missing = MISSING
     max_output_tokens: int | Missing = MISSING

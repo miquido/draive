@@ -1,7 +1,6 @@
 # Quickstart
 
-Build a minimal Draive app that talks to OpenAI, loads environment variables, invokes tools, and
-adapts to other providers.
+Build a minimal Draive app using `ctx.scope`, provider configuration, tool calls, and typed output.
 
 ## Prerequisites
 
@@ -9,13 +8,13 @@ adapts to other providers.
 pip install "draive[openai]"
 ```
 
-Create an `.env` file with your credentials:
+Create `.env`:
 
 ```env
-OPENAI_API_KEY=your-api-key-here
+OPENAI_API_KEY=your-api-key
 ```
 
-Load the environment before hitting the API:
+Load env variables before your first provider call:
 
 ```python
 from draive import load_env
@@ -23,12 +22,20 @@ from draive import load_env
 load_env()
 ```
 
-## Generate your first response
+## Generate Text
+
+This is the smallest production-shaped flow:
+
+- scope label for logs/traces,
+- explicit model configuration state,
+- provider client managed as disposable.
 
 ```python
 import asyncio
-from draive import ctx, TextGeneration
+
+from draive import TextGeneration, ctx
 from draive.openai import OpenAI, OpenAIResponsesConfig
+
 
 async def main() -> None:
     async with ctx.scope(
@@ -36,26 +43,33 @@ async def main() -> None:
         OpenAIResponsesConfig(model="gpt-5-mini"),
         disposables=(OpenAI(),),
     ):
-        result = await TextGeneration.generate(
+        result: str = await TextGeneration.generate(
             instructions="You are a helpful assistant",
             input="What is the capital of France?",
         )
         print(result)
 
+
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## Expose tools to the model
+## Add Tools
+
+Tools are regular async functions wrapped with `@tool`. Pass them through `tools=[...]` and the
+framework will manage request/response tool turns with the model.
 
 ```python
 from datetime import datetime, timezone
-from draive import ctx, TextGeneration, tool
+
+from draive import TextGeneration, ctx, tool
 from draive.openai import OpenAI, OpenAIResponsesConfig
 
-@tool(description="Return the current UTC timestamp")
+
+@tool(description="Return current UTC timestamp")
 async def current_time() -> str:
     return datetime.now(tz=timezone.utc).isoformat()
+
 
 async def with_tools() -> None:
     async with ctx.scope(
@@ -64,25 +78,31 @@ async def with_tools() -> None:
         disposables=(OpenAI(),),
     ):
         result = await TextGeneration.generate(
-            instructions="You are a helpful assistant with access to tools",
-            input="What's the time right now?",
+            instructions="Use tools when useful.",
+            input="What time is it right now?",
             tools=[current_time],
         )
         print(result)
 ```
 
-## Generate structured data
+## Generate Typed Output
+
+Use `ModelGeneration` when you want structured output that is validated and decoded into a typed
+model.
 
 ```python
 from collections.abc import Sequence
-from draive import DataModel, ModelGeneration, ctx
+
+from draive import ModelGeneration, State, ctx
 from draive.openai import OpenAI, OpenAIResponsesConfig
 
-class PersonInfo(DataModel):
+
+class PersonInfo(State, serializable=True):
     name: str
     age: int
     occupation: str
     skills: Sequence[str]
+
 
 async def extract_person() -> None:
     async with ctx.scope(
@@ -90,23 +110,26 @@ async def extract_person() -> None:
         OpenAIResponsesConfig(model="gpt-5-mini"),
         disposables=(OpenAI(),),
     ):
-        person = await ModelGeneration.generate(
+        person: PersonInfo = await ModelGeneration.generate(
             PersonInfo,
-            instructions="Extract the person details from the passage",
-            input="""
-            John Smith is a 32-year-old software engineer living in Seattle.
-            He specialises in Python, machine learning, and cloud architecture.
-            """,
+            instructions="Extract person details from the passage.",
+            input=(
+                "John Smith is a 32-year-old software engineer in Seattle. "
+                "He works with Python, ML, and cloud architecture."
+            ),
         )
         print(person)
 ```
 
-## Swap providers
+## Swap Providers
+
+The surrounding workflow stays the same; only config/client states change.
 
 ```python
+from draive import TextGeneration, ctx
 from draive.anthropic import Anthropic, AnthropicConfig
 from draive.gemini import Gemini, GeminiConfig
-from draive import TextGeneration, ctx
+
 
 async def joke_with_claude() -> None:
     async with ctx.scope(
@@ -114,11 +137,13 @@ async def joke_with_claude() -> None:
         AnthropicConfig(model="claude-3-5-haiku-20241022"),
         disposables=(Anthropic(),),
     ):
-        result = await TextGeneration.generate(
-            instructions="You are Claude, a playful assistant",
-            input="Tell me a short joke",
+        print(
+            await TextGeneration.generate(
+                instructions="You are concise and playful.",
+                input="Tell me a short joke.",
+            )
         )
-        print(result)
+
 
 async def joke_with_gemini() -> None:
     async with ctx.scope(
@@ -126,17 +151,16 @@ async def joke_with_gemini() -> None:
         GeminiConfig(model="gemini-2.5-flash"),
         disposables=(Gemini(),),
     ):
-        result = await TextGeneration.generate(
-            instructions="You are Gemini, a playful assistant",
-            input="Tell me a short joke",
+        print(
+            await TextGeneration.generate(
+                instructions="You are concise and playful.",
+                input="Tell me a short joke.",
+            )
         )
-        print(result)
 ```
 
-## Next steps
+## Next Steps
 
-- Wire up conversations with memory in [Basic Conversation](../guides/BasicConversation.md).
-- Explore typed outputs in [Basic Model Generation](../guides/BasicModelGeneration.md).
-- Manage observability and traces with [Evaluator Catalog](../guides/EvaluatorCatalog.md).
-
-When you are ready for deeper patterns continue with the [First Steps](first-steps.md) guide.
+- [First Steps](./first-steps.md)
+- [Basic Model Generation](../guides/BasicModelGeneration.md)
+- [Basic Tools Use](../guides/BasicToolsUse.md)

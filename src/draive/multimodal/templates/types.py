@@ -1,7 +1,7 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol, Self, final, runtime_checkable
 
-from haiway import META_EMPTY, Meta, MetaValues, State
+from haiway import Meta, MetaValues, State
 
 from draive.multimodal.content import Multimodal
 
@@ -15,6 +15,7 @@ __all__ = (
 )
 
 
+@final
 class TemplateMissing(Exception):
     """Raised when a requested template declaration or content cannot be found.
 
@@ -36,7 +37,7 @@ class TemplateMissing(Exception):
 
 
 @final
-class Template(State):
+class Template(State, serializable=True):
     """Immutable template reference describing how to render multimodal content.
 
     Templates reference concrete content by identifier and optionally carry default
@@ -85,7 +86,7 @@ class Template(State):
 
     identifier: str
     arguments: Mapping[str, Multimodal]
-    meta: Meta = META_EMPTY
+    meta: Meta = Meta.empty
 
     def with_arguments(
         self,
@@ -140,7 +141,7 @@ class Template(State):
 
 
 @final
-class TemplateDeclaration(State):
+class TemplateDeclaration(State, serializable=True):
     """Immutable template declaration describing user-facing template metadata.
 
     Declarations surface template descriptions and declared variables without
@@ -196,7 +197,7 @@ class TemplateDeclaration(State):
     identifier: str
     description: str | None = None
     variables: Mapping[str, str]
-    meta: Meta = META_EMPTY
+    meta: Meta = Meta.empty
 
 
 @runtime_checkable

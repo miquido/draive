@@ -1,7 +1,7 @@
 from typing import Any, Protocol, runtime_checkable
 
 from draive.models import ModelInstructions
-from draive.multimodal import MultimodalContent
+from draive.multimodal import Multimodal
 from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("ImageGenerating",)
@@ -13,6 +13,6 @@ class ImageGenerating(Protocol):
         self,
         *,
         instructions: ModelInstructions,
-        input: MultimodalContent,  # noqa: A002
+        input: Multimodal,  # noqa: A002
         **extra: Any,
     ) -> ResourceContent | ResourceReference: ...

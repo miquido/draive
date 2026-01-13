@@ -5,7 +5,7 @@ from haiway import asynchronous, ctx
 
 from draive.bedrock.api import BedrockAPI
 from draive.bedrock.config import BedrockInputGuardraisConfig, BedrockOutputGuardraisConfig
-from draive.guardrails import GuardrailsModeration, GuardrailsModerationException
+from draive.guardrails import GuardrailsModerationException
 from draive.multimodal import Multimodal, MultimodalContent, TextContent
 from draive.resources import ResourceContent, ResourceReference
 
@@ -13,12 +13,6 @@ __all__ = ("BedrockGuardrails",)
 
 
 class BedrockGuardrails(BedrockAPI):
-    def guardrails_moderation(self) -> GuardrailsModeration:
-        return GuardrailsModeration(
-            input_checking=self.content_input_verification,
-            output_checking=self.content_output_verification,
-        )
-
     async def content_input_verification(
         self,
         content: Multimodal,

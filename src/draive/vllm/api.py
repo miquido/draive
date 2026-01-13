@@ -23,7 +23,9 @@ class VLLMAPI:
         timeout: float | None = None,
         **extra: Any,
     ) -> None:
-        self._base_url: str | None = base_url or getenv_str("VLLM_BASE_URL")
+        self._base_url: str = (
+            base_url or getenv_str("VLLM_BASE_URL") or getenv_str("OPENAI_BASE_URL", required=True)
+        )
         self._default_headers: Mapping[str, str] | None = default_headers
         self._extra: Mapping[str, Any] = extra
         self._timeout: float | None = timeout

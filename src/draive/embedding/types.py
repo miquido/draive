@@ -2,7 +2,6 @@ from collections.abc import Callable, Collection, Sequence
 from typing import Any, Protocol, runtime_checkable
 
 from haiway import (
-    META_EMPTY,
     AttributePath,
     AttributeRequirement,
     Meta,
@@ -10,7 +9,6 @@ from haiway import (
 )
 
 from draive.multimodal import TextContent
-from draive.parameters import DataModel
 from draive.resources import ResourceContent
 
 __all__ = (
@@ -22,14 +20,14 @@ __all__ = (
 )
 
 
-class Embedded[Value: DataModel | State | str | bytes](State):
+class Embedded[Value: State | str | bytes](State):
     value: Value
     vector: Sequence[float]
-    meta: Meta = META_EMPTY
+    meta: Meta = Meta.empty
 
 
 @runtime_checkable
-class ValueEmbedding[Value: DataModel | State | str | bytes, Data: str | bytes](Protocol):
+class ValueEmbedding[Value: State | str | bytes, Data: str | bytes](Protocol):
     async def __call__(
         self,
         values: Sequence[Value] | Sequence[Data],
@@ -41,7 +39,7 @@ class ValueEmbedding[Value: DataModel | State | str | bytes, Data: str | bytes](
 
 @runtime_checkable
 class VectorIndexing(Protocol):
-    async def __call__[Model: DataModel, Value: ResourceContent | TextContent | str](
+    async def __call__[Model: State, Value: ResourceContent | TextContent | str](
         self,
         model: type[Model],
         /,
@@ -54,7 +52,7 @@ class VectorIndexing(Protocol):
 
 @runtime_checkable
 class VectorSearching(Protocol):
-    async def __call__[Model: DataModel](
+    async def __call__[Model: State](
         self,
         model: type[Model],
         /,
@@ -69,7 +67,7 @@ class VectorSearching(Protocol):
 
 @runtime_checkable
 class VectorDeleting(Protocol):
-    async def __call__[Model: DataModel](
+    async def __call__[Model: State](
         self,
         model: type[Model],
         /,

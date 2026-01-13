@@ -3,7 +3,16 @@ from collections.abc import Callable, Iterable, Sequence
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
-from haiway import AttributePath, AttributeRequirement, as_dict, as_list
+from haiway import (
+    AttributePath,
+    AttributeRequirement,
+    Paginated,
+    Pagination,
+    State,
+    as_dict,
+    as_list,
+)
+from qdrant_client.grpc import PointId
 from qdrant_client.models import (
     CollectionsResponse,
     Datatype,
@@ -12,14 +21,13 @@ from qdrant_client.models import (
     FilterSelector,
     PayloadSchemaType,
     PointStruct,
+    Record,
     VectorParams,
 )
 
 from draive.embedding import Embedded
-from draive.parameters import DataModel
 from draive.qdrant.filters import prepare_filter
 from draive.qdrant.session import QdrantSession
-from draive.qdrant.types import QdrantPaginationResult, QdrantPaginationToken
 
 __all__ = ("QdrantStoreMixin",)
 
@@ -29,7 +37,7 @@ class QdrantStoreMixin(QdrantSession):
         collections: CollectionsResponse = await self.client.get_collections()
         return tuple(collection.name for collection in collections.collections)
 
-    async def create_collection[Model: DataModel](
+    async def create_collection[Model: State](
         self,
         model: type[Model],
         /,
@@ -61,7 +69,7 @@ class QdrantStoreMixin(QdrantSession):
             **extra,
         )
 
-    async def create_payload_index[Model: DataModel, Attribute](
+    async def create_payload_index[Model: State, Attribute](
         self,
         model: type[Model],
         /,
@@ -91,7 +99,7 @@ class QdrantStoreMixin(QdrantSession):
         )
         return True
 
-    async def delete_collection[Model: DataModel](
+    async def delete_collection[Model: State](
         self,
         model: type[Model],
         /,
@@ -99,75 +107,68 @@ class QdrantStoreMixin(QdrantSession):
         await self.client.delete_collection(collection_name=model.__name__)
 
     @overload
-    async def fetch[Model: DataModel](
+    async def fetch[Model: State](
         self,
         model: type[Model],
         /,
         *,
         requirements: AttributeRequirement[Model] | None = None,
-        continuation: QdrantPaginationToken | None = None,
-        limit: int = 32,
+        pagination: Pagination | None = None,
         include_vector: Literal[False] = False,
         **extra: Any,
-    ) -> QdrantPaginationResult[Model]: ...
+    ) -> Paginated[Model]: ...
 
     @overload
-    async def fetch[Model: DataModel](
+    async def fetch[Model: State](
         self,
         model: type[Model],
         /,
         *,
         requirements: AttributeRequirement[Model] | None = None,
-        continuation: QdrantPaginationToken | None = None,
-        limit: int = 32,
+        pagination: Pagination | None = None,
         include_vector: Literal[True],
         **extra: Any,
-    ) -> QdrantPaginationResult[Embedded[Model]]: ...
+    ) -> Paginated[Embedded[Model]]: ...
 
     @overload
-    async def fetch[Model: DataModel](
+    async def fetch[Model: State](
         self,
         model: type[Model],
         /,
         *,
         requirements: AttributeRequirement[Model] | None = None,
-        continuation: QdrantPaginationToken | None = None,
-        limit: int = 32,
+        pagination: Pagination | None = None,
         include_vector: bool,
         **extra: Any,
-    ) -> QdrantPaginationResult[Embedded[Model]] | QdrantPaginationResult[Model]: ...
+    ) -> Paginated[Embedded[Model]] | Paginated[Model]: ...
 
-    async def fetch[Model: DataModel](
+    async def fetch[Model: State](
         self,
         model: type[Model],
         /,
         *,
         requirements: AttributeRequirement[Model] | None = None,
-        continuation: QdrantPaginationToken | None = None,
-        limit: int = 32,
+        pagination: Pagination | None = None,
         include_vector: bool = False,
         **extra: Any,
-    ) -> QdrantPaginationResult[Embedded[Model]] | QdrantPaginationResult[Model]:
-        records, next_point_id = await self.client.scroll(
+    ) -> Paginated[Embedded[Model]] | Paginated[Model]:
+        pagination = pagination if pagination is not None else Pagination.of(limit=32)
+        assert isinstance(pagination.token, PointId | None)  # nosec: B101
+        records: Sequence[Record]
+        continuation_token: Any | None
+        records, continuation_token = await self.client.scroll(
             collection_name=model.__name__,
             scroll_filter=prepare_filter(requirements=requirements),
-            limit=limit,
-            offset=continuation.next_id if continuation else None,
+            limit=pagination.limit,
+            offset=pagination.token,
             with_payload=True,
             with_vectors=include_vector,
             **extra,
         )
 
-        continuation_token: QdrantPaginationToken | None
-        if next_point_id is not None:
-            continuation_token = QdrantPaginationToken(next_id=next_point_id)
-
-        else:
-            continuation_token = None
-
         if include_vector:
-            return QdrantPaginationResult[Embedded[model]](
-                results=[
+            return Paginated[Embedded[model]](
+                items=[
                     Embedded[model](
                         value=model.from_mapping(record.payload),
                         # we are using only a single vector
@@ -176,20 +177,20 @@ class QdrantStoreMixin(QdrantSession):
                     for record in records
                     if record.payload is not None
                 ],
-                continuation_token=continuation_token,
+                pagination=pagination.with_token(continuation_token),
             )
 
         else:
-            return QdrantPaginationResult[model](
-                results=[
+            return Paginated[model](
+                items=[
                     model.from_mapping(record.payload)
                     for record in records
                     if record.payload is not None
                 ],
-                continuation_token=continuation_token,
+                pagination=pagination.with_token(continuation_token),
             )
 
-    async def store[Model: DataModel](
+    async def store[Model: State](
         self,
         model: type[Model],
         /,
@@ -211,7 +212,7 @@ class QdrantStoreMixin(QdrantSession):
             ),
         )
 
-    def _partial_store[Model: DataModel](
+    def _partial_store[Model: State](
         self,
         model: type[Model],
         /,
@@ -229,7 +230,7 @@ class QdrantStoreMixin(QdrantSession):
                 collection_name=model.__name__,
                 points=[
                     PointStruct(
-                        id=uuid4().hex,
+                        id=str(uuid4()),
                         payload=as_dict(element.value.to_mapping()),
                         vector=as_list(element.vector),
                     )
@@ -245,7 +246,7 @@ class QdrantStoreMixin(QdrantSession):
 
         return store
 
-    async def delete[Model: DataModel](
+    async def delete[Model: State](
         self,
         model: type[Model],
         /,

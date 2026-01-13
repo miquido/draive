@@ -6,19 +6,16 @@ from typing import Any, cast
 from haiway import State, as_list, ctx
 from ollama import EmbedResponse
 
-from draive.embedding import Embedded, TextEmbedding
+from draive.embedding import Embedded
+from draive.models.metrics import record_embedding_invocation, record_embedding_metrics
 from draive.ollama.api import OllamaAPI
 from draive.ollama.config import OllamaEmbeddingConfig
-from draive.parameters import DataModel
 
 __all__ = ("OllamaEmbedding",)
 
 
 class OllamaEmbedding(OllamaAPI):
-    def text_embedding(self) -> TextEmbedding:
-        return TextEmbedding(embedding=self.create_texts_embedding)
-
-    async def create_texts_embedding[Value: DataModel | State](
+    async def create_texts_embedding[Value: State](
         self,
         values: Sequence[Value] | Sequence[str],
         /,
@@ -28,18 +25,7 @@ class OllamaEmbedding(OllamaAPI):
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
         embedding_config: OllamaEmbeddingConfig = config or ctx.state(OllamaEmbeddingConfig)
-        async with ctx.scope("ollama_text_embedding"):
-            ctx.record_info(
-                attributes={
-                    "embedding.provider": "ollama",
-                    "embedding.model": embedding_config.model,
-                    "embedding.batch_size": embedding_config.batch_size,
-                    "embedding.concurrent": embedding_config.concurrent,
-                },
-            )
-            ctx.record_debug(
-                attributes=embedding_config.to_mapping(),
-            )
+        async with ctx.scope("ollama.text_embedding"):
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))
@@ -49,33 +35,28 @@ class OllamaEmbedding(OllamaAPI):
 
             assert all(isinstance(element, str) for element in attributes)  # nosec: B101
 
-            ctx.record_info(
-                metric="embedding.items",
-                value=len(attributes),
-                unit="count",
-                kind="counter",
-                attributes={
-                    "embedding.provider": "ollama",
-                    "embedding.model": embedding_config.model,
-                    "embedding.type": "text",
-                },
+            record_embedding_invocation(
+                provider="ollama",
+                model=embedding_config.model,
+                embedding_type="text",
+                batch_size=embedding_config.batch_size,
+                concurrent=embedding_config.concurrent,
+            )
+            record_embedding_metrics(
+                provider="ollama",
+                model=embedding_config.model,
+                embedding_type="text",
+                items=len(attributes),
+                batches=(
+                    (len(attributes) + embedding_config.batch_size - 1)
+                    // embedding_config.batch_size
+                    if attributes
+                    else 0
+                ),
             )
 
             if not attributes:
                 return ()  # empty
-
-            ctx.record_info(
-                metric="embedding.batches",
-                value=(len(attributes) + embedding_config.batch_size - 1)
-                // embedding_config.batch_size,
-                unit="count",
-                kind="counter",
-                attributes={
-                    "embedding.provider": "ollama",
-                    "embedding.model": embedding_config.model,
-                    "embedding.type": "text",
-                },
-            )
 
             responses: list[EmbedResponse]
             if embedding_config.concurrent:

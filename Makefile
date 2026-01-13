@@ -10,7 +10,7 @@ TESTS_PATH := tests
 -include .env
 
 ifndef UV_VERSION
-	UV_VERSION := 0.9.26
+	UV_VERSION := 0.10.9
 endif
 
 .PHONY: uv_check venv sync update format lint test docs docs-server docs-format docs-lint release
@@ -73,7 +73,7 @@ format:
 	@ruff format --quiet $(SOURCES_PATH) $(TESTS_PATH)
 
 # Run linters and code checks.
-lint:
+lint: sync
 	@bandit -r $(SOURCES_PATH)
 	@ruff check $(SOURCES_PATH) $(TESTS_PATH)
 	@pyright --project ./
@@ -91,7 +91,7 @@ docs-lint:
 	@echo '...finished!'
 
 # Run tests suite.
-test:
+test: sync
 	@python -B -m pytest -v --cov=$(SOURCES_PATH) --rootdir=$(TESTS_PATH)
 
 # Build documentation for production

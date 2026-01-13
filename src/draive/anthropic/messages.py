@@ -1,23 +1,26 @@
+import json
 import random
-from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable, Mapping, Sequence
-from typing import Any, Literal, cast, overload
+from collections.abc import AsyncIterable, Generator, Iterable, MutableSequence, Sequence
+from typing import Any, TypedDict, cast
 
 from anthropic import Omit, omit
 from anthropic import RateLimitError as AnthropicRateLimitError
 from anthropic.types import (
-    CitationCharLocation,
-    CitationContentBlockLocation,
-    CitationPageLocation,
-    CitationsSearchResultLocation,
-    ContentBlock,
+    CitationsDelta,
     ImageBlockParam,
-    Message,
+    InputJSONDelta,
     MessageParam,
+    RawContentBlockDeltaEvent,
+    RawContentBlockStartEvent,
+    RawMessageDeltaEvent,
+    RawMessageStartEvent,
     RedactedThinkingBlock,
-    TextBlock,
+    SignatureDelta,
     TextBlockParam,
+    TextDelta,
     ThinkingBlock,
     ThinkingConfigParam,
+    ThinkingDelta,
     ToolChoiceParam,
     ToolParam,
     ToolResultBlockParam,
@@ -27,12 +30,9 @@ from anthropic.types import (
 from anthropic.types.redacted_thinking_block_param import RedactedThinkingBlockParam
 from anthropic.types.thinking_block_param import ThinkingBlockParam
 from haiway import (
-    META_EMPTY,
     MISSING,
-    Meta,
     Missing,
     as_dict,
-    as_list,
     ctx,
     unwrap_missing,
 )
@@ -40,22 +40,26 @@ from haiway import (
 from draive.anthropic.api import AnthropicAPI
 from draive.anthropic.config import AnthropicConfig
 from draive.models import (
-    GenerativeModel,
     ModelContext,
+    ModelException,
     ModelInput,
     ModelInputInvalid,
     ModelInstructions,
     ModelOutput,
+    ModelOutputChunk,
     ModelOutputFailed,
+    ModelOutputInvalid,
     ModelOutputLimit,
     ModelOutputSelection,
     ModelRateLimit,
     ModelReasoning,
-    ModelStreamOutput,
+    ModelReasoningChunk,
     ModelToolRequest,
-    ModelToolsDeclaration,
+    ModelTools,
     ModelToolSpecification,
     ModelToolsSelection,
+    record_model_invocation,
+    record_usage_metrics,
 )
 from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, TextContent
 from draive.resources import ResourceContent, ResourceReference
@@ -64,134 +68,37 @@ __all__ = ("AnthropicMessages",)
 
 
 class AnthropicMessages(AnthropicAPI):
-    def generative_model(self) -> GenerativeModel:
-        return GenerativeModel(generating=self.completion)
-
-    @overload
-    def completion(
+    async def completion(  # noqa: C901, PLR0912, PLR0915
         self,
         *,
         instructions: ModelInstructions,
         context: ModelContext,
-        tools: ModelToolsDeclaration,
+        tools: ModelTools,
         output: ModelOutputSelection,
-        stream: Literal[False] = False,
         config: AnthropicConfig | None = None,
         prefill: Multimodal | None = None,
         **extra: Any,
-    ) -> Coroutine[None, None, ModelOutput]: ...
-
-    @overload
-    def completion(
-        self,
-        *,
-        instructions: ModelInstructions,
-        context: ModelContext,
-        tools: ModelToolsDeclaration,
-        output: ModelOutputSelection,
-        stream: Literal[True],
-        config: AnthropicConfig | None = None,
-        prefill: Multimodal | None = None,
-        **extra: Any,
-    ) -> AsyncGenerator[ModelStreamOutput]: ...
-
-    def completion(
-        self,
-        *,
-        instructions: ModelInstructions,
-        context: ModelContext,
-        tools: ModelToolsDeclaration,
-        output: ModelOutputSelection,
-        stream: bool = False,
-        config: AnthropicConfig | None = None,
-        prefill: Multimodal | None = None,
-        **extra: Any,
-    ) -> AsyncGenerator[ModelStreamOutput] | Coroutine[None, None, ModelOutput]:
-        if stream:
-            return self._completion_stream(
-                instructions=instructions,
-                context=context,
+    ) -> AsyncIterable[ModelOutputChunk]:
+        async with ctx.scope("model.invocation"):
+            config = config or ctx.state(AnthropicConfig)
+            record_model_invocation(
+                provider=self._provider,
+                model=config.model,
+                temperature=config.temperature,
+                max_output_tokens=config.max_output_tokens,
                 tools=tools,
                 output=output,
-                config=config or ctx.state(AnthropicConfig),
-                prefill=prefill,
-                **extra,
+                stop_sequences=config.stop_sequences,
+                thinking_budget=config.thinking_budget,
             )
-
-        else:
-            return self._completion(
-                instructions=instructions,
-                context=context,
-                tools=tools,
-                output=output,
-                config=config or ctx.state(AnthropicConfig),
-                prefill=prefill,
-                **extra,
-            )
-
-    async def _completion(  # noqa: C901, PLR0912
-        self,
-        *,
-        instructions: ModelInstructions,
-        context: ModelContext,
-        tools: ModelToolsDeclaration,
-        output: ModelOutputSelection,
-        config: AnthropicConfig,
-        prefill: Multimodal | None = None,
-        **extra: Any,
-    ) -> ModelOutput:
-        async with ctx.scope("model.completion"):
-            ctx.record_info(
-                attributes={
-                    "model.provider": self._provider,
-                    "model.name": config.model,
-                    "model.temperature": config.temperature,
-                    "model.thinking_budget": config.thinking_budget,
-                    "model.stop_sequences": config.stop_sequences,
-                    "model.output": str(output),
-                    "model.max_output_tokens": config.max_output_tokens,
-                    "model.tools.count": len(tools.specifications),
-                    "model.tools.selection": tools.selection,
-                    "model.stream": False,
-                },
-            )
-            ctx.record_debug(
-                attributes={
-                    "model.instructions": instructions,
-                    "model.tools": [tool.name for tool in tools.specifications],
-                    "model.context": [element.to_str() for element in context],
-                },
-            )
-
-            if output not in ("auto", "text", "json"):
-                raise NotImplementedError(f"{output} output is not supported by Anthropic")
 
             messages: Iterable[MessageParam]
-            try:  # Build base messages from context
-                if prefill is not None:
-                    messages = (
-                        *_context_messages(context),
-                        {
-                            "role": "assistant",
-                            "content": _content_elements(
-                                MultimodalContent.of(prefill),
-                                cache_type=None,
-                            ),
-                        },
-                    )
-
-                elif output == "json" or isinstance(output, type):
-                    messages = (
-                        *_context_messages(context),
-                        {
-                            "role": "assistant",
-                            # Bias the model toward JSON by pre-filling the opening brace
-                            "content": [{"type": "text", "text": "{"}],
-                        },
-                    )
-
-                else:
-                    messages = _context_messages(context)
+            try:
+                messages = _context_messages(
+                    context,
+                    prefill=prefill,
+                    output=output,
+                )
 
             except Exception as exc:
                 raise ModelInputInvalid(
@@ -201,71 +108,232 @@ class AnthropicMessages(AnthropicAPI):
 
             tools_list: Iterable[ToolParam] | Omit
             tool_choice: ToolChoiceParam | Omit
-            if tools.specifications:
-                tool_choice = _tools_selection_as_tool_choice(tools.selection)
-                tools_list = _tools_as_tool_params(tools.specifications)
+            tool_choice, tools_list = _tools_as_tool_params(
+                selection=tools.selection,
+                specification=tools.specification,
+            )
 
-            else:
-                tool_choice = omit
-                tools_list = omit
-
-            completion: Message
             try:
-                completion = await self._client.messages.create(
+                tool_accumulator: _ToolAccumulator | None = None
+                async with self._client.messages.stream(
                     model=config.model,
                     system=instructions if instructions else omit,
                     messages=messages,
-                    temperature=config.temperature,
+                    temperature=unwrap_missing(
+                        config.temperature,
+                        default=omit,
+                    ),
                     max_tokens=config.max_output_tokens,
                     thinking=_thinking_budget_config(config.thinking_budget),
                     tools=tools_list,
                     tool_choice=tool_choice,
-                    stop_sequences=as_list(cast(Sequence[str], config.stop_sequences))
-                    if config.stop_sequences is not MISSING
-                    else omit,
-                    stream=False,
-                )
+                    stop_sequences=unwrap_missing(
+                        cast(Any, config.stop_sequences),
+                        default=omit,
+                    ),
+                ) as stream:
+                    async for event in stream:
+                        match event.type:
+                            case "content_block_delta":
+                                assert isinstance(event, RawContentBlockDeltaEvent)  # nosec: B101
+                                match event.delta.type:
+                                    case "text_delta":
+                                        assert isinstance(event.delta, TextDelta)  # nosec: B101
+                                        yield TextContent.of(event.delta.text)
 
-            except AnthropicRateLimitError as exc:  # retry on rate limit after delay
+                                    case "thinking_delta":
+                                        assert isinstance(event.delta, ThinkingDelta)  # nosec: B101
+                                        yield ModelReasoningChunk.of(
+                                            TextContent.of(event.delta.thinking),
+                                            meta={"kind": "thinking"},
+                                        )
+
+                                    case "input_json_delta":
+                                        assert isinstance(event.delta, InputJSONDelta)  # nosec: B101
+                                        assert tool_accumulator is not None  # nosec: B101
+                                        tool_accumulator["arguments"].append(
+                                            event.delta.partial_json
+                                        )
+
+                                    case "signature_delta":
+                                        assert isinstance(event.delta, SignatureDelta)  # nosec: B101
+                                        yield ModelReasoningChunk.of(
+                                            TextContent.empty,
+                                            meta={
+                                                "kind": "thinking",
+                                                "signature": event.delta.signature,
+                                            },
+                                        )
+
+                                    case "citations_delta":
+                                        assert isinstance(event.delta, CitationsDelta)  # nosec: B101
+                                        pass  # unsupported
+
+                            case "content_block_start":
+                                assert isinstance(event, RawContentBlockStartEvent)  # nosec: B101
+                                match event.content_block.type:
+                                    case "thinking":
+                                        assert isinstance(event.content_block, ThinkingBlock)  # nosec: B101
+                                        if event.content_block.thinking:
+                                            yield ModelReasoningChunk.of(
+                                                TextContent.of(event.content_block.thinking),
+                                                meta={
+                                                    "kind": "thinking",
+                                                    "signature": event.content_block.signature,
+                                                },
+                                            )
+
+                                    case "text":
+                                        continue  # actual content arrives in text_delta events
+
+                                    case "tool_use":
+                                        assert isinstance(event.content_block, ToolUseBlock)  # nosec: B101
+                                        assert not event.content_block.input  # nosec: B101
+                                        tool_accumulator = {
+                                            "id": event.content_block.id,
+                                            "tool": event.content_block.name,
+                                            "arguments": [],
+                                        }
+
+                                    case "redacted_thinking":
+                                        assert isinstance(
+                                            event.content_block, RedactedThinkingBlock
+                                        )  # nosec: B101
+                                        yield ModelReasoningChunk.of(
+                                            TextContent.empty,
+                                            meta={
+                                                "kind": "redacted_thinking",
+                                                "data": event.content_block.data,
+                                            },
+                                        )
+
+                                    case other:
+                                        raise ModelOutputInvalid(
+                                            provider=self._provider,
+                                            model=config.model,
+                                            reason=f"Unsupported content block: {other}",
+                                        )
+
+                            case "content_block_stop":
+                                if tool_accumulator is None:
+                                    continue
+
+                                yield ModelToolRequest.of(
+                                    tool_accumulator["id"],
+                                    tool=tool_accumulator["tool"],
+                                    arguments=json.loads("".join(tool_accumulator["arguments"]))
+                                    if tool_accumulator["arguments"]
+                                    else None,
+                                )
+                                tool_accumulator = None
+
+                            case "message_delta":
+                                assert isinstance(event, RawMessageDeltaEvent)  # nosec: B101
+                                record_usage_metrics(
+                                    provider=self._provider,
+                                    model=config.model,
+                                    input_tokens=event.usage.input_tokens,
+                                    cached_input_tokens=event.usage.cache_read_input_tokens,
+                                    output_tokens=event.usage.output_tokens,
+                                )
+
+                                match event.delta.stop_reason:
+                                    case "end_turn" | "tool_use" | "pause_turn":
+                                        continue  # let it finish
+
+                                    case "max_tokens":
+                                        raise ModelOutputLimit(
+                                            provider=self._provider,
+                                            model=config.model,
+                                            max_output_tokens=unwrap_missing(
+                                                config.max_output_tokens, default=0
+                                            ),
+                                        )
+
+                                    case "refusal":
+                                        raise ModelOutputFailed(
+                                            provider=self._provider,
+                                            model=config.model,
+                                            reason="refusal",
+                                        )
+
+                                    case "stop_sequence":
+                                        continue  # let it finish
+
+                                    case other:
+                                        raise ModelOutputFailed(
+                                            provider=self._provider,
+                                            model=config.model,
+                                            reason=f"Unsupported stop reason: {other}",
+                                        )
+
+                            case "message_start":
+                                assert isinstance(event, RawMessageStartEvent)  # nosec: B101
+                                if event.message.content:
+                                    pass  # TODO: FIXME: provide initial data
+
+                            case "message_stop":
+                                continue  # let it finish
+
+                            case other:
+                                raise ModelOutputInvalid(
+                                    provider=self._provider,
+                                    model=config.model,
+                                    reason=f"Unsupported stream event: {other}",
+                                )
+
+                assert tool_accumulator is None  # nosec: B101
+            except AnthropicRateLimitError as exc:
                 if retry_after := exc.response.headers.get("Retry-After"):
-                    ctx.record_warning(
-                        event="model.rate_limit",
-                        attributes={
-                            "model.provider": self._provider,
-                            "model.name": config.model,
-                            "retry_after": retry_after,
-                        },
-                    )
                     try:
+                        delay = float(retry_after) + random.uniform(0.1, 3.0)  # nosec: B311
+                        ctx.record_warning(
+                            event="model.rate_limit",
+                            attributes={
+                                "model.provider": self._provider,
+                                "model.name": config.model,
+                                "retry_after": delay,
+                            },
+                        )
                         raise ModelRateLimit(
                             provider=self._provider,
                             model=config.model,
-                            # adding random extra delay to prevent immediate retry of all pending
-                            retry_after=float(retry_after) + random.uniform(0.1, 3.0),  # nosec: B311,
+                            retry_after=delay,
                         ) from exc
 
                     except ValueError:
+                        delay = random.uniform(0.3, 5.0)  # nosec: B311
+                        ctx.record_warning(
+                            event="model.rate_limit",
+                            attributes={
+                                "model.provider": self._provider,
+                                "model.name": config.model,
+                                "retry_after": delay,
+                            },
+                        )
                         raise ModelRateLimit(
                             provider=self._provider,
                             model=config.model,
-                            # using random delay if value not available
-                            retry_after=random.uniform(0.3, 5.0),  # nosec: B311,
+                            retry_after=delay,
                         ) from exc
 
-                else:
-                    ctx.record_warning(
-                        event="model.rate_limit",
-                        attributes={
-                            "model.provider": self._provider,
-                            "model.name": config.model,
-                        },
-                    )
-                    raise ModelRateLimit(
-                        provider=self._provider,
-                        model=config.model,
-                        # using random delay if value not available
-                        retry_after=random.uniform(0.3, 5.0),  # nosec: B311,
-                    ) from exc
+                delay = random.uniform(0.3, 5.0)  # nosec: B311
+                ctx.record_warning(
+                    event="model.rate_limit",
+                    attributes={
+                        "model.provider": self._provider,
+                        "model.name": config.model,
+                        "retry_after": delay,
+                    },
+                )
+                raise ModelRateLimit(
+                    provider=self._provider,
+                    model=config.model,
+                    retry_after=delay,
+                ) from exc
+
+            except ModelException as exc:
+                raise exc
 
             except Exception as exc:
                 raise ModelOutputFailed(
@@ -274,102 +342,19 @@ class AnthropicMessages(AnthropicAPI):
                     reason=str(exc),
                 ) from exc
 
-            ctx.record_info(
-                metric="model.input_tokens",
-                value=completion.usage.input_tokens,
-                unit="tokens",
-                kind="counter",
-                attributes={
-                    "model.provider": self._provider,
-                    "model.name": completion.model,
-                },
-            )
-            # Tokens served from cache (input side)
-            ctx.record_info(
-                metric="model.input_tokens.cached",
-                value=completion.usage.cache_read_input_tokens or 0,
-                unit="tokens",
-                kind="counter",
-                attributes={
-                    "model.provider": self._provider,
-                    "model.name": completion.model,
-                },
-            )
-            ctx.record_info(
-                metric="model.output_tokens",
-                value=completion.usage.output_tokens,
-                unit="tokens",
-                kind="counter",
-                attributes={
-                    "model.provider": self._provider,
-                    "model.name": completion.model,
-                },
-            )
-            # Anthropic does not expose cached output tokens; omit to avoid mislabeling
 
-            if completion.stop_reason == "refusal":
-                raise ModelOutputFailed(
-                    provider=self._provider,
-                    model=config.model,
-                    reason=completion.stop_reason,
-                )
-
-            if completion.stop_reason == "max_tokens":
-                raise ModelOutputLimit(
-                    provider=self._provider,
-                    model=config.model,
-                    max_output_tokens=unwrap_missing(config.max_output_tokens, default=0),
-                    content=tuple(_completion_as_content(completion.content)),
-                )
-
-            return ModelOutput.of(
-                *_completion_as_content(completion.content),
-                meta={
-                    "identifier": completion.id,
-                    "model": config.model,
-                    "stop_reason": completion.stop_reason,
-                },
-            )
-
-    async def _completion_stream(
-        self,
-        *,
-        instructions: ModelInstructions,
-        context: ModelContext,
-        tools: ModelToolsDeclaration,
-        output: ModelOutputSelection,
-        config: AnthropicConfig,
-        prefill: Multimodal | None = None,
-        **extra: Any,
-    ) -> AsyncGenerator[ModelStreamOutput]:
-        async with ctx.scope("model.completion.stream"):
-            ctx.log_warning(
-                "Anthropic completion streaming is not supported yet,"
-                " using regular response instead."
-            )
-
-            model_output: ModelOutput = await self._completion(
-                instructions=instructions,
-                context=context,
-                tools=tools,
-                output=output,
-                config=config,
-                prefill=prefill,
-            )
-
-            for block in model_output.blocks:
-                if isinstance(block, MultimodalContent):
-                    for part in block.parts:
-                        yield part
-
-                else:
-                    assert isinstance(block, ModelReasoning | ModelToolRequest)  # nosec: B101
-                    yield block
+class _ToolAccumulator(TypedDict):
+    id: str
+    tool: str
+    arguments: MutableSequence[str]
 
 
-def _context_messages(  # noqa: PLR0912
+def _context_messages(  # noqa: C901, PLR0912
     context: ModelContext,
     /,
+    *,
+    prefill: Multimodal | None,
+    output: ModelOutputSelection,
 ) -> Generator[MessageParam]:
     for element in context:
         content: list[
@@ -382,7 +367,7 @@ def _context_messages(  # noqa: PLR0912
         ] = []
 
         if isinstance(element, ModelInput):
-            for block in element.blocks:
+            for block in element.input:
                 if isinstance(block, MultimodalContent):
                     content.extend(
                         _content_elements(
@@ -396,11 +381,11 @@ def _context_messages(  # noqa: PLR0912
                         {
                             "tool_use_id": block.identifier,
                             "type": "tool_result",
-                            "is_error": block.handling == "error",
+                            "is_error": block.status == "error",
                             "content": cast(  # there will be no thinking within tool results
                                 Iterable[TextBlockParam | ImageBlockParam],
                                 _content_elements(
-                                    block.content,
+                                    block.result,
                                     cache_type=None,
                                 ),
                             ),
@@ -414,7 +399,7 @@ def _context_messages(  # noqa: PLR0912
 
         else:
             assert isinstance(element, ModelOutput)  # nosec: B101
-            for block in element.blocks:
+            for block in element.output:
                 if isinstance(block, MultimodalContent):
                     content.extend(
                         _content_elements(
@@ -429,7 +414,7 @@ def _context_messages(  # noqa: PLR0912
                             content.append(
                                 {
                                     "type": "thinking",
-                                    "thinking": block.content.to_str(),
+                                    "thinking": block.reasoning.to_str(),
                                     "signature": block.meta.get_str(
                                         "signature",
                                         default="",
@@ -441,7 +426,7 @@ def _context_messages(  # noqa: PLR0912
                             content.append(
                                 {
                                     "type": "redacted_thinking",
-                                    "data": block.content.to_str(),
+                                    "data": block.meta.get_str("data", default=""),
                                 }
                             )
 
@@ -463,6 +448,26 @@ def _context_messages(  # noqa: PLR0912
                 "role": "assistant",
                 "content": content,
             }
+
+    if prefill is not None:
+        yield {
+            "role": "assistant",
+            "content": _content_elements(
+                MultimodalContent.of(prefill),
+                cache_type=None,
+            ),
+        }
+
+    elif output == "json" or isinstance(output, type):
+        yield {
+            "role": "assistant",
+            "content": (
+                {
+                    "type": "text",
+                    "text": "{",
+                },
+            ),
+        }
 
 
 def _content_elements(
@@ -521,7 +526,7 @@ def _content_elements(
 
             text_block: TextBlockParam = {
                 "type": "text",
-                "text": part.artifact.to_str(),
+                "text": part.to_str(),
             }
             last_cacheable = text_block
             yield text_block
@@ -533,111 +538,6 @@ def _content_elements(
     last_cacheable["cache_control"] = {  # pyright: ignore[reportGeneralTypeIssues]
         "type": cache_type,
     }
-
-
-def _completion_as_content(
-    completion: Iterable[ContentBlock],
-    /,
-) -> Generator[MultimodalContent | ModelReasoning | ModelToolRequest]:
-    for block in completion:
-        if isinstance(block, TextBlock):
-            if block.citations:
-                yield MultimodalContent.of(
-                    TextContent(
-                        text=block.text,
-                        meta=Meta.of({"citations": _extract_text_citations(block)}),
-                    )
-                )
-
-            else:
-                yield MultimodalContent.of(
-                    TextContent(
-                        text=block.text,
-                    )
-                )
-
-        elif isinstance(block, ThinkingBlock):
-            yield ModelReasoning.of(
-                block.thinking,
-                meta={
-                    "kind": "thinking",
-                    "signature": block.signature,
-                },
-            )
-
-        elif isinstance(block, RedactedThinkingBlock):
-            yield ModelReasoning.of(
-                block.data,
-                meta={"kind": "redacted_thinking"},
-            )
-
-        elif isinstance(block, ToolUseBlock):
-            yield ModelToolRequest(
-                identifier=block.id,
-                tool=block.name,
-                arguments=cast(dict[str, Any], block.input),
-                meta=META_EMPTY,
-            )
-
-        else:
-            raise ValueError(f"Unsupported content block {type(block)}")
-
-
-def _extract_text_citations(
-    block: TextBlock,
-) -> Sequence[Mapping[str, Any]]:
-    if block.citations is None:
-        return ()
-
-    citations: list[dict[str, Any]] = []
-    for citation in block.citations:
-        source: str | None
-        kind: str
-        start_index: int
-        end_index: int
-        text: str
-        if isinstance(citation, CitationCharLocation):
-            source = citation.document_title or citation.file_id
-            kind = citation.type
-            start_index = citation.start_char_index
-            end_index = citation.end_char_index
-            text = citation.cited_text
-
-        elif isinstance(citation, CitationContentBlockLocation):
-            source = citation.document_title or citation.file_id
-            kind = citation.type
-            start_index = citation.start_block_index
-            end_index = citation.end_block_index
-            text = citation.cited_text
-
-        elif isinstance(citation, CitationPageLocation):
-            source = citation.document_title or citation.file_id
-            kind = citation.type
-            start_index = citation.start_page_number
-            end_index = citation.end_page_number
-            text = citation.cited_text
-
-        elif isinstance(citation, CitationsSearchResultLocation):
-            source = citation.source
-            kind = citation.type
-            start_index = citation.start_block_index
-            end_index = citation.end_block_index
-            text = citation.cited_text
-
-        else:
-            continue  # skip other/unsupported
-
-        citations.append(
-            {
-                "source": source,
-                "kind": kind,
-                "start": start_index,
-                "end": end_index,
-                "text": text,
-            }
-        )
-
-    return citations
 
 
 def _thinking_budget_config(
@@ -658,11 +558,14 @@ def _thinking_budget_config(
 
 
 def _tools_as_tool_params(
-    tools: Sequence[ModelToolSpecification],
-    /,
-) -> Sequence[ToolParam]:
+    selection: ModelToolsSelection,
+    specification: Sequence[ModelToolSpecification],
+) -> tuple[ToolChoiceParam | Omit, Iterable[ToolParam] | Omit]:
+    if not specification:
+        return (omit, omit)
+
     tool_params: list[ToolParam] = []
-    for tool in tools:
+    for tool in specification:
         input_schema: dict[str, Any]
         if parameters := tool.parameters:
             input_schema = cast(dict[str, Any], parameters)
@@ -683,24 +586,30 @@ def _tools_as_tool_params(
             }
         )
 
-    return tool_params
+    match selection:
+        case "auto":
+            return (
+                {"type": "auto"},
+                tool_params,
+            )
 
+        case "required":
+            return (
+                {"type": "any"},
+                tool_params,
+            )
 
-def _tools_selection_as_tool_choice(
-    selection: ModelToolsSelection,
-    /,
-) -> ToolChoiceParam:
-    return _TOOL_CHOICE_PARAM.get(
-        selection,
-        {
-            "type": "tool",
-            "name": selection,
-        },
-    )
+        case "none":
+            return (
+                {"type": "none"},
+                tool_params,
+            )
 
-
-_TOOL_CHOICE_PARAM: Mapping[str, ToolChoiceParam] = {
-    "auto": {"type": "auto"},
-    "required": {"type": "any"},
-    "none": {"type": "none"},
-}
+        case specific_tool:
+            return (
+                {
+                    "type": "tool",
+                    "name": specific_tool.name,
+                },
+                tool_params,
+            )

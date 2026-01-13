@@ -1,135 +1,140 @@
 # First Steps
 
-Build confidence with Draive by learning how scoped contexts, state containers, and typed models fit
-together. This guide walks through the essential patterns you will use in every project.
+This guide walks through the core building blocks you will use in most Draive applications:
+context scoping, typed state, generation, tools, retrieval, and guardrails.
 
-## Activate your environment
+## 1. Open A Context Scope
+
+`ctx.scope(...)` is the runtime boundary for state resolution and disposable lifecycle.
 
 ```python
 from draive import ctx
 from draive.openai import OpenAI, OpenAIResponsesConfig
 
-async def main() -> None:
-    async with ctx.scope(
-        "quickstart",
-        OpenAIResponsesConfig(model="gpt-5-mini"),
-        disposables=(OpenAI(),),
-    ):
-        ...
+
+async with ctx.scope(
+    "app",
+    OpenAIResponsesConfig(model="gpt-5-mini"),
+    disposables=(OpenAI(),),
+):
+    # Inside this block, ctx.state(...) can resolve these states.
+    ...
 ```
 
-`ctx.scope` binds configuration and disposables to a structured context. Everything inside the scope
-can access the active configuration via `ctx.state`.
+## 2. Define Typed State
 
-## Define immutable state
+State models are immutable by default. Use `.updating(...)` to create modified copies.
 
 ```python
-from haiway import State
+from draive import State
+
 
 class AppConfig(State):
     environment: str
-    max_retries: int = 3
-```
+    retries: int = 3
 
-State instances are immutable—use `.updating()` to create tweaked copies.
 
-```python
 config = AppConfig(environment="staging")
-updated = config.updating(max_retries=5)
+updated = config.updating(retries=5)
 ```
 
-## Model your data
+## 3. Generate Text
 
-Use `DataModel` when you need serializable data with validation and JSON Schema support.
-
-```python
-from draive import DataModel
-
-class Order(DataModel):
-    id: str
-    total: float
-    currency: str
-```
-
-`Order.json_schema()` generates machine-readable schemas for tool calls and structured generation.
-
-## Generate text
+`TextGeneration.generate(...)` is the simplest interface for text output.
 
 ```python
 from draive import TextGeneration
 
-async def tagline() -> str:
-    async with ctx.scope(
-        "tagline",
-        OpenAIResponsesConfig(model="gpt-5-mini"),
-        disposables=(OpenAI(),),
-    ):
-        return await TextGeneration.generate(
-            instructions="You are a branding assistant",
-            input="Create a one-line pitch for a travel planner",
-        )
+
+result: str = await TextGeneration.generate(
+    instructions="You are a concise assistant.",
+    input="Write one sentence about typed APIs.",
+)
 ```
 
-## Add tools
+## 4. Generate Structured Output
+
+When your downstream code needs strong contracts, generate typed serializable state.
 
 ```python
-from draive import tool
+from draive import ModelGeneration, State
+
+
+class Order(State, serializable=True):
+    id: str
+    total: float
+    currency: str
+
+
+order: Order = await ModelGeneration.generate(
+    Order,
+    instructions="Extract order fields from the input.",
+    input="Order #A-42 totals 129.90 USD.",
+)
+```
+
+## 5. Register Tools
+
+Tools are async functions decorated with `@tool`. They can be passed directly to generation calls.
+
+```python
 from datetime import datetime, timezone
 
-@tool(description="Return the current ISO timestamp")
+from draive import TextGeneration, tool
+
+
+@tool(description="Return current UTC timestamp")
 async def current_time() -> str:
     return datetime.now(tz=timezone.utc).isoformat()
+
+
+answer = await TextGeneration.generate(
+    instructions="Use tools when needed.",
+    input="What time is it now?",
+    tools=[current_time],
+)
 ```
 
-Pass tools to generations or conversations to let the model call them when needed.
+## 6. Add Retrieval With `VectorIndex`
 
-## Manage resources with disposables
-
-Use disposables for clients or services that require clean-up.
-
-```python
-from draive import ctx
-from draive.openai import OpenAI
-
-async with ctx.scope("app", disposables=(OpenAI(),)):
-    ...  # Client is available and cleaned up automatically
-```
-
-## Compose multimodal content
+`VectorIndex` is a context state API. In this example we use the in-memory implementation from
+`VolatileVectorIndex()`.
 
 ```python
-from draive.multimodal import MultimodalContent, TextContent
+from collections.abc import Sequence
 
-content = MultimodalContent.of(TextContent.of("Describe this diagram:"))
-```
-
-Pass `content` into generation APIs to mix text, images, and other artifacts.
-
-## Wire retrieval
-
-```python
+from draive import State, VectorIndex, ctx
 from draive.helpers import VolatileVectorIndex
-from draive.resources import ResourceContent
 
-index = VolatileVectorIndex()
-await index.add(ResourceContent.text("internal-notes", "Use fallback provider after 3 retries."))
+
+class Chunk(State, serializable=True):
+    text: str
+
+
+chunks: Sequence[Chunk] = (
+    Chunk(text="Draive uses scoped state."),
+    Chunk(text="Vector indexes support semantic search."),
+)
+
+
+async with ctx.scope("retrieval", VolatileVectorIndex()):
+    await VectorIndex.index(Chunk, values=chunks, attribute=Chunk._.text)
+    hits: Sequence[Chunk] = await VectorIndex.search(Chunk, query="semantic", limit=2)
 ```
 
-## Evaluate quality
+## 7. Run Moderation Guardrails
+
+If your active provider registers moderation state, you can run guardrail checks directly.
 
 ```python
 from draive.guardrails import GuardrailsModeration
+from draive.multimodal import MultimodalContent
 
-async with ctx.scope("moderated", GuardrailsModeration.of(provider="openai")):
-    ...
+await GuardrailsModeration.check_input(MultimodalContent.of("some user content"))
 ```
 
-Moderation, quality, and privacy guardrails plug into the same scoping mechanics.
+## Next Steps
 
-## Next steps
-
-1. Explore the [Guides](../guides/BasicUsage.md) for focused scenarios.
-1. Try applied blueprints in the [Cookbooks](../cookbooks/BasicRAG.md).
-1. Reference the API from your editor with Draive's strict type hints.
-
-Remember: keep code inside `ctx.scope`, favour immutable state, and add features incrementally.
+1. Continue with [Basic Usage](../guides/BasicUsage.md).
+1. Explore [Basic RAG](../cookbooks/BasicRAG.md).
+1. Add quality checks with [Basic Evaluation](../guides/BasicEvaluation.md).

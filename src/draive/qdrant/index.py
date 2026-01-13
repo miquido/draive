@@ -1,7 +1,7 @@
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any, Literal, cast
 
-from haiway import AttributePath, AttributeRequirement
+from haiway import AttributePath, AttributeRequirement, State
 
 from draive.embedding import (
     Embedded,
@@ -11,7 +11,6 @@ from draive.embedding import (
     mmr_vector_similarity_search,
 )
 from draive.multimodal import TextContent
-from draive.parameters import DataModel
 from draive.qdrant.state import Qdrant
 from draive.qdrant.types import QdrantResult
 from draive.resources import ResourceContent
@@ -22,7 +21,7 @@ __all__ = ("QdrantVectorIndex",)
 def QdrantVectorIndex() -> VectorIndex:  # noqa: C901
     """VectorIndex that manages text/image embeddings stored in Qdrant."""
 
-    async def index[Model: DataModel, Value: ResourceContent | TextContent | str](
+    async def index[Model: State, Value: ResourceContent | TextContent | str](
         model: type[Model],
         /,
         values: Iterable[Model],
@@ -82,7 +81,7 @@ def QdrantVectorIndex() -> VectorIndex:  # noqa: C901
             **extra,
         )
 
-    async def search[Model: DataModel](
+    async def search[Model: State](
         model: type[Model],
         /,
         query: Sequence[float] | ResourceContent | TextContent | str | None = None,
@@ -103,7 +102,7 @@ def QdrantVectorIndex() -> VectorIndex:  # noqa: C901
                     include_vector=False,
                     **extra,
                 )
-            ).results
+            ).items
 
         query_vector: Sequence[float]
         if isinstance(query, str):
@@ -157,7 +156,7 @@ def QdrantVectorIndex() -> VectorIndex:  # noqa: C901
             )
         )
 
-    async def delete[Model: DataModel](
+    async def delete[Model: State](
         model: type[Model],
         /,
         *,

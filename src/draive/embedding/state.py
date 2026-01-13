@@ -17,7 +17,6 @@ from draive.embedding.types import (
     VectorSearching,
 )
 from draive.multimodal import TextContent
-from draive.parameters import DataModel
 from draive.resources import ResourceContent
 
 __all__ = (
@@ -54,7 +53,7 @@ class TextEmbedding(State):
 
     @overload
     @classmethod
-    async def embed[Value: DataModel | State](
+    async def embed[Value: State](
         cls,
         content: Value,
         /,
@@ -63,7 +62,7 @@ class TextEmbedding(State):
     ) -> Embedded[Value]: ...
 
     @overload
-    async def embed[Value: DataModel | State](
+    async def embed[Value: State](
         self,
         content: Value,
         /,
@@ -72,7 +71,7 @@ class TextEmbedding(State):
     ) -> Embedded[Value]: ...
 
     @statemethod
-    async def embed[Value: DataModel | State | str](
+    async def embed[Value: State | str](
         self,
         content: Value | str,
         /,
@@ -109,7 +108,7 @@ class TextEmbedding(State):
             str_selector = cast(Callable[[Value], str], attribute)
 
         return (
-            await self.embedding(
+            await self._embedding(
                 [content],
                 attribute=str_selector,
                 **extra,
@@ -135,7 +134,7 @@ class TextEmbedding(State):
 
     @overload
     @classmethod
-    async def embed_many[Value: DataModel | State](
+    async def embed_many[Value: State](
         cls,
         content: Sequence[Value],
         /,
@@ -144,7 +143,7 @@ class TextEmbedding(State):
     ) -> Sequence[Embedded[Value]]: ...
 
     @overload
-    async def embed_many[Value: DataModel | State](
+    async def embed_many[Value: State](
         self,
         content: Sequence[Value],
         /,
@@ -153,7 +152,7 @@ class TextEmbedding(State):
     ) -> Sequence[Embedded[Value]]: ...
 
     @statemethod
-    async def embed_many[Value: DataModel | State | str](
+    async def embed_many[Value: State | str](
         self,
         content: Sequence[Value] | Sequence[str],
         /,
@@ -190,13 +189,19 @@ class TextEmbedding(State):
             ), "Prepare parameter path by using Type._.path.to.property"
             str_selector = cast(Callable[[Value], str], attribute)
 
-        return await self.embedding(
+        return await self._embedding(
             content,
             attribute=str_selector,
             **extra,
         )
 
-    embedding: ValueEmbedding[Any, str]
+    _embedding: ValueEmbedding[Any, str]
+
+    def __init__(
+        self,
+        embedding: ValueEmbedding[Any, str],
+    ) -> None:
+        super().__init__(_embedding=embedding)
 
 
 class ImageEmbedding(State):
@@ -226,7 +231,7 @@ class ImageEmbedding(State):
 
     @overload
     @classmethod
-    async def embed[Value: DataModel | State](
+    async def embed[Value: State](
         cls,
         content: Value,
         /,
@@ -235,7 +240,7 @@ class ImageEmbedding(State):
     ) -> Embedded[Value]: ...
 
     @overload
-    async def embed[Value: DataModel | State](
+    async def embed[Value: State](
         self,
         content: Value,
         /,
@@ -244,7 +249,7 @@ class ImageEmbedding(State):
     ) -> Embedded[Value]: ...
 
     @statemethod
-    async def embed[Value: DataModel | State | bytes](
+    async def embed[Value: State | bytes](
         self,
         content: Sequence[Value] | Sequence[bytes] | Value | bytes,
         /,
@@ -304,7 +309,7 @@ class ImageEmbedding(State):
 
     @overload
     @classmethod
-    async def embed_many[Value: DataModel | State](
+    async def embed_many[Value: State](
         cls,
         content: Sequence[Value],
         /,
@@ -313,7 +318,7 @@ class ImageEmbedding(State):
     ) -> Sequence[Embedded[Value]]: ...
 
     @overload
-    async def embed_many[Value: DataModel | State](
+    async def embed_many[Value: State](
         self,
         content: Sequence[Value],
         /,
@@ -322,7 +327,7 @@ class ImageEmbedding(State):
     ) -> Sequence[Embedded[Value]]: ...
 
     @statemethod
-    async def embed_many[Value: DataModel | State | bytes](
+    async def embed_many[Value: State | bytes](
         self,
         content: Sequence[Value] | Sequence[bytes],
         /,
@@ -373,7 +378,7 @@ class VectorIndex(State):
 
     @overload
     @classmethod
-    async def index[Model: DataModel, Value: ResourceContent | TextContent | str](
+    async def index[Model: State, Value: ResourceContent | TextContent | str](
         cls,
         model: type[Model],
         /,
@@ -384,7 +389,7 @@ class VectorIndex(State):
     ) -> None: ...
 
     @overload
-    async def index[Model: DataModel, Value: ResourceContent | TextContent | str](
+    async def index[Model: State, Value: ResourceContent | TextContent | str](
         self,
         model: type[Model],
         /,
@@ -395,7 +400,7 @@ class VectorIndex(State):
     ) -> None: ...
 
     @statemethod
-    async def index[Model: DataModel, Value: ResourceContent | TextContent | str](
+    async def index[Model: State, Value: ResourceContent | TextContent | str](
         self,
         model: type[Model],
         /,
@@ -433,7 +438,7 @@ class VectorIndex(State):
 
     @overload
     @classmethod
-    async def search[Model: DataModel](
+    async def search[Model: State](
         cls,
         model: type[Model],
         /,
@@ -444,7 +449,7 @@ class VectorIndex(State):
     ) -> Sequence[Model]: ...
 
     @overload
-    async def search[Model: DataModel](
+    async def search[Model: State](
         self,
         model: type[Model],
         /,
@@ -456,7 +461,7 @@ class VectorIndex(State):
 
     @overload
     @classmethod
-    async def search[Model: DataModel](
+    async def search[Model: State](
         cls,
         model: type[Model],
         /,
@@ -469,7 +474,7 @@ class VectorIndex(State):
     ) -> Sequence[Model]: ...
 
     @overload
-    async def search[Model: DataModel](
+    async def search[Model: State](
         self,
         model: type[Model],
         /,
@@ -482,7 +487,7 @@ class VectorIndex(State):
     ) -> Sequence[Model]: ...
 
     @statemethod
-    async def search[Model: DataModel](
+    async def search[Model: State](
         self,
         model: type[Model],
         /,
@@ -533,7 +538,7 @@ class VectorIndex(State):
 
     @overload
     @classmethod
-    async def delete[Model: DataModel](
+    async def delete[Model: State](
         cls,
         model: type[Model],
         /,
@@ -543,7 +548,7 @@ class VectorIndex(State):
     ) -> None: ...
 
     @overload
-    async def delete[Model: DataModel](
+    async def delete[Model: State](
         self,
         model: type[Model],
         /,
@@ -553,7 +558,7 @@ class VectorIndex(State):
     ) -> None: ...
 
     @statemethod
-    async def delete[Model: DataModel](
+    async def delete[Model: State](
         self,
         model: type[Model],
         /,

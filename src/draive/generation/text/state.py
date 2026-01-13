@@ -5,8 +5,9 @@ from haiway import State, ctx, statemethod
 
 from draive.generation.text.default import generate_text
 from draive.generation.text.types import TextGenerating
-from draive.models import ModelInstructions, Tool, Toolbox
-from draive.multimodal import Multimodal, MultimodalContent, Template, TemplatesRepository
+from draive.models import ModelInstructions
+from draive.multimodal import Multimodal, Template, TemplatesRepository
+from draive.tools import Tool, Toolbox
 
 __all__ = ("TextGeneration",)
 
@@ -19,7 +20,7 @@ class TextGeneration(State):
         *,
         instructions: Template | ModelInstructions = "",
         input: Template | Multimodal,
-        tools: Toolbox | Iterable[Tool] = (),
+        tools: Toolbox | Iterable[Tool] = Toolbox.empty,
         examples: Iterable[tuple[Multimodal, str]] = (),
         **extra: Any,
     ) -> str: ...
@@ -30,7 +31,7 @@ class TextGeneration(State):
         *,
         instructions: Template | ModelInstructions = "",
         input: Template | Multimodal,
-        tools: Toolbox | Iterable[Tool] = (),
+        tools: Toolbox | Iterable[Tool] = Toolbox.empty,
         examples: Iterable[tuple[Multimodal, str]] = (),
         **extra: Any,
     ) -> str: ...
@@ -41,29 +42,35 @@ class TextGeneration(State):
         *,
         instructions: Template | ModelInstructions = "",
         input: Template | Multimodal,  # noqa: A002
-        tools: Toolbox | Iterable[Tool] = (),
+        tools: Toolbox | Iterable[Tool] = Toolbox.empty,
         examples: Iterable[tuple[Multimodal, str]] = (),
         **extra: Any,
     ) -> str:
-        async with ctx.scope("generate_text"):
+        async with ctx.scope("text_generation"):
             if isinstance(instructions, Template):
                 ctx.record_info(
                     attributes={"instructions.template": instructions.identifier},
                 )
+                instructions = await TemplatesRepository.resolve_str(instructions)
 
             if isinstance(input, Template):
                 ctx.record_info(
                     attributes={"input.template": input.identifier},
                 )
+                input = await TemplatesRepository.resolve(input)  # noqa: A001
 
-            return await self.generating(
-                # resolve instructions templates
-                instructions=await TemplatesRepository.resolve_str(instructions),
-                # resolve input templates
-                input=await TemplatesRepository.resolve(input),
+            return await self._generating(
+                instructions=instructions,
+                input=input,
                 toolbox=Toolbox.of(tools),
-                examples=((MultimodalContent.of(ex_in), ex_out) for ex_in, ex_out in examples),
+                examples=examples,
                 **extra,
             )
 
-    generating: TextGenerating = generate_text
+    _generating: TextGenerating = generate_text
+
+    def __init__(
+        self,
+        generating: TextGenerating,
+    ) -> None:
+        super().__init__(_generating=generating)

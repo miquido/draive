@@ -3,23 +3,20 @@ from collections.abc import Callable, Sequence
 from itertools import chain
 from typing import Any, cast
 
-from haiway import State, as_list, ctx
+from haiway import State, as_list, ctx, unwrap_missing
+from openai import omit
 from openai.types.create_embedding_response import CreateEmbeddingResponse
 
-from draive.embedding import Embedded, TextEmbedding
+from draive.embedding import Embedded
+from draive.models.metrics import record_embedding_invocation, record_embedding_metrics
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIEmbeddingConfig
-from draive.openai.utils import unwrap_missing
-from draive.parameters import DataModel
 
 __all__ = ("OpenAIEmbedding",)
 
 
 class OpenAIEmbedding(OpenAIAPI):
-    def text_embedding(self) -> TextEmbedding:
-        return TextEmbedding(embedding=self.create_texts_embedding)
-
-    async def create_texts_embedding[Value: DataModel | State](
+    async def create_texts_embedding[Value: State](
         self,
         values: Sequence[Value] | Sequence[str],
         /,
@@ -29,16 +26,7 @@ class OpenAIEmbedding(OpenAIAPI):
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
         embedding_config: OpenAIEmbeddingConfig = config or ctx.state(OpenAIEmbeddingConfig)
-        async with ctx.scope("openai_text_embedding"):
-            ctx.record_info(
-                attributes={
-                    "embedding.provider": "openai",
-                    "embedding.model": embedding_config.model,
-                    "embedding.dimensions": embedding_config.dimensions,
-                    "embedding.batch_size": embedding_config.batch_size,
-                },
-            )
-
+        async with ctx.scope("openai.text_embedding"):
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))
@@ -48,40 +36,38 @@ class OpenAIEmbedding(OpenAIAPI):
 
             assert all(isinstance(element, str) for element in attributes)  # nosec: B101
 
-            ctx.record_info(
-                metric="embedding.items",
-                value=len(attributes),
-                unit="count",
-                kind="counter",
-                attributes={
-                    "embedding.provider": "openai",
-                    "embedding.model": embedding_config.model,
-                    "embedding.type": "text",
-                },
+            record_embedding_invocation(
+                provider="openai",
+                model=embedding_config.model,
+                embedding_type="text",
+                batch_size=embedding_config.batch_size,
+                dimensions=embedding_config.dimensions,
+            )
+            record_embedding_metrics(
+                provider="openai",
+                model=embedding_config.model,
+                embedding_type="text",
+                items=len(attributes),
+                batches=(
+                    (len(attributes) + embedding_config.batch_size - 1)
+                    // embedding_config.batch_size
+                    if attributes
+                    else 0
+                ),
             )
 
             if not attributes:
                 return ()  # empty
-
-            ctx.record_info(
-                metric="embedding.batches",
-                value=(len(attributes) + embedding_config.batch_size - 1)
-                // embedding_config.batch_size,
-                unit="count",
-                kind="counter",
-                attributes={
-                    "embedding.provider": "openai",
-                    "embedding.model": embedding_config.model,
-                    "embedding.type": "text",
-                },
-            )
 
             responses: list[CreateEmbeddingResponse] = await gather(
                 *[
                     self._client.embeddings.create(
                         input=attributes[index : index + embedding_config.batch_size],
                         model=embedding_config.model,
-                        dimensions=unwrap_missing(embedding_config.dimensions),
+                        dimensions=unwrap_missing(
+                            embedding_config.dimensions,
+                            default=omit,
+                        ),
                         encoding_format="float",
                     )
                     for index in range(0, len(attributes), embedding_config.batch_size)

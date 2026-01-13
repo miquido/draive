@@ -1,7 +1,8 @@
 from draive.evaluation import EvaluationScore, evaluator
 from draive.evaluators.utils import FORMAT_INSTRUCTION, extract_evaluation_result
+from draive.models import ModelInput
 from draive.multimodal import Multimodal, MultimodalContent
-from draive.stages import Stage
+from draive.steps import Step
 
 __all__ = ("readability_evaluator",)
 
@@ -48,14 +49,19 @@ async def readability_evaluator(
         )
 
     return extract_evaluation_result(
-        await Stage.completion(
-            MultimodalContent.of(
-                "<CONTENT>",
-                evaluated,
-                "</CONTENT>",
-            ),
+        await Step.generating_completion(
             instructions=INSTRUCTION.format(
                 guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
             ),
-        ).execute()
+        ).run(
+            (
+                ModelInput.of(
+                    MultimodalContent.of(
+                        "<CONTENT>",
+                        evaluated,
+                        "</CONTENT>",
+                    ),
+                ),
+            )
+        )
     )

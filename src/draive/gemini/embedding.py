@@ -6,19 +6,16 @@ from typing import Any, cast
 from google.genai.types import EmbedContentConfigDict, EmbedContentResponse
 from haiway import State, as_list, ctx, not_missing
 
-from draive.embedding import Embedded, TextEmbedding
+from draive.embedding import Embedded
 from draive.gemini.api import GeminiAPI
 from draive.gemini.config import GeminiEmbeddingConfig
-from draive.parameters import DataModel
+from draive.models.metrics import record_embedding_invocation, record_embedding_metrics
 
 __all__ = ("GeminiEmbedding",)
 
 
 class GeminiEmbedding(GeminiAPI):
-    def text_embedding(self) -> TextEmbedding:
-        return TextEmbedding(embedding=self.create_texts_embedding)
-
-    async def create_texts_embedding[Value: DataModel | State](
+    async def create_texts_embedding[Value: State](
         self,
         values: Sequence[Value] | Sequence[str],
         /,
@@ -27,17 +24,8 @@ class GeminiEmbedding(GeminiAPI):
         config: GeminiEmbeddingConfig | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
-        embedding_config: GeminiEmbeddingConfig = config or ctx.state(GeminiEmbeddingConfig)
-
-        async with ctx.scope("gemini_text_embedding"):
-            ctx.record_info(
-                attributes={
-                    "embedding.provider": "gemini",
-                    "embedding.model": embedding_config.model,
-                    "embedding.dimensions": embedding_config.dimensions,
-                    "embedding.batch_size": embedding_config.batch_size,
-                },
-            )
+        async with ctx.scope("gemini.text_embedding"):
+            config = config or ctx.state(GeminiEmbeddingConfig)
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))
@@ -47,37 +35,31 @@ class GeminiEmbedding(GeminiAPI):
 
             assert all(isinstance(element, str) for element in attributes)  # nosec: B101
 
-            ctx.record_info(
-                metric="embedding.items",
-                value=len(attributes),
-                unit="count",
-                kind="counter",
-                attributes={
-                    "embedding.provider": "gemini",
-                    "embedding.model": embedding_config.model,
-                    "embedding.type": "text",
-                },
+            record_embedding_invocation(
+                provider="gemini",
+                model=config.model,
+                embedding_type="text",
+                batch_size=config.batch_size,
+                dimensions=config.dimensions,
+            )
+            record_embedding_metrics(
+                provider="gemini",
+                model=config.model,
+                embedding_type="text",
+                items=len(attributes),
+                batches=(
+                    (len(attributes) + config.batch_size - 1) // config.batch_size
+                    if attributes
+                    else 0
+                ),
             )
 
             if not attributes:
                 return ()  # empty
 
-            ctx.record_info(
-                metric="embedding.batches",
-                value=(len(attributes) + embedding_config.batch_size - 1)
-                // embedding_config.batch_size,
-                unit="count",
-                kind="counter",
-                attributes={
-                    "embedding.provider": "gemini",
-                    "embedding.model": embedding_config.model,
-                    "embedding.type": "text",
-                },
-            )
-
             config_dict: EmbedContentConfigDict | None
-            if not_missing(embedding_config.dimensions):
-                config_dict = {"output_dimensionality": embedding_config.dimensions}
+            if not_missing(config.dimensions):
+                config_dict = {"output_dimensionality": config.dimensions}
 
             else:
                 config_dict = None
@@ -85,13 +67,13 @@ class GeminiEmbedding(GeminiAPI):
             responses: list[EmbedContentResponse] = await gather(
                 *[
                     self._client.aio.models.embed_content(  # pyright: ignore[reportUnknownMemberType]
-                        model=embedding_config.model,
+                        model=config.model,
                         config=config_dict,
                         contents=as_list(
-                            attributes[index : index + embedding_config.batch_size],
+                            attributes[index : index + config.batch_size],
                         ),
                     )
-                    for index in range(0, len(attributes), embedding_config.batch_size)
+                    for index in range(0, len(attributes), config.batch_size)
                 ]
             )
 

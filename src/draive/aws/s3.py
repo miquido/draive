@@ -8,7 +8,7 @@ from typing import Any
 from urllib.parse import ParseResult, urlparse
 
 from botocore.exceptions import ClientError  # pyright: ignore[reportMissingModuleSource]
-from haiway import META_EMPTY, BasicValue, Meta, asynchronous
+from haiway import BasicValue, Meta, Paginated, Pagination, asynchronous
 
 from draive.aws.api import AWSAPI
 from draive.aws.types import AWSAccessDenied, AWSError, AWSResourceNotFound
@@ -18,6 +18,61 @@ __all__ = ("AWSS3Mixin",)
 
 
 class AWSS3Mixin(AWSAPI):
+    async def list_paginated(
+        self,
+        *,
+        pagination: Pagination | None = None,
+        uri: str | None = None,
+        recursive: bool = True,
+        **extra: Any,
+    ) -> Paginated[ResourceReference]:
+        pagination = pagination if pagination is not None else Pagination.of(limit=32)
+
+        if uri is None:
+            references: Sequence[ResourceReference] = await self._list_buckets(
+                limit=None,
+                **extra,
+            )
+            start: int = 0
+            if pagination.token is not None:
+                bucket_token: str = pagination.token if isinstance(pagination.token, str) else ""
+                if not bucket_token.startswith("buckets:"):
+                    raise ValueError("Invalid buckets pagination token")
+
+                start = int(bucket_token.split(":", 1)[1])
+
+            end: int = max(start, 0) + pagination.limit
+            next_token: str | None
+            if end < len(references):
+                next_token = f"buckets:{end}"
+
+            else:
+                next_token = None
+
+            return Paginated[ResourceReference].of(
+                references[start:end],
+                pagination=pagination.with_token(next_token),
+            )
+
+        if not uri.startswith("s3://"):
+            raise ValueError("Unsupported list uri scheme")
+
+        parsed_uri: ParseResult = urlparse(uri)  # s3://bucket/prefix
+        bucket: str = parsed_uri.netloc
+        prefix: str = parsed_uri.path.lstrip("/")
+        references, token = await self._list_page(
+            bucket=bucket,
+            prefix=prefix,
+            recursive=recursive,
+            pagination=pagination,
+            **extra,
+        )
+
+        return Paginated[ResourceReference].of(
+            references,
+            pagination=pagination.with_token(token),
+        )
+
     async def list(
         self,
         *,
@@ -279,7 +334,7 @@ class AWSS3Mixin(AWSAPI):
             meta=content.meta,
         )
 
-        return META_EMPTY
+        return Meta.empty
 
     @asynchronous
     def _list(  # noqa: C901, PLR0912
@@ -352,6 +407,69 @@ class AWSS3Mixin(AWSAPI):
                     break
 
             return references
+
+        except ClientError as exc:
+            raise _translate_client_error(
+                error=exc,
+                bucket=bucket,
+                key=prefix,
+            ) from exc
+
+    @asynchronous
+    def _list_page(
+        self,
+        *,
+        bucket: str,
+        prefix: str,
+        recursive: bool,
+        pagination: Pagination,
+        **extra: Any,
+    ) -> tuple[Sequence[ResourceReference], str | None]:
+        try:
+            request: dict[str, Any] = {
+                "Bucket": bucket,
+                "Prefix": prefix,
+                "MaxKeys": min(1000, pagination.limit),
+            }
+            if pagination.token is not None:
+                request["ContinuationToken"] = pagination.token
+
+            if not recursive:
+                request["Delimiter"] = "/"
+
+            if extra:
+                request.update(extra)
+
+            response: Mapping[str, Any] = self._s3_client.list_objects_v2(**request)
+
+            references: list[ResourceReference] = []
+            for entry in response.get("Contents", []):
+                key = entry.get("Key", "")
+                if not key or (key == prefix and key.endswith("/")):
+                    continue
+
+                references.append(
+                    _object_reference(
+                        bucket=bucket,
+                        key=key,
+                        entry=entry,
+                    )
+                )
+
+            for common_prefix in response.get("CommonPrefixes", []):
+                prefix_key = common_prefix.get("Prefix", "")
+                if not prefix_key:
+                    continue
+
+                references.append(
+                    ResourceReference.of(
+                        f"s3://{bucket}/{prefix_key}",
+                        name=_object_name(prefix_key),
+                        meta=Meta.of({"type": "prefix"}),
+                    )
+                )
+
+            return references, response.get("NextContinuationToken")
 
         except ClientError as exc:
             raise _translate_client_error(

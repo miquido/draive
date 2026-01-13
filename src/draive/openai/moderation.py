@@ -3,7 +3,7 @@ from typing import Any
 from haiway import ctx, not_missing
 from openai.types import ModerationCreateResponse, ModerationMultiModalInputParam
 
-from draive.guardrails import GuardrailsModeration, GuardrailsModerationException
+from draive.guardrails import GuardrailsModerationException
 from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIModerationConfig
@@ -13,9 +13,6 @@ __all__ = ("OpenAIContentModeration",)
 
 
 class OpenAIContentModeration(OpenAIAPI):
-    def moderation_guardrails(self) -> GuardrailsModeration:
-        return GuardrailsModeration(input_checking=self.content_moderation)
-
     async def content_moderation(  # noqa: C901, PLR0912, PLR0915
         self,
         content: Multimodal,
@@ -25,7 +22,7 @@ class OpenAIContentModeration(OpenAIAPI):
         **extra: Any,
     ) -> None:
         moderation_config: OpenAIModerationConfig = config or ctx.state(OpenAIModerationConfig)
-        async with ctx.scope("moderation"):
+        async with ctx.scope("openai.moderation"):
             ctx.record_info(
                 attributes={
                     "guardrails.provider": "openai",
@@ -89,7 +86,7 @@ class OpenAIContentModeration(OpenAIAPI):
                     moderated_content.append(
                         {
                             "type": "text",
-                            "text": part.artifact.to_str(),
+                            "text": part.to_str(),
                         }
                     )
 

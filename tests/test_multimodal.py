@@ -1,4 +1,7 @@
-from draive import ArtifactContent, DataModel, MultimodalContent, ResourceReference, TextContent
+from haiway import State
+
+from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
+from draive.resources import ResourceReference
 
 input_string: str = "Lorem ipsum,\ndolor sit amet"
 input_text: TextContent = TextContent(text=input_string)
@@ -143,7 +146,7 @@ def test_matching_meta_handles_missing_metadata():
 
 
 def test_matching_meta_excludes_datamodel_artifacts():
-    class TestArtifact(DataModel):
+    class TestArtifact(State):
         value: str
 
     text_with_meta = input_text.updating(meta={"test": "value"})
@@ -219,7 +222,7 @@ def test_split_by_meta_skips_missing_values():
 
 
 def test_split_by_meta_includes_datamodel_artifacts():
-    class TestArtifact(DataModel):
+    class TestArtifact(State):
         value: str
 
     text_with_meta = input_text.updating(meta={"category": "important"})

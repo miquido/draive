@@ -2,7 +2,7 @@ from asyncio import Lock
 from collections.abc import Callable, Collection, MutableMapping, MutableSequence, Sequence
 from typing import Any, cast
 
-from haiway import AttributePath, AttributeRequirement
+from haiway import AttributePath, AttributeRequirement, State
 
 from draive.embedding import (
     Embedded,
@@ -13,7 +13,6 @@ from draive.embedding import (
     vector_similarity_search,
 )
 from draive.multimodal import TextContent
-from draive.parameters import DataModel
 from draive.resources import ResourceContent
 
 __all__ = ("VolatileVectorIndex",)
@@ -23,7 +22,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
     lock: Lock = Lock()
     storage: MutableMapping[type[Any], MutableSequence[Embedded[Any]]] = {}
 
-    async def index[Model: DataModel, Value: ResourceContent | TextContent | str](
+    async def index[Model: State, Value: ResourceContent | TextContent | str](
         model: type[Model],
         /,
         *,
@@ -88,7 +87,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
             else:
                 storage[model] = embedded_models
 
-    async def search[Model: DataModel](  # noqa: C901, PLR0911, PLR0912
+    async def search[Model: State](  # noqa: C901, PLR0911, PLR0912
         model: type[Model],
         /,
         *,
@@ -186,7 +185,7 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
             )
         )
 
-    async def delete[Model: DataModel](
+    async def delete[Model: State](
         model: type[Model],
         /,
         *,

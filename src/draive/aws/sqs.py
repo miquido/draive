@@ -12,8 +12,8 @@ from typing import Any
 
 from botocore.exceptions import ClientError  # pyright: ignore[reportMissingModuleSource]
 from haiway import (
-    META_EMPTY,
     FlatObject,
+    Meta,
     MQMessage,
     MQQueue,
     RawValue,
@@ -142,7 +142,7 @@ class AWSSQSMixin(AWSAPI):
                     content=decoder(message["Body"]),
                     acknowledge=acknowledge,
                     reject=reject,
-                    meta=META_EMPTY,
+                    meta=Meta.empty,
                 )
 
     @asynchronous

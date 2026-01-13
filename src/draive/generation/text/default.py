@@ -2,13 +2,13 @@ from collections.abc import Iterable
 from typing import Any
 
 from draive.models import (
-    GenerativeModel,
     ModelInput,
     ModelInstructions,
     ModelOutput,
-    Toolbox,
 )
-from draive.multimodal import MultimodalContent
+from draive.multimodal import Multimodal, MultimodalContent
+from draive.steps import Step
+from draive.tools import Toolbox
 
 __all__ = ("generate_text",)
 
@@ -16,28 +16,28 @@ __all__ = ("generate_text",)
 async def generate_text(
     *,
     instructions: ModelInstructions,
-    input: MultimodalContent,  # noqa: A002
+    input: Multimodal,  # noqa: A002
     toolbox: Toolbox,
-    examples: Iterable[tuple[MultimodalContent, str]],
+    examples: Iterable[tuple[Multimodal, str]],
     **extra: Any,
 ) -> str:
-    result: ModelOutput = await GenerativeModel.loop(
+    completion: MultimodalContent = await Step.looping_completion(
         instructions=instructions,
-        context=[
-            *[
+        tools=toolbox,
+        output="text",
+        **extra,
+    ).run(
+        (
+            *(
                 message
                 for example in examples
-                for message in [
-                    ModelInput.of(example[0]),
+                for message in (
+                    ModelInput.of(MultimodalContent.of(example[0])),
                     ModelOutput.of(MultimodalContent.of(example[1])),
-                ]
-            ],
-            ModelInput.of(input),
-        ],
-        toolbox=toolbox,
-        output="text",
-        stream=False,
-        **extra,
+                )
+            ),
+            ModelInput.of(MultimodalContent.of(input)),
+        )
     )
 
-    return result.content.to_str()
+    return completion.to_str()

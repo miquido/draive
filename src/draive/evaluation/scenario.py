@@ -13,7 +13,6 @@ from haiway import (
 )
 
 from draive.evaluation.evaluator import EvaluatorResult
-from draive.parameters import DataModel
 
 __all__ = (
     "EvaluatorScenario",
@@ -23,7 +22,7 @@ __all__ = (
 )
 
 
-class EvaluatorScenarioResult(DataModel):
+class EvaluatorScenarioResult(State, serializable=True):
     """
     Result of running an evaluator scenario.
 

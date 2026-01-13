@@ -1,42 +1,26 @@
 # Basic MCP
 
-ModelContextProtocol (MCP) allows to easily extend application and LLM capabilities using
-standardized feature implementation. Draive library comes with support for MCP both as a server and
-client allowing to build LLM based application even faster with more code reuse.
+Use MCP servers to expose external tools/resources to Draive through `MCPClient`.
 
-For this example we've created a directory in our home folder and its structure looks like this:
+This pattern is useful when you want models to call capabilities provided by external MCP servers
+without writing custom SDK integration code.
 
-```
-checkmeout/
-    .. file1
-    .. file2
-    .. file3
-```
+## Example: Filesystem MCP Server
 
 ```python
-from draive import (
-    ConversationMessage,
-    Toolbox,
-    Conversation,
-    ctx,
-    load_env,
-    setup_logging,
-)
+from draive import Conversation, ToolsProvider, ctx, load_env, setup_logging
 from draive.mcp import MCPClient
-from draive.openai import OpenAIResponsesConfig, OpenAI
+from draive.openai import OpenAI, OpenAIResponsesConfig
 
-load_env() # load .env variables
+load_env()
 setup_logging("mcp")
 
-# initialize dependencies and configuration
 async with ctx.scope(
     "mcp",
-    OpenAIResponsesConfig(model="gpt-5-mini"),  # configure OpenAI model
-    # prepare MCPClient, it will handle connection lifetime through context
-    # and provide associated state with MCP functionalities
+    OpenAIResponsesConfig(model="gpt-5-mini"),
     disposables=(
-        OpenAI(),  # initialize OpenAI client
-        # we are going to use stdio connection with one of the example servers
+        OpenAI(),
+        # Start MCP stdio transport and register tool/resource states in context.
         MCPClient.stdio(
             command="npx",
             args=[
@@ -45,26 +29,23 @@ async with ctx.scope(
                 "/Users/myname/checkmeout",
             ],
         ),
-    )
+    ),
 ):
-    # request model using any appropriate method, i.e. conversation for chat
-    response: ConversationMessage = await Conversation.completion(
-        # provide a prompt instruction
-        instructions="You can access files on behalf of the user on their machine using available tools."
-        " Desktop directory path is `/Users/myname/checkmeout`",
-        # add user input
-        input="What files are in checkmeout directory?",
-        # define tools available to the model from MCP extensions
-        tools=await Toolbox.fetched(),
+    # Build toolbox from currently available MCP tools.
+    toolbox = await ToolsProvider.toolbox(suggesting=True)
+
+    stream = await Conversation.completion(
+        instructions=(
+            "You can access user files using available tools. "
+            "Directory path is /Users/myname/checkmeout."
+        ),
+        message="What files are in checkmeout directory?",
+        toolbox=toolbox,
     )
-    print(response.content)
+
+    async for chunk in stream:
+        print(chunk)
 ```
 
-```
-The `checkmeout` directory contains the following files:
-
-- file1
-- file10
-- file2
-- file3
-```
+`MCPClient` contributes `ToolsProvider`/`ResourcesRepository` states inside `ctx.scope(...)`, so you
+can load MCP tools dynamically and keep all dependencies lifecycle-managed by context.

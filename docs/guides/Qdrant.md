@@ -12,12 +12,11 @@ Start by binding `QdrantClient` inside a `ctx.scope(...)`. The client lazily ope
 delete helpers.
 
 ```python
-from draive import ctx
+from draive import ctx, State
 from draive.embedding import Embedded
 from draive.qdrant import Qdrant, QdrantClient
-from draive.parameters import DataModel
 
-class Document(DataModel):
+class Document(State, serializable=True):
     id: str
     text: str
 
@@ -39,7 +38,7 @@ Access the bound `Qdrant` state anywhere inside the scope via `ctx.state(Qdrant)
 
 ## Collections and indexes
 
-Each data model maps to a dedicated Qdrant collection named after the `DataModel` class. Use
+Each data model maps to a dedicated Qdrant collection named after the `State` class. Use
 `Qdrant.create_collection(...)` to provision it with the correct vector size, optional datatype, and
 metric (Cosine, Dot, Euclid, Manhattan). The `skip_existing=True` flag lets you rerun bootstrapping
 scripts safely. When you need faster filtering on payload attributes, `Qdrant.create_index(...)`
@@ -56,7 +55,7 @@ Use `Qdrant.collections()` to inspect what the active server exposes and
 ## Persisting and replaying records
 
 `Qdrant.store(...)` expects an iterable of `Embedded[Model]` instances. Each record holds the typed
-`value` (built with your `DataModel`) and the dense vector that should be stored in Qdrant. You can
+`value` (built with your `State`) and the dense vector that should be stored in Qdrant. You can
 batch writes with `batch_size`, retry failures, and parallelize uploads through `parallel_tasks`.
 
 ```python

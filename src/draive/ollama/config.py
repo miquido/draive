@@ -10,7 +10,7 @@ __all__ = (
 
 class OllamaChatConfig(Configuration):
     model: str
-    temperature: float = 1.0
+    temperature: float | Missing = MISSING
     top_k: int | Missing = MISSING
     top_p: float | Missing = MISSING
     seed: int | None | Missing = MISSING

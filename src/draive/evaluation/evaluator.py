@@ -3,7 +3,6 @@ from collections.abc import Callable, Collection, Sequence
 from typing import Annotated, Protocol, Self, cast, overload, runtime_checkable
 
 from haiway import (
-    META_EMPTY,
     AttributePath,
     Description,
     Immutable,
@@ -21,7 +20,6 @@ from draive.evaluation.value import (
     evaluation_score_value,
     evaluation_score_verifier,
 )
-from draive.parameters import DataModel
 
 __all__ = (
     "Evaluator",
@@ -32,7 +30,7 @@ __all__ = (
 )
 
 
-class EvaluatorResult(DataModel):
+class EvaluatorResult(State, serializable=True):
     """
     Result from running an evaluator on a value.
 
@@ -106,7 +104,7 @@ class EvaluatorResult(DataModel):
     meta: Annotated[
         Meta,
         Description("Additional evaluation metadata"),
-    ] = META_EMPTY
+    ] = Meta.empty
 
     @property
     def passed(self) -> bool:
@@ -316,7 +314,7 @@ class Evaluator[Value, **Args](Immutable):
                 evaluator="lowest",
                 score=1.0,
                 threshold=0,
-                meta=META_EMPTY,
+                meta=Meta.empty,
             )
 
             for result in await concurrently(
@@ -364,7 +362,7 @@ class Evaluator[Value, **Args](Immutable):
                 evaluator="highest",
                 score=0.0,
                 threshold=1,
-                meta=META_EMPTY,
+                meta=Meta.empty,
             )
 
             for result in await concurrently(
@@ -423,7 +421,7 @@ class Evaluator[Value, **Args](Immutable):
                 evaluator="average",
                 score=sum(scores) / len(scores),
                 threshold=evaluation_score_value(threshold),
-                meta=META_EMPTY,
+                meta=Meta.empty,
             )
 
         return evaluate

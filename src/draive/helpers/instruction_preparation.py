@@ -2,9 +2,9 @@ from typing import Final
 
 from haiway import ctx
 
-from draive.models import ModelInstructions
+from draive.models import ModelInput, ModelInstructions
 from draive.multimodal import MultimodalContent, TemplateDeclaration
-from draive.stages import Stage
+from draive.steps import Step
 
 __all__ = (
     "InstructionPreparationAmbiguity",
@@ -44,25 +44,32 @@ async def prepare_instructions(
                 instruction_declaration = declaration
 
         assert instruction_declaration.description is not None  # nosec: B101
-        result: MultimodalContent = await Stage.completion(
-            f"<USER_TASK>{instruction_declaration.description}</USER_TASK>{_format_variables(instruction_declaration)}",
+        result: MultimodalContent = await Step.generating_completion(
             instructions=PREPARE_INSTRUCTION.replace(
                 "{guidelines}",
                 _format_guidelines(guidelines),
             ),
-        ).execute()
+        ).run(
+            (
+                ModelInput.of(
+                    MultimodalContent.of(
+                        f"<USER_TASK>{instruction_declaration.description}</USER_TASK>{_format_variables(instruction_declaration)}"
+                    ),
+                ),
+            )
+        )
 
-    if parsed := result.tag("RESULT_INSTRUCTION"):
-        ctx.log_info("...instruction preparation finished!")
-        return parsed.content.to_str()
+        if parsed := result.tag("RESULT_INSTRUCTION"):
+            ctx.log_info("...instruction preparation finished!")
+            return parsed.content.to_str()
 
-    elif parsed := result.tag("QUESTIONS"):
-        ctx.log_error("...instruction preparation requires clarification!")
-        raise InstructionPreparationAmbiguity(questions=parsed.content.to_str())
+        elif parsed := result.tag("QUESTIONS"):
+            ctx.log_error("...instruction preparation requires clarification!")
+            raise InstructionPreparationAmbiguity(questions=parsed.content.to_str())
 
-    else:
-        ctx.log_error("...instruction preparation failed!")
-        raise ValueError(f"Failed to prepare instruction: {result.to_str()}")
+        else:
+            ctx.log_error("...instruction preparation failed!")
+            raise ValueError(f"Failed to prepare instruction: {result.to_str()}")
 
 
 def _format_variables(

@@ -1,37 +1,54 @@
 import json
 import random
-from collections.abc import AsyncGenerator, Coroutine, Generator, Iterable, Mapping
+from collections.abc import Iterable, Mapping, MutableMapping, MutableSequence, Sequence
 from typing import Any, Literal, cast, overload
-from uuid import uuid4
 
-from haiway import META_EMPTY, MISSING, Missing, as_list, ctx
-from openai import Omit, omit
+from haiway import MISSING, Missing, as_list, ctx
+from openai import AsyncStream, Omit, omit
 from openai import RateLimitError as OpenAIRateLimitError
 from openai.types.chat import (
-    ChatCompletion,
-    ChatCompletionMessage,
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionChunk,
+    ChatCompletionContentPartImageParam,
+    ChatCompletionContentPartParam,
+    ChatCompletionContentPartTextParam,
+    ChatCompletionFunctionToolParam,
+    ChatCompletionMessageFunctionToolCallParam,
     ChatCompletionMessageParam,
+    ChatCompletionSystemMessageParam,
     ChatCompletionToolChoiceOptionParam,
     ChatCompletionToolParam,
+    ChatCompletionUserMessageParam,
 )
 from openai.types.chat.chat_completion_chunk import Choice
+from openai.types.chat.chat_completion_content_part_image_param import ImageURL
+from openai.types.chat.chat_completion_message_function_tool_call_param import Function
+from openai.types.chat.chat_completion_named_tool_choice_param import (
+    ChatCompletionNamedToolChoiceParam,
+)
 from openai.types.chat.completion_create_params import ResponseFormat
+from openai.types.shared_params.function_definition import FunctionDefinition
+from openai.types.shared_params.function_parameters import FunctionParameters
 
 from draive.models import (
-    GenerativeModel,
     ModelContext,
+    ModelException,
     ModelInput,
     ModelInstructions,
     ModelOutput,
     ModelOutputFailed,
+    ModelOutputInvalid,
+    ModelOutputLimit,
     ModelOutputSelection,
+    ModelOutputStream,
     ModelRateLimit,
     ModelReasoning,
-    ModelStreamOutput,
     ModelToolRequest,
-    ModelToolsDeclaration,
+    ModelTools,
     ModelToolSpecification,
     ModelToolsSelection,
+    record_model_invocation,
+    record_usage_metrics,
 )
 from draive.multimodal import (
     ArtifactContent,
@@ -46,154 +63,54 @@ from draive.vllm.utils import unwrap_missing
 
 __all__ = ("VLLMMessages",)
 
-# Consistent randomized backoff window for rate limits (seconds)
-RATE_LIMIT_RETRY_RANGE: tuple[float, float] = (0.3, 3.0)
-
 
 class VLLMMessages(VLLMAPI):
-    def generative_model(self) -> GenerativeModel:
-        return GenerativeModel(generating=self.completion)
-
-    @overload
-    def completion(
+    async def completion(  # noqa: C901, PLR0912, PLR0915
         self,
         *,
         instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
+        tools: ModelTools,
         context: ModelContext,
         output: ModelOutputSelection,
-        stream: Literal[False] = False,
         config: VLLMChatConfig | None = None,
         **extra: Any,
-    ) -> Coroutine[None, None, ModelOutput]: ...
-
-    @overload
-    def completion(
-        self,
-        *,
-        instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
-        context: ModelContext,
-        output: ModelOutputSelection,
-        stream: Literal[True],
-        config: VLLMChatConfig | None = None,
-        **extra: Any,
-    ) -> AsyncGenerator[ModelStreamOutput]: ...
-
-    def completion(
-        self,
-        *,
-        instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
-        context: ModelContext,
-        output: ModelOutputSelection,
-        stream: bool = False,
-        config: VLLMChatConfig | None = None,
-        **extra: Any,
-    ) -> AsyncGenerator[ModelStreamOutput] | Coroutine[None, None, ModelOutput]:
-        if stream:
-            return self._completion_stream(
-                instructions=instructions,
+    ) -> ModelOutputStream:
+        async with ctx.scope("vllm.completions"):
+            config = config or ctx.state(VLLMChatConfig)
+            record_model_invocation(
+                provider=f"vllm@{self._base_url}",
+                model=config.model,
+                temperature=config.temperature,
+                max_output_tokens=config.max_output_tokens,
                 tools=tools,
-                context=context,
                 output=output,
-                config=config or ctx.state(VLLMChatConfig),
-                **extra,
-            )
-
-        return self._completion(
-            instructions=instructions,
-            tools=tools,
-            context=context,
-            output=output,
-            config=config or ctx.state(VLLMChatConfig),
-            **extra,
-        )
-
-    async def _completion(
-        self,
-        *,
-        instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
-        context: ModelContext,
-        output: ModelOutputSelection,
-        config: VLLMChatConfig,
-        **extra: Any,
-    ) -> ModelOutput:
-        async with ctx.scope("model.completion"):
-            ctx.record_info(
-                attributes={
-                    "model.provider": "vllm",
-                    "model.name": config.model,
-                    "model.temperature": config.temperature,
-                    "model.max_output_tokens": config.max_output_tokens,
-                    "model.output": str(output),
-                    "model.tools.count": len(tools.specifications),
-                    "model.tools.selection": tools.selection,
-                    "model.stream": False,
-                },
             )
             ctx.record_debug(
                 attributes={
                     "model.instructions": instructions,
-                    "model.tools": [tool.name for tool in tools.specifications],
+                    "model.tools": [tool.name for tool in tools.specification],
                     "model.context": [element.to_str() for element in context],
                 },
             )
 
-            messages: list[ChatCompletionMessageParam]
-            if instructions:
-                messages = [
-                    cast(
-                        ChatCompletionMessageParam,
-                        {
-                            "role": "system",
-                            "content": instructions,
-                        },
-                    ),
-                    *_context_messages(
-                        context,
-                        vision_details=config.vision_details,
-                    ),
-                ]
-
-            else:
-                messages = list(
-                    _context_messages(
-                        context,
-                        vision_details=config.vision_details,
-                    )
-                )
-
-            # Response format
-            response_format: ResponseFormat | Omit
-            if output == "json":
-                response_format = {"type": "json_object"}
-
-            elif isinstance(output, type):
-                response_format = {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": output.__name__,
-                        "schema": cast(dict[str, Any], output.__SPECIFICATION__),
-                        "strict": False,
-                    },
-                }
-
-            else:
-                response_format = omit
-
+            tool_choice: ChatCompletionToolChoiceOptionParam | Omit
+            tools_list: Iterable[ChatCompletionToolParam] | Omit
             tool_choice, tools_list = _tools_as_tool_config(
-                tools.specifications,
+                tools.specification,
                 tool_selection=tools.selection,
             )
 
-            # Execute chat completion
+            # Start streaming request
+            stream: AsyncStream[ChatCompletionChunk]
             try:
-                completion: ChatCompletion = await self._client.chat.completions.create(
+                stream = await self._client.chat.completions.create(
                     model=config.model,
-                    messages=messages,
-                    temperature=config.temperature,
+                    messages=_context_messages(
+                        instructions=instructions,
+                        context=context,
+                        vision_details=config.vision_details,
+                    ),
+                    temperature=unwrap_missing(config.temperature),
                     top_p=unwrap_missing(config.top_p),
                     frequency_penalty=unwrap_missing(config.frequency_penalty),
                     tools=tools_list,
@@ -202,12 +119,12 @@ class VLLMMessages(VLLMAPI):
                     if tools_list is not omit
                     else omit,
                     max_tokens=unwrap_missing(config.max_output_tokens),
-                    response_format=response_format,
+                    response_format=_response_format(output),
                     seed=unwrap_missing(config.seed),
                     stop=as_list(cast(Iterable[str], config.stop_sequences))
                     if config.stop_sequences is not MISSING
                     else omit,
-                    stream=False,
+                    stream=True,
                 )
 
             except OpenAIRateLimitError as exc:
@@ -217,421 +134,348 @@ class VLLMMessages(VLLMAPI):
                         delay = float(retry_after)
 
                     else:
-                        delay = random.uniform(*RATE_LIMIT_RETRY_RANGE)  # nosec: B311
+                        delay = random.uniform(0.3, 3.0)  # nosec: B311
 
                 except Exception:
-                    delay = random.uniform(*RATE_LIMIT_RETRY_RANGE)  # nosec: B311
+                    delay = random.uniform(0.3, 3.0)  # nosec: B311
 
+                ctx.record_warning(
+                    event="model.rate_limit",
+                    attributes={
+                        "model.provider": f"vllm@{self._base_url}",
+                        "model.name": config.model,
+                        "retry_after": delay,
+                    },
+                )
                 raise ModelRateLimit(
-                    provider="vllm",
+                    provider=f"vllm@{self._base_url}",
                     model=config.model,
                     retry_after=delay,
                 ) from exc
 
             except Exception as exc:
                 raise ModelOutputFailed(
-                    provider="vllm",
+                    provider=f"vllm@{self._base_url}",
                     model=config.model,
                     reason=str(exc),
                 ) from exc
 
-            if usage := completion.usage:
-                ctx.record_info(
-                    metric="model.input_tokens",
-                    value=usage.prompt_tokens,
-                    unit="tokens",
-                    kind="counter",
-                    attributes={"model.provider": "vllm", "model.name": completion.model},
-                )
-                ctx.record_info(
-                    metric="model.output_tokens",
-                    value=usage.completion_tokens,
-                    unit="tokens",
-                    kind="counter",
-                    attributes={"model.provider": "vllm", "model.name": completion.model},
-                )
-
-            return ModelOutput.of(
-                *_completion_as_output_content(completion),
-                meta={
-                    "identifier": completion.id,
-                    "model": config.model,
-                    "finish_reason": completion.choices[0].finish_reason,
-                },
-            )
-
-    async def _completion_stream(  # noqa: C901, PLR0912, PLR0915
-        self,
-        *,
-        instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
-        context: ModelContext,
-        output: ModelOutputSelection,
-        config: VLLMChatConfig,
-        **extra: Any,
-    ) -> AsyncGenerator[ModelStreamOutput]:
-        ctx.record_info(
-            attributes={
-                "model.provider": "vllm",
-                "model.name": config.model,
-                "model.temperature": config.temperature,
-                "model.max_output_tokens": config.max_output_tokens,
-                "model.output": str(output),
-                "model.tools.count": len(tools.specifications),
-                "model.tools.selection": tools.selection,
-                "model.stream": True,
-            },
-        )
-        ctx.record_debug(
-            attributes={
-                "model.instructions": instructions,
-                "model.tools": [tool.name for tool in tools.specifications],
-                "model.context": [element.to_str() for element in context],
-            },
-        )
-
-        messages: list[ChatCompletionMessageParam]
-        if instructions:
-            messages = [
-                cast(
-                    ChatCompletionMessageParam,
-                    {
-                        "role": "system",
-                        "content": instructions,
-                    },
-                ),
-                *_context_messages(
-                    context,
-                    vision_details=config.vision_details,
-                ),
-            ]
-
-        else:
-            messages = list(
-                _context_messages(
-                    context,
-                    vision_details=config.vision_details,
-                )
-            )
-
-        response_format: ResponseFormat | Omit
-        if output == "json":
-            response_format = {"type": "json_object"}
-
-        elif isinstance(output, type):
-            response_format = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": output.__name__,
-                    "schema": cast(dict[str, Any], output.__SPECIFICATION__),
-                    "strict": False,
-                },
-            }
-
-        else:
-            response_format = omit
-
-        tool_choice, tools_list = _tools_as_tool_config(
-            tools.specifications,
-            tool_selection=tools.selection,
-        )
-
-        # Start streaming request
-        try:
-            stream = await self._client.chat.completions.create(
-                model=config.model,
-                messages=messages,
-                temperature=config.temperature,
-                top_p=unwrap_missing(config.top_p),
-                frequency_penalty=unwrap_missing(config.frequency_penalty),
-                tools=tools_list,
-                tool_choice=tool_choice,
-                parallel_tool_calls=unwrap_missing(config.parallel_tool_calls)
-                if tools_list is not omit
-                else omit,
-                max_tokens=unwrap_missing(config.max_output_tokens),
-                response_format=response_format,
-                seed=unwrap_missing(config.seed),
-                stop=as_list(cast(Iterable[str], config.stop_sequences))
-                if config.stop_sequences is not MISSING
-                else omit,
-                stream=True,
-            )
-        except OpenAIRateLimitError as exc:
-            delay: float
+            # Accumulate tool call deltas by index and emit complete calls after stream ends.
+            tool_accumulator: MutableMapping[int, MutableMapping[str, str]] = {}
+            latest_input_tokens: int | None = None
+            latest_output_tokens: int | None = None
             try:
-                if retry_after := exc.response.headers.get("Retry-After"):
-                    delay = float(retry_after)
+                async for chunk in stream:  # ChatCompletionChunk
+                    if usage := getattr(chunk, "usage", None):
+                        latest_input_tokens = usage.prompt_tokens
+                        latest_output_tokens = usage.completion_tokens
 
-                else:
-                    delay = random.uniform(*RATE_LIMIT_RETRY_RANGE)  # nosec: B311
+                    if not chunk.choices:
+                        continue  # allow usage-only chunks
 
-            except Exception:
-                delay = random.uniform(*RATE_LIMIT_RETRY_RANGE)  # nosec: B311
+                    choice: Choice = chunk.choices[0]
 
-            raise ModelRateLimit(
-                provider="vllm",
-                model=config.model,
-                retry_after=delay,
-            ) from exc
+                    if choice.delta.content:
+                        yield TextContent(text=choice.delta.content)
 
-        except Exception as exc:
-            raise ModelOutputFailed(
-                provider="vllm",
-                model=config.model,
-                reason=str(exc),
-            ) from exc
+                    # Accumulate tool call parts
+                    if choice.delta.tool_calls:
+                        for call in choice.delta.tool_calls:
+                            tool_state: MutableMapping[str, str] = tool_accumulator.setdefault(
+                                call.index,
+                                {"arguments": ""},
+                            )
+                            if call.id:
+                                tool_state["id"] = call.id
 
-        # Accumulate tool call deltas by index
-        tool_accum: dict[int, dict[str, str]] = {}
+                            if call.function:
+                                if call.function.name:
+                                    # name may stream in segments; append if partial
+                                    tool_state["name"] = (
+                                        tool_state.get("name", "") + call.function.name
+                                    )
 
-        try:
-            async for chunk in stream:  # ChatCompletionChunk
-                choice: Choice = chunk.choices[0]
+                                if call.function.arguments:
+                                    tool_state["arguments"] = (
+                                        tool_state["arguments"] + call.function.arguments
+                                    )
 
-                if choice.delta.content:
-                    yield TextContent(text=choice.delta.content)
-
-                # Accumulate tool call parts
-                if choice.delta.tool_calls:
-                    for call in choice.delta.tool_calls:
-                        idx = call.index
-                        entry = tool_accum.setdefault(
-                            idx,
-                            {
-                                "id": "",
-                                "name": "",
-                                "arguments": "",
-                            },
+                    if choice.finish_reason == "length":
+                        raise ModelOutputLimit(
+                            provider=f"vllm@{self._base_url}",
+                            model=config.model,
+                            max_output_tokens=(
+                                cast(int, config.max_output_tokens)
+                                if config.max_output_tokens is not MISSING
+                                else 0
+                            ),
                         )
 
-                        if call.id:
-                            entry["id"] = call.id
+                    if choice.finish_reason in (None, "stop", "tool_calls", "function_call"):
+                        continue
 
-                        if call.function:
-                            if call.function.name:
-                                # name may stream in segments; replace if provided
-                                entry["name"] = call.function.name
+                    raise ModelOutputFailed(
+                        provider=f"vllm@{self._base_url}",
+                        model=config.model,
+                        reason=f"Unsupported finish reason: {choice.finish_reason}",
+                    )
 
-                            if call.function.arguments:
-                                entry["arguments"] += call.function.arguments
+                record_usage_metrics(
+                    provider=f"vllm@{self._base_url}",
+                    model=config.model,
+                    input_tokens=latest_input_tokens,
+                    output_tokens=latest_output_tokens,
+                )
 
-                # When tool calls are selected, emit requests
-                if choice.finish_reason == "tool_calls" and tool_accum:
-                    for entry in tool_accum.values():
-                        name: str = entry.get("name") or "n/a"
-                        identifier: str = entry.get("id") or uuid4().hex
-                        args_text: str = entry.get("arguments") or ""
-                        try:
-                            arguments: Mapping[str, Any] = (
-                                json.loads(args_text) if args_text else {}
+                for index in sorted(tool_accumulator):
+                    tool_state = tool_accumulator[index]
+                    match tool_state:
+                        case {
+                            "id": str() as identifier,
+                            "name": str() as name,
+                            "arguments": str() as args,
+                        }:
+                            try:
+                                arguments: Mapping[str, Any] = json.loads(args) if args else {}
+
+                            except Exception as exc:
+                                raise ModelOutputInvalid(
+                                    provider=f"vllm@{self._base_url}",
+                                    model=config.model,
+                                    reason=(
+                                        "Tool arguments decoding error - "
+                                        f"{type(exc).__name__}: {exc}"
+                                    ),
+                                ) from exc
+
+                            yield ModelToolRequest.of(
+                                identifier,
+                                tool=name,
+                                arguments=arguments,
                             )
 
-                        except Exception:
-                            arguments = {}
+                        case _:
+                            raise ModelOutputInvalid(
+                                provider="vllm",
+                                model=config.model,
+                                reason="Invalid tool request",
+                            )
 
-                        yield ModelToolRequest.of(
-                            identifier,
-                            tool=name,
-                            arguments=arguments,
-                        )
+            except OpenAIRateLimitError as exc:
+                delay: float
+                try:
+                    if retry_after := exc.response.headers.get("Retry-After"):
+                        delay = float(retry_after)
 
-                    tool_accum.clear()
+                    else:
+                        delay = random.uniform(0.3, 3.0)  # nosec: B311
 
-        except OpenAIRateLimitError as exc:
-            delay: float
-            try:
-                if retry_after := exc.response.headers.get("Retry-After"):
-                    delay = float(retry_after)
+                except Exception:
+                    delay = random.uniform(0.3, 3.0)  # nosec: B311
 
-                else:
-                    delay = random.uniform(*RATE_LIMIT_RETRY_RANGE)  # nosec: B311
+                ctx.record_warning(
+                    event="model.rate_limit",
+                    attributes={
+                        "model.provider": f"vllm@{self._base_url}",
+                        "model.name": config.model,
+                        "retry_after": delay,
+                    },
+                )
+                raise ModelRateLimit(
+                    provider=f"vllm@{self._base_url}",
+                    model=config.model,
+                    retry_after=delay,
+                ) from exc
 
-            except Exception:
-                delay = random.uniform(*RATE_LIMIT_RETRY_RANGE)  # nosec: B311
+            except ModelException as exc:
+                raise exc
 
-            raise ModelRateLimit(
-                provider="vllm",
-                model=config.model,
-                retry_after=delay,
-            ) from exc
-
-        except Exception as exc:
-            raise ModelOutputFailed(
-                provider="vllm",
-                model=config.model,
-                reason=str(exc),
-            ) from exc
+            except Exception as exc:
+                raise ModelOutputFailed(
+                    provider=f"vllm@{self._base_url}",
+                    model=config.model,
+                    reason=str(exc),
+                ) from exc
 
 
 def _context_messages(
-    context: ModelContext,
-    /,
     *,
+    instructions: ModelInstructions,
+    context: ModelContext,
     vision_details: Literal["auto", "low", "high"] | Missing,
 ) -> Iterable[ChatCompletionMessageParam]:
+    yield ChatCompletionSystemMessageParam(
+        role="system",
+        content=instructions,
+    )
+
     for element in context:
         if isinstance(element, ModelInput):
-            user_content = element.content
-            yield cast(
-                ChatCompletionMessageParam,
-                {
-                    "role": "user",
-                    "content": list(
-                        content_parts(
-                            user_content.parts,
-                            vision_details=vision_details,
-                            text_only=False,
-                        )
-                    ),
-                },
+            yield ChatCompletionUserMessageParam(
+                role="user",
+                content=_content_parts(
+                    element.content.parts,
+                    vision_details=vision_details,
+                ),
             )
 
         else:
             assert isinstance(element, ModelOutput)  # nosec: B101
-            for block in element.blocks:
+            content: MutableSequence[ChatCompletionContentPartTextParam] = []
+            tool_calls: MutableSequence[ChatCompletionMessageFunctionToolCallParam] = []
+            for block in element.output:
                 if isinstance(block, MultimodalContent):
-                    yield cast(
-                        ChatCompletionMessageParam,
-                        {
-                            "role": "assistant",
-                            "content": list(
-                                content_parts(
-                                    block.parts,
-                                    vision_details=vision_details,
-                                    text_only=True,
-                                )
-                            ),
-                        },
+                    content.extend(
+                        _content_parts(
+                            block.parts,
+                            vision_details=vision_details,
+                            text_only=True,
+                        )
                     )
 
                 elif isinstance(block, ModelReasoning):
-                    continue  # skip reasoning
+                    continue  # skip reasoning blocks - not supported in this api
 
                 else:
-                    yield cast(
-                        ChatCompletionMessageParam,
-                        {
-                            "role": "assistant",
-                            "tool_calls": [
-                                {
-                                    "id": block.identifier,
-                                    "type": "function",
-                                    "function": {
-                                        "name": block.tool,
-                                        "arguments": json.dumps(block.arguments),
-                                    },
-                                }
-                            ],
-                        },
+                    tool_calls.append(
+                        ChatCompletionMessageFunctionToolCallParam(
+                            id=block.identifier,
+                            type="function",
+                            function=Function(
+                                name=block.tool,
+                                arguments=json.dumps(block.arguments),
+                            ),
+                        )
                     )
 
+            yield ChatCompletionAssistantMessageParam(
+                role="assistant",
+                content=content,
+                tool_calls=tool_calls,
+            )
 
-def content_parts(  # noqa: C901, PLR0912
+
+@overload
+def _content_parts(
     parts: Iterable[MultimodalContentPart],
     /,
     *,
     vision_details: Literal["auto", "low", "high"] | Missing,
-    text_only: bool,
-) -> Iterable[dict[str, Any]]:
-    for element in parts:
-        match element:
-            case TextContent() as text:
-                yield {
-                    "type": "text",
-                    "text": text.text,
-                }
-
-            case ResourceReference() as reference:
-                if text_only:
-                    continue  # skip with text only
-
-                if reference.mime_type is not None and not reference.mime_type.startswith("image"):
-                    raise ValueError(
-                        f"Unsupported message content mime type: {reference.mime_type}"
-                    )
-
-                if vision_details is MISSING:
-                    yield {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": reference.uri,
-                        },
-                    }
-
-                else:
-                    yield {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": reference.uri,
-                            "detail": vision_details,
-                        },
-                    }
-
-            case ResourceContent() as data:
-                if text_only:
-                    continue  # skip with text only
-
-                if not data.mime_type.startswith("image"):
-                    raise ValueError(f"Unsupported message content mime type: {data.mime_type}")
-
-                if vision_details is MISSING:
-                    yield {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": data.to_data_uri(),
-                        },
-                    }
-
-                else:
-                    yield {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": data.to_data_uri(),
-                            "detail": vision_details,
-                        },
-                    }
-
-            case ArtifactContent() as artifact:
-                if artifact.hidden or text_only:
-                    continue
-
-                yield {
-                    "type": "text",
-                    "text": artifact.artifact.to_str(),
-                }
+    text_only: Literal[True],
+) -> Iterable[ChatCompletionContentPartTextParam]: ...
 
 
-def _tool_specification_as_tool(tool: ModelToolSpecification) -> ChatCompletionToolParam:
-    return {
-        "type": "function",
-        "function": {
-            "name": tool.name,
-            "description": tool.description or "",
-            "parameters": cast(dict[str, Any], tool.parameters)
-            or {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": False,
-            },
-        },
-    }
+@overload
+def _content_parts(
+    parts: Iterable[MultimodalContentPart],
+    /,
+    *,
+    vision_details: Literal["auto", "low", "high"] | Missing,
+    text_only: Literal[False] = False,
+) -> Iterable[ChatCompletionContentPartParam]: ...
+
+
+def _content_parts(  # noqa: C901, PLR0912
+    parts: Iterable[MultimodalContentPart],
+    /,
+    *,
+    vision_details: Literal["auto", "low", "high"] | Missing,
+    text_only: bool = False,
+) -> Iterable[ChatCompletionContentPartParam]:
+    for part in parts:
+        if isinstance(part, TextContent):
+            yield ChatCompletionContentPartTextParam(
+                type="text",
+                text=part.text,
+            )
+
+        elif isinstance(part, ResourceReference):
+            if text_only:
+                continue  # skip with text only
+
+            if not part.mime_type.startswith("image"):
+                raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
+
+            if vision_details is MISSING:
+                yield ChatCompletionContentPartImageParam(
+                    type="image_url",
+                    image_url=ImageURL(
+                        url=part.uri,
+                    ),
+                )
+
+            else:
+                yield ChatCompletionContentPartImageParam(
+                    type="image_url",
+                    image_url=ImageURL(
+                        url=part.uri,
+                        detail=cast(Literal["auto", "low", "high"], vision_details),
+                    ),
+                )
+
+        elif isinstance(part, ResourceContent):
+            if text_only:
+                continue  # skip with text only
+
+            if not part.mime_type.startswith("image"):
+                raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
+
+            if vision_details is MISSING:
+                yield ChatCompletionContentPartImageParam(
+                    type="image_url",
+                    image_url=ImageURL(
+                        url=part.to_data_uri(),
+                    ),
+                )
+
+            else:
+                yield ChatCompletionContentPartImageParam(
+                    type="image_url",
+                    image_url=ImageURL(
+                        url=part.to_data_uri(),
+                        detail=cast(Literal["auto", "low", "high"], vision_details),
+                    ),
+                )
+
+        else:
+            assert isinstance(part, ArtifactContent)  # nosec: B101
+            if part.hidden:
+                continue  # skip hidden artifacts
+
+            yield ChatCompletionContentPartTextParam(
+                type="text",
+                text=part.to_str(),
+            )
 
 
 def _tools_as_tool_config(
-    tools: Iterable[ModelToolSpecification] | None,
+    tools: Sequence[ModelToolSpecification],
     /,
     *,
     tool_selection: ModelToolsSelection,
 ) -> tuple[
     ChatCompletionToolChoiceOptionParam | Omit,
-    list[ChatCompletionToolParam] | Omit,
+    Iterable[ChatCompletionToolParam] | Omit,
 ]:
-    tools_list: list[ChatCompletionToolParam] = [
-        _tool_specification_as_tool(tool) for tool in (tools or [])
-    ]
-    if not tools_list:
+    if not tools:
         return (omit, omit)
+
+    tools_list: list[ChatCompletionToolParam] = [
+        ChatCompletionFunctionToolParam(
+            type="function",
+            function=FunctionDefinition(
+                name=tool.name,
+                description=tool.description or "",
+                parameters=cast(FunctionParameters, tool.parameters)
+                or {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+            ),
+        )
+        for tool in tools
+    ]
 
     if tool_selection == "auto":
         return ("auto", tools_list)
@@ -642,34 +486,31 @@ def _tools_as_tool_config(
     if tool_selection == "required":
         return ("required", tools_list)
 
-    # specific tool name
-    return (
-        {
-            "type": "function",
-            "function": {
-                "name": tool_selection,
-            },
-        },
+    return (  # specific tool name
+        ChatCompletionNamedToolChoiceParam(
+            type="function",
+            function={"name": tool_selection.name},
+        ),
         tools_list,
     )
 
 
-def _completion_as_output_content(
-    completion: ChatCompletion,
-) -> Generator[MultimodalContent | ModelToolRequest]:
-    message: ChatCompletionMessage = completion.choices[0].message
+def _response_format(
+    output: ModelOutputSelection,
+    /,
+) -> ResponseFormat | Omit:
+    if output == "json":
+        return {"type": "json_object"}
 
-    if message.content:
-        yield MultimodalContent.of(TextContent(text=message.content))
+    elif isinstance(output, type):
+        return {
+            "type": "json_schema",
+            "json_schema": {
+                "name": output.__name__,
+                "schema": cast(dict[str, object], output.__SPECIFICATION__),
+                "strict": False,
+            },
+        }
 
-    if message.tool_calls:
-        for call in message.tool_calls:
-            if call.type != "function" or not call.function:
-                continue
-
-            yield ModelToolRequest(
-                identifier=call.id or uuid4().hex,
-                tool=call.function.name,
-                arguments=json.loads(call.function.arguments) if call.function.arguments else {},
-                meta=META_EMPTY,
-            )
+    else:
+        return omit

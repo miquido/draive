@@ -10,7 +10,7 @@ from haiway import State, as_list, ctx
 from draive.cohere.api import CohereAPI
 from draive.cohere.config import CohereImageEmbeddingConfig, CohereTextEmbeddingConfig
 from draive.embedding import Embedded, ImageEmbedding, TextEmbedding
-from draive.parameters import DataModel
+from draive.models.metrics import record_embedding_invocation, record_embedding_metrics
 
 __all__ = ("CohereEmbedding",)
 
@@ -19,7 +19,7 @@ class CohereEmbedding(CohereAPI):
     def text_embedding(self) -> TextEmbedding:
         return TextEmbedding(embedding=self.create_texts_embedding)
 
-    async def create_texts_embedding[Value: DataModel | State](
+    async def create_texts_embedding[Value: State](
         self,
         values: Sequence[Value] | Sequence[str],
         /,
@@ -30,14 +30,6 @@ class CohereEmbedding(CohereAPI):
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
         embedding_config: CohereTextEmbeddingConfig = config or ctx.state(CohereTextEmbeddingConfig)
         async with ctx.scope("cohere_text_embedding"):
-            ctx.record_info(
-                attributes={
-                    "embedding.model": embedding_config.model,
-                    "embedding.purpose": embedding_config.purpose,
-                    "embedding.batch_size": embedding_config.batch_size,
-                },
-            )
-
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))
@@ -47,33 +39,28 @@ class CohereEmbedding(CohereAPI):
 
             assert all(isinstance(element, str) for element in attributes)  # nosec: B101
 
-            ctx.record_info(
-                metric="embedding.items",
-                value=len(attributes),
-                unit="count",
-                kind="counter",
-                attributes={
-                    "embedding.provider": "cohere",
-                    "embedding.model": embedding_config.model,
-                    "embedding.type": "text",
-                },
+            record_embedding_invocation(
+                provider="cohere",
+                model=embedding_config.model,
+                embedding_type="text",
+                batch_size=embedding_config.batch_size,
+                purpose=embedding_config.purpose,
+            )
+            record_embedding_metrics(
+                provider="cohere",
+                model=embedding_config.model,
+                embedding_type="text",
+                items=len(attributes),
+                batches=(
+                    (len(attributes) + embedding_config.batch_size - 1)
+                    // embedding_config.batch_size
+                    if attributes
+                    else 0
+                ),
             )
 
             if not attributes:
                 return ()  # empty
-
-            ctx.record_info(
-                metric="embedding.batches",
-                value=(len(attributes) + embedding_config.batch_size - 1)
-                // embedding_config.batch_size,
-                unit="count",
-                kind="counter",
-                attributes={
-                    "embedding.provider": "cohere",
-                    "embedding.model": embedding_config.model,
-                    "embedding.type": "text",
-                },
-            )
 
             responses: list[EmbedByTypeResponse] = await gather(
                 *[
@@ -110,7 +97,7 @@ class CohereEmbedding(CohereAPI):
     def image_embedding(self) -> ImageEmbedding:
         return ImageEmbedding(embedding=self.create_images_embedding)
 
-    async def create_images_embedding[Value: DataModel | State](
+    async def create_images_embedding[Value: State](
         self,
         values: Sequence[Value] | Sequence[bytes],
         /,
@@ -123,12 +110,6 @@ class CohereEmbedding(CohereAPI):
             CohereImageEmbeddingConfig
         )
         async with ctx.scope("cohere_image_embedding"):
-            ctx.record_info(
-                attributes={
-                    "embedding.model": embedding_config.model,
-                    "embedding.batch_size": embedding_config.batch_size,
-                },
-            )
             attributes: list[bytes]
             if attribute is None:
                 attributes = cast(list[bytes], as_list(values))
@@ -138,33 +119,27 @@ class CohereEmbedding(CohereAPI):
 
             assert all(isinstance(element, bytes) for element in attributes)  # nosec: B101
 
-            ctx.record_info(
-                metric="embedding.items",
-                value=len(attributes),
-                unit="count",
-                kind="counter",
-                attributes={
-                    "embedding.provider": "cohere",
-                    "embedding.model": embedding_config.model,
-                    "embedding.type": "image",
-                },
+            record_embedding_invocation(
+                provider="cohere",
+                model=embedding_config.model,
+                embedding_type="image",
+                batch_size=embedding_config.batch_size,
+            )
+            record_embedding_metrics(
+                provider="cohere",
+                model=embedding_config.model,
+                embedding_type="image",
+                items=len(attributes),
+                batches=(
+                    (len(attributes) + embedding_config.batch_size - 1)
+                    // embedding_config.batch_size
+                    if attributes
+                    else 0
+                ),
             )
 
             if not attributes:
                 return ()  # empty
-
-            ctx.record_info(
-                metric="embedding.batches",
-                value=(len(attributes) + embedding_config.batch_size - 1)
-                // embedding_config.batch_size,
-                unit="count",
-                kind="counter",
-                attributes={
-                    "embedding.provider": "cohere",
-                    "embedding.model": embedding_config.model,
-                    "embedding.type": "image",
-                },
-            )
 
             responses: list[EmbedByTypeResponse] = await gather(
                 *[

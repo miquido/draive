@@ -248,8 +248,7 @@ DEFAULT_REGEX_RULES: Final[tuple[RegexSanitizationRule, ...]] = (
     RegexSanitizationRule(
         identifier="base64_encoded_instructions",
         pattern=re.compile(
-            r"(?i)(?:\b(?:decode|interpret|base64)\b.{0,40})?"
-            r"([A-Za-z0-9+/]{48,}={0,2})"
+            r"(?i)(?:\b(?:decode|interpret|base64)\b.{0,40})?" r"([A-Za-z0-9+/]{48,}={0,2})"
         ),
         reason="Detected attempt to convey instructions via base64 encoding.",
         mask=None,

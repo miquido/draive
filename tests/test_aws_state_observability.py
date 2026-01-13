@@ -3,8 +3,8 @@ import json
 from uuid import UUID, uuid4
 
 import pytest
+from haiway import ObservabilityLevel, ctx
 
-from draive import ObservabilityLevel, ctx
 from draive.aws import observability as aws_observability
 from draive.aws.observability import ScopeStore
 from draive.aws.state import AWSCloudwatch
@@ -135,7 +135,7 @@ async def test_scope_emits_span_start_end_events(monkeypatch: pytest.MonkeyPatch
 
     for event in events:
         detail = event["detail"]
-        assert detail["trace_id"] == trace_id.hex
+        assert detail["trace_id"] == str(trace_id)
         assert detail["span_id"] == identifier.scope_id.hex[-16:]
         assert "time_unix_nano" in detail
 
@@ -235,7 +235,7 @@ async def test_record_attributes_emit_event_and_metrics_are_scoped(
     assert attribute_events
     attributes = attribute_events[0]["detail"]["attributes"]
     assert attributes["scope.name"] == "work"
-    assert attributes["scope.id"] == identifier.scope_id.hex
+    assert attributes["scope.id"] == str(identifier.scope_id)
     assert attributes["user"] == "alice"
 
 

@@ -1,25 +1,20 @@
-from collections.abc import Generator, Iterable, Mapping
-from typing import Any, final
+from collections.abc import Iterable
+from typing import Any, final, overload
 
-from haiway import BasicValue, State, ctx
+from haiway import State, ctx, statemethod
 
 from draive.conversation.realtime.default import realtime_conversation_preparing
 from draive.conversation.realtime.types import (
     RealtimeConversationPreparing,
     RealtimeConversationSessionScope,
 )
-from draive.conversation.types import ConversationMessage
+from draive.conversation.state import ConversationMemory
 from draive.models import (
-    ModelInput,
     ModelInstructions,
-    ModelMemory,
-    ModelMemoryRecall,
-    ModelOutput,
     ModelSessionOutputSelection,
-    Tool,
-    Toolbox,
 )
 from draive.multimodal import Template, TemplatesRepository
+from draive.tools import Tool, Toolbox
 
 __all__ = ("RealtimeConversation",)
 
@@ -32,74 +27,58 @@ class RealtimeConversation(State):
     realtime preparation implementation.
     """
 
+    @overload
     @classmethod
     async def prepare(
         cls,
         *,
         instructions: Template | ModelInstructions = "",
-        tools: Toolbox | Iterable[Tool] = (),
-        memory: ModelMemory | Iterable[ConversationMessage] = (),
+        tools: Toolbox | Iterable[Tool] = Toolbox.empty,
+        memory: ConversationMemory = ConversationMemory.disabled,
+        output: ModelSessionOutputSelection = "auto",
+        **extra: Any,
+    ) -> RealtimeConversationSessionScope: ...
+
+    @overload
+    async def prepare(
+        self,
+        *,
+        instructions: Template | ModelInstructions = "",
+        tools: Toolbox | Iterable[Tool] = Toolbox.empty,
+        memory: ConversationMemory = ConversationMemory.disabled,
+        output: ModelSessionOutputSelection = "auto",
+        **extra: Any,
+    ) -> RealtimeConversationSessionScope: ...
+
+    @statemethod
+    async def prepare(
+        self,
+        *,
+        instructions: Template | ModelInstructions = "",
+        tools: Toolbox | Iterable[Tool] = Toolbox.empty,
+        memory: ConversationMemory = ConversationMemory.disabled,
         output: ModelSessionOutputSelection = "auto",
         **extra: Any,
     ) -> RealtimeConversationSessionScope:
-        """Prepare a realtime conversation session scope.
-
-        Parameters
-        ----------
-        instructions : Template | ModelInstructions, optional
-            Instructions to steer the session.
-        tools : Toolbox | Iterable[Tool], optional
-            Tools to expose within the session.
-        memory : ModelMemory | Iterable[ConversationMessage], optional
-            Initial memory; an iterable is converted to model context.
-        output : ModelSessionOutputSelection, optional
-            Desired session output selection policy.
-        **extra : Any
-            Provider-specific kwargs forwarded to the preparation implementation.
-        """
-
-        async with ctx.scope("conversation_realtime"):
-            conversation: RealtimeConversation = ctx.state(cls)
-
-            conversation_memory: ModelMemory
-            memory_variables: Mapping[str, BasicValue] | None
-            if isinstance(memory, ModelMemory):
-                conversation_memory = memory
-                memory_recall: ModelMemoryRecall = await memory.recall()
-                memory_variables = memory_recall.variables
-
-            else:
-
-                def model_context_elements() -> Generator[ModelInput | ModelOutput]:
-                    for message in memory:
-                        if message.role == "user":
-                            yield ModelInput.of(message.content)
-
-                        else:
-                            yield ModelOutput.of(message.content)
-
-                conversation_memory = ModelMemory.constant(*model_context_elements())
-                memory_variables = None
-
+        async with ctx.scope("conversation.realtime"):
             if isinstance(instructions, Template):
                 ctx.record_info(
                     attributes={"instructions.template": instructions.identifier},
                 )
+                instructions = await TemplatesRepository.resolve_str(instructions)
 
-            return await conversation.preparing(
-                instructions=await TemplatesRepository.resolve_str(
-                    instructions,
-                    arguments={
-                        key: value if isinstance(value, str) else str(value)
-                        for key, value in memory_variables.items()
-                    }
-                    if memory_variables
-                    else None,
-                ),
+            return await self._preparing(
+                instructions=instructions,
                 toolbox=Toolbox.of(tools),
-                memory=conversation_memory,
+                memory=memory,
                 output=output,
                 **extra,
             )
 
-    preparing: RealtimeConversationPreparing = realtime_conversation_preparing
+    _preparing: RealtimeConversationPreparing = realtime_conversation_preparing
+
+    def __init__(
+        self,
+        preparing: RealtimeConversationPreparing,
+    ) -> None:
+        super().__init__(_preparing=preparing)

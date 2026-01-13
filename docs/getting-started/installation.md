@@ -54,7 +54,7 @@ uv sync --all-groups --all-extras --frozen
 ## Verify your environment
 
 ```bash
-python -c "import draive; print(draive.__version__)"
+python -c "from importlib.metadata import version; print(version('draive'))"
 ```
 
 You are ready to jump into the [quickstart](./quickstart.md) once the version prints without errors.

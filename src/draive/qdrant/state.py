@@ -1,10 +1,9 @@
 from collections.abc import Iterable, Sequence
 from typing import Any, Literal, overload
 
-from haiway import AttributePath, AttributeRequirement, State, statemethod
+from haiway import AttributePath, AttributeRequirement, Paginated, Pagination, State, statemethod
 
 from draive.embedding import Embedded
-from draive.parameters import DataModel
 from draive.qdrant.types import (
     QdrantCollectionCreating,
     QdrantCollectionDeleting,
@@ -12,8 +11,6 @@ from draive.qdrant.types import (
     QdrantCollectionListing,
     QdrantDeleting,
     QdrantFetching,
-    QdrantPaginationResult,
-    QdrantPaginationToken,
     QdrantResult,
     QdrantSearching,
     QdrantStoring,
@@ -36,7 +33,7 @@ class Qdrant(State):
 
     @overload
     @classmethod
-    async def create_collection[Model: DataModel](
+    async def create_collection[Model: State](
         cls,
         model: type[Model],
         /,
@@ -55,7 +52,7 @@ class Qdrant(State):
     ) -> bool: ...
 
     @overload
-    async def create_collection[Model: DataModel](
+    async def create_collection[Model: State](
         self,
         model: type[Model],
         /,
@@ -74,7 +71,7 @@ class Qdrant(State):
     ) -> bool: ...
 
     @statemethod
-    async def create_collection[Model: DataModel](
+    async def create_collection[Model: State](
         self,
         model: type[Model],
         /,
@@ -103,21 +100,21 @@ class Qdrant(State):
 
     @overload
     @classmethod
-    async def delete_collection[Model: DataModel](
+    async def delete_collection[Model: State](
         cls,
         model: type[Model],
         /,
     ) -> None: ...
 
     @overload
-    async def delete_collection[Model: DataModel](
+    async def delete_collection[Model: State](
         self,
         model: type[Model],
         /,
     ) -> None: ...
 
     @statemethod
-    async def delete_collection[Model: DataModel](
+    async def delete_collection[Model: State](
         self,
         model: type[Model],
         /,
@@ -126,7 +123,7 @@ class Qdrant(State):
 
     @overload
     @classmethod
-    async def create_index[Model: DataModel, Attribute](
+    async def create_index[Model: State, Attribute](
         cls,
         model: type[Model],
         /,
@@ -146,7 +143,7 @@ class Qdrant(State):
     ) -> bool: ...
 
     @overload
-    async def create_index[Model: DataModel, Attribute](
+    async def create_index[Model: State, Attribute](
         self,
         model: type[Model],
         /,
@@ -166,7 +163,7 @@ class Qdrant(State):
     ) -> bool: ...
 
     @statemethod
-    async def create_index[Model: DataModel, Attribute](
+    async def create_index[Model: State, Attribute](
         self,
         model: type[Model],
         /,
@@ -193,80 +190,74 @@ class Qdrant(State):
 
     @overload
     @classmethod
-    async def fetch[Model: DataModel](
+    async def fetch[Model: State](
         cls,
         model: type[Model],
         /,
         *,
         requirements: AttributeRequirement[Model] | None = None,
-        limit: int = 32,
-        continuation: QdrantPaginationToken | None = None,
+        pagination: Pagination | None = None,
         include_vector: Literal[True],
         **extra: Any,
-    ) -> QdrantPaginationResult[Embedded[Model]]: ...
+    ) -> Paginated[Embedded[Model]]: ...
 
     @overload
     @classmethod
-    async def fetch[Model: DataModel](
+    async def fetch[Model: State](
         cls,
         model: type[Model],
         /,
         *,
         requirements: AttributeRequirement[Model] | None = None,
-        limit: int = 32,
-        continuation: QdrantPaginationToken | None = None,
+        pagination: Pagination | None = None,
         **extra: Any,
-    ) -> QdrantPaginationResult[Model]: ...
+    ) -> Paginated[Model]: ...
 
     @overload
-    async def fetch[Model: DataModel](
+    async def fetch[Model: State](
         self,
         model: type[Model],
         /,
         *,
         requirements: AttributeRequirement[Model] | None = None,
-        limit: int = 32,
-        continuation: QdrantPaginationToken | None = None,
+        pagination: Pagination | None = None,
         include_vector: Literal[True],
         **extra: Any,
-    ) -> QdrantPaginationResult[Embedded[Model]]: ...
+    ) -> Paginated[Embedded[Model]]: ...
 
     @overload
-    async def fetch[Model: DataModel](
+    async def fetch[Model: State](
         self,
         model: type[Model],
         /,
         *,
         requirements: AttributeRequirement[Model] | None = None,
-        limit: int = 32,
-        continuation: QdrantPaginationToken | None = None,
+        pagination: Pagination | None = None,
         **extra: Any,
-    ) -> QdrantPaginationResult[Model]: ...
+    ) -> Paginated[Model]: ...
 
     @statemethod
-    async def fetch[Model: DataModel](
+    async def fetch[Model: State](
         self,
         model: type[Model],
         /,
         *,
         requirements: AttributeRequirement[Model] | None = None,
-        continuation: QdrantPaginationToken | None = None,
-        limit: int = 32,
+        pagination: Pagination | None = None,
         include_vector: bool = False,
         **extra: Any,
-    ) -> QdrantPaginationResult[Embedded[Model]] | QdrantPaginationResult[Model]:
+    ) -> Paginated[Embedded[Model]] | Paginated[Model]:
         return await self.fetching(
             model,
             requirements=requirements,
-            continuation=continuation,
-            limit=limit,
+            pagination=pagination,
             include_vector=include_vector,
             **extra,
         )
 
     @overload
     @classmethod
-    async def search[Model: DataModel](
+    async def search[Model: State](
         cls,
         model: type[Model],
         /,
@@ -281,7 +272,7 @@ class Qdrant(State):
 
     @overload
     @classmethod
-    async def search[Model: DataModel](
+    async def search[Model: State](
         cls,
         model: type[Model],
         /,
@@ -294,7 +285,7 @@ class Qdrant(State):
     ) -> Sequence[Model]: ...
 
     @overload
-    async def search[Model: DataModel](
+    async def search[Model: State](
         self,
         model: type[Model],
         /,
@@ -308,7 +299,7 @@ class Qdrant(State):
     ) -> Sequence[QdrantResult[Model]]: ...
 
     @overload
-    async def search[Model: DataModel](
+    async def search[Model: State](
         self,
         model: type[Model],
         /,
@@ -321,7 +312,7 @@ class Qdrant(State):
     ) -> Sequence[Model]: ...
 
     @statemethod
-    async def search[Model: DataModel](
+    async def search[Model: State](
         self,
         model: type[Model],
         /,
@@ -345,7 +336,7 @@ class Qdrant(State):
 
     @overload
     @classmethod
-    async def store[Model: DataModel](
+    async def store[Model: State](
         cls,
         model: type[Model],
         /,
@@ -358,7 +349,7 @@ class Qdrant(State):
     ) -> None: ...
 
     @overload
-    async def store[Model: DataModel](
+    async def store[Model: State](
         self,
         model: type[Model],
         /,
@@ -371,7 +362,7 @@ class Qdrant(State):
     ) -> None: ...
 
     @statemethod
-    async def store[Model: DataModel](
+    async def store[Model: State](
         self,
         model: type[Model],
         /,
@@ -393,7 +384,7 @@ class Qdrant(State):
 
     @overload
     @classmethod
-    async def delete[Model: DataModel](
+    async def delete[Model: State](
         cls,
         model: type[Model],
         /,
@@ -403,7 +394,7 @@ class Qdrant(State):
     ) -> None: ...
 
     @overload
-    async def delete[Model: DataModel](
+    async def delete[Model: State](
         self,
         model: type[Model],
         /,
@@ -413,7 +404,7 @@ class Qdrant(State):
     ) -> None: ...
 
     @statemethod
-    async def delete[Model: DataModel](
+    async def delete[Model: State](
         self,
         model: type[Model],
         /,

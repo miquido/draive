@@ -1,9 +1,11 @@
 from collections.abc import Iterable
 from typing import Any, Protocol, runtime_checkable
 
-from draive.models import ModelInstructions, Toolbox
-from draive.multimodal import MultimodalContent
-from draive.parameters import DataModel
+from haiway import State
+
+from draive.models import ModelInstructions
+from draive.multimodal import Multimodal, MultimodalContent
+from draive.tools import Toolbox
 
 __all__ = (
     "ModelGenerating",
@@ -12,7 +14,7 @@ __all__ = (
 
 
 @runtime_checkable
-class ModelGenerationDecoder[Generated: DataModel](Protocol):
+class ModelGenerationDecoder[Generated: State](Protocol):
     def __call__(
         self,
         generated: MultimodalContent,
@@ -21,15 +23,15 @@ class ModelGenerationDecoder[Generated: DataModel](Protocol):
 
 @runtime_checkable
 class ModelGenerating(Protocol):
-    async def __call__[Generated: DataModel](
+    async def __call__[Generated: State](
         self,
         generated: type[Generated],
         /,
         *,
         instructions: ModelInstructions,
-        input: MultimodalContent,  # noqa: A002
+        input: Multimodal,  # noqa: A002
         toolbox: Toolbox,
-        examples: Iterable[tuple[MultimodalContent, Generated]],
+        examples: Iterable[tuple[Multimodal, Generated]],
         decoder: ModelGenerationDecoder[Generated] | None,
         **extra: Any,
     ) -> Generated: ...

@@ -72,7 +72,7 @@ class Anthropic(
         self._client = self._prepare_client()
         await self._client.__aenter__()
         if GenerativeModel in self._features:
-            return (self.generative_model(),)
+            return (GenerativeModel(generating=self.completion),)
 
         return ()
 

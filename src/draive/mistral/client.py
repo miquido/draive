@@ -55,13 +55,13 @@ class Mistral(
         state: list[State] = []
 
         if GenerativeModel in self._features:
-            state.append(self.generative_model())
+            state.append(GenerativeModel(generating=self.completion))
 
         if TextEmbedding in self._features:
-            state.append(self.text_embedding())
+            state.append(TextEmbedding(embedding=self.create_texts_embedding))
 
         if GuardrailsModeration in self._features:
-            state.append(self.content_guardrails())
+            state.append(GuardrailsModeration(input_checking=self.content_verification))
 
         return state
 

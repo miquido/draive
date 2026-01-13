@@ -208,9 +208,9 @@ nightly quality gates or pre-release validation.
 ```python
 from typing import Sequence
 from draive.evaluation import evaluator_suite, evaluate, EvaluatorResult, EvaluatorSuiteCase
-from draive import TextGeneration, DataModel
+from draive import State, TextGeneration
 
-class ContentTestCase(DataModel):
+class ContentTestCase(State, serializable=True):
     topic: str
     required_keywords: Sequence[str]
     reference_material: str

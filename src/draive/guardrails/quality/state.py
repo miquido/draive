@@ -87,7 +87,7 @@ class GuardrailsQualityVerification(State):
     ) -> None:
         content = MultimodalContent.of(content)
         try:
-            await self.verifying(
+            await self._verifying(
                 content,
                 **extra,
             )
@@ -110,4 +110,10 @@ class GuardrailsQualityVerification(State):
                 meta={"error_type": exc.__class__.__name__},
             ) from exc
 
-    verifying: GuardrailsQualityVerifying = _no_verification
+    _verifying: GuardrailsQualityVerifying
+
+    def __init__(
+        self,
+        verifying: GuardrailsQualityVerifying = _no_verification,
+    ) -> None:
+        super().__init__(_verifying=verifying)

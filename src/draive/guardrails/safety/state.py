@@ -40,7 +40,7 @@ class GuardrailsSafety(State):
     ) -> MultimodalContent:
         content = MultimodalContent.of(content)
         try:
-            return await self.sanitization(
+            return await self._sanitization(
                 content,
                 **extra,
             )
@@ -64,4 +64,10 @@ class GuardrailsSafety(State):
             ) from exc
 
     # use default set of regex rules for sanitization
-    sanitization: GuardrailsSafetySanitization = guardrails_regex_sanitizer()
+    _sanitization: GuardrailsSafetySanitization
+
+    def __init__(
+        self,
+        sanitization: GuardrailsSafetySanitization = guardrails_regex_sanitizer(),  # noqa: B008
+    ) -> None:
+        super().__init__(_sanitization=sanitization)

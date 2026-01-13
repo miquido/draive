@@ -1,28 +1,26 @@
 from typing import overload
 
-from haiway import AttributeRequirement
+from haiway import AttributeRequirement, State
 from qdrant_client.models import FieldCondition, Filter, MatchAny, MatchText, MatchValue
-
-from draive.parameters import DataModel
 
 __all__ = ("prepare_filter",)
 
 
 @overload
-def prepare_filter[Model: DataModel](
+def prepare_filter[Model: State](
     requirements: AttributeRequirement[Model] | None,
 ) -> Filter | None: ...
 
 
 @overload
-def prepare_filter[Model: DataModel](
+def prepare_filter[Model: State](
     requirements: AttributeRequirement[Model] | None,
     *,
     default: Filter,
 ) -> Filter: ...
 
 
-def prepare_filter[Model: DataModel](
+def prepare_filter[Model: State](
     requirements: AttributeRequirement[Model] | None,
     *,
     default: Filter | None = None,
@@ -34,7 +32,7 @@ def prepare_filter[Model: DataModel](
         return default
 
 
-def _convert[Model: DataModel](  # noqa: PLR0911
+def _convert[Model: State](  # noqa: PLR0911
     requirements: AttributeRequirement[Model],
     /,
 ) -> Filter:

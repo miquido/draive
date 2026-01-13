@@ -5,13 +5,12 @@ from collections.abc import Sequence
 from datetime import datetime
 
 import pytest
+from haiway import State, ctx
 
-from draive import ctx
 from draive.evaluation import EvaluatorResult, EvaluatorScenarioResult, evaluator_suite
-from draive.parameters import DataModel
 
 
-class _DatetimeCase(DataModel):
+class _DatetimeCase(State):
     date: datetime
 
 

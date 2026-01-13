@@ -1,8 +1,9 @@
 from collections.abc import Iterable, Sequence
 from typing import Any
 
+from haiway import State
+
 from draive.generation import ModelGeneration
-from draive.parameters import DataModel
 
 __all__ = ("generate_case_parameters",)
 
@@ -28,7 +29,7 @@ SCHEMA without any comments, formatting, or additional elements.
 INPUT: str = "Prepare additional scenario"
 
 
-async def generate_case_parameters[Parameters: DataModel](
+async def generate_case_parameters[Parameters: State](
     parameters: type[Parameters],
     /,
     *,

@@ -23,12 +23,11 @@ class OpenAIResponsesConfig(Configuration):
     temperature: float | Missing = MISSING
     vision_details: Literal["auto", "low", "high"] = "auto"
     verbosity: Literal["low", "medium", "high"] | Missing = MISSING
-    reasoning: Literal["minimal", "low", "medium", "high"] | Missing = MISSING
+    reasoning: Literal["none", "minimal", "low", "medium", "high", "xhigh"] | Missing = MISSING
     reasoning_summary: Literal["auto", "concise", "detailed"] = "auto"
-    parallel_tool_calls: bool = True
     truncation: Literal["auto", "disabled"] = "auto"
-    max_output_tokens: int | None = None
-    safety_identifier: str | None = None
+    max_output_tokens: int | Missing = MISSING
+    safety_identifier: str | Missing = MISSING
     service_tier: Literal["auto", "default", "flex", "scale", "priority"] = "auto"
 
 

@@ -1,320 +1,101 @@
-# Advanced state
+# Advanced State
+
+Draive models are typed `State` classes. For schema/JSON support, declare them as
+`State, serializable=True`.
+
+## Serialization And Schema
 
 ```python
-from draive import BasicValue, DataModel
+from draive import State
 
-class DictConverted(DataModel):
+
+class Example(State, serializable=True):
     name: str
     value: int
 
-# all of this applies to the `DataModel` as well
-dict_converted: DictConverted = DictConverted(name="converted", value=42)
-dict_converted_as_dict: dict[str, BasicValue] = dict_converted.as_dict()
-dict_converted_from_dict: DictConverted = DictConverted.from_dict(dict_converted_as_dict)
-print(dict_converted_from_dict)
+
+item = Example(name="converted", value=42)
+encoded = item.to_json()
+decoded = Example.from_json(encoded)
+
+print(decoded)
+print(Example.json_schema(indent=2))
+print(Example.simplified_schema(indent=2))
 ```
 
-```
-name: converted
-```
+`json_schema(...)` is precise and machine-oriented; `simplified_schema(...)` is compact and often
+useful when injecting schema hints into LLM prompts.
+
+## Immutability And Updates
 
 ```python
-class Mutable(DataModel):
+from draive import State
+
+
+class MutableExample(State):
     identifier: str
     value: int
 
-# prepare an instance of state
-initial: Mutable = Mutable(
-    identifier="pre",
-    value=42,
-)
-# update one of the fields by creating a copy
-updated: Mutable = initial.updating(identifier="post")
-# update initial state once more - this will be another copy
-final: Mutable = initial.updating(value=21)
 
-print("initial", initial)
-print("updated", updated)
-print("final", final)
+initial = MutableExample(identifier="pre", value=42)
+updated = initial.updating(identifier="post")
 ```
 
-```
-initial identifier: pre
-value: 42
-updated identifier: post
-value: 42
-final identifier: pre
-```
+## Schema Customization With Annotations
 
-```python
-from draive import DataModel
-
-class JSONConverted(DataModel):
-    name: str
-    value: int
-
-json_converted: JSONConverted = JSONConverted(name="converted", value=42)
-json_converted_as_json: str = json_converted.as_json()
-json_converted_from_json: JSONConverted = JSONConverted.from_json(json_converted_as_json)
-print(json_converted_from_json)
-```
-
-```
-name: converted
-```
-
-```python
-class BasicModel(DataModel):
-    field: str
-
-print(BasicModel.json_schema(indent=2))
-```
-
-```
-{
-  "type": "object",
-  "properties": {
-    "field": {
-      "type": "string"
-    }
-  },
-  "required": [
-    "field"
-  ]
-}
-```
-
-Additionally each model can generate a simplified schema description. This can be useful when
-requesting LLM structured data generation in some cases. Let's have a look:
-
-```python
-print(BasicModel.simplified_schema(indent=2))
-```
-
-```
-{
-  "field": "string"
-}
-```
+You can enrich field schema using `Annotated` metadata.
 
 ```python
 from typing import Annotated
 
-from draive import Alias, DataModel, Description
+from draive import Alias, Description, Specification, State
 
 
-class CustomizedSchemaModel(DataModel):
+class Customized(State, serializable=True):
     described: Annotated[int, Description("Field description")]
     aliased: Annotated[str, Alias("field_alias")]
+    fully_custom: Annotated[int, Specification({"type": "integer", "description": "Custom"})]
 
-print(f"JSON schema:\n{CustomizedSchemaModel.json_schema(indent=2)}")
-print(f"Simplified schema:\n{CustomizedSchemaModel.simplified_schema(indent=2)}")
+
+print(Customized.json_schema(indent=2))
 ```
 
-```
-JSON schema:
-{
-  "type": "object",
-  "properties": {
-    "described": {
-      "type": "integer",
-      "description": "Field description"
-    },
-    "field_alias": {
-      "type": "string"
-    }
-  },
-  "required": [
-    "described",
-    "field_alias"
-  ]
-}
-Simplified schema:
-{
-  "described": "integer(Field description)",
-  "field_alias": "string"
-```
+## Defaults And Factories
 
 ```python
 from collections.abc import Sequence
 
-from draive import DataModel, Default
+from draive import Default, State
 
 
-class CustomizedDefaultsModel(DataModel):
-    default: int = 42
-    field_default: int = 21
-    field_default_factory: Sequence[str] = Default(factory=tuple)
-
-# since all fields have defaults we can initialize without arguments
-print(CustomizedDefaultsModel())
+class Defaults(State, serializable=True):
+    retries: int = 3
+    tags: Sequence[str] = Default(factory=tuple)
 ```
 
-```
-default: 42
-field_default: 21
-```
+## Attribute Paths And Requirements
 
-````python
-# verifier gets pre-validated value, it already have required type
-def verifier(value: int) -> int:
-    if value < 0:
-        # raise an Exception if something is wrong with the value
-        raise ValueError("Value can't be less than zero!")
-
-    return value
-
-class VerifiedModel(DataModel):
+Attribute paths let you reference fields in a typed way for indexing, filtering, and reusable rules.
 
 ```python
-from typing import Any
+from collections.abc import Sequence
 
-from draive import DataModel, ValidatorContext, ValidatorError
-
-def validator(
-    # validator gets unknown type as an input, make sure to verify or convert it
-    value: Any,
-    /,
-    *,
-    # validator has also the current validation context which contains additional information
-    # i.e. what field actually is validated, it is very useful for preparing diagnostics information
-    context: ValidatorContext,
-) -> int:
-    if isinstance(value, int):
-        return value
-
-    else:
-        raise ValidatorError(f"Expected int but received {type(value)}")
-
-class ValidatedModel(DataModel):
-
-```python
-from typing import Annotated
-
-from draive import DataModel, Specification
+from draive import AttributePath, AttributeRequirement, State
 
 
-class CustomizedSpecificationModel(DataModel):
-    value: Annotated[int, Specification({"type": "integer", "description": "Fully custom"})]
-
-print(CustomizedSpecificationModel.json_schema(indent=2))
-````
-
-```
-{
-  "type": "object",
-  "properties": {
-    "value": {
-      "type": "integer",
-      "description": "Fully custom"
-    }
-  },
-  "required": [
-    "value"
-  ]
-```
-
-```python
-from typing import Annotated
-
-from draive import DataModel, Validator
-
-
-def converter(value: str, /,) -> int:
-    return len(value)
-
-
-class CustomizedConversionModel(DataModel):
-    value: Annotated[int, Validator(converter)]
-
-
-print(CustomizedConversionModel(value="integer?"))
-```
-
-```python
-from typing import cast
-
-from draive import AttributePath
-
-class NestedPathModel(DataModel):
+class Nested(State, serializable=True):
     values: Sequence[int]
 
-class PathModel(DataModel):
-    nested: NestedPathModel
+
+class Model(State, serializable=True):
+    nested: Nested
     value: int
 
-# we can construct the path for any given field inside
-path: AttributePath[PathModel, Sequence[int]] = cast(
-    AttributePath[PathModel, Sequence[int]],
-    PathModel._.nested.values,
-)
-path_model_instance: PathModel = PathModel(
-    value=21,
-    nested=NestedPathModel(
-        values=[42, 21],
-    ),
-)
-# and use it to retrieve that field value from any instance
-print(path(path_model_instance))
-```
 
-```
-(42, 21)
-```
+path: AttributePath[Model, Sequence[int]] = Model._.nested.values
+instance = Model(nested=Nested(values=(42, 21)), value=21)
+print(path(instance))
 
-Property paths can be used not only as the getters for field values. It also preserves the path as a
-string to be accessed later if needed.
-
-```python
-print(path)
-```
-
-```
-nested.values
-```
-
-Besides that paths can be also used to prepare per field requirements. We can simplify usage of
-paths in that case by avoiding the type conversion step:
-
-```python
-from draive import AttributeRequirement
-
-# prepare a parameter requirement - choose a requirement type you need
-requirement: AttributeRequirement[PathModel] = AttributeRequirement[PathModel].equal(
-    42, # here we require value to be equal to 42
-    path=PathModel._.nested.values[0], # under this specific path
-)
-
-# requirement can be executed to check value on any instance
-requirement.check(path_model_instance)
-```
-
-```
-True
-```
-
-Requirements can be combined and examined. This can be used to provide an expressive interface for
-defining various filters.
-
-```python
-print("lhs:", requirement.lhs)
-print("operator:", requirement.operator)
-print("rhs:", requirement.rhs)
-
-combined_requirement: AttributeRequirement[PathModel] = requirement & AttributeRequirement[
-    PathModel
-].contained_in(
-    [12, 21],
-    path=PathModel._.value,
-)
-
-combined_requirement.check(path_model_instance)
-```
-
-```
-lhs: nested.values[0]
-operator: equal
-rhs: 42
-
-True
+req = AttributeRequirement[Model].equal(42, path=Model._.nested.values[0])
+print(req.check(instance))
 ```
