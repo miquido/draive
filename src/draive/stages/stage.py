@@ -1467,7 +1467,7 @@ class Stage:
         self,
         /,
         *,
-        disposables: Disposables | Collection[Disposable],
+        disposables: Collection[Disposable],
     ) -> Self: ...
 
     @overload
@@ -1478,12 +1478,12 @@ class Stage:
         *state: State,
     ) -> Self: ...
 
-    def with_ctx(  # noqa: C901
+    def with_ctx(
         self,
         state: State | None = None,
         /,
         *states: State,
-        disposables: Disposables | Collection[Disposable] | None = None,
+        disposables: Collection[Disposable] = (),
     ) -> Self:
         """
         Apply the specified state context to this stage.
@@ -1502,7 +1502,7 @@ class Stage:
             Optional additional `State` objects to include in the state context.
             Only applicable when `state_context` is a `State`.
 
-        disposables: Disposables | Collection[Disposable] | None
+        disposables: Collection[Disposable]
             Optional Disposables which will be used for execution of this stage.
             State produced by disposables will be used within the context state.
 
@@ -1513,47 +1513,17 @@ class Stage:
         """
         execution: StageExecution = self._execution
 
-        resolved_disposables: Disposables | None
-        if disposables is None:
-            resolved_disposables = None
-
-        elif isinstance(disposables, Disposables):
-            resolved_disposables = disposables
-
-        else:
-            resolved_disposables = Disposables(disposables)
-
-        match (state, resolved_disposables):
-            case (None, None):
-                assert not states  # nosec: B101
-                return self  # nothing to change...
-
-            case (None, ctx_disposables):
-                assert not states  # nosec: B101
+        if ctx_state := state:
+            if disposables:
 
                 async def stage(
                     *,
                     state: StageState,
                 ) -> StageState:
-                    result_state: StageState
-                    try:
-                        with ctx.updated(*await ctx_disposables.prepare()):
-                            result_state = await execution(state=state)
-
-                    except BaseException as exc:
-                        await ctx_disposables.dispose(
-                            exc_type=type(exc),
-                            exc_val=exc,
-                            exc_tb=exc.__traceback__,
-                        )
-                        raise exc
-
-                    else:
-                        await ctx_disposables.dispose()
-
-                    return result_state
-
-            case (ctx_state, None):
+                    async with Disposables(disposables) as disposable_state:
+                        with ctx.updated(*disposable_state, ctx_state, *states):
+                            return await execution(state=state)
+            else:
 
                 async def stage(
                     *,
@@ -1562,30 +1532,18 @@ class Stage:
                     with ctx.updated(ctx_state, *states):
                         return await execution(state=state)
 
-            case (ctx_state, ctx_disposables):
+        elif disposables:
+            assert not states  # nosec: B101
 
-                async def stage(
-                    *,
-                    state: StageState,
-                ) -> StageState:
-                    disposables_state: Iterable[State] = await ctx_disposables.prepare()
-                    result_state: StageState
-                    try:
-                        with ctx.updated(ctx_state, *disposables_state, *states):
-                            result_state = await execution(state=state)
-
-                    except BaseException as exc:
-                        await ctx_disposables.dispose(
-                            exc_type=type(exc),
-                            exc_val=exc,
-                            exc_tb=exc.__traceback__,
-                        )
-                        raise exc
-
-                    else:
-                        await ctx_disposables.dispose()
-
-                    return result_state
+            async def stage(
+                *,
+                state: StageState,
+            ) -> StageState:
+                async with ctx.disposables(*disposables):
+                    return await execution(state=state)
+        else:
+            assert not states  # nosec: B101
+            return self  # nothing to change...
 
         return self.__class__(
             stage,

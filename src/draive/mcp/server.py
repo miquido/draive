@@ -36,28 +36,14 @@ class MCPServer:
         name: str,
         version: str | None = None,
         instructions: str | None = None,
-        resources: Iterable[ResourceTemplate[Any] | Resource] | None = None,
-        tools: Toolbox | Iterable[Tool] | None = None,
-        disposables: Disposables | Collection[Disposable] | None = None,
+        resources: Iterable[ResourceTemplate[Any] | Resource] = (),
+        tools: Toolbox | Iterable[Tool] = (),
+        disposables: Collection[Disposable] = (),
     ) -> None:
-        disposable: Disposables
-        if disposables is None:
-            disposable = Disposables(())
-
-        elif isinstance(disposables, Disposables):
-            disposable = disposables
-
-        else:
-            disposable = Disposables(disposables)
-
         @asynccontextmanager
         async def lifspan(server: Server) -> AsyncGenerator[Iterable[State]]:
-            state: Iterable[State] = await disposable.prepare()
-            try:
+            async with Disposables(disposables) as state:
                 yield state
-
-            finally:
-                await disposable.dispose()
 
         self._server = Server[Iterable[State]](
             name=name,
@@ -66,10 +52,10 @@ class MCPServer:
             lifespan=lifspan,
         )
 
-        if resources is not None:
+        if resources:
             self._expose_resources(resources)
 
-        if tools is not None:
+        if tools:
             self._expose_tools(tools)
 
     async def run_stdio(

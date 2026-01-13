@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from uuid import uuid4
 
-from haiway import MissingState, State, ctx
+from haiway import ContextStateMissing, State, ctx
 from pytest import mark, raises
 
 from draive import MultimodalContent, tool
@@ -1009,7 +1009,7 @@ async def test_stage_state_operations():
     # Test missing state
     assert state.get(str) is None
 
-    with raises(MissingState):
+    with raises(ContextStateMissing):
         state.get(str, required=True)
 
     # Test state update

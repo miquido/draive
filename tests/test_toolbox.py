@@ -234,10 +234,12 @@ async def test_respond_unknown_tool_fallback_and_logging() -> None:
 async def test_respond_detached_spawns_and_returns_immediate_message() -> None:
     async with ctx.scope("test"):
         marker: list[str] = []
+        done = asyncio.Event()
 
         @tool(handling="detached")
         async def bg(task: str) -> str:
             marker.append(task)
+            done.set()
             return task
 
         tb: Toolbox = Toolbox.of(bg)
@@ -250,7 +252,7 @@ async def test_respond_detached_spawns_and_returns_immediate_message() -> None:
         assert resp.content == MultimodalContent.of("bg tool execution has been requested")
 
         # allow the spawned task to run
-        await asyncio.sleep(0)
+        await asyncio.wait_for(done.wait(), timeout=0.1)
         assert marker == ["work"]
 
 

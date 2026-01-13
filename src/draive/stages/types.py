@@ -1,7 +1,7 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, Protocol, Self, cast, final, overload, runtime_checkable
 
-from haiway import Meta, MetaValues, MissingState, State
+from haiway import ContextStateMissing, Meta, MetaValues, State
 
 from draive.models import ModelContext, ModelOutput
 from draive.multimodal import Multimodal, MultimodalContent
@@ -179,7 +179,7 @@ class StageState:
         default : StateType | None
             Default value to return if the state is not found.
         required : bool
-            If True, raises MissingState when the state is not found.
+            If True, raises ContextStateMissing when the state is not found.
 
         Returns
         -------
@@ -188,7 +188,7 @@ class StageState:
 
         Raises
         ------
-        MissingState
+        ContextStateMissing
             When required=True and the state is not found.
         """
 
@@ -200,7 +200,7 @@ class StageState:
             return default
 
         elif required:
-            raise MissingState(f"{state.__qualname__} is not available within stage state")
+            raise ContextStateMissing(f"{state.__qualname__} is not available within stage state")
 
         else:
             return None
