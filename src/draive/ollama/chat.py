@@ -448,7 +448,7 @@ def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, A
 
     schema_type: Any = schema.get("type")
 
-    if isinstance(schema_type, Sequence) and not isinstance(schema_type, (str, bytes)):
+    if isinstance(schema_type, Sequence) and not isinstance(schema_type, str | bytes):
         elements: list[Any] = as_list(cast(Sequence[Any], schema_type))
         collapsed: str | None = _collapse_ollama_type_union(elements)
         if collapsed is None:
@@ -479,7 +479,7 @@ def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, A
             normalized_schema["properties"] = normalized_properties
 
         required_value: Any = schema.get("required")
-        if isinstance(required_value, Sequence) and not isinstance(required_value, (str, bytes)):
+        if isinstance(required_value, Sequence) and not isinstance(required_value, str | bytes):
             filtered_required: list[str] = [
                 name
                 for name in cast(Sequence[Any], required_value)
@@ -519,7 +519,7 @@ def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, A
             prefix_items: Any = schema.get("prefixItems")
             if (
                 isinstance(prefix_items, Sequence)
-                and not isinstance(prefix_items, (str, bytes))
+                and not isinstance(prefix_items, str | bytes)
                 and len(cast(Sequence[Any], prefix_items)) == 1
             ):
                 item_schema, item_changed = _normalize_schema_for_ollama(
@@ -531,7 +531,7 @@ def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, A
                     changed = changed or item_changed
                 else:
                     changed = True
-            elif isinstance(prefix_items, Sequence) and not isinstance(prefix_items, (str, bytes)):
+            elif isinstance(prefix_items, Sequence) and not isinstance(prefix_items, str | bytes):
                 changed = True
             else:
                 changed = True
@@ -548,7 +548,7 @@ def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, A
         normalized_schema = {"type": schema_type}
 
         enum_value: Any = schema.get("enum")
-        if isinstance(enum_value, Sequence) and not isinstance(enum_value, (str, bytes)):
+        if isinstance(enum_value, Sequence) and not isinstance(enum_value, str | bytes):
             normalized_schema["enum"] = list(cast(Sequence[Any], enum_value))
 
         if schema_type == "string" and isinstance(schema.get("format"), str):
@@ -563,7 +563,7 @@ def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, A
         enum_value = schema["enum"]
         if (
             isinstance(enum_value, Sequence)
-            and not isinstance(enum_value, (str, bytes))
+            and not isinstance(enum_value, str | bytes)
             and enum_value
         ):
             inferred_type: Any = cast(Any, type(cast(Sequence[Any], enum_value)[0]))
