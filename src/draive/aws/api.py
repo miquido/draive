@@ -9,11 +9,14 @@ __all__ = ("AWSAPI",)
 class AWSAPI:
     """Low-level AWS session and client management.
 
-    Provides an asynchronous S3 and SQS client initializers that other mixins
-    can rely on without duplicating boto3 session wiring.
+    Provides asynchronous client initializers for AWS services so higher-level
+    mixins can share a single boto3 session without duplicating configuration.
     """
 
     __slots__ = (
+        "_cloudwatch_client",
+        "_cloudwatch_logs_client",
+        "_eventbridge_client",
         "_s3_client",
         "_session",
         "_sqs_client",
@@ -52,6 +55,9 @@ class AWSAPI:
             kwargs["region_name"] = region
 
         self._session: Session = Session(**kwargs)
+        self._cloudwatch_client: Any
+        self._cloudwatch_logs_client: Any
+        self._eventbridge_client: Any
         self._s3_client: Any
         self._sqs_client: Any
 
@@ -65,6 +71,18 @@ class AWSAPI:
     def _prepare_sqs_client(self) -> None:
         self._sqs_client = self._session.client(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             service_name="sqs",
+        )
+
+    @asynchronous
+    def _prepare_cloudwatch_clients(self) -> None:
+        self._cloudwatch_client = self._session.client(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            service_name="cloudwatch",
+        )
+        self._cloudwatch_logs_client = self._session.client(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            service_name="logs",
+        )
+        self._eventbridge_client = self._session.client(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            service_name="events",
         )
 
     @property

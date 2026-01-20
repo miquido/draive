@@ -5,9 +5,10 @@ from typing import final
 from haiway import State
 
 from draive.aws.api import AWSAPI
+from draive.aws.cloudwatch import AWSCloudwatchMixin
 from draive.aws.s3 import AWSS3Mixin
 from draive.aws.sqs import AWSSQSMixin
-from draive.aws.state import AWSSQS
+from draive.aws.state import AWSSQS, AWSCloudwatch
 from draive.resources import ResourcesRepository
 
 __all__ = ("AWS",)
@@ -17,9 +18,10 @@ __all__ = ("AWS",)
 class AWS(
     AWSS3Mixin,
     AWSSQSMixin,
+    AWSCloudwatchMixin,
     AWSAPI,
 ):
-    """AWS service facade bundling S3 and SQS integrations.
+    """AWS service facade bundling S3, SQS, and CloudWatch integrations.
 
     Parameters
     ----------
@@ -45,7 +47,7 @@ class AWS(
         region_name: str | None = None,
         access_key_id: str | None = None,
         secret_access_key: str | None = None,
-        features: Collection[type[ResourcesRepository | AWSSQS]] | None = None,
+        features: Collection[type[ResourcesRepository | AWSSQS | AWSCloudwatch]] | None = None,
     ) -> None:
         super().__init__(
             region_name=region_name,
@@ -53,7 +55,7 @@ class AWS(
             secret_access_key=secret_access_key,
         )
 
-        self._features: Collection[type[ResourcesRepository | AWSSQS]]
+        self._features: Collection[type[ResourcesRepository | AWSSQS | AWSCloudwatch]]
         if features is not None:
             self._features = features
 
@@ -77,6 +79,17 @@ class AWS(
 
             features.append(
                 AWSSQS(queue_accessing=self._queue_access),
+            )
+
+        if AWSCloudwatch in self._features:
+            await self._prepare_cloudwatch_clients()
+
+            features.append(
+                AWSCloudwatch(
+                    log_putting=self.put_log,
+                    metric_putting=self.put_metric,
+                    event_putting=self.put_event,
+                ),
             )
 
         return features

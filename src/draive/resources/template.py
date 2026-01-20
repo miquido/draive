@@ -488,7 +488,7 @@ class ResourceTemplate[**Args](
         except ValueError:
             return None
 
-        if isinstance(parsed, Sequence) and not isinstance(parsed, (str, bytes)):
+        if isinstance(parsed, Sequence) and not isinstance(parsed, str | bytes):
             return parsed
 
         return None

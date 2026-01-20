@@ -1,11 +1,14 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
 from typing import Any, Protocol, runtime_checkable
 
-from haiway import MQQueue
+from haiway import MQQueue, ObservabilityAttribute
 
 __all__ = (
     "AWSAccessDenied",
+    "AWSCloudwatchEventPutting",
+    "AWSCloudwatchLogPutting",
+    "AWSCloudwatchMetricPutting",
     "AWSError",
     "AWSResourceNotFound",
     "AWSSQSQueueAccessing",
@@ -91,3 +94,39 @@ class AWSSQSQueueAccessing(Protocol):
         content_decoder: Callable[[str], Content],
         **extra: Any,
     ) -> AbstractAsyncContextManager[MQQueue[Content]]: ...
+
+
+@runtime_checkable
+class AWSCloudwatchLogPutting(Protocol):
+    async def __call__(
+        self,
+        *,
+        log_group: str,
+        log_stream: str,
+        message: str,
+    ) -> None: ...
+
+
+@runtime_checkable
+class AWSCloudwatchMetricPutting(Protocol):
+    async def __call__(
+        self,
+        *,
+        namespace: str,
+        metric: str,
+        value: float | int,
+        unit: str | None,
+        attributes: Mapping[str, ObservabilityAttribute],
+    ) -> None: ...
+
+
+@runtime_checkable
+class AWSCloudwatchEventPutting(Protocol):
+    async def __call__(
+        self,
+        *,
+        event_bus: str,
+        event_source: str,
+        detail_type: str,
+        detail: str,
+    ) -> None: ...
