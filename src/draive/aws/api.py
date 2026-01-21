@@ -27,6 +27,7 @@ class AWSAPI:
         region_name: str | None = None,
         access_key_id: str | None = None,
         secret_access_key: str | None = None,
+        profile_name: str | None = None,
     ) -> None:
         """Create an AWS session.
 
@@ -39,6 +40,8 @@ class AWSAPI:
             Optional access key identifier used for credential override.
         secret_access_key
             Optional secret key paired with ``access_key_id`` for override.
+        profile_name
+            Optional profile name to be used instead of Default profile.
         """
         # using dict as kwargs since existence of some
         # arguments when initializing session changes
@@ -53,6 +56,9 @@ class AWSAPI:
 
         if region := region_name:
             kwargs["region_name"] = region
+
+        if profile := profile_name:
+            kwargs["profile_name"] = profile
 
         self._session: Session = Session(**kwargs)
         self._cloudwatch_client: Any
