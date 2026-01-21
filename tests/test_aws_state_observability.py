@@ -79,9 +79,17 @@ async def test_scope_emits_span_start_end_events(monkeypatch: pytest.MonkeyPatch
         metrics_namespace="metrics",
     )
 
-    scope.record_scope_start()
-    scope.record_scope_end(None)
-    await asyncio.gather(*tasks)
+    async with ctx.scope(
+        "test",
+        AWSCloudwatch(
+            log_putting=log_putting,
+            metric_putting=metric_putting,
+            event_putting=event_putting,
+        ),
+    ):
+        scope.record_scope_start()
+        scope.record_scope_end(None)
+        await asyncio.gather(*tasks)
 
     assert len(events) == 2
     detail_types = {event["detail_type"] for event in events}
@@ -159,15 +167,23 @@ async def test_record_attributes_emit_event_and_metrics_are_scoped(
         event_source="draive",
     )
 
-    scope.record_attributes({"user": "alice"}, level=ObservabilityLevel.INFO)
-    scope.record_metric(
-        "latency",
-        value=1,
-        unit=None,
-        kind="gauge",
-        attributes={"service": "draive"},
-    )
-    await asyncio.gather(*tasks)
+    async with ctx.scope(
+        "test",
+        AWSCloudwatch(
+            log_putting=log_putting,
+            metric_putting=metric_putting,
+            event_putting=event_putting,
+        ),
+    ):
+        scope.record_attributes({"user": "alice"}, level=ObservabilityLevel.INFO)
+        scope.record_metric(
+            "latency",
+            value=1,
+            unit=None,
+            kind="gauge",
+            attributes={"service": "draive"},
+        )
+        await asyncio.gather(*tasks)
 
     assert recorded_metrics
     assert recorded_metrics[0]["attributes"] == {
