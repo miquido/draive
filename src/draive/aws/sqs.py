@@ -33,11 +33,13 @@ class AWSSQSMixin(AWSAPI):
         region_name: str | None = None,
         access_key_id: str | None = None,
         secret_access_key: str | None = None,
+        profile_name: str | None = None,
     ) -> None:
         super().__init__(
             region_name=region_name,
             access_key_id=access_key_id,
             secret_access_key=secret_access_key,
+            profile_name=profile_name,
         )
 
         self._queue_cache: MutableMapping[str, str] = {}

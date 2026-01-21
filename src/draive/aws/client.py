@@ -34,6 +34,8 @@ class AWS(
     secret_access_key
         Secret key paired with ``access_key_id`` when overriding
         credentials.
+    profile_name
+        Optional profile name to be used instead of Default profile.
     features
         Collection of feature state classes (for example
         :class:`ResourcesRepository`, :class:`AWSSQS`) to activate while the
@@ -47,12 +49,14 @@ class AWS(
         region_name: str | None = None,
         access_key_id: str | None = None,
         secret_access_key: str | None = None,
+        profile_name: str | None = None,
         features: Collection[type[ResourcesRepository | AWSSQS | AWSCloudwatch]] | None = None,
     ) -> None:
         super().__init__(
             region_name=region_name,
             access_key_id=access_key_id,
             secret_access_key=secret_access_key,
+            profile_name=profile_name,
         )
 
         self._features: Collection[type[ResourcesRepository | AWSSQS | AWSCloudwatch]]
