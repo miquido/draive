@@ -312,7 +312,7 @@ class ScopeStore:
             attributes["exception.message"] = str(exception)
 
         ctx.spawn_background(
-            AWSCloudwatch.log_putting,
+            AWSCloudwatch.put_log,
             log_stream=self.log_stream,
             log_group=self.log_group,
             message=_json_dumps(
@@ -336,7 +336,7 @@ class ScopeStore:
         /,
     ) -> None:
         ctx.spawn_background(
-            AWSCloudwatch.event_putting,
+            AWSCloudwatch.put_event,
             event_bus=self.event_bus,
             event_source=self.event_source,
             detail_type="exception",
@@ -374,7 +374,7 @@ class ScopeStore:
         attributes: Mapping[str, ObservabilityAttribute],
     ) -> None:
         ctx.spawn_background(
-            AWSCloudwatch.event_putting,
+            AWSCloudwatch.put_event,
             event_bus=self.event_bus,
             event_source=self.event_source,
             detail_type="event",
@@ -410,7 +410,7 @@ class ScopeStore:
         )
         metric_attributes.setdefault("otel.metric.kind", kind)
         ctx.spawn_background(
-            AWSCloudwatch.metric_putting,
+            AWSCloudwatch.put_metric,
             namespace=self.metrics_namespace,
             metric=name,
             value=value,
