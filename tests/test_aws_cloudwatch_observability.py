@@ -67,7 +67,7 @@ def test_format_metric_dimensions_respects_sequence_values(
         "skip": None,
     }
 
-    dimensions = cloudwatch._format_metric_dimensions(attributes)
+    dimensions = cloudwatch.format_metric_dimensions(attributes)
 
     assert dimensions == [
         {"Name": "service", "Value": "draive"},
@@ -86,7 +86,7 @@ def test_translate_cloudwatch_error_includes_code(
     }
     error = types.SimpleNamespace(response=response)
 
-    exc = cloudwatch._translate_cloudwatch_error(
+    exc = cloudwatch.translate_cloudwatch_error(
         error=error,
         service="events",
         operation="put_events",
@@ -107,7 +107,7 @@ def test_translate_cloudwatch_error_access_denied(
     }
     error = types.SimpleNamespace(response=response)
 
-    exc = cloudwatch._translate_cloudwatch_error(
+    exc = cloudwatch.translate_cloudwatch_error(
         error=error,
         service="events",
         operation="put_events",

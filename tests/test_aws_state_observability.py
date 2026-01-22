@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from draive import ObservabilityLevel, ctx
+from draive.aws import observability as aws_observability
 from draive.aws.observability import ScopeStore
 from draive.aws.state import AWSCloudwatch
 
@@ -23,6 +24,44 @@ class _FakeIdentifier:
         self.parent_id = parent_id
         self.is_root = is_root
         self.unique_name = f"{name}:{scope_id}"
+
+
+def test_cloudwatch_observability_trace_id_uses_generated_uuid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trace_id = uuid4()
+
+    class _FakeSession:
+        def __init__(self, **kwargs: object) -> None:
+            _ = kwargs
+
+        def client(self, service_name: str) -> object:
+            _ = service_name
+            return object()
+
+    monkeypatch.setattr(aws_observability, "uuid4", lambda: trace_id)
+    monkeypatch.setattr(aws_observability, "Session", _FakeSession)
+    monkeypatch.setattr(ctx, "spawn_background", lambda *args, **kwargs: None)
+
+    observability = aws_observability.CloudwatchObservability(
+        log_level=ObservabilityLevel.INFO,
+        log_group="group",
+        log_stream="stream",
+        event_bus="default",
+        event_source="draive",
+        metrics_namespace="metrics",
+    )
+
+    root_id = uuid4()
+    root_scope = _FakeIdentifier(
+        "root",
+        scope_id=root_id,
+        parent_id=root_id,
+        is_root=True,
+    )
+    observability.scope_entering(root_scope)
+
+    assert observability.trace_identifying(root_scope) == trace_id
 
 
 @pytest.mark.asyncio
@@ -63,10 +102,6 @@ async def test_scope_emits_span_start_end_events(monkeypatch: pytest.MonkeyPatch
         _ = (namespace, metric, value, unit, attributes)
 
     monkeypatch.setattr(ctx, "spawn_background", spawn_background)
-    monkeypatch.setattr(AWSCloudwatch, "event_putting", event_putting, raising=False)
-    monkeypatch.setattr(AWSCloudwatch, "log_putting", log_putting, raising=False)
-    monkeypatch.setattr(AWSCloudwatch, "metric_putting", metric_putting, raising=False)
-
     trace_id = uuid4()
     identifier = _FakeIdentifier("work", scope_id=uuid4(), parent_id=trace_id)
     scope = ScopeStore(
@@ -77,6 +112,9 @@ async def test_scope_emits_span_start_end_events(monkeypatch: pytest.MonkeyPatch
         event_bus="default",
         event_source="draive",
         metrics_namespace="metrics",
+        log_putting=log_putting,
+        metric_putting=metric_putting,
+        event_putting=event_putting,
     )
 
     async with ctx.scope(
@@ -151,10 +189,6 @@ async def test_record_attributes_emit_event_and_metrics_are_scoped(
         )
 
     monkeypatch.setattr(ctx, "spawn_background", spawn_background)
-    monkeypatch.setattr(AWSCloudwatch, "event_putting", event_putting, raising=False)
-    monkeypatch.setattr(AWSCloudwatch, "log_putting", log_putting, raising=False)
-    monkeypatch.setattr(AWSCloudwatch, "metric_putting", metric_putting, raising=False)
-
     trace_id = uuid4()
     identifier = _FakeIdentifier("work", scope_id=uuid4(), parent_id=trace_id)
     scope = ScopeStore(
@@ -165,6 +199,9 @@ async def test_record_attributes_emit_event_and_metrics_are_scoped(
         metrics_namespace="metrics",
         event_bus="default",
         event_source="draive",
+        log_putting=log_putting,
+        metric_putting=metric_putting,
+        event_putting=event_putting,
     )
 
     async with ctx.scope(
@@ -200,3 +237,79 @@ async def test_record_attributes_emit_event_and_metrics_are_scoped(
     assert attributes["scope.name"] == "work"
     assert attributes["scope.id"] == identifier.scope_id.hex
     assert attributes["user"] == "alice"
+
+
+@pytest.mark.asyncio
+async def test_scope_exception_emitted_once_on_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tasks: list[asyncio.Task[None]] = []
+    recorded_events: list[dict[str, object]] = []
+
+    def spawn_background(coro, *args, **kwargs) -> None:
+        tasks.append(asyncio.create_task(coro(*args, **kwargs)))
+
+    async def event_putting(
+        *,
+        event_bus: str,
+        event_source: str,
+        detail_type: str,
+        detail: str,
+    ) -> None:
+        recorded_events.append(
+            {
+                "event_bus": event_bus,
+                "event_source": event_source,
+                "detail_type": detail_type,
+                "detail": json.loads(detail),
+            }
+        )
+
+    async def log_putting(*, log_group: str, log_stream: str, message: str) -> None:
+        _ = (log_group, log_stream, message)
+
+    async def metric_putting(
+        *,
+        namespace: str,
+        metric: str,
+        value: float | int,
+        unit: str | None,
+        attributes: dict[str, object],
+    ) -> None:
+        _ = (namespace, metric, value, unit, attributes)
+
+    monkeypatch.setattr(ctx, "spawn_background", spawn_background)
+    trace_id = uuid4()
+    identifier = _FakeIdentifier("work", scope_id=uuid4(), parent_id=trace_id)
+    scope = ScopeStore(
+        identifier,
+        trace_id=trace_id,
+        log_group="group",
+        log_stream="stream",
+        event_bus="default",
+        event_source="draive",
+        metrics_namespace="metrics",
+        log_putting=log_putting,
+        metric_putting=metric_putting,
+        event_putting=event_putting,
+    )
+
+    async with ctx.scope(
+        "test",
+        AWSCloudwatch(
+            log_putting=log_putting,
+            metric_putting=metric_putting,
+            event_putting=event_putting,
+        ),
+    ):
+        error = RuntimeError("boom")
+        scope.record_log("failed", level=ObservabilityLevel.ERROR, exception=error)
+        scope.record_scope_end(error)
+        await asyncio.gather(*tasks)
+
+    exception_events = [
+        event
+        for event in recorded_events
+        if event["detail_type"] == "exception"
+    ]
+    assert len(exception_events) == 1
