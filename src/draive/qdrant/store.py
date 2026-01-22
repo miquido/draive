@@ -1,6 +1,5 @@
-from asyncio import get_running_loop
+import asyncio
 from collections.abc import Callable, Iterable, Sequence
-from contextvars import copy_context
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
@@ -201,9 +200,7 @@ class QdrantStoreMixin(QdrantSession):
         parallel_tasks: int = 1,
         **extra: Any,
     ) -> None:
-        await get_running_loop().run_in_executor(
-            None,
-            copy_context().run,
+        await asyncio.to_thread(
             self._partial_store(
                 model,
                 objects=objects,

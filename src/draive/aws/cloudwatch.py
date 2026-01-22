@@ -65,7 +65,7 @@ class AWSCloudwatchMixin(AWSAPI):
             )
 
         except ClientError as exc:
-            raise _translate_cloudwatch_error(
+            raise translate_cloudwatch_error(
                 error=exc,
                 service="logs",
                 operation="put_log",
@@ -110,7 +110,7 @@ class AWSCloudwatchMixin(AWSAPI):
             )
 
         except ClientError as exc:
-            raise _translate_cloudwatch_error(
+            raise translate_cloudwatch_error(
                 error=exc,
                 service="events",
                 operation="put_events",
@@ -145,7 +145,7 @@ class AWSCloudwatchMixin(AWSAPI):
         attributes: Mapping[str, ObservabilityAttribute],
     ) -> None:
         try:
-            dimensions = _format_metric_dimensions(attributes)
+            dimensions = format_metric_dimensions(attributes)
             metric_data: dict[str, Any] = {
                 "MetricName": metric,
                 "Value": value,
@@ -163,7 +163,7 @@ class AWSCloudwatchMixin(AWSAPI):
             )
 
         except ClientError as exc:
-            raise _translate_cloudwatch_error(
+            raise translate_cloudwatch_error(
                 error=exc,
                 service="cloudwatch",
                 operation="put_metric_data",
@@ -171,7 +171,7 @@ class AWSCloudwatchMixin(AWSAPI):
             ) from exc
 
 
-def _format_metric_dimensions(
+def format_metric_dimensions(
     attributes: Mapping[str, ObservabilityAttribute],
 ) -> list[dict[str, str]]:
     dimensions: list[dict[str, str]] = []
@@ -246,7 +246,7 @@ def _truncate_dimension(
     return value[:max_length]
 
 
-def _translate_cloudwatch_error(
+def translate_cloudwatch_error(
     *,
     error: ClientError,
     service: str,
