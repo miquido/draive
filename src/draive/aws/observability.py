@@ -383,6 +383,8 @@ class ScopeStore:
                     "time_unix_nano": time_ns(),
                     "trace_id": self.trace_id.hex,
                     "span_id": _span_id(self.identifier),
+                    "severity_text": level.name,
+                    "severity_number": level.value,
                     "name": event,
                     "attributes": _sanitized_attributes(
                         {
