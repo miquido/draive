@@ -157,7 +157,7 @@ class FunctionTool[**Args, Result](Function[Args, Coroutine[None, None, Result]]
     def meta(self) -> Meta:
         return self.specification.meta
 
-    def updated(
+    def updating(
         self,
         *,
         name: str | None = None,

@@ -264,7 +264,7 @@ def _tree_initialization_stage[Parameters: DataModel](
         )
 
         # Setup initial state
-        return state.updated(
+        return state.updating(
             _RefinementState(
                 root=root_node,
                 nodes={root_node.identifier: root_node},
@@ -324,7 +324,7 @@ def _tree_exploration_stage[Parameters: DataModel](
             }
 
         # Update the refinement state with the updated nodes
-        refinement_state = refinement_state.updated(nodes=updated_nodes)
+        refinement_state = refinement_state.updating(nodes=updated_nodes)
 
         # Log tree statistics
         total_nodes: int = len(refinement_state.nodes)
@@ -336,7 +336,7 @@ def _tree_exploration_stage[Parameters: DataModel](
             f"{active_nodes} active, {pruned_count} pruned"
         )
 
-        return state.updated(refinement_state)
+        return state.updating(refinement_state)
 
     async def condition(
         *,
@@ -419,7 +419,7 @@ async def _explore_node[Parameters: DataModel](
         # Evaluate with focused suite
         ctx.log_info(f"Evaluating strategy '{strategy_name}'...")
         focused_evaluation: EvaluatorSuiteResult
-        with ctx.updated(child_node.patched_instructions_repository):
+        with ctx.updating(child_node.patched_instructions_repository):
             focused_evaluation = await evaluator_suite(focused_suite_cases)
 
         # Check for performance drop
@@ -431,7 +431,7 @@ async def _explore_node[Parameters: DataModel](
         pruned: bool = performance_ratio < performance_drop_threshold
 
         # update node with evaluation data
-        children[child_node.identifier] = child_node.updated(
+        children[child_node.identifier] = child_node.updating(
             focused_evaluation=focused_evaluation,
             pruned=pruned,
         )
@@ -656,14 +656,14 @@ def _tree_finalization_stage[Parameters: DataModel](
             )
 
             complete_evaluation: EvaluatorSuiteResult
-            with ctx.updated(candidate_node.patched_instructions_repository):
+            with ctx.updating(candidate_node.patched_instructions_repository):
                 complete_evaluation = await evaluator_suite()
 
             # Update node with full eval score
-            updated_node: _RefinementTreeNode = candidate_node.updated(
+            updated_node: _RefinementTreeNode = candidate_node.updating(
                 complete_evaluation=complete_evaluation
             )
-            refinement_state = refinement_state.updated(
+            refinement_state = refinement_state.updating(
                 nodes={
                     **refinement_state.nodes,
                     # update node in tree
@@ -688,7 +688,7 @@ def _tree_finalization_stage[Parameters: DataModel](
         )
 
         # Update result with best instructions and updated state
-        return state.updated(
+        return state.updating(
             refinement_state,
             result=MultimodalContent.of(
                 TextContent.of(

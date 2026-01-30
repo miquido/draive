@@ -556,7 +556,7 @@ async def test_stage_concurrent():
         # Simple merge - take first successful result
         successful = [b for b in branches if isinstance(b, StageState)]
         if successful:
-            return successful[0].updated(result=MultimodalContent.of("Merged result"))
+            return successful[0].updating(result=MultimodalContent.of("Merged result"))
         raise RuntimeError("No successful branches")
 
     async with ctx.scope("test", GenerativeModel(generating=mock_generating)):
@@ -1014,7 +1014,7 @@ async def test_stage_state_operations():
 
     # Test state update
     new_data = ExampleData(value="updated", count=2)
-    updated_state = state.updated(new_data, result=MultimodalContent.of("new result"))
+    updated_state = state.updating(new_data, result=MultimodalContent.of("new result"))
 
     assert updated_state.get(ExampleData) == new_data
     assert extract_text_content(updated_state.result) == "new result"

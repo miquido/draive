@@ -78,7 +78,7 @@ class ResourceTemplate[**Args](
             ResourceReferenceTemplate(
                 template_uri=template_uri,
                 mime_type=mime_type,
-                meta=meta.updated(
+                meta=meta.updating(
                     name=name,
                     description=description,
                 ),

@@ -16,7 +16,7 @@ properties and an appropriate `__init__` function will be generated as well. Add
 types come with built-in validation. Each object is automatically validated during the
 initialization ensuring proper types and values for each field. Both types are also immutable by
 default - you will receive linting and runtime errors when trying to mutate those. To make a
-mutation of an instance of either of those we can use a dedicated `updated` method which makes a
+mutation of an instance of either of those we can use a dedicated `updating` method which makes a
 copy on the fly and validates mutation as well. Let's have a look:
 
 ```python
@@ -32,7 +32,7 @@ basic_state: BasicState = BasicState(
 # )
 
 # prepare an update
-updated_state: BasicState = basic_state.updated(
+updated_state: BasicState = basic_state.updating(
     value=21
 )  # value of `identifier` field won't change
 
@@ -150,7 +150,7 @@ def do_something_contextually() -> None:
 ```
 
 What will be the current state is defined by the context of the execution. We can change it locally
-by using another function from `ctx` called `updated` which allows us to update the state by copying
+by using another function from `ctx` called `updating` which allows us to update the state by copying
 the context and allowing to enter a new scope with it:
 
 ```python
@@ -160,7 +160,7 @@ async with ctx.scope("basics", basic_state):
     do_something_contextually()
 
     # then we can update it locally
-    with ctx.updated(basic_state.updated(identifier="updated")):
+    with ctx.updating(basic_state.updating(identifier="updated")):
         print("Updated:")
         # and access its updated version
         do_something_contextually()

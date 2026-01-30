@@ -56,6 +56,7 @@ class DataModelMeta(type):
     __SPECIFICATION__: TypeSpecification
     __FIELDS__: Sequence[Attribute]
     __ALLOWED_FIELDS__: Set[str]
+    __SERIALIZABLE__: bool
 
     def __new__(
         mcs,
@@ -118,6 +119,7 @@ class DataModelMeta(type):
 
         cls.__SELF_ATTRIBUTE__ = self_attribute  # pyright: ignore[reportConstantRedefinition]
         cls.__TYPE_PARAMETERS__ = type_parameters  # pyright: ignore[reportConstantRedefinition]
+        cls.__SERIALIZABLE__ = True  # pyright: ignore[reportConstantRedefinition]
         if not bases:
             assert not type_parameters  # nosec: B101
             cls.__FIELDS__ = ()  # pyright: ignore[reportAttributeAccessIssue, reportConstantRedefinition]
@@ -483,7 +485,7 @@ class DataModel(metaclass=DataModelMeta):
 
         return dict_result
 
-    def updated(
+    def updating(
         self,
         **kwargs: Any,
     ) -> Self:

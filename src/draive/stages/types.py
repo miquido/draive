@@ -205,7 +205,7 @@ class StageState:
         else:
             return None
 
-    def updated(
+    def updating(
         self,
         *state: DataModel | State,
         context: ModelContext | None = None,

@@ -53,45 +53,45 @@ def test_merged_contents_with_different_meta_are_concatenated_where_able():
     assert MultimodalContent.of(
         MultimodalContent.of(
             # "",
-            input_text.updated(meta={"test": True}),
+            input_text.updating(meta={"test": True}),
             input_image,
             MultimodalContent.of(
-                input_text.updated(meta={"test": True}),
-                input_text.updated(meta={"test": True}),
+                input_text.updating(meta={"test": True}),
+                input_text.updating(meta={"test": True}),
             ),
         ),
         MultimodalContent.of(
-            input_text.updated(meta={"test": False}),
+            input_text.updating(meta={"test": False}),
             input_image,
             MultimodalContent.of(
-                input_text.updated(meta={"test": False}),
+                input_text.updating(meta={"test": False}),
                 input_text,
             ),
         ),
     ).parts == (
-        input_text.updated(meta={"test": True}),
+        input_text.updating(meta={"test": True}),
         input_image,
-        input_text_merged.updated(meta={"test": True}),
-        input_text.updated(meta={"test": False}),
+        input_text_merged.updating(meta={"test": True}),
+        input_text.updating(meta={"test": False}),
         input_image,
-        input_text.updated(meta={"test": False}),
+        input_text.updating(meta={"test": False}),
         input_text,
     )
     result = MultimodalContent.of(
         MultimodalContent.of(
             "",
-            input_text.updated(meta={"test": True}),
+            input_text.updating(meta={"test": True}),
             input_image,
             MultimodalContent.of(
-                input_text.updated(meta={"test": True}),
-                input_text.updated(meta={"test": True}),
+                input_text.updating(meta={"test": True}),
+                input_text.updating(meta={"test": True}),
             ),
         ),
         MultimodalContent.of(
-            input_text.updated(meta={"test": False}),
+            input_text.updating(meta={"test": False}),
             input_image,
             MultimodalContent.of(
-                input_text.updated(meta={"test": False}),
+                input_text.updating(meta={"test": False}),
                 input_text,
             ),
         ),
@@ -111,9 +111,9 @@ def test_matching_meta_returns_self_when_no_values():
 
 
 def test_matching_meta_filters_by_single_value():
-    text_with_meta = input_text.updated(meta={"category": "important"})
-    image_with_meta = input_image.updated(meta={"category": "important"})
-    text_without_meta = input_text.updated(meta={"category": "normal"})
+    text_with_meta = input_text.updating(meta={"category": "important"})
+    image_with_meta = input_image.updating(meta={"category": "important"})
+    text_without_meta = input_text.updating(meta={"category": "normal"})
 
     content = MultimodalContent.of(text_with_meta, image_with_meta, text_without_meta)
     result = content.matching_meta(category="important")
@@ -122,9 +122,9 @@ def test_matching_meta_filters_by_single_value():
 
 
 def test_matching_meta_filters_by_multiple_values():
-    text_match = input_text.updated(meta={"category": "important", "priority": "high"})
-    image_partial = input_image.updated(meta={"category": "important", "priority": "low"})
-    text_no_match = input_text.updated(meta={"category": "normal", "priority": "high"})
+    text_match = input_text.updating(meta={"category": "important", "priority": "high"})
+    image_partial = input_image.updating(meta={"category": "important", "priority": "low"})
+    text_no_match = input_text.updating(meta={"category": "normal", "priority": "high"})
 
     content = MultimodalContent.of(text_match, image_partial, text_no_match)
     result = content.matching_meta(category="important", priority="high")
@@ -133,7 +133,7 @@ def test_matching_meta_filters_by_multiple_values():
 
 
 def test_matching_meta_handles_missing_metadata():
-    text_with_meta = input_text.updated(meta={"category": "important"})
+    text_with_meta = input_text.updating(meta={"category": "important"})
     text_without_meta = input_text  # no meta
 
     content = MultimodalContent.of(text_with_meta, text_without_meta)
@@ -146,7 +146,7 @@ def test_matching_meta_excludes_datamodel_artifacts():
     class TestArtifact(DataModel):
         value: str
 
-    text_with_meta = input_text.updated(meta={"test": "value"})
+    text_with_meta = input_text.updating(meta={"test": "value"})
     artifact = ArtifactContent.of(TestArtifact(value="test"))
 
     content = MultimodalContent.of(text_with_meta, artifact)
@@ -157,8 +157,8 @@ def test_matching_meta_excludes_datamodel_artifacts():
 
 def test_matching_meta_works_with_text_content():
     # Create separate text content instances to avoid merging
-    text_with_special_meta = input_text.updated(meta={"tag": "special"})
-    text_without_meta = input_text.updated(meta={"tag": "normal"})
+    text_with_special_meta = input_text.updating(meta={"tag": "special"})
+    text_without_meta = input_text.updating(meta={"tag": "normal"})
 
     content = MultimodalContent.of(text_with_special_meta, input_image, text_without_meta)
     result = content.matching_meta(tag="special")
@@ -167,7 +167,7 @@ def test_matching_meta_works_with_text_content():
 
 
 def test_matching_meta_returns_empty_when_no_matches():
-    text_with_meta = input_text.updated(meta={"category": "normal"})
+    text_with_meta = input_text.updating(meta={"category": "normal"})
     content = MultimodalContent.of(text_with_meta)
     result = content.matching_meta(category="important")
 
@@ -180,9 +180,9 @@ def test_split_by_meta_returns_empty_for_empty_content():
 
 
 def test_split_by_meta_single_group():
-    text1 = input_text.updated(meta={"category": "important"})
-    image1 = input_image.updated(meta={"category": "important"})
-    text2 = input_text.updated(meta={"category": "important"})
+    text1 = input_text.updating(meta={"category": "important"})
+    image1 = input_image.updating(meta={"category": "important"})
+    text2 = input_text.updating(meta={"category": "important"})
     content = MultimodalContent.of(text1, image1, text2)
 
     result = content.split_by_meta(key="category")
@@ -192,10 +192,10 @@ def test_split_by_meta_single_group():
 
 
 def test_split_by_meta_multiple_groups():
-    text_important = input_text.updated(meta={"category": "important"})
-    image_important = input_image.updated(meta={"category": "important"})
-    text_normal = input_text.updated(meta={"category": "normal"})
-    text_important2 = input_text.updated(meta={"category": "important"})
+    text_important = input_text.updating(meta={"category": "important"})
+    image_important = input_image.updating(meta={"category": "important"})
+    text_normal = input_text.updating(meta={"category": "normal"})
+    text_important2 = input_text.updating(meta={"category": "important"})
 
     content = MultimodalContent.of(text_important, image_important, text_normal, text_important2)
     result = content.split_by_meta(key="category")
@@ -207,9 +207,9 @@ def test_split_by_meta_multiple_groups():
 
 
 def test_split_by_meta_skips_missing_values():
-    text_with_meta = input_text.updated(meta={"category": "important"})
+    text_with_meta = input_text.updating(meta={"category": "important"})
     text_without_meta = input_text  # no meta
-    text_with_missing_meta = input_text.updated(meta={"other": "value"})  # no "category" key
+    text_with_missing_meta = input_text.updating(meta={"other": "value"})  # no "category" key
 
     content = MultimodalContent.of(text_with_meta, text_without_meta, text_with_missing_meta)
     result = content.split_by_meta(key="category")
@@ -222,9 +222,9 @@ def test_split_by_meta_includes_datamodel_artifacts():
     class TestArtifact(DataModel):
         value: str
 
-    text_with_meta = input_text.updated(meta={"category": "important"})
+    text_with_meta = input_text.updating(meta={"category": "important"})
     artifact = ArtifactContent.of(TestArtifact(value="test"), meta={"category": "artifact"})
-    text_with_same_meta = input_text.updated(meta={"category": "important"})
+    text_with_same_meta = input_text.updating(meta={"category": "important"})
 
     content = MultimodalContent.of(text_with_meta, artifact, text_with_same_meta)
     result = content.split_by_meta(key="category")
@@ -237,11 +237,11 @@ def test_split_by_meta_includes_datamodel_artifacts():
 
 
 def test_split_by_meta_preserves_order():
-    text1 = input_text.updated(meta={"priority": "high"})
-    text2 = input_text.updated(meta={"priority": "low"})
-    text3 = input_text.updated(meta={"priority": "high"})
-    text4 = input_text.updated(meta={"priority": "low"})
-    text5 = input_text.updated(meta={"priority": "high"})
+    text1 = input_text.updating(meta={"priority": "high"})
+    text2 = input_text.updating(meta={"priority": "low"})
+    text3 = input_text.updating(meta={"priority": "high"})
+    text4 = input_text.updating(meta={"priority": "low"})
+    text5 = input_text.updating(meta={"priority": "high"})
 
     content = MultimodalContent.of(text1, text2, text3, text4, text5)
     result = content.split_by_meta(key="priority")
@@ -255,13 +255,13 @@ def test_split_by_meta_preserves_order():
 
 
 def test_split_by_meta_groups_consecutive_same_values():
-    text1 = input_text.updated(meta={"priority": "high"})
-    image1 = input_image.updated(meta={"priority": "high"})
-    text2 = input_text.updated(meta={"priority": "high"})
-    text3 = input_text.updated(meta={"priority": "low"})
-    image2 = input_image.updated(meta={"priority": "low"})
-    text4 = input_text.updated(meta={"priority": "low"})
-    text5 = input_text.updated(meta={"priority": "high"})
+    text1 = input_text.updating(meta={"priority": "high"})
+    image1 = input_image.updating(meta={"priority": "high"})
+    text2 = input_text.updating(meta={"priority": "high"})
+    text3 = input_text.updating(meta={"priority": "low"})
+    image2 = input_image.updating(meta={"priority": "low"})
+    text4 = input_text.updating(meta={"priority": "low"})
+    text5 = input_text.updating(meta={"priority": "high"})
 
     content = MultimodalContent.of(text1, image1, text2, text3, image2, text4, text5)
     result = content.split_by_meta(key="priority")

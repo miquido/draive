@@ -11,7 +11,7 @@ load_env()
 ```
 
 ## Core primitives
-- `State` (from haiway): immutable runtime config/resources. Update via `.updated(...)`.
+- `State` (from haiway): immutable runtime config/resources. Update via `.updating(...)`.
 - `ctx.scope(label, *state, disposables=(...), observability=...)`: structured async context that activates states and disposables; nests safely.
 - `Disposables`: async resources (e.g., `OpenAI()`, `QdrantClient()`) auto-cleaned on scope exit.
 - `DataModel`: immutable, validated data containers with `.json_schema()` / `.simplified_schema()` and `.to_str()`.
@@ -189,5 +189,5 @@ all_ok = all(r.passed for r in results)
 - Always run inside `ctx.scope`.
 - Keep public APIs strictly typed (no implicit `Any`).
 - Avoid blocking calls; everything I/O is async.
-- Mutate state via `.updated(...)`; states and data models are immutable by design.
+- Mutate state via `.updating(...)`; states and data models are immutable by design.
 - Use `MultimodalContent` for any model input/output that mixes text/media/tools; use `.to_str()` for safe logging (binary redacted).

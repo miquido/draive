@@ -465,7 +465,7 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.98.0"
+version = "0.99.0"
 source = { editable = "." }
 dependencies = [
     { name = "haiway" },
@@ -567,7 +567,7 @@ requires-dist = [
     { name = "cohere", marker = "extra == 'cohere-bedrock'", specifier = "~=5.20" },
     { name = "google-api-core", marker = "extra == 'gemini'" },
     { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=1.50" },
-    { name = "haiway", specifier = "~=0.42.0" },
+    { name = "haiway", specifier = "~=0.43.0" },
     { name = "haiway", extras = ["httpx"], marker = "extra == 'httpx'" },
     { name = "haiway", extras = ["opentelemetry"], marker = "extra == 'opentelemetry'" },
     { name = "haiway", extras = ["postgres"], marker = "extra == 'postgres'" },
@@ -804,14 +804,14 @@ wheels = [
 
 [[package]]
 name = "haiway"
-version = "0.42.4"
+version = "0.43.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c4/c3/4c2437d539d51496727489da6d64dfe27768f195819c3c32d971fb301d56/haiway-0.42.4.tar.gz", hash = "sha256:c63558d20bb3dfc03e1bea5760f498f2b5ab78ce00b6cf64974284b28f71128d", size = 106307, upload-time = "2026-01-22T14:08:27.478Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ae/c6/e74d3498f35ff52e873cf11babc877a0aaeeb2515da3fe480c2b89e669ee/haiway-0.43.1.tar.gz", hash = "sha256:fbeb1fc9b6b70f472b6778aa70a17ebbeb42662fe7c177a46159fe3c4fe04ee4", size = 106336, upload-time = "2026-01-30T18:36:13.648Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c0/44/44eee32497e35a1615d73b24f22c6ba5da779c3f3806d2e3cb6ec6df550d/haiway-0.42.4-py3-none-any.whl", hash = "sha256:c9a11686a7ea994c883a8c592b18c7f7d33dd5c27bfad2a2328bcaaf41658d3c", size = 136557, upload-time = "2026-01-22T14:08:28.582Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/60/9f301c59b5dcd4d6907da753c52f8d59456610ef955b08002b44add3431f/haiway-0.43.1-py3-none-any.whl", hash = "sha256:35f123c018735bf24859ea10ce3debb073ae37709e60849f4587efe765e68f79", size = 136621, upload-time = "2026-01-30T18:36:14.604Z" },
 ]
 
 [package.optional-dependencies]

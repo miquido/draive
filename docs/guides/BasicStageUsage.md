@@ -9,7 +9,7 @@ reliable pipelines with confidence.
 
 - **Stage** – an async callable that produces or transforms multimodal content.
 - **StageState** – an immutable snapshot holding context entries and the latest result. Always
-    return `state.updated(...)` instead of mutating in place.
+    return `state.updating(...)` instead of mutating in place.
 - **MultimodalContent** – container for text, images, artifacts, and resources used as model inputs
     or outputs.
 - **`ctx.scope(...)`** – binds providers, disposables, and logging/metrics for the lifetime of your
@@ -189,7 +189,7 @@ async def merge_results(
 ) -> StageState:
     successful = [branch for branch in branches if isinstance(branch, StageState)]
     combined = MultimodalContent.of(*[state.result for state in successful])
-    return successful[0].updated(result=combined)
+    return successful[0].updating(result=combined)
 
 concurrent_stage = Stage.concurrent(
     Stage.completion("Analyze aspect A."),
@@ -292,7 +292,7 @@ from draive import MultimodalContent, StageState, stage
 @stage
 async def custom_processor(*, state: StageState) -> StageState:
     processed = MultimodalContent.of(f"Processed: {state.result.as_string()}")
-    return state.updated(result=processed)
+    return state.updating(result=processed)
 ```
 
 Any async function decorated with `@stage` gains the same API as built-in stages and can be mixed

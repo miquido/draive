@@ -34,7 +34,7 @@ Throughout the getting-started journey you will assemble:
 ## Core Concepts
 
 1. **State management** – mutable-looking, immutable-under-the-hood `State` classes represent
-    configuration and runtime data. You update them with methods like `State.updated(...)` to keep
+    configuration and runtime data. You update them with methods like `State.updating(...)` to keep
     histories, snapshots, and metrics consistent.
 1. **Context scoping** – `ctx.scope(...)` activates a stack of `State` instances and disposables for
     a logical unit of work, ensuring structured concurrency and clean teardown.

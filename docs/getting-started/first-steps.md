@@ -31,11 +31,11 @@ class AppConfig(State):
     max_retries: int = 3
 ```
 
-State instances are immutable—use `.updated()` to create tweaked copies.
+State instances are immutable—use `.updating()` to create tweaked copies.
 
 ```python
 config = AppConfig(environment="staging")
-updated = config.updated(max_retries=5)
+updated = config.updating(max_retries=5)
 ```
 
 ## Model your data
