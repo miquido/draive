@@ -87,7 +87,7 @@ class ResourceReference(DataModel):
         return cls(
             uri=uri,
             mime_type=mime_type,
-            meta=Meta.of(meta).updated(
+            meta=Meta.of(meta).updating(
                 name=name,
                 description=description,
             ),
@@ -113,7 +113,7 @@ class ResourceReferenceTemplate(DataModel):
         return cls(
             template_uri=template_uri,
             mime_type=mime_type,
-            meta=Meta.of(meta).updated(
+            meta=Meta.of(meta).updating(
                 name=name,
                 description=description,
             ),
@@ -288,7 +288,7 @@ class Resource(State):
         return cls(
             uri=uri,
             content=resource_content,
-            meta=Meta.of(meta).updated(
+            meta=Meta.of(meta).updating(
                 name=name,
                 description=description,
             ),

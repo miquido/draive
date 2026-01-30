@@ -78,10 +78,10 @@ async with ctx.scope(  # prepare the new context
     print("RESULT GPT 3.5 | temperature 0.4:", result)
 
     # we can update the configuration to change any parameter for nested context
-    with ctx.updated(
+    with ctx.updating(
         # we are updating the current context value instead of making a new one
         # this allows to preserve other elements of the configuration
-        ctx.state(OpenAIResponsesConfig).updated(
+        ctx.state(OpenAIResponsesConfig).updating(
             model="gpt-5",
         ),
     ):
@@ -135,8 +135,8 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
         text="Roses are red...",
     )
 
-    with ctx.updated(
-        ctx.state(OpenAIResponsesConfig).updated(
+    with ctx.updating(
+        ctx.state(OpenAIResponsesConfig).updating(
             model="gpt-5",
         ),
     ):

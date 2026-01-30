@@ -29,9 +29,9 @@ initial: Mutable = Mutable(
     value=42,
 )
 # update one of the fields by creating a copy
-updated: Mutable = initial.updated(identifier="post")
+updated: Mutable = initial.updating(identifier="post")
 # update initial state once more - this will be another copy
-final: Mutable = initial.updated(value=21)
+final: Mutable = initial.updating(value=21)
 
 print("initial", initial)
 print("updated", updated)

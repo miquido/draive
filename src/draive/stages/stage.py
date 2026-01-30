@@ -176,7 +176,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            return state.updated(
+            return state.updating(
                 context=(*state.context, *context),
                 result=result if result is not None else state.result,
             )
@@ -369,7 +369,7 @@ class Stage:
                     **extra,
                 )
 
-                return state.updated(
+                return state.updating(
                     context=context,  # GenerativeModel.loop updates the context
                     # Discard reasoning from the stage result; it remains in context
                     result=result.content,
@@ -466,7 +466,7 @@ class Stage:
                     **extra,
                 )
 
-                return state.updated(
+                return state.updating(
                     context=context,  # GenerativeModel.loop updates the context
                     # Discard reasoning from the stage result; it remains in context
                     result=result.content,
@@ -563,7 +563,7 @@ class Stage:
                     **extra,
                 )
 
-                return state.updated(
+                return state.updating(
                     context=context,  # GenerativeModel.loop updates the context
                     # Discard reasoning from the stage result; it remains in context
                     result=result.content,
@@ -638,7 +638,7 @@ class Stage:
                     **extra,
                 )
 
-                return state.updated(
+                return state.updating(
                     context=context,  # GenerativeModel.loop updates the context
                     # Discard reasoning from the stage result; it remains in context
                     result=result.content,
@@ -681,7 +681,7 @@ class Stage:
             state: StageState,
         ) -> StageState:
             async with ctx.scope("stage.transform.result"):
-                return state.updated(result=await transformation(state.result))
+                return state.updating(result=await transformation(state.result))
 
         return cls(
             stage,
@@ -720,7 +720,7 @@ class Stage:
             state: StageState,
         ) -> StageState:
             async with ctx.scope("stage.transform.context"):
-                return state.updated(context=await transformation(state.context))
+                return state.updating(context=await transformation(state.context))
 
         return cls(
             stage,
@@ -762,7 +762,7 @@ class Stage:
                     *,
                     state: StageState,
                 ) -> StageState:
-                    return state.updated(context=())
+                    return state.updating(context=())
 
             case int() as index:
 
@@ -770,7 +770,7 @@ class Stage:
                     *,
                     state: StageState,
                 ) -> StageState:
-                    return state.updated(context=state.context[:index])
+                    return state.updating(context=state.context[:index])
 
             case slice() as index_slice:
 
@@ -778,7 +778,7 @@ class Stage:
                     *,
                     state: StageState,
                 ) -> StageState:
-                    return state.updated(context=state.context[index_slice])
+                    return state.updating(context=state.context[index_slice])
 
         return cls(
             stage,
@@ -809,7 +809,7 @@ class Stage:
             *,
             state: StageState,
         ) -> StageState:
-            return state.updated(
+            return state.updating(
                 context=tuple(element.without_tools() for element in state.context)
             )
 
@@ -938,7 +938,7 @@ class Stage:
                     )
                     result = state.result
 
-                return state.updated(
+                return state.updating(
                     context=(
                         *state.context,
                         ModelOutput.of(tool_request),
@@ -1521,7 +1521,7 @@ class Stage:
                     state: StageState,
                 ) -> StageState:
                     async with Disposables(disposables) as disposable_state:
-                        with ctx.updated(*disposable_state, ctx_state, *states):
+                        with ctx.updating(*disposable_state, ctx_state, *states):
                             return await execution(state=state)
             else:
 
@@ -1529,7 +1529,7 @@ class Stage:
                     *,
                     state: StageState,
                 ) -> StageState:
-                    with ctx.updated(ctx_state, *states):
+                    with ctx.updating(ctx_state, *states):
                         return await execution(state=state)
 
         elif disposables:
@@ -1741,7 +1741,7 @@ class Stage:
             state: StageState,
         ) -> StageState:
             processed_state: StageState = await execution(state=state)
-            return processed_state.updated(context=state.context)
+            return processed_state.updating(context=state.context)
 
         return self.__class__(
             stage,
@@ -1781,7 +1781,7 @@ class Stage:
             )
             suffix: ModelContext = processed_state.context[len(common_prefix) :]
 
-            return state.updated(
+            return state.updating(
                 context=(
                     *common_prefix,
                     *(element.without_tools() for element in suffix),
@@ -1891,7 +1891,7 @@ class Stage:
             state: StageState,
         ) -> StageState:
             processed_state: StageState = await execution(state=state)
-            return processed_state.updated(result=state.result)  # preserve current result
+            return processed_state.updating(result=state.result)  # preserve current result
 
         return self.__class__(
             stage,
@@ -1917,7 +1917,7 @@ class Stage:
             state: StageState,
         ) -> StageState:
             processed_state: StageState = await execution(state=state)
-            return processed_state.updated(
+            return processed_state.updating(
                 result=state.result.appending(processed_state.result),
             )
 

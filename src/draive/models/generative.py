@@ -340,7 +340,7 @@ class GenerativeModel(State):
 
             if not pending_tools:
                 ctx.log_debug("...loop finished...")
-                result: ModelOutput = generated.updated(
+                result: ModelOutput = generated.updating(
                     # replace generated with forced result
                     blocks=(
                         *result_extension,
@@ -384,7 +384,7 @@ class GenerativeModel(State):
 
             if tools_result:  # tools direct result
                 ctx.log_debug("...loop finished by tools...")
-                result: ModelOutput = generated.updated(
+                result: ModelOutput = generated.updating(
                     # replace generated with forced result
                     blocks=(
                         *result_extension,
@@ -746,16 +746,16 @@ def _decoded(  # noqa: PLR0911
             return result
 
         case "text":
-            return result.updated(blocks=(MultimodalContent.of(*result.content.texts()),))
+            return result.updating(blocks=(MultimodalContent.of(*result.content.texts()),))
 
         case "image":
-            return result.updated(blocks=(MultimodalContent.of(*result.content.images()),))
+            return result.updating(blocks=(MultimodalContent.of(*result.content.images()),))
 
         case "audio":
-            return result.updated(blocks=(MultimodalContent.of(*result.content.audio()),))
+            return result.updating(blocks=(MultimodalContent.of(*result.content.audio()),))
 
         case "video":
-            return result.updated(blocks=(MultimodalContent.of(*result.content.video()),))
+            return result.updating(blocks=(MultimodalContent.of(*result.content.video()),))
 
         case selection if isinstance(selection, Collection) and not isinstance(selection, str):
             selected_parts: tuple[MultimodalContentPart, ...] = tuple(
@@ -763,10 +763,10 @@ def _decoded(  # noqa: PLR0911
                 for part in result.content.parts
                 if _matches_modalities(part, allowed=set(selection))
             )
-            return result.updated(blocks=(MultimodalContent.of(*selected_parts),))
+            return result.updating(blocks=(MultimodalContent.of(*selected_parts),))
 
         case "json":
-            return result.updated(
+            return result.updating(
                 blocks=(
                     MultimodalContent.of(
                         ArtifactContent.of(
@@ -779,7 +779,7 @@ def _decoded(  # noqa: PLR0911
 
         case model:
             assert isinstance(model, type)  # nosec: B101
-            return result.updated(
+            return result.updating(
                 blocks=(
                     MultimodalContent.of(
                         ArtifactContent.of(
