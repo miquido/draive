@@ -166,7 +166,7 @@ async with ctx.scope("basics", basic_state):
         do_something_contextually()
 
     print("Final:")
-    # when leaving the updated scope we go back to previously defined state
+    # when leaving the updating scope we go back to previously defined state
     do_something_contextually()
 
 # do_something_contextually() # calling it outside of any context scope will cause an error

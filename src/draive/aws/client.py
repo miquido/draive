@@ -73,6 +73,7 @@ class AWS(
             await self._prepare_s3_client()
             features.append(
                 ResourcesRepository(
+                    list_fetching=self.list,
                     fetching=self.fetch,
                     uploading=self.upload,
                 ),
