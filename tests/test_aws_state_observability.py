@@ -307,9 +307,5 @@ async def test_scope_exception_emitted_once_on_exit(
         scope.record_scope_end(error)
         await asyncio.gather(*tasks)
 
-    exception_events = [
-        event
-        for event in recorded_events
-        if event["detail_type"] == "exception"
-    ]
+    exception_events = [event for event in recorded_events if event["detail_type"] == "exception"]
     assert len(exception_events) == 1
