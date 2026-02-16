@@ -68,7 +68,7 @@ def _is_actionable_command(
     )
     for separator in (".", "!", "?", "\n"):
         if separator in normalized_prefix:
-            normalized_prefix = normalized_prefix.split(separator)[-1]
+            normalized_prefix = normalized_prefix.rsplit(separator, maxsplit=1)[-1]
 
     clause: str = normalized_prefix.strip()
     if not clause:

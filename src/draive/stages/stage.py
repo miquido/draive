@@ -100,6 +100,7 @@ class Stage:
         element: ModelContextElement,
         /,
         *elements: ModelContextElement,
+        result: Multimodal | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
@@ -110,6 +111,7 @@ class Stage:
         element: Multimodal,
         /,
         *elements: Multimodal,
+        result: Multimodal | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
