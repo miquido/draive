@@ -5,14 +5,14 @@
 In **Draive** you often need to surface multimodal data in logs, dashboards, or CLI output. Every
 model state exposes a few helpers that flatten structured content into printable strings:
 
-| Helper                                  | Output                                         |
-| --------------------------------------- | ---------------------------------------------- |
-| `x.to_mapping()` *(default)*            | `dict` representation                          |
-| `x.to_json(indent: int \| None = None)` | JSON string                                    |
-| `x.to_str()`                            | Model-defined string                           |
-| `str(x)`                                | Alias for `str(x.to_mapping())` on `DataModel` |
+| Helper                                  | Output                                                  |
+| --------------------------------------- | ------------------------------------------------------- |
+| `x.to_mapping()` *(default)*            | `dict` representation                                   |
+| `x.to_json(indent: int \| None = None)` | JSON string                                             |
+| `x.to_str()`                            | Model-defined string                                    |
+| `str(x)`                                | Alias for `str(x.to_mapping())` on typed `State` models |
 
-Different `DataModel` instances implement `.to_str()` in their own way, so the rendered view varies
+Different model instances implement `.to_str()` in their own way, so the rendered view varies
 by content type. The sections below walk through the most common multimodal classes and show how
 their printing helpers behave.
 

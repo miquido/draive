@@ -21,7 +21,6 @@ from haiway.attributes import AttributesJSONEncoder
 
 from draive.evaluation.evaluator import EvaluatorResult
 from draive.evaluation.scenario import EvaluatorScenarioResult
-from draive.parameters import DataModel
 
 __all__ = (
     "EvaluatorSuite",
@@ -34,7 +33,7 @@ __all__ = (
 )
 
 
-class EvaluatorSuiteCase[Parameters: DataModel](DataModel):
+class EvaluatorSuiteCase[Parameters: State](State, serializable=True):
     """
     Individual test case for an evaluator suite.
 
@@ -52,7 +51,7 @@ class EvaluatorSuiteCase[Parameters: DataModel](DataModel):
     parameters: Parameters
 
 
-class EvaluatorSuiteCaseResult(DataModel):
+class EvaluatorSuiteCaseResult(State, serializable=True):
     """
     Result of evaluating a single test case.
 
@@ -169,7 +168,7 @@ class EvaluatorSuiteCaseResult(DataModel):
         return score / len(self.results)
 
 
-class EvaluatorSuiteResult(DataModel):
+class EvaluatorSuiteResult(State, serializable=True):
     """
     Aggregated results from evaluating an entire test suite.
 
@@ -248,7 +247,7 @@ class EvaluatorSuiteResult(DataModel):
 
 
 @runtime_checkable
-class EvaluatorSuiteDefinition[**Args, Parameters: DataModel](Protocol):
+class EvaluatorSuiteDefinition[**Args, Parameters: State](Protocol):
     """
     Protocol for evaluator suite function definitions.
 
@@ -273,7 +272,7 @@ class EvaluatorSuiteDefinition[**Args, Parameters: DataModel](Protocol):
 
 
 @runtime_checkable
-class EvaluatorSuiteCasesStorage[Parameters: DataModel](Protocol):
+class EvaluatorSuiteCasesStorage[Parameters: State](Protocol):
     """
     Protocol for test case storage backends.
 
@@ -300,7 +299,7 @@ class EvaluatorSuiteCasesStorage[Parameters: DataModel](Protocol):
 
 
 @runtime_checkable
-class PreparedEvaluatorSuite[Parameters: DataModel](Protocol):
+class PreparedEvaluatorSuite[Parameters: State](Protocol):
     """
     Protocol for evaluator suites with pre-configured arguments.
 
@@ -325,7 +324,7 @@ class PreparedEvaluatorSuite[Parameters: DataModel](Protocol):
     ) -> EvaluatorSuiteResult: ...
 
 
-class EvaluatorSuite[**Args, Parameters: DataModel](Immutable):
+class EvaluatorSuite[**Args, Parameters: State](Immutable):
     """
     Comprehensive test suite for systematic evaluation.
 
@@ -737,7 +736,7 @@ class EvaluatorSuite[**Args, Parameters: DataModel](Immutable):
             await self._cases_storage.save(self._cases_cache)
 
 
-def evaluator_suite[**Args, Parameters: DataModel](
+def evaluator_suite[**Args, Parameters: State](
     parameters: type[Parameters],
     /,
     *,
@@ -840,11 +839,11 @@ def evaluator_suite[**Args, Parameters: DataModel](
     return wrap
 
 
-class EvaluatorSuiteData[Parameters: DataModel](DataModel):
+class EvaluatorSuiteData[Parameters: State](State, serializable=True):
     cases: Sequence[EvaluatorSuiteCase[Parameters]] = ()
 
 
-class _EvaluatorSuiteMemoryStorage[Parameters: DataModel](Immutable):
+class _EvaluatorSuiteMemoryStorage[Parameters: State](Immutable):
     _cases_store: Sequence[EvaluatorSuiteCase[Parameters]]
 
     def __init__(
@@ -873,7 +872,7 @@ class _EvaluatorSuiteMemoryStorage[Parameters: DataModel](Immutable):
         )
 
 
-class _EvaluatorSuiteFileStorage[Parameters: DataModel](Immutable):
+class _EvaluatorSuiteFileStorage[Parameters: State](Immutable):
     _path: Path
     _data_type: type[EvaluatorSuiteCase[Parameters]]
 

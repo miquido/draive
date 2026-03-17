@@ -1,31 +1,31 @@
 from collections.abc import Mapping
 
 import pytest
+from haiway import State
 
-from draive import DataModel
 from draive.ollama.chat import _response_format, _schema_for_ollama
 
 
-class _SimpleRecipe(DataModel):
+class _SimpleRecipe(State):
     name: str
     cuisine: str
     ingredients: list[str]
     steps: list[str]
 
 
-class _UnsupportedSchema(DataModel):
+class _UnsupportedSchema(State):
     metadata: dict[str, int]
 
 
-class _UnionSchema(DataModel):
+class _UnionSchema(State):
     value: str | int
 
 
-class _OptionalString(DataModel):
+class _OptionalString(State):
     detail: str | None
 
 
-class _UnsupportedUnion(DataModel):
+class _UnsupportedUnion(State):
     value: str | bool
 
 

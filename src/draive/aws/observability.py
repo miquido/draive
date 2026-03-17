@@ -444,7 +444,7 @@ class ScopeStore:
     ) -> None:
         attributes: MutableMapping[str, Any] = {
             "scope.name": self.identifier.name,
-            "scope.id": self.identifier.scope_id.hex,
+            "scope.id": str(self.identifier.scope_id),
         }
         parent_span_id: str | None = _parent_span_id(self.identifier)
         if parent_span_id is not None:
@@ -464,7 +464,7 @@ class ScopeStore:
                     "severity_text": level.name,
                     "severity_number": level.value,
                     "body": message,
-                    "trace_id": self.trace_id.hex,
+                    "trace_id": str(self.trace_id),
                     "span_id": _span_id(self.identifier),
                     "attributes": _sanitized_attributes(attributes),
                 }
@@ -484,13 +484,13 @@ class ScopeStore:
             detail=_json_dumps(
                 {
                     "time_unix_nano": time_ns(),
-                    "trace_id": self.trace_id.hex,
+                    "trace_id": str(self.trace_id),
                     "span_id": _span_id(self.identifier),
                     "name": "exception",
                     "attributes": _sanitized_attributes(
                         {
                             "scope.name": self.identifier.name,
-                            "scope.id": self.identifier.scope_id.hex,
+                            "scope.id": str(self.identifier.scope_id),
                             "exception.type": exception.__class__.__name__,
                             "exception.message": str(exception),
                             "exception.stacktrace": "".join(
@@ -522,7 +522,7 @@ class ScopeStore:
             detail=_json_dumps(
                 {
                     "time_unix_nano": time_ns(),
-                    "trace_id": self.trace_id.hex,
+                    "trace_id": str(self.trace_id),
                     "span_id": _span_id(self.identifier),
                     "severity_text": level.name,
                     "severity_number": level.value,
@@ -530,7 +530,7 @@ class ScopeStore:
                     "attributes": _sanitized_attributes(
                         {
                             "scope.name": self.identifier.name,
-                            "scope.id": self.identifier.scope_id.hex,
+                            "scope.id": str(self.identifier.scope_id),
                             **attributes,
                         }
                     ),

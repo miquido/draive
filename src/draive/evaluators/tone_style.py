@@ -1,7 +1,8 @@
 from draive.evaluation import EvaluationScore, evaluator
 from draive.evaluators.utils import FORMAT_INSTRUCTION, extract_evaluation_result
+from draive.models import ModelInput
 from draive.multimodal import Multimodal, MultimodalContent
-from draive.stages import Stage
+from draive.steps import Step
 
 __all__ = ("tone_style_evaluator",)
 
@@ -81,16 +82,21 @@ async def tone_style_evaluator(
         )
 
     return extract_evaluation_result(
-        await Stage.completion(
-            MultimodalContent.of(
-                "<EXPECTED_TONE_STYLE>",
-                expected_tone_style,
-                "</EXPECTED_TONE_STYLE>\n<EVALUATED>",
-                evaluated,
-                "</EVALUATED>",
-            ),
+        await Step.generating_completion(
             instructions=INSTRUCTION.format(
                 guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
             ),
-        ).execute()
+        ).run(
+            (
+                ModelInput.of(
+                    MultimodalContent.of(
+                        "<EXPECTED_TONE_STYLE>",
+                        expected_tone_style,
+                        "</EXPECTED_TONE_STYLE>\n<EVALUATED>",
+                        evaluated,
+                        "</EVALUATED>",
+                    ),
+                ),
+            )
+        )
     )

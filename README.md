@@ -6,14 +6,23 @@
 [![Docs](https://img.shields.io/badge/Documentation-yellow)](https://miquido.github.io/draive/)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/miquido/draive?utm_source=oss&utm_medium=github&utm_campaign=miquido%2Fdraive&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
-🏎️ An all-in-one, flexible Python library for building powerful LLM workflows and AI apps. 🏎️
+🏎️ Build production-ready GenAI systems with strict typing, clean architecture, and fast iteration.
 
-Draive gives you everything you need to turn large language models into production-ready software:
-agents, structured workflows, tool use, instruction refinement, guardrails, observability, and
-seamless multi-model integration — all in one clean, composable package.
+Draive helps teams move from prompt experiments to dependable AI features:
+typed outputs, tool orchestration, multimodal workflows, evaluation, guardrails, and observability
+in one cohesive framework.
 
-If you've ever felt like you’re stitching together glue code and hoping for the best — Draive is
-what you wish you'd started with!
+If you want AI code that stays maintainable as your product grows, Draive is built for that.
+
+## ✨ Why teams pick Draive
+
+- **Typed by default**: generate validated `State` objects, not fragile string blobs.
+- **Reliable execution model**: `ctx.scope(...)` gives explicit state, dependency lifecycle, and
+    structured concurrency.
+- **Model portability**: swap providers without rewriting your business workflow.
+- **Real-world coverage**: tools, multimodal content, retrieval, evaluators, and guardrails are
+    first-class building blocks.
+- **Production visibility**: built-in hooks for logs, metrics, traces, and quality checks.
 
 ## 🚀 Quick start
 
@@ -54,31 +63,31 @@ Draive is built for developers who want clarity, flexibility, and control when w
 Whether you’re building an autonomous agent, automating data flow, extracting information from
 documents, handling audio or images — Draive has your back.
 
-### What you can do with Draive
+### What you can build with Draive
 
 - **🔁 Start with evaluation** - make sure your app behaves as expected, right from the start
 - **🛠 Turn any Python function into a tool** that LLMs can call
 - **🔄 Switch between providers** like OpenAI, Claude, Gemini, or Mistral in seconds
-- **🧱 Design structured workflows** with reusable stages
+- **🧱 Design structured workflows** with reusable `Step` and `StepState` pipelines
 - **🛡 Enforce output quality using guardrails** including moderation and runtime evaluation
 - **📊 Monitor with ease** - plug into any OpenTelemetry-compatible services
 - **⚙️ Control your context** - use on-the-fly LLM context modifications for best results
 
-### Why you'll like it
+### What makes Draive stand out
 
 - **Instruction Optimization**: Draive gives you clean ways to write and refine prompts, including
-    metaprompts, instruction helpers, and optimizers. You can go from raw prompt text to a reusable,
+    metaprompts, instruction helpers, and optimizers. You can go from raw prompt text to reusable,
     structured config in no time.
-- **Composable Workflows**: Build modular flows using Stages and Tools. Every piece is reusable,
-    testable, and fits together seamlessly.
+- **Composable Workflows**: Build modular flows using `Step`, tools, and context-scoped state.
+    Every piece is reusable, testable, and fits together cleanly.
 - **Tooling = Just Python**: Define a tool by writing a function. Annotate it. That’s it. Draive
     handles the rest — serialization, context, and integration with LLMs.
-- **Structured Outputs** - use Python classes for JSON outputs and flexible multimodal XML parser
-    for custom results transformations.
-- **Telemetry + Evaluators**: Draive logs everything you care about: timing, output shape, tool
-    usage, error cases. Evaluators let you benchmark or regression-test LLM behavior like a normal
-    part of your CI.
-- **Model-Agnostic by Design**: Built-in support for most major providers.
+- **Structured Outputs** - decode to typed Python `State` models with schema-aware generation.
+- **Multimodal + Resource-Native**: Work with text, images, audio, files, and artifacts through one
+    content model.
+- **RAG Ready**: Built-in embeddings and `VectorIndex` utilities support retrieval-heavy workflows.
+- **Telemetry + Evaluators**: Measure timing, quality, tool usage, and regressions as part of CI.
+- **Model-Agnostic by Design**: Built-in support for major hosted and self-hosted providers.
 
 ## 🖥️ Install
 
@@ -149,6 +158,46 @@ Use VLLM services through OpenAI client.
 pip install 'draive[vllm]'
 ```
 
+- Bedrock:
+
+Use AWS Bedrock-backed models.
+
+```bash
+pip install 'draive[bedrock]'
+```
+
+- MCP:
+
+Use Model Context Protocol integrations.
+
+```bash
+pip install 'draive[mcp]'
+```
+
+- OpenTelemetry:
+
+Export traces/metrics to your observability stack.
+
+```bash
+pip install 'draive[opentelemetry]'
+```
+
+- Postgres:
+
+Use Postgres-backed persistence helpers.
+
+```bash
+pip install 'draive[postgres]'
+```
+
+- Qdrant:
+
+Use Qdrant vector database integration.
+
+```bash
+pip install 'draive[qdrant]'
+```
+
 ## 👷 Contributing
 
 Draive is open-source and always growing — and we’d love your help.
@@ -158,6 +207,13 @@ Open a PR or start a discussion — no contribution is too small!
 
 Whether you're fixing typos, building new integrations, or just testing things out and giving
 feedback — you're welcome here.
+
+## Community & Support
+
+- Report issues and discuss ideas on [GitHub](https://github.com/miquido/draive/issues).
+- Learn more about the team behind Draive at [Miquido](https://miquido.com).
+
+**Built by [Miquido](https://miquido.com)**
 
 ## License
 

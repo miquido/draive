@@ -1,95 +1,54 @@
 """Ollama chat adapter for GenerativeModel with tools and streaming."""
 
 import json
-from collections.abc import AsyncGenerator, Coroutine, Iterable, Mapping, Sequence
-from typing import Any, Final, Literal, cast, overload
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any, Final, Literal, cast
 from uuid import uuid4
 
-from haiway import META_EMPTY, as_list, ctx
+from haiway import Meta, State, as_list, ctx
 from ollama import ChatResponse, Image, Message, Options, Tool
 
 from draive.models import (
-    GenerativeModel,
     ModelContext,
+    ModelException,
     ModelInput,
     ModelInstructions,
     ModelOutput,
     ModelOutputBlock,
+    ModelOutputFailed,
+    ModelOutputInvalid,
     ModelOutputSelection,
-    ModelReasoning,
-    ModelStreamOutput,
+    ModelOutputStream,
+    ModelReasoningChunk,
     ModelToolRequest,
-    ModelToolsDeclaration,
+    ModelTools,
     ModelToolSpecification,
     ModelToolsSelection,
 )
+from draive.models.metrics import record_model_invocation, record_usage_metrics
 from draive.multimodal import Multimodal, MultimodalContent, TextContent
 from draive.multimodal.content import MultimodalContentPart
 from draive.ollama.api import OllamaAPI
 from draive.ollama.config import OllamaChatConfig
 from draive.ollama.utils import unwrap_missing
-from draive.parameters import DataModel
 from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("OllamaChat",)
 
 
 class OllamaChat(OllamaAPI):
-    def generative_model(self) -> GenerativeModel:
-        return GenerativeModel(generating=self.completion)
-
-    @overload
     def completion(
         self,
         *,
         instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
+        tools: ModelTools,
         context: ModelContext,
         output: ModelOutputSelection,
-        stream: Literal[False] = False,
-        config: OllamaChatConfig | None = None,
-        prefill: Multimodal | None = None,
-        **extra: object,
-    ) -> Coroutine[None, None, ModelOutput]: ...
-
-    @overload
-    def completion(
-        self,
-        *,
-        instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
-        context: ModelContext,
-        output: ModelOutputSelection,
-        stream: Literal[True],
-        config: OllamaChatConfig | None = None,
-        prefill: Multimodal | None = None,
-        **extra: object,
-    ) -> AsyncGenerator[ModelStreamOutput]: ...
-
-    def completion(
-        self,
-        *,
-        instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
-        context: ModelContext,
-        output: ModelOutputSelection,
-        stream: bool = False,
         config: OllamaChatConfig | None = None,
         prefill: Multimodal | None = None,
         **extra: Any,
-    ) -> AsyncGenerator[ModelStreamOutput] | Coroutine[None, None, ModelOutput]:
-        if stream:
-            return self._completion_stream(
-                instructions=instructions,
-                tools=tools,
-                context=context,
-                output=output,
-                config=config or ctx.state(OllamaChatConfig),
-                prefill=prefill,
-                **extra,
-            )
-
-        return self._completion(
+    ) -> ModelOutputStream:
+        return self._completion_stream(
             instructions=instructions,
             tools=tools,
             context=context,
@@ -103,34 +62,30 @@ class OllamaChat(OllamaAPI):
         self,
         *,
         instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
+        tools: ModelTools,
         context: ModelContext,
         output: ModelOutputSelection,
         config: OllamaChatConfig,
         prefill: Multimodal | None,
         **extra: Any,
     ) -> ModelOutput:
-        async with ctx.scope("model.completion"):
-            ctx.record_info(
-                attributes={
-                    "model.provider": "ollama",
-                    "model.name": config.model,
-                    "model.temperature": config.temperature,
-                    "model.output": str(output),
-                    "model.tools.count": len(tools.specifications),
-                    "model.tools.selection": tools.selection,
-                    "model.stream": False,
-                },
-            )
-            ctx.record_debug(
-                attributes={
-                    "model.instructions": instructions,
-                    "model.tools": [tool.name for tool in tools.specifications],
-                    "model.context": [element.to_str() for element in context],
-                },
+        async with ctx.scope("model.invocation"):
+            record_model_invocation(
+                provider="ollama",
+                model=config.model,
+                temperature=config.temperature,
+                max_output_tokens=config.max_output_tokens,
+                tools=tools,
+                output=output,
+                stop_sequences=config.stop_sequences,
             )
 
-            messages: list[Message] = list(_context_messages(context))
+            messages: list[Message] = list(
+                _context_messages(
+                    instructions=instructions,
+                    context=context,
+                )
+            )
 
             if prefill:
                 messages.append(_assistant_message_from_content(MultimodalContent.of(prefill)))
@@ -138,66 +93,72 @@ class OllamaChat(OllamaAPI):
             elif output == "json" or isinstance(output, type):
                 messages.append(_assistant_message_from_content(MultimodalContent.of("{")))
 
-            completion: ChatResponse = await self._client.chat(  # pyright: ignore[reportUnknownMemberType]
-                model=config.model,
-                messages=messages,
-                format=_response_format(output),
-                tools=_tools_as_tool_config(
-                    tools.specifications,
-                    tool_selection=tools.selection,
-                ),
-                options=Options(
-                    temperature=config.temperature,
-                    num_predict=unwrap_missing(config.max_output_tokens),
-                    top_k=unwrap_missing(config.top_k),
-                    top_p=unwrap_missing(config.top_p),
-                    seed=unwrap_missing(config.seed),
-                    stop=unwrap_missing(config.stop_sequences),
-                ),
-                stream=False,
-            )
-
-            blocks: list[ModelOutputBlock] = []
-            # Convert message content into content and reasoning blocks
-            blocks.extend(_message_to_blocks(completion.message))
-
-            # Append tool requests if present
-            if tool_calls := completion.message.tool_calls:
-                blocks.extend(
-                    [
-                        ModelToolRequest(
-                            identifier=uuid4().hex,  # ollama does not return an id
-                            tool=call.function.name,
-                            arguments=(
-                                json.loads(call.function.arguments)
-                                if isinstance(call.function.arguments, str)
-                                else call.function.arguments
-                            ),
-                            meta=META_EMPTY,
-                        )
-                        for call in tool_calls
-                    ],
+            try:
+                completion: ChatResponse = await self._client.chat(  # pyright: ignore[reportUnknownMemberType]
+                    model=config.model,
+                    messages=messages,
+                    format=_response_format(output),
+                    tools=_tools_as_tool_config(
+                        tools.specification,
+                        tool_selection=tools.selection,
+                    ),
+                    options=Options(
+                        temperature=unwrap_missing(config.temperature),
+                        num_predict=unwrap_missing(config.max_output_tokens),
+                        top_k=unwrap_missing(config.top_k),
+                        top_p=unwrap_missing(config.top_p),
+                        seed=unwrap_missing(config.seed),
+                        stop=unwrap_missing(config.stop_sequences),
+                    ),
+                    stream=False,
                 )
 
-            return ModelOutput.of(
-                *blocks,
-                meta={
-                    "model": config.model,
-                },
-            )
+                blocks: list[ModelOutputBlock] = []
+                # Convert message content into content and reasoning blocks
+                blocks.extend(_message_to_blocks(completion.message))
+
+                blocks.extend(
+                    _tool_calls_to_requests(
+                        completion.message.tool_calls,
+                        model=config.model,
+                    )
+                )
+                record_usage_metrics(
+                    provider="ollama",
+                    model=config.model,
+                    input_tokens=completion.prompt_eval_count,
+                    output_tokens=completion.eval_count,
+                )
+
+                return ModelOutput.of(
+                    *blocks,
+                    meta={
+                        "model": config.model,
+                    },
+                )
+
+            except ModelException as exc:
+                raise exc
+
+            except Exception as exc:
+                raise ModelOutputFailed(
+                    provider="ollama",
+                    model=config.model,
+                    reason=str(exc),
+                ) from exc
 
     async def _completion_stream(
         self,
         *,
         instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
+        tools: ModelTools,
         context: ModelContext,
         output: ModelOutputSelection,
         config: OllamaChatConfig,
         prefill: Multimodal | None,
         **extra: Any,
-    ) -> AsyncGenerator[ModelStreamOutput]:
-        async with ctx.scope("model.completion.stream"):
+    ) -> ModelOutputStream:
+        async with ctx.scope("ollama.chat"):
             ctx.log_warning(
                 "ollama completion streaming is not supported yet, using regular response instead."
             )
@@ -211,13 +172,13 @@ class OllamaChat(OllamaAPI):
                 prefill=prefill,
             )
 
-            for block in model_output.blocks:
+            for block in model_output.output:
                 if isinstance(block, MultimodalContent):
                     for part in block.parts:
                         yield part
 
                 else:
-                    assert isinstance(block, ModelReasoning | ModelToolRequest)  # nosec: B101
+                    assert isinstance(block, ModelToolRequest | ModelReasoningChunk)  # nosec: B101
                     yield block
 
 
@@ -295,8 +256,16 @@ def _message_to_blocks(  # noqa: C901
 
 
 def _context_messages(
+    *,
+    instructions: ModelInstructions,
     context: ModelContext,
 ) -> Iterable[Message]:
+    if instructions:
+        yield Message(
+            role="system",
+            content=instructions,
+        )
+
     for element in context:
         if isinstance(element, ModelInput):
             if content := element.content:
@@ -312,13 +281,13 @@ def _context_messages(
                     or None,
                 )
 
-            if responses := element.tools:
+            if responses := element.tool_responses:
                 # Include any tool responses that follow the user message
                 for tool_resp in responses:
                     yield Message(
                         role="tool",
                         tool_name=tool_resp.tool,
-                        content=tool_resp.content.without_resources().to_str(),
+                        content=tool_resp.result.without_resources().to_str(),
                     )
 
         else:
@@ -341,7 +310,7 @@ def _context_messages(
                             arguments=cast(dict[str, Any], request.arguments),
                         ),
                     )
-                    for request in element.tools
+                    for request in element.tool_requests
                 ],
             )
 
@@ -367,6 +336,64 @@ def _tool_specification_as_tool(
     )
 
 
+def _tool_call_arguments(
+    arguments: object,
+    /,
+    *,
+    model: str,
+) -> dict[str, Any]:
+    if isinstance(arguments, Mapping):
+        return cast(dict[str, Any], arguments)
+
+    if isinstance(arguments, str):
+        try:
+            loaded: object = json.loads(arguments)
+        except Exception as exc:
+            raise ModelOutputInvalid(
+                provider="ollama",
+                model=model,
+                reason=f"Tool arguments decoding error - {type(exc).__name__}: {exc}",
+            ) from exc
+
+        if isinstance(loaded, Mapping):
+            return cast(dict[str, Any], loaded)
+
+        raise ModelOutputInvalid(
+            provider="ollama",
+            model=model,
+            reason="Tool arguments should be a JSON object",
+        )
+
+    raise ModelOutputInvalid(
+        provider="ollama",
+        model=model,
+        reason="Tool arguments should be a mapping or JSON object string",
+    )
+
+
+def _tool_calls_to_requests(
+    tool_calls: Sequence[Message.ToolCall] | None,
+    /,
+    *,
+    model: str,
+) -> list[ModelToolRequest]:
+    if not tool_calls:
+        return []
+
+    return [
+        ModelToolRequest(
+            identifier=str(uuid4()),  # ollama does not return an id
+            tool=call.function.name,
+            arguments=_tool_call_arguments(
+                call.function.arguments,
+                model=model,
+            ),
+            meta=Meta.empty,
+        )
+        for call in tool_calls
+    ]
+
+
 def _tools_as_tool_config(
     tools: Iterable[ModelToolSpecification] | None,
     /,
@@ -387,11 +414,11 @@ def _tools_as_tool_config(
         # Ollama doesn't support hard-required tool selection
         return tools_list
 
-    # suggestions not supported
+    # specific tool suggestion is not supported by Ollama
     return tools_list
 
 
-def _schema_for_ollama(output: type[DataModel]) -> dict[str, Any] | None:
+def _schema_for_ollama(output: type[State]) -> dict[str, Any] | None:
     normalized_schema, changed = _normalize_schema_for_ollama(output.__SPECIFICATION__)
     if normalized_schema is None:
         return None

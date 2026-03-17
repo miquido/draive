@@ -1,8 +1,11 @@
 # Postgres integrations
 
-Draive ships with Postgres-backed implementations for the most common persistence interfaces so you
-can plug relational storage into your workflows without writing adapters. All helpers live in
+Draive ships with Postgres-backed implementations for common persistence interfaces so you can plug
+relational storage into your workflows without writing adapters. All helpers live in
 `draive.postgres` and reuse the shared `haiway.postgres.Postgres` connection states.
+
+Current adapters include `PostgresConfigurationRepository`, `PostgresTemplatesRepository`, and
+`PostgresVectorIndex`.
 
 ## Bootstrapping the Postgres context
 
@@ -12,22 +15,20 @@ helpers lean on `PostgresConnectionPool` and the `Postgres` facade exported from
 ```python
 from draive import ctx
 from draive.postgres import (
-    Postgres,
     PostgresConnectionPool,
     PostgresConfigurationRepository,
-    PostgresModelMemory,
     PostgresTemplatesRepository,
 )
 
 async with ctx.scope(
     "postgres-demo",
-    PostgresConfigurationRepository(), # use use postgres configurations
-    PostgresTemplatesRepository(), # use postgres templates
+    PostgresConfigurationRepository(),  # use postgres configurations
+    PostgresTemplatesRepository(),  # use postgres templates
     disposables=(
         PostgresConnectionPool.of(dsn="postgresql://draive:secret@localhost:5432/draive"),
     ),
 ):
-    session_memory = PostgresModelMemory("demo-session")
+    ...
 ```
 
 Each adapter relies on the same connection scope, so you can freely mix them within a single
@@ -114,48 +115,10 @@ Capabilities:
 Use this adapter whenever your multimodal templates live alongside other structured content in
 Postgres and you want on-demand caching with revision history.
 
-## ModelMemory implementation
-
-`PostgresModelMemory` enables durable conversational memory by persisting variables and context
-elements in three tables sharing the same identifier:
-
-```sql
-CREATE TABLE memories (
-    identifier TEXT NOT NULL,
-    created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (identifier)
-);
-
-CREATE TABLE memories_variables (
-    identifier TEXT NOT NULL REFERENCES memories (identifier) ON DELETE CASCADE,
-    variables JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE memories_elements (
-    identifier TEXT NOT NULL REFERENCES memories (identifier) ON DELETE CASCADE,
-    content JSONB NOT NULL,
-    created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-Capabilities:
-
-- `recall(limit=...)` fetches the latest variables and replayable context elements (inputs/outputs)
-    respecting the optional `recall_limit` supplied to the factory.
-- `remember(*items, variables=...)` persists new context elements and optionally a fresh variable
-    snapshot in a single transaction.
-- `maintenance(variables=...)` ensures the base `memories` row exists and can seed default variables
-    without appending messages.
-
-Use the memory helper when you need stateful chat sessions, per-user progressive profiling, or
-auditable interaction logs. Set `recall_limit` to bound the amount of context loaded back into
-generation pipelines.
-
 ## VectorIndex implementation (pgvector)
 
 The `PostgresVectorIndex` helper persists dense embeddings in Postgres using the
-[pgvector](https://github.com/pgvector/pgvector) extension. Each indexed `DataModel` maps to its own
+[pgvector](https://github.com/pgvector/pgvector) extension. Each indexed `State` maps to its own
 table, derived by converting the model class name to snake case (for example, `Chunk` → `chunk`).
 
 ### Enable pgvector and create tables
@@ -182,7 +145,7 @@ CREATE INDEX IF NOT EXISTS chunk_embedding_idx
     WITH (lists = 100);
 ```
 
-The helper stores the serialized `DataModel` instance inside `payload`, so the JSON schema mirrors
+The helper stores the serialized `State` instance inside `payload`, so the JSON schema mirrors
 the model definition. It writes monotonically increasing `created` timestamps to preserve insertion
 order for non-similarity queries.
 
@@ -196,15 +159,14 @@ before applying Maximal Marginal Relevance re-ranking when `rerank=True`.
 from collections.abc import Sequence
 from typing import Annotated
 
-from draive import Alias, DataModel, ctx
+from draive import Alias, State, VectorIndex, ctx
 from asyncpg.connection import Connection
 from pgvector.asyncpg import register_vector
 
 from draive.postgres import PostgresConnectionPool, PostgresVectorIndex
-from draive.utils import VectorIndex
 
 
-class Chunk(DataModel):
+class Chunk(State):
     identifier: Annotated[str, Alias("id")]
     text: str
 

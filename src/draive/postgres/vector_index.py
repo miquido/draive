@@ -4,7 +4,7 @@ from collections.abc import Callable, Collection, MutableMapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
-from haiway import AttributePath, AttributeRequirement, ctx
+from haiway import AttributePath, AttributeRequirement, State, ctx
 from haiway.postgres import Postgres, PostgresRow, PostgresValue
 
 from draive.embedding import (
@@ -15,7 +15,6 @@ from draive.embedding import (
     mmr_vector_similarity_search,
 )
 from draive.multimodal import TextContent
-from draive.parameters import DataModel
 from draive.resources import ResourceContent
 
 __all__ = ("PostgresVectorIndex",)
@@ -60,9 +59,9 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
     """
     assert mmr_multiplier > 0  # nosec: B101
 
-    table_names: MutableMapping[type[DataModel], str] = {}
+    table_names: MutableMapping[type[State], str] = {}
 
-    def resolve_table_name(model: type[DataModel]) -> str:
+    def resolve_table_name(model: type[State]) -> str:
         nonlocal table_names
         if name := table_names.get(model):
             return name
@@ -71,7 +70,7 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
         table_names[model] = resolved
         return resolved
 
-    async def index[Model: DataModel, Value: ResourceContent | TextContent | str](
+    async def index[Model: State, Value: ResourceContent | TextContent | str](
         model: type[Model],
         /,
         *,
@@ -166,7 +165,7 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
 
         ctx.log_info("Vector index update completed.")
 
-    async def search[Model: DataModel](  # noqa: C901, PLR0912
+    async def search[Model: State](  # noqa: C901, PLR0912
         model: type[Model],
         /,
         *,
@@ -284,7 +283,7 @@ def PostgresVectorIndex(  # noqa: C901, PLR0915
             )
         )
 
-    async def delete[Model: DataModel](
+    async def delete[Model: State](
         model: type[Model],
         /,
         *,

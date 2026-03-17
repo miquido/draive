@@ -4,9 +4,10 @@ from collections.abc import Sequence
 from draive.embedding import Embedded, ImageEmbedding, TextEmbedding, vector_similarity_score
 from draive.evaluation import EvaluationScore, evaluator
 from draive.evaluators.utils import FORMAT_INSTRUCTION, extract_evaluation_result
+from draive.models import ModelInput
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.resources import ResourceContent
-from draive.stages import Stage
+from draive.steps import Step
 
 __all__ = (
     "image_vector_similarity_evaluator",
@@ -61,18 +62,23 @@ async def similarity_evaluator(
         )
 
     return extract_evaluation_result(
-        await Stage.completion(
-            MultimodalContent.of(
-                "<REFERENCE>",
-                reference,
-                "</REFERENCE>\n<EVALUATED>",
-                evaluated,
-                "</EVALUATED>",
-            ),
+        await Step.generating_completion(
             instructions=INSTRUCTION.format(
                 guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
             ),
-        ).execute()
+        ).run(
+            (
+                ModelInput.of(
+                    MultimodalContent.of(
+                        "<REFERENCE>",
+                        reference,
+                        "</REFERENCE>\n<EVALUATED>",
+                        evaluated,
+                        "</EVALUATED>",
+                    ),
+                ),
+            )
+        )
     )
 
 

@@ -2,10 +2,9 @@ from collections.abc import Sequence
 from typing import Any, Literal, overload
 from uuid import UUID
 
-from haiway import AttributeRequirement, as_list
+from haiway import AttributeRequirement, State, as_list
 from qdrant_client.conversions.common_types import ScoredPoint
 
-from draive.parameters import DataModel
 from draive.qdrant.filters import prepare_filter
 from draive.qdrant.session import QdrantSession
 from draive.qdrant.types import QdrantResult
@@ -15,7 +14,7 @@ __all__ = ("QdrantSearchMixin",)
 
 class QdrantSearchMixin(QdrantSession):
     @overload
-    async def search[Model: DataModel](
+    async def search[Model: State](
         self,
         model: type[Model],
         /,
@@ -29,7 +28,7 @@ class QdrantSearchMixin(QdrantSession):
     ) -> Sequence[Model]: ...
 
     @overload
-    async def search[Model: DataModel](
+    async def search[Model: State](
         self,
         model: type[Model],
         /,
@@ -43,7 +42,7 @@ class QdrantSearchMixin(QdrantSession):
     ) -> Sequence[QdrantResult[Model]]: ...
 
     @overload
-    async def search[Model: DataModel](
+    async def search[Model: State](
         self,
         model: type[Model],
         /,
@@ -56,7 +55,7 @@ class QdrantSearchMixin(QdrantSession):
         **extra: Any,
     ) -> Sequence[QdrantResult[Model]] | Sequence[Model]: ...
 
-    async def search[Model: DataModel](
+    async def search[Model: State](
         self,
         model: type[Model],
         /,
@@ -94,7 +93,7 @@ class QdrantSearchMixin(QdrantSession):
             )
 
 
-def _qdrant_result[Content: DataModel](
+def _qdrant_result[Content: State](
     content: type[Content],
     /,
     data: ScoredPoint,

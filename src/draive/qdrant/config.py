@@ -1,6 +1,6 @@
 from typing import Final
 
-from draive import getenv_int, getenv_str
+from haiway import getenv_int, getenv_str
 
 __all__ = [
     "QDRANT_GRPC_PORT",

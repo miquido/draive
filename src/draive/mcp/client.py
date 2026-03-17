@@ -1,5 +1,6 @@
+import json
 from asyncio import gather
-from base64 import urlsafe_b64decode
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 from collections.abc import AsyncGenerator, Callable, Collection, Coroutine, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from itertools import chain
@@ -8,7 +9,18 @@ from typing import Any, Self, cast, final
 from urllib.parse import ParseResult, urlparse, urlunparse
 from uuid import uuid4
 
-from haiway import BasicValue, Meta, MetaTags, as_dict, as_list, as_tuple, ctx
+from haiway import (
+    BasicValue,
+    Meta,
+    MetaTags,
+    Paginated,
+    Pagination,
+    PaginationToken,
+    as_dict,
+    as_list,
+    as_tuple,
+    ctx,
+)
 from mcp import ClientSession, ListToolsResult, StdioServerParameters, stdio_client
 from mcp import Tool as MCPTool
 from mcp.client.sse import sse_client
@@ -17,6 +29,7 @@ from mcp.types import (
     BlobResourceContents,
     CallToolResult,
     ListResourcesResult,
+    PaginatedRequestParams,
     ReadResourceResult,
     TextResourceContents,
 )
@@ -27,21 +40,91 @@ from mcp.types import TextContent as MCPTextContent
 from pydantic import AnyUrl
 
 from draive.models import (
-    FunctionTool,
     ModelToolParametersSpecification,
-    ModelToolSpecification,
-    Tool,
-    ToolError,
-    ToolsProvider,
 )
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
-from draive.parameters import DataModel
 from draive.resources import ResourceContent, ResourceReference, ResourcesRepository
+from draive.tools import CoroutineTool, Tool, ToolsProvider
 
 __all__ = (
     "MCPClient",
     "MCPClients",
 )
+
+DEFAULT_PAGINATION_LIMIT = 32
+_LOCAL_PAGINATION_TOKEN_PREFIX = "draive:mcp:"  # nosec B105
+
+
+def _encode_pagination_token(data: Mapping[str, Any]) -> str:
+    encoded: str = urlsafe_b64encode(json.dumps(data).encode()).decode()
+    return f"{_LOCAL_PAGINATION_TOKEN_PREFIX}{encoded}"
+
+
+def _decode_pagination_token(token: PaginationToken | None) -> dict[str, Any] | None:
+    if not isinstance(token, str) or not token.startswith(_LOCAL_PAGINATION_TOKEN_PREFIX):
+        return None
+
+    try:
+        encoded: str = token.removeprefix(_LOCAL_PAGINATION_TOKEN_PREFIX)
+        decoded: Any = json.loads(urlsafe_b64decode(encoded.encode()).decode())
+        if isinstance(decoded, dict):
+            return cast(dict[str, Any], decoded)
+        else:
+            return None
+    except Exception:
+        return None
+
+
+def _decode_single_page_cursor(token: PaginationToken | None) -> tuple[str | None, int]:
+    cursor: str | None = token if isinstance(token, str) else None
+    offset: int = 0
+    decoded = _decode_pagination_token(token)
+    if decoded is None or decoded.get("kind") != "single":
+        return cursor, offset
+
+    token_value: Any = decoded.get("cursor")
+    if isinstance(token_value, str | None):
+        cursor = token_value
+
+    offset_value: Any = decoded.get("offset")
+    if isinstance(offset_value, int):
+        offset = max(offset_value, 0)
+
+    return cursor, offset
+
+
+def _decode_aggregate_state(
+    *,
+    token: PaginationToken | None,
+    server_ids: Sequence[str],
+) -> dict[str, dict[str, Any]]:
+    state: dict[str, dict[str, Any]] = {
+        server_id: {"cursor": None, "done": False} for server_id in server_ids
+    }
+    decoded = _decode_pagination_token(token)
+    if decoded is None or decoded.get("kind") != "aggregate":
+        return state
+
+    state_value: Any = decoded.get("state")
+    if not isinstance(state_value, Mapping):
+        return state
+    state_mapping: Mapping[str, Any] = cast(Mapping[str, Any], state_value)
+
+    for server_id in server_ids:
+        server_state: Any = state_mapping.get(server_id)
+        if not isinstance(server_state, Mapping):
+            continue
+        server_state_mapping: Mapping[str, Any] = cast(Mapping[str, Any], server_state)
+
+        cursor_value: Any = server_state_mapping.get("cursor")
+        if isinstance(cursor_value, str | None):
+            state[server_id]["cursor"] = cursor_value
+
+        done_value: Any = server_state_mapping.get("done")
+        if isinstance(done_value, bool):
+            state[server_id]["done"] = done_value
+
+    return state
 
 
 @final
@@ -70,7 +153,7 @@ class MCPClient:
                     yield session
 
         return cls(
-            identifier or uuid4().hex,
+            identifier or str(uuid4()),
             session_manager=mcp_stdio_session(),
             features=features if features is not None else (ResourcesRepository, ToolsProvider),
             tags=tags if tags is not None else (),
@@ -100,7 +183,7 @@ class MCPClient:
                     yield session
 
         return cls(
-            identifier or uuid4().hex,
+            identifier or str(uuid4()),
             session_manager=mcp_sse_session(),
             features=features if features is not None else (ResourcesRepository, ToolsProvider),
             tags=tags if tags is not None else (),
@@ -147,28 +230,99 @@ class MCPClient:
 
     async def resources_list(
         self,
+        pagination: Pagination | None,
         **extra: Any,
-    ) -> Sequence[ResourceReference]:
+    ) -> Paginated[ResourceReference]:
         assert hasattr(  # nosec: B101
             self,
             "_session",
         ), "MCPClient has to be initialized through async context entering"
 
-        # TODO: in theory there are some extra elements like pagination
-        # we are not supporting it as for now (how to pass cursor anyways?)
-        result: ListResourcesResult = await self._session.list_resources()
-
-        return [
-            ResourceReference(
-                uri=self._with_uri_identifier(resource.uri.unicode_string()),
-                mime_type=resource.mimeType,
-                meta=self._meta(
-                    name=resource.name,
-                    description=resource.description,
-                ),
+        pagination = (
+            pagination
+            if pagination is not None
+            else Pagination.of(
+                token=None,
+                limit=DEFAULT_PAGINATION_LIMIT,
             )
-            for resource in result.resources
-        ]
+        )
+        if pagination.limit <= 0:
+            return Paginated[ResourceReference].of(
+                (),
+                pagination=pagination.with_token(None),
+            )
+
+        starting_cursor, page_offset = _decode_single_page_cursor(pagination.token)
+        remaining: int = pagination.limit
+        references: list[ResourceReference] = []
+        cursor: str | None = starting_cursor
+        offset: int = page_offset
+        next_token: str | None = None
+        while remaining > 0:
+            request_params: PaginatedRequestParams | None
+            if cursor is not None:
+                request_params = PaginatedRequestParams(cursor=cursor)
+            else:
+                request_params = None
+
+            result: ListResourcesResult = await self._session.list_resources(
+                params=request_params,
+            )
+            current_resources = result.resources
+
+            if offset >= len(current_resources):
+                # Keep walking pages when stale/local offset points past current data.
+                offset -= len(current_resources)
+                if result.nextCursor is None or result.nextCursor == cursor:
+                    next_token = None
+                    break
+
+                cursor = result.nextCursor
+                continue
+
+            available = current_resources[offset:]
+            consumed: int = min(len(available), remaining)
+            references.extend(
+                self._resource_reference(resource) for resource in available[:consumed]
+            )
+            remaining -= consumed
+            if consumed < len(available):
+                next_token = _encode_pagination_token(
+                    {
+                        "kind": "single",
+                        "cursor": cursor,
+                        "offset": offset + consumed,
+                    }
+                )
+                break
+
+            if result.nextCursor is None or result.nextCursor == cursor:
+                next_token = None
+                break
+
+            cursor = result.nextCursor
+            offset = 0
+            next_token = cursor
+
+        return Paginated[ResourceReference].of(
+            tuple(references),
+            pagination=pagination.with_token(next_token),
+        )
+
+    def _resource_reference(
+        self,
+        resource: Any,
+    ) -> ResourceReference:
+        return ResourceReference(
+            uri=self._with_uri_identifier(resource.uri.unicode_string()),
+            mime_type=resource.mimeType
+            if resource.mimeType is not None
+            else "application/octet-stream",
+            meta=self._meta(
+                name=resource.name,
+                description=resource.description,
+            ),
+        )
 
     async def resource_fetch(
         self,
@@ -194,7 +348,9 @@ class MCPClient:
                 return [
                     ResourceReference(
                         uri=resource.uri.unicode_string(),
-                        mime_type=resource.mimeType,
+                        mime_type=resource.mimeType
+                        if resource.mimeType is not None
+                        else "application/octet-stream",
                         meta=self._meta(),
                     )
                     for resource in resources
@@ -245,9 +401,8 @@ class MCPClient:
         )
 
         if result.isError:
-            raise ToolError(
+            raise Exception(  # TODO: FIXME: raise an exception
                 f"Remote tool {name} failed",
-                content=content,
             )
 
         return content
@@ -439,7 +594,8 @@ async def _convert_content(  # noqa: C901, PLR0911
                         case "application/json":
                             return MultimodalContent.of(
                                 ArtifactContent.of(
-                                    DataModel.from_json(urlsafe_b64decode(blob.blob).decode())
+                                    json.loads(urlsafe_b64decode(blob.blob)),
+                                    category="json",
                                 )
                             )
 
@@ -472,7 +628,7 @@ def _convert_tool(
             arguments,
         )
 
-    return FunctionTool(
+    return CoroutineTool(
         name=name,
         description=mcp_tool.description,
         parameters=cast(
@@ -483,9 +639,6 @@ def _convert_tool(
             },
         ),
         function=remote_call,
-        availability=_available,
-        result_formatting=_format_tool_result,
-        error_formatting=_format_tool_failure,
         handling="response",
         meta=Meta.of(
             {
@@ -494,29 +647,6 @@ def _convert_tool(
             }
         ),
     )
-
-
-def _available(
-    tools_turn: int,
-    specification: ModelToolSpecification,
-) -> bool:
-    return True
-
-
-def _format_tool_result(
-    result: Any,
-) -> MultimodalContent:
-    assert isinstance(result, MultimodalContent)  # nosec: B101
-    return result
-
-
-def _format_tool_failure(
-    error: Exception,
-) -> MultimodalContent:
-    if isinstance(error, ToolError):
-        return error.content
-
-    return MultimodalContent.of("ERROR")
 
 
 @final
@@ -541,22 +671,102 @@ class MCPClients:
         self,
         *,
         mcp_server: str | None = None,
+        pagination: Pagination | None,
         **extra: Any,
-    ) -> Sequence[ResourceReference]:
+    ) -> Paginated[ResourceReference]:
+        pagination = (
+            pagination
+            if pagination is not None
+            else Pagination.of(
+                token=None,
+                limit=DEFAULT_PAGINATION_LIMIT,
+            )
+        )
         if mcp_server is None:
-            return tuple(
-                chain.from_iterable(
-                    await gather(
-                        *[client.fetch_list(**extra) for client in self._resources.values()]
-                    )
-                )
+            return await self._resources_list_aggregate(
+                pagination=pagination,
+                **extra,
             )
 
         elif resources := self._resources.get(mcp_server):
-            return await resources.fetch_list(**extra)
+            return await resources.fetch_list(
+                pagination=pagination,
+                **extra,
+            )
 
         else:
-            return ()
+            return Paginated[ResourceReference].of(
+                (),
+                pagination=pagination.with_token(None),
+            )
+
+    async def _resources_list_aggregate(
+        self,
+        *,
+        pagination: Pagination,
+        **extra: Any,
+    ) -> Paginated[ResourceReference]:
+        server_ids: tuple[str, ...] = tuple(self._resources.keys())
+        aggregate_state: dict[str, dict[str, Any]] = _decode_aggregate_state(
+            token=pagination.token,
+            server_ids=server_ids,
+        )
+        references: list[ResourceReference] = []
+        remaining: int = pagination.limit
+        while remaining > 0:
+            pending_ids: list[str] = [
+                server_id
+                for server_id in server_ids
+                if not bool(aggregate_state[server_id]["done"])
+            ]
+            if not pending_ids:
+                break
+
+            pages = await gather(
+                *[
+                    self._resources[server_id].fetch_list(
+                        pagination=Pagination.of(
+                            token=cast(str | None, aggregate_state[server_id]["cursor"]),
+                            limit=remaining,
+                        ),
+                        **extra,
+                    )
+                    for server_id in pending_ids
+                ]
+            )
+
+            progress_made: bool = False
+            for server_id, page in zip(pending_ids, pages, strict=True):
+                if page.items:
+                    references.extend(page.items)
+                    remaining = max(0, pagination.limit - len(references))
+                    progress_made = True
+
+                next_cursor = page.pagination.token
+                aggregate_state[server_id]["cursor"] = next_cursor
+                aggregate_state[server_id]["done"] = next_cursor is None
+                if next_cursor is not None:
+                    progress_made = True
+
+                if remaining <= 0:
+                    break
+
+            if not progress_made:
+                break
+
+        next_token: str | None = None
+        if any(not bool(state["done"]) for state in aggregate_state.values()):
+            next_token = _encode_pagination_token(
+                {
+                    "kind": "aggregate",
+                    "state": aggregate_state,
+                }
+            )
+
+        return Paginated[ResourceReference].of(
+            tuple(references[: pagination.limit]),
+            pagination=pagination.with_token(next_token),
+        )
 
     async def resource_fetch(
         self,
@@ -617,12 +827,12 @@ class MCPClients:
         if mcp_server is None:
             return tuple(
                 chain.from_iterable(
-                    await gather(*[client.loading(**extra) for client in self._tools.values()])
+                    await gather(*[client.load(**extra) for client in self._tools.values()])
                 )
             )
 
         elif tools := self._tools.get(mcp_server):
-            return await tools.loading(**extra)
+            return await tools.load(**extra)
 
         else:
             return ()

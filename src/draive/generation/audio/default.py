@@ -1,13 +1,12 @@
 from typing import Any
 
 from draive.models import (
-    GenerativeModel,
     ModelInput,
     ModelInstructions,
-    ModelOutput,
 )
-from draive.multimodal import MultimodalContent
+from draive.multimodal import Multimodal, MultimodalContent
 from draive.resources import ResourceContent, ResourceReference
+from draive.steps import Step
 
 __all__ = ("generate_audio",)
 
@@ -15,18 +14,16 @@ __all__ = ("generate_audio",)
 async def generate_audio(
     *,
     instructions: ModelInstructions,
-    input: MultimodalContent,  # noqa: A002
+    input: Multimodal,  # noqa: A002
     **extra: Any,
 ) -> ResourceContent | ResourceReference:
-    result: ModelOutput = await GenerativeModel.completion(
+    completion: MultimodalContent = await Step.generating_completion(
         instructions=instructions,
-        context=[ModelInput.of(input)],
         output="audio",
-        stream=False,
         **extra,
-    )
+    ).run((ModelInput.of(MultimodalContent.of(input)),))
 
-    for audio in result.content.audio():
-        return audio
+    for audio in completion.audio():
+        return audio  # TODO: consider resource content chunks requiring content merge
 
     raise ValueError("Failed to generate a valid audio")

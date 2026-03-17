@@ -39,23 +39,29 @@ class ImageGeneration(State):
         input: Template | Multimodal,  # noqa: A002
         **extra: Any,
     ) -> ResourceContent | ResourceReference:
-        async with ctx.scope("generate_image"):
+        async with ctx.scope("image_generation"):
             if isinstance(instructions, Template):
                 ctx.record_info(
                     attributes={"instructions.template": instructions.identifier},
                 )
+                instructions = await TemplatesRepository.resolve_str(instructions)
 
             if isinstance(input, Template):
                 ctx.record_info(
                     attributes={"input.template": input.identifier},
                 )
+                input = await TemplatesRepository.resolve(input)  # noqa: A001
 
-            return await self.generating(
-                # resolve instructions templates
-                instructions=await TemplatesRepository.resolve_str(instructions),
-                # resolve input templates
-                input=await TemplatesRepository.resolve(input),
+            return await self._generating(
+                instructions=instructions,
+                input=input,
                 **extra,
             )
 
-    generating: ImageGenerating = generate_image
+    _generating: ImageGenerating = generate_image
+
+    def __init__(
+        self,
+        generating: ImageGenerating,
+    ) -> None:
+        super().__init__(_generating=generating)

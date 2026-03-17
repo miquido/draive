@@ -1,10 +1,10 @@
 from asyncio import sleep
 from collections.abc import (
-    AsyncGenerator,
     AsyncIterable,
     Collection,
-    Coroutine,
+    Iterable,
     Mapping,
+    MutableSequence,
     Sequence,
 )
 from types import TracebackType
@@ -18,24 +18,20 @@ from typing import (
     Self,
     TypedDict,
     final,
-    overload,
     runtime_checkable,
 )
-from uuid import UUID, uuid4
 
 from haiway import (
-    META_EMPTY,
     BasicValue,
     Meta,
     MetaValues,
     State,
     TypeSpecification,
     ctx,
-    statemethod,
 )
 
-from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, MultimodalContentPart
-from draive.parameters import DataModel
+from draive.multimodal import Multimodal, MultimodalContent, TextContent
+from draive.multimodal.content import MultimodalContentPart
 
 __all__ = (
     "ModelContext",
@@ -48,11 +44,6 @@ __all__ = (
     "ModelInputChunk",
     "ModelInputInvalid",
     "ModelInstructions",
-    "ModelMemory",
-    "ModelMemoryMaintaining",
-    "ModelMemoryRecall",
-    "ModelMemoryRecalling",
-    "ModelMemoryRemembering",
     "ModelOutput",
     "ModelOutputBlock",
     "ModelOutputBlocks",
@@ -61,50 +52,47 @@ __all__ = (
     "ModelOutputInvalid",
     "ModelOutputLimit",
     "ModelOutputSelection",
+    "ModelOutputStream",
     "ModelRateLimit",
     "ModelReasoning",
+    "ModelReasoningChunk",
     "ModelSession",
     "ModelSessionClosing",
     "ModelSessionEvent",
-    "ModelSessionInput",
+    "ModelSessionInputChunk",
+    "ModelSessionInputStream",
     "ModelSessionOpening",
-    "ModelSessionOutput",
+    "ModelSessionOutputChunk",
     "ModelSessionOutputSelection",
+    "ModelSessionOutputStream",
     "ModelSessionPreparing",
     "ModelSessionReading",
     "ModelSessionScope",
     "ModelSessionWriting",
-    "ModelStreamOutput",
+    "ModelToolDetachedHandling",
     "ModelToolFunctionSpecification",
     "ModelToolHandling",
     "ModelToolParametersSpecification",
     "ModelToolRequest",
     "ModelToolResponse",
     "ModelToolSpecification",
-    "ModelToolsDeclaration",
+    "ModelToolStatus",
+    "ModelTools",
     "ModelToolsSelection",
 )
 
-ModelInstructions = str
-"""System or task instructions provided to guide model behavior.
-
-Currently represented as a string, but may be extended to support structured
-instruction objects in the future depending on provider capabilities.
-"""
-
 
 class ModelException(Exception):
-    """Base exception for model-related errors.
+    """Base exception raised by model providers.
 
-    Carries the provider and model identifiers for better diagnostics in higher
-    layers and logs.
-
-    Attributes
+    Parameters
     ----------
-    provider : str
-        Name of the provider that produced the error.
-    model : str
-        Name of the model that produced the error.
+    *args
+        Exception message parts passed to ``Exception``.
+    provider
+        Provider identifier that produced the failure.
+    model
+        Provider model identifier related to the failure.
     """
 
     __slots__ = (
@@ -123,10 +111,19 @@ class ModelException(Exception):
         self.model: str = model
 
 
+@final
 class ModelInputInvalid(ModelException):
-    """Raised when prepared input is invalid for a given provider/model."""
+    """Raised when a provider rejects request input as invalid.
 
-    __slots__ = ()
+    Parameters
+    ----------
+    provider
+        Provider identifier that rejected the input.
+    model
+        Provider model identifier used for the request.
+    """
+
+    __slots__ = ("reason",)
 
     def __init__(
         self,
@@ -135,19 +132,24 @@ class ModelInputInvalid(ModelException):
         model: str,
     ) -> None:
         super().__init__(
-            f"Invalid input prepared for {model} model provided by {provider}",
+            f"Invalid input for {model} by {provider}",
             provider=provider,
             model=model,
         )
 
 
+@final
 class ModelOutputInvalid(ModelException):
-    """Raised when a provider/model produces an invalid output.
+    """Raised when a provider returns malformed or unsupported output.
 
-    Attributes
+    Parameters
     ----------
-    reason : str
-        Human-readable reason describing why the output is considered invalid.
+    provider
+        Provider identifier that produced invalid output.
+    model
+        Provider model identifier used for generation.
+    reason
+        Human-readable validation failure reason.
     """
 
     __slots__ = ("reason",)
@@ -160,7 +162,7 @@ class ModelOutputInvalid(ModelException):
         reason: str,
     ) -> None:
         super().__init__(
-            f"Invalid output produced by {model} model provided by {provider}, reason: {reason}",
+            f"Invalid output from {model} by {provider}, reason: {reason}",
             provider=provider,
             model=model,
         )
@@ -169,12 +171,16 @@ class ModelOutputInvalid(ModelException):
 
 @final
 class ModelRateLimit(ModelException):
-    """Raised when a provider enforces a rate limit for a model.
+    """Raised when a provider applies rate limiting.
 
-    Attributes
+    Parameters
     ----------
-    retry_after : float
-        Number of seconds to wait before retrying.
+    provider
+        Provider identifier that applied the limit.
+    model
+        Provider model identifier affected by the limit.
+    retry_after
+        Delay in seconds before retry should be attempted.
     """
 
     __slots__ = ("retry_after",)
@@ -187,28 +193,34 @@ class ModelRateLimit(ModelException):
         retry_after: float,
     ) -> None:
         super().__init__(
-            f"Rate limit for {model} model provided by {provider}, retry after {retry_after:.2f}s",
+            f"Rate limit for {model} by {provider}, retry after {retry_after:.2f}s",
             provider=provider,
             model=model,
         )
         self.retry_after: float = retry_after
 
     async def wait(self) -> None:
-        """Sleep for the recommended ``retry_after`` interval.
+        """Sleep for the configured retry delay.
 
-        Useful shorthand to respect provider throttling without duplicating
-        sleep logic at call sites.
+        Returns
+        -------
+        None
         """
         await sleep(self.retry_after)
 
 
+@final
 class ModelOutputFailed(ModelException):
-    """Raised when provider signals a generation failure.
+    """Raised when provider output ends with a terminal failure state.
 
-    Attributes
+    Parameters
     ----------
-    reason : str
-        Human-readable reason describing the failure.
+    provider
+        Provider identifier that failed to produce output.
+    model
+        Provider model identifier used for generation.
+    reason
+        Human-readable failure reason.
     """
 
     __slots__ = ("reason",)
@@ -221,61 +233,113 @@ class ModelOutputFailed(ModelException):
         reason: str,
     ) -> None:
         super().__init__(
-            f"Output for {model} model provided by {provider} failed, reason: {reason}",
+            f"Output failed for {model} by {provider}, reason: {reason}",
             provider=provider,
             model=model,
         )
         self.reason: str = reason
 
 
+ModelInstructions = str
+"""Model-level instruction text consumed by a generation call."""
+
+
 @final
 class ModelToolParametersSpecification(TypedDict, total=False):
-    """Strict object schema used for tool parameters."""
+    """Schema description used to validate model tool call arguments.
+
+    Keys
+    ----
+    type
+        JSON Schema root type. Must be ``"object"``.
+    properties
+        Mapping of argument names to typed specifications.
+    description
+        Optional description of the parameter object.
+    required
+        Optional list of required argument names.
+    additionalProperties
+        Must be ``False`` to enforce strict argument validation.
+    """
 
     type: Required[Literal["object"]]
     properties: Required[Mapping[str, TypeSpecification]]
-    title: NotRequired[str]
-    description: NotRequired[str]
     required: NotRequired[Sequence[str]]
     additionalProperties: Required[Literal[False]]
 
 
 @final
-class ModelToolFunctionSpecification(State):
-    """Specification of a function tool for model usage."""
-
-    name: str
-    description: str | None
-    parameters: ModelToolParametersSpecification | None
-    meta: Meta = META_EMPTY
-
-
-ModelToolSpecification = ModelToolFunctionSpecification
-"""Type alias for tool specifications exposed to models."""
-
-ModelToolsSelection = Literal["auto", "required", "none"] | str
-"""Selection strategy for tool use during generation.
-
-- "auto": Let the model decide when to use tools
-- "required": Force the model to use at least one tool
-- "none": Disable tool use for this turn
-or a name of tool to be selected
-"""
-
-
-@final
-class ModelToolsDeclaration(State):
-    """Declares tools available to a generation turn.
-
-    Use ``ModelToolsDeclaration.of(...)`` to build an instance. ``none`` is a
-    predefined constant indicating that no tools are available.
+class ModelToolFunctionSpecification(State, serializable=True):
+    """Serializable tool declaration exposed to a provider.
 
     Attributes
     ----------
-    specifications : Sequence[ModelToolSpecification]
-        Function tool specifications exposed to the model.
-    selection : ModelToolsSelection
-        Selection strategy hint (e.g., ``"auto"``, ``"required"``, ``"none"`` or provider-specific).
+    name
+        Stable tool name used in model tool requests.
+    description
+        Optional model-facing description of tool behavior.
+    parameters
+        Optional argument schema expected by the tool.
+    meta
+        Additional metadata propagated with this declaration.
+    """
+
+    @classmethod
+    def of(
+        cls,
+        *,
+        name: str,
+        description: str | None = None,
+        parameters: ModelToolParametersSpecification | None = None,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        """Create a tool function specification with normalized metadata.
+
+        Parameters
+        ----------
+        name
+            Stable tool name used during dispatch.
+        description
+            Optional model-facing tool description.
+        parameters
+            Optional argument schema for tool invocation.
+        meta
+            Optional metadata merged into the resulting state.
+
+        Returns
+        -------
+        Self
+            New tool specification instance.
+        """
+        return cls(
+            name=name,
+            description=description,
+            parameters=parameters,
+            meta=Meta.of(meta),
+        )
+
+    name: str
+    description: str | None = None
+    parameters: ModelToolParametersSpecification | None = None
+    meta: Meta = Meta.empty
+
+
+ModelToolSpecification = ModelToolFunctionSpecification
+"""Alias for provider tool specification state."""
+ModelToolsSelection = Literal["auto", "required", "none"] | ModelToolSpecification
+"""Strategy controlling whether and how a model may call tools."""
+
+
+@final
+class ModelTools(State, serializable=True):
+    """Toolset and selection strategy passed to model generation.
+
+    Attributes
+    ----------
+    specification
+        Ordered collection of tool declarations available to the model.
+    selection
+        Provider-specific tool choice policy.
     """
 
     none: ClassVar[Self]  # defined after the class
@@ -283,45 +347,56 @@ class ModelToolsDeclaration(State):
     @classmethod
     def of(
         cls,
-        *specifications: ModelToolSpecification,
+        *specification: ModelToolSpecification,
         selection: ModelToolsSelection = "auto",
     ) -> Self:
-        """Build a tools declaration.
+        """Create a toolset with the provided specifications.
 
         Parameters
         ----------
-        specifications : Sequence[ModelToolSpecification]
-            Tool function specifications to expose.
-        selection : ModelToolsSelection, optional
-            Tool selection mode hint. Defaults to ``"auto"``.
+        *specification
+            Tool specifications exposed to the model.
+        selection
+            Tool-choice strategy used by provider adapters.
 
         Returns
         -------
-        ModelToolsDeclaration
-            The constructed declaration.
+        Self
+            Toolset state object.
         """
         return cls(
-            specifications=specifications,
+            specification=specification,
             selection=selection,
         )
 
-    specifications: Sequence[ModelToolSpecification]
+    specification: Sequence[ModelToolSpecification]
     selection: ModelToolsSelection
 
     def __bool__(self) -> bool:
-        """Return ``True`` when any tool specifications are present."""
-        return bool(self.specifications)
+        return bool(self.specification)
 
 
-ModelToolsDeclaration.none = ModelToolsDeclaration(
+ModelTools.none = ModelTools(
+    specification=(),
     selection="none",
-    specifications=(),
 )
 
 
 @final
-class ModelToolRequest(DataModel):
-    """A request emitted by the model to call a tool function."""
+class ModelToolRequest(State, serializable=True):
+    """Model-emitted request to execute a concrete tool.
+
+    Attributes
+    ----------
+    identifier
+        Provider-generated call identifier.
+    tool
+        Requested tool name.
+    arguments
+        Typed argument payload for the tool call.
+    meta
+        Metadata attached by provider adapters.
+    """
 
     @classmethod
     def of(
@@ -330,26 +405,26 @@ class ModelToolRequest(DataModel):
         /,
         *,
         tool: str,
-        arguments: Mapping[str, Any] | None = None,
+        arguments: Mapping[str, BasicValue] | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        """Create a tool request.
+        """Create a tool request with normalized defaults.
 
         Parameters
         ----------
-        identifier : str
-            Correlation identifier to match responses to requests.
-        tool : str
-            Name of the tool/function to invoke.
-        arguments : Mapping[str, Any], optional
-            JSON-serializable arguments for the tool.
-        meta : Meta | MetaValues | None, optional
-            Additional metadata.
+        identifier
+            Provider-generated tool call identifier.
+        tool
+            Requested tool name.
+        arguments
+            Optional argument mapping. Defaults to an empty mapping.
+        meta
+            Optional metadata attached to the request.
 
         Returns
         -------
-        ModelToolRequest
-            Constructed tool request.
+        Self
+            Tool request instance.
         """
         return cls(
             identifier=identifier,
@@ -358,29 +433,41 @@ class ModelToolRequest(DataModel):
             meta=Meta.of(meta),
         )
 
-    type: Literal["tool_request"] = "tool_request"
     identifier: str
     tool: str
-    arguments: Mapping[str, Any]
-    meta: Meta = META_EMPTY
+    arguments: Mapping[str, BasicValue]
+    meta: Meta = Meta.empty
 
 
-ModelToolHandling = Literal["response", "error", "output", "output_extension", "detached"]
-"""Defines how tool responses should be handled in the invocation loop flow.
+class ModelToolDetachedHandling(State):
+    detach_message: Multimodal
 
-- "response": Include the response in the loop context for the next turn
-- "error": Treat the response as an error and include it in context
-- "output": Use this response as the final output, ending the loop
-- "output_extension": Include content in final output while continuing the loop
-- "detached": Handle the response outside the normal loop flow
-"""
+
+ModelToolHandling = Literal["response", "output"] | ModelToolDetachedHandling
+"""Routing policy describing how successful tool results are handled."""
+
+ModelToolStatus = Literal["success", "error"]
+"""Outcome status describing whether tool execution succeeded."""
 
 
 @final
-class ModelToolResponse(DataModel):
-    """A response produced by a tool invocation.
+class ModelToolResponse(State, serializable=True):
+    """Application-produced tool execution result.
 
-    Content may be included in the model conversation depending on ``handling``.
+    Attributes
+    ----------
+    identifier
+        Identifier matching the originating tool request.
+    tool
+        Tool name for the reported result.
+    result
+        Multimodal result payload returned by the tool.
+    handling
+        Routing policy describing how successful tool results are handled.
+    status
+        Outcome status of the tool execution.
+    meta
+        Metadata attached to the response.
     """
 
     @classmethod
@@ -390,66 +477,66 @@ class ModelToolResponse(DataModel):
         /,
         *,
         tool: str,
-        content: MultimodalContent,
+        result: Multimodal,
         handling: ModelToolHandling = "response",
+        status: ModelToolStatus = "success",
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        """Create a tool response.
+        """Create a tool response with normalized content and metadata.
 
         Parameters
         ----------
-        identifier : str
-            Correlation identifier that matches a previous request.
-        tool : str
-            Tool/function name that produced the response.
-        content : MultimodalContent
-            Multimodal content produced by the tool.
-        handling : ModelToolHandling, optional
-            How the response should be used (``"response"``, ``"output"``, etc.).
-        meta : Meta | MetaValues | None, optional
-            Additional metadata.
+        identifier
+            Identifier of the related tool request.
+        tool
+            Tool name that produced the result.
+        result
+            Tool output content.
+        handling
+            Routing policy for successful tool output.
+        status
+            Outcome status used by providers and orchestration.
+        meta
+            Optional metadata attached to the response.
 
         Returns
         -------
-        ModelToolResponse
-            Constructed tool response.
+        Self
+            Tool response instance.
         """
         return cls(
             identifier=identifier,
             tool=tool,
-            content=content,
+            result=MultimodalContent.of(result),
             handling=handling,
+            status=status,
             meta=Meta.of(meta),
         )
 
-    type: Literal["tool_response"] = "tool_response"
     identifier: str
     tool: str
-    content: MultimodalContent
-    handling: ModelToolHandling
-    meta: Meta = META_EMPTY
+    result: MultimodalContent
+    handling: ModelToolHandling = "response"
+    status: ModelToolStatus = "success"
+    meta: Meta = Meta.empty
 
 
 ModelInputBlock = MultimodalContent | ModelToolResponse
-"""Content blocks that can be included in model input."""
-
+"""Single input block accepted by model generation."""
 ModelInputBlocks = Sequence[ModelInputBlock]
-"""Ordered sequence of input blocks for a model turn."""
+"""Ordered model input blocks."""
 
 
 @final
-class ModelInput(DataModel):
-    """Structured input to a model turn.
-
-    Combines multimodal content and tool responses that become part of the
-    conversation context.
+class ModelInput(State, serializable=True):
+    """Input payload passed into model generation.
 
     Attributes
     ----------
-    blocks : ModelInputBlocks
-        Ordered sequence of input blocks.
-    meta : Meta
-        Additional metadata.
+    input
+        Ordered sequence of content and tool response blocks.
+    meta
+        Metadata associated with this input payload.
     """
 
     @classmethod
@@ -457,263 +544,190 @@ class ModelInput(DataModel):
         cls,
         /,
         *blocks: ModelInputBlock,
-        identifier: UUID | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        """Create a model input from blocks.
+        """Create an input payload from blocks.
 
         Parameters
         ----------
-        blocks : ModelInputBlock
-            Multimodal content and/or tool responses.
-        identifier: UUID | None = None
-            custom element identifier, will be randomly generated if not provided.
-        meta : Meta | MetaValues | None = None
-            Additional metadata.
+        *blocks
+            Input blocks in delivery order.
+        meta
+            Optional metadata attached to the payload.
 
         Returns
         -------
-        ModelInput
-            Constructed model input.
+        Self
+            Input state object.
         """
         return cls(
-            type="model_input",
-            identifier=identifier if identifier is not None else uuid4(),
-            blocks=blocks,
+            input=blocks,
             meta=Meta.of(meta),
         )
 
-    type: Literal["model_input"] = "model_input"
-    identifier: UUID
-    blocks: ModelInputBlocks
-    meta: Meta = META_EMPTY
+    input: ModelInputBlocks
+    meta: Meta = Meta.empty
 
     @property
     def content(self) -> MultimodalContent:
-        """Return only the multimodal content blocks merged into one."""
+        """Return only multimodal content blocks."""
         return MultimodalContent.of(
-            *(block for block in self.blocks if isinstance(block, MultimodalContent))
+            *(block for block in self.input if isinstance(block, MultimodalContent))
         )
 
     @property
     def contains_tools(self) -> bool:
-        """Return True if any tool responses are included in the input."""
-        return any(isinstance(block, ModelToolResponse) for block in self.blocks)
+        return any(isinstance(block, ModelToolResponse) for block in self.input)
 
     @property
-    def tools(self) -> Sequence[ModelToolResponse]:
-        """Return only the tool responses included in the input."""
-        return tuple(block for block in self.blocks if isinstance(block, ModelToolResponse))
+    def tool_responses(self) -> Sequence[ModelToolResponse]:
+        """Return only tool response blocks."""
+        return tuple(block for block in self.input if isinstance(block, ModelToolResponse))
 
     def without_tools(self) -> Self:
-        """Return a copy of this input without tool responses."""
+        """Return a copy that excludes all tool response blocks."""
         return self.__class__(
-            identifier=self.identifier,
-            blocks=tuple(
-                block for block in self.blocks if not isinstance(block, ModelToolResponse)
-            ),
+            input=tuple(block for block in self.input if not isinstance(block, ModelToolResponse)),
             meta=self.meta,
         )
 
     def __bool__(self) -> bool:
-        """Return ``True`` when any input blocks are present."""
-        return bool(self.blocks)
+        return bool(self.input)
 
 
 ModelOutputSelection = (
     Collection[Literal["text", "image", "audio", "video"]]
     | Literal["auto", "text", "json", "image", "audio", "video"]
-    | type[DataModel]
+    | type[State]
 )
-"""Output selection policy for turn-level generations.
-
-Supports the broadest set of modalities to allow providers to narrow or expand
-what the model may return, including custom ``DataModel`` subclasses for
-provider-specific envelopes.
-"""
+"""Requested output modality selection for model generation."""
 
 
 @final
-class ModelReasoning(DataModel):
-    """Represents model reasoning or chain-of-thought content.
-
-    This class encapsulates reasoning steps, thoughts, or explanations generated
-    by a model before producing the final output. It's distinct from regular
-    multimodal content as it represents the model's internal thought process.
+class ModelReasoningChunk(State, serializable=True):
+    """Incremental reasoning fragment produced by providers.
 
     Attributes
     ----------
-    content : MultimodalContent
-        The reasoning content produced by the model.
-    meta : Meta
-        Additional metadata associated with the reasoning.
+    reasoning_part
+        Text fragment with model reasoning content.
+    meta
+        Metadata associated with the fragment.
     """
 
     @classmethod
     def of(
         cls,
-        content: Multimodal,
         /,
+        reasoning_chunk: TextContent,
         *,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        """Create a reasoning block from multimodal content.
+        """Create a reasoning fragment.
 
         Parameters
         ----------
-        content : Multimodal
-            The reasoning content to encapsulate.
-        meta : Meta | MetaValues | None, optional
-            Additional metadata for the reasoning block.
+        reasoning
+            Reasoning text fragment.
+        meta
+            Optional metadata attached to the fragment.
 
         Returns
         -------
-        ModelReasoning
-            Constructed reasoning block.
+        Self
+            Reasoning fragment instance.
         """
         return cls(
-            content=MultimodalContent.of(content),
+            reasoning_chunk=reasoning_chunk,
             meta=Meta.of(meta),
         )
 
-    type: Literal["reasoning"] = "reasoning"
-    content: MultimodalContent
-    meta: Meta = META_EMPTY
-
-
-ModelOutputBlock = MultimodalContent | ModelReasoning | ModelToolRequest
-"""Content blocks that can be included in model output."""
-
-ModelOutputBlocks = Sequence[ModelOutputBlock]
-"""Ordered sequence of output blocks from a model turn."""
+    reasoning_chunk: TextContent
+    meta: Meta = Meta.empty
 
 
 @final
-class ModelOutput(DataModel):
-    """Structured output of a model turn.
-
-    Contains multimodal content blocks and potential tool requests.
+class ModelReasoning(State, serializable=True):
+    """Aggregated reasoning content emitted by a model.
 
     Attributes
     ----------
-    blocks : ModelOutputBlocks
-        Ordered sequence of output blocks produced by the model.
-    meta : Meta
-        Additional metadata.
+    reasoning
+        Combined multimodal representation of reasoning parts.
+    meta
+        Metadata merged across reasoning fragments.
     """
 
     @classmethod
     def of(
         cls,
-        /,
-        *blocks: ModelOutputBlock,
-        identifier: UUID | None = None,
+        reasoning: Iterable[ModelReasoningChunk] | Multimodal,
+        *,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        """Create a model output from blocks.
+        """Create aggregated reasoning from fragments or multimodal input.
 
         Parameters
         ----------
-        blocks : ModelOutputBlock
-            Multimodal content and/or tool requests.
-        identifier: UUID | None = None
-            custom element identifier, will be randomly generated if not provided.
-        meta : Meta | MetaValues | None = None
-            Additional metadata.
+        reasoning
+            Either reasoning parts or already-formed multimodal content.
+        meta
+            Optional metadata used when ``reasoning`` is multimodal.
 
         Returns
         -------
-        ModelOutput
-            Constructed model output.
+        Self
+            Aggregated reasoning state.
         """
-        return cls(
-            type="model_output",
-            identifier=identifier if identifier is not None else uuid4(),
-            blocks=blocks,
-            meta=Meta.of(meta),
-        )
+        if isinstance(reasoning, Multimodal):
+            return cls(
+                reasoning=MultimodalContent.of(reasoning),
+                meta=Meta.of(meta),
+            )
 
-    type: Literal["model_output"] = "model_output"
-    identifier: UUID
-    blocks: ModelOutputBlocks
-    meta: Meta = META_EMPTY
+        else:
+            content_parts: MutableSequence[MultimodalContentPart] = []
+            combined_meta: Meta = Meta.empty
 
-    @property
-    def content(self) -> MultimodalContent:
-        """Return only the multimodal content blocks merged into one."""
-        return MultimodalContent.of(
-            *(block for block in self.blocks if isinstance(block, MultimodalContent))
-        )
+            for element in reasoning:
+                content_parts.append(element.reasoning_chunk)
+                combined_meta = combined_meta.merged_with(element.meta)
 
-    @property
-    def content_with_reasoning(self) -> MultimodalContent:
-        """Return multimodal content merged with hidden reasoning artifacts.
+            return cls(
+                reasoning=MultimodalContent.of(*content_parts),
+                meta=combined_meta,
+            )
 
-        Reasoning blocks are wrapped as hidden ``ArtifactContent`` items so the
-        caller can surface or inspect them without exposing the raw chain of
-        thought by default.
-        """
-        parts: list[MultimodalContentPart] = []
-        for block in self.blocks:
-            if isinstance(block, MultimodalContent):
-                parts.extend(block.parts)
-
-            elif isinstance(block, ModelReasoning):
-                parts.append(
-                    ArtifactContent.of(
-                        block,
-                        category="reasoning",
-                        hidden=True,
-                    )
-                )
-
-        return MultimodalContent.of(*parts)
-
-    @property
-    def reasoning(self) -> Sequence[ModelReasoning]:
-        """Return only the reasoning included in the output."""
-        return tuple(block for block in self.blocks if isinstance(block, ModelReasoning))
-
-    @property
-    def contains_tools(self) -> bool:
-        """Return True if any tool requests are included in the output."""
-        return any(isinstance(block, ModelToolRequest) for block in self.blocks)
-
-    @property
-    def tools(self) -> Sequence[ModelToolRequest]:
-        """Return only the tool requests included in the output."""
-        return tuple(block for block in self.blocks if isinstance(block, ModelToolRequest))
-
-    def without_tools(self) -> Self:
-        """Return a copy of this output without tool requests."""
-        return self.__class__(
-            identifier=self.identifier,
-            blocks=tuple(block for block in self.blocks if not isinstance(block, ModelToolRequest)),
-            meta=self.meta,
-        )
-
-    def __bool__(self) -> bool:
-        """Return ``True`` when any output blocks are present."""
-        return bool(self.blocks)
+    reasoning: MultimodalContent
+    meta: Meta = Meta.empty
 
 
-ModelStreamOutput = MultimodalContentPart | ModelReasoning | ModelToolRequest
-"""Individual chunks that can be streamed as model output."""
+ModelOutputBlock = MultimodalContent | ModelReasoning | ModelToolRequest
+"""Single output block emitted by model generation."""
+ModelOutputBlocks = Sequence[ModelOutputBlock]
+"""Ordered collection of model output blocks."""
 
 
 @final
 class ModelOutputLimit(ModelException):
-    """Raised when the model exceeds its configured output token limit.
+    """Raised when provider output exceeds a configured token budget.
 
-    Attributes
+    Parameters
     ----------
-    max_output_tokens : int
-        Maximum number of output tokens that was exceeded.
-    content : ModelOutputBlocks
-        Partial content produced before the limit was hit.
+    provider
+        Provider identifier producing the output.
+    model
+        Provider model identifier used for generation.
+    max_output_tokens
+        Maximum output token budget configured for the call.
+    content
+        Partial output captured before the limit was reached.
     """
 
-    __slots__ = ("content", "max_output_tokens")
+    __slots__ = (
+        "content",
+        "max_output_tokens",
+    )
 
     def __init__(
         self,
@@ -721,7 +735,6 @@ class ModelOutputLimit(ModelException):
         provider: str,
         model: str,
         max_output_tokens: int,
-        content: ModelOutputBlocks,
     ) -> None:
         super().__init__(
             f"Exceeded output limit of {max_output_tokens} tokens"
@@ -730,491 +743,306 @@ class ModelOutputLimit(ModelException):
             model=model,
         )
         self.max_output_tokens: int = max_output_tokens
-        self.content: ModelOutputBlocks = content
-
-
-ModelContextElement = ModelInput | ModelOutput
-"""Elements that can be included in conversation context."""
-
-ModelContext = Sequence[ModelContextElement]
-"""Conversation context as a sequence of inputs and outputs."""
 
 
 @final
-class ModelMemoryRecall(DataModel):
-    """Immutable snapshot of recalled memory for a session/turn.
+class ModelOutput(State, serializable=True):
+    """Output payload produced by model generation.
 
     Attributes
     ----------
-    context : ModelContext
-        Recalled context elements (inputs/outputs) to include.
-    variables : Mapping[str, str | int | float]
-        Key-value variables associated with the recall.
-    meta : Meta
-        Additional metadata.
-    """
-
-    empty: ClassVar[Self]  # defined after the class
-
-    @classmethod
-    def of(
-        cls,
-        *elements: ModelContextElement,
-        variables: Mapping[str, BasicValue] | None = None,
-        meta: Meta | MetaValues | None = None,
-    ) -> Self:
-        """Create a recall from one or more context elements.
-
-        Parameters
-        ----------
-        elements : ModelContextElement
-            Context elements (inputs/outputs) to include in the recall.
-        variables : Mapping[str, BasicValue] | None, optional
-            Variables associated with the recall.
-        meta : Meta | MetaValues | None, optional
-            Additional metadata.
-
-        Returns
-        -------
-        ModelMemoryRecall
-            Constructed memory recall snapshot.
-        """
-        return cls(
-            context=elements,
-            variables=variables,
-            meta=Meta.of(meta),
-        )
-
-    type: Literal["model_memory"] = "model_memory"
-    context: ModelContext
-    variables: Mapping[str, BasicValue] | None = None
-    meta: Meta = META_EMPTY
-
-
-ModelMemoryRecall.empty = ModelMemoryRecall(context=())
-
-
-@runtime_checkable
-class ModelMemoryRecalling(Protocol):
-    async def __call__(
-        self,
-        **extra: Any,
-    ) -> ModelMemoryRecall: ...
-
-
-@runtime_checkable
-class ModelMemoryRemembering(Protocol):
-    async def __call__(
-        self,
-        *elements: ModelContextElement,
-        variables: Mapping[str, BasicValue] | None,
-        **extra: Any,
-    ) -> None: ...
-
-
-@runtime_checkable
-class ModelMemoryMaintaining(Protocol):
-    async def __call__(
-        self,
-        **extra: Any,
-    ) -> None: ...
-
-
-async def _remembering_none(
-    *elements: ModelContextElement,
-    variables: Mapping[str, BasicValue] | None,
-    **extra: Any,
-) -> None:
-    pass  # noop
-
-
-async def _maintaining_noop(
-    **extra: Any,
-) -> None:
-    pass  # noop
-
-
-@final
-class ModelMemory(State):
-    @classmethod
-    def constant(
-        cls,
-        *elements: ModelContextElement,
-        variables: Mapping[str, BasicValue] | None = None,
-        meta: Meta | MetaValues | None = None,
-    ) -> Self:
-        recall: ModelMemoryRecall = ModelMemoryRecall.of(
-            *elements,
-            variables=variables,
-            meta=meta,
-        )
-
-        async def recalling(
-            **extra: Any,
-        ) -> ModelMemoryRecall:
-            return recall
-
-        return cls(
-            recalling=recalling,
-            remembering=_remembering_none,
-            maintaining=_maintaining_noop,
-            meta=Meta.of(meta if meta is not None else {"source": "constant"}),
-        )
-
-    @overload
-    @classmethod
-    async def recall(
-        cls,
-        **extra: Any,
-    ) -> ModelMemoryRecall: ...
-
-    @overload
-    async def recall(
-        self,
-        **extra: Any,
-    ) -> ModelMemoryRecall: ...
-
-    @statemethod
-    async def recall(
-        self,
-        **extra: Any,
-    ) -> ModelMemoryRecall:
-        return await self.recalling(**extra)
-
-    @overload
-    @classmethod
-    async def remember(
-        cls,
-        *elements: ModelContextElement,
-        variables: Mapping[str, BasicValue] | None = None,
-        **extra: Any,
-    ) -> None: ...
-
-    @overload
-    async def remember(
-        self,
-        *elements: ModelContextElement,
-        variables: Mapping[str, BasicValue] | None = None,
-        **extra: Any,
-    ) -> None: ...
-
-    @statemethod
-    async def remember(
-        self,
-        *elements: ModelContextElement,
-        variables: Mapping[str, BasicValue] | None = None,
-        **extra: Any,
-    ) -> None:
-        await self.remembering(
-            *elements,
-            variables=variables,
-            **extra,
-        )
-
-    @overload
-    @classmethod
-    async def maintenance(
-        cls,
-        **extra: Any,
-    ) -> None: ...
-
-    @overload
-    async def maintenance(
-        self,
-        **extra: Any,
-    ) -> None: ...
-
-    @statemethod
-    async def maintenance(
-        self,
-        **extra: Any,
-    ) -> None:
-        await self.maintaining(**extra)
-
-    recalling: ModelMemoryRecalling
-    remembering: ModelMemoryRemembering
-    maintaining: ModelMemoryMaintaining
-    meta: Meta
-
-
-@final
-class ModelInputChunk(DataModel):
-    """Streaming input chunk for realtime sessions.
-
-    Attributes
-    ----------
-    content : MultimodalContent
-        Incremental multimodal content payload.
-    eod : bool
-        End-of-data marker for the current input stream.
-    meta : Meta
-        Additional metadata.
-    """
-
-    @classmethod
-    def of(
-        cls,
-        *content: Multimodal,
-        eod: bool = False,
-        meta: Meta | MetaValues | None = None,
-    ) -> Self:
-        """Create a streaming input chunk.
-
-        Parameters
-        ----------
-        content : Multimodal
-            One or more multimodal elements to include.
-        eod : bool, optional
-            Marks the end of the input stream when ``True``.
-        meta : Meta | MetaValues | None, optional
-            Additional metadata.
-
-        Returns
-        -------
-        ModelInputChunk
-            Constructed input chunk.
-        """
-        return cls(
-            content=MultimodalContent.of(*content),
-            eod=eod,
-            meta=Meta.of(meta),
-        )
-
-    type: Literal["model_input_chunk"] = "model_input_chunk"
-    content: MultimodalContent
-    eod: bool = False
-    meta: Meta = META_EMPTY
-
-    def __bool__(self) -> bool:
-        """Return ``True`` when any content is present."""
-        return bool(self.content)
-
-
-@final
-class ModelOutputChunk(DataModel):
-    """Streaming output chunk produced by a model.
-
-    Attributes
-    ----------
-    content : MultimodalContent
-        Incremental multimodal content payload.
-    eod : bool
-        End-of-data marker for the current output stream.
-    meta : Meta
-        Additional metadata.
+    output
+        Ordered sequence of content, reasoning, and tool requests.
+    meta
+        Metadata associated with this output payload.
     """
 
     @classmethod
     def of(
         cls,
         /,
-        *content: Multimodal,
-        eod: bool = False,
+        *blocks: ModelOutputBlock,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        """Create a streaming output chunk.
+        """Create an output payload from blocks.
 
         Parameters
         ----------
-        content : Multimodal
-            One or more multimodal elements to include.
-        eod : bool, optional
-            Marks the end of the output stream when ``True``.
-        meta : Meta | MetaValues | None, optional
-            Additional metadata.
+        *blocks
+            Output blocks in stream order.
+        meta
+            Optional metadata attached to the payload.
 
         Returns
         -------
-        ModelOutputChunk
-            Constructed output chunk.
+        Self
+            Output state object.
         """
         return cls(
-            content=MultimodalContent.of(*content),
-            eod=eod,
+            output=blocks,
             meta=Meta.of(meta),
         )
 
-    type: Literal["model_output_chunk"] = "model_output_chunk"
-    content: MultimodalContent
-    eod: bool = False
-    meta: Meta = META_EMPTY
+    output: ModelOutputBlocks
+    meta: Meta = Meta.empty
+
+    @property
+    def content(self) -> MultimodalContent:
+        """Return only multimodal content blocks."""
+        return MultimodalContent.of(
+            *(block for block in self.output if isinstance(block, MultimodalContent))
+        )
+
+    @property
+    def contains_tools(self) -> bool:
+        return any(isinstance(block, ModelToolRequest) for block in self.output)
+
+    @property
+    def tool_requests(self) -> Sequence[ModelToolRequest]:
+        """Return only tool request blocks."""
+        return tuple(block for block in self.output if isinstance(block, ModelToolRequest))
+
+    def without_tools(self) -> Self:
+        """Return a copy that excludes all tool request blocks."""
+        return self.__class__(
+            output=tuple(block for block in self.output if not isinstance(block, ModelToolRequest)),
+            meta=self.meta,
+        )
+
+    def without_reasoning(self) -> Self:
+        return self.__class__(
+            output=tuple(block for block in self.output if not isinstance(block, ModelReasoning)),
+            meta=self.meta,
+        )
 
     def __bool__(self) -> bool:
-        """Return ``True`` when any content is present."""
-        return bool(self.content)
+        return bool(self.output)
+
+
+ModelContextElement = ModelInput | ModelOutput
+"""Single element of generation context history."""
+ModelContext = Sequence[ModelContextElement]
+"""Ordered model conversation context."""
+
+
+ModelInputChunk = MultimodalContentPart | ModelToolResponse
+"""Single incremental input chunk for realtime sessions."""
+ModelOutputChunk = MultimodalContentPart | ModelReasoningChunk | ModelToolRequest
+"""Single incremental output chunk emitted by providers."""
+ModelOutputStream = AsyncIterable[ModelOutputChunk]
+"""Asynchronous stream of model output chunks."""
 
 
 @runtime_checkable
 class ModelGenerating(Protocol):
-    """Provider interface for a single-turn generation call.
-
-    This protocol defines the contract that provider implementations must follow
-    for performing model generation. Implementations must handle both streaming
-    and non-streaming modes and support tool use through the tools parameter.
-
-    The protocol supports overloaded signatures to provide proper type hints
-    based on the stream parameter value.
-    """
-
-    @overload
-    def __call__(
-        self,
-        *,
-        instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
-        context: ModelContext,
-        output: ModelOutputSelection,
-        stream: Literal[False] = False,
-        **extra: Any,
-    ) -> Coroutine[None, None, ModelOutput]: ...
-
-    @overload
-    def __call__(
-        self,
-        *,
-        instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
-        context: ModelContext,
-        output: ModelOutputSelection,
-        stream: Literal[True],
-        **extra: Any,
-    ) -> AsyncGenerator[ModelStreamOutput]: ...
+    """Protocol for async model generation callables."""
 
     def __call__(
         self,
         *,
         instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
+        tools: ModelTools,
         context: ModelContext,
         output: ModelOutputSelection,
-        stream: bool = False,
         **extra: Any,
-    ) -> AsyncGenerator[ModelStreamOutput] | Coroutine[None, None, ModelOutput]: ...
+    ) -> ModelOutputStream: ...
 
 
 @final
-class ModelSessionEvent(DataModel):
-    """Session event used in realtime flows (e.g., status, typing)."""
+class ModelSessionEvent(State, serializable=True):
+    """Typed control/event message used in realtime model sessions.
+
+    Attributes
+    ----------
+    event
+        Event type identifier.
+    content
+        Optional event content payload.
+    meta
+        Metadata attached to the event.
+    """
 
     @classmethod
     def of(
         cls,
-        category: str,
-        /,
-        content: Multimodal = MultimodalContent.empty,
+        event: str,
         *,
+        content: State | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        """Create a session event.
-
-        Parameters
-        ----------
-        category : str
-            Event category or type.
-        content : Multimodal, optional
-            Optional multimodal payload carried with the event.
-        meta : Meta | MetaValues | None, optional
-            Additional metadata.
-
-        Returns
-        -------
-        ModelSessionEvent
-            Constructed session event.
-        """
         return cls(
-            category=category,
-            content=MultimodalContent.of(content),
+            event=event,
+            content=content,
             meta=Meta.of(meta),
         )
 
-    category: str
-    content: MultimodalContent
-    meta: Meta = META_EMPTY
+    @classmethod
+    def turn_started(
+        cls,
+        *,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        return cls(
+            event="turn_started",
+            content=None,
+            meta=Meta.of(meta),
+        )
 
+    @classmethod
+    def turn_commited(
+        cls,
+        *,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        return cls(
+            event="turn_commited",
+            content=None,
+            meta=Meta.of(meta),
+        )
 
-ModelSessionInput = ModelInputChunk | ModelToolResponse | ModelSessionEvent
-"""Input types that can be sent to a realtime model session."""
+    @classmethod
+    def turn_finished(
+        cls,
+        *,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        return cls(
+            event="turn_finished",
+            content=None,
+            meta=Meta.of(meta),
+        )
 
-ModelSessionOutput = ModelOutputChunk | ModelToolRequest | ModelSessionEvent
-"""Output types that can be received from a realtime model session."""
+    @classmethod
+    def turn_completed(
+        cls,
+        content: State,
+        *,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        return cls(
+            event="turn_completed",
+            content=content,
+            meta=Meta.of(meta),
+        )
+
+    @classmethod
+    def context_updated(
+        cls,
+        context: ModelContext,
+        *,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        return cls(
+            event="context_updated",
+            content=context,
+            meta=Meta.of(meta),
+        )
+
+    event: (
+        Literal[
+            "turn_started",
+            "turn_commited",
+            "turn_finished",
+            "turn_completed",
+            "context_updated",
+        ]
+        | str
+    )
+    content: State | ModelContext | None = None
+    meta: Meta = Meta.empty
+
 
 ModelSessionOutputSelection = (
     Collection[Literal["text", "audio"]] | Literal["auto", "text", "audio"]
 )
-"""Output selection policy for realtime session events.
+"""Requested modality selection for realtime session output."""
 
-Limited to text and audio modalities for realtime use cases.
-"""
+
+ModelSessionInputChunk = ModelInputChunk | ModelSessionEvent
+"""Single chunk accepted by realtime session write operations."""
+ModelSessionInputStream = AsyncIterable[ModelSessionInputChunk]
+"""Asynchronous input stream for realtime sessions."""
+ModelSessionOutputChunk = ModelOutputChunk | ModelSessionEvent
+"""Single chunk returned by realtime session read operations."""
+ModelSessionOutputStream = AsyncIterable[ModelSessionOutputChunk]
+"""Asynchronous output stream for realtime sessions."""
 
 
 @runtime_checkable
 class ModelSessionReading(Protocol):
-    """Callable that reads the next session output event."""
+    """Protocol describing a single realtime session read operation."""
 
-    async def __call__(self) -> ModelSessionOutput: ...
+    async def __call__(self) -> ModelSessionOutputChunk: ...
 
 
 @runtime_checkable
 class ModelSessionWriting(Protocol):
-    """Callable that writes an input event to the session."""
+    """Protocol describing a single realtime session write operation."""
 
     async def __call__(
         self,
-        input: ModelSessionInput,  # noqa: A002
+        input: ModelSessionInputChunk,  # noqa: A002
     ) -> None: ...
 
 
 @final
 class ModelSession(State):
-    """Static helpers for interacting with the active realtime session state.
-
-    Delegates to the provider-implemented ``reading``/``writing`` callables.
-    """
+    """Bound realtime model session with read/write callables."""
 
     @classmethod
-    async def read(cls) -> ModelSessionOutput:
-        """Read a single ``ModelSessionOutput`` event from the session."""
-        return await ctx.state(cls).reading()
+    async def read(cls) -> ModelSessionOutputChunk:
+        """Read a single chunk from the active scoped session."""
+        return await ctx.state(cls)._reading()
 
     @classmethod
-    async def stream_read(cls) -> AsyncIterable[ModelSessionOutput]:
-        """Async iterator that continuously reads session outputs until error."""
+    async def stream_read(cls) -> ModelSessionOutputStream:
+        """Continuously read chunks from the active scoped session."""
         session: Self = ctx.state(cls)
         while True:  # breaks on exception
-            yield await session.reading()
+            yield await session._reading()
 
     @classmethod
     async def write(
         cls,
-        input: ModelSessionInput,  # noqa: A002
+        input: ModelSessionInputChunk,  # noqa: A002
     ) -> None:
-        """Write a single input event into the session."""
-        await ctx.state(cls).writing(input=input)
+        """Write a single chunk to the active scoped session."""
+        await ctx.state(cls)._writing(input=input)
 
     @classmethod
     async def stream_write(
         cls,
-        input: AsyncIterable[ModelSessionInput],  # noqa: A002
+        input: AsyncIterable[ModelSessionInputChunk],  # noqa: A002
     ) -> None:
-        """Consume an async iterable and write each element into the session."""
+        """Write all chunks from an async iterable to the active session."""
         session: Self = ctx.state(cls)
         async for element in input:
-            await session.writing(input=element)
+            await session._writing(input=element)
 
-    reading: ModelSessionReading
-    writing: ModelSessionWriting
+    _reading: ModelSessionReading
+    _writing: ModelSessionWriting
+
+    def __init__(
+        self,
+        reading: ModelSessionReading,
+        writing: ModelSessionWriting,
+    ) -> None:
+        super().__init__(
+            _reading=reading,
+            _writing=writing,
+        )
 
 
 @runtime_checkable
 class ModelSessionOpening(Protocol):
-    """Callable that opens a realtime session and returns ``ModelSession``."""
+    """Protocol for opening a realtime session resource."""
 
     async def __call__(self) -> ModelSession: ...
 
 
 @runtime_checkable
 class ModelSessionClosing(Protocol):
-    """Callable that closes a realtime session, optionally receiving an exception."""
+    """Protocol for closing a realtime session resource."""
 
     async def __call__(
         self,
@@ -1224,22 +1052,24 @@ class ModelSessionClosing(Protocol):
 
 @final
 class ModelSessionScope(State):
-    """Async context manager that opens and closes a ``ModelSession``.
+    """Async context manager wrapping realtime session lifecycle hooks."""
 
-    Attributes
-    ----------
-    opening : ModelSessionOpening
-        Callable that opens the session.
-    closing : ModelSessionClosing
-        Callable that closes the session.
-    """
+    _opening: ModelSessionOpening
+    _closing: ModelSessionClosing
 
-    opening: ModelSessionOpening
-    closing: ModelSessionClosing
+    def __init__(
+        self,
+        opening: ModelSessionOpening,
+        closing: ModelSessionClosing,
+    ) -> None:
+        super().__init__(
+            _opening=opening,
+            _closing=closing,
+        )
 
     async def __aenter__(self) -> ModelSession:
-        """Open and return the underlying ``ModelSession``."""
-        return await self.opening()
+        """Open and return a realtime session."""
+        return await self._opening()
 
     async def __aexit__(
         self,
@@ -1247,44 +1077,20 @@ class ModelSessionScope(State):
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        """Close the session, forwarding any exception to the ``closing`` hook."""
-        await self.closing(exception=exc_val)
+        """Close the realtime session with an optional terminal exception."""
+        await self._closing(exception=exc_val)
 
 
 @runtime_checkable
 class ModelSessionPreparing(Protocol):
-    """Provider interface for preparing realtime model sessions.
-
-    This protocol defines how providers should implement session preparation
-    for realtime, bidirectional communication with models. The implementation
-    should return a ``ModelSessionScope`` that can be used as an async context
-    manager for session lifecycle management.
-
-    Parameters
-    ----------
-    instructions : ModelInstructions
-        System/task instructions for the session.
-    tools : ModelToolsDeclaration
-        Tools available throughout the session.
-    memory : ModelMemory
-        Initial memory context for the session.
-    output : ModelSessionOutputSelection
-        Desired output selection policy for session events.
-    **extra : Any
-        Provider-specific configuration parameters.
-
-    Returns
-    -------
-    ModelSessionScope
-        Prepared session scope ready for realtime interaction.
-    """
+    """Protocol for preparing scoped realtime model sessions."""
 
     async def __call__(
         self,
         *,
         instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
-        memory: ModelMemory,
+        toolbox: ModelTools,
+        context: ModelContext,
         output: ModelSessionOutputSelection,
         **extra: Any,
     ) -> ModelSessionScope: ...

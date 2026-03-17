@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, Self, final, overload
 
 from haiway import (
-    META_EMPTY,
     File,
     FileAccess,
     Immutable,
@@ -92,7 +91,7 @@ class TemplatesRepository(State):
                         variable: variable for variable in parse_template_variables(content)
                     },
                     description=None,
-                    meta=META_EMPTY,
+                    meta=Meta.empty,
                 )
                 for identifier, content in templates.items()
             },
@@ -162,7 +161,7 @@ class TemplatesRepository(State):
         Sequence[TemplateDeclaration]
             Collection of available template declarations.
         """
-        return await self.listing(**extra)
+        return await self._listing(**extra)
 
     @overload
     @classmethod
@@ -223,7 +222,7 @@ class TemplatesRepository(State):
         if not isinstance(content, Template):
             return MultimodalContent.of(content)
 
-        loaded: str | None = await self.loading(
+        loaded: str | None = await self._loading(
             content.identifier,
             meta=content.meta,
             **extra,
@@ -314,7 +313,7 @@ class TemplatesRepository(State):
             else:
                 return content
 
-        loaded: str | None = await self.loading(
+        loaded: str | None = await self._loading(
             content.identifier,
             meta=content.meta,
             **extra,
@@ -368,7 +367,7 @@ class TemplatesRepository(State):
         TemplateMissing
             If the template content is not available.
         """
-        loaded: str | None = await self.loading(
+        loaded: str | None = await self._loading(
             template.identifier,
             meta=template.meta,
             **extra,
@@ -420,7 +419,7 @@ class TemplatesRepository(State):
         **extra
             Extra arguments forwarded to the underlying defining callable.
         """
-        await self.defining(
+        await self._defining(
             identifier=template.identifier,
             description=template.description,
             variables=template.variables,
@@ -429,10 +428,24 @@ class TemplatesRepository(State):
             **extra,
         )
 
-    listing: TemplateListing = _empty_listing
-    loading: TemplateLoading = _none_loading
-    defining: TemplateDefining = _noop_defining
-    meta: Meta = META_EMPTY
+    _listing: TemplateListing
+    _loading: TemplateLoading
+    _defining: TemplateDefining
+    meta: Meta
+
+    def __init__(
+        self,
+        listing: TemplateListing = _empty_listing,
+        loading: TemplateLoading = _none_loading,
+        defining: TemplateDefining = _noop_defining,
+        meta: Meta = Meta.empty,
+    ) -> None:
+        super().__init__(
+            _listing=listing,
+            _loading=loading,
+            _defining=defining,
+            meta=meta,
+        )
 
 
 class VolatileStorage(Immutable):

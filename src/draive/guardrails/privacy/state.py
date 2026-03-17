@@ -36,9 +36,15 @@ class GuardrailsAnonymization(State):
         /,
         **extra: Any,
     ) -> GuardrailsAnonymizedContent:
-        return await self.anonymizing(
+        return await self._anonymizing(
             MultimodalContent.of(content),
             **extra,
         )
 
-    anonymizing: GuardrailsContentAnonymizing
+    _anonymizing: GuardrailsContentAnonymizing
+
+    def __init__(
+        self,
+        anonymizing: GuardrailsContentAnonymizing,
+    ) -> None:
+        super().__init__(_anonymizing=anonymizing)

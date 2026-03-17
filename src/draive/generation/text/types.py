@@ -1,8 +1,9 @@
 from collections.abc import Iterable
 from typing import Any, Protocol, runtime_checkable
 
-from draive.models import ModelInstructions, Toolbox
-from draive.multimodal import MultimodalContent
+from draive.models import ModelInstructions
+from draive.multimodal import Multimodal
+from draive.tools import Toolbox
 
 __all__ = ("TextGenerating",)
 
@@ -13,8 +14,8 @@ class TextGenerating(Protocol):
         self,
         *,
         instructions: ModelInstructions,
-        input: MultimodalContent,  # noqa: A002
+        input: Multimodal,  # noqa: A002
         toolbox: Toolbox,
-        examples: Iterable[tuple[MultimodalContent, str]],
+        examples: Iterable[tuple[Multimodal, str]],
         **extra: Any,
     ) -> str: ...

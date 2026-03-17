@@ -9,6 +9,10 @@ class FakeException(Exception):
     pass
 
 
+async def _tool_call_content(tool_call, /, **arguments: object) -> MultimodalContent:
+    return MultimodalContent.of(*[chunk async for chunk in tool_call(**arguments)])
+
+
 @mark.asyncio
 async def test_call_returns_result():
     async with ctx.scope("test"):
@@ -46,36 +50,27 @@ async def test_toolbox_call_returns_multimodal_content():
         executions: int = 0
 
         @tool
-        async def compute(value: int) -> int:
+        async def compute(value: int) -> str:
             nonlocal executions
             executions += 1
-            return value
+            return str(value)
 
-        assert await compute.call(
-            "call_id",
-            value=42,
-        ) == MultimodalContent.of("42")
+        assert await _tool_call_content(compute.call, value=42) == MultimodalContent.of("42")
         assert executions == 1
 
 
 @mark.asyncio
-async def test_toolbox_call_returns_custom_content():
+async def test_toolbox_call_returns_multimodal_parts():
     async with ctx.scope("test"):
         executions: int = 0
 
-        def custom_format(result: int) -> str:
-            return f"Value:{result}"
-
-        @tool(result_formatting=custom_format)
+        @tool
         async def compute(value: int) -> int:
             nonlocal executions
             executions += 1
-            return value
+            return MultimodalContent.of("Value:", str(value))
 
-        assert await compute.call(
-            "call_id",
-            value=42,
-        ) == MultimodalContent.of("Value:42")
+        assert await _tool_call_content(compute.call, value=42) == MultimodalContent.of("Value:42")
         assert executions == 1
 
 
@@ -112,3 +107,25 @@ async def test_returns_cached_with_cache():
 
         expected: int = await compute(value=42)
         assert await compute(value=42) == expected
+
+
+@mark.asyncio
+async def test_toolbox_call_formats_mapping_as_json() -> None:
+    async with ctx.scope("test"):
+
+        @tool
+        async def compute() -> str:
+            return '{"a": 1, "b": 2}'
+
+        assert await _tool_call_content(compute.call) == MultimodalContent.of('{"a": 1, "b": 2}')
+
+
+@mark.asyncio
+async def test_toolbox_call_returns_stringified_content() -> None:
+    async with ctx.scope("test"):
+
+        @tool
+        async def compute() -> str:
+            return '{"item": "value"}'
+
+        assert await _tool_call_content(compute.call) == MultimodalContent.of('{"item": "value"}')

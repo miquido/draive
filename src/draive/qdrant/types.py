@@ -2,10 +2,9 @@ from collections.abc import Iterable, Sequence
 from typing import Any, Literal, Protocol, runtime_checkable
 from uuid import UUID
 
-from haiway import AttributePath, AttributeRequirement, State
+from haiway import AttributePath, AttributeRequirement, Paginated, Pagination, State
 
 from draive.embedding import Embedded
-from draive.parameters import DataModel
 
 __all__ = (
     "QdrantCollectionCreating",
@@ -15,8 +14,6 @@ __all__ = (
     "QdrantDeleting",
     "QdrantException",
     "QdrantFetching",
-    "QdrantPaginationResult",
-    "QdrantPaginationToken",
     "QdrantResult",
     "QdrantSearching",
     "QdrantStoring",
@@ -27,20 +24,11 @@ class QdrantException(Exception):
     pass
 
 
-class QdrantResult[Content: DataModel](State):
+class QdrantResult[Content: State](State):
     identifier: UUID
     vector: Sequence[float]
     score: float
     content: Content
-
-
-class QdrantPaginationToken(State):
-    next_id: Any
-
-
-class QdrantPaginationResult[Result](State):
-    results: Sequence[Result]
-    continuation_token: QdrantPaginationToken | None
 
 
 @runtime_checkable
@@ -50,7 +38,7 @@ class QdrantCollectionListing(Protocol):
 
 @runtime_checkable
 class QdrantCollectionCreating(Protocol):
-    async def __call__[Model: DataModel](
+    async def __call__[Model: State](
         self,
         model: type[Model],
         /,
@@ -71,7 +59,7 @@ class QdrantCollectionCreating(Protocol):
 
 @runtime_checkable
 class QdrantCollectionIndexCreating(Protocol):
-    async def __call__[Model: DataModel, Attribute](
+    async def __call__[Model: State, Attribute](
         self,
         model: type[Model],
         /,
@@ -93,7 +81,7 @@ class QdrantCollectionIndexCreating(Protocol):
 
 @runtime_checkable
 class QdrantCollectionDeleting(Protocol):
-    async def __call__[Model: DataModel](
+    async def __call__[Model: State](
         self,
         model: type[Model],
         /,
@@ -102,22 +90,21 @@ class QdrantCollectionDeleting(Protocol):
 
 @runtime_checkable
 class QdrantFetching(Protocol):
-    async def __call__[Model: DataModel](
+    async def __call__[Model: State](
         self,
         model: type[Model],
         /,
         *,
         requirements: AttributeRequirement[Model] | None,
-        continuation: QdrantPaginationToken | None,
-        limit: int,
+        pagination: Pagination | None,
         include_vector: bool,
         **extra: Any,
-    ) -> QdrantPaginationResult[Embedded[Model]] | QdrantPaginationResult[Model]: ...
+    ) -> Paginated[Embedded[Model]] | Paginated[Model]: ...
 
 
 @runtime_checkable
 class QdrantSearching(Protocol):
-    async def __call__[Model: DataModel](
+    async def __call__[Model: State](
         self,
         model: type[Model],
         /,
@@ -133,7 +120,7 @@ class QdrantSearching(Protocol):
 
 @runtime_checkable
 class QdrantStoring(Protocol):
-    async def __call__[Model: DataModel](
+    async def __call__[Model: State](
         self,
         model: type[Model],
         /,
@@ -148,7 +135,7 @@ class QdrantStoring(Protocol):
 
 @runtime_checkable
 class QdrantDeleting(Protocol):
-    async def __call__[Model: DataModel](
+    async def __call__[Model: State](
         self,
         model: type[Model],
         /,

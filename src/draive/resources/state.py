@@ -1,7 +1,7 @@
-from collections.abc import Sequence
-from typing import Any, Literal, overload
+from collections.abc import Collection
+from typing import Any, Literal, final, overload
 
-from haiway import META_EMPTY, Meta, State, statemethod
+from haiway import Meta, Paginated, Pagination, State, statemethod
 
 from draive.resources.http import (
     http_resource_deleting,
@@ -24,26 +24,36 @@ from draive.resources.types import (
 __all__ = ("ResourcesRepository",)
 
 
+@final
 class ResourcesRepository(State):
     @overload
     @classmethod
     async def fetch_list(
         cls,
+        *,
+        pagination: Pagination | None = None,
         **extra: Any,
-    ) -> Sequence[ResourceReference]: ...
+    ) -> Paginated[ResourceReference]: ...
 
     @overload
     async def fetch_list(
         self,
+        *,
+        pagination: Pagination | None = None,
         **extra: Any,
-    ) -> Sequence[ResourceReference]: ...
+    ) -> Paginated[ResourceReference]: ...
 
     @statemethod
     async def fetch_list(
         self,
+        *,
+        pagination: Pagination | None = None,
         **extra: Any,
-    ) -> Sequence[ResourceReference]:
-        return await self.list_fetching(**extra)
+    ) -> Paginated[ResourceReference]:
+        return await self.list_fetching(
+            pagination=pagination,
+            **extra,
+        )
 
     @overload
     @classmethod
@@ -115,20 +125,21 @@ class ResourcesRepository(State):
         **extra: Any,
     ) -> Resource | None:
         uri: str
-        meta: Meta
         if isinstance(resource, str):
             uri = resource
-            meta = META_EMPTY
 
         else:
             uri = resource.uri
-            meta = resource.meta
 
-        if content := await self.fetching(uri, **extra):
+        fetched: Collection[ResourceReference] | ResourceContent | None = await self.fetching(
+            uri,
+            **extra,
+        )
+
+        if fetched is not None:
             return Resource(
                 uri=uri,
-                content=content,
-                meta=meta,
+                resource=fetched,
             )
 
         elif required and default is None:
@@ -161,10 +172,10 @@ class ResourcesRepository(State):
         /,
         **extra: Any,
     ) -> Meta:
-        if isinstance(resource.content, ResourceContent):
+        if isinstance(resource.resource, ResourceContent):
             return await self.uploading(
                 resource.uri,
-                resource.content,
+                resource.resource,
                 **extra,
             )
 
@@ -187,4 +198,4 @@ class ResourcesRepository(State):
     fetching: ResourceFetching = http_resource_fetching
     uploading: ResourceUploading = http_resource_uploading
     deleting: ResourceDeleting = http_resource_deleting
-    meta: Meta = META_EMPTY
+    meta: Meta = Meta.empty

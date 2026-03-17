@@ -1,18 +1,17 @@
 from typing import Annotated, Any, Self
 
-from haiway import META_EMPTY, Description, Meta, MetaValues, Validator
+from haiway import Description, Meta, MetaValues, State, Validator
 
 from draive.evaluation.value import (
     EvaluationScoreValue,
     evaluation_score_value,
     evaluation_score_verifier,
 )
-from draive.parameters import DataModel
 
 __all__ = ("EvaluationScore",)
 
 
-class EvaluationScore(DataModel):
+class EvaluationScore(State, serializable=True):
     """
     Evaluation score with value and optional comment.
 
@@ -63,7 +62,7 @@ class EvaluationScore(DataModel):
     meta: Annotated[
         Meta,
         Description("Metadata about the score"),
-    ] = META_EMPTY
+    ] = Meta.empty
 
     def __eq__(self, other: Any) -> bool:
         """

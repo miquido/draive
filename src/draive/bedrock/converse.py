@@ -1,8 +1,8 @@
 from base64 import urlsafe_b64decode
-from collections.abc import AsyncGenerator, Coroutine, Iterable, Mapping, Sequence
-from typing import Any, Literal, cast, overload
+from collections.abc import AsyncIterable, Iterable, Mapping, Sequence
+from typing import Any, Literal, cast
 
-from haiway import META_EMPTY, MISSING, asynchronous, ctx, unwrap_missing
+from haiway import MISSING, Meta, asynchronous, ctx, unwrap_missing
 
 from draive.bedrock.api import BedrockAPI
 from draive.bedrock.config import BedrockChatConfig
@@ -15,22 +15,23 @@ from draive.bedrock.models import (
     ChatTool,
 )
 from draive.models import (
-    GenerativeModel,
     ModelContext,
     ModelInput,
     ModelInstructions,
     ModelOutput,
+    ModelOutputChunk,
     ModelOutputFailed,
     ModelOutputLimit,
     ModelOutputSelection,
     ModelReasoning,
-    ModelStreamOutput,
+    ModelReasoningChunk,
     ModelToolRequest,
     ModelToolResponse,
-    ModelToolsDeclaration,
+    ModelTools,
     ModelToolSpecification,
     ModelToolsSelection,
 )
+from draive.models.metrics import record_model_invocation, record_usage_metrics
 from draive.multimodal import (
     ArtifactContent,
     Multimodal,
@@ -44,61 +45,18 @@ __all__ = ("BedrockConverse",)
 
 
 class BedrockConverse(BedrockAPI):
-    def generative_model(self) -> GenerativeModel:
-        return GenerativeModel(generating=self.completion)
-
-    @overload
     def completion(
         self,
         *,
         instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
+        tools: ModelTools,
         context: ModelContext,
         output: ModelOutputSelection,
-        stream: Literal[False] = False,
         config: BedrockChatConfig | None = None,
         prefill: Multimodal | None = None,
         **extra: Any,
-    ) -> Coroutine[None, None, ModelOutput]: ...
-
-    @overload
-    def completion(
-        self,
-        *,
-        instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
-        context: ModelContext,
-        output: ModelOutputSelection,
-        stream: Literal[True],
-        config: BedrockChatConfig | None = None,
-        prefill: Multimodal | None = None,
-        **extra: Any,
-    ) -> AsyncGenerator[ModelStreamOutput]: ...
-
-    def completion(
-        self,
-        *,
-        instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
-        context: ModelContext,
-        output: ModelOutputSelection,
-        stream: bool = False,
-        config: BedrockChatConfig | None = None,
-        prefill: Multimodal | None = None,
-        **extra: Any,
-    ) -> AsyncGenerator[ModelStreamOutput] | Coroutine[None, None, ModelOutput]:
-        if stream:
-            return self._completion_stream(
-                instructions=instructions,
-                context=context,
-                tools=tools,
-                output=output,
-                config=config or ctx.state(BedrockChatConfig),
-                prefill=prefill,
-                **extra,
-            )
-
-        return self._completion(
+    ) -> AsyncIterable[ModelOutputChunk]:
+        return self._completion_stream(
             instructions=instructions,
             context=context,
             tools=tools,
@@ -112,33 +70,22 @@ class BedrockConverse(BedrockAPI):
         self,
         *,
         instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
+        tools: ModelTools,
         context: ModelContext,
         output: ModelOutputSelection,
         config: BedrockChatConfig,
         prefill: Multimodal | None,
         **extra: Any,
     ) -> ModelOutput:
-        async with ctx.scope("model.completion"):
-            ctx.record_info(
-                attributes={
-                    "model.provider": "bedrock",
-                    "model.name": config.model,
-                    "model.temperature": config.temperature,
-                    "model.stop_sequences": config.stop_sequences,
-                    "model.max_output_tokens": config.max_output_tokens,
-                    "model.output": str(output),
-                    "model.tools.count": len(tools.specifications),
-                    "model.tools.selection": tools.selection,
-                    "model.stream": False,
-                },
-            )
-            ctx.record_debug(
-                attributes={
-                    "model.instructions": instructions,
-                    "model.tools": [tool.name for tool in tools.specifications],
-                    "model.context": [element.to_str() for element in context],
-                },
+        async with ctx.scope("model.invocation"):
+            record_model_invocation(
+                provider="bedrock",
+                model=config.model,
+                temperature=config.temperature,
+                max_output_tokens=config.max_output_tokens,
+                tools=tools,
+                output=output,
+                stop_sequences=config.stop_sequences,
             )
 
             # Build messages array from context
@@ -166,7 +113,7 @@ class BedrockConverse(BedrockAPI):
                 messages = _context_messages(context)
 
             tool_config: dict[str, Any] | None = _tools_as_tool_config(
-                tools.specifications,
+                tools.specification,
                 tool_selection=tools.selection,
             )
 
@@ -191,25 +138,11 @@ class BedrockConverse(BedrockAPI):
 
             completion: ChatCompletionResponse = await self._converse(parameters)
 
-            ctx.record_info(
-                metric="model.input_tokens",
-                value=completion["usage"]["inputTokens"],
-                unit="tokens",
-                kind="counter",
-                attributes={
-                    "model.provider": "bedrock",
-                    "model.name": config.model,
-                },
-            )
-            ctx.record_info(
-                metric="model.output_tokens",
-                value=completion["usage"]["outputTokens"],
-                unit="tokens",
-                kind="counter",
-                attributes={
-                    "model.provider": "bedrock",
-                    "model.name": config.model,
-                },
+            record_usage_metrics(
+                provider="bedrock",
+                model=config.model,
+                input_tokens=completion["usage"]["inputTokens"],
+                output_tokens=completion["usage"]["outputTokens"],
             )
 
             # Convert output content preserving order of content and tool requests
@@ -223,7 +156,6 @@ class BedrockConverse(BedrockAPI):
                     provider="bedrock",
                     model=config.model,
                     max_output_tokens=unwrap_missing(config.max_output_tokens, default=0),
-                    content=output_blocks,
                 )
 
             if stop_reason in ("guardrail_intervened", "content_filtered"):
@@ -245,13 +177,13 @@ class BedrockConverse(BedrockAPI):
         self,
         *,
         instructions: ModelInstructions,
-        tools: ModelToolsDeclaration,
+        tools: ModelTools,
         context: ModelContext,
         output: ModelOutputSelection,
         config: BedrockChatConfig,
         prefill: Multimodal | None,
         **extra: Any,
-    ) -> AsyncGenerator[ModelStreamOutput]:
+    ) -> AsyncIterable[ModelOutputChunk]:
         async with ctx.scope("model.completion.stream"):
             ctx.log_warning(
                 "Bedrock completion streaming is not supported yet, using regular response instead."
@@ -266,13 +198,13 @@ class BedrockConverse(BedrockAPI):
                 **extra,
             )
 
-            for block in model_output.blocks:
+            for block in model_output.output:
                 if isinstance(block, MultimodalContent):
                     for part in block.parts:
                         yield part
 
                 else:
-                    assert isinstance(block, ModelReasoning | ModelToolRequest)  # nosec: B101
+                    assert isinstance(block, ModelToolRequest | ModelReasoningChunk)  # nosec: B101
                     yield block
 
     @asynchronous
@@ -312,7 +244,7 @@ def _context_messages(  # noqa: C901, PLR0912
 
                 role = "user"
 
-            for block in element.blocks:
+            for block in element.input:
                 if isinstance(block, MultimodalContent):
                     content.extend(_convert_content(block.parts))
 
@@ -325,9 +257,9 @@ def _context_messages(  # noqa: C901, PLR0912
                                 "toolUseId": block.identifier,
                                 "content": cast(
                                     list[ChatMessageText | ChatMessageImage],
-                                    _convert_content(block.content.parts),
+                                    _convert_content(block.result.parts),
                                 ),
-                                "status": "error" if block.handling == "error" else "success",
+                                "status": "error" if block.status == "error" else "success",
                             }
                         }
                     )
@@ -340,7 +272,7 @@ def _context_messages(  # noqa: C901, PLR0912
 
                 role = "assistant"
 
-            for block in element.blocks:
+            for block in element.output:
                 if isinstance(block, MultimodalContent):
                     content.extend(_convert_content(block.parts))
 
@@ -420,7 +352,7 @@ def _convert_content(
             if part.hidden:
                 continue
 
-            converted.append({"text": part.artifact.to_str()})
+            converted.append({"text": part.to_str()})
 
     return converted
 
@@ -452,7 +384,7 @@ def _tools_as_tool_config(
     else:
         toolChoice = {
             "tool": {
-                "name": tool_selection,
+                "name": tool_selection.name,
             },
         }
 
@@ -514,7 +446,7 @@ def _completion_as_output_content(
                     identifier=identifier,
                     tool=tool,
                     arguments=cast(Mapping[str, Any], arguments),
-                    meta=META_EMPTY,
+                    meta=Meta.empty,
                 )
 
             case _:

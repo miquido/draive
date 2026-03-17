@@ -1,359 +1,286 @@
 import json
-from collections.abc import Generator, Mapping, Sequence
-from datetime import UTC, datetime, timedelta
+from collections.abc import Mapping, Sequence
+from itertools import chain
 from typing import Any, cast
 from uuid import UUID
 
-from haiway import BasicValue, Map, Meta, MetaValues, ctx
+from haiway import Paginated, Pagination, ctx
 from haiway.postgres import Postgres, PostgresRow
 
-from draive.models import (
-    ModelContextElement,
-    ModelInput,
-    ModelMemory,
-    ModelMemoryRecall,
-    ModelOutput,
+from draive.conversation.state import ConversationMemory
+from draive.conversation.types import (
+    ConversationAssistantTurn,
+    ConversationTurn,
+    ConversationUserTurn,
 )
+from draive.models import ModelContext
 
-__all__ = ("PostgresModelMemory",)
+__all__ = ("PostgresConversationMemory",)
 
 
-def PostgresModelMemory(
-    identifier: UUID,
+def PostgresConversationMemory(
     *,
-    recall_limit: int = 0,
-    meta: Meta | MetaValues | None = None,
-) -> ModelMemory:
-    """Create a model memory bound to a Postgres-backed storage.
-
-    Parameters
-    ----------
-    identifier: UUID
-        Key identifying the memory records grouping in the ``memories`` tables.
-    recall_limit: int
-        Optional maximum number of context elements returned during recall.
-
-    Returns
-    -------
-    ModelMemory
-        Memory interface persisting variables and context elements in Postgres.
-
-    Notes
-    ------
-    Example schema:
+    thread: UUID | str,
+) -> ConversationMemory:
+    """
     ```
-    CREATE TABLE memories (
+    CREATE TABLE conversation_memory (
+        thread_id TEXT NOT NULL,
+        turn TEXT NOT NULL,
         identifier UUID NOT NULL,
-        created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (identifier)
+        payload JSONB NOT NULL,
+        created TIMESTAMPTZ NOT NULL,
+        PRIMARY KEY (thread_id, identifier),
+        UNIQUE (thread_id, identifier)
     );
 
-    CREATE TABLE memories_variables (
-        memories UUID NOT NULL REFERENCES memories (identifier) ON DELETE CASCADE,
-        variables JSONB NOT NULL DEFAULT '{}'::jsonb,
-        created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE INDEX IF NOT EXISTS
-        memories_variables_idx
-
-    ON
-        memories_variables (memories, created DESC);
-
-    CREATE TABLE memories_elements (
-        identifier UUID NOT NULL DEFAULT gen_random_uuid(),
-        memories UUID NOT NULL REFERENCES memories (identifier) ON DELETE CASCADE,
-        content JSONB NOT NULL,
-        created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (identifier)
-    );
-
-    CREATE INDEX IF NOT EXISTS
-        memories_elements_idx
-
-    ON
-        memories_elements (
-            memories,
-            created DESC
-        );
+    CREATE INDEX IF NOT EXISTS conversation_memory_idx
+        ON conversation_memory (thread_id, created DESC, identifier DESC);
     ```
     """
-    assert recall_limit >= 0  # nosec: B101
+
+    thread_id: str = str(thread)
+
+    async def fetch(
+        pagination: Pagination,
+        **extra: Any,
+    ) -> Paginated[ConversationTurn]:
+        return await _fetch_turns(
+            thread_id=thread_id,
+            pagination=pagination,
+        )
 
     async def recall(
+        pagination: Pagination | None = None,
         **extra: Any,
-    ) -> ModelMemoryRecall:
-        ctx.log_info(f"Recalling memory for {identifier}...")
+    ) -> ModelContext:
+        turns: Sequence[ConversationTurn]
+        if pagination is None:
+            turns = await _recall(
+                thread_id=thread_id,
+            )
 
-        ctx.log_info("...loading variables...")
-        variables: Mapping[str, BasicValue] = await _load_variables(
-            identifier=identifier,
-        )
+        else:
+            turns = await _fetch_turns(
+                thread_id=thread_id,
+                pagination=pagination,
+            )
 
-        ctx.log_info("...loading context...")
-
-        context_elements: Sequence[ModelContextElement] = await _load_context(
-            identifier=identifier,
-            limit=recall_limit,
-        )
-
-        ctx.log_info(f"...{len(context_elements)} context elements recalled!")
-        ctx.record_info(
-            event="postgres.memory.recall",
-            attributes={
-                "identifier": str(identifier),
-                "limit": recall_limit,
-                "elements": len(context_elements),
-                "variables": len(variables),
-            },
-        )
-
-        return ModelMemoryRecall(
-            context=context_elements,
-            variables=variables,
-        )
+        return tuple(chain.from_iterable(turn.to_model_context() for turn in turns))
 
     async def remember(
-        *elements: ModelContextElement,
-        variables: Mapping[str, BasicValue] | None = None,
+        turns: Sequence[ConversationTurn],
         **extra: Any,
     ) -> None:
-        if not elements and variables is None:
-            return ctx.log_info(f"No content to remember for {identifier}, skipping!")
-
-        ctx.log_info(f"Remembering content for {identifier}...")
+        if not turns:
+            return
 
         async with Postgres.acquire_connection() as connection:
             async with connection.transaction():
-                if variables is not None:
-                    ctx.log_info(f"...remembering {len(variables)} variables...")
+                for turn in turns:
                     await connection.execute(
                         """
                         INSERT INTO
-                            memories_variables (
-                                memories,
-                                variables
-                            )
-
-                        VALUES (
-                            $1::UUID,
-                            $2::JSONB
-                        );
-                        """,
-                        identifier,
-                        json.dumps(variables),
-                    )
-
-                ctx.log_info(f"...remembering {len(elements)} context elements...")
-                timestamp: datetime = datetime.now(UTC)
-                for idx, element in enumerate(elements):
-                    created: datetime = timestamp + timedelta(microseconds=idx)
-
-                    await connection.execute(
-                        """
-                        INSERT INTO
-                            memories_elements (
+                            conversation_memory (
+                                thread_id,
+                                turn,
                                 identifier,
-                                memories,
-                                content,
+                                payload,
                                 created
                             )
 
                         VALUES (
-                            $1::UUID,
-                            $2::UUID,
-                            $3::JSONB,
-                            $4::TIMESTAMPTZ
-                        )
-
-                        ON CONFLICT (identifier) DO UPDATE
-                            SET
-                                content = EXCLUDED.content
-
-                            WHERE
-                                memories_elements.memories = EXCLUDED.memories;
-                        """,
-                        element.identifier,
-                        identifier,
-                        element.to_json(),
-                        created,
-                    )
-
-        ctx.record_info(
-            event="postgres.memory.remember",
-            attributes={
-                "identifier": str(identifier),
-                "elements": len(elements),
-                "variables": len(variables) if variables is not None else 0,
-            },
-        )
-        ctx.log_info("...memory persisted!")
-
-    async def maintenance(
-        variables: Mapping[str, BasicValue] | None = None,
-        **extra: Any,
-    ) -> None:
-        ctx.log_info(f"Performing maintenance for {identifier}...")
-        async with Postgres.acquire_connection() as connection:
-            async with connection.transaction():
-                ctx.log_info("...ensuring memory entry exists...")
-                await connection.execute(
-                    """
-                        INSERT INTO
-                            memories (
-                                identifier
-                            )
-
-                        VALUES (
-                            $1::UUID
-                        )
-
-                        ON CONFLICT (identifier)
-                        DO NOTHING;
-                        """,
-                    identifier,
-                )
-
-                if variables is not None:
-                    ctx.log_info(f"...remembering {len(variables)} variables...")
-                    await connection.execute(
-                        """
-                        INSERT INTO
-                            memories_variables (
-                                memories,
-                                variables
-                            )
-
-                        VALUES (
-                            $1::UUID,
-                            $2::JSONB
+                            $1::TEXT,
+                            $2::TEXT,
+                            $3::UUID,
+                            $4::JSONB,
+                            $5::TIMESTAMPTZ
                         );
-                        """,
-                        identifier,
-                        json.dumps(variables),
+                        """,  # nosec: B608
+                        thread_id,
+                        turn.turn,
+                        turn.identifier,
+                        turn.to_json(),
+                        turn.created,
                     )
 
-        ctx.log_info("...maintenance completed!")
+        ctx.log_debug("...conversation memory persisted.")
 
-    return ModelMemory(
+    return ConversationMemory(
+        fetching=fetch,
         recalling=recall,
         remembering=remember,
-        maintaining=maintenance,
-        meta=Meta.of(meta if meta is not None else {"source": "postgres"}),
     )
 
 
-async def _load_context(
+def _turn_from_row(
+    row: PostgresRow,
+    /,
+) -> ConversationTurn:
+    payload: str = cast(str, row["payload"])
+    parsed: Mapping[str, object] = cast(Mapping[str, object], json.loads(payload))
+
+    turn_kind: object | None = parsed.get("turn")
+    if turn_kind == "user":
+        return ConversationUserTurn.from_json(payload)
+
+    if turn_kind == "assistant":
+        return ConversationAssistantTurn.from_json(payload)
+
+    raise ValueError(f"Unsupported conversation turn payload: {turn_kind}")
+
+
+async def _recall(
     *,
-    identifier: UUID,
-    limit: int,
-) -> Sequence[ModelContextElement]:
+    thread_id: str,
+) -> Sequence[ConversationTurn]:
+    rows: Sequence[PostgresRow] = await Postgres.fetch(
+        """
+        SELECT
+            payload::TEXT
+
+        FROM
+            conversation_memory
+
+        WHERE
+            thread_id = $1::TEXT
+
+        ORDER BY
+            created ASC,
+            identifier ASC;
+        """,  # nosec: B608
+        thread_id,
+    )
+
+    return tuple(_turn_from_row(row) for row in rows)
+
+
+async def _fetch_turns(
+    *,
+    thread_id: str,
+    pagination: Pagination,
+) -> Paginated[ConversationTurn]:
+    if pagination.limit <= 0:
+        return Paginated[ConversationTurn].of(
+            (),
+            pagination=pagination.with_token(None),
+        )
+
+    cursor: UUID | None
+    if pagination.token is None:
+        cursor = None
+
+    elif isinstance(pagination.token, UUID):
+        cursor = pagination.token
+
+    elif isinstance(pagination.token, str):
+        try:
+            cursor = UUID(pagination.token)
+
+        except ValueError as exc:
+            raise ValueError("Invalid conversation memory pagination token") from exc
+
+    else:
+        raise ValueError("Invalid conversation memory pagination token")
+
     rows: Sequence[PostgresRow]
-    if limit:
+    if cursor is None:
         rows = await Postgres.fetch(
             """
             SELECT
-                content::JSONB
+                payload::TEXT,
+                created,
+                identifier
 
-            FROM
-                memories_elements
+            FROM (
+                SELECT
+                    payload,
+                    created,
+                    identifier
 
-            WHERE
-                memories = $1::UUID
+                FROM
+                    conversation_memory
+
+                WHERE
+                    thread_id = $1::TEXT
+
+                ORDER BY
+                    created DESC,
+                    identifier DESC
+
+                LIMIT $2::BIGINT
+            ) AS recent_turns
 
             ORDER BY
-                created DESC
-
-            LIMIT $2;
-            """,
-            identifier,
-            limit,
+                created ASC,
+                identifier ASC;
+            """,  # nosec: B608
+            thread_id,
+            pagination.limit,
         )
 
     else:
         rows = await Postgres.fetch(
             """
+            WITH cursor AS (
+                SELECT
+                    created,
+                    identifier
+
+                FROM
+                    conversation_memory
+
+                WHERE
+                    thread_id = $1::TEXT
+                AND
+                    identifier = $2::UUID
+            )
+
             SELECT
-                content::JSONB
+                payload::TEXT,
+                created,
+                identifier
 
-            FROM
-                memories_elements
+            FROM (
+                SELECT
+                    payload,
+                    created,
+                    identifier
 
-            WHERE
-                memories = $1::UUID
+                FROM
+                    conversation_memory
+
+                WHERE
+                    thread_id = $1::TEXT
+                AND (
+                    created < (SELECT created FROM cursor)
+                    OR (
+                        created = (SELECT created FROM cursor)
+                        AND identifier < (SELECT identifier FROM cursor)
+                    )
+                )
+
+                ORDER BY
+                    created DESC,
+                    identifier DESC
+
+                LIMIT $3::BIGINT
+            ) AS recent_turns
 
             ORDER BY
-                created DESC;
-            """,
-            identifier,
+                created ASC,
+                identifier ASC;
+            """,  # nosec: B608
+            thread_id,
+            cursor,
+            pagination.limit,
         )
 
-    return tuple(_decode_context(rows))
+    next_token: UUID | None = None
+    if len(rows) >= pagination.limit:
+        next_token = rows[0].get_uuid("identifier", required=True)
 
-
-def _decode_context(
-    rows: Sequence[PostgresRow],
-    /,
-) -> Generator[ModelContextElement]:
-    trim_prefix: bool = True
-    skip_output: bool = True
-    for row in reversed(rows):
-        decoded: Mapping[str, BasicValue] = json.loads(cast(str, row["content"]))
-        match decoded.get("type"):
-            case "model_input":
-                model_input: ModelInput = ModelInput.from_mapping(decoded)
-                if trim_prefix:
-                    if model_input.contains_tools:
-                        skip_output = True
-                        continue
-
-                    else:
-                        skip_output = False
-                        trim_prefix = False
-
-                yield model_input
-
-            case "model_output":
-                model_output: ModelOutput = ModelOutput.from_mapping(decoded)
-                if trim_prefix:
-                    if model_output.contains_tools:
-                        continue
-
-                    elif skip_output:
-                        continue
-
-                    else:
-                        trim_prefix = False
-
-                yield model_output
-
-            case other:
-                raise ValueError(f"Invalid model context element: {other}")
-
-
-async def _load_variables(
-    *,
-    identifier: UUID,
-) -> Mapping[str, BasicValue]:
-    row: PostgresRow | None = await Postgres.fetch_one(
-        """
-        SELECT
-            variables::JSONB
-
-        FROM
-            memories_variables
-
-        WHERE
-            memories = $1::UUID
-
-        ORDER BY created DESC
-
-        LIMIT 1;
-        """,
-        identifier,
+    return Paginated[ConversationTurn].of(
+        (_turn_from_row(row) for row in rows),
+        pagination=pagination.with_token(next_token),
     )
-
-    if row is None:
-        return Map()
-
-    return cast(Mapping[str, BasicValue], json.loads(cast(str, row["variables"])))

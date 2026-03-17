@@ -6,17 +6,16 @@ from draive.resources.types import (
     ResourceContent,
     ResourceCorrupted,
     ResourceDeleting,
+    ResourceException,
     ResourceFetching,
+    ResourceInaccessible,
     ResourceListFetching,
     ResourceMissing,
     ResourceReference,
     ResourceReferenceTemplate,
+    ResourceUnresolveable,
     ResourceUploading,
 )
-
-# Backwards-compatible/expected aliases
-ResourceException = ResourceCorrupted
-ResourceTemplateDeclaration = ResourceReferenceTemplate
 
 __all__ = (
     "MimeType",
@@ -25,12 +24,15 @@ __all__ = (
     "ResourceContent",
     "ResourceCorrupted",
     "ResourceDeleting",
+    "ResourceException",
     "ResourceFetching",
+    "ResourceInaccessible",
     "ResourceListFetching",
     "ResourceMissing",
     "ResourceReference",
     "ResourceReferenceTemplate",
     "ResourceTemplate",
+    "ResourceUnresolveable",
     "ResourceUploading",
     "ResourcesRepository",
     "resource",

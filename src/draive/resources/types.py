@@ -1,10 +1,8 @@
 from base64 import b64decode, b64encode
-from collections.abc import Collection, Sequence
+from collections.abc import Collection
 from typing import Any, Literal, Protocol, Self, final, overload, runtime_checkable
 
-from haiway import META_EMPTY, Meta, MetaValues, State
-
-from draive.parameters import DataModel
+from haiway import Meta, MetaValues, Paginated, Pagination, State
 
 __all__ = (
     "MimeType",
@@ -12,41 +10,92 @@ __all__ = (
     "ResourceContent",
     "ResourceCorrupted",
     "ResourceDeleting",
+    "ResourceException",
     "ResourceFetching",
+    "ResourceInaccessible",
     "ResourceListFetching",
     "ResourceMissing",
     "ResourceReference",
     "ResourceReferenceTemplate",
+    "ResourceUnresolveable",
     "ResourceUploading",
 )
 
 
-class ResourceMissing(Exception):
+class ResourceException(Exception):
+    __slots__ = ("uri",)
+
+    def __init__(
+        self,
+        *args: object,
+        uri: str,
+    ) -> None:
+        super().__init__(*args)
+        self.uri: str = uri or ""
+
+
+@final
+class ResourceMissing(ResourceException):
     """Raised when a resource cannot be found."""
 
-    __slots__ = ("uri",)
-
     def __init__(
         self,
         *,
         uri: str,
     ) -> None:
-        super().__init__(f"Missing resource - {uri}")
-        self.uri: str = uri or ""
+        super().__init__(
+            f"Missing resource - {uri}",
+            uri=uri,
+        )
 
 
-class ResourceCorrupted(Exception):
+@final
+class ResourceCorrupted(ResourceException):
     """Raised when a resource cannot be resolved correctly."""
 
-    __slots__ = ("uri",)
+    def __init__(
+        self,
+        *,
+        uri: str,
+    ) -> None:
+        super().__init__(
+            f"Corrupted resource - {uri}",
+            uri=uri,
+        )
+
+
+@final
+class ResourceInaccessible(ResourceException):
+    """Raised when a resource cannot be accessed."""
+
+    __slots__ = ("description",)
+
+    def __init__(
+        self,
+        *,
+        uri: str,
+        description: str,
+    ) -> None:
+        super().__init__(
+            f"Inaccessible resource ({description}) - {uri}",
+            uri=uri,
+        )
+        self.description: str = description
+
+
+@final
+class ResourceUnresolveable(ResourceException):
+    """Raised when a resource resolution method is not defined."""
 
     def __init__(
         self,
         *,
         uri: str,
     ) -> None:
-        super().__init__(f"Corrupted resource - {uri}")
-        self.uri: str = uri or ""
+        super().__init__(
+            f"Unresolveable resource - {uri}",
+            uri=uri,
+        )
 
 
 MimeType = (
@@ -63,6 +112,7 @@ MimeType = (
         "video/mp4",
         "video/mpeg",
         "video/ogg",
+        "inode/directory",
         "application/octet-stream",
         "application/json",
         "text/plain",
@@ -72,7 +122,7 @@ MimeType = (
 
 
 @final
-class ResourceReference(DataModel):
+class ResourceReference(State, serializable=True):
     @classmethod
     def of(
         cls,
@@ -86,7 +136,7 @@ class ResourceReference(DataModel):
     ) -> Self:
         return cls(
             uri=uri,
-            mime_type=mime_type,
+            mime_type=mime_type if mime_type is not None else "application/octet-stream",
             meta=Meta.of(meta).updating(
                 name=name,
                 description=description,
@@ -94,11 +144,11 @@ class ResourceReference(DataModel):
         )
 
     uri: str
-    mime_type: MimeType | None = None
-    meta: Meta = META_EMPTY
+    mime_type: MimeType
+    meta: Meta = Meta.empty
 
 
-class ResourceReferenceTemplate(DataModel):
+class ResourceReferenceTemplate(State, serializable=True):
     @classmethod
     def of(
         cls,
@@ -112,7 +162,7 @@ class ResourceReferenceTemplate(DataModel):
     ) -> Self:
         return cls(
             template_uri=template_uri,
-            mime_type=mime_type,
+            mime_type=mime_type if mime_type is not None else "application/octet-stream",
             meta=Meta.of(meta).updating(
                 name=name,
                 description=description,
@@ -120,34 +170,12 @@ class ResourceReferenceTemplate(DataModel):
         )
 
     template_uri: str
-    mime_type: MimeType | None = None
-    meta: Meta = META_EMPTY
+    mime_type: MimeType
+    meta: Meta = Meta.empty
 
 
 @final
-class ResourceContent(DataModel):
-    @overload
-    @classmethod
-    def of(
-        cls,
-        content: bytes,
-        /,
-        *,
-        mime_type: MimeType,
-        meta: Meta | MetaValues | None = None,
-    ) -> Self: ...
-
-    @overload
-    @classmethod
-    def of(
-        cls,
-        content: str,
-        /,
-        *,
-        mime_type: MimeType,
-        meta: Meta | MetaValues | None = None,
-    ) -> Self: ...
-
+class ResourceContent(State, serializable=True):
     @classmethod
     def of(
         cls,
@@ -158,12 +186,12 @@ class ResourceContent(DataModel):
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         if isinstance(content, str):
-            # Treat plain strings as text content; encode to base64
-            encoded_content: str = b64encode(content.encode("utf-8")).decode("utf-8")
+            # Treat strings as base64
+            assert validate_base64(content)  # nosec: B101
 
             return cls(
-                data=encoded_content,
-                mime_type=mime_type if mime_type is not None else "text/plain",
+                data=content,
+                mime_type=mime_type if mime_type is not None else "application/octet-stream",
                 meta=Meta.of(meta),
             )
 
@@ -171,14 +199,14 @@ class ResourceContent(DataModel):
             assert isinstance(content, bytes)  # nosec: B101
 
             return cls(
-                data=b64encode(content).decode("utf-8"),
+                data=b64encode(content).decode(),
                 mime_type=mime_type if mime_type is not None else "application/octet-stream",
                 meta=Meta.of(meta),
             )
 
     data: str  # base64 encoded
     mime_type: str
-    meta: Meta = META_EMPTY
+    meta: Meta = Meta.empty
 
     def to_str(
         self,
@@ -202,7 +230,7 @@ class ResourceContent(DataModel):
             return f"![{kind}]({self.to_data_uri()})"
 
         else:
-            return f"![{kind}](REDACTED)"
+            return f"![{kind}]()"
 
     def to_bytes(self) -> bytes:
         return b64decode(self.data)
@@ -219,7 +247,7 @@ class Resource(State):
     @classmethod
     def of(
         cls,
-        content: bytes,
+        content: str | bytes,
         /,
         *,
         uri: str,
@@ -233,27 +261,10 @@ class Resource(State):
     @classmethod
     def of(
         cls,
-        content: str,
+        content: Collection[ResourceReference] | ResourceContent,
         /,
         *,
         uri: str,
-        name: str | None = None,
-        description: str | None = None,
-        mime_type: MimeType | None = None,
-        meta: Meta | MetaValues | None = None,
-    ) -> Self: ...
-
-    @overload
-    @classmethod
-    def of(
-        cls,
-        content: ResourceContent,
-        /,
-        *,
-        uri: str,
-        name: str | None = None,
-        description: str | None = None,
-        meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
     @classmethod
@@ -269,50 +280,52 @@ class Resource(State):
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         resource_content: Collection[ResourceReference] | ResourceContent
-        if isinstance(content, bytes):
+        if isinstance(content, str | bytes):
             resource_content = ResourceContent.of(
                 content,
                 mime_type=mime_type if mime_type is not None else "application/octet-stream",
-            )
-
-        elif isinstance(content, str):
-            resource_content = ResourceContent.of(
-                content,  # assuming base64
-                mime_type=mime_type if mime_type is not None else "application/octet-stream",
+                meta=Meta.of(meta).updating(
+                    name=name,
+                    description=description,
+                ),
             )
 
         else:
             assert isinstance(content, Collection | ResourceContent)  # nosec: B101
+            assert name is None and description is None and meta is None  # nosec: B101
             resource_content = content
 
         return cls(
             uri=uri,
-            content=resource_content,
-            meta=Meta.of(meta).updating(
-                name=name,
-                description=description,
-            ),
+            resource=resource_content,
         )
 
     uri: str
-    content: Collection[ResourceReference] | ResourceContent
-    meta: Meta = META_EMPTY
+    resource: Collection[ResourceReference] | ResourceContent
 
     @property
     def reference(self) -> ResourceReference:
-        if isinstance(self.content, ResourceContent):
+        if isinstance(self.resource, ResourceContent):
             return ResourceReference(
                 uri=self.uri,
-                mime_type=self.content.mime_type,
-                meta=self.meta,
+                mime_type=self.resource.mime_type,
             )
 
         else:
             return ResourceReference(
                 uri=self.uri,
-                mime_type=None,
-                meta=self.meta,
+                mime_type="inode/directory",
             )
+
+
+@runtime_checkable
+class ResourceListFetching(Protocol):
+    async def __call__(
+        self,
+        *,
+        pagination: Pagination | None,
+        **extra: Any,
+    ) -> Paginated[ResourceReference]: ...
 
 
 @runtime_checkable
@@ -322,14 +335,6 @@ class ResourceFetching(Protocol):
         uri: str,
         **extra: Any,
     ) -> Collection[ResourceReference] | ResourceContent | None: ...
-
-
-@runtime_checkable
-class ResourceListFetching(Protocol):
-    async def __call__(
-        self,
-        **extra: Any,
-    ) -> Sequence[ResourceReference]: ...
 
 
 @runtime_checkable
@@ -349,3 +354,13 @@ class ResourceDeleting(Protocol):
         uri: str,
         **extra: Any,
     ) -> None: ...
+
+
+def validate_base64(data: str) -> bool:
+    try:
+        b64decode(data, validate=True)
+
+    except Exception:
+        return False
+
+    return True

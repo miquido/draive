@@ -49,10 +49,10 @@ class VLLM(
         await self._initialize_client()
         state: list[State] = []
         if GenerativeModel in self._features:
-            state.append(self.generative_model())
+            state.append(GenerativeModel(generating=self.completion))
 
         if TextEmbedding in self._features:
-            state.append(self.text_embedding())
+            state.append(TextEmbedding(embedding=self.create_texts_embedding))
 
         return state
 

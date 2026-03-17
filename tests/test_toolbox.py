@@ -1,364 +1,288 @@
 import asyncio
+from collections.abc import Sequence
 
-from pytest import mark, raises
+import pytest
+from haiway import Meta
 
 from draive import (
-    META_EMPTY,
-    Meta,
+    ModelToolDetachedHandling,
     ModelToolRequest,
+    ModelToolResponse,
+    ModelTools,
     MultimodalContent,
+    MultimodalContentPart,
     Toolbox,
+    ToolEvent,
+    ToolsProvider,
     ctx,
     tool,
 )
-from draive.models import ModelToolSpecification
 
 
-@mark.asyncio
-async def test_of_empty_defaults_and_declaration_none_selection() -> None:
+def _text_of(parts: Sequence[MultimodalContentPart]) -> str:
+    return "".join(part.to_str() for part in parts)
+
+
+def _multimodal_text_of(*elements: object) -> str:
+    return MultimodalContent.of(*elements).to_str()
+
+
+@pytest.mark.asyncio
+async def test_empty_toolbox_model_tools_returns_model_tools_none() -> None:
     async with ctx.scope("test"):
-        tb: Toolbox = Toolbox.of(None)
+        model_tools = Toolbox.empty.model_tools()
 
-        assert tb.tools == {}
-        assert tb.tool_turns_limit == 0
-
-        decl = tb.available_tools_declaration(tools_turn=0)
-        assert decl.selection == "none"
-        assert decl.specifications == ()
+    assert model_tools == ModelTools.none
 
 
-@mark.asyncio
-async def test_of_single_tool_defaults_and_turn_limit_behavior() -> None:
+@pytest.mark.asyncio
+async def test_handle_without_requests_yields_no_chunks() -> None:
     async with ctx.scope("test"):
+        chunks = [chunk async for chunk in Toolbox.empty.handle()]
 
-        @tool
-        async def compute(value: int) -> int:
-            return value
-
-        tb: Toolbox = Toolbox.of(compute)
-        assert set(tb.tools.keys()) == {compute.name}
-        assert tb.tool_turns_limit == 3
-
-        # before turns limit -> no suggestion => auto
-        decl0 = tb.available_tools_declaration(tools_turn=0)
-        assert decl0.selection == "auto"
-        assert [spec.name for spec in decl0.specifications] == [compute.name]
-
-        # at limit -> none
-        decl3 = tb.available_tools_declaration(tools_turn=3)
-        assert decl3.selection == "none"
+    assert chunks == []
 
 
-@mark.asyncio
-async def test_of_iterable_plus_additional_and_suggest_any() -> None:
+@pytest.mark.asyncio
+async def test_handle_returns_error_response_for_unknown_tool() -> None:
     async with ctx.scope("test"):
+        chunks = [
+            chunk
+            async for chunk in Toolbox.empty.handle(
+                ModelToolRequest.of("r1", tool="missing", arguments={})
+            )
+        ]
 
-        @tool
-        async def alpha() -> str:
-            return "A"
-
-        @tool
-        async def beta() -> str:
-            return "B"
-
-        tb: Toolbox = Toolbox.of([alpha], beta, suggesting=True)
-
-        # first turn suggested -> required
-        decl0 = tb.available_tools_declaration(tools_turn=0)
-        assert decl0.selection == "required"
-        assert {spec.name for spec in decl0.specifications} == {alpha.name, beta.name}
-
-        # next turn suggestion expires -> auto
-        decl1 = tb.available_tools_declaration(tools_turn=1)
-        assert decl1.selection == "auto"
+    assert len(chunks) == 1
+    response = chunks[0]
+    assert isinstance(response, ModelToolResponse)
+    assert response.identifier == "r1"
+    assert response.tool == "missing"
+    assert response.handling == "response"
+    assert response.status == "error"
+    assert response.result.to_str() == "ERROR: Unknown tool"
 
 
-@mark.asyncio
-async def test_of_suggest_specific_tool_and_missing_suggestion() -> None:
-    async with ctx.scope("test"):
-        # Use a minimal Tool implementation with a typed specification
-        from draive import ModelToolFunctionSpecification
-
-        class SimpleTool:
-            def __init__(self, name: str) -> None:
-                self._name = name
-                self._spec = ModelToolFunctionSpecification(
-                    name=name,
-                    description=None,
-                    parameters=None,
-                    meta=META_EMPTY,
-                )
-
-            @property
-            def name(self) -> str:
-                return self._name
-
-            @property
-            def description(self) -> str | None:
-                return None
-
-            @property
-            def parameters(self):  # type: ignore[override]
-                return None
-
-            @property
-            def specification(self):  # type: ignore[override]
-                return self._spec
-
-            @property
-            def meta(self) -> Meta:  # type: ignore[override]
-                return META_EMPTY
-
-            @property
-            def handling(self):  # type: ignore[override]
-                return "response"
-
-            def available(self, *, tools_turn: int) -> bool:  # type: ignore[override]
-                return True
-
-            async def call(self, call_id: str, /, **arguments):  # type: ignore[override]
-                return MultimodalContent.of(self._name)
-
-        first = SimpleTool("first")
-        second = SimpleTool("second")
-
-        # Suggest existing tool -> selection equals tool name
-        tb1: Toolbox = Toolbox.of([first, second], suggesting=second)
-        decl0 = tb1.available_tools_declaration(tools_turn=0)
-        assert decl0.selection == second.name
-
-        # Next turn suggestion expires -> auto
-        decl1 = tb1.available_tools_declaration(tools_turn=1)
-        assert decl1.selection == "auto"
-
-        # Suggest a tool that's not included -> no suggestion -> auto
-        tb2: Toolbox = Toolbox.of([first], suggesting=second)
-        decl_missing = tb2.available_tools_declaration(tools_turn=0)
-        assert decl_missing.selection == "auto"
-
-
-@mark.asyncio
-async def test_available_tools_filtered_by_availability() -> None:
-    async with ctx.scope("test"):
-
-        def even_turns_only(
-            tools_turn: int,
-            specification: ModelToolSpecification,
-        ) -> bool:
-            return tools_turn % 2 == 0
-
-        @tool(availability=even_turns_only)
-        async def even() -> str:
-            return "even"
-
-        @tool
-        async def always() -> str:
-            return "always"
-
-        tb: Toolbox = Toolbox.of([even, always])
-
-        decl_odd = tb.available_tools_declaration(tools_turn=1)
-        assert decl_odd.selection == "auto"
-        assert [spec.name for spec in decl_odd.specifications] == [always.name]
-
-        decl_even = tb.available_tools_declaration(tools_turn=2)
-        assert {spec.name for spec in decl_even.specifications} == {even.name, always.name}
-
-
-@mark.asyncio
-async def test_call_tool_success_and_missing() -> None:
+@pytest.mark.asyncio
+async def test_handle_response_tool_streams_events_and_returns_accumulated_response() -> None:
     async with ctx.scope("test"):
 
         @tool
-        async def echo(value: int) -> int:
-            return value
+        async def lookup(value: str):
+            yield ToolEvent.of("progress", f"checking:{value}")
+            yield "A:"
+            yield value
 
-        tb: Toolbox = Toolbox.of(echo)
+        chunks = [
+            chunk
+            async for chunk in Toolbox.of(lookup).handle(
+                ModelToolRequest.of("r1", tool="lookup", arguments={"value": "x"})
+            )
+        ]
 
-        result = await tb.call_tool("echo", call_id="c1", arguments={"value": 42})
-        assert result == MultimodalContent.of("42")
-
-        with raises(Exception) as err:
-            await tb.call_tool("missing", call_id="c2", arguments={})
-        # ToolError is expected and carries empty formatted content
-        assert getattr(err.value, "content", None) == MultimodalContent.empty
-
-
-@mark.asyncio
-async def test_respond_success_and_error_handling() -> None:
-    async with ctx.scope("test"):
-
-        class Boom(Exception):
-            pass
-
-        @tool
-        async def ok(value: int) -> int:
-            return value
-
-        @tool
-        async def fails() -> str:
-            raise Boom("boom")
-
-        tb: Toolbox = Toolbox.of([ok, fails])
-
-        req_ok = ModelToolRequest.of("r1", tool="ok", arguments={"value": 7})
-        resp_ok = await tb.respond(req_ok)
-        assert resp_ok.identifier == "r1"
-        assert resp_ok.tool == "ok"
-        assert resp_ok.handling == "response"
-        assert resp_ok.content == MultimodalContent.of("7")
-
-        req_fail = ModelToolRequest.of("r2", tool="fails")
-        resp_fail = await tb.respond(req_fail)
-        assert resp_fail.identifier == "r2"
-        assert resp_fail.tool == "fails"
-        assert resp_fail.handling == "error"
-        # default error formatter includes the exception class name
-        assert any("ERROR: Tool execution failed" in t.text for t in resp_fail.content.texts())
+    assert len(chunks) == 2
+    event = chunks[0]
+    response = chunks[1]
+    assert isinstance(event, ToolEvent)
+    assert event.event == "progress"
+    assert event.content.to_str() == "checking:x"
+    assert event.meta["tool"] == "lookup"
+    assert event.meta["identifier"] == "r1"
+    assert isinstance(response, ModelToolResponse)
+    assert response.status == "success"
+    assert response.handling == "response"
+    assert response.result.to_str() == "A:x"
 
 
-@mark.asyncio
-async def test_respond_unknown_tool_fallback_and_logging() -> None:
-    async with ctx.scope("test"):
-        tb: Toolbox = Toolbox.of(None)
-
-        req = ModelToolRequest.of("rx", tool="unknown")
-        resp = await tb.respond(req)
-        assert resp.identifier == "rx"
-        assert resp.tool == "unknown"
-        assert resp.handling == "error"
-        assert resp.content == MultimodalContent.of("ERROR: Unavailable tool unknown")
-
-
-@mark.asyncio
-async def test_respond_detached_spawns_and_returns_immediate_message() -> None:
-    async with ctx.scope("test"):
-        marker: list[str] = []
-        done = asyncio.Event()
-
-        @tool(handling="detached")
-        async def bg(task: str) -> str:
-            marker.append(task)
-            done.set()
-            return task
-
-        tb: Toolbox = Toolbox.of(bg)
-        req = ModelToolRequest.of("d1", tool="bg", arguments={"task": "work"})
-
-        resp = await tb.respond(req)
-        assert resp.identifier == "d1"
-        assert resp.tool == "bg"
-        assert resp.handling == "detached"
-        assert resp.content == MultimodalContent.of("bg tool execution has been requested")
-
-        # allow the spawned task to run
-        await asyncio.wait_for(done.wait(), timeout=0.1)
-        assert marker == ["work"]
-
-
-@mark.asyncio
-async def test_with_tools_adds_new_and_is_immutable() -> None:
+@pytest.mark.asyncio
+async def test_handle_response_tool_returns_error_response_with_partial_result() -> None:
     async with ctx.scope("test"):
 
         @tool
-        async def t1() -> str:
-            return "1"
+        async def unstable():
+            yield ToolEvent.of("progress", "started")
+            yield "partial"
+            raise RuntimeError("boom")
+
+        chunks = [
+            chunk
+            async for chunk in Toolbox.of(unstable).handle(
+                ModelToolRequest.of("r1", tool="unstable", arguments={})
+            )
+        ]
+
+    assert len(chunks) == 2
+    assert isinstance(chunks[0], ToolEvent)
+    response = chunks[1]
+    assert isinstance(response, ModelToolResponse)
+    assert response.status == "error"
+    assert response.handling == "response"
+    assert response.result.to_str() == "partial"
+
+
+@pytest.mark.asyncio
+async def test_handle_detached_tool_returns_detach_message_and_executes_in_background() -> None:
+    executed = asyncio.Event()
+
+    async with ctx.scope("test"):
+
+        @tool(handling=ModelToolDetachedHandling(detach_message="working"))
+        async def background(value: str) -> str:
+            await asyncio.sleep(0)
+            executed.set()
+            return value.upper()
+
+        chunks = [
+            chunk
+            async for chunk in Toolbox.of(background).handle(
+                ModelToolRequest.of("r1", tool="background", arguments={"value": "x"})
+            )
+        ]
+        await asyncio.wait_for(executed.wait(), timeout=1)
+
+    assert len(chunks) == 1
+    response = chunks[0]
+    assert isinstance(response, ModelToolResponse)
+    assert response.status == "success"
+    assert isinstance(response.handling, ModelToolDetachedHandling)
+    assert response.result.to_str() == "working"
+
+
+@pytest.mark.asyncio
+async def test_handle_detached_tool_keeps_success_response_when_background_fails() -> None:
+    attempted = asyncio.Event()
+
+    async with ctx.scope("test"):
+
+        @tool(handling=ModelToolDetachedHandling(detach_message="queued"))
+        async def failing_background() -> str:
+            attempted.set()
+            raise RuntimeError("boom")
+
+        chunks = [
+            chunk
+            async for chunk in Toolbox.of(failing_background).handle(
+                ModelToolRequest.of("r1", tool="failing_background", arguments={})
+            )
+        ]
+        await asyncio.wait_for(attempted.wait(), timeout=1)
+
+    assert len(chunks) == 1
+    response = chunks[0]
+    assert isinstance(response, ModelToolResponse)
+    assert response.status == "success"
+    assert isinstance(response.handling, ModelToolDetachedHandling)
+    assert response.result.to_str() == "queued"
+
+
+@pytest.mark.asyncio
+async def test_handle_output_tool_yields_event_then_output_parts_then_response() -> None:
+    async with ctx.scope("test"):
+
+        @tool(handling="output")
+        async def amplify(value: str):
+            yield ToolEvent.of("progress", "starting")
+            yield "OUT:"
+            yield value
+
+        chunks = [
+            chunk
+            async for chunk in Toolbox.of(amplify).handle(
+                ModelToolRequest.of("r1", tool="amplify", arguments={"value": "x"})
+            )
+        ]
+
+    assert len(chunks) == 4
+    event = chunks[0]
+    output_parts = chunks[1:3]
+    response = chunks[3]
+    assert isinstance(event, ToolEvent)
+    assert event.event == "progress"
+    assert event.meta["tool"] == "amplify"
+    assert event.meta["identifier"] == "r1"
+    assert _multimodal_text_of(*output_parts) == "OUT:x"
+    assert isinstance(response, ModelToolResponse)
+    assert response.status == "success"
+    assert response.handling == "output"
+    assert response.result.to_str() == "OUT:x"
+
+
+@pytest.mark.asyncio
+async def test_handle_output_tool_returns_error_response_with_partial_result() -> None:
+    async with ctx.scope("test"):
+
+        @tool(handling="output")
+        async def unstable_output():
+            yield "OUT:"
+            raise RuntimeError("boom")
+
+        chunks = [
+            chunk
+            async for chunk in Toolbox.of(unstable_output).handle(
+                ModelToolRequest.of("r1", tool="unstable_output", arguments={})
+            )
+        ]
+
+    assert len(chunks) == 2
+    assert _multimodal_text_of(*chunks[:1]) == "OUT:"
+    response = chunks[1]
+    assert isinstance(response, ModelToolResponse)
+    assert response.status == "error"
+    assert response.handling == "output"
+    assert response.result.to_str() == "OUT:"
+
+
+@pytest.mark.asyncio
+async def test_filtered_with_empty_tool_names_returns_empty_toolbox() -> None:
+    async with ctx.scope("test"):
 
         @tool
-        async def t2() -> str:
-            return "2"
+        async def ping() -> str:
+            return "pong"
 
-        base = Toolbox.of(t1)
-        extended = base.with_tools(t2)
+        filtered = Toolbox.of(ping).filtered(tools=set())
 
-        assert set(base.tools.keys()) == {t1.name}
-        assert set(extended.tools.keys()) == {t1.name, t2.name}
-        # policy and limits preserved
-        assert extended.tool_turns_limit == base.tool_turns_limit == 3
+    assert filtered.tools == {}
 
 
-@mark.asyncio
-async def test_with_suggestion_true_false_and_specific() -> None:
-    async with ctx.scope("test"):
-        from draive import ModelToolFunctionSpecification
-
-        class SimpleTool:
-            def __init__(self, name: str) -> None:
-                self._name = name
-                self._spec = ModelToolFunctionSpecification(
-                    name=name,
-                    description=None,
-                    parameters=None,
-                    meta=META_EMPTY,
-                )
-
-            @property
-            def name(self) -> str:
-                return self._name
-
-            @property
-            def description(self) -> str | None:
-                return None
-
-            @property
-            def parameters(self):  # type: ignore[override]
-                return None
-
-            @property
-            def specification(self):  # type: ignore[override]
-                return self._spec
-
-            @property
-            def meta(self) -> Meta:  # type: ignore[override]
-                return META_EMPTY
-
-            @property
-            def handling(self):  # type: ignore[override]
-                return "response"
-
-            def available(self, *, tools_turn: int) -> bool:  # type: ignore[override]
-                return True
-
-            async def call(self, call_id: str, /, **arguments):  # type: ignore[override]
-                return MultimodalContent.of(self._name)
-
-        main = SimpleTool("main")
-
-        tb = Toolbox.of(main)
-
-        # suggest any for two turns
-        tb_any = tb.with_suggestion(True, turns=2)
-        assert tb_any.available_tools_declaration(tools_turn=0).selection == "required"
-        assert tb_any.available_tools_declaration(tools_turn=1).selection == "required"
-        assert tb_any.available_tools_declaration(tools_turn=2).selection == "auto"
-
-        # disable suggestions
-        tb_none = tb.with_suggestion(False)
-        assert tb_none.available_tools_declaration(tools_turn=0).selection == "auto"
-
-        # suggest a specific tool
-        tb_specific = tb.with_suggestion(main, turns=1)
-        assert tb_specific.available_tools_declaration(tools_turn=0).selection == main.name
-
-
-@mark.asyncio
-async def test_filtered_by_tool_names_and_tags() -> None:
+@pytest.mark.asyncio
+async def test_model_tools_keeps_specific_suggestion_after_replacing_tool_instance() -> None:
     async with ctx.scope("test"):
 
-        @tool(meta=Meta.of({"tags": ("x", "y")}))
-        async def tagged_xy() -> str:
-            return "xy"
+        @tool
+        async def ping() -> str:
+            return "pong"
 
-        @tool(meta=Meta.of({"tags": ("y",)}))
-        async def tagged_y() -> str:
-            return "y"
+        toolbox = Toolbox.of(ping, suggesting=ping)
+        updated = ping.updating(description="Updated description")
 
-        tb = Toolbox.of([tagged_xy, tagged_y])
+        model_tools = toolbox.with_tools(updated).model_tools()
 
-        # filter by names
-        by_name = tb.filtered(tools={tagged_y.name})
-        assert set(by_name.tools.keys()) == {tagged_y.name}
+    assert model_tools.selection == updated.specification
 
-        # filter by tags (subset match)
-        by_tags = tb.filtered(tags=("x",))
-        assert set(by_tags.tools.keys()) == {tagged_xy.name}
+
+@pytest.mark.asyncio
+async def test_tools_provider_toolbox_accepts_tool_suggestion() -> None:
+    async with ctx.scope("test"):
+
+        @tool
+        async def ping() -> str:
+            return "pong"
+
+        toolbox = await ToolsProvider().toolbox(ping, suggesting=ping)
+
+    assert toolbox.model_tools().selection == ping.specification
+
+
+@pytest.mark.asyncio
+async def test_tool_updating_allows_clearing_meta() -> None:
+    async with ctx.scope("test"):
+
+        @tool(meta={"tag": "value"})
+        async def ping() -> str:
+            return "pong"
+
+        updated = ping.updating(meta=Meta.empty)
+
+    assert ping.meta == Meta.of({"tag": "value"})
+    assert updated.meta == Meta.empty

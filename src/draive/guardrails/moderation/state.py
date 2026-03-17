@@ -49,7 +49,7 @@ class GuardrailsModeration(State):
     ) -> None:
         content = MultimodalContent.of(content)
         try:
-            await self.input_checking(
+            await self._input_checking(
                 content,
                 **extra,
             )
@@ -107,7 +107,7 @@ class GuardrailsModeration(State):
     ) -> None:
         content = MultimodalContent.of(content)
         try:
-            await self.output_checking(
+            await self._output_checking(
                 content,
                 **extra,
             )
@@ -139,5 +139,15 @@ class GuardrailsModeration(State):
                 meta={"error_type": exc.__class__.__name__},
             ) from exc
 
-    input_checking: GuardrailsModerationChecking = _no_moderation
-    output_checking: GuardrailsModerationChecking = _no_moderation
+    _input_checking: GuardrailsModerationChecking = _no_moderation
+    _output_checking: GuardrailsModerationChecking
+
+    def __init__(
+        self,
+        input_checking: GuardrailsModerationChecking = _no_moderation,
+        output_checking: GuardrailsModerationChecking = _no_moderation,
+    ) -> None:
+        super().__init__(
+            _input_checking=input_checking,
+            _output_checking=output_checking,
+        )

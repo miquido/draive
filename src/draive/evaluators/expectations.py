@@ -1,7 +1,8 @@
 from draive.evaluation import EvaluationScore, evaluator
 from draive.evaluators.utils import FORMAT_INSTRUCTION, extract_evaluation_result
+from draive.models import ModelInput
 from draive.multimodal import Multimodal, MultimodalContent
-from draive.stages import Stage
+from draive.steps import Step
 
 __all__ = ("expectations_evaluator",)
 
@@ -54,16 +55,21 @@ async def expectations_evaluator(
         )
 
     return extract_evaluation_result(
-        await Stage.completion(
-            MultimodalContent.of(
-                "<EVALUATED>",
-                evaluated,
-                "</EVALUATED>\n<EXPECTATIONS>",
-                expectations,
-                "</EXPECTATIONS>",
-            ),
+        await Step.generating_completion(
             instructions=INSTRUCTION.format(
                 guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
             ),
-        ).execute()
+        ).run(
+            (
+                ModelInput.of(
+                    MultimodalContent.of(
+                        "<EVALUATED>",
+                        evaluated,
+                        "</EVALUATED>\n<EXPECTATIONS>",
+                        expectations,
+                        "</EXPECTATIONS>",
+                    ),
+                ),
+            )
+        )
     )

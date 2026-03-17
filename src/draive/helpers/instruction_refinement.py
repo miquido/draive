@@ -10,21 +10,19 @@ from draive.evaluation import (
     EvaluatorSuiteResult,
     PreparedEvaluatorSuite,
 )
-from draive.models import ModelInstructions
+from draive.models import ModelInput, ModelInstructions
 from draive.multimodal import (
     MultimodalContent,
     MultimodalTag,
     Template,
     TemplatesRepository,
-    TextContent,
 )
-from draive.parameters import DataModel
-from draive.stages import Stage, StageState, stage
+from draive.steps import Step, StepState, step
 
 __all__ = ("refine_instructions",)
 
 
-async def refine_instructions[Parameters: DataModel](
+async def refine_instructions[Parameters: State](
     instructions: Template,
     /,
     *,
@@ -72,8 +70,8 @@ async def refine_instructions[Parameters: DataModel](
         f"performance_drop_threshold={performance_drop_threshold}"
     )
 
-    result: MultimodalContent = await Stage.sequence(
-        _tree_initialization_stage(
+    result: MultimodalContent = await Step.sequence(
+        _tree_initialization_step(
             instructions=instructions,
             instructions_content=instructions_content,
             evaluator_suite=evaluator_suite,
@@ -82,19 +80,19 @@ async def refine_instructions[Parameters: DataModel](
             guidelines=guidelines,
             rounds_limit=rounds_limit,
         ),
-        _tree_exploration_stage(
+        _tree_exploration_step(
             evaluator_suite=evaluator_suite,
             evaluator_cases=evaluator_cases,
             rounds_limit=rounds_limit,
             quality_threshold=quality_threshold,
             concurrent_nodes=concurrent_nodes,
         ),
-        _tree_finalization_stage(
+        _tree_finalization_step(
             evaluator_suite=evaluator_suite,
             quality_threshold=quality_threshold,
             candidates_limit=candidates_limit,
         ),
-    ).execute()
+    ).run()
 
     ctx.log_info("...instructions refinement finished!")
     return result.to_str()
@@ -145,14 +143,14 @@ class _RefinementTreeNode(State):
                 return self.instructions_content
 
             else:  # otherwise preserve unchanged instructions
-                return await repository.loading(
+                return await repository._loading(  # pyright: ignore[reportPrivateUsage]
                     identifier=identifier,
                     meta=meta,
                     **extra,
                 )
 
         return TemplatesRepository(
-            listing=repository.listing,  # keep current listing
+            listing=repository._listing,  # pyright: ignore[reportPrivateUsage] keep current listing
             loading=instructions_loading,  # replace loading
             # do not allow modifications - use default noop implementation
         )
@@ -165,12 +163,13 @@ class _RefinementState(State):
     performance_drop_threshold: float
     guidelines: str | None = None
     rounds_remaining: int
+    instructions: ModelInstructions
 
     def leaves(self) -> Sequence[_RefinementTreeNode]:
         return [node for node in self.nodes.values() if node.is_leaf and not node.pruned]
 
 
-def _select_focused_cases[Parameters: DataModel](
+def _select_focused_cases[Parameters: State](
     *,
     evaluation_result: EvaluatorSuiteResult,
     evaluator_cases: Sequence[EvaluatorSuiteCase[Parameters]],
@@ -220,7 +219,7 @@ def _select_focused_cases[Parameters: DataModel](
     return failing_cases + sampling_cases
 
 
-def _tree_initialization_stage[Parameters: DataModel](
+def _tree_initialization_step[Parameters: State](
     *,
     instructions: Template,
     instructions_content: ModelInstructions | None,
@@ -229,12 +228,11 @@ def _tree_initialization_stage[Parameters: DataModel](
     performance_drop_threshold: float,
     guidelines: str | None,
     rounds_limit: int,
-) -> Stage:
-    @stage
+) -> Step:
+    @step
     async def tree_initialization(
-        *,
-        state: StageState,
-    ) -> StageState:
+        state: StepState,
+    ) -> StepState:
         ctx.log_info("...evaluating initial instructions with full suite...")
         # Make initial evaluation using current instructions
         evaluation: EvaluatorSuiteResult = await evaluator_suite()
@@ -264,7 +262,7 @@ def _tree_initialization_stage[Parameters: DataModel](
         )
 
         # Setup initial state
-        return state.updating(
+        return state.updating_artifacts(
             _RefinementState(
                 root=root_node,
                 nodes={root_node.identifier: root_node},
@@ -272,27 +270,25 @@ def _tree_initialization_stage[Parameters: DataModel](
                 performance_drop_threshold=performance_drop_threshold,
                 guidelines=guidelines,
                 rounds_remaining=rounds_limit,
+                instructions=content,
             ),
-            # set the result to be initial instruction content
-            result=MultimodalContent.of(content),
         )
 
     return tree_initialization
 
 
-def _tree_exploration_stage[Parameters: DataModel](
+def _tree_exploration_step[Parameters: State](
     *,
     evaluator_suite: PreparedEvaluatorSuite[Parameters],
     evaluator_cases: Sequence[EvaluatorSuiteCase[Parameters]],
     rounds_limit: int,
     quality_threshold: float,
     concurrent_nodes: int,
-) -> Stage:
-    @stage
+) -> Step:
+    @step
     async def tree_exploration(
-        *,
-        state: StageState,
-    ) -> StageState:
+        state: StepState,
+    ) -> StepState:
         refinement_state: _RefinementState = state.get(
             _RefinementState,
             required=True,
@@ -336,11 +332,10 @@ def _tree_exploration_stage[Parameters: DataModel](
             f"{active_nodes} active, {pruned_count} pruned"
         )
 
-        return state.updating(refinement_state)
+        return state.updating_artifacts(refinement_state)
 
     async def condition(
-        *,
-        state: StageState,
+        state: StepState,
         iteration: int,
     ) -> bool:
         refinement_state: _RefinementState = state.get(
@@ -361,13 +356,13 @@ def _tree_exploration_stage[Parameters: DataModel](
 
         return iteration < rounds_limit
 
-    return Stage.loop(
+    return Step.loop(
         tree_exploration,
         condition=condition,
     )
 
 
-async def _explore_node[Parameters: DataModel](
+async def _explore_node[Parameters: State](
     node: _RefinementTreeNode,
     evaluator_suite: PreparedEvaluatorSuite[Parameters],
     evaluator_cases: Sequence[EvaluatorSuiteCase[Parameters]],
@@ -501,10 +496,17 @@ For each strategy, provide the name and approach in the following tags format:
 </format>
 """  # noqa: E501
 
-    response: MultimodalContent = await Stage.completion(
-        f"<failure_analysis>\n{failure_report}\n</failure_analysis>",
+    response: MultimodalContent = await Step.generating_completion(
         instructions=strategy_prompt,
-    ).execute()
+    ).run(
+        (
+            ModelInput.of(
+                MultimodalContent.of(
+                    f"<failure_analysis>\n{failure_report}\n</failure_analysis>",
+                )
+            ),
+        )
+    )
 
     # Parse strategies
     strategies: list[tuple[str, str]] = []
@@ -559,10 +561,17 @@ Provide ONLY the refined instructions content, without any explanation or metada
 """  # noqa: E501
 
     ctx.log_info(f"Generating updated instructions using {strategy_name}:\n\n{strategy_approach}")
-    response: MultimodalContent = await Stage.completion(
-        f"<failure_analysis>\n{failure_report}\n</failure_analysis>",
+    response: MultimodalContent = await Step.generating_completion(
         instructions=refinement_prompt,
-    ).execute()
+    ).run(
+        (
+            ModelInput.of(
+                MultimodalContent.of(
+                    f"<failure_analysis>\n{failure_report}\n</failure_analysis>",
+                )
+            ),
+        )
+    )
 
     updated_instruction: str = response.to_str().strip()
 
@@ -616,17 +625,16 @@ async def _generate_refined_instructions(
             return refined_strategies[:2]
 
 
-def _tree_finalization_stage[Parameters: DataModel](
+def _tree_finalization_step[Parameters: State](
     *,
     evaluator_suite: PreparedEvaluatorSuite[Parameters],
     quality_threshold: float,
     candidates_limit: int,
-) -> Stage:
-    @stage
+) -> Step:
+    @step
     async def tree_finalization(
-        *,
-        state: StageState,
-    ) -> StageState:
+        state: StepState,
+    ) -> StepState:
         refinement_state: _RefinementState = state.get(
             _RefinementState,
             required=True,
@@ -681,22 +689,18 @@ def _tree_finalization_stage[Parameters: DataModel](
                 best_score = complete_evaluation.performance
                 best_node = updated_node
 
+        # Update state with best instructions
+        refinement_state = refinement_state.updating(
+            instructions=best_instructions,
+        )
+
         # Log final statistics
         _log_tree_statistics(
             refinement_state=refinement_state,
             best_node=best_node,
         )
 
-        # Update result with best instructions and updated state
-        return state.updating(
-            refinement_state,
-            result=MultimodalContent.of(
-                TextContent.of(
-                    best_instructions,
-                    meta={"score": best_score},
-                ),
-            ),
-        )
+        return state.updating_artifacts(refinement_state)
 
     return tree_finalization
 

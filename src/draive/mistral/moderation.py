@@ -4,7 +4,7 @@ from typing import Any, cast
 from haiway import MISSING, ctx
 from mistralai import ModerationResponse
 
-from draive.guardrails import GuardrailsModeration, GuardrailsModerationException
+from draive.guardrails import GuardrailsModerationException
 from draive.mistral.api import MistralAPI
 from draive.mistral.config import MistralModerationConfig
 from draive.multimodal import Multimodal, MultimodalContent
@@ -16,9 +16,6 @@ __all__ = ("MistralContentModeration",)
 
 
 class MistralContentModeration(MistralAPI):
-    def content_guardrails(self) -> GuardrailsModeration:
-        return GuardrailsModeration(input_checking=self.content_verification)
-
     async def content_verification(  # noqa: C901, PLR0912
         self,
         content: Multimodal,
@@ -59,7 +56,7 @@ class MistralContentModeration(MistralAPI):
                     if part.hidden:
                         continue  # skip hidden
 
-                    moderated_content.append(part.artifact.to_str())
+                    moderated_content.append(part.to_str())
 
             response: ModerationResponse = await self._client.classifiers.moderate_async(
                 model=moderation_config.model,
@@ -87,7 +84,7 @@ class MistralContentModeration(MistralAPI):
                             score: float = result.category_scores.get(
                                 category, 1.0 if flagged else 0.0
                             )
-                            if category_thresholds[category] >= score:
+                            if score >= category_thresholds[category]:
                                 violations[category] = score
 
                         elif flagged:

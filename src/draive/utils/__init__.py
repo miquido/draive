@@ -1,8 +1,3 @@
-from draive.utils.memory import Memory, MemoryMaintaining, MemoryRecalling, MemoryRemembering
+from draive.utils.schema import simplified_schema
 
-__all__ = (
-    "Memory",
-    "MemoryMaintaining",
-    "MemoryRecalling",
-    "MemoryRemembering",
-)
+__all__ = ("simplified_schema",)

@@ -38,10 +38,15 @@ class Bedrock(
         await self._initialize_client()
         state: list[State] = []
         if GenerativeModel in self._features:
-            state.append(self.generative_model())
+            state.append(GenerativeModel(generating=self.completion))
 
         if GuardrailsModeration in self._features:
-            state.append(self.guardrails_moderation())
+            state.append(
+                GuardrailsModeration(
+                    input_checking=self.content_input_verification,
+                    output_checking=self.content_output_verification,
+                )
+            )
 
         return state
 

@@ -1,394 +1,286 @@
-from collections.abc import Sequence
+from collections.abc import AsyncIterable, Sequence
 from typing import Any
-from uuid import uuid4
 
-from pytest import mark
+import pytest
+from haiway import ctx
 
-from draive import (
-    META_EMPTY,
-    GenerativeModel,
-    MultimodalContent,
-    Toolbox,
-    ctx,
-    tool,
-)
-from draive.conversation import Conversation, ConversationMessage
+from draive.conversation import Conversation
+from draive.conversation.state import ConversationMemory
+from draive.conversation.types import ConversationAssistantTurn, ConversationUserTurn
 from draive.models import (
+    GenerativeModel,
     ModelContextElement,
     ModelInput,
-    ModelMemory,
-    ModelMemoryRecall,
     ModelOutput,
+    ModelOutputChunk,
     ModelToolRequest,
-    ModelToolsDeclaration,
+    ModelTools,
 )
+from draive.multimodal import MultimodalContent, TextContent
+from draive.tools import tool
 
 
-class MockLMMTracker:
-    """Tracks LMM calls for testing."""
-
-    def __init__(self):
-        self.call_count = 0
-        self.last_context = None
-        self.last_instruction = None
-        self.last_tools = None
+async def _single_text_chunk(text: str) -> AsyncIterable[ModelOutputChunk]:
+    yield TextContent.of(text)
 
 
-def extract_text_content(content: MultimodalContent) -> str:
-    """Extract text from potentially nested MultimodalContent."""
-    return "".join(
-        part.text
-        if hasattr(part, "text")
-        else part.content.to_str()
-        if hasattr(part, "content")
-        else str(part)
-        for part in content.parts
-    )
+async def _stream_of(*chunks: ModelOutputChunk) -> AsyncIterable[ModelOutputChunk]:
+    for chunk in chunks:
+        yield chunk
 
 
-@mark.asyncio
-async def test_conversation_completion_simple_response():
-    """Test basic conversation completion with simple text response."""
-    tracker = MockLMMTracker()
-
-    async def mock_generating(
+@pytest.mark.asyncio
+async def test_conversation_completion_emits_stream_chunks() -> None:
+    def mock_generating(
         *,
         instructions: str,
-        tools: ModelToolsDeclaration,
+        tools: ModelTools,
         context: Sequence[ModelContextElement],
-        output: str | type | None = None,
-        stream: bool = False,
+        output: str | type | Sequence[str],
         **extra: Any,
-    ) -> ModelOutput:
-        tracker.call_count += 1
-        tracker.last_context = context
-        tracker.last_instruction = instructions
-        tracker.last_tools = tools
-        return ModelOutput.of(MultimodalContent.of("Hello! How can I help you?"))
+    ) -> AsyncIterable[ModelOutputChunk]:
+        _ = (instructions, tools, context, output, extra)
+        return _single_text_chunk("Hello from assistant")
 
     async with ctx.scope("test", GenerativeModel(generating=mock_generating), Conversation()):
-        result = await Conversation.completion(
-            input="Hi there!",
-            memory=None,
-            tools=None,
+        stream = Conversation.completion(
+            message="Hi",
+            memory=ConversationMemory.disabled,
         )
+        chunks = [chunk async for chunk in stream]
 
-        assert isinstance(result, ConversationMessage)
-        assert result.role == "model"
-        assert extract_text_content(result.content) == "Hello! How can I help you?"
-        assert tracker.call_count == 1
+    assert MultimodalContent.of(*chunks).to_str() == "Hello from assistant"
 
 
-@mark.asyncio
-async def test_conversation_completion_with_memory():
-    """Test conversation completion with memory context."""
-    tracker = MockLMMTracker()
-
-    async def mock_generating(
-        *,
-        instructions: str,
-        tools: ModelToolsDeclaration,
-        context: Sequence[ModelContextElement],
-        output: str | type | None = None,
-        stream: bool = False,
-        **extra: Any,
-    ) -> ModelOutput:
-        tracker.call_count += 1
-        tracker.last_context = context
-        return ModelOutput.of(MultimodalContent.of("I can see we talked before."))
-
-    memory_messages = [
-        ConversationMessage.user("Previous message"),
-        ConversationMessage.model("Previous response"),
-    ]
-
-    async with ctx.scope("test", GenerativeModel(generating=mock_generating), Conversation()):
-        result = await Conversation.completion(
-            input="Do you remember our conversation?",
-            memory=memory_messages,
-            tools=None,
-        )
-
-        assert isinstance(result, ConversationMessage)
-        assert extract_text_content(result.content) == "I can see we talked before."
-        assert tracker.call_count == 1
-        # Check that memory+input were included (context mutates to include output)
-        assert len(tracker.last_context or []) >= 3
-
-
-@mark.asyncio
-async def test_conversation_completion_with_instruction():
-    """Test conversation completion with custom instruction."""
-    tracker = MockLMMTracker()
-
-    async def mock_generating(
-        *,
-        instructions: str,
-        tools: ModelToolsDeclaration,
-        context: Sequence[ModelContextElement],
-        output: str | type | None = None,
-        stream: bool = False,
-        **extra: Any,
-    ) -> ModelOutput:
-        tracker.last_instruction = instructions
-        return ModelOutput.of(MultimodalContent.of("I'm a helpful assistant!"))
-
-    async with ctx.scope("test", GenerativeModel(generating=mock_generating), Conversation()):
-        result = await Conversation.completion(
-            instructions="You are a helpful assistant",
-            input="Who are you?",
-            memory=None,
-            tools=None,
-        )
-
-        assert extract_text_content(result.content) == "I'm a helpful assistant!"
-        assert tracker.last_instruction == "You are a helpful assistant"
-
-
-@mark.asyncio
-async def test_conversation_completion_with_tools():
-    """Test conversation completion with tool usage."""
-    call_count = 0
+@pytest.mark.asyncio
+async def test_conversation_completion_loops_tool_response_into_followup_completion() -> None:
+    calls = 0
 
     @tool
-    async def calculate(a: int, b: int) -> int:
-        """Calculate sum of two numbers."""
-        return a + b
+    async def echo(value: str) -> str:
+        return f"TOOL:{value}"
 
-    tool_request = ModelToolRequest.of(
-        str(uuid4()),
-        tool="calculate",
-        arguments={"a": 5, "b": 3},
-    )
-
-    async def mock_generating(
+    def mock_generating(
         *,
         instructions: str,
-        tools: ModelToolsDeclaration,
+        tools: ModelTools,
         context: Sequence[ModelContextElement],
-        output: str | type | None = None,
-        stream: bool = False,
+        output: str | type | Sequence[str],
         **extra: Any,
-    ) -> ModelOutput:
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            # First call requests tool usage
-            return ModelOutput.of(tool_request)
-        else:
-            # After tool response, return final result
-            return ModelOutput.of(MultimodalContent.of("The sum is 8"))
+    ) -> AsyncIterable[ModelOutputChunk]:
+        nonlocal calls
+        _ = (instructions, tools, output, extra)
+        calls += 1
+        if calls == 1:
+            assert len(context) == 1
+            assert isinstance(context[0], ModelInput)
+            assert context[0].content.to_str() == "Hi"
+            return _stream_of(
+                TextContent.of("Checking"),
+                ModelToolRequest.of("call-1", tool="echo", arguments={"value": "x"}),
+            )
 
-    async with ctx.scope("test", GenerativeModel(generating=mock_generating), Conversation()):
-        result = await Conversation.completion(
-            input="What is 5 + 3?",
-            memory=None,
-            tools=[calculate],
-        )
+        assert len(context) == 3
+        assert isinstance(context[1], ModelOutput)
+        assert context[1].tool_requests[0].identifier == "call-1"
+        assert isinstance(context[2], ModelInput)
+        assert context[2].tool_responses[0].identifier == "call-1"
+        assert context[2].tool_responses[0].result.to_str() == "TOOL:x"
+        return _stream_of(TextContent.of("Final answer"))
 
-        assert extract_text_content(result.content) == "The sum is 8"
-        assert call_count == 2  # Initial request + after tool response
-
-    # Tool events streaming behavior changed; streaming path is provider-dependent
-
-
-@mark.asyncio
-async def test_conversation_completion_with_memory_callback():
-    """Test conversation completion with memory remember callback."""
-    remembered_messages: list[ConversationMessage] = []
-
-    async def remember_callback(*elements: ModelContextElement, **_: Any):
-        for el in elements:
-            if isinstance(el, ModelInput):
-                remembered_messages.append(ConversationMessage.user(el.content))
-            else:
-                remembered_messages.append(ConversationMessage.model(el.content))
-
-    async def recall_callback(**_: Any):
-        return ModelMemoryRecall.empty
-
-    async def maintenance_callback(**_: Any):
-        pass
-
-    memory = ModelMemory(
-        recalling=recall_callback,
-        remembering=remember_callback,
-        maintaining=maintenance_callback,
-        meta=META_EMPTY,
-    )
-
-    async def mock_generating(
-        *,
-        instructions: str,
-        tools: ModelToolsDeclaration,
-        context: Sequence[ModelContextElement],
-        output: str | type | None = None,
-        stream: bool = False,
-        **extra: Any,
-    ) -> ModelOutput:
-        return ModelOutput.of(MultimodalContent.of("Hello!"))
-
-    async with ctx.scope("test", GenerativeModel(generating=mock_generating), Conversation()):
-        input_msg = ConversationMessage.user("Hi")
-        await Conversation.completion(
-            input=input_msg,
+    memory = ConversationMemory.volatile()
+    async with ctx.scope(
+        "test",
+        GenerativeModel(generating=mock_generating),
+        Conversation(),
+    ):
+        stream = Conversation.completion(
+            message="Hi",
+            tools=[echo],
             memory=memory,
-            tools=None,
         )
+        chunks = [chunk async for chunk in stream]
 
-        # Check that both input and response were remembered
-        assert len(remembered_messages) == 2
-        assert remembered_messages[0].role == "user"
-        assert extract_text_content(remembered_messages[0].content) == "Hi"
-        assert remembered_messages[1].role == "model"
-        assert extract_text_content(remembered_messages[1].content) == "Hello!"
+    assert calls == 2
+    assert chunks[0].text == "Checking"
+    assert chunks[1].event == "tool_request"
+    assert chunks[2].event == "tool_response"
+    assert chunks[3].text == "Final answer"
+
+    remembered_turns = await memory.fetch()
+    assert len(remembered_turns) == 2
+    assistant_turn = remembered_turns[1]
+    assert isinstance(assistant_turn, ConversationAssistantTurn)
+    assert assistant_turn.content[0].to_str() == "Checking"
+    assert assistant_turn.content[1].event == "tool_request"
+    assert assistant_turn.content[2].event == "tool_response"
+    assert assistant_turn.content[3].to_str() == "Final answer"
 
 
-@mark.asyncio
-async def test_conversation_completion_tool_error_handling():
-    """Test conversation completion handles tool errors gracefully."""
-    call_count = 0
+@pytest.mark.asyncio
+async def test_conversation_completion_output_tool_stops_loop_and_persists_output() -> None:
+    calls = 0
 
-    @tool
-    async def failing_tool() -> str:
-        """A tool that always fails."""
-        raise ValueError("Tool error!")
+    @tool(handling="output")
+    async def amplify(value: str) -> str:
+        return f"OUT:{value}"
 
-    tool_request = ModelToolRequest.of(
-        str(uuid4()),
-        tool="failing_tool",
-    )
-
-    async def mock_generating(
+    def mock_generating(
         *,
         instructions: str,
-        tools: ModelToolsDeclaration,
+        tools: ModelTools,
         context: Sequence[ModelContextElement],
-        output: str | type | None = None,
-        stream: bool = False,
+        output: str | type | Sequence[str],
         **extra: Any,
-    ) -> ModelOutput:
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            return ModelOutput.of(tool_request)
-        else:
-            # After seeing the tool error, provide a response
-            return ModelOutput.of(MultimodalContent.of("I encountered an error with the tool."))
+    ) -> AsyncIterable[ModelOutputChunk]:
+        nonlocal calls
+        _ = (instructions, tools, context, output, extra)
+        calls += 1
+        return _stream_of(ModelToolRequest.of("call-1", tool="amplify", arguments={"value": "x"}))
 
-    async with ctx.scope("test", GenerativeModel(generating=mock_generating), Conversation()):
-        result = await Conversation.completion(
-            input="Use the failing tool",
-            memory=None,
-            tools=[failing_tool],
+    memory = ConversationMemory.volatile()
+    async with ctx.scope(
+        "test",
+        GenerativeModel(generating=mock_generating),
+        Conversation(),
+    ):
+        stream = Conversation.completion(
+            message="Hi",
+            tools=[amplify],
+            memory=memory,
         )
+        chunks = [chunk async for chunk in stream]
 
-        assert "error" in extract_text_content(result.content).lower()
-        assert call_count == 2
+    assert calls == 1
+    assert chunks[0].event == "tool_request"
+    assert chunks[1].text == "OUT:x"
+    assert chunks[2].event == "tool_response"
 
-
-@mark.asyncio
-async def test_conversation_message_from_multimodal():
-    """Test creating conversation message from various multimodal inputs."""
-
-    async def mock_generating(
-        *,
-        instructions: str,
-        tools: ModelToolsDeclaration,
-        context: Sequence[ModelContextElement],
-        output: str | type | None = None,
-        stream: bool = False,
-        **extra: Any,
-    ) -> ModelOutput:
-        return ModelOutput.of(MultimodalContent.of("Received your message"))
-
-    async with ctx.scope("test", GenerativeModel(generating=mock_generating), Conversation()):
-        # Test with string input
-        result = await Conversation.completion(
-            input="Simple string",
-            memory=None,
-            tools=None,
-        )
-        assert isinstance(result, ConversationMessage)
-
-        # Test with MultimodalContent input
-        result = await Conversation.completion(
-            input=MultimodalContent.of("Content object"),
-            memory=None,
-            tools=None,
-        )
-        assert isinstance(result, ConversationMessage)
-
-        # Test with ConversationMessage input
-        msg = ConversationMessage.user("Direct message")
-        result = await Conversation.completion(
-            input=msg,
-            memory=None,
-            tools=None,
-        )
-        assert isinstance(result, ConversationMessage)
+    context = await memory.recall()
+    assert len(context) == 4
+    assert isinstance(context[0], ModelInput)
+    assert isinstance(context[1], ModelOutput)
+    assert context[1].tool_requests[0].identifier == "call-1"
+    assert isinstance(context[2], ModelInput)
+    assert context[2].tool_responses[0].identifier == "call-1"
+    assert isinstance(context[3], ModelOutput)
+    assert context[3].content.to_str() == "OUT:x"
 
 
-@mark.asyncio
-async def test_conversation_completion_empty_response():
-    """Test handling of empty LMM responses."""
-
-    async def mock_generating(
-        *,
-        instructions: str,
-        tools: ModelToolsDeclaration,
-        context: Sequence[ModelContextElement],
-        output: str | type | None = None,
-        stream: bool = False,
-        **extra: Any,
-    ) -> ModelOutput:
-        return ModelOutput.of(MultimodalContent.of(""))
-
-    async with ctx.scope("test", GenerativeModel(generating=mock_generating), Conversation()):
-        result = await Conversation.completion(
-            input="Give me nothing",
-            memory=None,
-            tools=None,
-        )
-
-        assert isinstance(result, ConversationMessage)
-        assert extract_text_content(result.content) == ""
-        assert result.role == "model"
-
-
-@mark.asyncio
-async def test_conversation_completion_with_toolbox():
-    """Test conversation completion with Toolbox instead of tool list."""
-
+@pytest.mark.asyncio
+async def test_conversation_completion_reuses_memory_with_previous_tool_turn() -> None:
     @tool
-    async def tool1() -> str:
-        return "tool1"
+    async def echo(value: str) -> str:
+        return f"TOOL:{value}"
 
-    @tool
-    async def tool2() -> str:
-        return "tool2"
+    memory = ConversationMemory.volatile()
+    first_calls = 0
 
-    toolbox = Toolbox.of(tool1, tool2)
-
-    async def mock_generating(
+    def first_generating(
         *,
         instructions: str,
-        tools: ModelToolsDeclaration,
+        tools: ModelTools,
         context: Sequence[ModelContextElement],
-        output: str | type | None = None,
-        **kwargs,
-    ) -> ModelOutput:
-        # Verify tools were passed
-        assert tools is not None and bool(tools)
-        return ModelOutput.of(MultimodalContent.of("Tools are available"))
+        output: str | type | Sequence[str],
+        **extra: Any,
+    ) -> AsyncIterable[ModelOutputChunk]:
+        nonlocal first_calls
+        _ = (instructions, tools, output, extra)
+        first_calls += 1
+        if first_calls == 1:
+            return _stream_of(ModelToolRequest.of("call-1", tool="echo", arguments={"value": "x"}))
 
-    async with ctx.scope("test", GenerativeModel(generating=mock_generating), Conversation()):
-        result = await Conversation.completion(
-            input="Example",
-            memory=None,
-            tools=toolbox,
+        assert len(context) == 3
+        assert isinstance(context[2], ModelInput)
+        assert context[2].tool_responses[0].result.to_str() == "TOOL:x"
+        return _stream_of(TextContent.of("First final"))
+
+    async with ctx.scope(
+        "test.first",
+        GenerativeModel(generating=first_generating),
+        Conversation(),
+    ):
+        first_stream = Conversation.completion(
+            message="Hi",
+            tools=[echo],
+            memory=memory,
         )
+        _ = [chunk async for chunk in first_stream]
 
-        assert extract_text_content(result.content) == "Tools are available"
+    second_calls = 0
 
-    # Skipped provider-dependent streaming identifier consistency
+    def second_generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: Sequence[ModelContextElement],
+        output: str | type | Sequence[str],
+        **extra: Any,
+    ) -> AsyncIterable[ModelOutputChunk]:
+        nonlocal second_calls
+        _ = (instructions, tools, output, extra)
+        second_calls += 1
+        assert len(context) == 5
+        assert isinstance(context[0], ModelInput)
+        assert context[0].content.to_str() == "Hi"
+        assert isinstance(context[1], ModelOutput)
+        assert context[1].tool_requests[0].identifier == "call-1"
+        assert isinstance(context[2], ModelInput)
+        assert context[2].tool_responses[0].identifier == "call-1"
+        assert isinstance(context[3], ModelOutput)
+        assert context[3].content.to_str() == "First final"
+        assert isinstance(context[4], ModelInput)
+        assert context[4].content.to_str() == "Follow-up"
+        return _stream_of(TextContent.of("Second answer"))
+
+    async with ctx.scope(
+        "test.second",
+        GenerativeModel(generating=second_generating),
+        Conversation(),
+    ):
+        second_stream = Conversation.completion(
+            message="Follow-up",
+            tools=[echo],
+            memory=memory,
+        )
+        chunks = [chunk async for chunk in second_stream]
+
+    assert second_calls == 1
+    assert MultimodalContent.of(*chunks).to_str() == "Second answer"
+
+
+@pytest.mark.asyncio
+async def test_conversation_completion_links_new_turns_in_memory_order() -> None:
+    def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: Sequence[ModelContextElement],
+        output: str | type | Sequence[str],
+        **extra: Any,
+    ) -> AsyncIterable[ModelOutputChunk]:
+        _ = (instructions, tools, context, output, extra)
+        return _single_text_chunk("linked answer")
+
+    memory = ConversationMemory.volatile()
+    existing_turn = ConversationUserTurn.of(MultimodalContent.of("earlier"))
+    await memory.remember(existing_turn)
+
+    async with ctx.scope(
+        "test",
+        GenerativeModel(generating=mock_generating),
+        Conversation(),
+    ):
+        stream = Conversation.completion(
+            message="Hi",
+            memory=memory,
+        )
+        _ = [chunk async for chunk in stream]
+
+    remembered_turns = await memory.fetch()
+    assert len(remembered_turns) == 3
+    user_turn = remembered_turns[1]
+    assistant_turn = remembered_turns[2]
+    assert remembered_turns[0].identifier == existing_turn.identifier
+    assert user_turn.turn == "user"
+    assert assistant_turn.turn == "assistant"

@@ -1,14 +1,12 @@
-from typing import Self, final
+from typing import ClassVar, Self, final
 
-from haiway import META_EMPTY, Meta, MetaValues
-
-from draive.parameters import DataModel
+from haiway import Meta, MetaValues, State
 
 __all__ = ("TextContent",)
 
 
 @final
-class TextContent(DataModel):
+class TextContent(State, serializable=True):
     """
     Text block with optional metadata.
 
@@ -25,6 +23,8 @@ class TextContent(DataModel):
         Structured metadata associated with the text. Used for filtering and
         grouping operations. Defaults to an empty metadata object.
     """
+
+    empty: ClassVar[Self]  # defined after the class
 
     @classmethod
     def of(
@@ -56,7 +56,7 @@ class TextContent(DataModel):
         )
 
     text: str
-    meta: Meta = META_EMPTY
+    meta: Meta = Meta.empty
 
     def to_str(self) -> str:
         """
@@ -79,4 +79,10 @@ class TextContent(DataModel):
             ``True`` if ``text`` contains at least one character, ``False``
             otherwise. Whitespace-only strings are considered truthy.
         """
-        return len(self.text) > 0
+        return bool(self.text)
+
+
+TextContent.empty = TextContent(
+    text="",
+    meta=Meta.empty,
+)

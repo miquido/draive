@@ -16,7 +16,7 @@ building end-to-end evaluation flows.
 ### Working with `EvaluationScore`
 
 ```python
-from draive import EvaluationScore
+from draive.evaluation import EvaluationScore
 
 score_from_float = EvaluationScore.of(0.85)
 score_from_label = EvaluationScore.of("good")
@@ -26,7 +26,7 @@ score_from_boolean = EvaluationScore.of(True)
 ### Defining an evaluator
 
 ```python
-from draive import evaluator
+from draive.evaluation import evaluator
 
 @evaluator(name="length_check", threshold="excellent")
 async def check_response_length(value: str, min_length: int = 100) -> float:
@@ -86,11 +86,12 @@ Suites persist test cases, run them in bulk, and expose reporting helpers.
 from pathlib import Path
 from typing import Sequence
 
-from draive import DataModel, evaluator_suite
+from draive import State
+from draive.evaluation import evaluator_suite
 from draive.evaluation import EvaluatorResult
 
 
-class QATestCase(DataModel):
+class QATestCase(State, serializable=True):
     question: str
     expected_topics: list[str]
     min_length: int = 100
@@ -157,7 +158,7 @@ normalized = my_evaluator.contra_map(lambda data: data["response"].strip().lower
 ```python
 from haiway import State, ctx
 
-from draive import evaluator
+from draive.evaluation import evaluator
 
 
 class EvaluationConfig(State):
@@ -222,7 +223,7 @@ precise_check = factual_accuracy_evaluator.with_threshold(0.85)
 ```python
 from datetime import datetime
 
-from draive import EvaluationScore, evaluator
+from draive.evaluation import EvaluationScore, evaluator
 
 
 @evaluator
