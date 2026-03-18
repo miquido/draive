@@ -1,7 +1,7 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import Any, Protocol, Self, final, runtime_checkable
 
-from haiway import Meta, MetaValues, State
+from haiway import Meta, MetaValues, Paginated, Pagination, State
 
 from draive.multimodal.content import Multimodal
 
@@ -9,6 +9,7 @@ __all__ = (
     "Template",
     "TemplateDeclaration",
     "TemplateDefining",
+    "TemplateInvalid",
     "TemplateListing",
     "TemplateLoading",
     "TemplateMissing",
@@ -21,7 +22,7 @@ class TemplateMissing(Exception):
 
     Parameters
     ----------
-    identifier
+    identifier : str
         Identifier of the missing template.
     """
 
@@ -37,19 +38,47 @@ class TemplateMissing(Exception):
 
 
 @final
+class TemplateInvalid(Exception):
+    """Raised when a template declaration is inconsistent with its content.
+
+    Parameters
+    ----------
+    identifier : str
+        Identifier of the invalid template.
+    description : str
+        Human-readable explanation of the validation failure.
+    """
+
+    __slots__ = (
+        "description",
+        "identifier",
+    )
+
+    def __init__(
+        self,
+        *,
+        identifier: str,
+        description: str,
+    ) -> None:
+        super().__init__(f"Invalid template ({description}) - {identifier}")
+        self.identifier: str = identifier
+        self.description: str = description
+
+
+@final
 class Template(State, serializable=True):
     """Immutable template reference describing how to render multimodal content.
 
     Templates reference concrete content by identifier and optionally carry default
-    argument bindings that will be merged with arguments provided during resolution.
+    argument bindings merged with arguments provided during resolution.
 
     Parameters
     ----------
-    identifier
+    identifier : str
         Unique name of the template to load from a repository.
-    arguments
+    arguments : Mapping[str, Self | Multimodal]
         Default argument mapping applied on top of call-time arguments.
-    meta
+    meta : Meta
         Supplemental metadata propagated to the underlying repository implementation.
     """
 
@@ -59,18 +88,18 @@ class Template(State, serializable=True):
         identifier: str,
         /,
         *,
-        arguments: Mapping[str, Multimodal] | None = None,
+        arguments: Mapping[str, Self | Multimodal] | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        """Create a template reference with optional defaults.
+        """Create a template reference.
 
         Parameters
         ----------
-        identifier
+        identifier : str
             Unique name of the template.
-        arguments
-            Default argument mapping applied when resolving the template.
-        meta
+        arguments : Mapping[str, Self | Multimodal] | None, optional
+            Optional default argument mapping applied when resolving the template.
+        meta : Meta | MetaValues | None, optional
             Optional metadata forwarded to repository calls.
 
         Returns
@@ -85,18 +114,18 @@ class Template(State, serializable=True):
         )
 
     identifier: str
-    arguments: Mapping[str, Multimodal]
+    arguments: Mapping[str, Self | Multimodal]
     meta: Meta = Meta.empty
 
     def with_arguments(
         self,
-        **arguments: Multimodal,
+        **arguments: Self | Multimodal,
     ) -> Self:
-        """Return a new template augmented with additional default arguments.
+        """Return a template with additional default arguments.
 
         Parameters
         ----------
-        **arguments
+        **arguments : Self | Multimodal
             Additional argument bindings to merge with existing defaults.
 
         Returns
@@ -118,11 +147,11 @@ class Template(State, serializable=True):
         meta: Meta | MetaValues,
         /,
     ) -> Self:
-        """Return a new template with metadata merged into the current meta.
+        """Return a template with merged metadata.
 
         Parameters
         ----------
-        meta
+        meta : Meta | MetaValues
             Extra metadata values to merge with the existing metadata.
 
         Returns
@@ -149,13 +178,13 @@ class TemplateDeclaration(State, serializable=True):
 
     Parameters
     ----------
-    identifier
+    identifier : str
         Unique name of the template declaration.
-    description
+    description : str | None
         Optional human-readable summary of the template purpose.
-    variables
+    variables : Mapping[str, str]
         Mapping of variable names to description strings.
-    meta
+    meta : Meta
         Supplemental metadata preserved when invoking repository operations.
     """
 
@@ -169,17 +198,17 @@ class TemplateDeclaration(State, serializable=True):
         variables: Mapping[str, str] | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        """Create a template declaration with optional description and variables.
+        """Create a template declaration.
 
         Parameters
         ----------
-        identifier
+        identifier : str
             Unique name of the template declaration.
-        description
+        description : str | None, optional
             Optional human-readable description.
-        variables
+        variables : Mapping[str, str] | None, optional
             Mapping of variable names to their descriptions.
-        meta
+        meta : Meta | MetaValues | None, optional
             Optional metadata forwarded to repository calls.
 
         Returns
@@ -202,29 +231,77 @@ class TemplateDeclaration(State, serializable=True):
 
 @runtime_checkable
 class TemplateListing(Protocol):
-    """Callable protocol returning available template declarations."""
+    """Protocol for listing available template declarations.
+
+    Returns paginated template declarations from a repository or registry.
+    Additional keyword arguments allow integrations to expose backend-specific
+    controls without weakening the common callable shape.
+    """
 
     async def __call__(
         self,
+        pagination: Pagination | None,
         **extra: Any,
-    ) -> Sequence[TemplateDeclaration]: ...
+    ) -> Paginated[TemplateDeclaration]:
+        """List template declarations.
+
+        Parameters
+        ----------
+        pagination : Pagination | None
+            Pagination cursor and page-size information for the listing request.
+            When ``None``, the implementation should use its default pagination
+            behavior.
+        **extra : Any
+            Backend-specific options accepted by the listing implementation.
+
+        Returns
+        -------
+        Paginated[TemplateDeclaration]
+            Paginated collection of template declarations.
+        """
+        ...
 
 
 @runtime_checkable
 class TemplateLoading(Protocol):
-    """Callable protocol loading template content for the given identifier."""
+    """Protocol for loading template content for a given identifier.
+
+    Implementations load raw template content and may use metadata and
+    additional keyword arguments to drive repository-specific lookup behavior.
+    """
 
     async def __call__(
         self,
         identifier: str,
         meta: Meta,
         **extra: Any,
-    ) -> str | None: ...
+    ) -> str | None:
+        """Load template content for a given identifier.
+
+        Parameters
+        ----------
+        identifier : str
+            Unique template identifier to load.
+        meta : Meta
+            Metadata forwarded with the loading request.
+        **extra : Any
+            Backend-specific options accepted by the loading implementation.
+
+        Returns
+        -------
+        str | None
+            Template content when found, otherwise ``None``.
+        """
+        ...
 
 
 @runtime_checkable
 class TemplateDefining(Protocol):
-    """Callable protocol that upserts template content and metadata."""
+    """Protocol for upserting template content and metadata.
+
+    Implementations persist template content together with declaration metadata,
+    creating or replacing the stored definition for the given identifier.
+    """
 
     async def __call__(
         self,
@@ -234,4 +311,22 @@ class TemplateDefining(Protocol):
         variables: Mapping[str, str],
         meta: Meta,
         **extra: Any,
-    ) -> None: ...
+    ) -> None:
+        """Create or update a template definition.
+
+        Parameters
+        ----------
+        identifier : str
+            Unique template identifier to define.
+        description : str | None
+            Optional human-readable description of the template.
+        content : str
+            Raw template source to persist.
+        variables : Mapping[str, str]
+            Mapping of declared variable names to their descriptions.
+        meta : Meta
+            Metadata forwarded with the defining request.
+        **extra : Any
+            Backend-specific options accepted by the defining implementation.
+        """
+        ...
