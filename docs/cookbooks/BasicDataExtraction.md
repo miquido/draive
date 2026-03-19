@@ -57,7 +57,7 @@ Schema injection controls how much schema guidance is injected into instructions
 ```python
 result: PersonalData = await ModelGeneration.generate(
     PersonalData,
-    instructions="Extract fields from the input. Return JSON matching the schema.",
+    instructions="Extract fields from the input. Return JSON matching the schema:\n{%schema%}",
     input=document,
     schema_injection="simplified",
 )

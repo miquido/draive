@@ -1,13 +1,15 @@
 import json
 from collections.abc import Mapping, MutableMapping, Sequence
 from pathlib import Path
-from typing import Any, Self, final, overload
+from typing import Any, Self, cast, final, overload
 
 from haiway import (
     File,
     FileAccess,
     Immutable,
     Meta,
+    Paginated,
+    Pagination,
     State,
     ctx,
     statemethod,
@@ -18,6 +20,7 @@ from draive.multimodal.templates.types import (
     Template,
     TemplateDeclaration,
     TemplateDefining,
+    TemplateInvalid,
     TemplateListing,
     TemplateLoading,
     TemplateMissing,
@@ -32,9 +35,14 @@ __all__ = ("TemplatesRepository",)
 
 
 async def _empty_listing(
+    pagination: Pagination | None,
     **extra: Any,
-) -> Sequence[TemplateDeclaration]:
-    return ()
+) -> Paginated[TemplateDeclaration]:
+    _ = extra
+    return Paginated[TemplateDeclaration].of(
+        (),
+        pagination=Pagination.of(limit=0),
+    )
 
 
 async def _none_loading(
@@ -75,13 +83,13 @@ class TemplatesRepository(State):
 
         Parameters
         ----------
-        **templates
-            Mapping of template identifier to template content.
+        **templates : str
+            Template contents keyed by template identifier.
 
         Returns
         -------
-        Self
-            Repository instance with volatile storage.
+        repository : Self
+            Repository instance backed by process-local mutable storage.
         """
         volatile_storage: VolatileStorage = VolatileStorage(
             _declarations={
@@ -114,12 +122,13 @@ class TemplatesRepository(State):
 
         Parameters
         ----------
-        path
-            Filesystem path where templates will be stored and loaded.
+        path : Path | str
+            Filesystem path used to load and persist template declarations and
+            their contents.
 
         Returns
         -------
-        Self
+        repository : Self
             Repository instance backed by the given file.
         """
         file_storage: FileStorage = FileStorage(path=path)
@@ -135,83 +144,95 @@ class TemplatesRepository(State):
     @classmethod
     async def templates(
         cls,
+        pagination: Pagination | None = None,
         **extra: Any,
-    ) -> Sequence[TemplateDeclaration]: ...
+    ) -> Paginated[TemplateDeclaration]: ...
 
     @overload
     async def templates(
         self,
+        pagination: Pagination | None = None,
         **extra: Any,
-    ) -> Sequence[TemplateDeclaration]: ...
+    ) -> Paginated[TemplateDeclaration]: ...
 
     @statemethod
     async def templates(
         self,
+        pagination: Pagination | None = None,
         **extra: Any,
-    ) -> Sequence[TemplateDeclaration]:
+    ) -> Paginated[TemplateDeclaration]:
         """List available template declarations.
 
         Parameters
         ----------
-        **extra
+        pagination : Pagination | None, optional
+            Pagination settings controlling the declaration page to return. When
+            omitted, the repository default is used.
+        **extra : Any
             Extra arguments forwarded to the underlying listing callable.
 
         Returns
         -------
-        Sequence[TemplateDeclaration]
+        declarations : Paginated[TemplateDeclaration]
             Collection of available template declarations.
         """
-        return await self._listing(**extra)
+        return await self._listing(
+            pagination=pagination,
+            **extra,
+        )
 
     @overload
     @classmethod
     async def resolve(
         cls,
-        content: Template | Multimodal,
+        content: Template | str,
         /,
         *,
         default: str | None = None,
-        arguments: Mapping[str, Multimodal] | None = None,
+        arguments: Mapping[str, Template | Multimodal] | None = None,
         **extra: Any,
     ) -> MultimodalContent: ...
 
     @overload
     async def resolve(
         self,
-        content: Template | Multimodal,
+        content: Template | str,
         /,
         *,
         default: str | None = None,
-        arguments: Mapping[str, Multimodal] | None = None,
+        arguments: Mapping[str, Template | Multimodal] | None = None,
         **extra: Any,
     ) -> MultimodalContent: ...
 
     @statemethod
     async def resolve(
         self,
-        content: Template | Multimodal,
+        content: Template | str,
         /,
         *,
         default: str | None = None,
-        arguments: Mapping[str, Multimodal] | None = None,
+        arguments: Mapping[str, Template | Multimodal] | None = None,
         **extra: Any,
     ) -> MultimodalContent:
         """Resolve a template into multimodal content.
 
         Parameters
         ----------
-        content
-            Template reference to resolve or straight result content.
-        default
+        content : Template | str
+            Template reference to resolve or raw template source to render
+            directly.
+        default : str | None, optional
             Fallback template body used when the repository yields no content.
-        arguments
-            Additional arguments merged with the template defaults before rendering.
-        **extra
+        arguments : Mapping[str, Template | Multimodal] | None, optional
+            Additional template arguments merged with the template declaration
+            arguments before rendering. Nested `Template` values are resolved
+            recursively.
+        **extra : Any
             Extra arguments forwarded to the underlying loading callable.
 
         Returns
         -------
-        MultimodalContent
+        resolved : MultimodalContent
             Rendered multimodal content.
 
         Raises
@@ -219,8 +240,14 @@ class TemplatesRepository(State):
         TemplateMissing
             If neither repository content nor ``default`` is available.
         """
-        if not isinstance(content, Template):
-            return MultimodalContent.of(content)
+        if isinstance(content, str):
+            return resolve_multimodal_template(
+                content,
+                arguments=await self._resolve_arguments(
+                    arguments,
+                    **extra,
+                ),
+            )
 
         loaded: str | None = await self._loading(
             content.identifier,
@@ -228,23 +255,22 @@ class TemplatesRepository(State):
             **extra,
         )
 
-        merged_arguments: Mapping[str, Multimodal]
-        if arguments:
-            merged_arguments = {**arguments, **content.arguments}
-
-        else:
-            merged_arguments = content.arguments
-
         if loaded is not None:
             return resolve_multimodal_template(
                 loaded,
-                arguments=merged_arguments,
+                arguments=await self._resolve_arguments(
+                    {**content.arguments, **arguments} if arguments else content.arguments,
+                    **extra,
+                ),
             )
 
         elif default is not None:
             return resolve_multimodal_template(
                 default,
-                arguments=merged_arguments,
+                arguments=await self._resolve_arguments(
+                    {**content.arguments, **arguments} if arguments else content.arguments,
+                    **extra,
+                ),
             )
 
         else:
@@ -258,7 +284,7 @@ class TemplatesRepository(State):
         /,
         *,
         default: str | None = None,
-        arguments: Mapping[str, Multimodal] | None = None,
+        arguments: Mapping[str, Template | Multimodal] | None = None,
         **extra: Any,
     ) -> str: ...
 
@@ -269,7 +295,7 @@ class TemplatesRepository(State):
         /,
         *,
         default: str | None = None,
-        arguments: Mapping[str, Multimodal] | None = None,
+        arguments: Mapping[str, Template | Multimodal] | None = None,
         **extra: Any,
     ) -> str: ...
 
@@ -280,25 +306,28 @@ class TemplatesRepository(State):
         /,
         *,
         default: str | None = None,
-        arguments: Mapping[str, Multimodal] | None = None,
+        arguments: Mapping[str, Template | Multimodal] | None = None,
         **extra: Any,
     ) -> str:
         """Resolve a template into a text string.
 
         Parameters
         ----------
-        content
-            Template reference or raw string to return as-is.
-        default
+        content : Template | str
+            Template reference to resolve or raw template source to render
+            directly.
+        default : str | None, optional
             Fallback template body used when the repository yields no content.
-        arguments
-            Additional arguments merged with the template defaults before rendering.
-        **extra
+        arguments : Mapping[str, Template | Multimodal] | None, optional
+            Additional template arguments merged with the template declaration
+            arguments before rendering. Nested `Template` values are resolved
+            recursively.
+        **extra : Any
             Extra arguments forwarded to the underlying loading callable.
 
         Returns
         -------
-        str
+        resolved : str
             Rendered text content.
 
         Raises
@@ -306,12 +335,14 @@ class TemplatesRepository(State):
         TemplateMissing
             If neither repository content nor ``default`` is available.
         """
-        if not isinstance(content, Template):
-            if arguments:
-                return content.format_map({key: str(value) for key, value in arguments.items()})
-
-            else:
-                return content
+        if isinstance(content, str):
+            return resolve_text_template(
+                content,
+                arguments=await self._resolve_arguments(
+                    arguments,
+                    **extra,
+                ),
+            )
 
         loaded: str | None = await self._loading(
             content.identifier,
@@ -319,23 +350,22 @@ class TemplatesRepository(State):
             **extra,
         )
 
-        merged_arguments: Mapping[str, Multimodal]
-        if arguments:
-            merged_arguments = {**arguments, **content.arguments}
-
-        else:
-            merged_arguments = content.arguments
-
         if loaded is not None:
             return resolve_text_template(
                 loaded,
-                arguments=merged_arguments,
+                arguments=await self._resolve_arguments(
+                    {**content.arguments, **arguments} if arguments else content.arguments,
+                    **extra,
+                ),
             )
 
         elif default is not None:
             return resolve_text_template(
                 default,
-                arguments=merged_arguments,
+                arguments=await self._resolve_arguments(
+                    {**content.arguments, **arguments} if arguments else content.arguments,
+                    **extra,
+                ),
             )
 
         else:
@@ -352,14 +382,14 @@ class TemplatesRepository(State):
 
         Parameters
         ----------
-        template
+        template : Template
             Template reference to load.
-        **extra
+        **extra : Any
             Extra arguments forwarded to the underlying loading callable.
 
         Returns
         -------
-        str
+        content : str
             Raw template body retrieved from the repository.
 
         Raises
@@ -412,13 +442,35 @@ class TemplatesRepository(State):
 
         Parameters
         ----------
-        template
+        template : TemplateDeclaration
             Declaration describing the template metadata to be stored.
-        content
+        content : str
             Template body to associate with the declaration.
-        **extra
+        **extra : Any
             Extra arguments forwarded to the underlying defining callable.
+
+        Returns
+        -------
+        None
+            Returns after the template declaration and content are persisted.
+
+        Raises
+        ------
+        TemplateInvalid
+            If the declared template variables do not match the variables
+            parsed from `content`.
         """
+        parsed_variables: tuple[str, ...] = tuple(dict.fromkeys(parse_template_variables(content)))
+        declared_variables: tuple[str, ...] = tuple(template.variables.keys())
+        if set(parsed_variables) != set(declared_variables):
+            raise TemplateInvalid(
+                identifier=template.identifier,
+                description=(
+                    "declared variables do not match template content "
+                    f"(declared={declared_variables}, parsed={parsed_variables})"
+                ),
+            )
+
         await self._defining(
             identifier=template.identifier,
             description=template.description,
@@ -447,6 +499,75 @@ class TemplatesRepository(State):
             meta=meta,
         )
 
+    async def _resolve_arguments(
+        self,
+        arguments: Mapping[str, Template | Multimodal] | None,
+        **extra: Any,
+    ) -> Mapping[str, Multimodal]:
+        if arguments is None:
+            return {}
+
+        arguments = dict(arguments)
+        for key, value in arguments.items():
+            if isinstance(value, Exception):
+                raise value
+
+            elif isinstance(value, Template):
+                arguments[key] = RecursionError("Recursive template resolution is not supported")  # pyright: ignore[reportArgumentType]
+                resolved: MultimodalContent = await self.resolve(
+                    value,
+                    arguments=arguments,
+                    **extra,
+                )
+                arguments[key] = resolved
+
+        return cast(Mapping[str, Multimodal], arguments)
+
+
+def _paginate_declarations(
+    declarations: Sequence[TemplateDeclaration],
+    *,
+    pagination: Pagination | None,
+    source: str,
+) -> Paginated[TemplateDeclaration]:
+    pagination = pagination or Pagination.of(limit=32)
+
+    if pagination.limit <= 0:
+        return Paginated[TemplateDeclaration].of(
+            (),
+            pagination=pagination.with_token(None),
+        )
+
+    start: int
+    if pagination.token is None:
+        start = 0
+
+    elif isinstance(pagination.token, str):
+        if not pagination.token.startswith("templates:"):
+            raise ValueError(f"Invalid {source} templates pagination token")
+
+        try:
+            start = max(int(pagination.token.split(":", 1)[1]), 0)
+
+        except ValueError as exc:
+            raise ValueError(f"Invalid {source} templates pagination token") from exc
+
+    elif isinstance(pagination.token, int):
+        start = max(pagination.token, 0)
+
+    else:
+        raise ValueError(f"Invalid {source} templates pagination token")
+
+    end: int = start + pagination.limit
+    next_token: str | None = None
+    if end < len(declarations):
+        next_token = f"templates:{end}"
+
+    return Paginated[TemplateDeclaration].of(
+        declarations[start:end],
+        pagination=pagination.with_token(next_token),
+    )
+
 
 class VolatileStorage(Immutable):
     _declarations: MutableMapping[str, TemplateDeclaration]
@@ -454,9 +575,15 @@ class VolatileStorage(Immutable):
 
     async def listing(
         self,
+        pagination: Pagination | None,
         **extra: Any,
-    ) -> Sequence[TemplateDeclaration]:
-        return tuple(self._declarations.values())
+    ) -> Paginated[TemplateDeclaration]:
+        _ = extra
+        return _paginate_declarations(
+            tuple(self._declarations.values()),
+            pagination=pagination,
+            source="volatile",
+        )
 
     async def loading(
         self,
@@ -516,13 +643,19 @@ class FileStorage(Immutable):
 
     async def listing(
         self,
+        pagination: Pagination | None,
         **extra: Any,
-    ) -> Sequence[TemplateDeclaration]:
+    ) -> Paginated[TemplateDeclaration]:
+        _ = extra
         if self._declarations is None:
             await self._load_file()
 
         assert self._declarations is not None  # nosec: B101
-        return tuple(self._declarations.values())
+        return _paginate_declarations(
+            tuple(self._declarations.values()),
+            pagination=pagination,
+            source="file",
+        )
 
     async def loading(
         self,
@@ -571,26 +704,33 @@ class FileStorage(Immutable):
             match json.loads(file_contents):
                 case [*elements]:
                     for element in elements:
-                        match element:
-                            case {
-                                "identifier": str() as identifier,
-                                "description": str() | None as description,
-                                "variables": {**variables},
-                                "content": str() as content,
-                                "meta": {**meta},
-                            }:
-                                declarations[identifier] = TemplateDeclaration(
-                                    identifier=identifier,
-                                    variables=variables,
-                                    description=description,
-                                    meta=Meta.of(meta),
-                                )
-                                contents[identifier] = content
+                        try:
+                            match element:
+                                case {
+                                    "identifier": str() as identifier,
+                                    "description": str() | None as description,
+                                    "variables": {**variables},
+                                    "content": str() as content,
+                                    "meta": {**meta},
+                                }:
+                                    declarations[identifier] = TemplateDeclaration(
+                                        identifier=identifier,
+                                        variables=variables,
+                                        description=description,
+                                        meta=Meta.of(meta),
+                                    )
+                                    contents[identifier] = content
 
-                            case _:  # skip with warning
-                                ctx.log_warning(
-                                    "Invalid templates file storage element, skipping..."
-                                )
+                                case _:  # skip with warning
+                                    ctx.log_warning(
+                                        "Invalid templates file storage element, skipping..."
+                                    )
+
+                        except Exception as exc:
+                            ctx.log_warning(
+                                "Invalid templates file storage element, skipping...",
+                                exception=exc,
+                            )
 
                 case _:  # empty storage with error
                     ctx.log_error("Invalid templates file storage, using empty...")

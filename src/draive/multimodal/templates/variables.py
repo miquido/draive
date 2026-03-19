@@ -5,7 +5,7 @@ from typing import Final
 from draive.multimodal.content import Multimodal, MultimodalContent
 
 # Match `{%variable%}` where the name contains no whitespace.
-_PLACEHOLDER_PATTERN: Final[re.Pattern[str]] = re.compile(r"{%([^\s%]+)%}")
+_VARIABLE_PATTERN: Final[re.Pattern[str]] = re.compile(r"{%([^\s%]+)%}")
 
 __all__ = (
     "parse_template_variables",
@@ -17,7 +17,7 @@ __all__ = (
 def parse_template_variables(
     template: str,
 ) -> Generator[str]:
-    for match in _PLACEHOLDER_PATTERN.finditer(template):
+    for match in _VARIABLE_PATTERN.finditer(template):
         yield match.group(1)
 
 
@@ -31,9 +31,7 @@ def resolve_text_template(
     get_argument: Callable[[str], Multimodal | None] = arguments.get
     cursor: int = 0
 
-    for match in _PLACEHOLDER_PATTERN.finditer(template):
-        start: int
-        end: int
+    for match in _VARIABLE_PATTERN.finditer(template):
         start, end = match.span()
         if start > cursor:
             append(template[cursor:start])
@@ -67,7 +65,7 @@ def resolve_multimodal_template(
     get_argument: Callable[[str], Multimodal | None] = arguments.get
     cursor: int = 0
 
-    for match in _PLACEHOLDER_PATTERN.finditer(template):
+    for match in _VARIABLE_PATTERN.finditer(template):
         start, end = match.span()
         if start > cursor:
             append(template[cursor:start])
@@ -82,8 +80,5 @@ def resolve_multimodal_template(
 
     if cursor < len(template):
         append(template[cursor:])
-
-    if not parts:
-        return MultimodalContent.empty
 
     return MultimodalContent.of(*parts)
