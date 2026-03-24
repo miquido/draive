@@ -2,23 +2,21 @@ from collections.abc import AsyncIterable, Sequence
 from typing import (
     Any,
     Protocol,
-    Self,
     runtime_checkable,
 )
 
-from haiway import BasicValue, Meta, MetaValues, State, ctx
+from haiway import BasicValue
 
 from draive.models import (
     ModelToolHandling,
     ModelToolParametersSpecification,
-    ModelToolRequest,
     ModelToolSpecification,
 )
-from draive.multimodal import Multimodal, MultimodalContent, MultimodalContentPart
+from draive.multimodal import MultimodalContentPart
+from draive.utils import ProcessingEvent
 
 __all__ = (
     "Tool",
-    "ToolEvent",
     "ToolException",
     "ToolOutputChunk",
     "ToolsLoading",
@@ -30,65 +28,7 @@ class ToolException(Exception):
     """Base exception raised by tool execution helpers."""
 
 
-_placeholder_request: ModelToolRequest = ModelToolRequest(
-    identifier="",
-    tool="",
-    arguments={},
-)
-
-
-class ToolEvent(State, serializable=True):
-    """Structured event emitted while a tool is running."""
-
-    @classmethod
-    def of(
-        cls,
-        event: str,
-        /,
-        content: Multimodal = MultimodalContent.empty,
-        *,
-        meta: Meta | MetaValues | None = None,
-    ) -> Self:
-        """Create a tool event bound to the current tool request context.
-
-        Parameters
-        ----------
-        event : str
-            Event name describing the emitted state transition or progress update.
-        content : Multimodal, default=MultimodalContent.empty
-            Event payload converted to multimodal content.
-        meta : Meta | MetaValues | None, default=None
-            Additional metadata merged with the current request identifier and tool
-            name when available in context.
-
-        Returns
-        -------
-        Self
-            Event instance ready to be streamed alongside tool output.
-        """
-        request: ModelToolRequest = ctx.state(
-            ModelToolRequest,
-            default=_placeholder_request,
-        )
-        return cls(
-            event=event,
-            content=MultimodalContent.of(content),
-            meta=Meta.of(meta).merged_with(
-                {
-                    "tool": request.tool,
-                    "identifier": request.identifier,
-                }
-            )
-            if request is not _placeholder_request
-            else Meta.of(meta),
-        )
-
-    event: str
-    content: MultimodalContent
-    meta: Meta = Meta.empty
-
-
-ToolOutputChunk = MultimodalContentPart | ToolEvent
+ToolOutputChunk = MultimodalContentPart | ProcessingEvent
 
 
 @runtime_checkable

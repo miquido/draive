@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal, Protocol, Self, final, runtime_checkable
 from uuid import UUID, uuid4
 
-from haiway import Meta, MetaValues, Paginated, Pagination, State
+from haiway import Default, Meta, MetaValues, Paginated, Pagination, State
 
 from draive.models import (
     ModelContext,
@@ -18,7 +18,7 @@ from draive.models import (
     ModelToolResponse,
 )
 from draive.multimodal import ArtifactContent, MultimodalContent, MultimodalContentPart
-from draive.tools.types import ToolEvent
+from draive.utils import ProcessingEvent
 
 __all__ = (
     "ConversationAssistantTurn",
@@ -42,7 +42,7 @@ class ConversationEvent(State, serializable=True):
         cls,
         event: str,
         *,
-        content: State | None = None,
+        content: ArtifactContent | State | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         return cls(
@@ -87,7 +87,7 @@ class ConversationEvent(State, serializable=True):
     @classmethod
     def tool_event(
         cls,
-        event: ToolEvent,
+        event: ProcessingEvent,
         /,
         *,
         meta: Meta | MetaValues | None = None,
@@ -101,7 +101,7 @@ class ConversationEvent(State, serializable=True):
         )
 
     event: str
-    created: datetime
+    created: datetime = Default(default_factory=lambda: datetime.now(UTC))
     content: ArtifactContent | None = None
     meta: Meta = Meta.empty
 
@@ -125,7 +125,7 @@ class ConversationUserTurn(State, serializable=True):
         )
 
     identifier: UUID
-    created: datetime
+    created: datetime = Default(default_factory=lambda: datetime.now(UTC))
     turn: Literal["user"] = "user"
     content: Sequence[MultimodalContent]
     meta: Meta = Meta.empty
@@ -159,7 +159,7 @@ class ConversationAssistantTurn(State, serializable=True):
         )
 
     identifier: UUID
-    created: datetime
+    created: datetime = Default(default_factory=lambda: datetime.now(UTC))
     turn: Literal["assistant"] = "assistant"
     content: Sequence[MultimodalContent | ModelReasoning | ConversationEvent]
     meta: Meta = Meta.empty

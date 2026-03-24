@@ -4,16 +4,14 @@ from typing import Protocol, Self, TypeIs, final, overload
 
 from haiway import BasicValue, Function, Meta, MetaValues, TypeSpecification
 
-from draive.models.types import (
+from draive.models import (
     ModelToolFunctionSpecification,
     ModelToolHandling,
     ModelToolParametersSpecification,
     ModelToolSpecification,
 )
 from draive.multimodal import Multimodal, MultimodalContent
-from draive.tools.types import (
-    ToolOutputChunk,
-)
+from draive.tools.types import ToolOutputChunk
 
 __all__ = (
     "CoroutineTool",
@@ -84,18 +82,8 @@ class CoroutineTool[**Args](Function[Args, Coroutine[None, None, Multimodal]]):
             parameter without a type specification.
         """
         super().__init__(function)
-        self.name: str
-        object.__setattr__(
-            self,
-            "name",
-            name,
-        )
-        self.description: str | None
-        object.__setattr__(
-            self,
-            "description",
-            description,
-        )
+        self.name: str = name
+        self.description: str | None = description
         assert all(arg.name in self._keyword_arguments for arg in self._positional_arguments)  # nosec: B101
         assert self._variadic_positional_arguments is None  # nosec: B101
 
@@ -121,29 +109,14 @@ class CoroutineTool[**Args](Function[Args, Coroutine[None, None, Multimodal]]):
                 "additionalProperties": False,
             }
 
-        self.parameters: ModelToolParametersSpecification
-        object.__setattr__(
-            self,
-            "parameters",
-            parameters,
+        self.parameters: ModelToolParametersSpecification = parameters
+        self.specification: ModelToolSpecification = ModelToolFunctionSpecification(
+            name=name,
+            description=description,
+            parameters=parameters,
+            meta=meta,
         )
-        self.specification: ModelToolSpecification
-        object.__setattr__(
-            self,
-            "specification",
-            ModelToolFunctionSpecification(
-                name=name,
-                description=description,
-                parameters=parameters,
-                meta=meta,
-            ),
-        )
-        self.handling: ModelToolHandling
-        object.__setattr__(
-            self,
-            "handling",
-            handling,
-        )
+        self.handling: ModelToolHandling = handling
 
     @property
     def meta(self) -> Meta:
@@ -261,18 +234,8 @@ class GeneratorTool[**Args](Function[Args, AsyncIterable[ToolOutputChunk]]):
             parameter without a type specification.
         """
         super().__init__(function)
-        self.name: str
-        object.__setattr__(
-            self,
-            "name",
-            name,
-        )
-        self.description: str | None
-        object.__setattr__(
-            self,
-            "description",
-            description,
-        )
+        self.name: str = name
+        self.description: str | None = description
         assert all(arg.name in self._keyword_arguments for arg in self._positional_arguments)  # nosec: B101
         assert self._variadic_positional_arguments is None  # nosec: B101
 
@@ -298,29 +261,14 @@ class GeneratorTool[**Args](Function[Args, AsyncIterable[ToolOutputChunk]]):
                 "additionalProperties": False,
             }
 
-        self.parameters: ModelToolParametersSpecification
-        object.__setattr__(
-            self,
-            "parameters",
-            parameters,
+        self.parameters: ModelToolParametersSpecification = parameters
+        self.specification: ModelToolSpecification = ModelToolFunctionSpecification(
+            name=name,
+            description=description,
+            parameters=parameters,
+            meta=meta,
         )
-        self.specification: ModelToolSpecification
-        object.__setattr__(
-            self,
-            "specification",
-            ModelToolFunctionSpecification(
-                name=name,
-                description=description,
-                parameters=parameters,
-                meta=meta,
-            ),
-        )
-        self.handling: ModelToolHandling
-        object.__setattr__(
-            self,
-            "handling",
-            handling,
-        )
+        self.handling: ModelToolHandling = handling
 
     @property
     def meta(self) -> Meta:

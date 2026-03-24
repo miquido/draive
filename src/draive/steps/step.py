@@ -1,6 +1,7 @@
 from asyncio import ALL_COMPLETED, Task, sleep, wait
 from collections.abc import (
     AsyncIterable,
+    AsyncIterator,
     Callable,
     Collection,
     Coroutine,
@@ -9,7 +10,7 @@ from collections.abc import (
     MutableSequence,
     Sequence,
 )
-from typing import Any, ClassVar, Protocol, Self, final, overload, runtime_checkable
+from typing import Any, ClassVar, NoReturn, Protocol, Self, final, overload, runtime_checkable
 
 from haiway import (
     AsyncStream,
@@ -66,7 +67,8 @@ from draive.steps.types import (
     StepStateRestoring,
     StepStream,
 )
-from draive.tools import Tool, Toolbox, ToolEvent
+from draive.tools import Tool, Toolbox
+from draive.utils import ProcessingEvent
 
 __all__ = (
     "Step",
@@ -816,7 +818,7 @@ class Step:
                         responses.append(chunk)
                         yield chunk
 
-                    elif isinstance(chunk, ToolEvent):
+                    elif isinstance(chunk, ProcessingEvent):
                         yield chunk
 
                     else:
@@ -980,7 +982,7 @@ class Step:
                                 responses.append(chunk)
                                 yield chunk
 
-                            elif isinstance(chunk, ToolEvent):
+                            elif isinstance(chunk, ProcessingEvent):
                                 yield chunk
 
                             else:
@@ -1744,11 +1746,14 @@ class Step:
 
             yield chunk  # provide the rest
 
+    def __aiter__(self) -> AsyncIterator[StepOutputChunk]:
+        return aiter(self.stream())
+
     def __setattr__(
         self,
         name: str,
         value: Any,
-    ) -> Any:
+    ) -> NoReturn:
         raise AttributeError(
             f"Can't modify immutable {self.__class__.__qualname__},"
             f" attribute - '{name}' cannot be modified"
@@ -1757,7 +1762,7 @@ class Step:
     def __delattr__(
         self,
         name: str,
-    ) -> None:
+    ) -> NoReturn:
         raise AttributeError(
             f"Can't modify immutable {self.__class__.__qualname__},"
             f" attribute - '{name}' cannot be deleted"

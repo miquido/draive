@@ -11,7 +11,7 @@ from draive.models import (
 )
 from draive.multimodal import MultimodalContentPart
 from draive.steps.state import StepState
-from draive.tools import ToolEvent
+from draive.utils import ProcessingEvent
 
 __all__ = (
     "StepConditionVerifying",
@@ -80,7 +80,11 @@ class StepException(Exception):
 
 
 StepOutputChunk = (
-    MultimodalContentPart | ModelReasoningChunk | ModelToolRequest | ModelToolResponse | ToolEvent
+    MultimodalContentPart
+    | ModelReasoningChunk
+    | ModelToolRequest
+    | ModelToolResponse
+    | ProcessingEvent
 )
 StepStream = AsyncIterable[StepOutputChunk | StepState]
 
