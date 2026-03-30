@@ -94,6 +94,16 @@ from haiway import (
     without_missing,
 )
 
+from draive.agents import (
+    Agent,
+    AgentContext,
+    AgentException,
+    AgentExecuting,
+    AgentIdentity,
+    AgentMessage,
+    AgentsGroup,
+    AgentUnavailable,
+)
 from draive.conversation import (
     Conversation,
     ConversationAssistantTurn,
@@ -127,9 +137,7 @@ from draive.generation import (
     TextGenerating,
     TextGeneration,
 )
-from draive.generation import (
-    ModelGenerating as GenerationModelGenerating,
-)
+from draive.generation import ModelGenerating as GenerationModelGenerating
 from draive.guardrails import (
     GuardrailsAnonymization,
     GuardrailsAnonymizedContent,
@@ -251,7 +259,6 @@ from draive.tools import (
     GeneratorTool,
     Tool,
     Toolbox,
-    ToolEvent,
     ToolException,
     ToolOutputChunk,
     ToolsLoading,
@@ -259,9 +266,18 @@ from draive.tools import (
     ToolsSuggesting,
     tool,
 )
+from draive.utils import ProcessingEvent
 
 __all__ = (
     "MISSING",
+    "Agent",
+    "AgentContext",
+    "AgentException",
+    "AgentExecuting",
+    "AgentIdentity",
+    "AgentMessage",
+    "AgentUnavailable",
+    "AgentsGroup",
     "Alias",
     "ArtifactContent",
     "AsyncQueue",
@@ -403,6 +419,7 @@ __all__ = (
     "ObservabilityLevel",
     "Paginated",
     "Pagination",
+    "ProcessingEvent",
     "RawValue",
     "RealtimeConversation",
     "RealtimeConversationSession",
@@ -445,7 +462,6 @@ __all__ = (
     "TextGenerating",
     "TextGeneration",
     "Tool",
-    "ToolEvent",
     "ToolException",
     "ToolOutputChunk",
     "Toolbox",

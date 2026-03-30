@@ -92,6 +92,106 @@ answer: str = await TextGeneration.generate(
 )
 ```
 
+## Agents API
+- `Agent` is a thin immutable wrapper over an async executor.
+- `Agent.call(...)` accepts multimodal input and streams `MultimodalContentPart | ProcessingEvent`.
+- `Agent.respond(...)` is the lower-level form when you already have an `AgentMessage`.
+- `AgentContext` carries the active `thread` and merged `meta` through nested agent calls.
+- Import agent primitives from `draive` when possible: `Agent`, `AgentIdentity`, `AgentMessage`, `AgentsGroup`.
+
+### Build An Agent From A `Step`
+Use `Agent.steps(...)` when you already have a `Step` pipeline.
+
+```python
+from collections.abc import AsyncIterable
+
+from draive import Agent, ProcessingEvent
+from draive.multimodal import TextContent
+from draive.steps import Step, StepState
+
+
+async def execute(
+    state: StepState,
+) -> AsyncIterable[ProcessingEvent | TextContent | StepState]:
+    yield ProcessingEvent.of("progress", "Working...")
+    yield TextContent.of("Done")
+    yield state
+
+
+worker: Agent = Agent.steps(
+    Step(execute),
+    name="worker",
+    description="Performs a deterministic task",
+)
+```
+
+Behavior of `Agent.steps(...)`:
+- prepends incoming message content with `Step.appending_input(...)`,
+- runs the provided step,
+- filters out `ModelReasoningChunk`, `ModelToolRequest`, and `ModelToolResponse`,
+- exposes only visible content and `ProcessingEvent`s.
+
+### Build A Generative Model Agent
+Use `Agent.generative(...)` for prompt-first agents backed by `GenerativeModel.completion(...)`.
+
+```python
+from draive import Agent, tool
+
+
+@tool(description="Return system status")
+async def system_status() -> str:
+    return "All systems operational"
+
+
+assistant: Agent = Agent.generative(
+    name="support",
+    instructions="You are a concise support assistant. Use tools when useful.",
+    tools=[system_status],
+)
+```
+
+Stateless agent loop:
+- start request-local model context with incoming `ModelInput`,
+- run `GenerativeModel.completion(...)`,
+- collect `ModelToolRequest`s,
+- execute them with `Toolbox.handle(...)`,
+- append `ModelToolResponse`s back as `ModelInput`,
+- continue until there are no more tool requests.
+
+If a tool uses `handling="output"`, its visible chunks are streamed directly and the loop stops.
+
+### Multi-Agent Delegation With `AgentsGroup`
+Use `AgentsGroup` to expose agents as tools for another agent.
+
+```python
+from draive import Agent, AgentsGroup
+from draive.multimodal import TextContent
+from draive.steps import Step
+
+
+researcher: Agent = Agent.steps(
+    Step.emitting(TextContent.of("Collected facts")),
+    name="researcher",
+    description="Collects background information",
+)
+
+coordinator: Agent = Agent.generative(
+    name="coordinator",
+    instructions="Delegate research before answering.",
+    tools=AgentsGroup.of(researcher).request_tool(),
+)
+```
+
+Delegation modes:
+- `request_tool()`: delegated result becomes a normal tool response and feeds back into caller reasoning.
+- `handover_tool()`: delegated agent streams output directly to the user as `handling="output"`.
+
+Practical defaults:
+- use `Agent.steps(...)` for deterministic typed orchestration,
+- use `Agent.generative(...)` for model-driven agents,
+- use `request_tool()` when the caller should keep reasoning after delegation,
+- use `handover_tool()` when the delegated agent should take over visible output.
+
 ## Conversation API (Streaming)
 - `Conversation.completion(...)` is chat-oriented and returns an async stream.
 - Use `message=...` (not `input=...`).

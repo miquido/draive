@@ -24,7 +24,7 @@ from draive.models import (
 )
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalContentPart
 from draive.tools import Toolbox
-from draive.tools.types import ToolEvent
+from draive.utils import ProcessingEvent
 
 __all__ = ("conversation_completion",)
 
@@ -125,7 +125,7 @@ async def conversation_completion(  # noqa: C901, PLR0912, PLR0915
                     assistant_turn_accumulator.append(event)
                     yield event
 
-                elif isinstance(chunk, ToolEvent):
+                elif isinstance(chunk, ProcessingEvent):
                     event: ConversationEvent = ConversationEvent.tool_event(chunk)
                     assistant_turn_accumulator.append(event)
                     yield event

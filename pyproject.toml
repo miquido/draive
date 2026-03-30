@@ -1,11 +1,11 @@
 [build-system]
-requires = ["uv_build>=0.10.0,<0.11.0"]
+requires = ["uv_build>=0.11.0,<0.12.0"]
 build-backend = "uv_build"
 
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.100.1"
+version = "0.101.0"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
@@ -24,7 +24,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 license = { file = "LICENSE" }
-dependencies = ["numpy~=2.3", "haiway~=0.47.0"]
+dependencies = ["numpy~=2.3", "haiway~=0.48.0"]
 
 [project.urls]
 Homepage = "https://miquido.com"
@@ -60,7 +60,7 @@ dev = [
   "pytest~=8.4",
   "pytest-asyncio~=1.2",
   "pytest-cov~=7.0",
-  "ruff~=0.14",
+  "ruff~=0.15",
 ]
 docs = [
   "mkdocs~=1.6",

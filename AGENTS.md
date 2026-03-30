@@ -14,6 +14,7 @@ Top-level code lives under `src/draive/`, with key packages:
 
 - `draive/models/` — core model abstractions (`GenerativeModel`, context/input/output types, session and tool-related model types)
 - `draive/tools/` — tool abstractions and orchestration (`Tool`, `FunctionTool`, `Toolbox`, providers)
+- `draive/agents/` — lightweight async agent wrappers and delegation (`Agent`, `AgentsGroup`, agent message/identity types)
 - `draive/generation/` — typed generation facades (`text/`, `image/`, `audio/`, `model/`) with `state.py`, `types.py`, and `default.py`
 - `draive/conversation/` — higher-level chat/realtime flows (`completion/`, `realtime/`)
 - `draive/multimodal/` — multimodal content and templates (`MultimodalContent`, `TextContent`, `ArtifactContent`, template helpers)

@@ -22,7 +22,8 @@ from draive.models import (
     ModelToolsSelection,
 )
 from draive.multimodal import MultimodalContent, MultimodalContentPart
-from draive.tools.types import Tool, ToolEvent, ToolException, ToolsSuggesting
+from draive.tools.types import Tool, ToolException, ToolsSuggesting
+from draive.utils import ProcessingEvent
 
 __all__ = ("Toolbox",)
 
@@ -249,7 +250,7 @@ class Toolbox(State):
             accumulator: MutableSequence[MultimodalContentPart] = []
             try:
                 async for chunk in selected_tool.call(**arguments):
-                    if isinstance(chunk, ToolEvent):
+                    if isinstance(chunk, ProcessingEvent):
                         continue
 
                     accumulator.append(chunk)
@@ -263,10 +264,10 @@ class Toolbox(State):
 
             return MultimodalContent.of(*accumulator)
 
-    async def handle(  # noqa: C901, PLR0915
+    async def handle(  # noqa: C901, PLR0912, PLR0915
         self,
         *requests: ModelToolRequest,
-    ) -> AsyncIterable[ModelToolResponse | ToolEvent | MultimodalContentPart]:
+    ) -> AsyncIterable[ModelToolResponse | ProcessingEvent | MultimodalContentPart]:
         """Execute model tool requests and stream responses, events, and output.
 
         Parameters
@@ -277,7 +278,7 @@ class Toolbox(State):
 
         Yields
         ------
-        ModelToolResponse | ToolEvent | MultimodalContentPart
+        ModelToolResponse | ProcessingEvent | MultimodalContentPart
             Tool events and output chunks emitted during execution, followed by tool
             responses describing final status and aggregated results.
         """
@@ -287,7 +288,9 @@ class Toolbox(State):
         # TODO: refine processing for better handling
         async with ContextTaskGroup():  # ensure proper task joins through local task group
             tasks: MutableSet[Task[None]] = set()
-            output: AsyncQueue[ModelToolResponse | ToolEvent | MultimodalContentPart] = AsyncQueue()
+            output: AsyncQueue[ModelToolResponse | ProcessingEvent | MultimodalContentPart] = (
+                AsyncQueue()
+            )
             for request in requests:
                 tool: Tool | None = self.tools.get(request.tool)
                 if tool is None:
@@ -313,8 +316,15 @@ class Toolbox(State):
                             accumulator: MutableSequence[MultimodalContentPart] = []
                             try:
                                 async for chunk in tool.call(**request.arguments):
-                                    if isinstance(chunk, ToolEvent):
-                                        output.enqueue(chunk)  # enqueue only events
+                                    if isinstance(chunk, ProcessingEvent):
+                                        output.enqueue(  # pass events
+                                            chunk.updating(
+                                                meta=chunk.meta.updating(
+                                                    identifier=request.identifier,
+                                                    tool=request.tool,
+                                                )
+                                            )
+                                        )
 
                                     else:
                                         accumulator.append(chunk)  # accumulate output
@@ -385,9 +395,17 @@ class Toolbox(State):
                         accumulator: MutableSequence[MultimodalContentPart] = []
                         try:
                             async for chunk in tool.call(**request.arguments):
-                                yield chunk  # enqueue output chunks
-                                if not isinstance(chunk, ToolEvent):
-                                    accumulator.append(chunk)  # accumulate output
+                                if isinstance(chunk, ProcessingEvent):
+                                    yield chunk.updating(
+                                        meta=chunk.meta.updating(
+                                            identifier=request.identifier,
+                                            tool=request.tool,
+                                        )
+                                    )
+
+                                else:
+                                    yield chunk
+                                    accumulator.append(chunk)
 
                             yield ModelToolResponse.of(
                                 request.identifier,

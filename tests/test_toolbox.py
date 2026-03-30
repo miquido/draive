@@ -11,8 +11,8 @@ from draive import (
     ModelTools,
     MultimodalContent,
     MultimodalContentPart,
+    ProcessingEvent,
     Toolbox,
-    ToolEvent,
     ToolsProvider,
     ctx,
     tool,
@@ -69,7 +69,7 @@ async def test_handle_response_tool_streams_events_and_returns_accumulated_respo
 
         @tool
         async def lookup(value: str):
-            yield ToolEvent.of("progress", f"checking:{value}")
+            yield ProcessingEvent.of("progress", f"checking:{value}")
             yield "A:"
             yield value
 
@@ -83,7 +83,7 @@ async def test_handle_response_tool_streams_events_and_returns_accumulated_respo
     assert len(chunks) == 2
     event = chunks[0]
     response = chunks[1]
-    assert isinstance(event, ToolEvent)
+    assert isinstance(event, ProcessingEvent)
     assert event.event == "progress"
     assert event.content.to_str() == "checking:x"
     assert event.meta["tool"] == "lookup"
@@ -100,7 +100,7 @@ async def test_handle_response_tool_returns_error_response_with_partial_result()
 
         @tool
         async def unstable():
-            yield ToolEvent.of("progress", "started")
+            yield ProcessingEvent.of("progress", "started")
             yield "partial"
             raise RuntimeError("boom")
 
@@ -112,7 +112,7 @@ async def test_handle_response_tool_returns_error_response_with_partial_result()
         ]
 
     assert len(chunks) == 2
-    assert isinstance(chunks[0], ToolEvent)
+    assert isinstance(chunks[0], ProcessingEvent)
     response = chunks[1]
     assert isinstance(response, ModelToolResponse)
     assert response.status == "error"
@@ -181,7 +181,7 @@ async def test_handle_output_tool_yields_event_then_output_parts_then_response()
 
         @tool(handling="output")
         async def amplify(value: str):
-            yield ToolEvent.of("progress", "starting")
+            yield ProcessingEvent.of("progress", "starting")
             yield "OUT:"
             yield value
 
@@ -196,7 +196,7 @@ async def test_handle_output_tool_yields_event_then_output_parts_then_response()
     event = chunks[0]
     output_parts = chunks[1:3]
     response = chunks[3]
-    assert isinstance(event, ToolEvent)
+    assert isinstance(event, ProcessingEvent)
     assert event.event == "progress"
     assert event.meta["tool"] == "amplify"
     assert event.meta["identifier"] == "r1"

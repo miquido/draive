@@ -33,7 +33,8 @@ from draive.models import (
     RealtimeGenerativeModel,
 )
 from draive.multimodal import MultimodalContent, MultimodalContentPart
-from draive.tools import Toolbox, ToolEvent
+from draive.tools import Toolbox
+from draive.utils import ProcessingEvent
 
 __all__ = ("realtime_conversation_preparing",)
 
@@ -89,7 +90,7 @@ async def realtime_conversation_preparing(  # noqa: C901, PLR0915
                         # deliver the result directly to input
                         await session._writing(chunk)  # pyright: ignore[reportPrivateUsage]
 
-                    elif isinstance(chunk, ToolEvent):
+                    elif isinstance(chunk, ProcessingEvent):
                         output_queue.enqueue(ConversationEvent.tool_event(chunk))
 
                     else:
