@@ -926,6 +926,18 @@ class ModelSessionEvent(State, serializable=True):
         )
 
     @classmethod
+    def turn_interrupted(
+        cls,
+        *,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        return cls(
+            event="turn_interrupted",
+            content=None,
+            meta=Meta.of(meta),
+        )
+
+    @classmethod
     def context_updated(
         cls,
         context: ModelContext,
@@ -944,6 +956,7 @@ class ModelSessionEvent(State, serializable=True):
             "turn_commited",
             "turn_finished",
             "turn_completed",
+            "turn_interrupted",
             "context_updated",
         ]
         | str
@@ -1089,7 +1102,7 @@ class ModelSessionPreparing(Protocol):
         self,
         *,
         instructions: ModelInstructions,
-        toolbox: ModelTools,
+        tools: ModelTools,
         context: ModelContext,
         output: ModelSessionOutputSelection,
         **extra: Any,

@@ -9,13 +9,15 @@ from draive.embedding import TextEmbedding
 from draive.gemini.api import GeminiAPI
 from draive.gemini.embedding import GeminiEmbedding
 from draive.gemini.generating import GeminiGenerating
-from draive.models import GenerativeModel
+from draive.gemini.live import GeminiLive
+from draive.models import GenerativeModel, RealtimeGenerativeModel
 
 __all__ = ("Gemini",)
 
 
 @final
 class Gemini(
+    GeminiLive,
     GeminiGenerating,
     GeminiEmbedding,
     GeminiAPI,
@@ -31,7 +33,8 @@ class Gemini(
         api_key: str | None = None,
         vertexai: bool | None = None,
         http_options: HttpOptionsDict | None = None,
-        features: Collection[type[GenerativeModel | TextEmbedding]] | None = None,
+        features: Collection[type[GenerativeModel | RealtimeGenerativeModel | TextEmbedding]]
+        | None = None,
         **extra: Any,
     ) -> None:
         super().__init__(
@@ -44,13 +47,16 @@ class Gemini(
         self._features: frozenset[type[State]] = (
             frozenset(features)
             if features is not None
-            else frozenset((GenerativeModel, TextEmbedding))
+            else frozenset((GenerativeModel, RealtimeGenerativeModel, TextEmbedding))
         )
 
     async def __aenter__(self) -> Iterable[State]:
         state: list[State] = []
         if GenerativeModel in self._features:
             state.append(GenerativeModel(generating=self.completion))
+
+        if RealtimeGenerativeModel in self._features:
+            state.append(RealtimeGenerativeModel(session_preparing=self.session_prepare))
 
         if TextEmbedding in self._features:
             state.append(TextEmbedding(embedding=self.create_texts_embedding))
