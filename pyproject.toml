@@ -53,7 +53,7 @@ opentelemetry = [
 httpx = ["haiway[httpx]", "httpx"]
 postgres = ["haiway[postgres]", "asyncpg"]
 rabbitmq = ["haiway[rabbitmq]", "pika"]
-qdrant = ["qdrant-client~=1.15.0"]
+qdrant = ["qdrant-client~=1.17"]
 dev = [
   "bandit~=1.8",
   "pyright~=1.1",
