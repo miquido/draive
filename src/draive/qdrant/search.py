@@ -4,6 +4,7 @@ from uuid import UUID
 
 from haiway import AttributeRequirement, State, as_list
 from qdrant_client.conversions.common_types import ScoredPoint
+from qdrant_client.http.models.models import QueryResponse
 
 from draive.qdrant.filters import prepare_filter
 from draive.qdrant.session import QdrantSession
@@ -67,16 +68,17 @@ class QdrantSearchMixin(QdrantSession):
         include_vector: bool = False,
         **extra: Any,
     ) -> Sequence[QdrantResult[Model]] | Sequence[Model]:
-        results: list[ScoredPoint] = await self.client.search(
+        response: QueryResponse = await self.client.query_points(
             collection_name=model.__name__,
+            query=as_list(query_vector),
             query_filter=prepare_filter(requirements=requirements),
-            query_vector=as_list(query_vector),
             score_threshold=score_threshold,
             limit=limit,
             with_payload=True,
             with_vectors=include_vector,
             **extra,
         )
+        results: list[ScoredPoint] = response.points
 
         if include_vector:
             return tuple(
