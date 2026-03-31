@@ -236,13 +236,13 @@ class OpenAIRealtime(OpenAIAPI):
                                 record_usage_metrics(
                                     provider="openai",
                                     model=config.model,
-                                    input_tokens=usage.input_tokens or 0,
+                                    input_tokens=usage.input_tokens,
                                     cached_input_tokens=(
                                         usage.input_token_details.cached_tokens
                                         if usage.input_token_details is not None
                                         else None
                                     ),
-                                    output_tokens=usage.output_tokens or 0,
+                                    output_tokens=usage.output_tokens,
                                 )
 
                             continue  # keep going, nothing to send here
@@ -746,7 +746,10 @@ def _content_to_multimodal(
                     yield TextContent.of(text)
 
                 if transcript := element.get("transcript"):
-                    yield TextContent.of(transcript, meta={"transcript": True})
+                    yield TextContent.of(
+                        transcript,
+                        meta={"transcript": True},
+                    )
 
             case other:
                 ctx.log_warning(f"Unsupported message content - {other}")
