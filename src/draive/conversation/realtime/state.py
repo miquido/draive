@@ -79,6 +79,6 @@ class RealtimeConversation(State):
 
     def __init__(
         self,
-        preparing: RealtimeConversationPreparing,
+        preparing: RealtimeConversationPreparing = realtime_conversation_preparing,
     ) -> None:
         super().__init__(_preparing=preparing)
