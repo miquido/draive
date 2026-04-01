@@ -108,7 +108,7 @@ MimeType = (
         "audio/mpeg",
         "audio/ogg",
         "audio/wav",
-        "audio/pcm16",
+        "audio/pcm",
         "video/mp4",
         "video/mpeg",
         "video/ogg",

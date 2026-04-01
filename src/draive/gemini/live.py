@@ -3,6 +3,7 @@ from collections import deque
 from collections.abc import AsyncIterator, Generator, MutableSequence
 from contextlib import AbstractAsyncContextManager
 from datetime import UTC, datetime
+from types import TracebackType
 from typing import Any, cast
 from uuid import uuid4
 
@@ -28,7 +29,7 @@ from haiway import MISSING, Meta, as_dict, ctx
 
 from draive.gemini.api import GeminiAPI
 from draive.gemini.config import GeminiConfig
-from draive.gemini.utils import unwrap_missing
+from draive.gemini.utils import speech_config, unwrap_missing
 from draive.models import (
     ModelContext,
     ModelException,
@@ -57,11 +58,9 @@ from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("GeminiLive",)
 
-RATE_LIMIT_STATUS_CODE = 429
-
 
 class GeminiLive(GeminiAPI):
-    async def session_prepare(  # noqa: C901, PLR0915
+    def session_prepare(  # noqa: C901, PLR0915
         self,
         *,
         instructions: ModelInstructions,
@@ -72,6 +71,9 @@ class GeminiLive(GeminiAPI):
         **extra: Any,
     ) -> ModelSessionScope:
         assert isinstance(config, GeminiConfig | None)  # nosec: B101
+        # managing scope manually
+        scope: AbstractAsyncContextManager[str]
+        # prepare config
         config = config or ctx.state(GeminiConfig)
         connection_config: LiveConnectConfigDict = _live_connect_config(
             instructions=instructions,
@@ -79,7 +81,7 @@ class GeminiLive(GeminiAPI):
             output=output,
             config=config,
         )
-        scope: AbstractAsyncContextManager[str] = ctx.scope("model.session")
+        # prepare connection
         connection_manager: AbstractAsyncContextManager[AsyncSession] = (
             self._client.aio.live.connect(
                 model=config.model,
@@ -88,6 +90,9 @@ class GeminiLive(GeminiAPI):
         )
 
         async def open_session() -> ModelSession:  # noqa: C901, PLR0915
+            nonlocal scope
+            # enter scope
+            scope = ctx.scope("model.session")
             await scope.__aenter__()
             record_model_invocation(
                 provider="gemini",
@@ -100,39 +105,13 @@ class GeminiLive(GeminiAPI):
                 thinking_budget=config.thinking_budget,
             )
 
-            try:
-                session: AsyncSession = await connection_manager.__aenter__()
-
-            except ResourceExhausted as exc:
-                raise ModelException(
-                    "Gemini Live session rate limited",
-                    provider="gemini",
-                    model=config.model,
-                ) from exc
-
-            except ClientError as exc:
-                if exc.code == RATE_LIMIT_STATUS_CODE:
-                    raise ModelException(
-                        "Gemini Live session rate limited",
-                        provider="gemini",
-                        model=config.model,
-                    ) from exc
-
-                raise ModelException(
-                    str(exc),
-                    provider="gemini",
-                    model=config.model,
-                ) from exc
+            session: AsyncSession = await connection_manager.__aenter__()
 
             if context:  # send initial context
-                try:
-                    await session.send_client_content(
-                        turns=_request_content(context),
-                        turn_complete=False,
-                    )
-                except BaseException as exc:
-                    await close_session(exc)
-                    raise
+                await session.send_client_content(
+                    turns=_request_content(context),
+                    turn_complete=False,
+                )
 
             read_stream: AsyncIterator[LiveServerMessage] = session.receive()
             read_buffer: deque[ModelSessionOutputChunk] = deque()
@@ -165,7 +144,7 @@ class GeminiLive(GeminiAPI):
                         ) from exc
 
                     except ClientError as exc:
-                        if exc.code == RATE_LIMIT_STATUS_CODE:
+                        if exc.code == 429:  # noqa: PLR2004
                             raise ModelException(
                                 "Gemini Live session rate limited",
                                 provider="gemini",
@@ -177,6 +156,10 @@ class GeminiLive(GeminiAPI):
                             provider="gemini",
                             model=config.model,
                         ) from exc
+
+                    except StopAsyncIteration:
+                        read_stream = session.receive()
+                        continue  # for some mysterious reason iterator breaks after each turn...
 
                     if message.usage_metadata is not None:
                         record_usage_metrics(
@@ -409,18 +392,23 @@ class GeminiLive(GeminiAPI):
             )
 
         async def close_session(
-            exception: BaseException | None,
+            exc_type: type[BaseException] | None,
+            exc_val: BaseException | None,
+            exc_tb: TracebackType | None,
         ) -> None:
-            await connection_manager.__aexit__(
-                type(exception) if exception is not None else None,
-                exception,
-                exception.__traceback__ if exception is not None else None,
-            )
-            await scope.__aexit__(
-                type(exception) if exception is not None else None,
-                exception,
-                exception.__traceback__ if exception is not None else None,
-            )
+            try:
+                await connection_manager.__aexit__(
+                    exc_type,
+                    exc_val,
+                    exc_tb,
+                )
+
+            finally:
+                await scope.__aexit__(  # noqa: F821
+                    exc_type,
+                    exc_val,
+                    exc_tb,
+                )
 
         return ModelSessionScope(
             opening=open_session,
@@ -488,14 +476,8 @@ def _live_connect_config(
     else:
         raise ValueError(f"Unsupported media resolution: {config.media_resolution}")
 
-    if config.speech_voice_name is not MISSING:
-        live_config["speech_config"] = {
-            "voice_config": {
-                "prebuilt_voice_config": {
-                    "voice_name": cast(str, config.speech_voice_name),
-                },
-            }
-        }
+    if speech := speech_config(config):
+        live_config["speech_config"] = speech
 
     if config.thinking_budget is not MISSING:
         live_config["thinking_config"] = {

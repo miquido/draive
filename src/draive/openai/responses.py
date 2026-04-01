@@ -85,10 +85,11 @@ class OpenAIResponses(OpenAIAPI):
         context: ModelContext,
         tools: ModelTools,
         output: ModelOutputSelection,
-        config: OpenAIResponsesConfig | Missing = MISSING,
-        cache_key: str | Missing = MISSING,
+        config: OpenAIResponsesConfig | None = None,
+        cache_key: str | None = None,
         **extra: Any,
     ) -> ModelOutputStream:
+        assert isinstance(config, OpenAIResponsesConfig | None)  # nosec: B101
         async with ctx.scope("model.invocation"):
             config = config or ctx.state(OpenAIResponsesConfig)
             record_model_invocation(
@@ -152,10 +153,7 @@ class OpenAIResponses(OpenAIAPI):
                         config.safety_identifier,
                         default=omit,
                     ),
-                    prompt_cache_key=unwrap_missing(
-                        cache_key,
-                        default=omit,
-                    ),
+                    prompt_cache_key=cache_key or omit,
                     include=["reasoning.encrypted_content"]
                     # for gpt-5 model family we need to request encrypted reasoning
                     if "gpt-5" in config.model.lower()
@@ -172,7 +170,7 @@ class OpenAIResponses(OpenAIAPI):
                                 assert isinstance(event, ResponseAudioDeltaEvent)  # nosec: B101
                                 yield ResourceContent.of(
                                     event.delta,
-                                    mime_type="audio/pcm16",  # it seems it is a default format
+                                    mime_type="audio/pcm",  # it seems it is a default format
                                 )
 
                             case "response.reasoning_text.delta":

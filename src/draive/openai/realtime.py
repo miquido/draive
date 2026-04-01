@@ -1,9 +1,10 @@
 import json
 from base64 import b64decode, b64encode, urlsafe_b64decode
-from collections.abc import Generator, Mapping, MutableMapping
+from collections.abc import Generator, Mapping, MutableMapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from copy import copy
 from datetime import UTC, datetime
+from types import TracebackType
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -13,11 +14,18 @@ from openai.resources.realtime.realtime import (
     AsyncRealtimeConnectionManager,
 )
 from openai.types.realtime import (
+    RealtimeFunctionToolParam,
     RealtimeServerEvent,
     RealtimeSessionCreateRequestParam,
 )
+from openai.types.realtime.realtime_conversation_item_assistant_message import (
+    Content as AssistantContent,
+)
 from openai.types.realtime.realtime_conversation_item_assistant_message_param import (
     Content as AssistantContentParam,
+)
+from openai.types.realtime.realtime_conversation_item_user_message import (
+    Content as UserContent,
 )
 from openai.types.realtime.realtime_conversation_item_user_message_param import (
     Content as UserContentParam,
@@ -49,7 +57,7 @@ __all__ = ("OpenAIRealtime",)
 
 
 class OpenAIRealtime(OpenAIAPI):
-    async def session_prepare(  # noqa: C901, PLR0915
+    def session_prepare(  # noqa: C901, PLR0915
         self,
         *,
         instructions: ModelInstructions,
@@ -59,6 +67,10 @@ class OpenAIRealtime(OpenAIAPI):
         config: OpenAIRealtimeConfig | None = None,
         **extra: Any,
     ) -> ModelSessionScope:
+        assert isinstance(config, OpenAIRealtimeConfig | None)  # nosec: B101
+        # managing scope manually
+        scope: AbstractAsyncContextManager[str]
+        # prepare config
         config = config or ctx.state(OpenAIRealtimeConfig)
         session_config: RealtimeSessionCreateRequestParam = _prepare_session_config(
             config=config,
@@ -66,8 +78,13 @@ class OpenAIRealtime(OpenAIAPI):
             tools=tools,
             output=output,
         )
-        # managing scope manually
-        scope: AbstractAsyncContextManager[str] = ctx.scope("model.session")
+        output_audio_format: str
+        match config.output_parameters:
+            case {"format": {"type": str() as audio_input}}:
+                output_audio_format = audio_input
+
+            case _:
+                output_audio_format = "audio/pcm"
         # prepare connection
         connection_manager: AsyncRealtimeConnectionManager = self._client.realtime.connect(
             model=config.model,
@@ -76,16 +93,10 @@ class OpenAIRealtime(OpenAIAPI):
             },
         )
 
-        output_audio_format: str
-        match config.output_parameters:
-            case {"format": {"type": str() as audio_input}}:
-                output_audio_format = audio_input
-
-            case _:
-                output_audio_format = "audio/pcm"
-
         async def open_session() -> ModelSession:  # noqa: C901, PLR0915
+            nonlocal scope
             # enter scope
+            scope = ctx.scope("model.session")
             await scope.__aenter__()
             record_model_invocation(
                 provider="openai",
@@ -100,7 +111,7 @@ class OpenAIRealtime(OpenAIAPI):
 
             current_items: MutableMapping[str, Meta] = {}
 
-            if context:
+            if context:  # send initial context
                 await _send_context(
                     context,
                     current_items=current_items,
@@ -381,19 +392,23 @@ class OpenAIRealtime(OpenAIAPI):
             )
 
         async def close_session(
-            exception: BaseException | None,
+            exc_type: type[BaseException] | None,
+            exc_val: BaseException | None,
+            exc_tb: TracebackType | None,
         ) -> None:
-            nonlocal connection_manager
-            await connection_manager.__aexit__(  # close connection
-                type(exception) if exception is not None else None,
-                exception,
-                exception.__traceback__ if exception is not None else None,
-            )
-            await scope.__aexit__(  # exit scope
-                type(exception) if exception is not None else None,
-                exception,
-                exception.__traceback__ if exception is not None else None,
-            )
+            try:
+                await connection_manager.__aexit__(  # close connection
+                    exc_type,
+                    exc_val,
+                    exc_tb,
+                )
+
+            finally:
+                await scope.__aexit__(  # noqa: F821 # exit scope
+                    exc_type,
+                    exc_val,
+                    exc_tb,
+                )
 
         return ModelSessionScope(
             opening=open_session,
@@ -672,7 +687,7 @@ def _prepare_session_config(
                 "name": tool.name,
             }
 
-    session_tools: list[Mapping[str, Any]] | Missing
+    session_tools: list[RealtimeFunctionToolParam] | Missing
     if tools:
         session_tools = [
             without_missing(
@@ -682,6 +697,7 @@ def _prepare_session_config(
                     "description": tool.description or MISSING,
                     "parameters": tool.parameters or MISSING,
                 },
+                typed=RealtimeFunctionToolParam,
             )
             for tool in tools.specification
         ]
@@ -720,15 +736,15 @@ def _event_context(
 
 
 def _content_to_multimodal(
-    content: Any,
+    content: Sequence[AssistantContent | UserContent],
     /,
     *,
     audio_format: str,
 ) -> Generator[MultimodalContentPart]:
     for element in content:
-        match element.get("type"):
-            case "output_audio" | "input_audio" | "audio":
-                if encoded_audio := element.get("audio"):
+        match element.type:
+            case "output_audio" | "input_audio":
+                if encoded_audio := element.audio:
                     try:
                         yield ResourceContent.of(
                             b64decode(encoded_audio),
@@ -742,10 +758,10 @@ def _content_to_multimodal(
                         )
 
             case "output_text" | "input_text":
-                if text := element.get("text"):
+                if text := element.text:
                     yield TextContent.of(text)
 
-                if transcript := element.get("transcript"):
+                if transcript := element.transcript:
                     yield TextContent.of(
                         transcript,
                         meta={"transcript": True},

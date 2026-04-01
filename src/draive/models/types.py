@@ -1059,7 +1059,9 @@ class ModelSessionClosing(Protocol):
 
     async def __call__(
         self,
-        exception: BaseException | None,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None: ...
 
 
@@ -1091,14 +1093,14 @@ class ModelSessionScope(State):
         exc_tb: TracebackType | None,
     ) -> None:
         """Close the realtime session with an optional terminal exception."""
-        await self._closing(exception=exc_val)
+        await self._closing(exc_type, exc_val, exc_tb)
 
 
 @runtime_checkable
 class ModelSessionPreparing(Protocol):
     """Protocol for preparing scoped realtime model sessions."""
 
-    async def __call__(
+    def __call__(
         self,
         *,
         instructions: ModelInstructions,

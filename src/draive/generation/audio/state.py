@@ -62,6 +62,6 @@ class AudioGeneration(State):
 
     def __init__(
         self,
-        generating: AudioGenerating,
+        generating: AudioGenerating = generate_audio,
     ) -> None:
         super().__init__(_generating=generating)

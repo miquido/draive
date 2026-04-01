@@ -96,19 +96,22 @@ class GenerativeModel(State):
 class RealtimeGenerativeModel(State):
     """Typed facade for realtime, session-based generative interactions.
 
-    Delegates setup to a configured ``ModelSessionPreparing``
-    callable and returns a scoped session object that encapsulates ongoing
-    bidirectional model interaction.
+    Delegates setup to a configured ``ModelSessionPreparing`` callable, which
+    synchronously returns an asynchronous context manager for provider-specific
+    realtime session setup. The resulting scoped session object encapsulates
+    ongoing bidirectional model interaction.
 
     Parameters
     ----------
     session_preparing : ModelSessionPreparing
-        Async callable implementing provider-specific realtime session setup.
+        Synchronous callable implementing provider-specific realtime session
+        setup by returning an asynchronous context manager when invoked.
     """
 
     @overload
     @classmethod
-    async def session(
+    def session(  # pyright: ignore[reportInconsistentOverload]
+        # it seems to be pyright limitation and false positive
         cls,
         *,
         instructions: ModelInstructions = "",
@@ -119,7 +122,7 @@ class RealtimeGenerativeModel(State):
     ) -> ModelSessionScope: ...
 
     @overload
-    async def session(
+    def session(
         self,
         *,
         instructions: ModelInstructions = "",
@@ -130,7 +133,7 @@ class RealtimeGenerativeModel(State):
     ) -> ModelSessionScope: ...
 
     @statemethod
-    async def session(
+    def session(
         self,
         *,
         instructions: ModelInstructions = "",
@@ -164,7 +167,7 @@ class RealtimeGenerativeModel(State):
         Exception
             Propagates exceptions raised by the configured session preparer.
         """
-        return await self._session_preparing(
+        return self._session_preparing(
             instructions=instructions,
             tools=tools,
             context=context,
@@ -183,6 +186,7 @@ class RealtimeGenerativeModel(State):
         Parameters
         ----------
         session_preparing : ModelSessionPreparing
-            Async callable used to initialize realtime model sessions.
+            Synchronous callable used to initialize realtime model sessions by
+            returning an asynchronous context manager when called.
         """
         super().__init__(_session_preparing=session_preparing)
