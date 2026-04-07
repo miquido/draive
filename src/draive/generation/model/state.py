@@ -117,6 +117,6 @@ class ModelGeneration(State):
 
     def __init__(
         self,
-        generating: ModelGenerating,
+        generating: ModelGenerating = generate_model,
     ) -> None:
         super().__init__(_generating=generating)

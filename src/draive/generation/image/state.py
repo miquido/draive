@@ -62,6 +62,6 @@ class ImageGeneration(State):
 
     def __init__(
         self,
-        generating: ImageGenerating,
+        generating: ImageGenerating = generate_image,
     ) -> None:
         super().__init__(_generating=generating)

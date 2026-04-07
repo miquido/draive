@@ -73,14 +73,19 @@ async def test_realtime_memory_completed_event_is_remembered_and_not_forwarded()
         _ = input
 
     async def open_session() -> ModelSession:
-        return ModelSession(reading=read, writing=write)
+        return ModelSession(
+            reading=read,
+            writing=write,
+        )
 
     async def close_session(
-        exception: BaseException | None,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
     ) -> None:
-        _ = exception
+        _ = (exc_type, exc_val, exc_tb)
 
-    async def session_prepare(
+    def session_prepare(
         *,
         instructions: ModelInstructions,
         tools: ModelTools,
@@ -125,7 +130,7 @@ async def test_realtime_memory_completed_event_is_remembered_and_not_forwarded()
         "test",
         RealtimeGenerativeModel(session_preparing=session_prepare),
     ):
-        session_scope = await realtime_conversation_preparing(
+        session_scope = realtime_conversation_preparing(
             instructions="",
             toolbox=Toolbox.empty,
             memory=memory,
@@ -133,7 +138,7 @@ async def test_realtime_memory_completed_event_is_remembered_and_not_forwarded()
         )
 
         async with session_scope as session:
-            chunk = await session.reading()
+            chunk = await session.read()
 
     assert isinstance(chunk, TextContent)
     assert chunk.text == "assistant output"

@@ -71,6 +71,6 @@ class TextGeneration(State):
 
     def __init__(
         self,
-        generating: TextGenerating,
+        generating: TextGenerating = generate_text,
     ) -> None:
         super().__init__(_generating=generating)

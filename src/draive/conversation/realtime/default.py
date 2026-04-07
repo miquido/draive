@@ -1,10 +1,10 @@
-from asyncio import CancelledError, Task
+from asyncio import CancelledError
+from collections import deque
 from collections.abc import Generator, MutableSequence, Sequence
 from types import TracebackType
 from typing import Any
 
-from haiway import AsyncQueue, State, ctx
-from haiway.context.tasks import ContextTaskGroup
+from haiway import State, ctx
 
 from draive.conversation.realtime.types import (
     RealtimeConversationSession,
@@ -39,7 +39,7 @@ from draive.utils import ProcessingEvent
 __all__ = ("realtime_conversation_preparing",)
 
 
-async def realtime_conversation_preparing(  # noqa: C901, PLR0915
+def realtime_conversation_preparing(  # noqa: C901, PLR0915
     *,
     instructions: ModelInstructions,
     toolbox: Toolbox,
@@ -47,23 +47,19 @@ async def realtime_conversation_preparing(  # noqa: C901, PLR0915
     output: ModelSessionOutputSelection,
     **extra: Any,
 ) -> RealtimeConversationSessionScope:
-    # TODO: allow instructions and tools changes during the session
-    session_scope: ModelSessionScope = await RealtimeGenerativeModel.session(
-        instructions=instructions,
-        tools=toolbox.model_tools(),
-        context=await memory.recall(),
-        output=output,
-        **extra,
-    )
-    task_group: ContextTaskGroup = ContextTaskGroup()
-    process_task: Task[None] | None = None
+    session_scope: ModelSessionScope
 
     async def open_session() -> RealtimeConversationSession:  # noqa: C901, PLR0915
-        await task_group.__aenter__()  # enter context as soon as session begins
+        nonlocal session_scope
+        session_scope = RealtimeGenerativeModel.session(
+            instructions=instructions,
+            tools=toolbox.model_tools(),
+            context=await memory.recall(),
+            output=output,
+            **extra,
+        )
         session: ModelSession = await session_scope.__aenter__()
-        output_queue: AsyncQueue[
-            MultimodalContentPart | ModelReasoningChunk | ConversationEvent
-        ] = AsyncQueue()
+        tools_output: deque[MultimodalContentPart | ConversationEvent] = deque()
 
         async def remember_turn(turn: ConversationTurn | None) -> None:
             if turn is None:
@@ -86,19 +82,19 @@ async def realtime_conversation_preparing(  # noqa: C901, PLR0915
                 ctx.log_debug(f"Requested tool ({tool_request.identifier}) handling...")
                 async for chunk in toolbox.handle(tool_request):
                     if isinstance(chunk, ModelToolResponse):
-                        output_queue.enqueue(ConversationEvent.tool_response(chunk))
+                        tools_output.append(ConversationEvent.tool_response(chunk))
                         # deliver the result directly to input
                         await session._writing(chunk)  # pyright: ignore[reportPrivateUsage]
 
                     elif isinstance(chunk, ProcessingEvent):
-                        output_queue.enqueue(ConversationEvent.tool_event(chunk))
+                        tools_output.append(ConversationEvent.tool_event(chunk))
 
                     else:
                         assert isinstance(chunk, MultimodalContentPart)  # nosec: B101
                         # TODO: we should probably remember it as actual
                         # output to include within context and memory
                         ctx.log_warning("Tool direct outputs are not preserved within context...")
-                        output_queue.enqueue(chunk)
+                        tools_output.append(chunk)
 
             except CancelledError:
                 ctx.log_debug(f"...tool request ({tool_request.identifier}) handling cancelled!")
@@ -115,69 +111,60 @@ async def realtime_conversation_preparing(  # noqa: C901, PLR0915
 
         pending_elements: MutableSequence[ModelInput | ModelOutput] = []
 
-        async def process() -> None:  # noqa: C901, PLR0912
-            nonlocal process_task
-            try:
-                while True:
-                    chunk: ModelSessionOutputChunk = await session._reading()  # pyright: ignore[reportPrivateUsage]
-                    if isinstance(chunk, ModelReasoningChunk):
-                        output_queue.enqueue(chunk)
+        async def read() -> MultimodalContentPart | ModelReasoningChunk | ConversationEvent:  # noqa: C901, PLR0912
+            while True:
+                if tools_output:
+                    return tools_output.popleft()
 
-                    elif isinstance(chunk, ModelToolRequest):
-                        output_queue.enqueue(ConversationEvent.tool_request(chunk))
-                        ctx.spawn(handle_tool_request, chunk)
+                chunk: ModelSessionOutputChunk = await session._reading()  # pyright: ignore[reportPrivateUsage]
+                if isinstance(chunk, ModelReasoningChunk):
+                    return chunk
 
-                    elif isinstance(chunk, ModelSessionEvent):
-                        if chunk.event == "turn_completed":
-                            if isinstance(chunk.content, ModelInput):
-                                if chunk.content.contains_tools:
-                                    pending_elements.append(chunk.content)
+                elif isinstance(chunk, ModelToolRequest):
+                    ctx.spawn(handle_tool_request, chunk)
+                    return ConversationEvent.tool_request(chunk)
 
-                                else:
-                                    await remember_turn(_user_turn(chunk.content))
-
-                            elif isinstance(chunk.content, ModelOutput):
-                                if chunk.content.contains_tools:
-                                    pending_elements.append(chunk.content)
-
-                                else:
-                                    await remember_turn(
-                                        _assistant_turn(chunk.content, *pending_elements)
-                                    )
-                                    pending_elements.clear()
-
-                            elif pending_elements:
-                                await remember_turn(_assistant_turn(*pending_elements))
-                                pending_elements.clear()
+                elif isinstance(chunk, ModelSessionEvent):
+                    if chunk.event == "turn_completed":
+                        if isinstance(chunk.content, ModelInput):
+                            if chunk.content.contains_tools:
+                                pending_elements.append(chunk.content)
 
                             else:
-                                continue  # skip
+                                await remember_turn(_user_turn(chunk.content))
 
-                        elif isinstance(chunk.content, State | None):
-                            output_queue.enqueue(
-                                ConversationEvent.of(
-                                    chunk.event,
-                                    content=chunk.content,
-                                    meta=chunk.meta,
+                        elif isinstance(chunk.content, ModelOutput):
+                            if chunk.content.contains_tools:
+                                pending_elements.append(chunk.content)
+
+                            else:
+                                await remember_turn(
+                                    _assistant_turn(
+                                        chunk.content,
+                                        *pending_elements,
+                                    )
                                 )
-                            )
+                                pending_elements.clear()
+
+                        elif pending_elements:
+                            await remember_turn(_assistant_turn(*pending_elements))
+                            pending_elements.clear()
 
                         else:
-                            ctx.log_error(f"Received unsupported session event: {chunk.event}")
+                            continue  # skip
+
+                    elif isinstance(chunk.content, State | None):
+                        return ConversationEvent.of(
+                            chunk.event,
+                            content=chunk.content,
+                            meta=chunk.meta,
+                        )
 
                     else:
-                        output_queue.enqueue(chunk)
+                        ctx.log_error(f"Received unsupported session event: {chunk.event}")
 
-            except BaseException as exc:
-                output_queue.finish(exc)
-
-            else:
-                output_queue.finish()
-
-        process_task = ctx.spawn(process)
-
-        async def read() -> MultimodalContentPart | ModelReasoningChunk | ConversationEvent:
-            return await output_queue.next()
+                else:
+                    return chunk
 
         async def write(
             input: MultimodalContentPart | ConversationEvent,  # noqa: A002
@@ -218,15 +205,7 @@ async def realtime_conversation_preparing(  # noqa: C901, PLR0915
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        if process_task is not None:
-            process_task.cancel()
-
-        await session_scope.__aexit__(
-            exc_type,
-            exc_val,
-            exc_tb,
-        )
-        await task_group.__aexit__(
+        await session_scope.__aexit__(  # noqa: F821
             exc_type,
             exc_val,
             exc_tb,

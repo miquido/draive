@@ -31,7 +31,7 @@ from draive.gemini.api import GeminiAPI
 from draive.gemini.config import (
     GeminiConfig,
 )
-from draive.gemini.utils import unwrap_missing
+from draive.gemini.utils import speech_config, unwrap_missing
 from draive.models import (
     ModelContext,
     ModelException,
@@ -381,14 +381,8 @@ def _request_config(  # noqa: C901, PLR0912
     elif config.media_resolution == "high":
         configuration["media_resolution"] = MediaResolution.MEDIA_RESOLUTION_HIGH
 
-    if config.speech_voice_name:
-        configuration["speech_config"] = {
-            "voice_config": {
-                "prebuilt_voice_config": {
-                    "voice_name": cast(str, config.speech_voice_name),
-                },
-            }
-        }
+    if speech := speech_config(config):
+        configuration["speech_config"] = speech
 
     return configuration
 

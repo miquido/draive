@@ -1,4 +1,6 @@
 from collections.abc import Iterable
+from contextlib import AbstractAsyncContextManager
+from types import TracebackType
 from typing import Any, final, overload
 
 from haiway import State, ctx, statemethod
@@ -6,6 +8,7 @@ from haiway import State, ctx, statemethod
 from draive.conversation.realtime.default import realtime_conversation_preparing
 from draive.conversation.realtime.types import (
     RealtimeConversationPreparing,
+    RealtimeConversationSession,
     RealtimeConversationSessionScope,
 )
 from draive.conversation.state import ConversationMemory
@@ -29,7 +32,8 @@ class RealtimeConversation(State):
 
     @overload
     @classmethod
-    async def prepare(
+    def prepare(  # pyright: ignore[reportInconsistentOverload]
+        # it seems to be pyright limitation and false positive
         cls,
         *,
         instructions: Template | ModelInstructions = "",
@@ -37,10 +41,10 @@ class RealtimeConversation(State):
         memory: ConversationMemory = ConversationMemory.disabled,
         output: ModelSessionOutputSelection = "auto",
         **extra: Any,
-    ) -> RealtimeConversationSessionScope: ...
+    ) -> AbstractAsyncContextManager[RealtimeConversationSession]: ...
 
     @overload
-    async def prepare(
+    def prepare(
         self,
         *,
         instructions: Template | ModelInstructions = "",
@@ -48,10 +52,10 @@ class RealtimeConversation(State):
         memory: ConversationMemory = ConversationMemory.disabled,
         output: ModelSessionOutputSelection = "auto",
         **extra: Any,
-    ) -> RealtimeConversationSessionScope: ...
+    ) -> AbstractAsyncContextManager[RealtimeConversationSession]: ...
 
     @statemethod
-    async def prepare(
+    def prepare(
         self,
         *,
         instructions: Template | ModelInstructions = "",
@@ -59,21 +63,55 @@ class RealtimeConversation(State):
         memory: ConversationMemory = ConversationMemory.disabled,
         output: ModelSessionOutputSelection = "auto",
         **extra: Any,
-    ) -> RealtimeConversationSessionScope:
-        async with ctx.scope("conversation.realtime"):
+    ) -> AbstractAsyncContextManager[RealtimeConversationSession]:
+        scope: AbstractAsyncContextManager[str]
+        session_scope: AbstractAsyncContextManager[RealtimeConversationSession]
+
+        async def opening(
+            instructions: Template | ModelInstructions = instructions,
+        ) -> RealtimeConversationSession:
+            nonlocal scope
+            nonlocal session_scope
+            scope = ctx.scope("conversation.realtime")
+            await scope.__aenter__()
             if isinstance(instructions, Template):
                 ctx.record_info(
                     attributes={"instructions.template": instructions.identifier},
                 )
                 instructions = await TemplatesRepository.resolve_str(instructions)
 
-            return await self._preparing(
+            session_scope = self._preparing(
                 instructions=instructions,
                 toolbox=Toolbox.of(tools),
                 memory=memory,
                 output=output,
                 **extra,
             )
+            return await session_scope.__aenter__()
+
+        async def closing(
+            exc_type: type[BaseException] | None,
+            exc_val: BaseException | None,
+            exc_tb: TracebackType | None,
+        ) -> None:
+            try:
+                await session_scope.__aexit__(  # noqa: F821
+                    exc_type,
+                    exc_val,
+                    exc_tb,
+                )
+
+            finally:
+                await scope.__aexit__(  # noqa: F821
+                    exc_type,
+                    exc_val,
+                    exc_tb,
+                )
+
+        return RealtimeConversationSessionScope(
+            opening=opening,
+            closing=closing,
+        )
 
     _preparing: RealtimeConversationPreparing = realtime_conversation_preparing
 

@@ -37,6 +37,7 @@ class GeminiConfig(Configuration):
     seed: int | Missing = MISSING
     stop_sequences: Sequence[str] | Missing = MISSING
     speech_voice_name: str | Missing = MISSING
+    speech_language_code: str | Missing = MISSING
     media_resolution: Literal["low", "medium", "high"] | Missing = MISSING
     thinking_budget: int | Missing = MISSING
     safety: GeminiSafetyConfig | Missing = MISSING

@@ -4,6 +4,7 @@ from typing import Any, cast
 
 import pytest
 from haiway import Meta
+from openai.types.realtime.realtime_conversation_item_user_message import Content
 
 from draive.models import (
     ModelInput,
@@ -23,17 +24,17 @@ from draive.openai.realtime import (
 from draive.resources import ResourceContent
 
 
-def test_content_to_multimodal_decodes_output_audio() -> None:
+def test_content_to_multimodal_decodes_input_audio() -> None:
     raw_audio = b"\x00\x01\x02\x03"
     encoded_audio = b64encode(raw_audio).decode("ascii")
 
     content = MultimodalContent.of(
         *_content_to_multimodal(
             [
-                {
-                    "type": "output_audio",
-                    "audio": encoded_audio,
-                }
+                Content(
+                    type="input_audio",
+                    audio=encoded_audio,
+                )
             ],
             audio_format="audio/pcm",
         )
@@ -178,7 +179,7 @@ async def test_session_write_text_content_is_skipped() -> None:
     model = OpenAIRealtime(api_key="test")
     model._client = cast(Any, _MockClient(manager))
 
-    scope = await model.session_prepare(
+    scope = model.session_prepare(
         instructions="",
         tools=ModelTools.none,
         context=(),
@@ -203,7 +204,7 @@ async def test_session_write_hidden_artifact_is_skipped() -> None:
     model = OpenAIRealtime(api_key="test")
     model._client = cast(Any, _MockClient(manager))
 
-    scope = await model.session_prepare(
+    scope = model.session_prepare(
         instructions="",
         tools=ModelTools.none,
         context=(),
