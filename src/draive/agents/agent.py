@@ -171,16 +171,10 @@ class Agent:
                     yield chunk  # pass events
 
                 elif isinstance(chunk, ModelToolRequest):
-                    if __debug__:
-                        raise AssertionError("Tool requests are unexpected")
-
-                    continue  # tools should not occur
+                    continue  # skip tools within output
 
                 elif isinstance(chunk, ModelToolResponse):
-                    if __debug__:
-                        raise AssertionError("Tool responses are unexpected")
-
-                    continue  # tools should not occur
+                    continue  # skip tools within output
 
                 else:
                     yield chunk  # pass content

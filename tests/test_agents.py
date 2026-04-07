@@ -62,32 +62,6 @@ async def test_agent_steps_filters_reasoning_chunks() -> None:
 
 
 @pytest.mark.asyncio
-async def test_agent_steps_rejects_tool_chunks() -> None:
-    async def execute(
-        state: StepState,
-    ) -> AsyncIterable[object]:
-        yield ProcessingEvent.of("progress", "starting")
-        yield ModelToolRequest.of("request-1", tool="lookup", arguments={"query": "hidden"})
-        yield ModelToolResponse.of(
-            "request-1",
-            tool="lookup",
-            result=TextContent.of("handled"),
-        )
-        yield TextContent.of("visible")
-        yield state
-
-    agent = Agent.steps(
-        Step(execute),
-        name="helper",
-        description="Test helper",
-    )
-
-    async with ctx.scope("test.agent.steps.tools"):
-        with pytest.raises(AssertionError, match="Tool requests are unexpected"):
-            _ = [chunk async for chunk in agent.call(input="hello")]
-
-
-@pytest.mark.asyncio
 async def test_agent_call_reuses_context_thread_and_meta() -> None:
     thread = uuid4()
     captured: dict[str, object] = {}
