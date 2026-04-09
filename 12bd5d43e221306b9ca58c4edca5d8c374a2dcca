@@ -1,0 +1,26 @@
+docs/guides/AdvancedStepUsage.md
+  eb3071a0fbd9af32 1-535
+mkdocs.yml
+  eb3071a0fbd9af32 114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "12bd5d43e221306b9ca58c4edca5d8c374a2dcca",
+  "prompts": {
+    "eb3071a0fbd9af32": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d7157-1b1c-7bc2-9853-05af6df619c8",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "marcinwolder",
+      "messages": [],
+      "total_additions": 536,
+      "total_deletions": 0,
+      "accepted_lines": 536,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.miquido.dev/cas/c4bfe0c5b1cd8680279fe460adab614c9e6d70d490e89566df4741f366083b56"
+    }
+  }
+}
