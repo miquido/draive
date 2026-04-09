@@ -111,6 +111,7 @@ nav:
       - Evaluator Catalog: guides/EvaluatorCatalog.md
       - Basic Stage Usage: guides/BasicStageUsage.md
       - Basic Step Usage: guides/BasicStepUsage.md
+      - Advanced Step Usage: guides/AdvancedStepUsage.md
       - Advanced State: guides/AdvancedState.md
       - Multimodal Content: guides/MultimodalContent.md
       - Templates: guides/Templates.md
