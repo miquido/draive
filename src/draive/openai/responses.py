@@ -488,7 +488,7 @@ def _model_input_to_params(
                 call_id=block.identifier,
                 output=list(
                     _input_content_parts(
-                        block.result,
+                        block.content,
                         vision_details=vision_details,
                     )
                 ),

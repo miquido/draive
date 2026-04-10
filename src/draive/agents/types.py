@@ -18,16 +18,40 @@ __all__ = (
 
 
 class AgentException(Exception):
-    """Base exception raised by agent helpers."""
+    """Base exception raised by agent helpers.
+
+    Raises
+    ------
+    AgentException
+        Raised when agent operations fail with a framework-level error.
+    """
 
 
 class AgentUnavailable(AgentException):
-    """Raised when a referenced agent cannot be accessed."""
+    """Raised when a referenced agent cannot be accessed.
+
+    Raises
+    ------
+    AgentUnavailable
+        Raised when an agent reference points to an unavailable or unknown agent.
+    """
 
 
 @final
 class AgentIdentity(State, serializable=True):
-    """Identity and description of an agent instance."""
+    """Identity and description of an agent instance.
+
+    Parameters
+    ----------
+    uri : str
+        Stable URI identifying the agent instance.
+    name : str
+        Human-readable agent name.
+    description : str
+        Short description of the agent's purpose.
+    meta : Meta
+        Additional metadata attached to the identity.
+    """
 
     @classmethod
     def of(
@@ -71,7 +95,19 @@ class AgentIdentity(State, serializable=True):
 
 @final
 class AgentMessage(State, serializable=True):
-    """Single message delivered to an agent."""
+    """Single message delivered to an agent.
+
+    Parameters
+    ----------
+    thread : UUID
+        Conversation thread identifier associated with the message.
+    created : datetime
+        UTC timestamp recording when the message was created.
+    content : MultimodalContent
+        Normalized multimodal message payload.
+    meta : Meta
+        Additional message metadata.
+    """
 
     @classmethod
     def of(
@@ -112,7 +148,15 @@ class AgentMessage(State, serializable=True):
 
 @final
 class AgentContext(State):
-    """Scoped runtime context shared across nested agent calls."""
+    """Scoped runtime context shared across nested agent calls.
+
+    Parameters
+    ----------
+    thread : UUID
+        Conversation thread identifier propagated through nested calls.
+    meta : Meta
+        Metadata shared within the active agent execution scope.
+    """
 
     @classmethod
     def of(
@@ -146,7 +190,13 @@ class AgentContext(State):
 
 @runtime_checkable
 class AgentExecuting(Protocol):
-    """Runtime contract implemented by agent executors."""
+    """Runtime contract implemented by agent executors.
+
+    Returns
+    -------
+    AsyncIterable[MultimodalContentPart | ProcessingEvent]
+        Stream produced by the executor for each processed message.
+    """
 
     def __call__(
         self,

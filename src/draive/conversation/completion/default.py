@@ -70,7 +70,7 @@ async def conversation_completion(  # noqa: C901, PLR0912, PLR0915
 
                     reasoning_accumulator.append(chunk)
 
-                elif isinstance(chunk, ModelToolRequest):
+                elif isinstance(chunk, ModelToolRequest):  # TODO: start handling immediately
                     event: ConversationEvent = ConversationEvent.tool_request(chunk)
                     yield event
 

@@ -69,7 +69,6 @@ __all__ = (
     "ModelSessionReading",
     "ModelSessionScope",
     "ModelSessionWriting",
-    "ModelToolDetachedHandling",
     "ModelToolFunctionSpecification",
     "ModelToolHandling",
     "ModelToolParametersSpecification",
@@ -382,6 +381,10 @@ ModelTools.none = ModelTools(
 )
 
 
+ModelToolHandling = Literal["response", "output"]
+"""Routing policy describing how successful tool results are handled."""
+
+
 @final
 class ModelToolRequest(State, serializable=True):
     """Model-emitted request to execute a concrete tool.
@@ -394,6 +397,8 @@ class ModelToolRequest(State, serializable=True):
         Requested tool name.
     arguments
         Typed argument payload for the tool call.
+    handling
+        Routing policy describing how successful tool results are handled.
     meta
         Metadata attached by provider adapters.
     """
@@ -406,6 +411,7 @@ class ModelToolRequest(State, serializable=True):
         *,
         tool: str,
         arguments: Mapping[str, BasicValue] | None = None,
+        handling: ModelToolHandling | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create a tool request with normalized defaults.
@@ -418,6 +424,8 @@ class ModelToolRequest(State, serializable=True):
             Requested tool name.
         arguments
             Optional argument mapping. Defaults to an empty mapping.
+        handling
+            Optional routing policy describing how successful tool results are handled.
         meta
             Optional metadata attached to the request.
 
@@ -425,26 +433,26 @@ class ModelToolRequest(State, serializable=True):
         -------
         Self
             Tool request instance.
+
+        Raises
+        ------
+        TypeError
+            If ``meta`` cannot be normalized into :class:`Meta`.
         """
         return cls(
             identifier=identifier,
             tool=tool,
             arguments=arguments if arguments is not None else {},
+            handling=handling,
             meta=Meta.of(meta),
         )
 
     identifier: str
     tool: str
     arguments: Mapping[str, BasicValue]
+    handling: ModelToolHandling | None = None
     meta: Meta = Meta.empty
 
-
-class ModelToolDetachedHandling(State):
-    detach_message: Multimodal
-
-
-ModelToolHandling = Literal["response", "output"] | ModelToolDetachedHandling
-"""Routing policy describing how successful tool results are handled."""
 
 ModelToolStatus = Literal["success", "error"]
 """Outcome status describing whether tool execution succeeded."""
@@ -460,12 +468,10 @@ class ModelToolResponse(State, serializable=True):
         Identifier matching the originating tool request.
     tool
         Tool name for the reported result.
-    result
-        Multimodal result payload returned by the tool.
-    handling
-        Routing policy describing how successful tool results are handled.
     status
         Outcome status of the tool execution.
+    content
+        Multimodal content payload returned by the tool.
     meta
         Metadata attached to the response.
     """
@@ -477,9 +483,8 @@ class ModelToolResponse(State, serializable=True):
         /,
         *,
         tool: str,
-        result: Multimodal,
-        handling: ModelToolHandling = "response",
         status: ModelToolStatus = "success",
+        content: Multimodal,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create a tool response with normalized content and metadata.
@@ -489,13 +494,11 @@ class ModelToolResponse(State, serializable=True):
         identifier
             Identifier of the related tool request.
         tool
-            Tool name that produced the result.
-        result
-            Tool output content.
-        handling
-            Routing policy for successful tool output.
+            Tool name that produced the response.
         status
             Outcome status used by providers and orchestration.
+        content
+            Tool output content.
         meta
             Optional metadata attached to the response.
 
@@ -503,21 +506,24 @@ class ModelToolResponse(State, serializable=True):
         -------
         Self
             Tool response instance.
+
+        Raises
+        ------
+        TypeError
+            If ``content`` or ``meta`` cannot be normalized into the expected state objects.
         """
         return cls(
             identifier=identifier,
             tool=tool,
-            result=MultimodalContent.of(result),
-            handling=handling,
             status=status,
+            content=MultimodalContent.of(content),
             meta=Meta.of(meta),
         )
 
     identifier: str
     tool: str
-    result: MultimodalContent
-    handling: ModelToolHandling = "response"
     status: ModelToolStatus = "success"
+    content: MultimodalContent
     meta: Meta = Meta.empty
 
 
@@ -627,7 +633,7 @@ class ModelReasoningChunk(State, serializable=True):
 
         Parameters
         ----------
-        reasoning
+        reasoning_chunk
             Reasoning text fragment.
         meta
             Optional metadata attached to the fragment.
@@ -720,8 +726,6 @@ class ModelOutputLimit(ModelException):
         Provider model identifier used for generation.
     max_output_tokens
         Maximum output token budget configured for the call.
-    content
-        Partial output captured before the limit was reached.
     """
 
     __slots__ = (
@@ -835,7 +839,26 @@ ModelOutputStream = AsyncIterable[ModelOutputChunk]
 
 @runtime_checkable
 class ModelGenerating(Protocol):
-    """Protocol for async model generation callables."""
+    """Protocol for async model generation callables.
+
+    Parameters
+    ----------
+    instructions
+        Instruction text provided to the model.
+    tools
+        Tool configuration exposed during generation.
+    context
+        Conversation context supplied with the request.
+    output
+        Requested output modality selection.
+    **extra
+        Provider-specific generation options.
+
+    Returns
+    -------
+    ModelOutputStream
+        Asynchronous stream of model output chunks.
+    """
 
     def __call__(
         self,
@@ -870,6 +893,22 @@ class ModelSessionEvent(State, serializable=True):
         content: State | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
+        """Create a session event with normalized metadata.
+
+        Parameters
+        ----------
+        event
+            Event type identifier.
+        content
+            Optional event payload.
+        meta
+            Optional metadata attached to the event.
+
+        Returns
+        -------
+        Self
+            Session event instance.
+        """
         return cls(
             event=event,
             content=content,
@@ -983,14 +1022,30 @@ ModelSessionOutputStream = AsyncIterable[ModelSessionOutputChunk]
 
 @runtime_checkable
 class ModelSessionReading(Protocol):
-    """Protocol describing a single realtime session read operation."""
+    """Protocol describing a single realtime session read operation.
+
+    Returns
+    -------
+    ModelSessionOutputChunk
+        Next output chunk emitted by the active session.
+    """
 
     async def __call__(self) -> ModelSessionOutputChunk: ...
 
 
 @runtime_checkable
 class ModelSessionWriting(Protocol):
-    """Protocol describing a single realtime session write operation."""
+    """Protocol describing a single realtime session write operation.
+
+    Parameters
+    ----------
+    input
+        Input chunk written into the active session.
+
+    Returns
+    -------
+    None
+    """
 
     async def __call__(
         self,
@@ -1000,16 +1055,36 @@ class ModelSessionWriting(Protocol):
 
 @final
 class ModelSession(State):
-    """Bound realtime model session with read/write callables."""
+    """Bound realtime model session with read/write callables.
+
+    Parameters
+    ----------
+    reading
+        Callable used to read a single output chunk.
+    writing
+        Callable used to write a single input chunk.
+    """
 
     @classmethod
     async def read(cls) -> ModelSessionOutputChunk:
-        """Read a single chunk from the active scoped session."""
+        """Read a single chunk from the active scoped session.
+
+        Returns
+        -------
+        ModelSessionOutputChunk
+            Next output chunk emitted by the scoped session.
+        """
         return await ctx.state(cls)._reading()
 
     @classmethod
     async def stream_read(cls) -> ModelSessionOutputStream:
-        """Continuously read chunks from the active scoped session."""
+        """Continuously read chunks from the active scoped session.
+
+        Returns
+        -------
+        ModelSessionOutputStream
+            Asynchronous stream yielding output chunks until the session ends.
+        """
         session: Self = ctx.state(cls)
         while True:  # breaks on exception
             yield await session._reading()
@@ -1019,7 +1094,17 @@ class ModelSession(State):
         cls,
         input: ModelSessionInputChunk,  # noqa: A002
     ) -> None:
-        """Write a single chunk to the active scoped session."""
+        """Write a single chunk to the active scoped session.
+
+        Parameters
+        ----------
+        input
+            Input chunk written into the scoped session.
+
+        Returns
+        -------
+        None
+        """
         await ctx.state(cls)._writing(input=input)
 
     @classmethod
@@ -1027,7 +1112,17 @@ class ModelSession(State):
         cls,
         input: AsyncIterable[ModelSessionInputChunk],  # noqa: A002
     ) -> None:
-        """Write all chunks from an async iterable to the active session."""
+        """Write all chunks from an async iterable to the active session.
+
+        Parameters
+        ----------
+        input
+            Asynchronous stream of input chunks to forward.
+
+        Returns
+        -------
+        None
+        """
         session: Self = ctx.state(cls)
         async for element in input:
             await session._writing(input=element)
@@ -1048,14 +1143,34 @@ class ModelSession(State):
 
 @runtime_checkable
 class ModelSessionOpening(Protocol):
-    """Protocol for opening a realtime session resource."""
+    """Protocol for opening a realtime session resource.
+
+    Returns
+    -------
+    ModelSession
+        Newly opened realtime session.
+    """
 
     async def __call__(self) -> ModelSession: ...
 
 
 @runtime_checkable
 class ModelSessionClosing(Protocol):
-    """Protocol for closing a realtime session resource."""
+    """Protocol for closing a realtime session resource.
+
+    Parameters
+    ----------
+    exc_type
+        Exception type that ended the session, if any.
+    exc_val
+        Exception instance that ended the session, if any.
+    exc_tb
+        Traceback associated with the terminal exception, if any.
+
+    Returns
+    -------
+    None
+    """
 
     async def __call__(
         self,
@@ -1067,7 +1182,15 @@ class ModelSessionClosing(Protocol):
 
 @final
 class ModelSessionScope(State):
-    """Async context manager wrapping realtime session lifecycle hooks."""
+    """Async context manager wrapping realtime session lifecycle hooks.
+
+    Parameters
+    ----------
+    opening
+        Callable used to create a session on enter.
+    closing
+        Callable used to finalize a session on exit.
+    """
 
     _opening: ModelSessionOpening
     _closing: ModelSessionClosing
@@ -1083,7 +1206,13 @@ class ModelSessionScope(State):
         )
 
     async def __aenter__(self) -> ModelSession:
-        """Open and return a realtime session."""
+        """Open and return a realtime session.
+
+        Returns
+        -------
+        ModelSession
+            Opened realtime session bound to this scope.
+        """
         return await self._opening()
 
     async def __aexit__(
@@ -1092,13 +1221,46 @@ class ModelSessionScope(State):
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        """Close the realtime session with an optional terminal exception."""
+        """Close the realtime session with an optional terminal exception.
+
+        Parameters
+        ----------
+        exc_type
+            Exception type that ended the scope, if any.
+        exc_val
+            Exception instance that ended the scope, if any.
+        exc_tb
+            Traceback associated with the terminal exception, if any.
+
+        Returns
+        -------
+        None
+        """
         await self._closing(exc_type, exc_val, exc_tb)
 
 
 @runtime_checkable
 class ModelSessionPreparing(Protocol):
-    """Protocol for preparing scoped realtime model sessions."""
+    """Protocol for preparing scoped realtime model sessions.
+
+    Parameters
+    ----------
+    instructions
+        Instruction text provided to the model.
+    tools
+        Tool configuration exposed during the session.
+    context
+        Initial conversation context for the session.
+    output
+        Requested realtime output modalities.
+    **extra
+        Provider-specific session preparation options.
+
+    Returns
+    -------
+    ModelSessionScope
+        Scope managing session open and close operations.
+    """
 
     def __call__(
         self,

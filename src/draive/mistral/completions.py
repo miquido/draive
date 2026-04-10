@@ -271,7 +271,7 @@ def _context_messages(
                     "role": "tool",
                     "tool_call_id": tool_response.identifier,
                     "name": tool_response.tool,
-                    "content": list(_content_chunks(tool_response.result.parts)),
+                    "content": list(_content_chunks(tool_response.content.parts)),
                 }
 
         else:

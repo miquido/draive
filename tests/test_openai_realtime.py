@@ -233,7 +233,7 @@ async def test_reset_context_deletes_tool_items_seeded_by_send_context() -> None
     tool_response = ModelToolResponse.of(
         "tool-call-output",
         tool="echo",
-        result=MultimodalContent.of(TextContent.of("ok")),
+        content=MultimodalContent.of(TextContent.of("ok")),
         meta={"identifier": "00000000-0000-0000-0000-000000000013"},
     )
     tool_request = ModelToolRequest.of(

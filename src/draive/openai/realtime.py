@@ -454,7 +454,7 @@ async def _send_context(
                             "id": item_id,
                             "type": "function_call_output",
                             "call_id": response.identifier,
-                            "output": _tool_result(response.result),
+                            "output": _tool_result(response.content),
                         },
                     )
 
@@ -639,7 +639,7 @@ async def _send_tool_response(
         item={
             "type": "function_call_output",
             "call_id": response.identifier,
-            "output": _tool_result(response.result),
+            "output": _tool_result(response.content),
         },
     )
 

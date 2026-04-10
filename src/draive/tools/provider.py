@@ -9,15 +9,67 @@ from draive.tools.types import Tool, ToolsLoading, ToolsSuggesting
 __all__ = ("ToolsProvider",)
 
 
-async def _no_tools(
-    **extra: Any,
-) -> Sequence[Tool]:
-    return ()
-
-
 @final
 class ToolsProvider(State):
-    """State wrapper exposing async tool loaders as toolbox helpers."""
+    """State wrapper exposing async tool loaders as toolbox helpers.
+
+    Instances keep an async tools loader together with provider metadata and expose
+    convenience helpers for loading tools or building a toolbox in the active context.
+    """
+
+    @overload
+    @classmethod
+    async def load(
+        cls,
+        **extra: Any,
+    ) -> Sequence[Tool]: ...
+
+    @overload
+    async def load(
+        self,
+        **extra: Any,
+    ) -> Sequence[Tool]: ...
+
+    @statemethod
+    async def load(
+        self,
+        **extra: Any,
+    ) -> Sequence[Tool]:
+        """Load tools for the current context.
+
+        Parameters
+        ----------
+        **extra : Any
+            Loader-specific contextual arguments.
+
+        Returns
+        -------
+        Sequence[Tool]
+            Loaded tools ready to be added to a toolbox.
+        """
+        return await self._loading(**extra)
+
+    _loading: ToolsLoading
+    meta: Meta
+
+    def __init__(
+        self,
+        loading: ToolsLoading,
+        meta: Meta = Meta.empty,
+    ) -> None:
+        """Initialize the provider.
+
+        Parameters
+        ----------
+        loading : ToolsLoading
+            Async loader returning runtime tools.
+        meta : Meta, default=Meta.empty
+            Provider metadata stored in state.
+        """
+        super().__init__(
+            _loading=loading,
+            meta=meta,
+        )
 
     @overload
     @classmethod
@@ -68,59 +120,5 @@ class ToolsProvider(State):
         return Toolbox.of(
             (*await self._loading(**extra), *tools),
             suggesting=suggesting,
-            meta=meta,
-        )
-
-    @overload
-    @classmethod
-    async def load(
-        cls,
-        **extra: Any,
-    ) -> Sequence[Tool]: ...
-
-    @overload
-    async def load(
-        self,
-        **extra: Any,
-    ) -> Sequence[Tool]: ...
-
-    @statemethod
-    async def load(
-        self,
-        **extra: Any,
-    ) -> Sequence[Tool]:
-        """Load tools for the current context.
-
-        Parameters
-        ----------
-        **extra : Any
-            Loader-specific contextual arguments.
-
-        Returns
-        -------
-        Sequence[Tool]
-            Loaded tools ready to be added to a toolbox.
-        """
-        return await self._loading(**extra)
-
-    _loading: ToolsLoading
-    meta: Meta
-
-    def __init__(
-        self,
-        loading: ToolsLoading = _no_tools,
-        meta: Meta = Meta.empty,
-    ) -> None:
-        """Initialize the provider.
-
-        Parameters
-        ----------
-        loading : ToolsLoading, default=_no_tools
-            Async loader returning runtime tools.
-        meta : Meta, default=Meta.empty
-            Provider metadata stored in state.
-        """
-        super().__init__(
-            _loading=loading,
-            meta=meta,
+            meta=self.meta if meta is None else meta,
         )

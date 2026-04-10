@@ -5,7 +5,7 @@ from typing import (
     runtime_checkable,
 )
 
-from haiway import BasicValue
+from haiway import BasicValue, Meta, MetaValues
 
 from draive.models import (
     ModelToolHandling,
@@ -26,6 +26,18 @@ __all__ = (
 
 class ToolException(Exception):
     """Base exception raised by tool execution helpers."""
+
+    __slots__ = ("meta", "tool")
+
+    def __init__(
+        self,
+        *args: object,
+        tool: str,
+        meta: Meta | MetaValues | None = None,
+    ) -> None:
+        super().__init__(*args)
+        self.tool: str = tool
+        self.meta: Meta = Meta.of(meta)
 
 
 ToolOutputChunk = MultimodalContentPart | ProcessingEvent

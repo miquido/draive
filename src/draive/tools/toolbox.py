@@ -1,5 +1,6 @@
-from asyncio import Task
+from asyncio import Lock, Task
 from collections.abc import (
+    AsyncGenerator,
     AsyncIterable,
     Collection,
     Iterable,
@@ -14,7 +15,7 @@ from haiway import AsyncQueue, BasicValue, Meta, MetaTags, MetaValues, State, ct
 from haiway.context.tasks import ContextTaskGroup
 
 from draive.models import (
-    ModelToolDetachedHandling,
+    ModelToolHandling,
     ModelToolRequest,
     ModelToolResponse,
     ModelTools,
@@ -49,17 +50,17 @@ class Toolbox(State):
         tool_or_tools: Iterable[Tool] | Tool | None,
         /,
         *tools: Tool,
-        suggesting: ToolsSuggesting | Tool | bool | None = None,
+        suggesting: ToolsSuggesting | Tool | int | bool | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
     @classmethod
-    def of(
+    def of(  # noqa: C901, PLR0912
         cls,
         tool_or_tools: Self | Iterable[Tool] | Tool | None = None,
         /,
         *tools: Tool,
-        suggesting: ToolsSuggesting | Tool | bool | None = None,
+        suggesting: ToolsSuggesting | Tool | int | bool | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create a toolbox from tools, an existing toolbox, or no tools.
@@ -72,10 +73,11 @@ class Toolbox(State):
         *tools : Tool
             Additional tools merged into the resulting toolbox. Tools are indexed by
             name and later duplicates replace previous ones.
-        suggesting : ToolsSuggesting | Tool | bool | None
+        suggesting : ToolsSuggesting | Tool | int | bool | None
             Selection strategy used to suggest tools to a model.
             ``False``/``None`` disables suggestions, ``True`` enables generic
-            suggestion for the first iteration, and a ``Tool`` suggests that specific
+            suggestion for the first iteration, integer enables suggestion for given number
+            of iterations, and a ``Tool`` suggests that specific
             tool for the first iteration when available.
         meta : Meta | MetaValues | None
             Optional metadata attached to the toolbox state.
@@ -111,6 +113,9 @@ class Toolbox(State):
             elif suggesting is True:
                 suggestion = _suggest_any(iterations=1)
 
+            elif isinstance(suggesting, int):
+                suggestion = _suggest_any(iterations=suggesting)
+
             elif isinstance(suggesting, Tool):
                 suggestion = _suggest_tool(
                     suggesting,
@@ -132,6 +137,9 @@ class Toolbox(State):
 
             elif suggesting is True:
                 suggestion = _suggest_any(iterations=1)
+
+            elif isinstance(suggesting, int):
+                suggestion = _suggest_any(iterations=suggesting)
 
             elif isinstance(suggesting, Tool):
                 suggestion = _suggest_tool(
@@ -157,7 +165,7 @@ class Toolbox(State):
     def model_tools(
         self,
         *,
-        iteration: int = 0,
+        iteration: int,
     ) -> ModelTools:
         """Build model-facing tool configuration for a specific iteration.
 
@@ -174,28 +182,16 @@ class Toolbox(State):
             Suggestion ``False`` maps to ``"auto"``, suggestion ``True`` maps to
             ``"required"``, and a suggested specification is forwarded directly.
         """
-        specification = tuple(tool.specification for tool in self.tools.values())
-        if not specification:
+        if not self.tools:
             return ModelTools.none
 
-        tool_suggestion: ModelToolSpecification | bool = self.suggesting(
-            iteration=iteration,
-            tools=specification,
+        specification: Sequence[ModelToolSpecification] = tuple(
+            tool.specification for tool in self.tools.values()
         )
-        if (
-            tool_suggestion is not False
-            and tool_suggestion is not True
-            and tool_suggestion not in specification
-        ):
-            tool_suggestion = next(
-                (
-                    available_tool
-                    for available_tool in specification
-                    if available_tool.name == tool_suggestion.name
-                ),
-                False,
-            )
-
+        tool_suggestion: ModelToolSpecification | bool = self.suggesting(
+            tools=specification,
+            iteration=iteration,
+        )
         tools_selection: ModelToolsSelection
         if tool_suggestion is False:
             tools_selection = "auto"
@@ -204,6 +200,7 @@ class Toolbox(State):
             tools_selection = "required"
 
         else:  # ModelToolSpecification
+            assert isinstance(tool_suggestion, ModelToolSpecification)  # nosec: B101
             tools_selection = tool_suggestion
 
         return ModelTools(
@@ -229,14 +226,6 @@ class Toolbox(State):
         -------
         MultimodalContent
             Aggregated non-event output produced by the tool.
-
-        Raises
-        ------
-        ToolException
-            If no tool with the given name exists in the toolbox.
-        Exception
-            Re-raises any exception emitted by the underlying tool call after
-            logging it.
         """
         async with ctx.scope(f"tool.{tool}"):
             if arguments is None:
@@ -244,27 +233,28 @@ class Toolbox(State):
 
             selected_tool: Tool | None = self.tools.get(tool)
             if selected_tool is None:
-                ctx.log_error(f"Requested unknown tool {tool}")
-                raise ToolException(f"Requested unknown tool {tool}")
+                raise ToolException(
+                    f"Requested unknown tool {tool}",
+                    tool=tool,
+                )
 
             accumulator: MutableSequence[MultimodalContentPart] = []
             try:
                 async for chunk in selected_tool.call(**arguments):
                     if isinstance(chunk, ProcessingEvent):
-                        continue
+                        continue  # skip events
 
                     accumulator.append(chunk)
 
             except Exception as exc:
-                ctx.log_error(
+                raise ToolException(
                     f"Tool {tool} call failed due to an error: {exc}",
-                    exception=exc,
-                )
-                raise
+                    tool=tool,
+                ) from exc
 
             return MultimodalContent.of(*accumulator)
 
-    async def handle(  # noqa: C901, PLR0912, PLR0915
+    async def handle(  # noqa: C901
         self,
         *requests: ModelToolRequest,
     ) -> AsyncIterable[ModelToolResponse | ProcessingEvent | MultimodalContentPart]:
@@ -285,173 +275,153 @@ class Toolbox(State):
         if not requests:
             return  # nothing to be done
 
-        # TODO: refine processing for better handling
         async with ContextTaskGroup():  # ensure proper task joins through local task group
+            output_stream: AsyncQueue[
+                ModelToolResponse | ProcessingEvent | MultimodalContentPart
+            ] = AsyncQueue()
             tasks: MutableSet[Task[None]] = set()
-            output: AsyncQueue[ModelToolResponse | ProcessingEvent | MultimodalContentPart] = (
-                AsyncQueue()
-            )
-            for request in requests:
-                tool: Tool | None = self.tools.get(request.tool)
-                if tool is None:
-                    async with ctx.scope(f"tool.{request.tool}", request):
-                        ctx.log_error(
-                            f"Requested unknown tool {request.tool} call [{request.identifier}]"
-                        )
-                        yield ModelToolResponse.of(
-                            request.identifier,
-                            tool=request.tool,
-                            result=MultimodalContent.of("ERROR: Unknown tool"),
-                            handling="response",
-                            status="error",
-                        )
-
-                elif tool.handling == "response":
-
-                    async def tool_handler(
-                        tool: Tool = tool,
-                        request: ModelToolRequest = request,
-                    ) -> None:
-                        async with ctx.scope(f"tool.{request.tool}", request):
-                            accumulator: MutableSequence[MultimodalContentPart] = []
-                            try:
-                                async for chunk in tool.call(**request.arguments):
-                                    if isinstance(chunk, ProcessingEvent):
-                                        output.enqueue(  # pass events
-                                            chunk.updating(
-                                                meta=chunk.meta.updating(
-                                                    identifier=request.identifier,
-                                                    tool=request.tool,
-                                                )
-                                            )
-                                        )
-
-                                    else:
-                                        accumulator.append(chunk)  # accumulate output
-
-                                output.enqueue(
-                                    ModelToolResponse.of(
-                                        request.identifier,
-                                        tool=request.tool,
-                                        result=MultimodalContent.of(*accumulator),
-                                        handling=tool.handling,
-                                        status="success",
-                                    )
-                                )
-
-                            except Exception as exc:
-                                ctx.log_error(
-                                    f"Tool {request.tool} call [{request.identifier}] failed"
-                                    f" due to an error: {exc}",
-                                    exception=exc,
-                                )
-                                output.enqueue(
-                                    ModelToolResponse.of(
-                                        request.identifier,
-                                        tool=request.tool,
-                                        result=MultimodalContent.of(*accumulator)
-                                        if accumulator
-                                        else MultimodalContent.of("ERROR"),  # TODO: custom message?
-                                        handling=tool.handling,
-                                        status="error",
-                                    )
-                                )
-
-                    tasks.add(ctx.spawn(tool_handler))
-
-                elif isinstance(tool.handling, ModelToolDetachedHandling):
-
-                    async def tool_handler(
-                        tool: Tool = tool,
-                        request: ModelToolRequest = request,
-                    ) -> None:
-                        async with ctx.scope(f"tool.{request.tool}", request):
-                            try:
-                                async for _ in tool.call(**request.arguments):
-                                    pass  # just execute and ensure completion
-
-                            except Exception as exc:
-                                ctx.log_error(
-                                    f"Tool {request.tool} call [{request.identifier}] failed"
-                                    f" due to an error: {exc}",
-                                    exception=exc,
-                                )
-
-                    ctx.spawn_background(tool_handler)
-
-                    yield ModelToolResponse.of(
-                        request.identifier,
-                        tool=request.tool,
-                        result=MultimodalContent.of(tool.handling.detach_message),
-                        handling=tool.handling,
-                        status="success",
-                    )
-
-                else:  # direct output is handled synchronously to avoid messing up output chunks
-                    assert tool.handling == "output"  # nosec: B101
-                    # TODO: we could postpone output tools and spawn other types first
-                    # for better parallelism
-                    async with ctx.scope(f"tool.{request.tool}", request):
-                        accumulator: MutableSequence[MultimodalContentPart] = []
-                        try:
-                            async for chunk in tool.call(**request.arguments):
-                                if isinstance(chunk, ProcessingEvent):
-                                    yield chunk.updating(
-                                        meta=chunk.meta.updating(
-                                            identifier=request.identifier,
-                                            tool=request.tool,
-                                        )
-                                    )
-
-                                else:
-                                    yield chunk
-                                    accumulator.append(chunk)
-
-                            yield ModelToolResponse.of(
-                                request.identifier,
-                                tool=request.tool,
-                                result=MultimodalContent.of(*accumulator),
-                                handling=tool.handling,
-                                status="success",
-                            )
-
-                        except Exception as exc:
-                            ctx.log_error(
-                                f"Tool {request.tool} call [{request.identifier}] failed"
-                                f" due to an error: {exc}",
-                                exception=exc,
-                            )
-                            yield ModelToolResponse.of(
-                                request.identifier,
-                                tool=request.tool,
-                                result=MultimodalContent.of(*accumulator)
-                                if accumulator
-                                else MultimodalContent.of("ERROR"),  # TODO: custom message?
-                                handling=tool.handling,
-                                status="error",
-                            )
-
-            if not tasks:
-                output.finish()
-                return
+            lock: Lock = Lock()  # synchronize outputs
 
             def task_finish(task: Task[None]) -> None:
                 exc: BaseException | None = task.exception()
                 if exc is not None:
                     # fail with first exception
-                    output.finish(exc)
+                    output_stream.finish(exc)
 
                 elif all(task.done() for task in tasks):
                     # finish when all done
-                    output.finish()
+                    output_stream.finish()
 
-            for task in tasks:
-                task.add_done_callback(task_finish)
+            for request in requests:
+                tool: Tool | None = self.tools.get(request.tool)
+                handling: ModelToolHandling
+                if request.handling is None:
+                    if tool is None:
+                        handling = "response"
 
-            async for chunk in output:
+                    else:
+                        handling = tool.handling
+
+                else:
+                    handling = request.handling
+
+                match handling:
+                    case "response":
+                        task: Task[None] = ctx.spawn(
+                            self._response_execute(
+                                tool,
+                                request=request,
+                                output_stream=output_stream,
+                            )
+                        )
+                        tasks.add(task)
+                        task.add_done_callback(task_finish)
+
+                    case "output":
+                        task: Task[None] = ctx.spawn(
+                            self._output_execute(
+                                tool,
+                                request=request,
+                                lock=lock,
+                                output_stream=output_stream,
+                            )
+                        )
+                        tasks.add(task)
+                        task.add_done_callback(task_finish)
+
+            async for chunk in output_stream:
                 yield chunk
 
             assert all(task.done() for task in tasks)  # nosec: B101
+
+    async def _execute(
+        self,
+        tool: Tool | None,
+        *,
+        request: ModelToolRequest,
+    ) -> AsyncGenerator[ModelToolResponse | ProcessingEvent | MultimodalContentPart]:
+        async with ctx.scope(f"tool.{request.tool}", request):
+            if tool is None:
+                ctx.log_error(f"Requested unknown tool `{request.tool}` [{request.identifier}]")
+                yield ModelToolResponse(
+                    identifier=request.identifier,
+                    tool=request.tool,
+                    status="error",
+                    content=MultimodalContent.of(
+                        f"<error>Requested unknown tool `{request.tool}`</error>"
+                    ),
+                )
+                return  # execution finished
+
+            accumulator: MutableSequence[MultimodalContentPart] = []
+            try:
+                async for chunk in tool.call(**request.arguments):
+                    if isinstance(chunk, ProcessingEvent):
+                        ctx.record_info(event=chunk.event)
+                        yield chunk.updating(
+                            meta=chunk.meta.updating(
+                                tool=request.tool,
+                                request=request.identifier,
+                            )
+                        )
+
+                    else:
+                        accumulator.append(chunk)
+                        yield chunk  # stream content to output
+
+                yield ModelToolResponse(
+                    identifier=request.identifier,
+                    tool=request.tool,
+                    status="success",
+                    # TODO: perhaps we should replace final response content for direct outputs?
+                    content=MultimodalContent.of(*accumulator),
+                )
+
+            except Exception as exc:
+                ctx.log_error(
+                    f"Tool `{request.tool}` execution [{request.identifier}] failed"
+                    f" due to an error: {exc}",
+                    exception=exc,
+                )
+                yield ModelToolResponse(
+                    identifier=request.identifier,
+                    tool=request.tool,
+                    status="error",
+                    content=MultimodalContent.of(
+                        *accumulator,  # preserve output up to the error occurrence
+                        # TODO: should we allow custom error message?
+                        "<error>Tool execution failed due to an error</error>",
+                    ),
+                )
+
+    async def _response_execute(
+        self,
+        tool: Tool | None,
+        *,
+        request: ModelToolRequest,
+        output_stream: AsyncQueue[ModelToolResponse | ProcessingEvent | MultimodalContentPart],
+    ) -> None:
+        async for chunk in self._execute(
+            tool,
+            request=request,
+        ):
+            if isinstance(chunk, ProcessingEvent | ModelToolResponse):
+                output_stream.enqueue(chunk)
+
+    async def _output_execute(
+        self,
+        tool: Tool | None,
+        *,
+        request: ModelToolRequest,
+        lock: Lock,
+        output_stream: AsyncQueue[ModelToolResponse | ProcessingEvent | MultimodalContentPart],
+    ) -> None:
+        async with lock:  # synchronize outputs so only one streams at the same time
+            async for chunk in self._execute(
+                tool,
+                request=request,
+            ):
+                output_stream.enqueue(chunk)
 
     def with_tools(
         self,

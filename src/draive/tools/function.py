@@ -1,6 +1,6 @@
-from collections.abc import AsyncIterable, Callable, Coroutine
+from collections.abc import AsyncIterable, Callable, Coroutine, MutableMapping, MutableSequence
 from inspect import isasyncgenfunction, iscoroutinefunction, unwrap
-from typing import Protocol, Self, TypeIs, final, overload
+from typing import Protocol, Self, final, overload
 
 from haiway import BasicValue, Function, Meta, MetaValues, TypeSpecification
 
@@ -18,20 +18,6 @@ __all__ = (
     "GeneratorTool",
     "tool",
 )
-
-
-def _is_coroutine_tool[**Args](
-    function: Callable[Args, AsyncIterable[ToolOutputChunk]]
-    | Callable[Args, Coroutine[None, None, Multimodal]],
-) -> TypeIs[Callable[Args, Coroutine[None, None, Multimodal]]]:
-    return iscoroutinefunction(unwrap(function))
-
-
-def _is_generator_tool[**Args](
-    function: Callable[Args, AsyncIterable[ToolOutputChunk]]
-    | Callable[Args, Coroutine[None, None, Multimodal]],
-) -> TypeIs[Callable[Args, AsyncIterable[ToolOutputChunk]]]:
-    return isasyncgenfunction(unwrap(function))
 
 
 @final
@@ -88,8 +74,8 @@ class CoroutineTool[**Args](Function[Args, Coroutine[None, None, Multimodal]]):
         assert self._variadic_positional_arguments is None  # nosec: B101
 
         if parameters is None:
-            aliased_required: list[str] = []
-            specifications: dict[str, TypeSpecification] = {}
+            aliased_required: MutableSequence[str] = []
+            specifications: MutableMapping[str, TypeSpecification] = {}
             for argument in self._keyword_arguments.values():
                 specification: TypeSpecification | None = argument.specification
                 if specification is None:
@@ -240,8 +226,8 @@ class GeneratorTool[**Args](Function[Args, AsyncIterable[ToolOutputChunk]]):
         assert self._variadic_positional_arguments is None  # nosec: B101
 
         if parameters is None:
-            aliased_required: list[str] = []
-            specifications: dict[str, TypeSpecification] = {}
+            aliased_required: MutableSequence[str] = []
+            specifications: MutableMapping[str, TypeSpecification] = {}
             for argument in self._keyword_arguments.values():
                 specification: TypeSpecification | None = argument.specification
                 if specification is None:
@@ -428,9 +414,9 @@ def tool[**Args](
         function: Callable[Arg, AsyncIterable[ToolOutputChunk]]
         | Callable[Arg, Coroutine[None, None, Multimodal]],
     ) -> CoroutineTool[Arg] | GeneratorTool[Arg]:
-        if _is_coroutine_tool(function):
+        if iscoroutinefunction(unwrap(function)):
             return CoroutineTool[Arg](
-                function=function,
+                function=function,  # pyright: ignore[reportArgumentType]
                 name=name or function.__name__,
                 description=description,
                 parameters=parameters,
@@ -438,9 +424,9 @@ def tool[**Args](
                 meta=Meta.of(meta),
             )
 
-        if _is_generator_tool(function):
+        if isasyncgenfunction(unwrap(function)):
             return GeneratorTool[Arg](
-                function=function,
+                function=function,  # pyright: ignore[reportArgumentType]
                 name=name or function.__name__,
                 description=description,
                 parameters=parameters,
@@ -450,8 +436,8 @@ def tool[**Args](
 
         raise TypeError("Unsupported tool function")
 
-    if function is not None:
-        return wrap(function=function)
+    if function is None:
+        return wrap
 
     else:
-        return wrap
+        return wrap(function=function)

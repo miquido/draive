@@ -17,6 +17,7 @@ from draive.models import (
     ModelToolRequest,
     ModelToolResponse,
 )
+from draive.models.types import ModelToolHandling
 from draive.multimodal import (
     Multimodal,
     MultimodalContent,
@@ -24,7 +25,8 @@ from draive.multimodal import (
     Template,
 )
 from draive.steps import Step
-from draive.tools import Tool, Toolbox
+from draive.tools import Tool, Toolbox, tool
+from draive.tools.types import ToolOutputChunk
 from draive.utils import ProcessingEvent
 
 __all__ = ("Agent",)
@@ -32,7 +34,20 @@ __all__ = ("Agent",)
 
 @final
 class Agent:
-    """Immutable async worker exposing a scoped streaming execution interface."""
+    """Immutable async worker exposing a scoped streaming execution interface.
+
+    Parameters
+    ----------
+    identity : AgentIdentity
+        Immutable metadata identifying the agent.
+    executing : AgentExecuting
+        Async executor handling incoming messages.
+
+    Attributes
+    ----------
+    identity : AgentIdentity
+        Immutable metadata identifying the agent.
+    """
 
     @classmethod
     def noop(
@@ -285,6 +300,89 @@ class Agent:
         ):
             async for chunk in self._executing(message):
                 yield chunk
+
+    def as_tool(  # noqa: C901
+        self,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        handling: ModelToolHandling = "response",
+        meta: Meta | MetaValues | None = None,
+    ) -> Tool:
+        """Expose the agent as a callable tool.
+
+        Parameters
+        ----------
+        name : str | None, default=None
+            Tool name. When omitted, a name is derived from the agent identity
+            and requested handling mode.
+        description : str | None, default=None
+            Tool description. When omitted, a description is derived from the
+            agent identity and requested handling mode.
+        handling : ModelToolHandling, default="response"
+            Tool handling mode used when registering the generated tool.
+        meta : Meta | MetaValues | None, default=None
+            Additional metadata attached to the generated tool definition.
+
+        Returns
+        -------
+        Tool
+            Tool forwarding its ``task`` input to the agent.
+        """
+        if name is None:
+            match handling:
+                case "response":
+                    name = f"agent_{self.identity.name}_request"
+
+                case "output":
+                    name = f"agent_{self.identity.name}_handover"
+
+        if description is None:
+            match handling:
+                case "response":
+                    description = (
+                        f"Request the {self.identity.name} agent to perform a task for you.\n"
+                        f"\n{self.identity.description}"
+                    )
+
+                case "output":
+                    description = (
+                        f"Hand over your task to the {self.identity.name} agent.\n"
+                        f"\n{self.identity.description}"
+                    )
+
+        task_description: str
+        match handling:
+            case "response":
+                task_description = "Task to be performed by the agent"
+
+            case "output":
+                task_description = "Task to be handed over to the agent"
+
+        @tool(
+            name=name,
+            description=description,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": task_description,
+                    },
+                },
+                "required": ("task",),
+                "additionalProperties": False,
+            },
+            handling=handling,
+            meta=meta,
+        )
+        async def agent_request(
+            task: str,
+        ) -> AsyncIterable[ToolOutputChunk]:
+            async for chunk in self.call(input=task):
+                yield chunk
+
+        return agent_request
 
     def __setattr__(
         self,
