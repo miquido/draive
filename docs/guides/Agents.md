@@ -242,32 +242,44 @@ writer: Agent = Agent.generative(
     name="writer",
     description="Writes the final response",
     instructions="Delegate research first, then answer clearly.",
-    tools=AgentsGroup.of(researcher).request_tool(),
+    tools=[AgentsGroup.of(researcher).as_tool()],
 )
 ```
 
 The generated tool takes:
 
 - `agent`: selected agent name,
-- `message`: plain-text request sent to that agent.
+- `task`: plain-text request sent to that agent.
 
 Agent names must be unique inside a group. `AgentsGroup.of(...)` raises `ValueError` if duplicate
 names are provided.
 
-## 5. Choose Request vs Handover
-
-`AgentsGroup` provides two delegation modes.
-
-### `request_tool()`
-
-Use `request_tool()` when the delegated agent result should come back as a normal tool response and
-be fed into the caller's model loop.
+You can also expose a single agent directly as a tool when you do not need a group registry.
 
 ```python
 from draive.tools import Tool
 
 
-tools: Tool = AgentsGroup.of(researcher).request_tool()
+tools: list[Tool] = [
+    researcher.as_tool(),
+]
+```
+
+## 5. Choose Response vs Output Handling
+
+Both `Agent.as_tool(...)` and `AgentsGroup.as_tool(...)` support two delegation modes through the
+`handling=` argument.
+
+### `handling="response"`
+
+Use `handling="response"` when the delegated agent result should come back as a normal tool
+response and be fed into the caller's model loop.
+
+```python
+from draive.tools import Tool
+
+
+tools: Tool = AgentsGroup.of(researcher).as_tool(handling="response")
 ```
 
 This behaves like any regular `handling="response"` tool.
@@ -275,15 +287,15 @@ This behaves like any regular `handling="response"` tool.
 Choose this mode when the caller agent should inspect the delegated result and continue its own
 reasoning loop.
 
-### `handover_tool()`
+### `handling="output"`
 
-Use `handover_tool()` when the delegated agent should stream final output directly to the user.
+Use `handling="output"` when the delegated agent should stream final output directly to the user.
 
 ```python
 from draive.tools import Tool
 
 
-tools: Tool = AgentsGroup.of(researcher).handover_tool()
+tools: Tool = AgentsGroup.of(researcher).as_tool(handling="output")
 ```
 
 This behaves like a `handling="output"` tool. Output chunks from the selected agent are streamed
@@ -318,7 +330,7 @@ coordinator: Agent = Agent.generative(
         "Use `agent_request` to delegate work to the specialized agents. "
         "Combine their results into one final answer."
     ),
-    tools=AgentsGroup.of(researcher, reviewer).request_tool(),
+    tools=[AgentsGroup.of(researcher, reviewer).as_tool()],
 )
 ```
 
@@ -333,10 +345,11 @@ clear role and the coordinator can select among them by name from the generated 
 
 ## 7. When To Use Each API
 
-- Use `Agent.steps(...)` for deterministic pipelines, typed artifacts, and explicit control.
-- Use `Agent.generative(...)` for prompt-first, tool-aware model agents.
-- Use `AgentsGroup.request_tool()` when the caller should continue reasoning after delegation.
-- Use `AgentsGroup.handover_tool()` when the delegated agent should take over visible output.
+- Prefer `Agent.steps(...)` for deterministic pipelines, typed artifacts, and explicit control.
+- Try `Agent.generative(...)` for prompt-first, tool-aware model agents.
+- Expose one concrete agent via `Agent.as_tool(...)` when a model should call it directly.
+- Delegate using `AgentsGroup.as_tool(handling="response")` when the caller should continue reasoning after delegation.
+- Delegate using `AgentsGroup.as_tool(handling="output")` when the delegated agent should take over visible output.
 
 Avoid using `Agent.generative(...)` as a substitute for persistent chat history. By design it loops
 only within one request while tools are being resolved.

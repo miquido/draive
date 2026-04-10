@@ -85,7 +85,7 @@ async def test_conversation_completion_loops_tool_response_into_followup_complet
         assert context[1].tool_requests[0].identifier == "call-1"
         assert isinstance(context[2], ModelInput)
         assert context[2].tool_responses[0].identifier == "call-1"
-        assert context[2].tool_responses[0].result.to_str() == "TOOL:x"
+        assert context[2].tool_responses[0].content.to_str() == "TOOL:x"
         return _stream_of(TextContent.of("Final answer"))
 
     memory = ConversationMemory.volatile()
@@ -192,7 +192,7 @@ async def test_conversation_completion_reuses_memory_with_previous_tool_turn() -
 
         assert len(context) == 3
         assert isinstance(context[2], ModelInput)
-        assert context[2].tool_responses[0].result.to_str() == "TOOL:x"
+        assert context[2].tool_responses[0].content.to_str() == "TOOL:x"
         return _stream_of(TextContent.of("First final"))
 
     async with ctx.scope(

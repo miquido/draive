@@ -257,7 +257,7 @@ def _context_messages(  # noqa: C901, PLR0912
                                 "toolUseId": block.identifier,
                                 "content": cast(
                                     list[ChatMessageText | ChatMessageImage],
-                                    _convert_content(block.result.parts),
+                                    _convert_content(block.content.parts),
                                 ),
                                 "status": "error" if block.status == "error" else "success",
                             }

@@ -523,10 +523,10 @@ def _tool_response_payload(
 ) -> dict[str, Any]:
     # TODO: add media support within tool responses
     if response.status == "error":
-        return {"error": "".join(part.to_str() for part in response.result.parts)}
+        return {"error": "".join(part.to_str() for part in response.content.parts)}
 
     else:
-        return {"output": "".join(part.to_str() for part in response.result.parts)}
+        return {"output": "".join(part.to_str() for part in response.content.parts)}
 
 
 def _request_content(

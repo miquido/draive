@@ -1,11 +1,9 @@
-import asyncio
 from collections.abc import Sequence
 
 import pytest
 from haiway import Meta
 
 from draive import (
-    ModelToolDetachedHandling,
     ModelToolRequest,
     ModelToolResponse,
     ModelTools,
@@ -30,7 +28,7 @@ def _multimodal_text_of(*elements: object) -> str:
 @pytest.mark.asyncio
 async def test_empty_toolbox_model_tools_returns_model_tools_none() -> None:
     async with ctx.scope("test"):
-        model_tools = Toolbox.empty.model_tools()
+        model_tools = Toolbox.empty.model_tools(iteration=0)
 
     assert model_tools == ModelTools.none
 
@@ -58,9 +56,8 @@ async def test_handle_returns_error_response_for_unknown_tool() -> None:
     assert isinstance(response, ModelToolResponse)
     assert response.identifier == "r1"
     assert response.tool == "missing"
-    assert response.handling == "response"
     assert response.status == "error"
-    assert response.result.to_str() == "ERROR: Unknown tool"
+    assert response.content.to_str() == "<error>Requested unknown tool `missing`</error>"
 
 
 @pytest.mark.asyncio
@@ -87,11 +84,10 @@ async def test_handle_response_tool_streams_events_and_returns_accumulated_respo
     assert event.event == "progress"
     assert event.content.to_str() == "checking:x"
     assert event.meta["tool"] == "lookup"
-    assert event.meta["identifier"] == "r1"
+    assert event.meta["request"] == "r1"
     assert isinstance(response, ModelToolResponse)
     assert response.status == "success"
-    assert response.handling == "response"
-    assert response.result.to_str() == "A:x"
+    assert response.content.to_str() == "A:x"
 
 
 @pytest.mark.asyncio
@@ -116,63 +112,9 @@ async def test_handle_response_tool_returns_error_response_with_partial_result()
     response = chunks[1]
     assert isinstance(response, ModelToolResponse)
     assert response.status == "error"
-    assert response.handling == "response"
-    assert response.result.to_str() == "partial"
-
-
-@pytest.mark.asyncio
-async def test_handle_detached_tool_returns_detach_message_and_executes_in_background() -> None:
-    executed = asyncio.Event()
-
-    async with ctx.scope("test"):
-
-        @tool(handling=ModelToolDetachedHandling(detach_message="working"))
-        async def background(value: str) -> str:
-            await asyncio.sleep(0)
-            executed.set()
-            return value.upper()
-
-        chunks = [
-            chunk
-            async for chunk in Toolbox.of(background).handle(
-                ModelToolRequest.of("r1", tool="background", arguments={"value": "x"})
-            )
-        ]
-        await asyncio.wait_for(executed.wait(), timeout=1)
-
-    assert len(chunks) == 1
-    response = chunks[0]
-    assert isinstance(response, ModelToolResponse)
-    assert response.status == "success"
-    assert isinstance(response.handling, ModelToolDetachedHandling)
-    assert response.result.to_str() == "working"
-
-
-@pytest.mark.asyncio
-async def test_handle_detached_tool_keeps_success_response_when_background_fails() -> None:
-    attempted = asyncio.Event()
-
-    async with ctx.scope("test"):
-
-        @tool(handling=ModelToolDetachedHandling(detach_message="queued"))
-        async def failing_background() -> str:
-            attempted.set()
-            raise RuntimeError("boom")
-
-        chunks = [
-            chunk
-            async for chunk in Toolbox.of(failing_background).handle(
-                ModelToolRequest.of("r1", tool="failing_background", arguments={})
-            )
-        ]
-        await asyncio.wait_for(attempted.wait(), timeout=1)
-
-    assert len(chunks) == 1
-    response = chunks[0]
-    assert isinstance(response, ModelToolResponse)
-    assert response.status == "success"
-    assert isinstance(response.handling, ModelToolDetachedHandling)
-    assert response.result.to_str() == "queued"
+    assert (
+        response.content.to_str() == "partial<error>Tool execution failed due to an error</error>"
+    )
 
 
 @pytest.mark.asyncio
@@ -199,12 +141,11 @@ async def test_handle_output_tool_yields_event_then_output_parts_then_response()
     assert isinstance(event, ProcessingEvent)
     assert event.event == "progress"
     assert event.meta["tool"] == "amplify"
-    assert event.meta["identifier"] == "r1"
+    assert event.meta["request"] == "r1"
     assert _multimodal_text_of(*output_parts) == "OUT:x"
     assert isinstance(response, ModelToolResponse)
     assert response.status == "success"
-    assert response.handling == "output"
-    assert response.result.to_str() == "OUT:x"
+    assert response.content.to_str() == "OUT:x"
 
 
 @pytest.mark.asyncio
@@ -228,8 +169,7 @@ async def test_handle_output_tool_returns_error_response_with_partial_result() -
     response = chunks[1]
     assert isinstance(response, ModelToolResponse)
     assert response.status == "error"
-    assert response.handling == "output"
-    assert response.result.to_str() == "OUT:"
+    assert response.content.to_str() == "OUT:<error>Tool execution failed due to an error</error>"
 
 
 @pytest.mark.asyncio
@@ -256,7 +196,7 @@ async def test_model_tools_keeps_specific_suggestion_after_replacing_tool_instan
         toolbox = Toolbox.of(ping, suggesting=ping)
         updated = ping.updating(description="Updated description")
 
-        model_tools = toolbox.with_tools(updated).model_tools()
+        model_tools = toolbox.with_tools(updated).model_tools(iteration=0)
 
     assert model_tools.selection == updated.specification
 
@@ -269,9 +209,42 @@ async def test_tools_provider_toolbox_accepts_tool_suggestion() -> None:
         async def ping() -> str:
             return "pong"
 
-        toolbox = await ToolsProvider().toolbox(ping, suggesting=ping)
+        async def load_tools() -> tuple[()]:
+            return ()
 
-    assert toolbox.model_tools().selection == ping.specification
+        toolbox = await ToolsProvider(load_tools).toolbox(ping, suggesting=ping)
+
+    assert toolbox.model_tools(iteration=0).selection == ping.specification
+
+
+@pytest.mark.asyncio
+async def test_tools_provider_toolbox_uses_provider_meta_by_default() -> None:
+    async with ctx.scope("test"):
+
+        async def load_tools() -> tuple[()]:
+            return ()
+
+        toolbox = await ToolsProvider(
+            load_tools,
+            meta=Meta.of({"provider": "value"}),
+        ).toolbox()
+
+    assert toolbox.meta == Meta.of({"provider": "value"})
+
+
+@pytest.mark.asyncio
+async def test_tools_provider_toolbox_allows_overriding_provider_meta() -> None:
+    async with ctx.scope("test"):
+
+        async def load_tools() -> tuple[()]:
+            return ()
+
+        toolbox = await ToolsProvider(
+            load_tools,
+            meta=Meta.of({"provider": "value"}),
+        ).toolbox(meta={"call": "value"})
+
+    assert toolbox.meta == Meta.of({"call": "value"})
 
 
 @pytest.mark.asyncio

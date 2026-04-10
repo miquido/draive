@@ -66,7 +66,7 @@ async def test_updating_artifacts_and_get() -> None:
 
 
 @pytest.mark.asyncio
-async def test_appending_and_updating_context() -> None:
+async def test_appending_and_mutating_context() -> None:
     initial_context = (ModelInput.of(MultimodalContent.of("input")),)
 
     async def reverse_context(
@@ -76,7 +76,7 @@ async def test_appending_and_updating_context() -> None:
 
     pipeline = Step.sequence(
         Step.appending_context(ModelOutput.of(MultimodalContent.of("output"))),
-        Step.updating_context(reverse_context),
+        Step.mutating_context(reverse_context),
     )
 
     state = await pipeline.process(initial_context)
@@ -262,7 +262,7 @@ async def test_handling_tools_appends_tool_response_input() -> None:
     response = state.context[1].tool_responses[0]
     assert isinstance(response, ModelToolResponse)
     assert response.status == "success"
-    assert _text_of(response.result) == "E:x"
+    assert _text_of(response.content) == "E:x"
 
 
 @pytest.mark.asyncio

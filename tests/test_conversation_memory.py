@@ -40,7 +40,7 @@ async def test_volatile_memory_recall_extracts_tool_blocks_from_turn_events() ->
     tool_response = ModelToolResponse.of(
         "call_1",
         tool="search",
-        result=MultimodalContent.of("result"),
+        content=MultimodalContent.of("result"),
     )
 
     memory = ConversationMemory.volatile()

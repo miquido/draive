@@ -6,6 +6,7 @@ from haiway import Meta, MetaValues
 
 from draive.agents.agent import Agent
 from draive.agents.types import AgentException, AgentIdentity, AgentUnavailable
+from draive.models.types import ModelToolHandling
 from draive.multimodal import Multimodal, MultimodalContentPart
 from draive.tools import Tool, ToolOutputChunk, tool
 from draive.utils import ProcessingEvent
@@ -232,40 +233,73 @@ class AgentsGroup:
         else:
             raise AgentUnavailable(f"Agent `{agent}` is not defined")
 
-    def request_tool(
+    def as_tool(  # noqa: C901
         self,
-        name: str = "agent_request",
+        *,
+        name: str | None = None,
         description: str | None = None,
+        handling: ModelToolHandling = "response",
         meta: Meta | MetaValues | None = None,
     ) -> Tool:
-        """Create a tool that delegates a request to a selected agent.
+        """Expose the declared agents as a model-callable tool.
 
         Parameters
         ----------
-        name : str, default="agent_request"
-            Tool name exposed to the model.
+        name : str | None, default=None
+            Explicit tool name. When omitted, a name is derived from
+            ``handling``.
         description : str | None, default=None
-            Optional tool description. When omitted, a description listing all
-            available agents is generated automatically.
+            Explicit tool description. When omitted, a description listing the
+            declared agents is generated automatically.
+        handling : ModelToolHandling, default="response"
+            Tool handling mode used to determine both the generated defaults and
+            how the resulting tool is interpreted by the model runtime.
         meta : Meta | MetaValues | None, default=None
             Metadata attached to the generated tool.
 
         Returns
         -------
         Tool
-            Tool using ``response`` handling so the delegated agent result is
-            returned as a tool response payload.
+            Tool that accepts an agent name and task, then delegates execution
+            to the selected agent.
 
         Raises
         ------
         AgentUnavailable
-            Raised at call time when the selected agent name is unknown.
+            Raised when the generated tool is invoked with an agent name that is
+            declared in the schema but not currently bound.
         """
+        if name is None:
+            match handling:
+                case "response":
+                    name = "agent_request"
+
+                case "output":
+                    name = "agent_handover"
+
         if description is None:
-            description = "Select an agent to request a task.\n\n"
-            description += "\n---\n".join(
-                f"{identity.name}: {identity.description}" for identity in self._declared
-            )
+            match handling:
+                case "response":
+                    description = "Request the selected agent to perform a task for you.\n"
+                    description += "\n".join(
+                        f'<agent name="{identity.name}">{identity.description}</agent>'
+                        for identity in self._declared
+                    )
+
+                case "output":
+                    description = "Hand over your task to the selected agent.\n"
+                    description += "\n".join(
+                        f'<agent name="{identity.name}">{identity.description}</agent>'
+                        for identity in self._declared
+                    )
+
+        task_description: str
+        match handling:
+            case "response":
+                task_description = "Task to be performed by the agent"
+
+            case "output":
+                task_description = "Task to be handed over to the agent"
 
         @tool(
             name=name,
@@ -278,105 +312,32 @@ class AgentsGroup:
                         "enum": tuple(identity.name for identity in self._declared),
                         "description": "Selected agent name",
                     },
-                    "message": {
+                    "task": {
                         "type": "string",
-                        "description": "Contents of the message sent to the agent",
+                        "description": task_description,
                     },
                 },
                 "required": (
                     "agent",
-                    "message",
+                    "task",
                 ),
                 "additionalProperties": False,
             },
-            handling="response",
+            handling=handling,
             meta=meta,
         )
         async def agent_request(
             agent: str,
-            message: str,
+            task: str,
         ) -> AsyncIterable[ToolOutputChunk]:
             if selected := self._available.get(agent):
-                async for chunk in selected.call(input=message):
+                async for chunk in selected.call(input=task):
                     yield chunk
 
             else:
                 raise AgentUnavailable(f"Agent `{agent}` is not defined")
 
         return agent_request
-
-    def handover_tool(
-        self,
-        name: str = "agent_handover",
-        description: str | None = None,
-        meta: Meta | MetaValues | None = None,
-    ) -> Tool:
-        """Create a tool that hands over output streaming to a selected agent.
-
-        Parameters
-        ----------
-        name : str, default="agent_handover"
-            Tool name exposed to the model.
-        description : str | None, default=None
-            Optional tool description. When omitted, a description listing all
-            available agents is generated automatically.
-        meta : Meta | MetaValues | None, default=None
-            Metadata attached to the generated tool.
-
-        Returns
-        -------
-        Tool
-            Tool using ``output`` handling so delegated agent chunks are streamed
-            directly into the caller output.
-
-        Raises
-        ------
-        AgentUnavailable
-            Raised at call time when the selected agent name is unknown.
-        """
-        if description is None:
-            description = "Select an agent to handover the task.\n\n"
-            description += "\n---\n".join(
-                f"{identity.name}: {identity.description}" for identity in self._declared
-            )
-
-        @tool(
-            name=name,
-            description=description,
-            parameters={
-                "type": "object",
-                "properties": {
-                    "agent": {
-                        "type": "string",
-                        "enum": tuple(identity.name for identity in self._declared),
-                        "description": "Selected agent name",
-                    },
-                    "message": {
-                        "type": "string",
-                        "description": "Contents of the message sent to the agent",
-                    },
-                },
-                "required": (
-                    "agent",
-                    "message",
-                ),
-                "additionalProperties": False,
-            },
-            handling="output",
-            meta=meta,
-        )
-        async def agent_handover(
-            agent: str,
-            message: str,
-        ) -> AsyncIterable[ToolOutputChunk]:
-            if selected := self._available.get(agent):
-                async for chunk in selected.call(input=message):
-                    yield chunk
-
-            else:
-                raise AgentUnavailable(f"Agent `{agent}` is not defined")
-
-        return agent_handover
 
     def __setattr__(
         self,

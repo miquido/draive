@@ -53,7 +53,7 @@ def realtime_conversation_preparing(  # noqa: C901, PLR0915
         nonlocal session_scope
         session_scope = RealtimeGenerativeModel.session(
             instructions=instructions,
-            tools=toolbox.model_tools(),
+            tools=toolbox.model_tools(iteration=0),
             context=await memory.recall(),
             output=output,
             **extra,

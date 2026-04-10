@@ -482,7 +482,7 @@ def _block_parts(  # noqa: PLR0912
                         "id": block.identifier,
                         "name": block.tool,
                         "response": {
-                            "error": list(_content_parts(block.result)),
+                            "error": list(_content_parts(block.content)),
                         },
                     }
                 }
@@ -493,7 +493,7 @@ def _block_parts(  # noqa: PLR0912
                         "id": block.identifier,
                         "name": block.tool,
                         "response": {
-                            "output": list(_content_parts(block.result)),
+                            "output": list(_content_parts(block.content)),
                         },
                     }
                 }

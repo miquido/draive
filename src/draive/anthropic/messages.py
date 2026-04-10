@@ -385,7 +385,7 @@ def _context_messages(  # noqa: C901, PLR0912
                             "content": cast(  # there will be no thinking within tool results
                                 Iterable[TextBlockParam | ImageBlockParam],
                                 _content_elements(
-                                    block.result,
+                                    block.content,
                                     cache_type=None,
                                 ),
                             ),

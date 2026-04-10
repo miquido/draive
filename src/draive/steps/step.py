@@ -10,6 +10,7 @@ from collections.abc import (
     MutableSequence,
     Sequence,
 )
+from inspect import iscoroutinefunction
 from typing import Any, ClassVar, NoReturn, Protocol, Self, final, overload, runtime_checkable
 
 from haiway import (
@@ -214,14 +215,14 @@ class Step:
     @classmethod
     def replacing_context(
         cls,
-        context: ModelContext,
+        context: Callable[[], Coroutine[None, None, ModelContext]] | ModelContext,
     ) -> Self:
         """Create a step assigning fixed context.
 
         Parameters
         ----------
-        context : ModelContext
-            Replacement for current model context.
+        context : Callable[[], Coroutine[None, None, ModelContext]] | ModelContext
+            Replacement model context or async provider returning it.
 
         Returns
         -------
@@ -233,15 +234,24 @@ class Step:
         Rationale: explicit context rewrite logic.
         """
 
-        async def step(
-            state: StepState,
-        ) -> StepStream:
-            yield state.updating(context=context)
+        if iscoroutinefunction(context):
+
+            async def step(
+                state: StepState,
+            ) -> StepStream:
+                yield state.updating(context=await context())
+
+        else:
+
+            async def step(
+                state: StepState,
+            ) -> StepStream:
+                yield state.updating(context=context)
 
         return cls(step)
 
     @classmethod
-    def updating_context(
+    def mutating_context(
         cls,
         mutation: StepContextMutating,
     ) -> Self:
@@ -659,7 +669,7 @@ class Step:
         ----------
         instructions : Template | ModelInstructions
             Static instructions string or template resolved at runtime.
-        tools : Toolbox | Iterable[Tool] | ModelTools | Iterable[ModelToolSpecification]
+        tools : Toolbox | ModelTools | Iterable[ModelToolSpecification]
             Toolbox, explicit ``ModelTools``, or tool specifications exposed to
             the completion call.
         input : Template | Multimodal | None = None
@@ -707,7 +717,7 @@ class Step:
 
                 model_tools: ModelTools
                 if isinstance(tools, Toolbox):
-                    model_tools = tools.model_tools()
+                    model_tools = tools.model_tools(iteration=0)
 
                 elif isinstance(tools, ModelTools):
                     model_tools = tools
@@ -935,6 +945,7 @@ class Step:
                                 reasoning_accumulator.append(chunk)
 
                             elif isinstance(chunk, ModelToolRequest):
+                                # TODO: start handling immediately
                                 if content_accumulator:
                                     output_accumulator.append(
                                         MultimodalContent.of(*content_accumulator)
@@ -1259,6 +1270,57 @@ class Step:
 
         return self.__class__(step)
 
+    def with_isolated_context(
+        self,
+        context: Callable[[], Coroutine[None, None, ModelContext]] | ModelContext = (),
+    ) -> Self:
+        """Execute this step against an isolated context snapshot.
+
+        Parameters
+        ----------
+        context : Callable[[], Coroutine[None, None, ModelContext]] | ModelContext
+            Replacement context, or async provider returning one, used only for
+            the wrapped execution.
+
+        Returns
+        -------
+        Self
+            A wrapped step that restores the original context on emitted state
+            updates.
+
+        Notes
+        -----
+        Rationale: allows temporary context substitution without letting
+        wrapped execution mutate the caller-visible context.
+        """
+        executing: StepExecuting = self._executing
+
+        if iscoroutinefunction(context):
+
+            async def step(
+                state: StepState,
+            ) -> StepStream:
+                async for chunk in executing(state=state.updating(context=await context())):
+                    if isinstance(chunk, StepState):
+                        yield chunk.updating(context=state.context)
+
+                    else:
+                        yield chunk
+
+        else:
+
+            async def step(
+                state: StepState,
+            ) -> StepStream:
+                async for chunk in executing(state=state.updating(context=context)):
+                    if isinstance(chunk, StepState):
+                        yield chunk.updating(context=state.context)
+
+                    else:
+                        yield chunk
+
+        return self.__class__(step)
+
     def with_volatile_context(self) -> Self:
         """Discard context changes produced by this step.
 
@@ -1307,11 +1369,11 @@ class Step:
         ) -> StepStream:
             async for chunk in executing(state=state):
                 if isinstance(chunk, StepState):
-                    yield chunk.updating(
-                        context=tuple(  # remove context elements containing tools
-                            element for element in chunk.context if not element.contains_tools
-                        )
+                    updated: ModelContext = tuple(  # remove context elements containing tools
+                        element for element in chunk.context if not element.contains_tools
                     )
+                    if chunk.context != updated:
+                        yield chunk.updating(context=updated)
 
                 else:
                     yield chunk
@@ -1817,6 +1879,8 @@ Step.noop = _noop
 
 @runtime_checkable
 class StepSelecting(Protocol):
+    """Protocol for runtime step selection based on the current state."""
+
     async def __call__(
         self,
         state: StepState,

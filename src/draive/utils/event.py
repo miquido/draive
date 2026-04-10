@@ -38,7 +38,7 @@ class ProcessingEvent(State, serializable=True):
         """
         return cls(
             event=event,
-            created=datetime.now(),
+            created=datetime.now(UTC),
             content=MultimodalContent.of(content),
             meta=Meta.of(meta),
         )

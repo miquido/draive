@@ -287,7 +287,7 @@ def _context_messages(
                     yield Message(
                         role="tool",
                         tool_name=tool_resp.tool,
-                        content=tool_resp.result.without_resources().to_str(),
+                        content=tool_resp.content.without_resources().to_str(),
                     )
 
         else:

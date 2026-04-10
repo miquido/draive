@@ -149,7 +149,7 @@ async def test_agents_group_request_tool_returns_response_tool_output() -> None:
         name="worker",
         description="Worker agent",
     )
-    tool = AgentsGroup.of(agent).request_tool()
+    tool = AgentsGroup.of(agent).as_tool()
 
     async with ctx.scope("test.agent.group.request"):
         chunks = [
@@ -158,7 +158,7 @@ async def test_agents_group_request_tool_returns_response_tool_output() -> None:
                 ModelToolRequest.of(
                     "r1",
                     tool="agent_request",
-                    arguments={"agent": agent.identity.name, "message": "perform task"},
+                    arguments={"agent": agent.identity.name, "task": "perform task"},
                 )
             )
         ]
@@ -168,9 +168,8 @@ async def test_agents_group_request_tool_returns_response_tool_output() -> None:
     assert chunks[0].event == "progress"
     assert chunks[0].content.to_str() == "routing"
     assert isinstance(chunks[1], ModelToolResponse)
-    assert chunks[1].handling == "response"
     assert chunks[1].status == "success"
-    assert chunks[1].result.to_str() == "done"
+    assert chunks[1].content.to_str() == "done"
 
 
 @pytest.mark.asyncio
@@ -180,7 +179,7 @@ async def test_agents_group_handover_tool_streams_direct_output() -> None:
         name="worker",
         description="Worker agent",
     )
-    tool = AgentsGroup.of(agent).handover_tool()
+    tool = AgentsGroup.of(agent).as_tool(handling="output")
 
     async with ctx.scope("test.agent.group.handover"):
         chunks = [
@@ -189,7 +188,7 @@ async def test_agents_group_handover_tool_streams_direct_output() -> None:
                 ModelToolRequest.of(
                     "r1",
                     tool="agent_handover",
-                    arguments={"agent": agent.identity.name, "message": "perform task"},
+                    arguments={"agent": agent.identity.name, "task": "perform task"},
                 )
             )
         ]
@@ -199,18 +198,17 @@ async def test_agents_group_handover_tool_streams_direct_output() -> None:
     assert chunks[0].event == "progress"
     assert _multimodal_text_of(chunks[1]) == "done"
     assert isinstance(chunks[2], ModelToolResponse)
-    assert chunks[2].handling == "output"
     assert chunks[2].status == "success"
-    assert chunks[2].result.to_str() == "done"
+    assert chunks[2].content.to_str() == "done"
 
 
 @pytest.mark.asyncio
 async def test_agents_group_tools_raise_for_missing_agent() -> None:
-    tool = AgentsGroup.of().request_tool()
+    tool = AgentsGroup.of().as_tool()
 
     async with ctx.scope("test.agent.group.missing"):
         with pytest.raises(AgentUnavailable, match="Agent `missing` is not defined"):
-            _ = [chunk async for chunk in tool.call(agent="missing", message="hello")]
+            _ = [chunk async for chunk in tool.call(agent="missing", task="hello")]
 
 
 def test_agents_group_rejects_duplicate_agent_names() -> None:
