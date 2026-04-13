@@ -334,7 +334,7 @@ class Agent:
                 case "response":
                     name = f"agent_{self.identity.name}_request"
 
-                case "output":
+                case "output" | "output_stream":
                     name = f"agent_{self.identity.name}_handover"
 
         if description is None:
@@ -345,7 +345,7 @@ class Agent:
                         f"\n{self.identity.description}"
                     )
 
-                case "output":
+                case "output" | "output_stream":
                     description = (
                         f"Hand over your task to the {self.identity.name} agent.\n"
                         f"\n{self.identity.description}"
@@ -356,7 +356,7 @@ class Agent:
             case "response":
                 task_description = "Task to be performed by the agent"
 
-            case "output":
+            case "output" | "output_stream":
                 task_description = "Task to be handed over to the agent"
 
         @tool(
