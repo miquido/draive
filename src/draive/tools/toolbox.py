@@ -317,9 +317,9 @@ class Toolbox(State):
                         tasks.add(task)
                         task.add_done_callback(task_finish)
 
-                    case "output":
+                    case "output" | "output_stream":
                         task: Task[None] = ctx.spawn(
-                            self._output_execute(
+                            self._output_stream_execute(
                                 tool,
                                 request=request,
                                 lock=lock,
@@ -409,6 +409,29 @@ class Toolbox(State):
                 output_stream.enqueue(chunk)
 
     async def _output_execute(
+        self,
+        tool: Tool | None,
+        *,
+        request: ModelToolRequest,
+        lock: Lock,
+        output_stream: AsyncQueue[ModelToolResponse | ProcessingEvent | MultimodalContentPart],
+    ) -> None:
+        accumulator: MutableSequence[MultimodalContentPart] = []
+        async for chunk in self._execute(
+            tool,
+            request=request,
+        ):
+            if isinstance(chunk, ProcessingEvent | ModelToolResponse):
+                output_stream.enqueue(chunk)
+
+            else:
+                accumulator.append(chunk)
+
+        async with lock:  # synchronize outputs so only one streams at the same time
+            for chunk in accumulator:
+                output_stream.enqueue(chunk)
+
+    async def _output_stream_execute(
         self,
         tool: Tool | None,
         *,
