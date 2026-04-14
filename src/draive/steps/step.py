@@ -769,6 +769,12 @@ class Step:
                 if reasoning_accumulator:
                     output_accumulator.append(ModelReasoning.of(reasoning_accumulator))
 
+                state = _try_parse_output_artifact(
+                    state,
+                    output=output,
+                    content=MultimodalContent.of(*content_accumulator),
+                )
+
                 yield state.appending_context(ModelOutput.of(*output_accumulator))
 
         return cls(step)
@@ -976,7 +982,11 @@ class Step:
                             output_accumulator.append(ModelReasoning.of(reasoning_accumulator))
 
                         model_output: ModelOutput = ModelOutput.of(*output_accumulator)
-
+                        state = _try_parse_output_artifact(
+                            state,
+                            output=output,
+                            content=model_output.content,
+                        )
                         state = state.appending_context(model_output)
                         yield state
 
@@ -1004,9 +1014,15 @@ class Step:
 
                         if tools_output_accumulator:  # tools direct result
                             ctx.log_debug("...tools generated output...")
+                            tools_output = MultimodalContent.of(*tools_output_accumulator)
+                            state = _try_parse_output_artifact(
+                                state,
+                                output=output,
+                                content=tools_output,
+                            )
                             yield state.appending_context(
                                 ModelInput.of(*responses),
-                                ModelOutput.of(MultimodalContent.of(*tools_output_accumulator)),
+                                ModelOutput.of(tools_output),
                             )
                             break  # end of loop
 
@@ -1859,6 +1875,23 @@ def step(
         yield await processing(state)
 
     return Step(executing)
+
+
+def _try_parse_output_artifact(
+    state: StepState,
+    /,
+    *,
+    output: ModelOutputSelection,
+    content: MultimodalContent,
+) -> StepState:
+    if not isinstance(output, type):
+        return state
+
+    try:
+        return state.updating_artifacts(output.from_json(content.texts()[-1].text))
+    except ValueError as e:
+        ctx.log_warning("Artifact parsing failed", exception=e)
+        return state
 
 
 async def _noop_stream() -> StepStream:
