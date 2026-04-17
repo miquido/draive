@@ -616,7 +616,7 @@ class Evaluator[Value, **Args](Immutable):
         self,
         mapping: Callable[[Mapped], Value] | AttributePath[Mapped, Value] | Value,
         /,
-    ) -> "Evaluator[Mapped, Args]":
+    ) -> Evaluator[Mapped, Args]:
         """
         Transform the input value before evaluation.
 

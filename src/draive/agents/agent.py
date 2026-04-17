@@ -298,6 +298,9 @@ class Agent:
                 meta=message.meta,
             ),
         ):
+            ctx.log_info(
+                f"Agent {self.identity.name} responding to message within thread {message.thread}"
+            )
             async for chunk in self._executing(message):
                 yield chunk
 

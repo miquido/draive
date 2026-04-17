@@ -1,9 +1,10 @@
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any, cast
+from typing import Any, NoReturn, cast, final
+from uuid import UUID
 
 from haiway import Meta, MetaValues, Paginated, Pagination, cache, ctx
-from haiway.postgres import Postgres, PostgresRow
+from haiway.postgres import Postgres, PostgresConnection, PostgresRow
 
 from draive.multimodal.templates.repository import TemplatesRepository
 from draive.multimodal.templates.types import TemplateDeclaration
@@ -11,121 +12,184 @@ from draive.multimodal.templates.types import TemplateDeclaration
 __all__ = ("PostgresTemplatesRepository",)
 
 
-def _declaration_from_row(
-    row: PostgresRow,
-    /,
-) -> TemplateDeclaration:
-    return TemplateDeclaration(
-        identifier=cast(str, row["identifier"]),
-        description=cast(str | None, row["description"]),
-        variables=json.loads(cast(str, row["variables"] or "{}")),
-        meta=Meta.from_json(cast(str, row["meta"] or "{}")),
-    )
+@final
+class PostgresTemplatesRepository:
+    @staticmethod
+    async def migrate() -> None:
+        await PostgresConnection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS templates (
+                identifier TEXT NOT NULL,
+                description TEXT DEFAULT NULL,
+                content TEXT NOT NULL,
+                variables JSONB NOT NULL DEFAULT '{}'::jsonb,
+                meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (identifier, created)
+            );
 
+            CREATE INDEX IF NOT EXISTS
+                templates_idx
 
-def _templates_pagination_token(
-    pagination: Pagination,
-    /,
-) -> str | int | None:
-    if pagination.token is None:
-        return None
+            ON
+                templates (identifier, created DESC);
+            """
+        )
 
-    if isinstance(pagination.token, str):
-        if not pagination.token.startswith("templates:"):
-            raise ValueError("Invalid postgres templates pagination token")
+    @staticmethod
+    def prepare(
+        cache_limit: int = 32,
+        cache_expiration: float = 600.0,  # 10 min
+        meta: Meta | MetaValues | None = None,
+    ) -> TemplatesRepository:
+        """Return a Postgres-backed templates repository with caching.
 
-        token: str = pagination.token.split(":", 1)[1]
-        if token.startswith("cursor:"):
-            cursor: str = token.removeprefix("cursor:")
-            if cursor:
-                return cursor
+        Parameters
+        ----------
+        cache_limit
+            Maximum number of loaded template payloads cached concurrently.
+        cache_expiration
+            Lifetime in seconds for cached entries before reloading from Postgres.
 
-            raise ValueError("Invalid postgres templates pagination token")
+        Returns
+        -------
+        TemplatesRepository
+            Repository facade operating on the ``templates`` Postgres table.
+        """
 
-        try:
-            return max(int(token), 0)
+        async def listing(
+            pagination: Pagination | None,
+            **extra: Any,
+        ) -> Paginated[TemplateDeclaration]:
+            _ = extra
+            return await _list_template_declarations(pagination)
 
-        except ValueError as exc:
-            raise ValueError("Invalid postgres templates pagination token") from exc
+        @cache(
+            limit=cache_limit,
+            expiration=cache_expiration,
+        )
+        async def load(
+            identifier: str,
+            /,
+        ) -> str | None:
+            ctx.log_info(f"Loading '{identifier}' template ...")
+            result = await Postgres.fetch_one(
+                """
+                SELECT DISTINCT ON (identifier)
+                    content::TEXT
 
-    if isinstance(pagination.token, int):
-        return max(pagination.token, 0)
+                FROM
+                    templates
 
-    raise ValueError("Invalid postgres templates pagination token")
+                WHERE
+                    identifier = $1::TEXT
+
+                ORDER BY
+                    identifier,
+                    created
+                DESC
+
+                LIMIT 1;
+                """,
+                identifier,
+            )
+
+            if not result:
+                ctx.log_info("...template not found!")
+                return None
+
+            ctx.log_info("...template loaded!")
+            return cast(str, result["content"])
+
+        async def loading(
+            identifier: str,
+            meta: Meta,
+            **extra: Any,
+        ) -> str | None:
+            return await load(identifier)
+
+        async def defining(
+            identifier: str,
+            description: str | None,
+            content: str,
+            variables: Mapping[str, str],
+            meta: Meta,
+            **extra: Any,
+        ) -> None:
+            ctx.log_info(f"Defining '{identifier}' template...")
+            await Postgres.execute(
+                """
+                INSERT INTO
+                    templates (
+                        identifier,
+                        description,
+                        content,
+                        variables,
+                        meta
+                    )
+
+                VALUES
+                    (
+                        $1::TEXT,
+                        $2::TEXT,
+                        $3::TEXT,
+                        $4::JSONB,
+                        $5::JSONB
+                    );
+                """,
+                identifier,
+                description,
+                content,
+                json.dumps(variables),
+                meta.to_json(),
+            )
+            ctx.log_info("...clearing cache...")
+            await load.clear_cache()
+            ctx.log_info("...template definition completed!")
+
+        return TemplatesRepository(
+            listing=listing,
+            loading=loading,
+            defining=defining,
+            meta=Meta.of(meta if meta is not None else {"source": "postgres"}),
+        )
+
+    __slots__ = ()
+
+    def __init__(self) -> NoReturn:
+        raise RuntimeError("PostgresTemplatesRepository instantiation is forbidden")
 
 
 def _paginated_query_arguments(
     pagination: Pagination | None,
     /,
-) -> tuple[Pagination, str | int | None, int]:
-    resolved_pagination: Pagination = pagination or Pagination.of(limit=32)
-    if resolved_pagination.limit <= 0:
-        return resolved_pagination, None, 0
+) -> tuple[Pagination, UUID | str | int | None, int]:
+    pagination = pagination or Pagination.of(limit=32)
+    if pagination.limit <= 0:
+        return pagination, None, 0
 
     return (
-        resolved_pagination,
-        _templates_pagination_token(resolved_pagination),
-        resolved_pagination.limit + 1,
+        pagination,
+        pagination.token,
+        pagination.limit + 1,
     )
 
 
-def PostgresTemplatesRepository(
-    cache_limit: int = 32,
-    cache_expiration: float = 600.0,  # 10 min
-    meta: Meta | MetaValues | None = None,
-) -> TemplatesRepository:
-    """Return a Postgres-backed templates repository with caching.
+async def _list_template_declarations(
+    pagination: Pagination | None,
+    /,
+) -> Paginated[TemplateDeclaration]:
+    ctx.log_info("Listing templates...")
+    pagination, token, fetch_limit = _paginated_query_arguments(pagination)
+    if pagination.limit <= 0:
+        return Paginated[TemplateDeclaration].of(
+            (),
+            pagination=pagination.with_token(None),
+        )
 
-    Parameters
-    ----------
-    cache_limit
-        Maximum number of loaded template payloads cached concurrently.
-    cache_expiration
-        Lifetime in seconds for cached entries before reloading from Postgres.
-
-    Returns
-    -------
-    TemplatesRepository
-        Repository facade operating on the ``templates`` Postgres table.
-
-    Notes
-    ------
-    Example schema:
-    ```
-    CREATE TABLE templates (
-        identifier TEXT NOT NULL,
-        description TEXT DEFAULT NULL,
-        content TEXT NOT NULL,
-        variables JSONB NOT NULL DEFAULT '{}'::jsonb,
-        meta JSONB NOT NULL DEFAULT '{}'::jsonb,
-        created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (identifier, created)
-    );
-
-    CREATE INDEX IF NOT EXISTS
-        templates_idx
-
-    ON
-        templates (identifier, created DESC);
-    ```
-    """
-
-    async def listing(
-        pagination: Pagination | None,
-        **extra: Any,
-    ) -> Paginated[TemplateDeclaration]:
-        _ = extra
-        ctx.log_info("Listing templates...")
-        resolved_pagination, pagination_token, fetch_limit = _paginated_query_arguments(pagination)
-
-        if resolved_pagination.limit <= 0:
-            return Paginated[TemplateDeclaration].of(
-                (),
-                pagination=resolved_pagination.with_token(None),
-            )
-
-        results: Sequence[PostgresRow]
-        if isinstance(pagination_token, str):
+    results: Sequence[PostgresRow]
+    match token:
+        case str() as identifier:
             results = await Postgres.fetch(
                 """
                 WITH latest_templates AS (
@@ -154,18 +218,18 @@ def PostgresTemplatesRepository(
                     latest_templates
 
                 WHERE
-                    identifier > $1::TEXT
+                    identifier < $1::TEXT
 
                 ORDER BY
-                    identifier
+                    identifier DESC
 
                 LIMIT $2::INTEGER;
                 """,
-                pagination_token,
+                identifier,
                 fetch_limit,
             )
 
-        elif isinstance(pagination_token, int):
+        case int() as offset:
             results = await Postgres.fetch(
                 """
                 WITH latest_templates AS (
@@ -194,16 +258,16 @@ def PostgresTemplatesRepository(
                     latest_templates
 
                 ORDER BY
-                    identifier
+                    identifier DESC
 
                 LIMIT $1::INTEGER
                 OFFSET $2::INTEGER;
                 """,
                 fetch_limit,
-                pagination_token,
+                offset,
             )
 
-        else:
+        case None:
             results = await Postgres.fetch(
                 """
                 WITH latest_templates AS (
@@ -232,112 +296,31 @@ def PostgresTemplatesRepository(
                     latest_templates
 
                 ORDER BY
-                    identifier
+                    identifier DESC
 
                 LIMIT $1::INTEGER;
                 """,
                 fetch_limit,
             )
-        ctx.log_info(f"...{len(results)} results found!")
 
-        declarations: Sequence[TemplateDeclaration] = tuple(
-            _declaration_from_row(result) for result in results[: resolved_pagination.limit]
-        )
-        next_token: str | None = None
-        if len(results) > resolved_pagination.limit and declarations:
-            next_token = f"templates:cursor:{declarations[-1].identifier}"
+        case _:
+            raise ValueError("Invalid Postgres templates pagination token")
 
-        return Paginated[TemplateDeclaration].of(
-            declarations,
-            pagination=resolved_pagination.with_token(next_token),
-        )
+    page_results: Sequence[PostgresRow] = results[: pagination.limit]
+    ctx.log_info(f"...{len(page_results)} results found!")
+    next_token: str | None = None
+    if len(results) > pagination.limit:
+        next_token = f"{page_results[-1]['identifier']}"
 
-    @cache(
-        limit=cache_limit,
-        expiration=cache_expiration,
-    )
-    async def load(
-        identifier: str,
-        /,
-    ) -> str | None:
-        ctx.log_info(f"Loading '{identifier}' template ...")
-        result = await Postgres.fetch_one(
-            """
-            SELECT DISTINCT ON (identifier)
-                content::TEXT
-
-            FROM
-                templates
-
-            WHERE
-                identifier = $1::TEXT
-
-            ORDER BY
-                identifier,
-                created
-            DESC
-
-            LIMIT 1;
-            """,
-            identifier,
-        )
-
-        if not result:
-            ctx.log_info("...template not found!")
-            return None
-
-        ctx.log_info("...template loaded!")
-        return cast(str, result["content"])
-
-    async def loading(
-        identifier: str,
-        meta: Meta,
-        **extra: Any,
-    ) -> str | None:
-        return await load(identifier)
-
-    async def defining(
-        identifier: str,
-        description: str | None,
-        content: str,
-        variables: Mapping[str, str],
-        meta: Meta,
-        **extra: Any,
-    ) -> None:
-        ctx.log_info(f"Defining '{identifier}' template...")
-        await Postgres.execute(
-            """
-            INSERT INTO
-                templates (
-                    identifier,
-                    description,
-                    content,
-                    variables,
-                    meta
-                )
-
-            VALUES
-                (
-                    $1::TEXT,
-                    $2::TEXT,
-                    $3::TEXT,
-                    $4::JSONB,
-                    $5::JSONB
-                );
-            """,
-            identifier,
-            description,
-            content,
-            json.dumps(variables),
-            meta.to_json(),
-        )
-        ctx.log_info("...clearing cache...")
-        await load.clear_cache()
-        ctx.log_info("...template definition completed!")
-
-    return TemplatesRepository(
-        listing=listing,
-        loading=loading,
-        defining=defining,
-        meta=Meta.of(meta if meta is not None else {"source": "postgres"}),
+    return Paginated[TemplateDeclaration].of(
+        tuple(
+            TemplateDeclaration(
+                identifier=cast(str, result["identifier"]),
+                description=cast(str | None, result["description"]),
+                variables=json.loads(cast(str, result["variables"] or "{}")),
+                meta=Meta.from_json(cast(str, result["meta"] or "{}")),
+            )
+            for result in page_results
+        ),
+        pagination=pagination.with_token(next_token),
     )

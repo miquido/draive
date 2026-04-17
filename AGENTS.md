@@ -2,7 +2,7 @@ Draive is a python framework helping to build high-quality Gen-AI applications. 
 
 ## Development Toolchain
 
-- Python: 3.13+
+- Python: 3.14+
 - Virtualenv: managed by uv, available at `./.venv`, assume already set up and working within venv
 - Formatting: Ruff formatter (`make format`), no other formatter
 - Linters/Type-checkers: Ruff, Bandit, Pyright (strict). Run via `make lint`
@@ -42,7 +42,7 @@ Public exports are centralized in `src/draive/__init__.py`.
 
 ### Typing & Immutability
 
-- Use strict typing and modern Python 3.13 syntax
+- Use strict typing and modern Python 3.14 syntax
 - No untyped public APIs; avoid loose `Any` except at explicit third-party boundaries
 - Prefer explicit attribute access with static types; avoid dynamic `getattr` except at narrow boundaries
 - Prefer abstract immutable protocols (`Mapping`, `Sequence`, `Iterable`) over concrete mutable collections in public APIs

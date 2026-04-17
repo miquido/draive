@@ -23,7 +23,7 @@ from draive.postgres import (
 async with ctx.scope(
     "postgres-demo",
     PostgresConfigurationRepository(),  # use postgres configurations
-    PostgresTemplatesRepository(),  # use postgres templates
+    PostgresTemplatesRepository.prepare(),  # use postgres templates
     disposables=(
         PostgresConnectionPool.of(dsn="postgresql://draive:secret@localhost:5432/draive"),
     ),
@@ -151,8 +151,8 @@ order for non-similarity queries.
 
 ### Wiring the index
 
-Construct the index with `PostgresVectorIndex()` and reuse the shared `Postgres` state inside an
-active context scope. The optional `mmr_multiplier` argument controls how many rows are fetched
+Construct the index with `PostgresVectorIndex.prepare()` and reuse the shared `Postgres` state
+inside an active context scope. The optional `mmr_multiplier` argument controls how many rows are fetched
 before applying Maximal Marginal Relevance re-ranking when `rerank=True`.
 
 ```python
@@ -177,7 +177,7 @@ async def initialize_pgvector(connection: Connection) -> None:
 
 async with ctx.scope(
     "pgvector-demo",
-    PostgresVectorIndex(),
+    PostgresVectorIndex.prepare(),
     disposables=(
         PostgresConnectionPool.of(
             dsn="postgresql://draive:secret@localhost:5432/draive",

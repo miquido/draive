@@ -109,7 +109,7 @@ async def test_postgres_conversation_memory_fetch_uses_pagination_token(
 
     monkeypatch.setattr(postgres_memory.Postgres, "fetch", fake_fetch)
 
-    memory = PostgresConversationMemory(thread="thread-1")
+    memory = PostgresConversationMemory.prepare(thread="thread-1")
 
     page_1 = await memory.fetch(Pagination.of(limit=2))
     assert [turn.content[0].to_str() for turn in page_1.items] == ["second", "third"]
@@ -159,7 +159,7 @@ async def test_postgres_conversation_memory_recall_uses_latest_turns_in_order(
 
     monkeypatch.setattr(postgres_memory.Postgres, "fetch", fake_fetch)
 
-    memory = PostgresConversationMemory(thread="thread-1")
+    memory = PostgresConversationMemory.prepare(thread="thread-1")
 
     context = await memory.recall(Pagination.of(limit=2))
 

@@ -1,7 +1,7 @@
 # Draive LLM Integration Guide (Refactor-Aligned)
 
 Concise, authoritative guidance for building Draive apps with current APIs.
-Targets Python 3.13+, strict typing, and async-only I/O.
+Targets Python 3.14+, strict typing, and async-only I/O.
 
 ## Core Rules
 - Always run model operations inside `ctx.scope(...)`.

@@ -69,7 +69,7 @@ async def test_postgres_templates_repository_templates_support_pagination(
 
     monkeypatch.setattr(postgres_templates.Postgres, "fetch", fake_fetch)
 
-    repository = PostgresTemplatesRepository()
+    repository = PostgresTemplatesRepository.prepare()
 
     page_1 = await repository.templates(Pagination.of(limit=2))
     page_2 = await repository.templates(page_1.pagination)
@@ -88,7 +88,7 @@ async def test_postgres_templates_repository_templates_support_pagination(
             meta={},
         ),
     )
-    assert page_1.pagination.token == "templates:cursor:summary"
+    assert page_1.pagination.token == "summary"
     assert page_2.items == (
         TemplateDeclaration(
             identifier="closing",
@@ -121,14 +121,14 @@ async def test_postgres_templates_repository_accepts_legacy_offset_pagination_to
     ) -> Sequence[_FakeRow]:
         _ = statement
 
-        assert args == (3, 2)
+        assert args == ("2", 3)
         return rows
 
     monkeypatch.setattr(postgres_templates.Postgres, "fetch", fake_fetch)
 
-    repository = PostgresTemplatesRepository()
+    repository = PostgresTemplatesRepository.prepare()
 
-    page = await repository.templates(Pagination.of(limit=2).with_token("templates:2"))
+    page = await repository.templates(Pagination.of(limit=2).with_token("2"))
 
     assert page.items == (
         TemplateDeclaration(
@@ -161,7 +161,7 @@ async def test_postgres_templates_repository_define_preserves_empty_description(
 
     monkeypatch.setattr(postgres_templates.Postgres, "execute", fake_execute)
 
-    repository = PostgresTemplatesRepository()
+    repository = PostgresTemplatesRepository.prepare()
     cached_load = repository._defining.__closure__[0].cell_contents
     monkeypatch.setattr(cached_load, "clear_cache", fake_clear_cache)
 
