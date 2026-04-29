@@ -188,10 +188,7 @@ async def test_surreal_embedded_execute_supports_inline_sql_transactions(
             if message.method is RequestMethod.QUERY and "BEGIN TRANSACTION;" in str(
                 message.kwargs.get("query", "")
             ):
-                detail: str = (
-                    "Transactions are not supported for embedded connection in this"
-                    " mode"
-                )
+                detail: str = "Transactions are not supported for embedded connection in this mode"
                 return {
                     "result": [
                         {
