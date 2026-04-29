@@ -314,7 +314,7 @@ class _FakeAnthropicStream:
     def __init__(self, events: Sequence[Any]) -> None:
         self._events = events
 
-    async def __aenter__(self) -> "_FakeAnthropicStream":
+    async def __aenter__(self) -> _FakeAnthropicStream:
         return self
 
     async def __aexit__(

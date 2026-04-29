@@ -43,11 +43,11 @@ class AnthropicAPI:
                 )
 
             case "bedrock":
-                from anthropic import AsyncAnthropicBedrock
+                from anthropic import AsyncAnthropicAWS
 
                 return cast(
                     AsyncAnthropic,  # it is not actually the same but for our purpose it works
-                    AsyncAnthropicBedrock(
+                    AsyncAnthropicAWS(
                         base_url=self._base_url,
                         aws_region=self._aws_region,
                         timeout=self._timeout,

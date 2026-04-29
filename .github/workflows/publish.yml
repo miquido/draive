@@ -18,7 +18,7 @@ jobs:
       - name: Install uv and set the python version
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: 3.13
+          python-version: 3.14
 
       - name: Install
         run: uv sync --all-groups --all-extras --frozen --no-python-downloads
@@ -27,7 +27,8 @@ jobs:
         run: uv run ruff check --output-format=github ./src ./tests
 
       - name: Test
-        run: uv run pytest --rootdir= ./tests --doctest-modules --junitxml=junit/test-results.xml
+        run: uv run pytest --rootdir= ./tests --doctest-modules
+          --junitxml=junit/test-results.xml
 
       - name: Publish
         env:

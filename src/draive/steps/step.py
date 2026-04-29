@@ -1022,7 +1022,7 @@ class Step:
     @classmethod
     def selection(
         cls,
-        selecting: "StepSelecting",
+        selecting: StepSelecting,
     ) -> Self:
         """Create a step that selects and executes another step at runtime.
 

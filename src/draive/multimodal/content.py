@@ -45,7 +45,7 @@ class MultimodalContent(State, serializable=True):
     @classmethod
     def of(
         cls,
-        *elements: "Multimodal",
+        *elements: Multimodal,
     ) -> Self:
         """
         Construct a normalized ``MultimodalContent``.
@@ -260,7 +260,7 @@ class MultimodalContent(State, serializable=True):
 
     def appending(
         self,
-        *parts: "Self | MultimodalTag | MultimodalContentPart | str",
+        *parts: Self | MultimodalTag | MultimodalContentPart | str,
     ) -> Self:
         """
         Return a new content instance with parts appended.
@@ -368,7 +368,7 @@ class MultimodalContent(State, serializable=True):
         self,
         name: str | None = None,
         /,
-    ) -> "MultimodalTag | None":
+    ) -> MultimodalTag | None:
         """
         Return the first tag whose name matches ``name``.
 
@@ -390,7 +390,7 @@ class MultimodalContent(State, serializable=True):
         self,
         name: str | None = None,
         /,
-    ) -> "Sequence[MultimodalTag]":
+    ) -> Sequence[MultimodalTag]:
         """
         Return all tags whose name matches ``name``.
 
@@ -411,7 +411,7 @@ class MultimodalContent(State, serializable=True):
         self,
         name: str,
         /,
-        replacement: "Multimodal",
+        replacement: Multimodal,
         *,
         strip_tags: bool = False,
         exhaustive: bool = False,

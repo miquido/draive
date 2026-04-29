@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["3.13"]
+        python-version: ["3.14"]
 
     steps:
       - uses: actions/checkout@v4
@@ -29,13 +29,15 @@ jobs:
         run: uv sync --all-groups --all-extras --frozen --no-python-downloads
 
       - name: Lint
-        run: uv run ruff check --output-format=github ./src ./tests && uv run pyright --project ./
+        run: uv run ruff check --output-format=github ./src ./tests && uv run pyright
+          --project ./
 
       - name: Docs Lint
         run: uv run pymarkdown --config .pymarkdown.json scan README.md docs
 
       - name: Test
-        run: uv run pytest --rootdir= ./tests --doctest-modules --junitxml=junit/test-results.xml
+        run: uv run pytest --rootdir= ./tests --doctest-modules
+          --junitxml=junit/test-results.xml
 
       - name: Build
         run: uv build

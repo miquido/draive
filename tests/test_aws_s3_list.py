@@ -9,7 +9,7 @@ from draive import Pagination
 
 
 class _FakePaginator:
-    def __init__(self, pages: list[dict[str, object]], client: "_FakeS3Client") -> None:
+    def __init__(self, pages: list[dict[str, object]], client: _FakeS3Client) -> None:
         self._pages = pages
         self._client = client
 

@@ -7,7 +7,7 @@ require explicit shape guarantees.
 
 ## Prerequisites
 
-- Python 3.13+
+- Python 3.14+
 - OpenAI credentials loaded via `load_env()`
 
 ```python

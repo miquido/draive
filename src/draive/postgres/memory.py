@@ -1,11 +1,11 @@
 import json
 from collections.abc import Mapping, Sequence
 from itertools import chain
-from typing import Any, cast
+from typing import Any, NoReturn, cast, final
 from uuid import UUID
 
 from haiway import Paginated, Pagination, ctx
-from haiway.postgres import Postgres, PostgresRow
+from haiway.postgres import Postgres, PostgresConnection, PostgresRow
 
 from draive.conversation.state import ConversationMemory
 from draive.conversation.types import (
@@ -18,99 +18,171 @@ from draive.models import ModelContext
 __all__ = ("PostgresConversationMemory",)
 
 
-def PostgresConversationMemory(
-    *,
-    thread: UUID | str,
-) -> ConversationMemory:
-    """
+@final
+class PostgresConversationMemory:
+    """PostgreSQL-backed conversation memory factory.
+
+    This utility exposes static helpers for schema migration and creating
+    thread-scoped :class:`~draive.conversation.state.ConversationMemory`
+    instances persisted in PostgreSQL.
+
+    Examples
+    --------
+    ```python
+    from uuid import uuid4
+
+    from draive import ctx
+    from draive.postgres.memory import PostgresConversationMemory
+
+    async def bootstrap_memory() -> None:
+        async with ctx.scope("conversation-memory"):
+            await PostgresConversationMemory.migrate()
+            memory = PostgresConversationMemory.prepare(thread=uuid4())
+            await memory.recall()
     ```
-    CREATE TABLE conversation_memory (
-        thread_id TEXT NOT NULL,
-        turn TEXT NOT NULL,
-        identifier UUID NOT NULL,
-        payload JSONB NOT NULL,
-        created TIMESTAMPTZ NOT NULL,
-        PRIMARY KEY (thread_id, identifier),
-        UNIQUE (thread_id, identifier)
-    );
-
-    CREATE INDEX IF NOT EXISTS conversation_memory_idx
-        ON conversation_memory (thread_id, created DESC, identifier DESC);
-    ```
     """
 
-    thread_id: str = str(thread)
+    @staticmethod
+    async def migrate() -> None:
+        """Create database structures required by conversation memory.
 
-    async def fetch(
-        pagination: Pagination,
-        **extra: Any,
-    ) -> Paginated[ConversationTurn]:
-        return await _fetch_turns(
-            thread_id=thread_id,
-            pagination=pagination,
+        This asynchronous method creates the `conversation_memory` table and
+        its supporting index when they do not already exist.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+            Completes when the schema migration statements finish.
+
+        Raises
+        ------
+        Exception
+            Raised when PostgreSQL command execution fails, for example due to
+            connection or database-level errors.
+        """
+        await PostgresConnection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_memory (
+                thread_id TEXT NOT NULL,
+                turn TEXT NOT NULL,
+                identifier UUID NOT NULL,
+                payload JSONB NOT NULL,
+                created TIMESTAMPTZ NOT NULL,
+                PRIMARY KEY (thread_id, identifier),
+                UNIQUE (thread_id, identifier)
+            );
+
+            CREATE INDEX IF NOT EXISTS conversation_memory_idx
+                ON conversation_memory (thread_id, created DESC, identifier DESC);
+            """
         )
 
-    async def recall(
-        pagination: Pagination | None = None,
-        **extra: Any,
-    ) -> ModelContext:
-        turns: Sequence[ConversationTurn]
-        if pagination is None:
-            turns = await _recall(
-                thread_id=thread_id,
-            )
+    @staticmethod
+    def prepare(
+        *,
+        thread: UUID | str,
+    ) -> ConversationMemory:
+        """Prepare thread-scoped conversation memory operations.
 
-        else:
-            turns = await _fetch_turns(
+        Parameters
+        ----------
+        thread : UUID | str
+            Conversation thread identifier used to isolate persisted turns.
+
+        Returns
+        -------
+        ConversationMemory
+            A configured conversation memory instance with fetch, recall, and
+            remember handlers bound to the provided thread.
+
+        Raises
+        ------
+        ValueError
+            Raised by memory operations if pagination token validation fails.
+        Exception
+            Raised by memory operations when PostgreSQL interactions fail.
+        """
+        thread_id: str = str(thread)
+
+        async def fetch(
+            pagination: Pagination,
+            **extra: Any,
+        ) -> Paginated[ConversationTurn]:
+            return await _fetch_turns(
                 thread_id=thread_id,
                 pagination=pagination,
             )
 
-        return tuple(chain.from_iterable(turn.to_model_context() for turn in turns))
+        async def recall(
+            pagination: Pagination | None = None,
+            **extra: Any,
+        ) -> ModelContext:
+            turns: Sequence[ConversationTurn]
+            if pagination is None:
+                turns = await _recall(
+                    thread_id=thread_id,
+                )
 
-    async def remember(
-        turns: Sequence[ConversationTurn],
-        **extra: Any,
-    ) -> None:
-        if not turns:
-            return
+            else:
+                turns = await _fetch_turns(
+                    thread_id=thread_id,
+                    pagination=pagination,
+                )
 
-        async with Postgres.acquire_connection() as connection:
-            async with connection.transaction():
-                for turn in turns:
-                    await connection.execute(
-                        """
-                        INSERT INTO
-                            conversation_memory (
-                                thread_id,
-                                turn,
-                                identifier,
-                                payload,
-                                created
-                            )
+            return tuple(chain.from_iterable(turn.to_model_context() for turn in turns))
 
-                        VALUES (
-                            $1::TEXT,
-                            $2::TEXT,
-                            $3::UUID,
-                            $4::JSONB,
-                            $5::TIMESTAMPTZ
-                        );
-                        """,  # nosec: B608
-                        thread_id,
-                        turn.turn,
-                        turn.identifier,
-                        turn.to_json(),
-                        turn.created,
-                    )
+        async def remember(
+            turns: Sequence[ConversationTurn],
+            **extra: Any,
+        ) -> None:
+            if not turns:
+                return
 
-        ctx.log_debug("...conversation memory persisted.")
+            async with Postgres.acquire_connection() as connection:
+                async with connection.transaction():
+                    for turn in turns:
+                        await connection.execute(
+                            """
+                            INSERT INTO
+                                conversation_memory (
+                                    thread_id,
+                                    turn,
+                                    identifier,
+                                    payload,
+                                    created
+                                )
 
-    return ConversationMemory(
-        fetching=fetch,
-        recalling=recall,
-        remembering=remember,
-    )
+                            VALUES (
+                                $1::TEXT,
+                                $2::TEXT,
+                                $3::UUID,
+                                $4::JSONB,
+                                $5::TIMESTAMPTZ
+                            );
+                            """,  # nosec: B608
+                            thread_id,
+                            turn.turn,
+                            turn.identifier,
+                            turn.to_json(),
+                            turn.created,
+                        )
+
+            ctx.log_debug("...conversation memory persisted.")
+
+        return ConversationMemory(
+            fetching=fetch,
+            recalling=recall,
+            remembering=remember,
+        )
+
+    __slots__ = ()
+
+    def __init__(self) -> NoReturn:
+        raise RuntimeError("PostgresConversationMemory instantiation is forbidden")
 
 
 def _turn_from_row(
