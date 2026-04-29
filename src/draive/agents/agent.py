@@ -24,6 +24,7 @@ from draive.multimodal import (
     MultimodalContentPart,
     Template,
 )
+from draive.skills import Skill
 from draive.steps import Step
 from draive.tools import Tool, Toolbox, tool
 from draive.tools.types import ToolOutputChunk
@@ -132,6 +133,54 @@ class Agent:
             name=name,
             description=description,
             meta=meta,
+        )
+
+    @classmethod
+    def from_skill(
+        cls,
+        skill: Skill,
+        *,
+        tools: Toolbox | Iterable[Tool] = Toolbox.empty,
+        output: ModelOutputSelection = "auto",
+        meta: Meta | MetaValues | None = None,
+    ) -> Self:
+        """Create a model-backed agent from a loaded Agent Skill.
+
+        Parameters
+        ----------
+        skill : Skill
+            Loaded skill containing discovery metadata, instructions, and
+            optional resources.
+        tools : Toolbox | Iterable[Tool], default=Toolbox.empty
+            Additional tools available while handling requests.
+        output : ModelOutputSelection, default="auto"
+            Output selection mode forwarded to model completion.
+        meta : Meta | MetaValues | None, default=None
+            Additional metadata merged with the skill metadata and attached to
+            the agent identity.
+
+        Returns
+        -------
+        Self
+            Agent instance configured from skill metadata and instructions.
+        """
+
+        resolved_toolbox: Toolbox
+        if isinstance(tools, Toolbox):
+            resolved_toolbox = tools.with_tools(skill.resources_tool())
+
+        else:
+            resolved_toolbox = Toolbox.of(skill.resources_tool(), *tools)
+
+        return cls.steps(
+            Step.looping_completion(
+                instructions=skill.instructions,
+                tools=resolved_toolbox,
+                output=output,
+            ),
+            name=skill.name,
+            description=skill.description,
+            meta=skill.meta.merged_with(meta),
         )
 
     @classmethod

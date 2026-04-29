@@ -44,6 +44,7 @@ async def test_surreal_templates_repository_templates_support_pagination(
             },
         ),
     )
+
     async def fake_execute(
         statement: str,
         /,

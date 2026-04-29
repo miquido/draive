@@ -19,7 +19,7 @@ personalised = welcome.with_arguments(product="Draive 2.0")
 ```
 
 - `Template.of(...)` creates an immutable handle identified by `identifier`.
-- `arguments` holds default values for `{% placeholders %}` embedded in the template source.
+- `arguments` holds default values for `{%placeholders%}` embedded in the template source.
 - Use `.with_arguments(...)` to merge additional arguments without mutating the original object.
 
 Templates support multimodal values, so an argument can be plain text, `MultimodalContent`, or any
@@ -37,12 +37,12 @@ from draive import TemplatesRepository
 
 file_repository = TemplatesRepository.file(Path("templates"))
 volatile_repository = TemplatesRepository.volatile(
-    onboarding="Hello {% user %}!",
+    onboarding="Hello {%user%}!",
 )
 ```
 
 - `TemplatesRepository.file(...)` reads templates from `.tmpl` files on disk. It automatically
-    infers variables by scanning for `{% variable %}` markers.
+    infers variables by scanning for `{%variable%}` markers.
 - `TemplatesRepository.volatile(...)` keeps definitions in memory, ideal for tests or quick demos.
 - Custom backends only need to provide the `listing`, `loading`, and `defining` callables. See
     `PostgresTemplatesRepository` for a production-ready example.
@@ -113,7 +113,7 @@ code:
     `TemplateDeclaration`).
 - Swap `InstructionsRepository.resolve(...)` with `TemplatesRepository.resolve_str(...)` or
     `resolve(...)` if you now need multimodal payloads.
-- Update placeholders from legacy `{{ variable }}` markers to `{% variable %}`. The new syntax
+- Update placeholders from legacy `{{ variable }}` markers to `{%variable%}`. The new syntax
     distinguishes literal braces from arguments and supports multimodal values.
 - Remove instruction-specific argument lists; template arguments are simple mappings keyed by the
     placeholder name.
