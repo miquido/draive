@@ -244,6 +244,11 @@ from draive.resources import (
     ResourceUploading,
     resource,
 )
+from draive.skills import (
+    Skill,
+    SkillResource,
+    SkillResourceMissing,
+)
 from draive.splitters import split_text
 from draive.steps import (
     Step,
@@ -441,6 +446,9 @@ __all__ = (
     "ResourceUnresolveable",
     "ResourceUploading",
     "ResourcesRepository",
+    "Skill",
+    "SkillResource",
+    "SkillResourceMissing",
     "Specification",
     "State",
     "Step",
