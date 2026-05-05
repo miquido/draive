@@ -13,6 +13,7 @@ from draive.models import (
     ModelToolResponse,
 )
 from draive.multimodal import MultimodalContent, MultimodalContentPart, TextContent
+from draive.skills import Skill
 from draive.steps import Step, StepState
 from draive.tools import Toolbox
 from draive.utils import ProcessingEvent
@@ -255,6 +256,26 @@ def test_agents_group_rejects_duplicate_agent_uris() -> None:
 
     with pytest.raises(ValueError, match="Agent `agent://worker` is already defined"):
         _ = AgentsGroup.of(agent_a, agent_b)
+
+
+def test_agent_skill_constructor_uses_skill_identity_and_meta() -> None:
+    skill = Skill.of(
+        "code-review",
+        description="Review source code for issues and regressions.",
+        instructions="Analyze code changes and report findings.",
+        meta={"source": "skill", "scope": "skill"},
+    )
+
+    agent = Agent.from_skill(
+        skill,
+        meta={"source": "override", "request": "constructor"},
+    )
+
+    assert agent.identity.name == "code-review"
+    assert agent.identity.description == "Review source code for issues and regressions."
+    assert agent.identity.meta.get_str("source") == "override"
+    assert agent.identity.meta.get_str("scope") == "skill"
+    assert agent.identity.meta.get_str("request") == "constructor"
 
 
 @pytest.mark.asyncio

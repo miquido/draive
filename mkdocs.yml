@@ -104,6 +104,7 @@ nav:
       - Basic Usage: guides/BasicUsage.md
       - Basic Tools Use: guides/BasicToolsUse.md
       - Agents: guides/Agents.md
+      - Skills: guides/Skills.md
       - Basic Conversation: guides/BasicConversation.md
       - Basic Model Generation: guides/BasicModelGeneration.md
       - Basic Evaluation: guides/BasicEvaluation.md

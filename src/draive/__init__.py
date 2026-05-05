@@ -29,7 +29,8 @@ from haiway import (
     DisposableState,
     EventsSubscription,
     File,
-    FileAccess,
+    FileException,
+    Files,
     FlatObject,
     Function,
     HTTPClient,
@@ -244,6 +245,12 @@ from draive.resources import (
     ResourceUploading,
     resource,
 )
+from draive.skills import (
+    Skill,
+    SkillException,
+    SkillResource,
+    SkillResourceMissing,
+)
 from draive.splitters import split_text
 from draive.steps import (
     Step,
@@ -321,7 +328,8 @@ __all__ = (
     "Embedded",
     "EventsSubscription",
     "File",
-    "FileAccess",
+    "FileException",
+    "Files",
     "FlatObject",
     "Function",
     "GenerationModelGenerating",
@@ -441,6 +449,10 @@ __all__ = (
     "ResourceUnresolveable",
     "ResourceUploading",
     "ResourcesRepository",
+    "Skill",
+    "SkillException",
+    "SkillResource",
+    "SkillResourceMissing",
     "Specification",
     "State",
     "Step",

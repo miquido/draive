@@ -5,7 +5,7 @@ from typing import Any, Self, cast, final, overload
 
 from haiway import (
     File,
-    FileAccess,
+    Files,
     Immutable,
     Meta,
     Paginated,
@@ -692,7 +692,7 @@ class FileStorage(Immutable):
 
     async def _load_file(self) -> None:
         file_contents: bytes
-        async with ctx.disposables(FileAccess.open(self._path, create=True)):
+        async with ctx.disposables(Files.access(self._path, create=True)):
             file_contents = await File.read()
 
         if not file_contents.strip():
@@ -770,5 +770,5 @@ class FileStorage(Immutable):
             ]
         ).encode()
 
-        async with ctx.disposables(FileAccess.open(self._path, create=True)):
+        async with ctx.disposables(Files.access(self._path, create=True)):
             await File.write(file_contents)
