@@ -273,3 +273,44 @@ def test_split_by_meta_groups_consecutive_same_values():
     assert result[0].parts == (text1, image1, text2)
     assert result[1].parts == (text3, image2, text4)
     assert result[2].parts == (text5,)
+
+
+def test_artifacts_returns_artifact_content_parts_only():
+    class FirstArtifact(State):
+        value: str
+
+    class SecondArtifact(State):
+        count: int
+
+    first = ArtifactContent.of(FirstArtifact(value="alpha"), category="first")
+    second = ArtifactContent.of(SecondArtifact(count=2), category="second")
+    content = MultimodalContent.of(input_text, first, input_image, second)
+
+    assert content.artifacts() == (first, second)
+
+
+def test_artifacts_filters_by_category():
+    class TestArtifact(State):
+        value: str
+
+    matching = ArtifactContent.of(TestArtifact(value="yes"), category="selected")
+    skipped = ArtifactContent.of(TestArtifact(value="no"), category="other")
+    content = MultimodalContent.of(matching, input_text, skipped)
+
+    assert content.artifacts(category="selected") == (matching,)
+    assert content.artifacts(category="missing") == ()
+
+
+def test_artifacts_decodes_to_target_state_with_optional_category_filter():
+    class DecodedArtifact(State):
+        value: str
+
+    first = ArtifactContent.of(DecodedArtifact(value="one"), category="target")
+    second = ArtifactContent.of(DecodedArtifact(value="two"), category="other")
+    content = MultimodalContent.of(first, second)
+
+    assert content.artifacts(DecodedArtifact) == (
+        DecodedArtifact(value="one"),
+        DecodedArtifact(value="two"),
+    )
+    assert content.artifacts(DecodedArtifact, category="target") == (DecodedArtifact(value="one"),)
