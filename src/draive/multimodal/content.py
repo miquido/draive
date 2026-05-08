@@ -1,6 +1,6 @@
-from collections.abc import Collection, Generator, Mapping, Sequence
+from collections.abc import Callable, Collection, Generator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import ClassVar, Literal, Self, cast, final
+from typing import ClassVar, Literal, Self, cast, final, overload
 
 from haiway import MISSING, BasicValue, Meta, MetaValues, Missing, State
 
@@ -205,31 +205,57 @@ class MultimodalContent(State, serializable=True):
         """
         return any(isinstance(part, ArtifactContent) for part in self.parts)
 
+    @overload
     def artifacts(
         self,
         *,
         category: str | None = None,
-    ) -> Sequence[ArtifactContent]:
+    ) -> Sequence[ArtifactContent]: ...
+
+    @overload
+    def artifacts[Artifact: State](
+        self,
+        artifact: type[Artifact],
+        *,
+        category: str | None = None,
+    ) -> Sequence[Artifact]: ...
+
+    def artifacts[Artifact: State = ArtifactContent](
+        self,
+        artifact: type[Artifact] = ArtifactContent,
+        *,
+        category: str | None = None,
+    ) -> Sequence[Artifact]:
         """
-        Return artifact parts, optionally filtered by category.
+        Return artifact parts or decoded artifact states.
 
         Parameters
         ----------
+        artifact : type[Artifact], default=ArtifactContent
+            Target state type used to decode each artifact payload.
+            When left as ``ArtifactContent``, raw artifact wrappers are
+            returned without decoding.
         category : str | None, optional
             When provided, only artifacts whose ``category`` equals this value
             are returned.
 
         Returns
         -------
-        Sequence[ArtifactContent]
-            Artifact parts in order, narrowed by the provided filters.
+        Sequence[Artifact]
+            Artifacts in order, optionally filtered by ``category``. Items are
+            returned as ``ArtifactContent`` or decoded into ``artifact`` state
+            instances, depending on the selected target type.
         """
         if category is None:
-            return tuple(part for part in self.parts if isinstance(part, ArtifactContent))
+            return tuple(
+                cast(Artifact, part) if artifact is ArtifactContent else part.to_state(artifact)
+                for part in self.parts
+                if isinstance(part, ArtifactContent)
+            )
 
         else:
             return tuple(
-                part
+                cast(Artifact, part) if artifact is ArtifactContent else part.to_state(artifact)
                 for part in self.parts
                 if isinstance(part, ArtifactContent) and part.category == category
             )
@@ -247,16 +273,32 @@ class MultimodalContent(State, serializable=True):
             parts=tuple(part for part in self.parts if not isinstance(part, ArtifactContent)),
         )
 
-    def to_str(self) -> str:
+    def to_str(
+        self,
+        artifact_to_str: Callable[[ArtifactContent], str] | None = None,
+    ) -> str:
         """
         Produce a string representation of the content sequence.
+
+        Parameters
+        ----------
+        artifact_to_str : Callable[[ArtifactContent], str] | None, optional
+            Custom serializer used for ``ArtifactContent`` parts. When omitted,
+            each part is rendered with its own ``to_str()`` implementation.
 
         Returns
         -------
         str
-            Concatenation of ``to_str()`` across all parts in order.
+            Concatenation of rendered parts in their original order.
         """
-        return "".join(part.to_str() for part in self.parts)
+        if artifact_to_str is None:
+            return "".join(part.to_str() for part in self.parts)
+
+        else:
+            return "".join(
+                artifact_to_str(part) if isinstance(part, ArtifactContent) else part.to_str()
+                for part in self.parts
+            )
 
     def appending(
         self,

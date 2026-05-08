@@ -127,13 +127,13 @@ class ArtifactContent(State, serializable=True):
 
     def to_state[Content: State](
         self,
-        content: type[Content],
+        state: type[Content],
     ) -> Content:
         """Deserialize the stored artifact payload into a typed state object.
 
         Parameters
         ----------
-        content : type[Content]
+        state : type[Content]
             Target state type used to decode the payload.
 
         Returns
@@ -141,7 +141,7 @@ class ArtifactContent(State, serializable=True):
         Content
             Decoded state instance.
         """
-        return content.from_mapping(self.artifact)
+        return state.from_mapping(self.artifact)
 
     @overload
     def get_uuid(
