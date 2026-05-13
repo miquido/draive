@@ -21,7 +21,9 @@ __all__ = (
 
 
 @final
-class CoroutineTool[**Args](Function[Args, Coroutine[None, None, Multimodal]]):
+class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
+    Function[Args, Coroutine[None, None, Result]]
+):
     """Tool adapter wrapping an async function returning multimodal content."""
 
     __slots__ = (
@@ -35,7 +37,7 @@ class CoroutineTool[**Args](Function[Args, Coroutine[None, None, Multimodal]]):
     def __init__(
         self,
         /,
-        function: Callable[Args, Coroutine[None, None, Multimodal]],
+        function: Callable[Args, Coroutine[None, None, Result]],
         *,
         name: str,
         description: str | None,
@@ -114,7 +116,7 @@ class CoroutineTool[**Args](Function[Args, Coroutine[None, None, Multimodal]]):
         *,
         name: str | None = None,
         description: str | None = None,
-        function: Callable[Args, Coroutine[None, None, Multimodal]] | None = None,
+        function: Callable[Args, Coroutine[None, None, Result]] | None = None,
         parameters: ModelToolParametersSpecification | None = None,
         handling: ModelToolHandling | None = None,
         meta: Meta | None = None,
@@ -324,28 +326,57 @@ class GeneratorTool[**Args](Function[Args, AsyncIterable[ToolOutputChunk]]):
 class FunctionToolWrapper(Protocol):
     """Decorator signature for wrapping a function into a tool adapter."""
 
+    @overload
     def __call__[**Args](
         self,
+        function: Callable[Args, AsyncIterable[ToolOutputChunk]],
+    ) -> GeneratorTool[Args]: ...
+
+    @overload
+    def __call__[**Args, Result: Multimodal](
+        self,
+        function: Callable[Args, Coroutine[None, None, Result]],
+    ) -> CoroutineTool[Args, Result]: ...
+
+    def __call__[**Args, Result: Multimodal = MultimodalContent](
+        self,
         function: Callable[Args, AsyncIterable[ToolOutputChunk]]
-        | Callable[Args, Coroutine[None, None, Multimodal]],
-    ) -> CoroutineTool[Args] | GeneratorTool[Args]:
-        """Wrap a single async callable as a configured tool."""
+        | Callable[Args, Coroutine[None, None, Result]],
+    ) -> CoroutineTool[Args, Result] | GeneratorTool[Args]:
+        """Wrap a single callable as a configured tool."""
         ...
 
 
 @overload
 def tool[**Args](
-    function: Callable[Args, AsyncIterable[ToolOutputChunk]]
-    | Callable[Args, Coroutine[None, None, Multimodal]],
+    function: Callable[Args, AsyncIterable[ToolOutputChunk]],
     /,
-) -> CoroutineTool[Args] | GeneratorTool[Args]:
-    """Wrap an async callable into a tool adapter with default settings.
+) -> GeneratorTool[Args]:
+    """Wrap a callable into a tool adapter with default settings.
 
     Parameters
     ----------
     function : Callable[Args, AsyncIterable[ToolOutputChunk]]
-        | Callable[Args, Coroutine[None, None, Multimodal]]
-        Async callable to expose as a tool.
+        Callable to expose as a tool.
+
+    Returns
+    -------
+    GeneratorTool[Args]
+        Tool instance with inferred name and inferred parameter schema.
+    """
+
+
+@overload
+def tool[**Args, Result: Multimodal](
+    function: Callable[Args, Coroutine[None, None, Result]],
+    /,
+) -> CoroutineTool[Args, Result]:
+    """Wrap a callable into a tool adapter with default settings.
+
+    Parameters
+    ----------
+    function : Callable[Args, Coroutine[None, None, Multimodal]]
+        Callable to expose as a tool.
 
     Returns
     -------
@@ -365,9 +396,9 @@ def tool(
 ) -> FunctionToolWrapper: ...
 
 
-def tool[**Args](
+def tool[**Args, Result: Multimodal = MultimodalContent](
     function: Callable[Args, AsyncIterable[ToolOutputChunk]]
-    | Callable[Args, Coroutine[None, None, Multimodal]]
+    | Callable[Args, Coroutine[None, None, Result]]
     | None = None,
     *,
     name: str | None = None,
@@ -375,7 +406,7 @@ def tool[**Args](
     parameters: ModelToolParametersSpecification | None = None,
     handling: ModelToolHandling = "response",
     meta: Meta | MetaValues | None = None,
-) -> FunctionToolWrapper | CoroutineTool[Args] | GeneratorTool[Args]:
+) -> FunctionToolWrapper | CoroutineTool[Args, Result] | GeneratorTool[Args]:
     """Create or configure a decorator that turns an async callable into a tool.
 
     Parameters
@@ -410,12 +441,22 @@ def tool[**Args](
         async generator function.
     """
 
+    @overload
     def wrap[**Arg](
+        function: Callable[Arg, AsyncIterable[ToolOutputChunk]],
+    ) -> GeneratorTool[Arg]: ...
+
+    @overload
+    def wrap[**Arg, Res: Multimodal](
+        function: Callable[Arg, Coroutine[None, None, Res]],
+    ) -> CoroutineTool[Arg, Res]: ...
+
+    def wrap[**Arg, Res: Multimodal = MultimodalContent](
         function: Callable[Arg, AsyncIterable[ToolOutputChunk]]
-        | Callable[Arg, Coroutine[None, None, Multimodal]],
-    ) -> CoroutineTool[Arg] | GeneratorTool[Arg]:
+        | Callable[Arg, Coroutine[None, None, Res]],
+    ) -> CoroutineTool[Arg, Res] | GeneratorTool[Arg]:
         if iscoroutinefunction(unwrap(function)):
-            return CoroutineTool[Arg](
+            return CoroutineTool[Arg, Res](
                 function=function,  # pyright: ignore[reportArgumentType]
                 name=name or function.__name__,
                 description=description,
