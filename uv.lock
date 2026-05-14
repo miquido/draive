@@ -503,11 +503,12 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.106.2"
+version = "0.106.3"
 source = { editable = "." }
 dependencies = [
     { name = "haiway" },
     { name = "numpy" },
+    { name = "pyyaml" },
 ]
 
 [package.optional-dependencies]
@@ -637,6 +638,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = "~=9.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "~=1.2" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = "~=7.0" },
+    { name = "pyyaml", specifier = "~=6.0" },
     { name = "qdrant-client", marker = "extra == 'qdrant'", specifier = "~=1.17" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "~=0.15" },
     { name = "surrealdb", marker = "extra == 'surrealdb'", specifier = "~=2.0" },
