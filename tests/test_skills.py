@@ -129,11 +129,7 @@ async def test_skill_from_directory_supports_crlf_frontmatter(
     skill_root = tmp_path / "crlf-frontmatter"
     skill_root.mkdir(parents=True)
     (skill_root / "SKILL.md").write_text(
-        "---\r\n"
-        "name: crlf-skill\r\n"
-        "description: Works with Windows newlines.\r\n"
-        "---\r\n"
-        "# Body\r\n",
+        "---\r\nname: crlf-skill\r\ndescription: Works with Windows newlines.\r\n---\r\n# Body\r\n",
         encoding="utf-8",
         newline="",
     )
@@ -152,11 +148,7 @@ async def test_skill_from_directory_raises_value_error_for_malformed_yaml(
     skill_root = tmp_path / "malformed-frontmatter"
     skill_root.mkdir(parents=True)
     (skill_root / "SKILL.md").write_text(
-        "---\n"
-        "name: [\n"
-        "description: invalid yaml\n"
-        "---\n"
-        "# Body\n",
+        "---\nname: [\ndescription: invalid yaml\n---\n# Body\n",
         encoding="utf-8",
     )
 
@@ -172,9 +164,7 @@ async def test_skill_from_directory_raises_value_error_for_empty_frontmatter(
     skill_root = tmp_path / "empty-frontmatter"
     skill_root.mkdir(parents=True)
     (skill_root / "SKILL.md").write_text(
-        "---\n"
-        "---\n"
-        "# Body\n",
+        "---\n---\n# Body\n",
         encoding="utf-8",
     )
 

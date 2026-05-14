@@ -1,11 +1,17 @@
 from typing import Final, cast
 
 from draive.evaluation import EvaluationScore, EvaluationScoreValue
+from draive.models import (
+    ModelContext,
+    ModelOutput,
+    ModelToolRequest,
+)
 from draive.multimodal import MultimodalContent, MultimodalTag
 
 __all__ = (
     "FORMAT_INSTRUCTION",
     "extract_evaluation_result",
+    "model_context_multimodal",
 )
 
 COMMENT_TAG_NAME: Final[str] = "comment"
@@ -55,3 +61,31 @@ def extract_evaluation_result(
 
     except Exception as exc:
         raise ValueError(f"Invalid evaluator result - {exc}:\n{content}") from exc
+
+
+def model_context_multimodal(
+    context: ModelContext,
+    /,
+) -> MultimodalContent:
+    parts: list[str | MultimodalContent] = []
+    for index, element in enumerate(context, start=1):
+        if isinstance(element, ModelOutput):
+            parts.append(f"\n<CONTEXT_ELEMENT index='{index}' role='model'>")
+            for block in element.output:
+                if isinstance(block, MultimodalContent):
+                    parts.append(block)
+                elif isinstance(block, ModelToolRequest):
+                    parts.append(f"<TOOL_CALL tool='{block.tool}'/>")
+                # ModelReasoning intentionally skipped
+            parts.append("</CONTEXT_ELEMENT>")
+        else:  # ModelInput
+            parts.append(f"\n<CONTEXT_ELEMENT index='{index}' role='user'>")
+            for block in element.input:
+                if isinstance(block, MultimodalContent):
+                    parts.append(block)
+                else:
+                    parts.append(f"<TOOL_RESPONSE tool='{block.tool}' status='{block.status}'>")
+                    parts.append(block.content)
+                    parts.append("</TOOL_RESPONSE>")
+            parts.append("</CONTEXT_ELEMENT>")
+    return MultimodalContent.of(*parts)
