@@ -39,11 +39,7 @@ async def test_skill_from_directory_skips_symlinked_resources(tmp_path: Path) ->
     outside.write_text("secret", encoding="utf-8")
 
     (skill_root / "SKILL.md").write_text(
-        "---\n"
-        "name: safe-skill\n"
-        "description: Valid description.\n"
-        "---\n"
-        "content\n",
+        "---\nname: safe-skill\ndescription: Valid description.\n---\ncontent\n",
         encoding="utf-8",
     )
 

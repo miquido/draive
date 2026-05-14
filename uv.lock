@@ -94,7 +94,7 @@ wheels = [
 
 [[package]]
 name = "anthropic"
-version = "0.101.0"
+version = "0.102.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -106,9 +106,9 @@ dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b5/cb/9d0123243e749ac3a579972b2c398971bce1dc57bcc4efb08066df610360/anthropic-0.101.0.tar.gz", hash = "sha256:1116a6a87c55757e0fbe3e1ba40804fbd04de7963601a6dd6b539a889f18de3e", size = 758603, upload-time = "2026-05-11T15:46:33.944Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b9/47/cb2a71f70431fb09af4db83e3ea89eb2dd8e0e348d27af53ed32e6c599dd/anthropic-0.102.0.tar.gz", hash = "sha256:96f747cad11886c4ae12d4080131b94eebd68b202bd2190fe27959031bb1fa9c", size = 763697, upload-time = "2026-05-13T18:12:41.624Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f1/b2/74ff06762d005ecf1658929a292df0acb786d025f6a6c54fcb30e2dc7761/anthropic-0.101.0-py3-none-any.whl", hash = "sha256:cc3cc6576989471e2aa9132258034ad0ff0d8fe500b04ac499e4e46ed68c5ed0", size = 753594, upload-time = "2026-05-11T15:46:32.216Z" },
+    { url = "https://files.pythonhosted.org/packages/87/75/0f6c603594876413bc858a00e7cc0d80a0cc14edf5c7b959a3ea6ec45e44/anthropic-0.102.0-py3-none-any.whl", hash = "sha256:ab96540bbd4b0f36564252d955a86f8abbe4f00944a24bc9931acc9b139bab6f", size = 763070, upload-time = "2026-05-13T18:12:43.474Z" },
 ]
 
 [package.optional-dependencies]
@@ -229,30 +229,30 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.43.6"
+version = "1.43.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0a/37/78c630d1308964aa9abf44951d9c4df776546ff37251ec2434944e205c4e/boto3-1.43.6.tar.gz", hash = "sha256:e6315effaf12b890b99956e6f8e2c3000a3f64e4ee91943cec3895ce9a836afb", size = 113153, upload-time = "2026-05-07T20:49:59.694Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/0d/67ebf496fe061397f7eb907504e950fe6d2fa5945fd05891f3033376e471/boto3-1.43.7.tar.gz", hash = "sha256:b1e4b40f4a828c67291b12ebefd17d87a57321101e4a0c969b2f593a0310f343", size = 113170, upload-time = "2026-05-13T19:35:48.556Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/e2/3c2eef44f55eafab256836d1d9479bd6a74f70c26cbfdc0639a0e23e4327/boto3-1.43.6-py3-none-any.whl", hash = "sha256:179601ec2992726a718053bf41e43c223ceba397d31ceab11f64d9c910d9fc3a", size = 140502, upload-time = "2026-05-07T20:49:57.8Z" },
+    { url = "https://files.pythonhosted.org/packages/40/87/68fdfc7eaed69c4c77de1b9f1ddbd52e529510161baf9b2bf863be07aad1/boto3-1.43.7-py3-none-any.whl", hash = "sha256:7060f603ca0f645153ee2244506db4db5968a858cd513399d8df70637c362159", size = 140524, upload-time = "2026-05-13T19:35:44.879Z" },
 ]
 
 [[package]]
 name = "botocore"
-version = "1.43.6"
+version = "1.43.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jmespath" },
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/79/a7/23d0f5028011455096a1eeac0ddf3cbe147b3e855e127342f8202552194d/botocore-1.43.6.tar.gz", hash = "sha256:b1e395b347356860398da42e61c808cf1e34b6fa7180cf2b9d87d986e1a06ba0", size = 15336070, upload-time = "2026-05-07T20:49:48.14Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ed/be/59144884fa71908e2ac389cfe0fd2ebe8e8adb47bcc994188eb59967406a/botocore-1.43.7.tar.gz", hash = "sha256:abbbc623c52dce86ea9d4534d35e2d6ce447d98edfdaced1695ee0278d6063e3", size = 15350131, upload-time = "2026-05-13T19:35:33.106Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/c8/6f47223840e8d8cfa8c9f7c0ec1b77970417f257fc885169ff4f6326ce09/botocore-1.43.6-py3-none-any.whl", hash = "sha256:b6d1fdbc6f65a5fe0b7e947823aa37535d3f39f3ba4d21110fab1f55bbbcc04b", size = 15017094, upload-time = "2026-05-07T20:49:44.964Z" },
+    { url = "https://files.pythonhosted.org/packages/19/f3/a9beaae1cda959fa438b3937fc995d82b2a08cb117c67c31547580f19849/botocore-1.43.7-py3-none-any.whl", hash = "sha256:e93f25dc186a9de033c87128c0f2016aedd74aea9057d918bfc0703a946b1ad1", size = 15031637, upload-time = "2026-05-13T19:35:27.288Z" },
 ]
 
 [[package]]
@@ -503,7 +503,7 @@ wheels = [
 
 [[package]]
 name = "draive"
-version = "0.106.1"
+version = "0.106.2"
 source = { editable = "." }
 dependencies = [
     { name = "haiway" },
@@ -600,7 +600,7 @@ requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = "~=0.75" },
     { name = "anthropic", extras = ["bedrock"], marker = "extra == 'anthropic-bedrock'", specifier = "~=0.75" },
     { name = "asyncpg", marker = "extra == 'postgres'" },
-    { name = "bandit", marker = "extra == 'dev'", specifier = "~=1.8" },
+    { name = "bandit", marker = "extra == 'dev'", specifier = "~=1.9" },
     { name = "boto3", marker = "extra == 'aws'", specifier = "~=1.41" },
     { name = "boto3", marker = "extra == 'bedrock'", specifier = "~=1.41" },
     { name = "boto3", marker = "extra == 'cohere-bedrock'", specifier = "~=1.41" },
@@ -608,7 +608,7 @@ requires-dist = [
     { name = "cohere", marker = "extra == 'cohere-bedrock'", specifier = "~=5.20" },
     { name = "google-api-core", marker = "extra == 'gemini'" },
     { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=1.50" },
-    { name = "haiway", specifier = "~=0.51.0" },
+    { name = "haiway", specifier = "~=0.51.1" },
     { name = "haiway", extras = ["httpx"], marker = "extra == 'httpx'" },
     { name = "haiway", extras = ["opentelemetry"], marker = "extra == 'opentelemetry'" },
     { name = "haiway", extras = ["postgres"], marker = "extra == 'postgres'" },
@@ -634,7 +634,7 @@ requires-dist = [
     { name = "pika", marker = "extra == 'rabbitmq'" },
     { name = "pymarkdownlnt", marker = "extra == 'docs'", specifier = "~=0.9" },
     { name = "pyright", marker = "extra == 'dev'", specifier = "~=1.1" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = "~=8.4" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = "~=9.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "~=1.2" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = "~=7.0" },
     { name = "qdrant-client", marker = "extra == 'qdrant'", specifier = "~=1.17" },
@@ -864,14 +864,14 @@ wheels = [
 
 [[package]]
 name = "haiway"
-version = "0.51.0"
+version = "0.51.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/42/50/a117275ea98678d62f5f84dcf774d29c0a72b83a88263fae82b516eaedd5/haiway-0.51.0.tar.gz", hash = "sha256:396809cfa038e01facaa2c4a5c944a23558601badee211aac336efd56f4266dd", size = 117331, upload-time = "2026-05-08T08:02:04.036Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/96/7a/229fbe259bce07a16fa81924c03a89831aa503c063419171cbbb93f0eaf4/haiway-0.51.2.tar.gz", hash = "sha256:1e74c9df2bea35a2f07058fdec7eeb1e2af13015de5c811fccc932d769b5d984", size = 117586, upload-time = "2026-05-14T10:53:37.087Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/a3/2387640b3f28daa76d490407ba29ca237f0c3557bc8d902839880b809347/haiway-0.51.0-py3-none-any.whl", hash = "sha256:558203862697b67ca9a0f89539486f4a790e7b12545eda0f50de5eac6f9389d6", size = 148860, upload-time = "2026-05-08T08:02:02.703Z" },
+    { url = "https://files.pythonhosted.org/packages/35/e9/18d606fa1676f73a199fa36b6d215ec4246c68e9d836bb9a6f6f30ef9834/haiway-0.51.2-py3-none-any.whl", hash = "sha256:05e3de098dd95b59002c4712625b1e7717c7472deff7d4c2fc977b77d06749fe", size = 148990, upload-time = "2026-05-14T10:53:35.603Z" },
 ]
 
 [package.optional-dependencies]
@@ -2008,15 +2008,15 @@ wheels = [
 
 [[package]]
 name = "pymdown-extensions"
-version = "10.21.2"
+version = "10.21.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdown" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/df/08/f1c908c581fd11913da4711ea7ba32c0eee40b0190000996bb863b0c9349/pymdown_extensions-10.21.2.tar.gz", hash = "sha256:c3f55a5b8a1d0edf6699e35dcbea71d978d34ff3fa79f3d807b8a5b3fa90fbdc", size = 853922, upload-time = "2026-03-29T15:01:55.233Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9e/26/d1015444da4d952a1ca487a236b522eb979766f0295a0bd0c5fc089989a9/pymdown_extensions-10.21.3.tar.gz", hash = "sha256:72cfcf55f07aea0d4af2c4f11dd4e52466ddfb1bb819673146398e0bd3a77354", size = 854140, upload-time = "2026-05-13T12:57:32.267Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f7/27/a2fc51a4a122dfd1015e921ae9d22fee3d20b0b8080d9a704578bf9deece/pymdown_extensions-10.21.2-py3-none-any.whl", hash = "sha256:5c0fd2a2bea14eb39af8ff284f1066d898ab2187d81b889b75d46d4348c01638", size = 268901, upload-time = "2026-03-29T15:01:53.244Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/85/545a951eecc270fcd688288c600017e2050a1aacb56c711d208586d3e470/pymdown_extensions-10.21.3-py3-none-any.whl", hash = "sha256:d7a5d08014fc571e80ca21dd6f854e31f94c489800350564d55d15b3c41e76b6", size = 269002, upload-time = "2026-05-13T12:57:30.296Z" },
 ]
 
 [[package]]
@@ -2043,7 +2043,7 @@ wheels = [
 
 [[package]]
 name = "pytest"
-version = "8.4.2"
+version = "9.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
@@ -2052,9 +2052,9 @@ dependencies = [
     { name = "pluggy" },
     { name = "pygments" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a3/5c/00a0e072241553e1a7496d638deababa67c5058571567b92a7eaa258397c/pytest-8.4.2.tar.gz", hash = "sha256:86c0d0b93306b961d58d62a4db4879f27fe25513d4b969df351abdddb3c30e01", size = 1519618, upload-time = "2025-09-04T14:34:22.711Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7d/0d/549bd94f1a0a402dc8cf64563a117c0f3765662e2e668477624baeec44d5/pytest-9.0.3.tar.gz", hash = "sha256:b86ada508af81d19edeb213c681b1d48246c1a91d304c6c81a427674c17eb91c", size = 1572165, upload-time = "2026-04-07T17:16:18.027Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a8/a4/20da314d277121d6534b3a980b29035dcd51e6744bd79075a6ce8fa4eb8d/pytest-8.4.2-py3-none-any.whl", hash = "sha256:872f880de3fc3a5bdc88a11b39c9710c3497a547cfa9320bc3c5e62fbf272e79", size = 365750, upload-time = "2025-09-04T14:34:20.226Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/24/a372aaf5c9b7208e7112038812994107bc65a84cd00e0354a88c2c77a617/pytest-9.0.3-py3-none-any.whl", hash = "sha256:2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9", size = 375249, upload-time = "2026-04-07T17:16:16.13Z" },
 ]
 
 [[package]]
@@ -2194,7 +2194,7 @@ wheels = [
 
 [[package]]
 name = "requests"
-version = "2.34.0"
+version = "2.34.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -2202,9 +2202,9 @@ dependencies = [
     { name = "idna" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/43/b8/7a707d60fea4c49094e40262cc0e2ca6c768cca21587e34d3f705afec47e/requests-2.34.0.tar.gz", hash = "sha256:7d62fe92f50eb82c529b0916bb445afa1531a566fc8f35ffdc64446e771b856a", size = 142436, upload-time = "2026-05-11T19:29:51.717Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/24/36/7180e7f077c38108945dbbdf60fe04db681c3feb6e96419f8c6dc8723741/requests-2.34.1.tar.gz", hash = "sha256:0fc5669f2b69704449fe1552360bd2a73a54512dfd03e65529157f1513322beb", size = 142783, upload-time = "2026-05-13T19:20:24.662Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ef/e6/e300fce5fe83c30520607a015dabd985df3251e188d234bfe9492e17a389/requests-2.34.0-py3-none-any.whl", hash = "sha256:917520a21b767485ce7c588f4ebb917c436b24a31231b44228715eaeb5a52c60", size = 73021, upload-time = "2026-05-11T19:29:49.923Z" },
+    { url = "https://files.pythonhosted.org/packages/15/5a/4a949d170476de3c04ac036b5466422fbcbf348a917d8042eedf2cac7d1b/requests-2.34.1-py3-none-any.whl", hash = "sha256:bf38a3ff993960d3dd819c08862c40b3c703306eb7c744fcd9f4ddbb95b548f0", size = 73085, upload-time = "2026-05-13T19:20:22.827Z" },
 ]
 
 [[package]]

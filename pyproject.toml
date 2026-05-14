@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.106.1"
+version = "0.106.2"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },
@@ -24,7 +24,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 license = { file = "LICENSE" }
-dependencies = ["numpy~=2.3", "haiway~=0.51.0"]
+dependencies = ["numpy~=2.3", "haiway~=0.51.1"]
 
 [project.urls]
 Homepage = "https://miquido.com"
@@ -56,9 +56,9 @@ rabbitmq = ["haiway[rabbitmq]", "pika"]
 qdrant = ["qdrant-client~=1.17"]
 surrealdb = ["surrealdb~=2.0"]
 dev = [
-  "bandit~=1.8",
+  "bandit~=1.9",
   "pyright~=1.1",
-  "pytest~=8.4",
+  "pytest~=9.0",
   "pytest-asyncio~=1.2",
   "pytest-cov~=7.0",
   "ruff~=0.15",
