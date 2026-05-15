@@ -23,6 +23,7 @@ from google.genai.types import (
     Modality,
     Part,
     PartDict,
+    ThinkingLevel,
     Transcription,
 )
 from haiway import MISSING, Meta, as_dict, ctx
@@ -416,6 +417,33 @@ class GeminiLive(GeminiAPI):
         )
 
 
+def _resolve_thinking_level(level: str) -> ThinkingLevel:
+    match level:
+        case "minimal":
+            return ThinkingLevel.MINIMAL
+        case "low":
+            return ThinkingLevel.LOW
+        case "medium":
+            return ThinkingLevel.MEDIUM
+        case "high":
+            return ThinkingLevel.HIGH
+        case _:
+            raise ValueError(f"Unsupported thinking level: {level}")
+
+
+def _resolve_media_resolution(config: GeminiConfig) -> MediaResolution | None:
+    if config.media_resolution is MISSING:
+        return None
+    elif config.media_resolution == "low":
+        return MediaResolution.MEDIA_RESOLUTION_LOW
+    elif config.media_resolution == "medium":
+        return MediaResolution.MEDIA_RESOLUTION_MEDIUM
+    elif config.media_resolution == "high":
+        return MediaResolution.MEDIA_RESOLUTION_HIGH
+    else:
+        raise ValueError(f"Unsupported media resolution: {config.media_resolution}")
+
+
 def _live_connect_config(
     *,
     instructions: ModelInstructions,
@@ -431,11 +459,11 @@ def _live_connect_config(
         "history_config": {
             "initial_history_in_client_content": True,
         },
-        "context_window_compression": {
-            "sliding_window": {},
-        },
         "seed": unwrap_missing(config.seed),
     }
+
+    if config.context_window_compression is True:
+        live_config["context_window_compression"] = {"sliding_window": {}}
 
     if instructions:
         live_config["system_instruction"] = instructions
@@ -461,25 +489,17 @@ def _live_connect_config(
             }
         ]
 
-    if config.media_resolution is MISSING:
-        pass  # skip missing
-
-    elif config.media_resolution == "low":
-        live_config["media_resolution"] = MediaResolution.MEDIA_RESOLUTION_LOW
-
-    elif config.media_resolution == "medium":
-        live_config["media_resolution"] = MediaResolution.MEDIA_RESOLUTION_MEDIUM
-
-    elif config.media_resolution == "high":
-        live_config["media_resolution"] = MediaResolution.MEDIA_RESOLUTION_HIGH
-
-    else:
-        raise ValueError(f"Unsupported media resolution: {config.media_resolution}")
+    if resolution := _resolve_media_resolution(config):
+        live_config["media_resolution"] = resolution
 
     if speech := speech_config(config):
         live_config["speech_config"] = speech
 
-    if config.thinking_budget is not MISSING:
+    if config.thinking_level is not MISSING:
+        live_config["thinking_config"] = {
+            "thinking_level": _resolve_thinking_level(cast(str, config.thinking_level)),
+        }
+    elif config.thinking_budget is not MISSING:
         live_config["thinking_config"] = {
             "include_thoughts": True,
             "thinking_budget": cast(int, config.thinking_budget),

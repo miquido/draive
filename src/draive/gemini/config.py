@@ -40,6 +40,8 @@ class GeminiConfig(Configuration):
     speech_language_code: str | Missing = MISSING
     media_resolution: Literal["low", "medium", "high"] | Missing = MISSING
     thinking_budget: int | Missing = MISSING
+    thinking_level: Literal["minimal", "low", "medium", "high"] | Missing = MISSING
+    context_window_compression: bool | Missing = MISSING
     safety: GeminiSafetyConfig | Missing = MISSING
 
 
