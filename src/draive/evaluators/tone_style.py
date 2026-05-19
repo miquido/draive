@@ -132,7 +132,7 @@ async def tone_style_context_evaluator(
                         expected_tone_style,
                         "</EXPECTED_TONE_STYLE>\n<EVALUATED>",
                         model_context_multimodal(evaluated),
-                        "\n</EVALUATED>",
+                        "</EVALUATED>",
                     ),
                 ),
             )

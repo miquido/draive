@@ -13,6 +13,7 @@ from draive.steps import Step
 async def readability_evaluator(
     evaluated: Multimodal,
     /,
+    *,
     guidelines: str | None = None,
 ) -> EvaluationScore:
     """
@@ -59,6 +60,7 @@ async def readability_evaluator(
 async def readability_context_evaluator(
     evaluated: ModelContext,
     /,
+    *,
     guidelines: str | None = None,
 ) -> EvaluationScore:
     """

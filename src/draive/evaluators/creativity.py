@@ -13,6 +13,7 @@ from draive.steps import Step
 async def creativity_evaluator(
     evaluated: Multimodal,
     /,
+    *,
     guidelines: str | None = None,
 ) -> EvaluationScore:
     """
@@ -68,6 +69,7 @@ async def creativity_evaluator(
 async def creativity_context_evaluator(
     evaluated: ModelContext,
     /,
+    *,
     guidelines: str | None = None,
 ) -> EvaluationScore:
     """

@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "draive"
 description = "Framework designed to simplify and accelerate the development of LLM-based applications."
-version = "0.106.4"
+version = "0.106.5"
 readme = "README.md"
 maintainers = [
   { name = "Kacper Kaliński", email = "kacper.kalinski@miquido.com" },

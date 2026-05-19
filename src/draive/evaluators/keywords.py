@@ -159,14 +159,14 @@ async def forbidden_keywords_evaluator(
     """
     if not evaluated:
         return EvaluationScore.of(
-            0.0,
-            meta={"comment": "Input was empty!"},
+            1.0,
+            meta={"comment": "Input was empty - no forbidden keywords present."},
         )
 
     if not keywords:
         return EvaluationScore.of(
-            0.0,
-            meta={"comment": "Keywords list was empty!"},
+            1.0,
+            meta={"comment": "Keywords list was empty - no forbidden keywords to check."},
         )
 
     text_normalization: Callable[[str], str]
@@ -217,14 +217,14 @@ async def forbidden_keywords_context_evaluator(
     """
     if not evaluated:
         return EvaluationScore.of(
-            0.0,
-            meta={"comment": "Input context was empty!"},
+            1.0,
+            meta={"comment": "Input context was empty - no forbidden keywords present."},
         )
 
     if not keywords:
         return EvaluationScore.of(
-            0.0,
-            meta={"comment": "Keywords list was empty!"},
+            1.0,
+            meta={"comment": "Keywords list was empty - no forbidden keywords to check."},
         )
 
     text_normalization: Callable[[str], str]

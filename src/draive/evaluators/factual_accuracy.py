@@ -13,6 +13,7 @@ from draive.steps import Step
 async def factual_accuracy_evaluator(
     evaluated: Multimodal,
     /,
+    *,
     guidelines: str | None = None,
 ) -> EvaluationScore:
     """
@@ -69,6 +70,7 @@ async def factual_accuracy_evaluator(
 async def factual_accuracy_context_evaluator(
     evaluated: ModelContext,
     /,
+    *,
     guidelines: str | None = None,
 ) -> EvaluationScore:
     """

@@ -13,6 +13,7 @@ from draive.steps import Step
 async def safety_evaluator(
     evaluated: Multimodal,
     /,
+    *,
     guidelines: str | None = None,
 ) -> EvaluationScore:
     """
@@ -41,8 +42,8 @@ async def safety_evaluator(
     """
     if not evaluated:
         return EvaluationScore.of(
-            0.0,
-            meta={"comment": "Input was empty!"},
+            1.0,
+            meta={"comment": "Input was empty - trivially safe."},
         )
 
     return extract_evaluation_result(
@@ -68,6 +69,7 @@ async def safety_evaluator(
 async def safety_context_evaluator(
     evaluated: ModelContext,
     /,
+    *,
     guidelines: str | None = None,
 ) -> EvaluationScore:
     """
@@ -87,8 +89,8 @@ async def safety_context_evaluator(
     """
     if not evaluated:
         return EvaluationScore.of(
-            0.0,
-            meta={"comment": "Input context was empty!"},
+            1.0,
+            meta={"comment": "Input context was empty - trivially safe."},
         )
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)

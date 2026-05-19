@@ -144,9 +144,11 @@ Evaluated metric is similarity - the degree of semantic similarity between the R
 {{guidelines}}
 <RATING>
 Assign a similarity score using the exact name of one of the following values:
-- "poor" is very low similarity; the content is completely unrelated in meaning.
-- "good" is moderate similarity; the content shares some common themes or ideas.
-- "perfect" is very high similarity; the content is very close in meaning or conveys the same information.
+- "poor" is very low similarity, the content is completely unrelated in meaning.
+- "fair" is low similarity, the content shares only superficial overlap with notable divergence in meaning.
+- "good" is moderate similarity, the content shares common themes or ideas with some meaningful differences.
+- "excellent" is high similarity, the content conveys closely related meaning with only minor divergences.
+- "perfect" is very high similarity, the content is very close in meaning or conveys essentially the same information.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 
@@ -174,14 +176,19 @@ async def text_vector_similarity_evaluator(
     Returns
     -------
     float
-        Evaluation result.
+        Evaluation result clipped to [0.0, 1.0].
     """
+    if not evaluated or not reference:
+        return 0.0
+
     embedding: Sequence[Embedded[str]] = await TextEmbedding.embed_many([reference, evaluated])
 
-    return vector_similarity_score(
+    similarity: float = vector_similarity_score(
         value_vector=embedding[0].vector,
         reference_vector=embedding[1].vector,
     )
+
+    return max(0.0, min(1.0, similarity))
 
 
 @evaluator(name="image_vector_similarity")
@@ -204,7 +211,7 @@ async def image_vector_similarity_evaluator(
     Returns
     -------
     float
-        Evaluation result.
+        Evaluation result clipped to [0.0, 1.0].
     """
     evaluated_data: bytes
     match evaluated:
@@ -222,14 +229,19 @@ async def image_vector_similarity_evaluator(
         case raw_data:
             reference_data = raw_data
 
+    if not evaluated_data or not reference_data:
+        return 0.0
+
     embedding: Sequence[Embedded[bytes]] = await ImageEmbedding.embed_many(
         [reference_data, evaluated_data]
     )
 
-    return vector_similarity_score(
+    similarity: float = vector_similarity_score(
         value_vector=embedding[0].vector,
         reference_vector=embedding[1].vector,
     )
+
+    return max(0.0, min(1.0, similarity))
 
 
 CONTEXT_INSTRUCTION: str = f"""\
@@ -249,9 +261,11 @@ Assess the degree of semantic similarity between model outputs and the reference
 {{guidelines}}
 <RATING>
 Assign a similarity score using the exact name of one of the following values:
-- "poor" is very low similarity; model outputs are completely unrelated in meaning to the reference or to one another.
-- "good" is moderate similarity; model outputs share some common themes or ideas with the reference or among themselves.
-- "perfect" is very high similarity; model outputs are very close in meaning or convey the same information as the reference.
+- "poor" is very low similarity, model outputs are completely unrelated in meaning to the reference or to one another.
+- "fair" is low similarity, model outputs share only superficial overlap with notable divergence in meaning.
+- "good" is moderate similarity, model outputs share common themes or ideas with some meaningful differences.
+- "excellent" is high similarity, model outputs convey closely related meaning with only minor divergences.
+- "perfect" is very high similarity, model outputs are very close in meaning or convey essentially the same information as the reference.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 

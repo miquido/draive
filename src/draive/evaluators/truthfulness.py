@@ -14,7 +14,7 @@ async def truthfulness_evaluator(
     evaluated: Multimodal,
     /,
     *,
-    reference: Multimodal,
+    reference: Multimodal | None = None,
     guidelines: str | None = None,
 ) -> EvaluationScore:
     """
@@ -24,8 +24,9 @@ async def truthfulness_evaluator(
     ----------
     evaluated : Multimodal
         Evaluator input parameter.
-    reference : Multimodal
-        Evaluator input parameter.
+    reference : Multimodal | None
+        Optional supplemental reference used as additional context;
+        truthfulness is judged against established knowledge regardless of source.
     guidelines : str | None
         Evaluator input parameter.
 
@@ -40,10 +41,19 @@ async def truthfulness_evaluator(
             meta={"comment": "Input was empty!"},
         )
 
-    if not reference:
-        return EvaluationScore.of(
-            0.0,
-            meta={"comment": "Reference was empty!"},
+    input_content: MultimodalContent = MultimodalContent.of(
+        "<EVALUATED>",
+        evaluated,
+        "</EVALUATED>",
+    )
+
+    if reference:
+        input_content = MultimodalContent.of(
+            "<REFERENCE>",
+            reference,
+            "</REFERENCE>\n<EVALUATED>",
+            evaluated,
+            "</EVALUATED>",
         )
 
     return extract_evaluation_result(
@@ -51,19 +61,7 @@ async def truthfulness_evaluator(
             instructions=CONTENT_INSTRUCTION.format(
                 guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
             ),
-        ).run(
-            (
-                ModelInput.of(
-                    MultimodalContent.of(
-                        "<REFERENCE>",
-                        reference,
-                        "</REFERENCE>\n<EVALUATED>",
-                        evaluated,
-                        "</EVALUATED>",
-                    ),
-                ),
-            )
-        )
+        ).run((ModelInput.of(input_content),))
     )
 
 
@@ -128,13 +126,14 @@ CONTENT_INSTRUCTION: str = f"""\
 You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
-Compare the REFERENCE and the EVALUATED content by carefully examining them, then rate the EVALUATED content using solely a truthfulness (factual accuracy) metric according to the EVALUATION_CRITERIA.
+Carefully examine the EVALUATED content and rate it using solely a truthfulness metric according to the EVALUATION_CRITERIA.
+When REFERENCE is provided, treat it as supplemental context that can help interpret claims, but truthfulness is judged against established knowledge - not entailment by the reference.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
-Evaluated metric is truthfulness (factual accuracy) - this metric evaluates the factual correctness of the content, regardless of its relation to the source material. Truthfulness is concerned with whether the information presented is accurate in the broader context, ensuring that the facts are correct and reliable, and that the content does not perpetuate errors or falsehoods. This metric is more concerned with the overall factual integrity of the content, meaning that even if a claim is not directly traceable to the provided source, it must still be correct and represent the truth of the matter. Truthfulness is about the correctness of the facts themselves, not just their alignment with a specific source.
+Evaluated metric is truthfulness - the factual correctness of the content judged against established knowledge, verifiable facts, scientific consensus, and reliable real-world information. Truthfulness is concerned with whether claims are correct in the broader context, regardless of any provided source material. Even claims not traceable to a reference must still be accurate and not perpetuate errors or falsehoods.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
@@ -154,8 +153,8 @@ CONTEXT_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess their factual truthfulness.
-When REFERENCE is explicitly provided, evaluate model outputs for truthfulness against it; otherwise assess whether model outputs present factually correct and reliable information based on established knowledge.
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess their factual truthfulness according to the EVALUATION_CRITERIA.
+When REFERENCE is provided, treat it as supplemental context that can help interpret claims, but judge truthfulness against established knowledge—not by entailment from the reference.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>

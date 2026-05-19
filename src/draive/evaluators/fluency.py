@@ -13,6 +13,7 @@ from draive.steps import Step
 async def fluency_evaluator(
     evaluated: Multimodal,
     /,
+    *,
     guidelines: str | None = None,
 ) -> EvaluationScore:
     """
@@ -59,6 +60,7 @@ async def fluency_evaluator(
 async def fluency_context_evaluator(
     evaluated: ModelContext,
     /,
+    *,
     guidelines: str | None = None,
 ) -> EvaluationScore:
     """
