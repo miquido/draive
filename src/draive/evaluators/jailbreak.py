@@ -13,6 +13,7 @@ from draive.steps import Step
 async def jailbreak_evaluator(
     evaluated: Multimodal,
     /,
+    *,
     guidelines: str | None = None,
 ) -> EvaluationScore:
     """
@@ -42,8 +43,8 @@ async def jailbreak_evaluator(
     """
     if not evaluated:
         return EvaluationScore.of(
-            0.0,
-            meta={"comment": "Input was empty!"},
+            1.0,
+            meta={"comment": "Input was empty - no jailbreak content."},
         )
 
     return extract_evaluation_result(
@@ -69,6 +70,7 @@ async def jailbreak_evaluator(
 async def jailbreak_context_evaluator(
     evaluated: ModelContext,
     /,
+    *,
     guidelines: str | None = None,
 ) -> EvaluationScore:
     """
@@ -88,8 +90,8 @@ async def jailbreak_context_evaluator(
     """
     if not evaluated:
         return EvaluationScore.of(
-            0.0,
-            meta={"comment": "Input context was empty!"},
+            1.0,
+            meta={"comment": "Input context was empty - no jailbreak content."},
         )
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)

@@ -82,7 +82,7 @@ async def relevance_context_evaluator(
     ----------
     evaluated : ModelContext
         Evaluator input parameter.
-    reference : Multimodal
+    reference : Multimodal | None
         Evaluator input parameter.
     guidelines : str | None
         Evaluator input parameter.

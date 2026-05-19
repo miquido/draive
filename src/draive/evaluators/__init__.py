@@ -29,9 +29,11 @@ from draive.evaluators.similarity import (
     text_vector_similarity_evaluator,
 )
 from draive.evaluators.tone_style import tone_style_context_evaluator, tone_style_evaluator
+from draive.evaluators.tool_usage import ToolUsageRequirement, tool_usage_context_evaluator
 from draive.evaluators.truthfulness import truthfulness_context_evaluator, truthfulness_evaluator
 
 __all__ = (
+    "ToolUsageRequirement",
     "coherence_context_evaluator",
     "coherence_evaluator",
     "completeness_context_evaluator",
@@ -72,6 +74,7 @@ __all__ = (
     "text_vector_similarity_evaluator",
     "tone_style_context_evaluator",
     "tone_style_evaluator",
+    "tool_usage_context_evaluator",
     "truthfulness_context_evaluator",
     "truthfulness_evaluator",
 )

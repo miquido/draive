@@ -60,11 +60,11 @@ async def expectations_evaluator(
             (
                 ModelInput.of(
                     MultimodalContent.of(
-                        "<EVALUATED>",
-                        evaluated,
-                        "</EVALUATED>\n<EXPECTATIONS>",
+                        "<EXPECTATIONS>",
                         expectations,
-                        "</EXPECTATIONS>",
+                        "</EXPECTATIONS>\n<EVALUATED>",
+                        evaluated,
+                        "</EVALUATED>",
                     ),
                 ),
             )
@@ -118,11 +118,11 @@ async def expectations_context_evaluator(
             (
                 ModelInput.of(
                     MultimodalContent.of(
-                        "<EVALUATED>",
-                        model_context_multimodal(evaluated),
-                        "\n</EVALUATED>\n<EXPECTATIONS>",
+                        "<EXPECTATIONS>",
                         expectations,
-                        "</EXPECTATIONS>",
+                        "</EXPECTATIONS>\n<EVALUATED>",
+                        model_context_multimodal(evaluated),
+                        "</EVALUATED>",
                     ),
                 ),
             )
