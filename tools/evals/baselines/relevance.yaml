@@ -1,0 +1,847 @@
+evaluator: relevance
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED passage purely on topical relevance to REFERENCE.
+    Ignore accuracy, fluency, and style — judge only whether the content
+    stays on the reference's topic.
+  source: synthetic
+
+samples:
+  # ───────────── Sourdough bread at home ─────────────
+  - id: sourdough-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        How to make sourdough bread at home, from creating a starter to
+        baking the finished loaf.
+      evaluated: |
+        Begin by combining equal weights of flour and water in a jar and
+        leaving it loosely covered at room temperature. Discard half each
+        day and refresh with fresh flour and water; after about a week the
+        starter should double reliably between feedings. To bake, mix
+        active starter with bread flour, water, and salt and rest the dough
+        for half an hour. Perform a series of stretch-and-folds over the
+        next few hours, then shape the loaf and let it proof overnight in
+        the fridge. Score the chilled dough and bake it in a preheated
+        Dutch oven, lid on for the first twenty minutes and lid off until
+        the crust is deeply browned.
+
+  - id: sourdough-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        How to make sourdough bread at home, from creating a starter to
+        baking the finished loaf.
+      evaluated: |
+        Start by feeding a jar of flour and water daily until it doubles
+        on schedule — that's your starter. Sourdough has a long history,
+        and bakers in San Francisco famously kept starters alive through
+        the Gold Rush, but the same biology works in any modern kitchen.
+        Mix active starter with flour, water, and salt; rest, fold, shape,
+        and proof the dough overnight. The next morning, bake the loaf in
+        a covered Dutch oven so it traps steam and develops a glossy
+        crust, then finish uncovered until deeply browned.
+
+  - id: sourdough-good
+    human_score: good
+    inputs:
+      reference: |
+        How to make sourdough bread at home, from creating a starter to
+        baking the finished loaf.
+      evaluated: |
+        A sourdough starter is just flour and water with patience; feed it
+        daily until it reliably doubles. Mix the active starter with
+        flour, water, and salt to form a dough and let it ferment for
+        several hours with periodic folds. After that, the conversation
+        usually drifts to gear: bannetons in cane versus plastic, the
+        merits of different Dutch ovens, whether a lame is worth the
+        money, and which digital scale is least annoying to clean. People
+        also debate flour brands at length, and many bakers swear by
+        small Polish stoneground mills.
+
+  - id: sourdough-fair
+    human_score: fair
+    inputs:
+      reference: |
+        How to make sourdough bread at home, from creating a starter to
+        baking the finished loaf.
+      evaluated: |
+        Sourdough is one of many ways to leaven bread at home. Beyond it,
+        home bakers also work with commercial yeast for sandwich loaves,
+        baking soda and buttermilk for soda bread, and chemical leaveners
+        for quick breads like banana bread or cornbread. Each method has
+        its own rhythm and equipment list, and choosing between them often
+        comes down to how much time you have on a given day. Bread, in
+        general, rewards routine and patience more than expensive tools.
+
+  - id: sourdough-poor
+    human_score: poor
+    inputs:
+      reference: |
+        How to make sourdough bread at home, from creating a starter to
+        baking the finished loaf.
+      evaluated: |
+        Fresh pasta is best rolled the same day it is made. Combine
+        roughly one egg per hundred grams of flour, knead for ten minutes,
+        and let the dough rest under a bowl so the gluten relaxes. Pass it
+        repeatedly through a hand-cranked pasta machine, dropping a notch
+        at a time, until the sheet is thin enough to read a newspaper
+        through. Cut into ribbons, dust with semolina, and cook in
+        well-salted water for under two minutes.
+
+  # ───────────── Fixing a flat tire ─────────────
+  - id: flat-tire-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        How to change a flat tire on a passenger car using the spare,
+        jack, and lug wrench that come with the vehicle.
+      evaluated: |
+        Pull onto a level, firm surface, engage the parking brake, and
+        switch on the hazard lights. Take the spare, jack, and lug wrench
+        from the trunk. Before lifting the car, loosen each lug nut on
+        the flat tire by about a quarter turn — they are far harder to
+        break free once the wheel is in the air. Position the jack at the
+        manufacturer's lift point nearest the flat and raise the car
+        until the tire clears the ground. Remove the lug nuts, swap the
+        flat for the spare, and hand-tighten the nuts in a star pattern.
+        Lower the car back down and torque each nut firmly in the same
+        pattern. Stow the flat and tools, and drive at reduced speed to a
+        shop for repair.
+
+  - id: flat-tire-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        How to change a flat tire on a passenger car using the spare,
+        jack, and lug wrench that come with the vehicle.
+      evaluated: |
+        Move the car onto level ground, set the parking brake, and turn
+        on the hazards. Loosen each lug nut a quarter turn before
+        jacking. Most cars come with a compact "donut" spare rather than
+        a full-size one — these are speed-limited and meant only to get
+        you to a tire shop, which is worth knowing before you set off.
+        Place the jack under the proper lift point, raise the car, remove
+        the lug nuts, and swap in the spare. Tighten the nuts in a star
+        pattern, lower the car, and re-torque firmly before driving on.
+
+  - id: flat-tire-good
+    human_score: good
+    inputs:
+      reference: |
+        How to change a flat tire on a passenger car using the spare,
+        jack, and lug wrench that come with the vehicle.
+      evaluated: |
+        Park on a level surface and turn on the hazards before you start.
+        Crack the lug nuts loose with the wrench before lifting, then
+        jack the car at the proper lift point. While you are at it, it's
+        worth thinking about whether you should be running a tire-repair
+        kit instead of a spare; many new cars ship without a spare at
+        all, and sealant-and-compressor kits handle small punctures
+        faster than a wheel swap. Some drivers also keep a plug kit in
+        the glovebox for nail-sized punctures, which can be fixed without
+        removing the wheel.
+
+  - id: flat-tire-fair
+    human_score: fair
+    inputs:
+      reference: |
+        How to change a flat tire on a passenger car using the spare,
+        jack, and lug wrench that come with the vehicle.
+      evaluated: |
+        Tires are one of the most safety-critical parts of a car. Modern
+        passenger tires are rated for load, speed, and tread wear, and
+        the right choice depends on your climate and driving style.
+        All-season tires are a fine compromise for most owners, but
+        people in snowy regions are usually better off with a dedicated
+        winter set on a second set of wheels. Tire pressure also matters
+        a great deal for fuel economy and handling.
+
+  - id: flat-tire-poor
+    human_score: poor
+    inputs:
+      reference: |
+        How to change a flat tire on a passenger car using the spare,
+        jack, and lug wrench that come with the vehicle.
+      evaluated: |
+        A good roast chicken starts with a dry bird. Pat it thoroughly
+        with paper towels, salt it generously inside and out, and rest it
+        uncovered in the fridge for several hours so the skin dries out.
+        Roast at high heat on a rack so air circulates underneath. Let
+        the bird rest for fifteen minutes after coming out of the oven so
+        the juices redistribute before carving.
+
+  # ───────────── Choosing running shoes ─────────────
+  - id: running-shoes-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        How to choose running shoes that match your foot shape, gait, and
+        the kind of running you do.
+      evaluated: |
+        Start by thinking about where and how you run: short road runs,
+        long road runs, mixed trail and road, or technical trail all
+        point to different categories of shoe. Next, account for foot
+        shape — width, arch height, and how your foot lands during the
+        gait cycle. Visit a specialty running store if you can; staff
+        there will watch you jog, note whether your ankle rolls inward
+        or outward, and suggest neutral or stability models accordingly.
+        Try several pairs in your usual running socks, late in the day
+        when feet are slightly swollen, and leave roughly a thumb's
+        width of room at the toe. The right shoe should feel almost
+        invisible from the first stride.
+
+  - id: running-shoes-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        How to choose running shoes that match your foot shape, gait, and
+        the kind of running you do.
+      evaluated: |
+        Decide first what surface you'll be running on most of the time —
+        road and trail shoes are built quite differently. Then consider
+        your foot. Brands tend to specialize: one major brand is known
+        for roomy toe boxes, another for narrow heels, and the
+        differences matter more than marketing copy suggests. A gait
+        analysis at a specialty store will tell you whether you need
+        neutral or stability shoes. Always try shoes on later in the day
+        with your usual running socks, and leave thumb-width clearance
+        at the toe.
+
+  - id: running-shoes-good
+    human_score: good
+    inputs:
+      reference: |
+        How to choose running shoes that match your foot shape, gait, and
+        the kind of running you do.
+      evaluated: |
+        The right running shoe depends on your foot shape and where you
+        run. A gait analysis is helpful, and you should always try shoes
+        in your usual socks. That said, once you have the shoes, the
+        question becomes how to train. Most beginners benefit from a
+        run-walk progression, gradually replacing walking intervals with
+        running until they can cover three miles continuously. A weekly
+        long run, two easy runs, and at least one full rest day form a
+        sensible base.
+
+  - id: running-shoes-fair
+    human_score: fair
+    inputs:
+      reference: |
+        How to choose running shoes that match your foot shape, gait, and
+        the kind of running you do.
+      evaluated: |
+        Running is one of the most accessible sports there is — almost
+        anyone can start with a pair of shoes and a free half hour. The
+        bigger barriers are usually motivation and injury risk. Joining
+        a local club or finding a training partner helps with the first,
+        while easing into mileage helps with the second. Many beginners
+        also benefit from cross-training on a bike or in a pool to
+        reduce impact while building cardiovascular fitness.
+
+  - id: running-shoes-poor
+    human_score: poor
+    inputs:
+      reference: |
+        How to choose running shoes that match your foot shape, gait, and
+        the kind of running you do.
+      evaluated: |
+        Tomatoes are one of the most rewarding plants for a home
+        gardener. They thrive in full sun and well-drained soil, and
+        most varieties need at least six hours of direct light a day to
+        set fruit reliably. Indeterminate types keep growing and
+        producing all season but require staking, while determinate
+        types stay compact and ripen most of their fruit in a short
+        window.
+
+  # ───────────── Rules of chess ─────────────
+  - id: chess-rules-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The basic rules of chess: how each piece moves, how the game
+        ends, and the few special moves a beginner needs to know.
+      evaluated: |
+        Chess is played on an eight-by-eight board between two players,
+        White and Black, who alternate single moves. Pawns advance one
+        square forward, capture one square diagonally, and may step two
+        squares from their starting rank. Rooks slide any number of
+        squares along ranks and files; bishops slide along diagonals;
+        queens combine both. Knights leap in an L-shape and are the only
+        piece that can jump over others. The king moves one square in
+        any direction. The game ends when a king is in check and cannot
+        escape, which is checkmate. Beginners should also learn three
+        special moves: castling, en passant, and pawn promotion.
+
+  - id: chess-rules-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The basic rules of chess: how each piece moves, how the game
+        ends, and the few special moves a beginner needs to know.
+      evaluated: |
+        Chess pits two players against each other on a sixty-four square
+        board, each commanding sixteen pieces with distinct moves. Pawns
+        push forward and capture diagonally; rooks, bishops, and queens
+        slide along straight lines; knights leap; the king moves one
+        step at a time. The game's roots reach back to sixth-century
+        India, but the rules played today were largely settled by the
+        nineteenth century. A game ends in checkmate when the king has
+        no legal escape from check. Castling, en passant, and pawn
+        promotion are the three special moves every beginner needs.
+
+  - id: chess-rules-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The basic rules of chess: how each piece moves, how the game
+        ends, and the few special moves a beginner needs to know.
+      evaluated: |
+        Many classic board games reward learning a small set of rules
+        and then practicing patterns. Go uses simple stone placement
+        rules to produce extremely deep play. Backgammon mixes dice with
+        positional skill. Even checkers, despite its simple appearance,
+        has been solved by computers only after decades of work. Chess
+        sits in this family, with relatively few rules but extraordinary
+        depth of strategy.
+
+  - id: chess-rules-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The basic rules of chess: how each piece moves, how the game
+        ends, and the few special moves a beginner needs to know.
+      evaluated: |
+        A well-maintained chef's knife will outlast almost every other
+        tool in the kitchen. Rinse it immediately after use, wipe it dry
+        with a soft cloth, and store it on a magnetic strip or in a
+        block rather than rattling around in a drawer. Honing the edge
+        every few uses with a steel keeps the blade aligned; proper
+        sharpening on a whetstone is needed only a couple of times a
+        year.
+
+  # ───────────── Growing tomatoes indoors ─────────────
+  - id: tomatoes-indoor-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        How to grow tomatoes indoors in pots with grow lights, from
+        seed to harvest.
+      evaluated: |
+        Start seeds in small cells of moist seed-starting mix and keep
+        them at around twenty-two degrees Celsius until they germinate.
+        Once true leaves appear, move the seedlings under a full-spectrum
+        LED grow light running about fourteen hours a day, positioned a
+        few centimetres above the plants. Pot them up into five-litre
+        containers with rich, well-drained potting soil and feed weekly
+        with a balanced liquid fertiliser, switching to a higher-potassium
+        feed once the first trusses set. Choose compact, indeterminate
+        varieties suited to containers, pinch out side shoots, and shake
+        the flowers gently each day to pollinate them in the absence of
+        wind and insects.
+
+  - id: tomatoes-indoor-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        How to grow tomatoes indoors in pots with grow lights, from
+        seed to harvest.
+      evaluated: |
+        Tomatoes do well indoors if you give them enough light and
+        enough root space. Start seeds in small cells under a grow
+        light, then move strong seedlings into five-litre pots. Modern
+        LED grow lights have transformed indoor gardening — older
+        fluorescent fixtures worked, but the new full-spectrum panels
+        are far more efficient. Feed weekly, prune side shoots on
+        indeterminate varieties, and gently shake the flower trusses
+        each day to stand in for the wind and pollinators they would
+        normally rely on outdoors.
+
+  - id: tomatoes-indoor-good
+    human_score: good
+    inputs:
+      reference: |
+        How to grow tomatoes indoors in pots with grow lights, from
+        seed to harvest.
+      evaluated: |
+        Tomatoes grown indoors need plenty of light, deep pots, and
+        regular feeding. A full-spectrum LED running roughly fourteen
+        hours a day gives them what the sun would. From there, indoor
+        gardening branches in many directions: people grow basil and
+        parsley on the same shelf for cooking, run small hydroponic
+        towers for lettuces, and even raise dwarf citrus trees in
+        sunny corners. A grow tent makes climate control easier for any
+        of these crops, not just tomatoes.
+
+  - id: tomatoes-indoor-fair
+    human_score: fair
+    inputs:
+      reference: |
+        How to grow tomatoes indoors in pots with grow lights, from
+        seed to harvest.
+      evaluated: |
+        Container gardening on a small balcony or windowsill can be
+        remarkably productive. Herbs, salad greens, peppers, and even
+        small fruiting plants all do well in five- to ten-litre pots
+        with regular watering and feeding. The biggest constraints
+        are light and root space; both improve with a south-facing
+        window or a modest grow light. Choosing compact varieties
+        bred for containers makes a noticeable difference too.
+
+  # ───────────── Photography composition ─────────────
+  - id: photo-composition-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Basics of photography composition: how to arrange the elements
+        of a frame to create a clear, engaging image.
+      evaluated: |
+        Strong composition starts with a clear subject and a deliberate
+        choice about where it sits in the frame. The rule of thirds, in
+        which the frame is divided by two horizontal and two vertical
+        lines, gives four intersections that naturally draw the eye;
+        placing the subject on one of those points usually produces a
+        more dynamic image than centring it. Leading lines — roads,
+        fences, railings — pull the viewer's attention toward the
+        subject. Negative space lets the subject breathe, while framing
+        the subject through an arch or window adds depth. Finally, vary
+        your viewpoint: a low angle makes the subject feel imposing, a
+        high angle makes it feel small.
+
+  - id: photo-composition-good
+    human_score: good
+    inputs:
+      reference: |
+        Basics of photography composition: how to arrange the elements
+        of a frame to create a clear, engaging image.
+      evaluated: |
+        Composition is mostly a matter of intent — knowing what your
+        subject is and arranging everything else to support it. The
+        rule of thirds, leading lines, and framing devices are
+        well-tested starting points. Beyond composition, exposure and
+        focus are the other two legs of the tripod of photographic
+        craft. Mastering the exposure triangle of aperture, shutter
+        speed, and ISO gives you the control needed to translate what
+        you see into the image you want, even in difficult light.
+
+  - id: photo-composition-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Basics of photography composition: how to arrange the elements
+        of a frame to create a clear, engaging image.
+      evaluated: |
+        Choosing a camera as a beginner can feel overwhelming. Modern
+        mirrorless bodies have largely displaced DSLRs, offering
+        electronic viewfinders, silent shutters, and excellent
+        autofocus in compact packages. For most newcomers, a mid-range
+        APS-C body paired with a versatile zoom lens is the most
+        forgiving combination, leaving room to add primes or
+        specialised lenses later as interests narrow.
+
+  - id: photo-composition-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Basics of photography composition: how to arrange the elements
+        of a frame to create a clear, engaging image.
+      evaluated: |
+        Estate planning is something most adults put off longer than
+        they should. At a minimum, an adult with any dependants or
+        meaningful assets benefits from a will, a durable power of
+        attorney for finances, and a healthcare directive. These
+        documents ensure that someone you trust can make decisions on
+        your behalf if you cannot, and that your wishes for your
+        property are followed after death.
+
+  # ───────────── Intro to chord progressions ─────────────
+  - id: chord-progressions-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        An introduction to chord progressions in popular music: what
+        they are, how they're built from a key, and a few common
+        patterns to know.
+      evaluated: |
+        A chord progression is a sequence of chords that gives a piece
+        of music its harmonic motion. In a major key, you can build a
+        chord on each of the seven scale degrees, producing a fixed
+        pattern of three major chords, three minor chords, and one
+        diminished chord, conventionally labelled with Roman numerals
+        I through vii. Popular music leans on a small handful of
+        progressions: I–V–vi–IV underpins countless modern hits;
+        I–vi–IV–V drives much of 1950s pop; ii–V–I forms the backbone
+        of jazz. Once you can hear these patterns, songs you know
+        suddenly start to reveal a family resemblance.
+
+  - id: chord-progressions-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        An introduction to chord progressions in popular music: what
+        they are, how they're built from a key, and a few common
+        patterns to know.
+      evaluated: |
+        A chord progression is just the order in which chords appear in
+        a song. They're usually drawn from a single key, where each
+        scale degree gives a predictable chord quality. Roman-numeral
+        notation makes this portable across keys: a I–V–vi–IV in C is
+        the same shape as in G or D, which is why songwriters lean on
+        it. It's also why a guitarist with a capo can play along with
+        a singer in any key — the shapes stay the same.
+
+  - id: chord-progressions-good
+    human_score: good
+    inputs:
+      reference: |
+        An introduction to chord progressions in popular music: what
+        they are, how they're built from a key, and a few common
+        patterns to know.
+      evaluated: |
+        A chord progression is a sequence of chords that supports a
+        melody. Most popular songs draw their progressions from one
+        key, and a few patterns turn up again and again. From there,
+        the question becomes how to actually play them. Beginning
+        guitarists usually start with open chord shapes in the first
+        position, learn to switch between them smoothly, and add a
+        steady strumming pattern. After that, barre chords unlock the
+        rest of the neck and many more songs.
+
+  - id: chord-progressions-poor
+    human_score: poor
+    inputs:
+      reference: |
+        An introduction to chord progressions in popular music: what
+        they are, how they're built from a key, and a few common
+        patterns to know.
+      evaluated: |
+        Pour-over coffee rewards attention to a few small variables.
+        Use freshly roasted beans, ground just before brewing to a
+        medium-coarse texture. Wet the filter to rinse out paper taste,
+        add the grounds, and pour in slow concentric circles. A typical
+        ratio is sixty grams of coffee per litre of water, brewed in
+        about three minutes from the first pour to the final drip.
+
+  # ───────────── Debugging memory leaks ─────────────
+  - id: memory-leaks-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        How to debug a memory leak in a long-running server process,
+        from spotting the symptoms to finding the offending allocation.
+      evaluated: |
+        Start by confirming the leak is real: graph the process's
+        resident set size over hours or days and look for a monotonic
+        climb that doesn't reset after garbage collection. Once you've
+        established the pattern, take heap snapshots at two well-spaced
+        points under realistic load and diff them; the object types
+        that grew between snapshots are your suspects. Cross-reference
+        those types with allocation traces — most runtimes can sample
+        allocation stacks — to find the call sites responsible. From
+        there it usually comes down to a cache without an eviction
+        policy, listeners that are never unregistered, or closures that
+        capture more than they should. Fix the root cause, then re-run
+        the same long-soak test to confirm the climb has flattened.
+
+  - id: memory-leaks-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        How to debug a memory leak in a long-running server process,
+        from spotting the symptoms to finding the offending allocation.
+      evaluated: |
+        First, prove there's actually a leak by graphing memory under
+        steady load — a true leak climbs without ever resetting.
+        Memory profilers have come a long way in the last decade;
+        modern tools can sample allocations with surprisingly low
+        overhead even in production. Take heap snapshots at intervals,
+        diff them to find the types that are growing, then chase the
+        allocation traces back to the call site. Common culprits are
+        unbounded caches and forgotten event listeners.
+
+  - id: memory-leaks-fair
+    human_score: fair
+    inputs:
+      reference: |
+        How to debug a memory leak in a long-running server process,
+        from spotting the symptoms to finding the offending allocation.
+      evaluated: |
+        Production incidents involving servers come in many shapes:
+        runaway CPU, network saturation, deadlocks, slow database
+        queries, and outright crashes. The first response is usually
+        the same — get to a stable state, then collect enough telemetry
+        to understand what happened. A good incident retrospective
+        looks at both the technical failure and the response process,
+        and ends with concrete changes to monitoring, alerting, or
+        runbooks.
+
+  - id: memory-leaks-poor
+    human_score: poor
+    inputs:
+      reference: |
+        How to debug a memory leak in a long-running server process,
+        from spotting the symptoms to finding the offending allocation.
+      evaluated: |
+        Choosing a kindergarten is one of the first significant
+        decisions parents make about their child's education. Beyond
+        the obvious questions about location and hours, it's worth
+        visiting in person, watching how staff interact with the
+        children, and asking how the day is structured between play,
+        rest, meals, and guided activities. Word of mouth from current
+        families is often more revealing than any brochure.
+
+  # ───────────── Choosing a kindergarten ─────────────
+  - id: kindergarten-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        How to choose a kindergarten for a young child, including what
+        to look for during a visit and what questions to ask staff.
+      evaluated: |
+        Begin with the practical filters — commute, hours, fees, and
+        whether the school's calendar matches your work — to narrow a
+        shortlist to a handful of options. Then visit each one in
+        person, ideally during a normal session rather than an open
+        day. Watch how staff greet children, how they handle a small
+        conflict between two kids, and how the day moves between
+        free play, structured activities, meals, and rest. Ask about
+        staff-to-child ratios, qualifications, turnover, and how the
+        team supports a child who is slow to settle. Pay attention to
+        whether the children look genuinely engaged and to whether the
+        staff give you straight answers to direct questions; those
+        signals reveal more than any glossy prospectus.
+
+  - id: kindergarten-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        How to choose a kindergarten for a young child, including what
+        to look for during a visit and what questions to ask staff.
+      evaluated: |
+        Narrow the list by commute and cost first, then visit each
+        finalist in person. Approaches to early-years education differ
+        more than people expect — a Montessori-leaning room looks and
+        feels quite different from a play-based Reggio Emilia one, for
+        instance — but in any setting the things to watch are the
+        same. Look at how staff handle small conflicts, ask about
+        ratios and turnover, and notice whether the children seem
+        genuinely engaged. Direct, unhurried answers from staff are a
+        strong signal.
+
+  - id: kindergarten-good
+    human_score: good
+    inputs:
+      reference: |
+        How to choose a kindergarten for a young child, including what
+        to look for during a visit and what questions to ask staff.
+      evaluated: |
+        Choosing a kindergarten starts with a shortlist filtered by
+        commute, hours, and fees, followed by in-person visits to each
+        option. Once your child starts, the bigger question becomes
+        how to support the transition at home. A consistent morning
+        routine, a calm goodbye, and lots of unstructured time in the
+        afternoon all help small children settle. Sleep is another
+        big lever — most four- and five-year-olds need ten to twelve
+        hours, and shortfalls show up first as behavioural difficulty
+        at school.
+
+  - id: kindergarten-poor
+    human_score: poor
+    inputs:
+      reference: |
+        How to choose a kindergarten for a young child, including what
+        to look for during a visit and what questions to ask staff.
+      evaluated: |
+        Marathon training is best planned in cycles of three or four
+        weeks: gradually building weekly mileage, then dropping back
+        for a recovery week before pushing higher. Most plans for
+        first-time marathoners run sixteen to twenty weeks and peak
+        around fifty to sixty kilometres a week, with one long run
+        each weekend that builds toward thirty-two kilometres.
+
+  # ───────────── Basics of estate planning ─────────────
+  - id: estate-planning-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The basics of estate planning for an ordinary adult: the core
+        documents to put in place and what each one does.
+      evaluated: |
+        Estate planning for an ordinary adult rests on a small set of
+        documents. A will directs who receives your property after
+        your death and, if you have minor children, names a guardian
+        for them. A durable power of attorney lets a trusted person
+        manage your finances if you become incapacitated, which
+        matters far more in practice than people assume. A healthcare
+        directive or living will spells out the medical interventions
+        you do or don't want and names someone to speak for you when
+        you cannot. Beneficiary designations on retirement accounts
+        and life insurance policies sit outside the will and should
+        be reviewed at every major life event. Store the originals
+        somewhere your executor can actually find them.
+
+  - id: estate-planning-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The basics of estate planning for an ordinary adult: the core
+        documents to put in place and what each one does.
+      evaluated: |
+        For most adults, four documents do the heavy lifting: a will,
+        a durable power of attorney for finances, a healthcare
+        directive, and up-to-date beneficiary designations. The will
+        directs your assets and, if relevant, names a guardian for
+        minor children. Probate, the court-supervised process of
+        validating a will and settling debts, is the part most people
+        try to minimise — which is why some families also set up a
+        revocable living trust to keep certain assets out of it.
+        Whatever the structure, store the originals where your
+        executor can find them.
+
+  - id: estate-planning-good
+    human_score: good
+    inputs:
+      reference: |
+        The basics of estate planning for an ordinary adult: the core
+        documents to put in place and what each one does.
+      evaluated: |
+        A basic estate plan usually includes a will, a durable power
+        of attorney, and a healthcare directive. With those in place,
+        attention turns to the broader picture of personal finance.
+        Adequate term life insurance, a healthy emergency fund, and
+        consistent retirement contributions matter at least as much
+        as the legal paperwork. For families with young children,
+        disability insurance is often the most overlooked piece —
+        statistically, a working-age adult is more likely to be
+        disabled than to die early.
+
+  - id: estate-planning-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The basics of estate planning for an ordinary adult: the core
+        documents to put in place and what each one does.
+      evaluated: |
+        Personal finance is built on a small number of habits applied
+        consistently over decades: spending less than you earn,
+        avoiding high-interest debt, maintaining an emergency fund,
+        and investing the surplus in low-cost diversified funds.
+        Compounding does most of the work given enough time, which is
+        why starting early matters so much. The specific account
+        types and tax rules vary by country, but the underlying
+        principles are remarkably universal.
+
+  # ───────────── Marathon training ─────────────
+  - id: marathon-training-good
+    human_score: good
+    inputs:
+      reference: |
+        How to train for a first marathon over a four- to five-month
+        block, including weekly structure and the long run.
+      evaluated: |
+        A first marathon plan typically runs sixteen to twenty weeks
+        with a weekly long run, two easy runs, and a rest day or
+        cross-training. Beyond the running itself, race-day logistics
+        deserve almost as much attention. Travel and accommodation
+        near a big-city race need to be booked early. On the morning
+        of the race, eat what you've practised with on long runs,
+        arrive early to deal with bag drop and queues for the toilets,
+        and remember that the first few kilometres will feel
+        deceptively easy — pace discipline is the single biggest
+        determinant of how the last ten kilometres go.
+
+  - id: marathon-training-fair
+    human_score: fair
+    inputs:
+      reference: |
+        How to train for a first marathon over a four- to five-month
+        block, including weekly structure and the long run.
+      evaluated: |
+        Endurance sport is as much a mental discipline as a physical
+        one. Consistent training over months or years rewires how
+        comfortable you are with sustained effort and discomfort.
+        Cyclists, swimmers, and rowers learn the same lesson in
+        different forms: the body adapts faster than people expect,
+        but only if the stimulus is regular and the recovery is
+        respected.
+
+  - id: marathon-training-poor
+    human_score: poor
+    inputs:
+      reference: |
+        How to train for a first marathon over a four- to five-month
+        block, including weekly structure and the long run.
+      evaluated: |
+        Learning a foreign language as an adult is mostly a question of
+        time on task and the right kind of practice. Short daily
+        sessions beat occasional long ones. A spaced-repetition app
+        handles vocabulary efficiently, but real progress comes from
+        comprehensible input — podcasts, graded readers, and
+        conversation partners at the edge of what you can follow.
+
+  # ───────────── Pour-over coffee ─────────────
+  - id: pour-over-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        How to brew a clean, balanced cup of pour-over coffee at home
+        using a basic dripper, paper filter, and gooseneck kettle.
+      evaluated: |
+        Heat water to just off the boil and rinse the paper filter in
+        the dripper to remove papery flavours. Add freshly ground
+        coffee at a ratio of about sixty grams per litre, ground
+        medium-fine — somewhere between table salt and sand. Most
+        modern recipes are variations on a theme first popularised by
+        the third-wave cafe scene, but the underlying mechanics are
+        simple. Bloom the grounds with twice their weight in water,
+        then pour the remainder in slow concentric circles, aiming
+        for a total brew time of around three minutes.
+
+  - id: pour-over-good
+    human_score: good
+    inputs:
+      reference: |
+        How to brew a clean, balanced cup of pour-over coffee at home
+        using a basic dripper, paper filter, and gooseneck kettle.
+      evaluated: |
+        A clean pour-over starts with freshly roasted coffee, the
+        right grind size, and water just off the boil. Beyond
+        technique, gear can pull you in many directions. People
+        debate ceramic versus glass drippers, the merits of various
+        gooseneck kettles, and whether a refractometer is worth it
+        for a home set-up. Burr grinders, in particular, make a
+        bigger difference than almost any other purchase — the
+        consistency of the grind sets the ceiling on what the rest
+        of your equipment can achieve.
+
+  # ───────────── Cleaning kitchen knives ─────────────
+  - id: kitchen-knives-fair
+    human_score: fair
+    inputs:
+      reference: |
+        How to clean and maintain kitchen knives so they stay sharp
+        and rust-free.
+      evaluated: |
+        A well-equipped home kitchen doesn't actually need very many
+        tools. A heavy skillet, a wide saucepan, a sheet pan, a good
+        cutting board, and a small set of well-made knives will
+        handle almost everything most cooks do day to day.
+        Specialised gadgets are tempting, but they tend to gather
+        dust unless there's a regular recipe that needs them.
+
+  - id: kitchen-knives-poor
+    human_score: poor
+    inputs:
+      reference: |
+        How to clean and maintain kitchen knives so they stay sharp
+        and rust-free.
+      evaluated: |
+        Backpacking trips reward ruthless editing of what goes in the
+        pack. Start with the big three — shelter, sleep system, and
+        pack — and choose the lightest options you can afford that
+        still work for the expected weather. From there, everything
+        else should earn its place: a single pot, one set of
+        utensils, a handful of meals, and only the layers you'll
+        actually wear. Weight saved at the start of the trail
+        compounds with every kilometre.

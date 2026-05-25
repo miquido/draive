@@ -154,12 +154,13 @@ Evaluated metric is tone and style - how well the EVALUATED content matches the 
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
+Before scoring, identify the two or three load-bearing dimensions of EXPECTED_TONE_STYLE (e.g. formality, warmth, register, brand voice, rhythm) and judge match on those dimensions specifically. Treat an isolated misstep as a deviation, not a failure. "Perfect" does not require the content to read as if written by the same author as the spec — it requires consistent alignment on the load-bearing dimensions.
 Assign a tone and style score using exact name of one of the following values:
-- "poor" is very low tone/style match, the content has tone and style that significantly conflicts with the expected tone/style requirements.
-- "fair" is low tone/style match, the content has some alignment with expected tone/style but contains several mismatches or inappropriate elements.
-- "good" is moderate tone/style match, the content generally aligns with expected tone/style with some minor inconsistencies or deviations.
-- "excellent" is high tone/style match, the content closely matches the expected tone/style with only minimal deviations.
-- "perfect" is very high tone/style match, the content perfectly aligns with the expected tone, style, and voice characteristics.
+- "poor" - the content reads in a tone fundamentally at odds with the spec (e.g. wry where reverent was asked, casual where formal was asked); the mismatch is felt throughout.
+- "fair" - the content gestures at the requested voice but breaks into the wrong register repeatedly; a reader would notice the mismatch.
+- "good" - the content broadly matches the requested voice with a few clear misses (one wrong word choice, one sentence in the wrong register, one missing characteristic flourish).
+- "excellent" - the content matches the requested voice on every load-bearing dimension with one or two subtle deviations a careful reader might notice.
+- "perfect" - consistent alignment on every load-bearing dimension; no register breaks; no jarring word choices.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 
@@ -181,12 +182,13 @@ Assess how consistently model outputs match the EXPECTED_TONE_STYLE across the c
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
+Before scoring, identify the two or three load-bearing dimensions of EXPECTED_TONE_STYLE and judge match on those dimensions specifically. Treat an isolated misstep as a deviation, not a failure.
 Assign a tone and style score using exact name of one of the following values:
-- "poor" is very low tone/style match, model outputs have tone and style that significantly conflicts with the expected tone/style requirements.
-- "fair" is low tone/style match, model outputs have some alignment with expected tone/style but contain several mismatches or inappropriate elements.
-- "good" is moderate tone/style match, model outputs generally align with expected tone/style with some minor inconsistencies or deviations.
-- "excellent" is high tone/style match, model outputs closely match the expected tone/style with only minimal deviations.
-- "perfect" is very high tone/style match, model outputs perfectly align with the expected tone, style, and voice characteristics throughout.
+- "poor" - model outputs read in a tone fundamentally at odds with the spec; the mismatch is felt throughout the conversation.
+- "fair" - model outputs gesture at the requested voice but break into the wrong register repeatedly.
+- "good" - model outputs broadly match the requested voice with a few clear misses across the conversation.
+- "excellent" - model outputs match the requested voice on every load-bearing dimension with one or two subtle deviations.
+- "perfect" - consistent alignment on every load-bearing dimension across the conversation; no register breaks.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 

@@ -1,0 +1,435 @@
+evaluator: factual_accuracy
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Verify each factual claim in EVALUATED against authoritative sources.
+    Score on the proportion of well-established claims that are correct.
+  source: synthetic
+
+samples:
+  # ───────────── World capitals ─────────────
+  - id: capitals-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Paris is the capital of France, Tokyo is the capital of Japan, and
+        Ottawa is the capital of Canada. Berlin is the capital of Germany,
+        and Rome is the capital of Italy.
+
+  - id: capitals-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Paris is the capital of France, Tokyo is the capital of Japan, and
+        Ottawa is the capital of Canada. Madrid is the capital of Spain, and
+        Brasilia is the capital of Brazil — a city built specifically to
+        serve as the capital in the mid-20th century.
+
+  - id: capitals-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Paris is the capital of France and Tokyo is the capital of Japan.
+        Ottawa is the capital of Canada. Sydney is the capital of Australia,
+        and Berlin is the capital of Germany.
+
+  - id: capitals-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Paris is the capital of France. Tokyo is the capital of China.
+        Toronto is the capital of Canada. Berlin is the capital of Germany,
+        and Sydney is the capital of Australia.
+
+  - id: capitals-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Paris is the capital of Germany, Tokyo is the capital of China, and
+        Ottawa is the capital of Mexico. Sydney is the capital of Australia,
+        and Barcelona is the capital of Spain.
+
+  # ───────────── Planetary facts ─────────────
+  - id: planets-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Mercury is the closest planet to the Sun, and Neptune is the
+        farthest. Jupiter is the largest planet in our solar system, and
+        Earth is the third planet from the Sun. Saturn is famous for its
+        prominent ring system.
+
+  - id: planets-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Jupiter is the largest planet in the solar system, and Mercury is
+        the closest to the Sun. Earth is the third planet from the Sun, and
+        Mars is the fourth. Saturn has a striking ring system that is easily
+        visible from Earth through a small telescope.
+
+  - id: planets-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Jupiter is the largest planet in the solar system, and Mercury is
+        the closest to the Sun. Earth is the third planet from the Sun.
+        Saturn is the largest planet and is known for its rings.
+
+  - id: planets-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Mars is the largest planet in the solar system. Mercury is closest
+        to the Sun. Earth is the third planet from the Sun, and Saturn has
+        rings. Venus is farther from the Sun than Neptune.
+
+  - id: planets-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Earth is the largest planet in the solar system. Pluto is the
+        closest planet to the Sun. Mars is the third planet from the Sun,
+        and Jupiter has the most prominent ring system. Saturn is a moon of
+        Neptune.
+
+  # ───────────── US presidents ─────────────
+  - id: presidents-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        George Washington was the first president of the United States, and
+        he served two terms. Abraham Lincoln was the 16th president and led
+        the country through the Civil War. Thomas Jefferson, the third
+        president, was the principal author of the Declaration of
+        Independence.
+
+  - id: presidents-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        George Washington was the first president of the United States.
+        Abraham Lincoln, the 16th president, led the country through the
+        Civil War and was assassinated in 1865. John F. Kennedy was elected
+        in 1960 and was assassinated in Dallas in 1963.
+
+  - id: presidents-good
+    human_score: good
+    inputs:
+      evaluated: |
+        George Washington was the first US president. Abraham Lincoln was
+        the 16th president and led the country through the Civil War.
+        Thomas Jefferson was the second president and wrote the Declaration
+        of Independence.
+
+  - id: presidents-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        George Washington was the first US president. Abraham Lincoln was
+        the 12th president. Thomas Jefferson was the first president and
+        wrote the Constitution. John F. Kennedy was assassinated in Dallas.
+
+  - id: presidents-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Benjamin Franklin was the first US president. Abraham Lincoln was
+        the third president and led the Revolutionary War. Thomas Jefferson
+        wrote the Magna Carta. John F. Kennedy was assassinated in New
+        York.
+
+  # ───────────── Human anatomy basics ─────────────
+  - id: anatomy-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        The adult human body normally has 206 bones. The heart pumps blood
+        through the circulatory system, and the lungs exchange oxygen and
+        carbon dioxide with the air. Adults typically have 32 teeth,
+        including four wisdom teeth.
+
+  - id: anatomy-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Adult humans have 206 bones. The heart pumps blood through the
+        body, while the lungs handle gas exchange with the air. Adults
+        normally have 32 teeth in total, and the skin is the body's largest
+        organ.
+
+  - id: anatomy-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Adult humans have 206 bones. The heart pumps blood, and the lungs
+        breathe air. Adults have 28 teeth. The skin is the body's largest
+        organ.
+
+  - id: anatomy-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Adult humans have 150 bones. The heart pumps blood, and the lungs
+        breathe air. Adults have 32 teeth. The liver is the body's largest
+        organ.
+
+  - id: anatomy-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Adult humans have 50 bones. The lungs pump blood through the body,
+        and the heart breathes air. Adults have 18 teeth, and the brain is
+        the body's smallest organ.
+
+  # ───────────── Basic chemistry ─────────────
+  - id: chemistry-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Water is the compound H2O, made of two hydrogen atoms bonded to one
+        oxygen atom. Gold has the chemical symbol Au, and oxygen has the
+        symbol O. The periodic table organizes elements by their atomic
+        number.
+
+  - id: chemistry-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Water is H2O — two hydrogen atoms and one oxygen atom. The chemical
+        symbol for gold is Au and for silver is Ag. The periodic table is
+        organized by atomic number, and hydrogen is the lightest element.
+
+  - id: chemistry-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Water is H2O. The chemical symbol for gold is Au. The periodic
+        table is organized by atomic number. Oxygen has the symbol Ox, and
+        hydrogen is the lightest element.
+
+  - id: chemistry-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Water is HO2. The chemical symbol for gold is Go. Oxygen has the
+        symbol O. The periodic table is organized by atomic weight, and
+        hydrogen is the heaviest element.
+
+  - id: chemistry-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Water is the compound CO2, made of carbon and oxygen. The chemical
+        symbol for gold is Gd. Oxygen has the symbol H. The periodic table
+        is organized alphabetically, and uranium is the lightest element.
+
+  # ───────────── Geographic features ─────────────
+  - id: geography-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Mount Everest is the tallest mountain on Earth above sea level. The
+        Nile and the Amazon are among the longest rivers in the world. The
+        Pacific is the largest ocean, and the Sahara is the largest hot
+        desert.
+
+  - id: geography-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Mount Everest is the highest mountain above sea level, located in
+        the Himalayas. The Amazon and the Nile are the two longest rivers,
+        with both stretching for several thousand kilometres. The Pacific
+        Ocean is the largest ocean on Earth.
+
+  - id: geography-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Mount Everest is the tallest mountain on Earth. The Nile is one of
+        the longest rivers in the world. The Atlantic is the largest ocean.
+        The Sahara is the largest hot desert.
+
+  - id: geography-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Mount Kilimanjaro is the tallest mountain on Earth. The Nile is one
+        of the longest rivers in the world. The Indian is the largest
+        ocean, and the Gobi is the largest desert in the world.
+
+  - id: geography-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Mount Fuji is the tallest mountain on Earth. The Thames is the
+        longest river in the world. The Arctic is the largest ocean, and
+        Antarctica is the largest hot desert. Mount Everest is in South
+        America.
+
+  # ───────────── Basic math facts ─────────────
+  - id: math-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Seven times eight is 56, and twelve times twelve is 144. The square
+        root of 81 is 9. A triangle has three sides, and a hexagon has six
+        sides. The sum of the angles in any triangle is 180 degrees.
+
+  - id: math-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Seven times eight is 56. The square root of 81 is 9. A triangle has
+        three sides and its interior angles sum to 180 degrees. A regular
+        hexagon has six equal sides, and pi is roughly 3.14159.
+
+  - id: math-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Seven times eight is 56. The square root of 81 is 9. A triangle has
+        three sides, and a hexagon has eight sides. Pi is roughly 3.14.
+
+  - id: math-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Seven times eight is 54. The square root of 81 is 8. A triangle has
+        three sides, and a hexagon has six sides. The interior angles of a
+        triangle sum to 90 degrees.
+
+  - id: math-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Seven times eight is 42. The square root of 81 is 7. A triangle has
+        four sides, and a hexagon has five sides. The interior angles of a
+        triangle sum to 360 degrees, and pi is exactly 4.
+
+  # ───────────── Olympic / sports records ─────────────
+  - id: sports-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        The modern Olympic Games were first held in Athens in 1896. The
+        FIFA World Cup is held every four years. Usain Bolt of Jamaica
+        holds the men's world record in the 100-metre sprint.
+
+  - id: sports-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        The modern Olympic Games began in Athens in 1896 and have been held
+        every four years since, with a few wartime interruptions. The FIFA
+        World Cup is also held every four years, and Brazil has won it more
+        times than any other country.
+
+  - id: sports-good
+    human_score: good
+    inputs:
+      evaluated: |
+        The modern Olympic Games started in 1896 in Athens. The FIFA World
+        Cup is held every four years. Usain Bolt holds the men's 100-metre
+        world record. Italy has won the World Cup more times than any other
+        country.
+
+  - id: sports-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        The modern Olympic Games started in 1920 in Paris. The FIFA World
+        Cup is held every two years. Usain Bolt of Jamaica holds the men's
+        100-metre world record. The World Cup was first held in 1990.
+
+  - id: sports-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        The modern Olympic Games began in 1950 in London. The FIFA World
+        Cup is held every year. Usain Bolt of Canada holds the men's
+        marathon world record. Brazil has never won the World Cup.
+
+  # ───────────── Historical wars ─────────────
+  - id: wars-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        World War I began in 1914 and ended in 1918. World War II began in
+        1939 and ended in 1945. The American Civil War took place from 1861
+        to 1865.
+
+  - id: wars-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        World War I ran from 1914 to 1918, and World War II from 1939 to
+        1945. The American Civil War was fought between the Union and the
+        Confederacy from 1861 to 1865, and ended with the Union's victory.
+
+  - id: wars-good
+    human_score: good
+    inputs:
+      evaluated: |
+        World War I began in 1914 and ended in 1918. World War II began in
+        1939 and ended in 1945. The American Civil War ended in 1870. The
+        Allies won World War II.
+
+  - id: wars-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        World War I ended in 1920. World War II began in 1941. The American
+        Civil War took place in the 1860s. The Axis powers won World War I.
+
+  - id: wars-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        World War I began in 1939 and ended in 1945. World War II began in
+        1914 and ended in 1918. The American Civil War was fought between
+        the US and Britain in the 1700s. Germany won both world wars.
+
+  # ───────────── Basic physics ─────────────
+  - id: physics-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Water freezes at 0 degrees Celsius and boils at 100 degrees Celsius
+        at standard atmospheric pressure. The speed of light in a vacuum is
+        about 300,000 kilometres per second. Isaac Newton formulated the
+        laws of motion and the law of universal gravitation.
+
+  - id: physics-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        At standard atmospheric pressure, water freezes at 0 degrees
+        Celsius and boils at 100 degrees Celsius. Light travels through a
+        vacuum at roughly 300,000 km per second. Isaac Newton, an English
+        physicist, formulated the three laws of motion.
+
+  - id: physics-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Water freezes at 0 degrees Celsius and boils at 100 degrees
+        Celsius. The speed of light is about 300,000 km per second. Isaac
+        Newton formulated the laws of motion and discovered electricity.
+
+  - id: physics-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Water freezes at 10 degrees Celsius and boils at 90 degrees
+        Celsius. The speed of light is about 300,000 km per second. Albert
+        Einstein formulated the three laws of motion in the 1600s.
+
+  - id: physics-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Water freezes at 100 degrees Celsius and boils at 0 degrees
+        Celsius. The speed of light is about 30 km per hour. Isaac Newton
+        invented the steam engine and discovered penicillin.

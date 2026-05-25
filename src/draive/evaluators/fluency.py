@@ -110,6 +110,7 @@ You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
 Carefully examine provided CONTENT, then rate it using solely a fluency metric according to the EVALUATION_CRITERIA.
+Do not default to a high score for content that is grammatically valid but stiff, awkward, or unnatural. Stilted phrasing, register mismatches, run-ons, and clunky word order are all fluency defects, not stylistic choices. Count concrete issues (awkward phrasings, agreement errors, dropped articles, register breaks) before scoring.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
@@ -119,12 +120,13 @@ Evaluated metric is fluency - the quality of the content in terms of grammar, sp
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
+Anchor the score to concrete language-quality signals, not surface plausibility.
 Assign a fluency score using exact name of one of the following values:
-- "poor" is very low fluency, the content has many errors that make it hard to understand or look unnatural.
-- "fair" is low fluency, the content partially reads well but contains noticeable issues affecting clarity or naturalness.
-- "good" is moderate fluency, the content has some errors that affect clarity or smoothness, but the main points remain comprehensible.
-- "excellent" is high fluency, the content reads well with only minor issues that rarely impact understanding.
-- "perfect" is very high fluency - the content has few or no errors and is easy to read and follow.
+- "poor" - multiple grammar/spelling/agreement errors per paragraph; ESL-quality awkwardness; or text that is hard to parse on first read.
+- "fair" - frequent stilted constructions, run-ons, dropped articles, or register breaks; comprehensible but visibly non-native or unedited.
+- "good" - mostly readable native-speaker prose with several clunky phrasings, occasional awkward word order, or one minor grammar slip; passable but would not survive a copy-edit.
+- "excellent" - reads as natural native-speaker prose with one or two minor awkward spots that a copy-editor would smooth.
+- "perfect" - no awkward phrasings, no grammar issues, no register breaks anywhere; reads as if professionally edited.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 
@@ -136,6 +138,7 @@ You are evaluating model results produced within a conversation context accordin
 
 <INSTRUCTION>
 Carefully examine the CONTENT conversation timeline. Focus on model-produced results in output elements and rate their language fluency.
+Do not default to a high score for outputs that are grammatically valid but stiff, awkward, or unnatural. Stilted phrasing, register mismatches, run-ons, and clunky word order are all fluency defects.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
@@ -146,12 +149,13 @@ Assess the quality of model outputs in terms of grammar, spelling, punctuation, 
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
+Anchor the score to concrete language-quality signals, not surface plausibility.
 Assign a fluency score using exact name of one of the following values:
-- "poor" is very low fluency, model outputs have many errors that make them hard to understand or appear unnatural.
-- "fair" is low fluency, model outputs partially read well but contain noticeable issues affecting clarity or naturalness.
-- "good" is moderate fluency, model outputs have some errors that affect clarity or smoothness, but main points remain comprehensible.
-- "excellent" is high fluency, model outputs read well with only minor issues that rarely impact understanding.
-- "perfect" is very high fluency, model outputs have few or no errors and are easy to read and follow.
+- "poor" - multiple grammar or agreement errors per output; ESL-quality awkwardness; outputs that are hard to parse on first read.
+- "fair" - frequent stilted constructions, run-ons, dropped articles, or register breaks; comprehensible but visibly unedited.
+- "good" - mostly readable native-speaker prose with several clunky phrasings or one minor grammar slip; passable but unpolished.
+- "excellent" - natural native-speaker prose with one or two minor awkward spots that a copy-editor would smooth.
+- "perfect" - no awkward phrasings, no grammar issues, no register breaks anywhere; reads as if professionally edited.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 

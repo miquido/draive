@@ -1,0 +1,743 @@
+evaluator: readability
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED text on how easily the audience named in `guidelines`
+    can read and understand it. Sentence length, vocabulary level, and
+    jargon density drive the rating.
+  source: synthetic
+
+samples:
+  # ───────────── Gravity for 10-year-olds ─────────────
+  - id: gravity-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: 10-year-olds learning about gravity for the first time.
+      evaluated: |
+        Gravity is what pulls things down. When you jump, you come back to
+        the ground because the Earth pulls you. The Earth pulls on you, and
+        you pull on the Earth too, but you are much smaller, so you are the
+        one that moves. The Moon pulls on the Earth as well. That is how
+        gravity works. It pulls everything toward everything else.
+
+  - id: gravity-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: 10-year-olds learning about gravity for the first time.
+      evaluated: |
+        Gravity is the invisible force that pulls objects toward each other.
+        The bigger something is, the stronger its pull. Earth is huge, so it
+        pulls everything on it toward its center. That is why a ball you toss
+        in the air always comes back down. The Sun pulls on Earth in the same
+        way, which keeps our planet circling around it.
+
+  - id: gravity-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: 10-year-olds learning about gravity for the first time.
+      evaluated: |
+        Gravity is the attraction between objects that have mass. Any object
+        with mass attracts every other object, and the strength of the pull
+        depends on how massive each object is and how far apart they are.
+        Earth has so much mass that its gravitational pull keeps people,
+        oceans, and the atmosphere bound to its surface. The same force
+        causes the Moon to orbit Earth and Earth to orbit the Sun.
+
+  - id: gravity-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: 10-year-olds learning about gravity for the first time.
+      evaluated: |
+        Gravity is a fundamental interaction by which all objects possessing
+        mass exert an attractive force on one another, the magnitude of which
+        is proportional to the product of their masses and inversely
+        proportional to the square of the distance between their centers,
+        according to Newton's law of universal gravitation. Earth's mass
+        produces a substantial gravitational field that accelerates objects
+        near its surface at approximately 9.8 metres per second squared.
+
+  - id: gravity-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: 10-year-olds learning about gravity for the first time.
+      evaluated: |
+        In the general-relativistic formulation, gravitation is not a force
+        but the manifestation of spacetime curvature induced by the
+        stress-energy tensor, with freely falling worldlines tracing
+        geodesics of the resulting pseudo-Riemannian manifold; the Newtonian
+        limit emerges from a weak-field, low-velocity approximation of the
+        Einstein field equations, in which the metric perturbation reduces
+        to a scalar gravitational potential satisfying Poisson's equation.
+
+  # ───────────── Privacy policy for general public ─────────────
+  - id: privacy-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: general public reading a website's privacy policy,
+        no legal or technical background.
+      evaluated: |
+        We collect your email so we can send you the things you ask for.
+        We do not sell your data. We do not share it with other companies
+        for ads. If you want us to delete what we have about you, send us a
+        message and we will do it within a week. You can ask us at any time
+        what we know about you. We will tell you.
+
+  - id: privacy-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: general public reading a website's privacy policy,
+        no legal or technical background.
+      evaluated: |
+        This policy explains what we collect and why. We store the email
+        you give us at sign-up and the actions you take on our site, such
+        as which pages you visit. We use this only to run the service and
+        improve it. We never sell your data, and we only share it when the
+        law requires us to. You can ask to see or delete your data at any
+        time by contacting us.
+
+  - id: privacy-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: general public reading a website's privacy policy,
+        no legal or technical background.
+      evaluated: |
+        This Privacy Policy describes the categories of personal information
+        we collect from users, the purposes for which it is processed, and
+        the rights available to data subjects. Personal data may include
+        identifiers, contact details, and usage information collected via
+        cookies and similar technologies. Processing is conducted on the
+        legal bases of consent, legitimate interest, and contractual
+        necessity, as applicable to each processing activity.
+
+  - id: privacy-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: general public reading a website's privacy policy,
+        no legal or technical background.
+      evaluated: |
+        The Controller, as defined under Article 4(7) of Regulation (EU)
+        2016/679 ("GDPR"), processes personal data pursuant to one or more
+        of the lawful bases enumerated in Article 6(1), including without
+        limitation the data subject's prior, freely-given, specific,
+        informed and unambiguous consent; the necessity of such processing
+        for the performance of a contract to which the data subject is a
+        party; and the legitimate interests pursued by the Controller or
+        a third party.
+
+  - id: privacy-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: general public reading a website's privacy policy,
+        no legal or technical background.
+      evaluated: |
+        Notwithstanding any provision herein to the contrary, and subject
+        to the limitations set forth in Sections 7.3, 9.1(b)(iv), and
+        12.5(c), the Controller reserves the unilateral, irrevocable, and
+        non-exclusive right to effectuate cross-border transfers of
+        Personal Data to recipients situated in third countries lacking an
+        adequacy decision pursuant to Article 45 GDPR, provided that
+        appropriate safeguards within the meaning of Article 46 are
+        implemented, including standard contractual clauses, binding
+        corporate rules, or derogations enumerated under Article 49.
+
+  # ───────────── Double-entry bookkeeping for small-business owners ─────────────
+  - id: bookkeeping-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: small-business owners with no accounting background,
+        learning double-entry bookkeeping.
+      evaluated: |
+        Every time money moves in your business, write it in two places.
+        If a customer pays you $100, put $100 into your cash list and $100
+        into your sales list. If you spend $50 on supplies, take $50 out of
+        cash and add $50 to your supplies cost. Each event has two sides,
+        and they always match. That is why it is called double-entry: every
+        change shows up twice, so nothing is missed.
+
+  - id: bookkeeping-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: small-business owners with no accounting background,
+        learning double-entry bookkeeping.
+      evaluated: |
+        Double-entry bookkeeping records each transaction in two accounts at
+        the same time. One account goes up and another goes down, or one
+        gain is matched by one cost. For example, if you buy stock for cash,
+        your inventory account rises and your cash account falls by the
+        same amount. Because every entry has a matching pair, your books
+        should always balance, which makes mistakes easier to spot.
+
+  - id: bookkeeping-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: small-business owners with no accounting background,
+        learning double-entry bookkeeping.
+      evaluated: |
+        Double-entry bookkeeping is a system in which each financial
+        transaction is recorded with equal debit and credit entries across
+        at least two accounts in the general ledger. Assets and expenses
+        carry normal debit balances, while liabilities, equity, and revenue
+        carry normal credit balances. The fundamental accounting equation
+        — assets equal liabilities plus equity — must remain in balance
+        after every transaction.
+
+  - id: bookkeeping-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: small-business owners with no accounting background,
+        learning double-entry bookkeeping.
+      evaluated: |
+        Under the double-entry paradigm, each transaction is bifurcated
+        into reciprocal debit and credit postings affecting nominal, real,
+        and personal accounts, the aggregate of which is reconciled via the
+        trial balance and subsequently articulated in the statement of
+        financial position and the statement of comprehensive income in
+        accordance with the prevailing GAAP or IFRS framework adopted by
+        the reporting entity.
+
+  - id: bookkeeping-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: small-business owners with no accounting background,
+        learning double-entry bookkeeping.
+      evaluated: |
+        Recognition and measurement of contingent consideration arising in
+        a business combination accounted for under IFRS 3 requires
+        classification as either equity or a financial liability pursuant
+        to IAS 32, with subsequent remeasurement through profit or loss in
+        accordance with IFRS 9 for liability-classified arrangements,
+        notwithstanding the bifurcation requirements applicable to embedded
+        derivatives not closely related to the host contract under the
+        amended classification overlay.
+
+  # ───────────── Photosynthesis for high school students ─────────────
+  - id: photosynthesis-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: high school biology students.
+      evaluated: |
+        Photosynthesis is how plants make their own food. Inside their
+        leaves, a green pigment called chlorophyll captures energy from
+        sunlight. The plant uses that energy to combine water from the soil
+        with carbon dioxide from the air, producing sugar and oxygen. The
+        sugar feeds the plant, and the oxygen is released into the air for
+        animals to breathe.
+
+  - id: photosynthesis-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: high school biology students.
+      evaluated: |
+        Photosynthesis is a two-stage process that occurs in the
+        chloroplasts of plant cells. The light-dependent reactions take
+        place in the thylakoid membranes, where chlorophyll absorbs photons
+        and uses their energy to split water, generating ATP, NADPH, and
+        oxygen. The Calvin cycle then uses ATP and NADPH in the stroma to
+        fix carbon dioxide into a three-carbon sugar.
+
+  - id: photosynthesis-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: high school biology students.
+      evaluated: |
+        Photosynthesis proceeds via the photolysis of H2O at the
+        oxygen-evolving complex of photosystem II, generating an electron
+        flux that traverses the thylakoid electron transport chain through
+        plastoquinone, cytochrome b6f, and plastocyanin to photosystem I,
+        thereby establishing a transmembrane proton gradient that drives
+        chemiosmotic phosphorylation of ADP by ATP synthase, with
+        concomitant reduction of NADP+ via ferredoxin-NADP+ reductase.
+
+  - id: photosynthesis-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: high school biology students.
+      evaluated: |
+        Non-photochemical quenching mechanisms — qE, qT, qI — modulate
+        excitation pressure on PSII via the xanthophyll cycle, wherein
+        violaxanthin de-epoxidation to zeaxanthin under low-luminal-pH
+        conditions facilitates radiationless dissipation of singlet
+        chlorophyll excited states, while state transitions reallocate
+        LHCII trimers between photosystems through STN7-mediated
+        phosphorylation, optimising linear-versus-cyclic electron flow
+        partitioning under fluctuating actinic irradiance.
+
+  # ───────────── Encryption for non-technical readers ─────────────
+  - id: encryption-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: people with no technical background, learning what
+        encryption is and why it matters.
+      evaluated: |
+        Encryption is a way to scramble a message so that only the right
+        person can read it. Imagine you write a note in a secret code that
+        only your friend knows how to unlock. Anyone else who finds the
+        note just sees nonsense. When you send a credit card number online,
+        your computer scrambles it before it leaves. Only the shop's
+        computer has the key to unscramble it. That is encryption.
+
+  - id: encryption-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: people with no technical background, learning what
+        encryption is and why it matters.
+      evaluated: |
+        Encryption turns readable information into a scrambled form so that
+        only people with the right key can turn it back. Many things you do
+        online use it: chat apps, banking, and shopping sites all encrypt
+        your data while it travels across the internet. Without encryption,
+        anyone who could see the network traffic would be able to read your
+        messages and account details.
+
+  - id: encryption-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: people with no technical background, learning what
+        encryption is and why it matters.
+      evaluated: |
+        Symmetric ciphers such as AES employ a shared secret key to perform
+        block-wise substitution and permutation operations over plaintext,
+        whereas asymmetric schemes like RSA exploit the computational
+        hardness of integer factorization to enable public-key
+        cryptography. Hybrid TLS handshakes typically use asymmetric
+        primitives to negotiate ephemeral symmetric session keys, after
+        which authenticated encryption modes such as GCM secure the
+        subsequent payload traffic.
+
+  - id: encryption-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: people with no technical background, learning what
+        encryption is and why it matters.
+      evaluated: |
+        Lattice-based post-quantum KEMs such as ML-KEM rely on the
+        hardness of the Module-LWE problem, instantiated over rings of the
+        form Z_q[x]/(x^n + 1) with parameters chosen to resist known
+        primal and dual lattice-reduction attacks under the BKZ cost model;
+        ciphertexts are produced via deterministic rejection sampling from
+        centered binomial noise distributions and decapsulation employs the
+        Fujisaki-Okamoto transform to achieve IND-CCA2 security in the
+        random oracle model.
+
+  # ───────────── Vaccines for parents ─────────────
+  - id: vaccines-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: parents with no medical background, learning how
+        childhood vaccines work.
+      evaluated: |
+        A vaccine teaches your child's body how to fight a sickness before
+        it ever shows up. The shot contains a tiny piece of the germ — too
+        small to make your child sick — that the body learns to recognize.
+        After the shot, the body remembers the germ. If the real one ever
+        comes along, the body knows how to stop it right away.
+
+  - id: vaccines-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: parents with no medical background, learning how
+        childhood vaccines work.
+      evaluated: |
+        Vaccines train the immune system to recognise a specific germ
+        without causing the disease. Each dose contains a harmless version
+        of the germ, or a small piece of it, so the body can practise its
+        defence. The immune system makes antibodies and keeps a memory of
+        the germ, so if your child is exposed later, the body can fight it
+        off quickly.
+
+  - id: vaccines-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: parents with no medical background, learning how
+        childhood vaccines work.
+      evaluated: |
+        Vaccines induce adaptive immunity by presenting antigens to the
+        immune system in a controlled manner. B lymphocytes recognise the
+        antigen and differentiate into plasma cells that secrete
+        antigen-specific antibodies, while a subset persists as memory
+        cells. Upon subsequent exposure to the pathogen, these memory cells
+        mount a rapid secondary response that typically prevents clinical
+        disease.
+
+  - id: vaccines-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: parents with no medical background, learning how
+        childhood vaccines work.
+      evaluated: |
+        Following intramuscular administration, antigen-presenting dendritic
+        cells endocytose the immunogen, traffic to draining lymph nodes via
+        CCR7-mediated chemotaxis, and present processed peptide epitopes on
+        MHC class II to naive CD4+ T cells, whose subsequent Tfh
+        differentiation orchestrates germinal-centre B-cell affinity
+        maturation through somatic hypermutation and class-switch
+        recombination, ultimately yielding long-lived plasma cells and
+        memory B-cell pools with high-avidity neutralising titres.
+
+  # ───────────── Climate change for general audience ─────────────
+  - id: climate-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: general public, no science background, learning about
+        climate change.
+      evaluated: |
+        Climate change is the long-term warming of the Earth caused mostly
+        by greenhouse gases such as carbon dioxide. These gases come mainly
+        from burning fossil fuels for electricity, transport, and heating.
+        They trap heat from the sun in the atmosphere, raising average
+        temperatures. As the planet warms, ice caps melt, sea levels rise,
+        and weather patterns become more extreme.
+
+  - id: climate-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: general public, no science background, learning about
+        climate change.
+      evaluated: |
+        Coupled atmosphere-ocean general circulation models, constrained
+        by paleoclimatic proxies and integrated under representative
+        concentration pathway scenarios, project equilibrium climate
+        sensitivities in the range of 2.5 to 4 K per doubling of
+        atmospheric CO2, with non-negligible probability mass in the tails
+        owing to uncertainties in cloud feedback parameterisations and
+        carbon-cycle feedbacks under transient forcing.
+
+  # ───────────── Diabetes for newly diagnosed patients ─────────────
+  - id: diabetes-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: a patient newly diagnosed with type 2 diabetes,
+        no medical background.
+      evaluated: |
+        Diabetes means there is too much sugar in your blood. Your body
+        uses sugar from food for energy. A helper called insulin lets the
+        sugar go from your blood into your cells. With type 2 diabetes,
+        the helper does not work as well, so sugar stays in the blood. Too
+        much sugar in your blood for a long time can hurt your eyes, your
+        feet, and your heart. Your doctor will help you keep your sugar at
+        a safer level.
+
+  - id: diabetes-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: a patient newly diagnosed with type 2 diabetes,
+        no medical background.
+      evaluated: |
+        Type 2 diabetes mellitus is characterised by chronic hyperglycemia
+        resulting from a combination of peripheral insulin resistance and
+        progressive pancreatic beta-cell dysfunction. Long-term elevation
+        of plasma glucose contributes to microvascular complications such
+        as retinopathy, nephropathy, and peripheral neuropathy, as well as
+        macrovascular complications including coronary artery disease.
+
+  - id: diabetes-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: a patient newly diagnosed with type 2 diabetes,
+        no medical background.
+      evaluated: |
+        Hyperinsulinemic-euglycemic clamp studies demonstrate diminished
+        whole-body glucose disposal rates in T2DM subjects, with concurrent
+        attenuation of suppression of endogenous hepatic glucose production
+        upon exogenous insulin infusion; this dual derangement of glucose
+        homeostasis is further compounded by impaired incretin effect,
+        notably blunted GLP-1-mediated potentiation of glucose-stimulated
+        insulin secretion at the pancreatic beta cell.
+
+  # ───────────── Recursion for first-year programming students ─────────────
+  - id: recursion-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: first-year programming students who have just learned
+        about functions.
+      evaluated: |
+        Recursion is when a function calls itself. Think about counting
+        down from 5. You say "5" and then you count down from 4. To count
+        down from 4, you say "4" and then you count down from 3. Each step
+        is the same job, but with a smaller number. The function stops
+        when it reaches 0. That's all recursion is: a function that does a
+        small piece of the work and asks itself to do the rest.
+
+  - id: recursion-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: first-year programming students who have just learned
+        about functions.
+      evaluated: |
+        General recursion in the untyped lambda calculus is mediated by
+        fixed-point combinators such as the Y combinator, λf.(λx.f(x x))
+        (λx.f(x x)), which yields the least fixed point of any functional
+        under suitable strictness assumptions; in total functional
+        languages, structural recursion is constrained to recursion
+        schemes — catamorphisms, anamorphisms, hylomorphisms — that
+        guarantee termination via well-founded induction over inductive
+        datatypes.
+
+  # ───────────── Inflation for general audience ─────────────
+  - id: inflation-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: general public, no economics background, learning what
+        inflation is.
+      evaluated: |
+        Inflation means that things cost more this year than they did last
+        year. A loaf of bread that was $2 a year ago might cost $2.20 now.
+        Your money does not buy as much as it used to. When wages do not
+        go up as fast as prices, people feel poorer even if they earn the
+        same amount.
+
+  - id: inflation-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: general public, no economics background, learning what
+        inflation is.
+      evaluated: |
+        Inflation refers to a sustained increase in the general price level
+        of goods and services in an economy, typically measured by indices
+        such as the Consumer Price Index. Causes include demand-pull
+        pressures, when aggregate demand outpaces supply, and cost-push
+        factors, when input costs such as energy or labour rise. Central
+        banks aim to keep inflation low and stable, often targeting around
+        two percent per year.
+
+  - id: inflation-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: general public, no economics background, learning what
+        inflation is.
+      evaluated: |
+        Within a New Keynesian DSGE framework, the trajectory of inflation
+        is governed by a forward-looking Phillips curve in which current
+        inflation depends on expected future inflation and a measure of
+        real marginal cost, while monetary policy is characterised by an
+        interest-rate feedback rule satisfying the Taylor principle to
+        ensure determinacy of the rational-expectations equilibrium.
+
+  - id: inflation-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: general public, no economics background, learning what
+        inflation is.
+      evaluated: |
+        Cointegration analysis of the term structure of inflation
+        expectations, extracted via the affine no-arbitrage decomposition
+        of nominal and real yield curves into expected short rates and
+        time-varying term premia, indicates a statistically significant
+        long-run anchoring effect of credible inflation-targeting regimes,
+        with Granger-causal implications for the persistence parameter of
+        a fractionally integrated ARFIMA(p,d,q) specification of headline
+        CPI dynamics.
+
+  # ───────────── How an engine works for middle-school students ─────────────
+  - id: engine-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: middle-school students learning how a car engine works.
+      evaluated: |
+        A car engine works by burning a fuel-and-air mix inside small
+        chambers called cylinders. In each cylinder, a piston moves down to
+        draw in the mixture, then moves up to compress it. A spark plug
+        ignites the mixture, and the burning gases push the piston back
+        down with force. That motion is passed through rods to a spinning
+        crankshaft, which sends power to the wheels.
+
+  - id: engine-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: middle-school students learning how a car engine works.
+      evaluated: |
+        A four-stroke internal combustion engine operates through a
+        repeating sequence of intake, compression, power, and exhaust
+        strokes. During each cycle, the piston traverses the cylinder bore
+        twice, while the crankshaft completes two revolutions. Valves
+        actuated by the camshaft regulate the admission of the air-fuel
+        charge and the expulsion of combustion products in synchrony with
+        piston position.
+
+  # ───────────── Black holes for science-curious adults ─────────────
+  - id: blackhole-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: science-curious adults with a general high school
+        education.
+      evaluated: |
+        A black hole is a region of space whose gravity is too strong for
+        anything, including light, to escape. Most form when a massive
+        star ends its life and its core collapses under its own weight.
+        The boundary around the black hole is called the event horizon;
+        once something crosses it, it cannot get back out. The black hole
+        itself has no surface in the ordinary sense.
+
+  - id: blackhole-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: science-curious adults with a general high school
+        education.
+      evaluated: |
+        In the Kerr geometry, the outer event horizon is located at the
+        larger root of g^{rr} = 0 in Boyer-Lindquist coordinates, namely
+        r_+ = M + (M^2 - a^2)^{1/2}, where a denotes the specific angular
+        momentum; the ergoregion bounded externally by the stationary
+        limit surface admits negative-energy orbits exploited in the
+        Penrose process to extract rotational energy, while Hawking's
+        semiclassical analysis predicts a thermal flux at temperature
+        T = κ/(2π) where κ is the surface gravity.
+
+  # ───────────── How a vaccine factory makes vaccines ─────────────
+  - id: factory-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: children aged 8-10 learning how a factory makes a
+        vaccine.
+      evaluated: |
+        First, scientists grow a tiny, harmless copy of the germ in a big
+        tank. Then they take it out, clean it, and make sure it is safe.
+        They mix it with water and a few other safe things to make the
+        liquid for the shot. Workers put the liquid into small glass
+        bottles. Each bottle is checked, sealed, and packed in a cold box
+        before it is sent out to doctors.
+
+  - id: factory-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: children aged 8-10 learning how a factory makes a
+        vaccine.
+      evaluated: |
+        A vaccine factory starts by growing the germ, or just a small part
+        of it, in large tanks. Once enough has grown, the workers separate
+        the useful part from the rest and clean it carefully. They then
+        mix it with safe ingredients to make the final liquid. Machines
+        fill tiny bottles, seal them, and label them. The bottles are
+        kept cold while they travel to clinics.
+
+  - id: factory-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: children aged 8-10 learning how a factory makes a
+        vaccine.
+      evaluated: |
+        Vaccine manufacturing involves cultivating the antigenic component
+        in bioreactors, purifying it through filtration and
+        chromatography, and formulating it with adjuvants and stabilisers
+        before aseptic fill-and-finish operations. Each batch undergoes
+        rigorous quality control testing for potency, purity, and
+        sterility prior to release. Cold-chain logistics maintain product
+        integrity during distribution.
+
+  - id: factory-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: children aged 8-10 learning how a factory makes a
+        vaccine.
+      evaluated: |
+        Upstream bioprocessing involves perfusion cultivation of Vero or
+        HEK293 cell substrates in stirred-tank bioreactors under defined
+        chemically-formulated media, followed by viral inoculation and
+        subsequent harvest via tangential-flow microfiltration;
+        downstream purification employs orthogonal chromatographic
+        modalities — anion-exchange, hydrophobic interaction, and
+        multimodal mixed-mode resins — to achieve impurity clearance
+        targets specified by ICH Q6B guidelines.
+
+  # ───────────── Mortgages for first-time home buyers ─────────────
+  - id: mortgage-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: first-time home buyers with no finance background.
+      evaluated: |
+        A mortgage is a loan you take out to buy a house. The bank pays
+        for the house up front, and you pay the bank back a little each
+        month for many years. The bank also charges you extra for letting
+        you use the money; that extra part is called interest. If you
+        stop making payments, the bank can take the house back and sell
+        it to get its money.
+
+  - id: mortgage-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: first-time home buyers with no finance background.
+      evaluated: |
+        A mortgage is a secured loan used to finance the purchase of a
+        property, repayable over a fixed term, typically with monthly
+        installments comprising both principal and interest. The property
+        itself serves as collateral; failure to meet the agreed payment
+        schedule may result in foreclosure proceedings, by which the
+        lender can recover the outstanding debt through sale of the
+        secured asset.
+
+  - id: mortgage-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: first-time home buyers with no finance background.
+      evaluated: |
+        Residential mortgage instruments are characterised by their
+        amortisation schedule, prepayment optionality, and loan-to-value
+        ratio, the latter influencing the requirement for private mortgage
+        insurance. Adjustable-rate mortgages typically index to a
+        benchmark such as the secured overnight financing rate plus a
+        contractual margin, with periodic and lifetime caps constraining
+        the extent of rate resets during the loan term.
+
+  - id: mortgage-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: first-time home buyers with no finance background.
+      evaluated: |
+        Mortgage-backed security tranches are subject to negative
+        convexity arising from the embedded prepayment option exercised
+        by underlying obligors when refinancing incentives, parameterised
+        via the WAC-WAM-burnout triplet, drive option-adjusted spreads
+        below the static-spread benchmark; the resulting hedge ratios
+        derived from prepayment-model-implied effective durations require
+        dynamic rebalancing against the Treasury and swap curves as
+        rate-driven CPR projections shift.

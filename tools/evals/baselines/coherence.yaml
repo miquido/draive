@@ -1,0 +1,727 @@
+evaluator: coherence
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED passage purely on structural coherence relative to the
+    REFERENCE topic. Ignore factual correctness, depth, and style.
+  source: synthetic
+
+samples:
+  # ───────────── Photosynthesis ─────────────
+  - id: photosynthesis-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Photosynthesis is the process by which plants convert sunlight, water,
+        and carbon dioxide into glucose and oxygen.
+      evaluated: |
+        Photosynthesis begins when chlorophyll in a plant's leaves absorbs
+        energy from sunlight. That energy splits water molecules drawn up from
+        the roots, releasing oxygen as a byproduct. At the same time, the
+        plant pulls carbon dioxide from the air through tiny pores called
+        stomata. Using the captured energy, it combines the carbon dioxide
+        with hydrogen from the split water to build glucose. The glucose then
+        feeds the plant's growth, while the oxygen returns to the atmosphere
+        and, in turn, fuels nearly every animal on Earth.
+
+  - id: photosynthesis-good
+    human_score: good
+    inputs:
+      reference: |
+        Photosynthesis is the process by which plants convert sunlight, water,
+        and carbon dioxide into glucose and oxygen.
+      evaluated: |
+        Plants do photosynthesis to make food. Chlorophyll catches sunlight.
+        Water is split into hydrogen and oxygen. Carbon dioxide is also needed
+        and comes in through the leaves. The plant makes glucose this way,
+        which it uses to grow. Oxygen is also created, which is what we
+        breathe. Stomata are little holes in the leaves where gases move.
+        Photosynthesis is happening in green plants all the time during the
+        day.
+
+  - id: photosynthesis-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Photosynthesis is the process by which plants convert sunlight, water,
+        and carbon dioxide into glucose and oxygen.
+      evaluated: |
+        Glucose. Plants are green. Oxygen, we breathe it. Carbon dioxide is
+        bad sometimes but plants like it. Chlorophyll. Stomata is a word.
+        Water from the ground or rain. Sun. Plants make food from
+        photosynthesis which is how it works.
+
+  # ───────────── Compound interest ─────────────
+  - id: compound-interest-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Compound interest is the effect of earning interest both on an
+        original deposit and on the interest already accrued, causing the
+        balance to grow exponentially over time.
+      evaluated: |
+        Imagine you deposit $1,000 in an account that pays 5% per year. After
+        the first year, you have $1,050 — your original deposit plus $50 in
+        interest. In the second year, however, the 5% is calculated on the
+        full $1,050, not just the original $1,000, so you earn $52.50 instead
+        of $50. Each year the base grows a little larger, and so does the
+        interest it produces. Over a few decades that compounding effect
+        dwarfs the original deposit, which is why long-term savers care more
+        about the rate of compounding than about the size of any single
+        contribution.
+
+  - id: compound-interest-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Compound interest is the effect of earning interest both on an
+        original deposit and on the interest already accrued, causing the
+        balance to grow exponentially over time.
+      evaluated: |
+        Compound interest pays you interest on top of interest you've already
+        earned. Say you have $1,000 at 5% per year. After year one, you'd
+        have $1,050. In year two, the 5% applies to that $1,050, so you earn
+        $52.50 — slightly more than the year before. This pattern continues
+        each year. Over long periods the balance grows much faster than with
+        simple interest, since each year's growth widens the base for the
+        next.
+
+  - id: compound-interest-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Compound interest is the effect of earning interest both on an
+        original deposit and on the interest already accrued, causing the
+        balance to grow exponentially over time.
+      evaluated: |
+        Compound interest means more interest. Banks pay it. A higher rate is
+        better. Starting young matters a lot. $1,000 can become $5,000 over
+        time. There is also simple interest, which is different. Compound
+        interest is what makes savings grow.
+
+  # ───────────── Sourdough bread ─────────────
+  - id: sourdough-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Sourdough bread is leavened using a fermented mixture of flour and
+        water that hosts wild yeast and lactic-acid bacteria instead of
+        commercial baker's yeast.
+      evaluated: |
+        Sourdough bread begins with a starter — a mixture of flour and water
+        that captures wild yeast and lactic-acid bacteria from the
+        environment. The baker feeds the starter for several days until it
+        becomes bubbly and reliably active. To bake, the starter is mixed
+        with flour, water, and salt to form a dough, which is folded and
+        rested over several hours so the wild microbes can ferment the
+        sugars. Fermentation produces carbon dioxide that lifts the loaf and
+        organic acids that give sourdough its tang. The shaped loaf is then
+        baked at high heat to set the crumb and crust.
+
+  - id: sourdough-good
+    human_score: good
+    inputs:
+      reference: |
+        Sourdough bread is leavened using a fermented mixture of flour and
+        water that hosts wild yeast and lactic-acid bacteria instead of
+        commercial baker's yeast.
+      evaluated: |
+        You start with a starter. The starter is flour and water and you keep
+        feeding it. When it is active you mix it with more flour, water, and
+        salt. The dough needs to rest for many hours. Wild yeast inside the
+        starter makes it rise. The bread also gets a sour taste from
+        bacteria. After resting it is baked in a hot oven.
+
+  - id: sourdough-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Sourdough bread is leavened using a fermented mixture of flour and
+        water that hosts wild yeast and lactic-acid bacteria instead of
+        commercial baker's yeast.
+      evaluated: |
+        Sourdough is bread. A starter is part of it. You bake it. Flour,
+        water, salt are ingredients. Yeast is wild — not from the store.
+        It takes a long time. Sour because of bacteria. People like it.
+
+  # ───────────── Water cycle ─────────────
+  - id: water-cycle-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The water cycle describes how water continuously moves between the
+        oceans, the atmosphere, and the land through evaporation,
+        condensation, precipitation, and runoff.
+      evaluated: |
+        The water cycle begins as the sun warms the surface of oceans, lakes,
+        and rivers, causing liquid water to evaporate into the air. As that
+        vapor rises and cools, it condenses around tiny particles to form
+        clouds. When the droplets in a cloud become heavy enough, they fall
+        back to the ground as rain, snow, or hail. Some of that
+        precipitation soaks into the soil and replenishes groundwater, while
+        the rest runs across the land into streams and rivers that eventually
+        return to the ocean. From there the sun lifts the water back into
+        the air, and the cycle repeats.
+
+  - id: water-cycle-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The water cycle describes how water continuously moves between the
+        oceans, the atmosphere, and the land through evaporation,
+        condensation, precipitation, and runoff.
+      evaluated: |
+        Water moves in a loop between the sea, the sky, and the land. The sun
+        evaporates water from oceans and lakes into the air. The vapor cools
+        and forms clouds. The clouds release rain or snow back to the ground.
+        That water then runs off into rivers and eventually back to the ocean,
+        and groundwater also feeds back into rivers. After that, the sun
+        evaporates water again and it all starts over.
+
+  - id: water-cycle-good
+    human_score: good
+    inputs:
+      reference: |
+        The water cycle describes how water continuously moves between the
+        oceans, the atmosphere, and the land through evaporation,
+        condensation, precipitation, and runoff.
+      evaluated: |
+        The water cycle is a process. Water evaporates from the ocean.
+        Clouds form. It rains. Rivers flow. The sun is involved in heating
+        things up. Snow is also a kind of precipitation. Groundwater is
+        underground. Eventually water gets back to the ocean.
+
+  - id: water-cycle-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The water cycle describes how water continuously moves between the
+        oceans, the atmosphere, and the land through evaporation,
+        condensation, precipitation, and runoff.
+      evaluated: |
+        Rain. Cloud. The sun. Snow falls in winter. Rivers go somewhere.
+        Ocean is salty mostly. Evaporation is a word. Water cycle. Sometimes
+        there are puddles after rain.
+
+  # ───────────── Industrial Revolution ─────────────
+  - id: industrial-revolution-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The Industrial Revolution was a period beginning in late-18th-century
+        Britain during which mechanized production, steam power, and factory
+        organization transformed economies and societies.
+      evaluated: |
+        The Industrial Revolution started in late-18th-century Britain, where
+        a series of inventions made it possible to spin and weave cloth far
+        faster than any human hand. Steam engines, originally developed to
+        pump water out of coal mines, were soon adapted to power those new
+        machines and, eventually, locomotives and ships. As production
+        concentrated around steam-powered equipment, work shifted from
+        cottages into factories, drawing workers from the countryside into
+        rapidly growing industrial cities. The same logic spread to
+        ironworks, chemicals, and other industries, and over the following
+        century reshaped economies, labor, and daily life across Europe and
+        North America.
+
+  - id: industrial-revolution-good
+    human_score: good
+    inputs:
+      reference: |
+        The Industrial Revolution was a period beginning in late-18th-century
+        Britain during which mechanized production, steam power, and factory
+        organization transformed economies and societies.
+      evaluated: |
+        The Industrial Revolution happened in Britain first. Steam engines
+        were a big invention. Factories were built. People moved to cities
+        from the country. Coal was important too. Trains came later. Many
+        people worked in textile factories. It changed how people lived.
+
+  - id: industrial-revolution-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The Industrial Revolution was a period beginning in late-18th-century
+        Britain during which mechanized production, steam power, and factory
+        organization transformed economies and societies.
+      evaluated: |
+        Factories. Steam. Britain started it. Coal. Trains. Cities got
+        bigger. People worked long hours. There were inventions. Textiles
+        also. Pollution.
+
+  # ───────────── How a bicycle works ─────────────
+  - id: bicycle-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A bicycle converts the rider's pedaling motion into forward
+        movement using a chain, gears, and two wheels.
+      evaluated: |
+        When the rider pushes the pedals, the front sprocket turns. A chain
+        wraps around that sprocket and around a smaller gear on the rear
+        wheel, so the rear wheel spins along with the pedals. Because the
+        front sprocket is larger than the rear gear, one full pedal stroke
+        rotates the rear wheel multiple times, which is why even a modest
+        push moves the bike forward quickly. The handlebars steer the front
+        wheel, and the rider's balance keeps the whole thing upright.
+
+  - id: bicycle-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A bicycle converts the rider's pedaling motion into forward
+        movement using a chain, gears, and two wheels.
+      evaluated: |
+        Pedals. Chain. Bike rolls. Tires get flat sometimes. Gears. You sit
+        on the seat. Forward. Handlebars to steer maybe. Two wheels usually.
+
+  # ───────────── Caffeine ─────────────
+  - id: caffeine-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Caffeine is a stimulant that increases alertness by blocking
+        adenosine receptors in the brain.
+      evaluated: |
+        Throughout the day, a chemical called adenosine builds up in the
+        brain and binds to specialized receptors, producing the feeling of
+        tiredness. Caffeine has a molecular shape similar enough to
+        adenosine that it can slide into those same receptors without
+        activating them, blocking adenosine from doing so. With the
+        tiredness signal interrupted, neurons stay more active, the heart
+        rate ticks up slightly, and the drinker feels more alert. As the
+        body metabolizes caffeine over the following hours, adenosine
+        regains access to its receptors and ordinary tiredness returns.
+
+  - id: caffeine-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Caffeine is a stimulant that increases alertness by blocking
+        adenosine receptors in the brain.
+      evaluated: |
+        Coffee has caffeine. People drink it. Adenosine is in the brain.
+        Caffeine wakes you up. There are receptors. Too much is bad. Tea
+        also has it.
+
+  # ───────────── DNA and genes ─────────────
+  - id: dna-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        DNA is a long molecule inside cells that stores genetic information
+        in sequences called genes, which the cell reads to build proteins.
+      evaluated: |
+        Inside almost every cell of a living organism sits a long, twisted
+        molecule called DNA. The molecule is built from four chemical
+        letters — A, T, C, and G — arranged in a precise order. Stretches of
+        that order are grouped into units called genes, and each gene acts
+        like a recipe. When the cell needs a particular protein, it copies
+        the matching gene into a working draft, then hands that draft to
+        molecular machinery that translates the letters into a chain of
+        amino acids. The resulting protein folds into a specific shape and
+        carries out a specific job, which is how the instructions written in
+        DNA become the structures and behaviors of a living body.
+
+  - id: dna-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        DNA is a long molecule inside cells that stores genetic information
+        in sequences called genes, which the cell reads to build proteins.
+      evaluated: |
+        DNA is the molecule that stores genetic information. It is made of
+        four bases — A, T, C, and G — strung together in a long sequence.
+        Specific stretches of that sequence are called genes. Each gene
+        codes for a protein. When the cell needs that protein, it reads the
+        gene and builds the protein from amino acids. Proteins then do most
+        of the work in the body, from digesting food to building muscle.
+
+  - id: dna-good
+    human_score: good
+    inputs:
+      reference: |
+        DNA is a long molecule inside cells that stores genetic information
+        in sequences called genes, which the cell reads to build proteins.
+      evaluated: |
+        DNA stores information in cells. It is made of four bases. Genes are
+        parts of DNA. Genes tell the cell how to make proteins. Proteins do
+        many things in the body. DNA is in the nucleus of the cell. It is
+        shaped like a double helix.
+
+  - id: dna-fair
+    human_score: fair
+    inputs:
+      reference: |
+        DNA is a long molecule inside cells that stores genetic information
+        in sequences called genes, which the cell reads to build proteins.
+      evaluated: |
+        DNA has letters: A, T, C, G. Genes. Proteins. Double helix.
+        Information is stored. The cell uses it. Inheritance from parents.
+
+  - id: dna-poor
+    human_score: poor
+    inputs:
+      reference: |
+        DNA is a long molecule inside cells that stores genetic information
+        in sequences called genes, which the cell reads to build proteins.
+      evaluated: |
+        Genes. DNA double helix. Watson Crick. A T C G are letters.
+        Proteins are made somehow. The nucleus is a place. Information.
+
+  # ───────────── Tides ─────────────
+  - id: tides-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Ocean tides are the regular rise and fall of sea levels caused
+        primarily by the gravitational pull of the Moon, and to a lesser
+        extent the Sun, on Earth's water.
+      evaluated: |
+        Ocean tides happen because the Moon's gravity tugs on Earth, and
+        water — being free to flow — responds to that tug more easily than
+        the solid ground does. On the side of Earth facing the Moon, water
+        bulges slightly toward it; on the opposite side, the planet itself
+        is pulled away from the water, leaving a second bulge behind. As
+        Earth rotates beneath these two bulges roughly once a day, any
+        given coastline passes through them in turn, experiencing two high
+        tides and two low tides. The Sun adds a smaller second pull, and
+        when Sun and Moon align, the combined effect produces the largest
+        tides, known as spring tides.
+
+  - id: tides-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Ocean tides are the regular rise and fall of sea levels caused
+        primarily by the gravitational pull of the Moon, and to a lesser
+        extent the Sun, on Earth's water.
+      evaluated: |
+        Tides are caused by the Moon's gravity pulling on the oceans. The
+        water bulges toward the Moon on one side of Earth and on the
+        opposite side as well. As Earth rotates, every coast passes through
+        the bulges, which is why we see two high tides and two low tides a
+        day. The Sun also contributes a smaller effect, and when both align
+        you get especially big tides.
+
+  - id: tides-good
+    human_score: good
+    inputs:
+      reference: |
+        Ocean tides are the regular rise and fall of sea levels caused
+        primarily by the gravitational pull of the Moon, and to a lesser
+        extent the Sun, on Earth's water.
+      evaluated: |
+        The Moon causes tides. Water gets pulled by gravity. There are high
+        tides and low tides each day. The Sun also pulls on the water but
+        less. Sometimes tides are bigger, like at full moon. Coasts see the
+        change clearly.
+
+  - id: tides-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Ocean tides are the regular rise and fall of sea levels caused
+        primarily by the gravitational pull of the Moon, and to a lesser
+        extent the Sun, on Earth's water.
+      evaluated: |
+        The Moon pulls water. Tides go up and down. The Sun helps. Twice a
+        day usually. Spring tides exist. Beaches get wet.
+
+  - id: tides-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Ocean tides are the regular rise and fall of sea levels caused
+        primarily by the gravitational pull of the Moon, and to a lesser
+        extent the Sun, on Earth's water.
+      evaluated: |
+        Moon. Water. The sea. Gravity. Tides. High and low. Sometimes the
+        sun. Beach.
+
+  # ───────────── Vaccines ─────────────
+  - id: vaccines-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Vaccines train the immune system to recognize a specific pathogen
+        by exposing the body to a weakened, inactivated, or partial form of
+        it, so that a real infection can be neutralized quickly.
+      evaluated: |
+        A vaccine works by showing the immune system what a dangerous
+        pathogen looks like without exposing the body to the full disease.
+        It does this with a weakened or inactivated version of the pathogen,
+        or just a recognisable piece of it — often a single protein from
+        the surface. Specialised white blood cells encounter that material,
+        learn its molecular shape, and produce antibodies that can lock
+        onto it. Once the body has rehearsed this response, a small
+        population of memory cells stays behind. If the real pathogen ever
+        arrives, those memory cells trigger antibody production within
+        hours instead of days, stopping the infection before it can take
+        hold.
+
+  - id: vaccines-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Vaccines train the immune system to recognize a specific pathogen
+        by exposing the body to a weakened, inactivated, or partial form of
+        it, so that a real infection can be neutralized quickly.
+      evaluated: |
+        Vaccines work by teaching the immune system to recognise a
+        pathogen. The vaccine contains a harmless version — weakened, dead,
+        or just a piece of the pathogen. White blood cells study it and
+        make antibodies. The body also keeps memory cells. If the real
+        pathogen shows up later, those memory cells respond quickly so the
+        person doesn't get sick.
+
+  - id: vaccines-good
+    human_score: good
+    inputs:
+      reference: |
+        Vaccines train the immune system to recognize a specific pathogen
+        by exposing the body to a weakened, inactivated, or partial form of
+        it, so that a real infection can be neutralized quickly.
+      evaluated: |
+        Vaccines protect against diseases. They use a weak form of the
+        pathogen. The immune system learns to fight it. Antibodies are
+        produced. Later, if the real disease appears, the body is ready.
+        Memory cells are involved.
+
+  - id: vaccines-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Vaccines train the immune system to recognize a specific pathogen
+        by exposing the body to a weakened, inactivated, or partial form of
+        it, so that a real infection can be neutralized quickly.
+      evaluated: |
+        Immunity. Vaccines are shots. Antibodies. Pathogens. Memory cells.
+        Diseases are stopped. The immune system is involved somehow.
+
+  - id: vaccines-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Vaccines train the immune system to recognize a specific pathogen
+        by exposing the body to a weakened, inactivated, or partial form of
+        it, so that a real infection can be neutralized quickly.
+      evaluated: |
+        Shots. Doctor. Antibodies are a word. Sick or not sick. Immune.
+        Pathogen. Vaccine.
+
+  # ───────────── Plate tectonics ─────────────
+  - id: plate-tectonics-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Plate tectonics describes how Earth's outer shell is broken into
+        large rigid pieces that slowly move over the hotter, flowing
+        mantle beneath, producing earthquakes, volcanoes, and mountain
+        ranges where they interact.
+      evaluated: |
+        Earth's outer shell is not a single solid sphere but a mosaic of a
+        dozen or so rigid plates floating on the hotter, partly molten
+        mantle below. Convection currents in the mantle nudge those plates
+        a few centimetres per year — slow on a human scale, but enormous
+        over geological time. Where two plates pull apart, magma rises to
+        form new crust along mid-ocean ridges. Where they push together,
+        one may dive beneath the other, melting and feeding volcanoes
+        above, or the two may buckle upward into mountain ranges. Where
+        they slide past each other, the built-up friction releases in
+        sudden bursts that we feel as earthquakes.
+
+  - id: plate-tectonics-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Plate tectonics describes how Earth's outer shell is broken into
+        large rigid pieces that slowly move over the hotter, flowing
+        mantle beneath, producing earthquakes, volcanoes, and mountain
+        ranges where they interact.
+      evaluated: |
+        Earth's outer shell is split into large plates that slowly move
+        over the hot mantle underneath. They drift a few centimetres a
+        year. Where plates pull apart, new crust forms; where they collide,
+        one can slide under the other and produce volcanoes, or they push
+        up mountains. When plates grind past each other, the sudden release
+        of friction causes earthquakes.
+
+  - id: plate-tectonics-good
+    human_score: good
+    inputs:
+      reference: |
+        Plate tectonics describes how Earth's outer shell is broken into
+        large rigid pieces that slowly move over the hotter, flowing
+        mantle beneath, producing earthquakes, volcanoes, and mountain
+        ranges where they interact.
+      evaluated: |
+        The Earth has plates that move slowly. The mantle is underneath and
+        it is hot. Plates can crash into each other or pull apart. Mountains
+        form when plates push together. Earthquakes happen at plate edges.
+        Volcanoes too. Continents drift over time.
+
+  - id: plate-tectonics-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Plate tectonics describes how Earth's outer shell is broken into
+        large rigid pieces that slowly move over the hotter, flowing
+        mantle beneath, producing earthquakes, volcanoes, and mountain
+        ranges where they interact.
+      evaluated: |
+        Plates. The Earth moves. Mantle is hot. Earthquakes happen.
+        Volcanoes erupt. Mountains exist. Pangea is a word. Continents
+        drift.
+
+  - id: plate-tectonics-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Plate tectonics describes how Earth's outer shell is broken into
+        large rigid pieces that slowly move over the hotter, flowing
+        mantle beneath, producing earthquakes, volcanoes, and mountain
+        ranges where they interact.
+      evaluated: |
+        Volcanoes. Earthquake shaking. The Earth. Plates of some kind.
+        Mantle. Lava. Pangea maybe.
+
+  # ───────────── Electric circuits ─────────────
+  - id: circuits-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        An electric circuit is a closed loop through which electrons flow,
+        driven by a voltage source and shaped by components such as
+        resistors, switches, and light bulbs.
+      evaluated: |
+        An electric circuit is a continuous loop along which electrons can
+        move. The loop is powered by a source of voltage — a battery, for
+        example — which acts a bit like a pump, pushing electrons out of
+        one terminal and pulling them back in at the other. Wires guide
+        that flow, while components placed along the path do useful work:
+        a light bulb converts some of the electrical energy into heat and
+        light, a resistor limits how quickly electrons can pass, and a
+        switch can open the loop to cut the flow entirely. If the loop is
+        ever broken — by a flipped switch or a snipped wire — current
+        stops everywhere in the circuit, since electrons no longer have a
+        complete path to follow.
+
+  - id: circuits-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        An electric circuit is a closed loop through which electrons flow,
+        driven by a voltage source and shaped by components such as
+        resistors, switches, and light bulbs.
+      evaluated: |
+        An electric circuit is a closed loop. A voltage source such as a
+        battery pushes electrons around the loop. The wires carry the
+        electrons, and components along the way use the energy. A bulb
+        glows; a resistor slows the flow. A switch can break the loop and
+        stop the current. If the loop is open anywhere, no current flows.
+
+  - id: circuits-good
+    human_score: good
+    inputs:
+      reference: |
+        An electric circuit is a closed loop through which electrons flow,
+        driven by a voltage source and shaped by components such as
+        resistors, switches, and light bulbs.
+      evaluated: |
+        A circuit is a loop for electricity. A battery provides voltage.
+        Electrons move through the wires. Light bulbs glow when they get
+        electricity. Switches turn the circuit off. Resistors are also
+        used. The current needs a complete path.
+
+  - id: circuits-fair
+    human_score: fair
+    inputs:
+      reference: |
+        An electric circuit is a closed loop through which electrons flow,
+        driven by a voltage source and shaped by components such as
+        resistors, switches, and light bulbs.
+      evaluated: |
+        Battery. Wires. Bulb lights up. Switch. Voltage. Resistor. Loop.
+        Electrons move.
+
+  - id: circuits-poor
+    human_score: poor
+    inputs:
+      reference: |
+        An electric circuit is a closed loop through which electrons flow,
+        driven by a voltage source and shaped by components such as
+        resistors, switches, and light bulbs.
+      evaluated: |
+        Electricity. Wires. Battery is a thing. Lights. Switch off and on.
+        Voltage. Resistor maybe.
+
+  # ───────────── 3D printing ─────────────
+  - id: printing-3d-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        3D printing is a manufacturing process that builds an object layer
+        by layer from a digital model, using materials such as plastic,
+        resin, or metal.
+      evaluated: |
+        A 3D printer starts with a digital model of the object you want to
+        make. Software slices that model into hundreds or thousands of
+        thin horizontal layers and produces a path the printer can follow
+        for each one. The printer then deposits material along those
+        paths, one layer at a time: most consumer printers melt a strand
+        of plastic and extrude it through a moving nozzle, while
+        industrial machines may cure liquid resin with light or fuse metal
+        powder with a laser. Each new layer bonds to the one below it
+        before cooling or hardening, and after many such layers the
+        digital model has become a physical object.
+
+  - id: printing-3d-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        3D printing is a manufacturing process that builds an object layer
+        by layer from a digital model, using materials such as plastic,
+        resin, or metal.
+      evaluated: |
+        3D printing makes a physical object from a digital file by adding
+        material a layer at a time. Software first slices the model into
+        many flat layers. The printer then builds each layer in turn,
+        usually by melting plastic through a moving nozzle, although some
+        printers use resin or metal powder. Each layer sticks to the one
+        below, and after enough layers the object is complete.
+
+  - id: printing-3d-good
+    human_score: good
+    inputs:
+      reference: |
+        3D printing is a manufacturing process that builds an object layer
+        by layer from a digital model, using materials such as plastic,
+        resin, or metal.
+      evaluated: |
+        3D printers build things layer by layer. You start with a digital
+        model. The printer uses plastic mostly. Some use resin or metal.
+        The nozzle moves around and lays down material. After a while the
+        object is finished. Printers can be slow.
+
+  - id: printing-3d-fair
+    human_score: fair
+    inputs:
+      reference: |
+        3D printing is a manufacturing process that builds an object layer
+        by layer from a digital model, using materials such as plastic,
+        resin, or metal.
+      evaluated: |
+        Plastic. Nozzle. Layer by layer. Digital file. Printer. Resin too.
+        Hot. Slow.
+
+  - id: printing-3d-poor
+    human_score: poor
+    inputs:
+      reference: |
+        3D printing is a manufacturing process that builds an object layer
+        by layer from a digital model, using materials such as plastic,
+        resin, or metal.
+      evaluated: |
+        Plastic things. A printer. Layers somewhere. 3D model. Resin word.
+        Nozzle.

@@ -1,0 +1,448 @@
+evaluator: fluency
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED text on linguistic fluency — grammar, word choice,
+    naturalness, idiom. Ignore content accuracy, coherence, and structure.
+  source: synthetic
+
+samples:
+  # ───────────── Hotel description ─────────────
+  - id: hotel-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        The hotel sits on a quiet bend of the river, just five minutes on
+        foot from the old town square. Each room overlooks either the water
+        or the cobbled lane behind it, and breakfast is served in a sunny
+        courtyard until eleven.
+
+  - id: hotel-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        The hotel sits on a quiet bend of the river, only five minutes by
+        foot from the old town square. Every room looks out either onto the
+        water or the cobbled lane behind, and breakfast is served in a sunny
+        courtyard till eleven o'clock.
+
+  - id: hotel-good
+    human_score: good
+    inputs:
+      evaluated: |
+        The hotel is on a quiet bend of the river, only five minutes walking
+        from the old town square. Each room looks at either the water or the
+        cobbled street behind it, and the breakfast is served in a sunny
+        courtyard until eleven.
+
+  - id: hotel-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        The hotel located on quiet bend of river, only five minute walking
+        from old town square place. Every room is looking on the water or on
+        the cobbled lane in back, and breakfast they serve in sunny courtyard
+        until eleven hour.
+
+  - id: hotel-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Hotel is in place by river. The river bend make quiet. Walking on
+        foot five minute we is reaching at old town. Rooms looking water or
+        street stones. Breakfast they make outside until eleven of clock.
+
+  # ───────────── Weather forecast ─────────────
+  - id: weather-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Expect a bright, breezy morning across most of the country, with
+        scattered showers pushing in from the west by late afternoon.
+        Temperatures will peak around 18 degrees before dipping into single
+        digits overnight.
+
+  - id: weather-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Expect a bright and breezy morning over most of the country, with
+        some scattered showers moving in from the west by late afternoon.
+        Temperatures will reach around 18 degrees before falling into single
+        digits overnight.
+
+  - id: weather-good
+    human_score: good
+    inputs:
+      evaluated: |
+        The morning will be bright and a bit breezy across most parts of
+        the country. Some scattered showers will come from the west in the
+        late afternoon. Temperatures will go up to around 18 degrees and
+        then drop to single digits in the night.
+
+  - id: weather-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Morning will be bright with a little wind in most of country. Some
+        rain showers coming from west side in late afternoon time.
+        Temperatures going to be around 18 degree, and then dropping to one
+        digit numbers in the night.
+
+  - id: weather-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Morning is bright. Wind some. Country most place have it. Rains
+        comes from the west side at afternoon late. Temperature about 18
+        degree at high, after going down small number at night sleep time.
+
+  # ───────────── Product review (headphones) ─────────────
+  - id: headphones-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        After a month of daily commutes, I can confidently say these
+        headphones punch well above their price. The noise cancelling is
+        genuinely effective on the train, and the battery still has plenty
+        left at the end of a full workday.
+
+  - id: headphones-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        After a month of daily commuting, I can say with confidence that
+        these headphones punch above their price. The noise cancellation is
+        truly effective on the train, and there is still plenty of battery
+        at the end of a full workday.
+
+  - id: headphones-good
+    human_score: good
+    inputs:
+      evaluated: |
+        After one month of using them daily on the commute, I can say these
+        headphones are better than the price. The noise cancelling really
+        works on the train, and the battery still has a lot left after a
+        full day of work.
+
+  - id: headphones-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        After one month of daily commute using, I can say this headphone is
+        more better than the price what it has. Noise cancelling is working
+        truly good in the train, and battery is still having much remain
+        after one full work day end.
+
+  - id: headphones-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        One month I use everyday for go to work. Headphone is good more
+        than price money. Noise it cancel inside train very. Battery still
+        having power end of day work finish.
+
+  # ───────────── Recipe blurb (tomato soup) ─────────────
+  - id: soup-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Slow-roasting the tomatoes with a head of garlic and a drizzle of
+        olive oil concentrates their sweetness before they ever hit the pot.
+        Blend with warm stock and a splash of cream, and you have a soup
+        that tastes far more luxurious than its short ingredient list
+        suggests.
+
+  - id: soup-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Roasting the tomatoes slow with a head of garlic and some olive oil
+        makes them sweeter before they go in the pot. Blend them with warm
+        stock and a bit of cream, and the soup tastes much richer than the
+        short list of ingredients would make you think.
+
+  - id: soup-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Roasting tomato slow with one garlic head and small olive oil is
+        making the sweet more before going inside pot. Blending together
+        with warm stock and little cream, and soup is tasting much rich
+        than small ingredient list is saying.
+
+  - id: soup-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Tomato roast slow in oven. Garlic one piece big and olive oil for
+        pour. Sweet more becoming before pot. Blend stock warm, cream
+        little. Soup taste rich very much, more than small list say to
+        you.
+
+  # ───────────── Travel anecdote ─────────────
+  - id: travel-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        We got hopelessly lost on the way back from the temple, but a woman
+        selling mangoes by the roadside waved us into her cousin's pickup
+        and we ended up sharing dinner with three generations of his
+        family.
+
+  - id: travel-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        We got completely lost on the way back from the temple, but a woman
+        who was selling mangoes by the road waved us into her cousin's
+        pickup, and we ended up sharing dinner with three generations of
+        his family.
+
+  - id: travel-good
+    human_score: good
+    inputs:
+      evaluated: |
+        We got totally lost on the way back from the temple. A woman who was
+        selling mangoes near the road waved at us to get in her cousin's
+        pickup truck, and in the end we ate dinner with three generations
+        of his family.
+
+  - id: travel-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Coming back from temple, we lost all way. Woman near road, mango
+        selling. She wave hand us into pickup car of her cousin man. Dinner
+        eating with him family, three time generation people together.
+
+  # ───────────── Sports recap ─────────────
+  - id: sports-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Down by two with a minute to play, the home side mounted one final
+        push, drove the length of the pitch, and snatched an equaliser in
+        stoppage time that sent the stands into delirium.
+
+  - id: sports-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Trailing by two with a minute left to play, the home side put
+        together one last push, drove the length of the pitch, and grabbed
+        an equaliser in stoppage time that sent the stands into a frenzy.
+
+  - id: sports-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Being down by two with one minute remain to play, the home side
+        making one final pushing, driving across all length of the pitch
+        ground, and catching one equaliser at stoppage time, sending the
+        stands into the big crazy noise.
+
+  - id: sports-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Two goal less, only minute left for play. Home team push more one
+        time. Running all field long. Goal coming late time stoppage. Stand
+        people becoming very loud crazy noise.
+
+  # ───────────── Museum guide blurb ─────────────
+  - id: museum-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        The east wing houses the museum's celebrated collection of Dutch
+        still lifes, arranged so that the gleam of pewter in one canvas
+        seems to answer the curl of a lemon peel in the next.
+
+  - id: museum-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        The east wing holds the museum's famous collection of Dutch still
+        lifes, arranged in such a way that the gleam of pewter in one
+        painting seems to answer the curl of a lemon peel in the next.
+
+  - id: museum-good
+    human_score: good
+    inputs:
+      evaluated: |
+        The east wing has the museum's famous collection of Dutch still
+        life paintings. They are arranged so the shine of pewter in one
+        painting seems to match the curl of a lemon peel in the next one.
+
+  # ───────────── Customer service email ─────────────
+  - id: email-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Thank you for reaching out, and apologies for the trouble with your
+        order. I've issued a replacement, which should arrive within three
+        business days; please don't hesitate to write back if anything
+        else comes up.
+
+  - id: email-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Thank you for getting in touch, and sorry about the trouble with
+        your order. I have sent a replacement, which should be arriving in
+        three business days. Please write back if anything else comes up.
+
+  - id: email-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Thanks for the contacting us, and sorry for trouble with your order
+        one. I am sending the replacement, which is supposed to arrive in
+        three business day. Please writing back to us if other thing is
+        happening.
+
+  # ───────────── App review ─────────────
+  - id: app-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        The latest update finally fixes the sync issues that drove me up
+        the wall last spring, and the redesigned widget actually earns its
+        spot on my home screen.
+
+  - id: app-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        The latest update finally fixes the sync issues that drove me crazy
+        last spring, and the redesigned widget really does earn its place
+        on my home screen.
+
+  - id: app-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        New update fix the syncing problem from spring last time which was
+        big bad for me. Widget new design is okay for keep on home screen
+        also.
+
+  # ───────────── Gardening tip ─────────────
+  - id: garden-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Mulch your tomato beds with a generous layer of straw once the
+        soil has warmed; it keeps the roots cool, locks in moisture, and
+        spares you a fair amount of weeding through the rest of the
+        summer.
+
+  - id: garden-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Put a thick layer of straw on top of your tomato beds once the soil
+        is warm. It keeps the roots cool, holds the moisture in, and saves
+        you a lot of weeding for the rest of summer.
+
+  - id: garden-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Putting one thick straw layer on top of tomato bed when soil
+        becoming warm already. Roots are staying cool, moisture is keeping
+        in, and you are saving the much weed pulling work for rest of
+        summer time.
+
+  - id: garden-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Straw thick on top of tomato bed. Soil warm first need. Root cool
+        stay, water inside keep, weed pull work less for summer rest of
+        time.
+
+  # ───────────── Parenting advice ─────────────
+  - id: parenting-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Try not to fight every battle at bedtime. Pick one rule that really
+        matters — say, brushing teeth — and let the smaller skirmishes go
+        until everyone has had a decent night's sleep.
+
+  - id: parenting-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Try not to fight all the battles at bedtime. Pick one rule that
+        really matters, like brushing teeth, and let the small fights go
+        until everyone has had a good night of sleep.
+
+  - id: parenting-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Not fight every battle bedtime. One rule pick which matter, teeth
+        brush. Small fight leave alone until all peoples sleep good one
+        night.
+
+  # ───────────── Book blurb ─────────────
+  - id: book-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Set in a coastal town during the final months before a war that
+        nobody names, the novel follows a young postmistress whose letters
+        start to outlive the people they were meant to reach.
+
+  - id: book-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Story is happening in one coastal town in final months before war
+        which nobody is naming. Novel is following young postmistress
+        woman whose letters are starting to live longer than people who
+        was supposed to receive them.
+
+  # ───────────── Restaurant menu description ─────────────
+  - id: menu-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Slow-braised lamb shoulder, finished with rosemary and lemon zest,
+        served on top of creamy white-bean purée with a handful of bitter
+        greens.
+
+  - id: menu-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Lamb shoulder braised slow, finishing with rosemary herb and lemon
+        zest peel, serving over creamy white bean puree mash with one
+        bunch of bitter green leaves.
+
+  - id: menu-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Lamb meat shoulder cook slow long time. Rosemary, lemon peel for
+        finish. White bean make creamy under. Bitter green leaf on top
+        side.
+
+  # ───────────── Movie review snippet ─────────────
+  - id: movie-good
+    human_score: good
+    inputs:
+      evaluated: |
+        The film mostly relies on its lead actors for the first hour, and
+        then it quietly becomes something stranger and more tender than
+        the trailer made you expect.
+
+  - id: movie-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        For the first hour film is mostly leaning on its lead actors, and
+        after that it is becoming quietly something more strange and more
+        tender than what the trailer is letting you to expect.

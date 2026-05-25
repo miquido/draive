@@ -1,0 +1,521 @@
+evaluator: similarity
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED text on semantic similarity to REFERENCE. Paraphrases
+    score highest; topically distant content scores lowest. Style and quality
+    do not factor in.
+  source: synthetic
+
+samples:
+  # ───────────── Weather observation ─────────────
+  - id: weather-observation-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        It rained heavily in Warsaw last night, flooding several streets in
+        the city center.
+      evaluated: |
+        A heavy downpour hit Warsaw overnight and left a number of downtown
+        streets under water.
+
+  - id: weather-observation-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        It rained heavily in Warsaw last night, flooding several streets in
+        the city center.
+      evaluated: |
+        Warsaw saw intense rainfall yesterday evening, and a few central
+        roads ended up flooded.
+
+  - id: weather-observation-good
+    human_score: good
+    inputs:
+      reference: |
+        It rained heavily in Warsaw last night, flooding several streets in
+        the city center.
+      evaluated: |
+        Storms moved across central Poland overnight and caused localized
+        flooding in a number of towns.
+
+  - id: weather-observation-fair
+    human_score: fair
+    inputs:
+      reference: |
+        It rained heavily in Warsaw last night, flooding several streets in
+        the city center.
+      evaluated: |
+        Warsaw has been dealing with infrastructure issues in its older
+        districts for several years.
+
+  - id: weather-observation-poor
+    human_score: poor
+    inputs:
+      reference: |
+        It rained heavily in Warsaw last night, flooding several streets in
+        the city center.
+      evaluated: |
+        The new art exhibition at the national gallery opens to the public
+        next Saturday.
+
+  # ───────────── Sports score ─────────────
+  - id: sports-score-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Real Madrid defeated Barcelona 3-1 in the league match on Sunday.
+      evaluated: |
+        In Sunday's league fixture, Real Madrid beat Barcelona by a score of
+        three goals to one.
+
+  - id: sports-score-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Real Madrid defeated Barcelona 3-1 in the league match on Sunday.
+      evaluated: |
+        Sunday's clasico ended with a 3-1 win for Real Madrid over their
+        Catalan rivals.
+
+  - id: sports-score-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Real Madrid defeated Barcelona 3-1 in the league match on Sunday.
+      evaluated: |
+        Barcelona's youth academy has produced a steady stream of national
+        team players over the last decade.
+
+  - id: sports-score-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Real Madrid defeated Barcelona 3-1 in the league match on Sunday.
+      evaluated: |
+        The new tax law takes effect at the beginning of the next fiscal
+        quarter.
+
+  # ───────────── Recipe step ─────────────
+  - id: recipe-step-good
+    human_score: good
+    inputs:
+      reference: |
+        Whisk the eggs with a pinch of salt and pour the mixture into a
+        hot, lightly buttered pan.
+      evaluated: |
+        Crack a few eggs into a bowl, season them, and cook them up in a
+        skillet however you like.
+
+  - id: recipe-step-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Whisk the eggs with a pinch of salt and pour the mixture into a
+        hot, lightly buttered pan.
+      evaluated: |
+        Free-range eggs tend to have richer yolks than eggs from caged
+        hens.
+
+  # ───────────── Scientific finding ─────────────
+  - id: scientific-finding-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Researchers found that regular moderate exercise reduces the risk
+        of cardiovascular disease in adults over fifty.
+      evaluated: |
+        A study showed that adults past the age of fifty who do moderate
+        exercise regularly are less likely to develop heart disease.
+
+  - id: scientific-finding-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Researchers found that regular moderate exercise reduces the risk
+        of cardiovascular disease in adults over fifty.
+      evaluated: |
+        New research suggests that people over fifty who stay moderately
+        active each week lower their chances of heart trouble.
+
+  - id: scientific-finding-good
+    human_score: good
+    inputs:
+      reference: |
+        Researchers found that regular moderate exercise reduces the risk
+        of cardiovascular disease in adults over fifty.
+      evaluated: |
+        Several recent papers have linked physical activity to better
+        long-term health outcomes in older populations.
+
+  - id: scientific-finding-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Researchers found that regular moderate exercise reduces the risk
+        of cardiovascular disease in adults over fifty.
+      evaluated: |
+        The municipal library is offering free creative-writing workshops
+        on Thursday evenings.
+
+  # ───────────── Historical event ─────────────
+  - id: historical-event-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The Berlin Wall fell in November 1989, marking the symbolic end of
+        the Cold War division of Europe.
+      evaluated: |
+        In November 1989 the Berlin Wall came down, serving as the symbolic
+        close of the Cold War split across Europe.
+
+  - id: historical-event-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The Berlin Wall fell in November 1989, marking the symbolic end of
+        the Cold War division of Europe.
+      evaluated: |
+        The collapse of the Berlin Wall in late 1989 is widely seen as the
+        moment that symbolically ended the East-West divide on the
+        continent.
+
+  - id: historical-event-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The Berlin Wall fell in November 1989, marking the symbolic end of
+        the Cold War division of Europe.
+      evaluated: |
+        Modern street food in Bangkok blends Chinese, Thai, and Malay
+        influences in roughly equal measure.
+
+  # ───────────── Customer complaint ─────────────
+  - id: customer-complaint-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        My order arrived two weeks late and one of the items was broken,
+        so I would like a refund.
+      evaluated: |
+        The package showed up a fortnight after the promised date and one
+        of the products inside was damaged, so I'm requesting my money
+        back.
+
+  - id: customer-complaint-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        My order arrived two weeks late and one of the items was broken,
+        so I would like a refund.
+      evaluated: |
+        My delivery was about two weeks behind schedule and an item
+        arrived broken — please issue a refund.
+
+  - id: customer-complaint-fair
+    human_score: fair
+    inputs:
+      reference: |
+        My order arrived two weeks late and one of the items was broken,
+        so I would like a refund.
+      evaluated: |
+        Online retailers have generally improved their packaging standards
+        over the last few years.
+
+  # ───────────── Product description ─────────────
+  - id: product-description-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        This wireless keyboard is compact, has backlit keys, and lasts
+        about a month on a single charge.
+      evaluated: |
+        A small wireless keyboard with illuminated keys, offering roughly
+        a month of use per charge.
+
+  - id: product-description-good
+    human_score: good
+    inputs:
+      reference: |
+        This wireless keyboard is compact, has backlit keys, and lasts
+        about a month on a single charge.
+      evaluated: |
+        The keyboard is portable and works well for travel; it pairs over
+        Bluetooth with most laptops and tablets.
+
+  - id: product-description-fair
+    human_score: fair
+    inputs:
+      reference: |
+        This wireless keyboard is compact, has backlit keys, and lasts
+        about a month on a single charge.
+      evaluated: |
+        Mechanical keyboards are popular among gamers because of their
+        tactile switches and customizable layouts.
+
+  - id: product-description-poor
+    human_score: poor
+    inputs:
+      reference: |
+        This wireless keyboard is compact, has backlit keys, and lasts
+        about a month on a single charge.
+      evaluated: |
+        The new community garden behind the library will start accepting
+        plot applications in March.
+
+  # ───────────── Code comment ─────────────
+  - id: code-comment-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Returns the cached value if available, otherwise computes and
+        stores it before returning.
+      evaluated: |
+        If a cached value exists, it is returned directly; otherwise the
+        value is computed, stored in the cache, and then returned.
+
+  - id: code-comment-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Returns the cached value if available, otherwise computes and
+        stores it before returning.
+      evaluated: |
+        Looks up the cache first and returns the stored value on hit; on
+        a miss, computes the value, caches it, and returns it.
+
+  - id: code-comment-good
+    human_score: good
+    inputs:
+      reference: |
+        Returns the cached value if available, otherwise computes and
+        stores it before returning.
+      evaluated: |
+        Implements a memoization helper that avoids recomputing expensive
+        results across repeated calls.
+
+  - id: code-comment-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Returns the cached value if available, otherwise computes and
+        stores it before returning.
+      evaluated: |
+        Redis is often used as an in-memory cache in front of slower
+        primary databases.
+
+  - id: code-comment-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Returns the cached value if available, otherwise computes and
+        stores it before returning.
+      evaluated: |
+        The conference badges will be distributed at the registration desk
+        on the first morning.
+
+  # ───────────── Travel plan ─────────────
+  - id: travel-plan-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        We're flying to Lisbon on Friday and spending the weekend exploring
+        the old town.
+      evaluated: |
+        Our flight to Lisbon leaves on Friday, and we plan to wander
+        around the historic district for the whole weekend.
+
+  - id: travel-plan-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        We're flying to Lisbon on Friday and spending the weekend exploring
+        the old town.
+      evaluated: |
+        We head to Lisbon by plane on Friday and will spend a couple of
+        days walking through the older neighborhoods.
+
+  - id: travel-plan-good
+    human_score: good
+    inputs:
+      reference: |
+        We're flying to Lisbon on Friday and spending the weekend exploring
+        the old town.
+      evaluated: |
+        We've booked a short Portuguese getaway later in the week and are
+        looking forward to the food and the weather.
+
+  - id: travel-plan-poor
+    human_score: poor
+    inputs:
+      reference: |
+        We're flying to Lisbon on Friday and spending the weekend exploring
+        the old town.
+      evaluated: |
+        Please remember to refill the printer paper before tomorrow's
+        board meeting.
+
+  # ───────────── Financial summary ─────────────
+  - id: financial-summary-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The company reported a 12% increase in quarterly revenue, driven
+        mainly by strong international sales.
+      evaluated: |
+        Quarterly revenue rose by 12% at the firm, with most of the growth
+        coming from sales outside the home market.
+
+  - id: financial-summary-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The company reported a 12% increase in quarterly revenue, driven
+        mainly by strong international sales.
+      evaluated: |
+        The business posted a roughly 12% jump in revenue for the quarter,
+        largely thanks to robust performance abroad.
+
+  - id: financial-summary-good
+    human_score: good
+    inputs:
+      reference: |
+        The company reported a 12% increase in quarterly revenue, driven
+        mainly by strong international sales.
+      evaluated: |
+        The firm's latest earnings report drew positive reactions from
+        analysts following the stock.
+
+  - id: financial-summary-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The company reported a 12% increase in quarterly revenue, driven
+        mainly by strong international sales.
+      evaluated: |
+        Several large multinationals have announced layoffs in their
+        European operations this year.
+
+  # ───────────── Medical advice ─────────────
+  - id: medical-advice-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        If you have a mild fever, stay hydrated, rest, and call a doctor
+        only if symptoms worsen or last more than three days.
+      evaluated: |
+        With a low-grade fever, focus on fluids and rest; only contact a
+        physician if things get worse or the fever lingers beyond three
+        days.
+
+  - id: medical-advice-good
+    human_score: good
+    inputs:
+      reference: |
+        If you have a mild fever, stay hydrated, rest, and call a doctor
+        only if symptoms worsen or last more than three days.
+      evaluated: |
+        When you feel under the weather, take it easy and pay attention to
+        how your body responds over the following days.
+
+  - id: medical-advice-fair
+    human_score: fair
+    inputs:
+      reference: |
+        If you have a mild fever, stay hydrated, rest, and call a doctor
+        only if symptoms worsen or last more than three days.
+      evaluated: |
+        Pharmacies in most countries can recommend over-the-counter
+        remedies for common seasonal complaints.
+
+  - id: medical-advice-poor
+    human_score: poor
+    inputs:
+      reference: |
+        If you have a mild fever, stay hydrated, rest, and call a doctor
+        only if symptoms worsen or last more than three days.
+      evaluated: |
+        The orchestra is preparing a program of mid-twentieth-century
+        chamber works for next month's concert.
+
+  # ───────────── Weather warning ─────────────
+  - id: weather-warning-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A strong wind warning has been issued for the coastal region until
+        midnight, with gusts expected to reach 90 km/h.
+      evaluated: |
+        The coastal area is under a high-wind warning until late tonight,
+        with gusts predicted to hit around 90 km/h.
+
+  - id: weather-warning-good
+    human_score: good
+    inputs:
+      reference: |
+        A strong wind warning has been issued for the coastal region until
+        midnight, with gusts expected to reach 90 km/h.
+      evaluated: |
+        Forecasters are urging residents along the shore to expect rough
+        conditions through the night.
+
+  - id: weather-warning-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A strong wind warning has been issued for the coastal region until
+        midnight, with gusts expected to reach 90 km/h.
+      evaluated: |
+        Coastal towns have invested heavily in seawall reinforcements over
+        the past decade.
+
+  - id: weather-warning-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A strong wind warning has been issued for the coastal region until
+        midnight, with gusts expected to reach 90 km/h.
+      evaluated: |
+        The bakery on the corner has started selling sourdough loaves on
+        weekday mornings.
+
+  # ───────────── Simple instructions ─────────────
+  - id: simple-instructions-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Press and hold the power button for ten seconds to restart the
+        device.
+      evaluated: |
+        Keep the power button pressed for about ten seconds to reboot the
+        device.
+
+  - id: simple-instructions-good
+    human_score: good
+    inputs:
+      reference: |
+        Press and hold the power button for ten seconds to restart the
+        device.
+      evaluated: |
+        If the device freezes, you can force it to restart using one of
+        the hardware buttons.
+
+  - id: simple-instructions-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Press and hold the power button for ten seconds to restart the
+        device.
+      evaluated: |
+        Charging cables for many newer devices have switched to USB-C
+        connectors.
+
+  - id: simple-instructions-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Press and hold the power button for ten seconds to restart the
+        device.
+      evaluated: |
+        The neighborhood film club is screening a silent-era classic this
+        Thursday evening.

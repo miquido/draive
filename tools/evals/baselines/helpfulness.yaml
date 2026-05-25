@@ -1,0 +1,1086 @@
+evaluator: helpfulness
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED response on how effectively it advances the specific
+    goal in USER_QUERY. Generic, evasive, or off-goal responses score lower
+    even if the writing is polished.
+  source: synthetic
+
+samples:
+  # ───────────── Debug Python KeyError ─────────────
+  - id: debug-python-keyerror-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        My Python script crashes with `KeyError: 'user_id'` on this line:
+        `name = data['user_id']`. `data` is a dict I built from
+        `json.loads(response.text)` after calling our internal API. It
+        works in dev but fails in production. How do I fix it?
+      evaluated: |
+        Your prod payload almost certainly omits `user_id` (anonymous
+        users, error responses, or a schema change). Three concrete steps:
+
+        1. Add `print(json.dumps(data, indent=2))` right before the
+           crashing line in production once, so you can see the actual
+           shape. Compare with a dev payload.
+        2. Switch the access to `data.get('user_id')` and branch on
+           `None`, e.g.
+               name = data.get('user_id')
+               if name is None:
+                   logger.warning("missing user_id in payload: %s",
+                                  data.get('id', '?'))
+                   return  # or a sensible default
+        3. If `user_id` is genuinely required, validate at the boundary:
+           `if 'user_id' not in data: raise ValueError(...)` right after
+           `json.loads`, so the failure is loud and near its source
+           instead of three layers in.
+
+        The dev/prod divergence is the smoking gun — capture one bad
+        payload and the root cause will be obvious.
+
+  - id: debug-python-keyerror-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        My Python script crashes with `KeyError: 'user_id'` on this line:
+        `name = data['user_id']`. `data` is a dict I built from
+        `json.loads(response.text)` after calling our internal API. It
+        works in dev but fails in production. How do I fix it?
+      evaluated: |
+        `KeyError` means the key isn't in the dict, so in prod your API
+        response sometimes doesn't include `user_id`. Replace
+        `data['user_id']` with `data.get('user_id')` and handle the
+        `None` case — log it and fall back, or raise a clearer error.
+        Also log the full `data` dict the first time it happens so you
+        can see what prod is actually sending.
+
+  - id: debug-python-keyerror-good
+    human_score: good
+    inputs:
+      user_query: |
+        My Python script crashes with `KeyError: 'user_id'` on this line:
+        `name = data['user_id']`. `data` is a dict I built from
+        `json.loads(response.text)` after calling our internal API. It
+        works in dev but fails in production. How do I fix it?
+      evaluated: |
+        A `KeyError` means the key isn't in the dictionary. Your
+        production API response probably doesn't always include
+        `user_id`. You can use `data.get('user_id')` instead, which
+        returns `None` when the key is missing, and then decide what to
+        do from there.
+
+  - id: debug-python-keyerror-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        My Python script crashes with `KeyError: 'user_id'` on this line:
+        `name = data['user_id']`. `data` is a dict I built from
+        `json.loads(response.text)` after calling our internal API. It
+        works in dev but fails in production. How do I fix it?
+      evaluated: |
+        A `KeyError` in Python happens when you try to access a key that
+        doesn't exist in a dictionary. You should always handle errors
+        properly in production code. Use try/except blocks, validate
+        your inputs, and write tests. Logging is also important.
+
+  - id: debug-python-keyerror-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        My Python script crashes with `KeyError: 'user_id'` on this line:
+        `name = data['user_id']`. `data` is a dict I built from
+        `json.loads(response.text)` after calling our internal API. It
+        works in dev but fails in production. How do I fix it?
+      evaluated: |
+        Debugging production issues can be tricky! Python is a great
+        language with a vibrant community. Have you considered using a
+        different language, like Go or Rust, which have stronger typing?
+        It really depends on your situation.
+
+  # ───────────── Trip to Tokyo ─────────────
+  - id: trip-tokyo-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I'm planning a 7-day trip to Tokyo with my partner in late
+        October. Budget is about $3,000 total excluding flights. We
+        like food, neighborhood walks, and one day-trip out of the
+        city. Not interested in clubbing or theme parks. What would
+        you suggest?
+      evaluated: |
+        For late October (cool, dry, peak walking weather) with $3,000
+        on the ground for two, a workable plan:
+
+        Lodging (~$1,000): book a small hotel in Shinjuku or Kuramae
+        (around $140/night double). Both have easy JR + Metro access.
+
+        Days 1–2 — Shinjuku/Shibuya base: Omoide Yokocho for cheap
+        yakitori, Shibuya crossing at night, walk Yoyogi Park → Meiji
+        Shrine in the morning.
+        Day 3 — Yanaka/Nezu walk + Ueno Park; lunch at Kayaba Coffee.
+        Day 4 — Tsukiji Outer Market for breakfast, then Ginza/Marunouchi,
+        finish at the free observation deck in the Tokyo Metropolitan
+        Government Building.
+        Day 5 — Day trip: Hakone via Romancecar (~$70/pp round trip,
+        plus a Hakone Free Pass ~$55). Open-air museum + onsen + Mt.
+        Fuji views from Lake Ashi. Late October usually has color.
+        Day 6 — Kuramae/Asakusa walk, Senso-ji early to avoid crowds,
+        coffee at Leaves Coffee Apartment, evening izakaya in
+        Nishi-Asakusa.
+        Day 7 — teamLab Planets (book ahead, ~$28/pp), then last meal
+        somewhere splurgy — try Tonkatsu Maisen Aoyama.
+
+        Food: budget ~$80/day for two eats well (conveyor sushi, ramen,
+        izakaya). One nice meal (~$120) mid-trip.
+        Transit: get IC cards (Suica/Pasmo) at the airport; skip the
+        7-day JR Pass unless you're going beyond Hakone.
+
+        Rough totals: lodging $980, transit + day trip $300, food $560,
+        attractions $80, contingency $1,080. You'll have room for one
+        splurge dinner or a kaiseki lunch.
+
+  - id: trip-tokyo-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I'm planning a 7-day trip to Tokyo with my partner in late
+        October. Budget is about $3,000 total excluding flights. We
+        like food, neighborhood walks, and one day-trip out of the
+        city. Not interested in clubbing or theme parks. What would
+        you suggest?
+      evaluated: |
+        Stay in Shinjuku or Asakusa — both fit your budget at around
+        $130–150/night for a small double, which leaves plenty for
+        food. Spend a couple of days walking Yanaka, Kuramae, and the
+        Meiji Shrine/Yoyogi loop. For food, hit Omoide Yokocho and
+        Tsukiji Outer Market, and book one nicer dinner mid-trip.
+        For your day trip, take the Romancecar to Hakone — onsen,
+        views, autumn color, easy to do in a day with the Hakone Free
+        Pass. Skip the JR Pass; just use a Suica card on Tokyo metro.
+
+  - id: trip-tokyo-good
+    human_score: good
+    inputs:
+      user_query: |
+        I'm planning a 7-day trip to Tokyo with my partner in late
+        October. Budget is about $3,000 total excluding flights. We
+        like food, neighborhood walks, and one day-trip out of the
+        city. Not interested in clubbing or theme parks. What would
+        you suggest?
+      evaluated: |
+        Tokyo in October is a great choice. You should stay somewhere
+        central like Shinjuku or Shibuya. Plan to eat at lots of
+        different places — ramen, sushi, izakaya. Take long walks
+        through different neighborhoods. For your day trip, Hakone or
+        Kamakura are both popular options. Get a transit card to make
+        getting around easy. Your budget should be enough.
+
+  - id: trip-tokyo-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I'm planning a 7-day trip to Tokyo with my partner in late
+        October. Budget is about $3,000 total excluding flights. We
+        like food, neighborhood walks, and one day-trip out of the
+        city. Not interested in clubbing or theme parks. What would
+        you suggest?
+      evaluated: |
+        When planning a trip to Tokyo, you should: book accommodation
+        in advance, get travel insurance, exchange currency, check
+        visa requirements, learn a few Japanese phrases, pack
+        appropriate clothing, and plan your itinerary. Tokyo has many
+        things to see including temples, shrines, museums, and
+        restaurants.
+
+  - id: trip-tokyo-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I'm planning a 7-day trip to Tokyo with my partner in late
+        October. Budget is about $3,000 total excluding flights. We
+        like food, neighborhood walks, and one day-trip out of the
+        city. Not interested in clubbing or theme parks. What would
+        you suggest?
+      evaluated: |
+        It really depends on what you're into! Everyone's trip is
+        different. Have you considered Kyoto instead? It's very
+        cultural. Or maybe a cruise — cruises are a relaxing way to
+        travel. The most important thing is to enjoy yourselves.
+
+  # ───────────── Buy Headphones ─────────────
+  - id: buy-headphones-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I want to buy over-ear headphones for working from a noisy
+        open-plan office. Budget up to $350. Must have active noise
+        cancellation, comfortable for 6+ hours, and reliable Bluetooth
+        multipoint so I can switch between my MacBook and iPhone. I
+        don't care about audiophile sound. Which should I get?
+      evaluated: |
+        Given your priorities (ANC, all-day comfort, rock-solid
+        multipoint, Apple ecosystem, sub-$350), the Sony WH-1000XM5 is
+        the strongest match — usually $329–349 and currently the best
+        ANC in the class, with stable two-device multipoint that
+        handles Mac↔iPhone handoff cleanly. The lighter clamp and
+        single-piece headband are noticeably more comfortable for long
+        sessions than the XM4.
+
+        Close runner-up: Bose QuietComfort Ultra (around $429 list but
+        regularly $349 on sale). Slightly better call mic and Bose's
+        traditionally comfortable fit; ANC is on par with the XM5.
+        Watch for a sale; at full price it's over budget.
+
+        Skip for you: AirPods Max (over budget, no multipoint with
+        non-Apple, heavy). Sennheiser Momentum 4 (ANC noticeably weaker
+        than Sony/Bose in office chatter).
+
+        Action: buy the XM5 from a retailer with a 30-day return window
+        (Best Buy, Amazon, B&H). Test on your actual office floor for a
+        week — that's the only way to confirm the ANC handles your
+        specific noise profile. If the fit bothers you, return and try
+        the QC Ultra on sale.
+
+  - id: buy-headphones-good
+    human_score: good
+    inputs:
+      user_query: |
+        I want to buy over-ear headphones for working from a noisy
+        open-plan office. Budget up to $350. Must have active noise
+        cancellation, comfortable for 6+ hours, and reliable Bluetooth
+        multipoint so I can switch between my MacBook and iPhone. I
+        don't care about audiophile sound. Which should I get?
+      evaluated: |
+        In your price range and for office use, look at the Sony
+        WH-1000XM5 and the Bose QuietComfort Ultra. Both have strong
+        ANC and good comfort, and both support multipoint. The Sony
+        often runs around $330 and the Bose more like $400 but it goes
+        on sale. Either would work well for what you describe; read a
+        few reviews and pick the one you like the look of.
+
+  - id: buy-headphones-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I want to buy over-ear headphones for working from a noisy
+        open-plan office. Budget up to $350. Must have active noise
+        cancellation, comfortable for 6+ hours, and reliable Bluetooth
+        multipoint so I can switch between my MacBook and iPhone. I
+        don't care about audiophile sound. Which should I get?
+      evaluated: |
+        When buying headphones, consider sound quality, comfort,
+        battery life, build quality, price, and brand reputation.
+        Active noise cancellation is a useful feature. Read reviews
+        before buying. Major brands include Sony, Bose, Sennheiser,
+        Apple, and Beats. Try them on if possible.
+
+  - id: buy-headphones-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I want to buy over-ear headphones for working from a noisy
+        open-plan office. Budget up to $350. Must have active noise
+        cancellation, comfortable for 6+ hours, and reliable Bluetooth
+        multipoint so I can switch between my MacBook and iPhone. I
+        don't care about audiophile sound. Which should I get?
+      evaluated: |
+        Have you thought about earbuds instead? Or maybe just asking
+        for a quieter desk? Open-plan offices are tough. Honestly, the
+        best headphones are the ones you enjoy using. Different people
+        like different things.
+
+  # ───────────── Recipe with Limited Ingredients ─────────────
+  - id: recipe-pasta-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I have spaghetti, 3 eggs, half a block of parmesan, garlic,
+        olive oil, salt, black pepper, and one onion. No bacon, no
+        cream, no parsley. Can you give me a 20-minute dinner recipe
+        for two?
+      evaluated: |
+        Make a stripped-down carbonara-style spaghetti. Serves 2,
+        ~20 minutes.
+
+        1. Bring a large pot of well-salted water to a boil. Drop in
+           about 200 g (half a 1-lb box) of spaghetti.
+        2. While it cooks, finely dice half the onion and mince 2
+           garlic cloves. In a wide pan over medium-low heat, sweat
+           the onion in 3 tbsp olive oil for 5–6 min until soft and
+           sweet, then add garlic for 30 seconds. Don't brown.
+        3. In a bowl, beat 2 whole eggs + 1 yolk (save the extra
+           white for breakfast). Grate ~50 g parmesan into the eggs.
+           Add a heavy crack of black pepper — maybe 30 turns. Whisk.
+        4. Just before the pasta is al dente, scoop out a mug of
+           pasta water. Drain the pasta and tip it into the onion
+           pan, off the heat. Toss for 30 seconds so the pan cools
+           slightly.
+        5. Pour the egg-cheese mix over the pasta, tossing
+           constantly. Add splashes of the reserved pasta water until
+           it's silky, not scrambled. If it looks dry, more water; if
+           loose, return briefly to very low heat while tossing.
+        6. Plate, finish with more parmesan and pepper.
+
+        The onion stands in for the bacon's sweetness; the extra yolk
+        replaces the cream's richness. Total active time ~15 min.
+
+  - id: recipe-pasta-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I have spaghetti, 3 eggs, half a block of parmesan, garlic,
+        olive oil, salt, black pepper, and one onion. No bacon, no
+        cream, no parsley. Can you give me a 20-minute dinner recipe
+        for two?
+      evaluated: |
+        Boil 200 g spaghetti in well-salted water. While it cooks,
+        sweat half a diced onion and 2 minced garlic cloves in 3 tbsp
+        olive oil over medium-low heat until soft. Whisk 2 whole eggs
+        plus 1 yolk with about 50 g grated parmesan and lots of black
+        pepper. Save a mug of pasta water before draining. Toss the
+        hot pasta into the onion pan off the heat, then pour in the
+        egg-cheese mix, tossing fast and adding splashes of pasta
+        water until silky. Serve immediately with more parmesan and
+        pepper.
+
+  - id: recipe-pasta-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I have spaghetti, 3 eggs, half a block of parmesan, garlic,
+        olive oil, salt, black pepper, and one onion. No bacon, no
+        cream, no parsley. Can you give me a 20-minute dinner recipe
+        for two?
+      evaluated: |
+        With pasta and eggs you can make many dishes. Pasta carbonara
+        is a classic Italian dish that traditionally uses eggs and
+        cheese. You could also make pasta with garlic and oil (aglio
+        e olio). Italian cooking emphasizes simple ingredients and
+        good technique. Be sure to salt your pasta water well.
+
+  - id: recipe-pasta-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I have spaghetti, 3 eggs, half a block of parmesan, garlic,
+        olive oil, salt, black pepper, and one onion. No bacon, no
+        cream, no parsley. Can you give me a 20-minute dinner recipe
+        for two?
+      evaluated: |
+        Cooking with what you have on hand is a great skill! Have you
+        thought about ordering takeout instead? Sometimes a night off
+        from cooking is what you really need. There's a lot to be
+        said for the social aspect of a meal out.
+
+  # ───────────── Fix a Leaky Faucet ─────────────
+  - id: fix-leaky-faucet-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        My kitchen faucet drips constantly from the spout, not the
+        handle. It's a single-handle Moen with a small lever on top.
+        I'm renting and want to fix it myself without calling a
+        plumber. I have an adjustable wrench, screwdrivers, and pliers.
+        What do I do?
+      evaluated: |
+        A single-handle Moen dripping from the spout almost always
+        means a worn cartridge — the brass-and-plastic insert under
+        the handle. Replacing it takes 20–30 minutes.
+
+        1. Shut off both supply valves under the sink (turn clockwise
+           until firm). Open the faucet to confirm no water comes out
+           and to relieve pressure.
+        2. Pop the decorative cap on top of the handle (small flat-
+           head screwdriver, pry gently). Under it is a Phillips or
+           hex screw — unscrew and lift the handle off.
+        3. You'll see a dome-shaped cap and a retaining clip (a
+           horseshoe-shaped metal piece). Pull the clip straight up
+           with pliers; it's the only thing holding the cartridge
+           down. Don't lose it.
+        4. Grip the cartridge stem with pliers and pull straight up.
+           If it's stuck, Moen sells a $10 plastic puller that
+           threads over the stem; most home stores carry it.
+        5. Note the cartridge's orientation (there's a notch or flat).
+           Buy a matching cartridge — Moen 1225 is the most common
+           single-handle one, ~$25 at any hardware store. Pictures of
+           your old one help.
+        6. Slide the new cartridge in the same orientation, replace
+           the clip (push down until it seats), reattach the handle
+           and cap, turn the supplies back on slowly, and check for
+           drips.
+
+        Tenant note: a $25 part and a YouTube search is reasonable
+        DIY, but text your landlord first — many leases require
+        notice, and some will reimburse. Save the receipt and the old
+        cartridge.
+
+  - id: fix-leaky-faucet-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        My kitchen faucet drips constantly from the spout, not the
+        handle. It's a single-handle Moen with a small lever on top.
+        I'm renting and want to fix it myself without calling a
+        plumber. I have an adjustable wrench, screwdrivers, and pliers.
+        What do I do?
+      evaluated: |
+        Drips from the spout on a single-handle Moen almost always
+        mean the cartridge needs replacing. Shut off the supply
+        valves under the sink, pop the cap on top of the handle,
+        unscrew the handle, pull out the horseshoe-shaped retaining
+        clip with pliers, then pull the cartridge straight up. Take
+        it to a hardware store and match it (Moen 1225 fits most
+        single-handle ones). Drop the new one in the same orientation,
+        clip back on, handle back on, water back on. Also tell your
+        landlord first since you're renting.
+
+  - id: fix-leaky-faucet-good
+    human_score: good
+    inputs:
+      user_query: |
+        My kitchen faucet drips constantly from the spout, not the
+        handle. It's a single-handle Moen with a small lever on top.
+        I'm renting and want to fix it myself without calling a
+        plumber. I have an adjustable wrench, screwdrivers, and pliers.
+        What do I do?
+      evaluated: |
+        A drip from the spout on a single-handle faucet usually
+        means a worn cartridge inside. You'll need to turn off the
+        water under the sink, take the handle apart, remove the old
+        cartridge, and put in a new one. Moen replacement parts are
+        easy to find at any hardware store.
+
+  - id: fix-leaky-faucet-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        My kitchen faucet drips constantly from the spout, not the
+        handle. It's a single-handle Moen with a small lever on top.
+        I'm renting and want to fix it myself without calling a
+        plumber. I have an adjustable wrench, screwdrivers, and pliers.
+        What do I do?
+      evaluated: |
+        Plumbing repairs can be tricky! If you're not careful you
+        could cause water damage. Since you're renting, it's really
+        the landlord's responsibility anyway. Have you considered
+        just letting them know? That's usually the easiest path.
+
+  # ───────────── Career Pivot ─────────────
+  - id: career-pivot-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I'm a 32-year-old paralegal with 8 years of experience and a
+        bachelor's in English. I want to move into UX research within
+        12 months without taking on debt. I can study about 10 hours
+        a week. What concrete path would you recommend?
+      evaluated: |
+        You have two huge transferable assets: structured interviewing
+        and synthesizing evidence under deadline. Lean on those.
+
+        12-month plan, ~10h/week:
+
+        Months 1–3: Take the free Google UX Design certificate on
+        Coursera (audit for free) — skip the design-heavy modules and
+        focus on the research ones. In parallel, read Erika Hall's
+        "Just Enough Research" (~$20 used) and Steve Portigal's
+        "Interviewing Users."
+        Months 3–6: Do two unpaid mini-projects. Pick a small local
+        nonprofit or your firm itself and run a real research study:
+        5 user interviews + a written report and an Airtable affinity
+        diagram. These become your portfolio.
+        Months 6–9: Apply for Junior UX Researcher or "Research
+        Coordinator" roles, plus contract gigs on User Interviews
+        (the platform) to build paid experience. Reframe your resume
+        around "qualitative research, stakeholder interviews,
+        evidence synthesis."
+        Months 9–12: Network into 1–2 weekly coffee chats with UX
+        researchers via LinkedIn — most will say yes if you ask
+        specific questions. Many UXR hires happen through referrals.
+
+        Skip: expensive bootcamps ($8–15k, low ROI for research
+        specifically) and a Master's (overkill for entry-level).
+
+  - id: career-pivot-good
+    human_score: good
+    inputs:
+      user_query: |
+        I'm a 32-year-old paralegal with 8 years of experience and a
+        bachelor's in English. I want to move into UX research within
+        12 months without taking on debt. I can study about 10 hours
+        a week. What concrete path would you recommend?
+      evaluated: |
+        UX research is a good fit because your paralegal background
+        gives you interviewing and synthesis skills. Take an online
+        UX course (Coursera or Interaction Design Foundation are
+        affordable), read some foundational books on user research,
+        and build a small portfolio of 2–3 projects. Then start
+        applying for junior UX research positions. Networking with
+        people already in the field will help a lot.
+
+  - id: career-pivot-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I'm a 32-year-old paralegal with 8 years of experience and a
+        bachelor's in English. I want to move into UX research within
+        12 months without taking on debt. I can study about 10 hours
+        a week. What concrete path would you recommend?
+      evaluated: |
+        A career change is a big decision. To switch careers
+        successfully you should: identify your transferable skills,
+        do research on the new field, build relevant skills, create
+        a portfolio, network with people in the field, and apply for
+        jobs. It also helps to have a financial cushion. UX research
+        is a growing field.
+
+  - id: career-pivot-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I'm a 32-year-old paralegal with 8 years of experience and a
+        bachelor's in English. I want to move into UX research within
+        12 months without taking on debt. I can study about 10 hours
+        a week. What concrete path would you recommend?
+      evaluated: |
+        Career changes are very personal! Have you thought about
+        whether you really want to leave law? Many paralegals go on
+        to law school, which can be very rewarding. Or you could
+        stay where you are — there's something to be said for
+        stability. Follow your passion.
+
+  # ───────────── Email Deadline Extension ─────────────
+  - id: email-deadline-extension-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        Help me draft an email to my professor (Dr. Chen) asking for a
+        3-day extension on my term paper, which is due Friday. The
+        real reason is that I got the flu over the weekend and lost
+        4 days of work. I want to be honest, professional, and not
+        beg. Can you write it for me?
+      evaluated: |
+        Here's a draft you can paste in and tweak. Honest, brief, no
+        groveling, with a concrete new date.
+
+        Subject: Request for 3-day extension on term paper
+
+        Dear Dr. Chen,
+
+        I'm writing to ask whether it would be possible to submit my
+        term paper on Monday instead of Friday. I came down with the
+        flu over the weekend and was unable to work on it for about
+        four days, which has left me short of the time I need to
+        finish at the quality I'd like to turn in.
+
+        I have a complete outline and a partial draft already, and I
+        am confident I can have a finished paper to you by 5pm
+        Monday. If a shorter extension would work better, I'm happy
+        to take whatever you can offer.
+
+        Thank you for considering this — and apologies for the
+        late-week notice.
+
+        Best regards,
+        [Your name]
+        [Course name / section]
+
+        Tips: send it before Friday's deadline, not after. If you have
+        a doctor's note or a campus health visit, mention it in one
+        sentence ("I have a note from Student Health if useful").
+
+  - id: email-deadline-extension-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        Help me draft an email to my professor (Dr. Chen) asking for a
+        3-day extension on my term paper, which is due Friday. The
+        real reason is that I got the flu over the weekend and lost
+        4 days of work. I want to be honest, professional, and not
+        beg. Can you write it for me?
+      evaluated: |
+        Subject: Request for an extension on the term paper
+
+        Dear Dr. Chen,
+
+        I'd like to ask for a three-day extension on the term paper,
+        moving my submission from Friday to Monday. I had the flu
+        over the weekend and lost about four days of writing time,
+        and I'd prefer to turn in something I'm proud of rather than
+        rush a weakened draft. I have an outline and partial draft
+        already and can commit to Monday.
+
+        Thank you for considering it.
+
+        Best,
+        [Your name]
+
+  - id: email-deadline-extension-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        Help me draft an email to my professor (Dr. Chen) asking for a
+        3-day extension on my term paper, which is due Friday. The
+        real reason is that I got the flu over the weekend and lost
+        4 days of work. I want to be honest, professional, and not
+        beg. Can you write it for me?
+      evaluated: |
+        When writing an email to a professor, you should be polite,
+        clear, and concise. Use a professional greeting and sign-off.
+        Explain the situation honestly. Make your specific request
+        clearly. Proofread before sending. Always be respectful of
+        the professor's time.
+
+  - id: email-deadline-extension-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        Help me draft an email to my professor (Dr. Chen) asking for a
+        3-day extension on my term paper, which is due Friday. The
+        real reason is that I got the flu over the weekend and lost
+        4 days of work. I want to be honest, professional, and not
+        beg. Can you write it for me?
+      evaluated: |
+        Asking for extensions can be tricky! Every professor is
+        different. Some are flexible, others very strict. Have you
+        considered just turning in what you have? Sometimes a B is
+        better than the stress of asking. Trust your gut on this one.
+
+  # ───────────── Math: Derivative ─────────────
+  - id: math-derivative-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I'm stuck finding the derivative of f(x) = x^2 * sin(x). I
+        know the answer is supposed to use the product rule but I
+        keep getting confused about which part is which. Can you
+        walk me through it?
+      evaluated: |
+        The product rule says: if f(x) = u(x) * v(x), then
+            f'(x) = u'(x) * v(x) + u(x) * v'(x).
+
+        Step 1 — label the pieces. Pick which factor is u and which
+        is v. It doesn't matter which is which, just be consistent:
+            u(x) = x^2
+            v(x) = sin(x)
+
+        Step 2 — differentiate each piece on its own:
+            u'(x) = 2x          (power rule)
+            v'(x) = cos(x)      (standard derivative of sin)
+
+        Step 3 — plug into the rule. Write it out before simplifying:
+            f'(x) = u'(x) * v(x)  +  u(x) * v'(x)
+                  = (2x)(sin(x)) +  (x^2)(cos(x))
+
+        So f'(x) = 2x·sin(x) + x²·cos(x).
+
+        The trick people get stuck on is mixing up which factor gets
+        differentiated. Always write the template first
+        (u'·v + u·v'), then drop the labelled pieces in — never try
+        to compute it in your head.
+
+  - id: math-derivative-good
+    human_score: good
+    inputs:
+      user_query: |
+        I'm stuck finding the derivative of f(x) = x^2 * sin(x). I
+        know the answer is supposed to use the product rule but I
+        keep getting confused about which part is which. Can you
+        walk me through it?
+      evaluated: |
+        Use the product rule: (uv)' = u'v + uv'. Let u = x² and
+        v = sin(x). Then u' = 2x and v' = cos(x). Putting it
+        together gives f'(x) = 2x·sin(x) + x²·cos(x).
+
+  - id: math-derivative-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I'm stuck finding the derivative of f(x) = x^2 * sin(x). I
+        know the answer is supposed to use the product rule but I
+        keep getting confused about which part is which. Can you
+        walk me through it?
+      evaluated: |
+        Calculus can be tough! Don't give up. Have you tried
+        watching some YouTube videos? Khan Academy is good. Math is
+        all about practice. You'll get there!
+
+  # ───────────── Choose Task Tracker ─────────────
+  - id: choose-task-tracker-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I run a small consulting firm with 4 people. We need a task
+        tracker for client projects: must support tasks per client,
+        time tracking, simple invoicing, work offline-friendly, and
+        cost under $20/user/month. We use Macs. What should we pick?
+      evaluated: |
+        Your "tasks + time + invoicing in one tool, under $20/seat"
+        constraint narrows this hard. The strongest match is
+        Productive.io — explicitly built for small consultancies,
+        bundles tasks per client/project, time tracking, and
+        invoicing in one workspace. Pricing is around $11/user/month
+        for the Essential plan, well under your cap. Native Mac and
+        iOS apps; the iOS app handles timer entry offline and syncs.
+
+        Close second: Harvest (time + invoicing, $11/seat) paired
+        with Asana free or Trello free for tasks. Cheaper, but
+        you'll do double entry between two tools and lose the
+        per-client roll-up.
+
+        Skip: Monday.com and ClickUp — add-ons push you past $20 for
+        invoicing. Jira — wrong shape entirely for client work. Bare
+        Notion — fine for tasks but no real time tracking or invoices.
+
+        Action: start a Productive.io trial today, port one live
+        client over for a week, and confirm the invoicing exports
+        cleanly to your accounting tool (it does QBO, Xero, and PDF).
+        Decide at end of week.
+
+  - id: choose-task-tracker-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I run a small consulting firm with 4 people. We need a task
+        tracker for client projects: must support tasks per client,
+        time tracking, simple invoicing, work offline-friendly, and
+        cost under $20/user/month. We use Macs. What should we pick?
+      evaluated: |
+        Look at Productive.io — it's built specifically for small
+        consultancies and bundles tasks-per-client, time tracking,
+        and invoicing in one place at around $11/seat. If you want
+        cheaper, pair Harvest (for time + invoices) with Asana free
+        (for tasks). Productive will be smoother because you skip
+        the double-entry between tools. Try a one-week trial with
+        one live client.
+
+  - id: choose-task-tracker-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I run a small consulting firm with 4 people. We need a task
+        tracker for client projects: must support tasks per client,
+        time tracking, simple invoicing, work offline-friendly, and
+        cost under $20/user/month. We use Macs. What should we pick?
+      evaluated: |
+        When choosing project management software, consider: features,
+        price, ease of use, integrations, mobile support, customer
+        support, and security. Popular tools include Asana, Trello,
+        Monday.com, ClickUp, Notion, and Jira. Take advantage of free
+        trials before committing.
+
+  # ───────────── Workout With Knee Injury ─────────────
+  - id: workout-knee-injury-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I sprained my left knee 3 weeks ago. My doctor cleared me for
+        low-impact exercise. I want to stay in shape for a 10K I'm
+        running in 8 weeks. What can I safely do, and what should I
+        avoid?
+      evaluated: |
+        With doctor clearance for low-impact, structure the next 8
+        weeks around three things: cardio that spares the knee,
+        targeted hip + glute work (the main contributors to knee
+        stability), and a gradual return to running.
+
+        Weeks 1–3 (now): cycle or pool-run 3x/week, 30–45 min,
+        moderate effort. Add 2x/week strength: glute bridges, side-
+        lying clamshells, single-leg balance, calf raises. Skip
+        running entirely.
+
+        Weeks 4–5: introduce treadmill walk-run (e.g. 1 min jog / 2
+        min walk for 30 min). If no pain or swelling next morning,
+        progress to 2:1, then 3:1.
+
+        Weeks 6–7: continuous easy runs up to 5 km, plus one cycle
+        session. Skip speed work.
+
+        Race week: one easy 3 km shakeout 3 days out, then rest.
+
+        Avoid: hill running, plyometrics, lunges, anything that hurts
+        during or the day after. Stop and ice if you feel a sharp
+        pain (vs general muscle soreness). 8 weeks to a 10K from
+        cleared-but-not-yet-running is doable if you skip a session
+        any time the knee complains rather than push through.
+
+  - id: workout-knee-injury-good
+    human_score: good
+    inputs:
+      user_query: |
+        I sprained my left knee 3 weeks ago. My doctor cleared me for
+        low-impact exercise. I want to stay in shape for a 10K I'm
+        running in 8 weeks. What can I safely do, and what should I
+        avoid?
+      evaluated: |
+        Stick with low-impact cardio like cycling and pool running to
+        keep your fitness while the knee finishes healing. Add some
+        glute and hip strengthening since those help knee stability.
+        Reintroduce running gradually — short walk-run intervals
+        first, then longer continuous runs. Avoid hills and sprints
+        until you're symptom-free. Back off if anything hurts.
+
+  - id: workout-knee-injury-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I sprained my left knee 3 weeks ago. My doctor cleared me for
+        low-impact exercise. I want to stay in shape for a 10K I'm
+        running in 8 weeks. What can I safely do, and what should I
+        avoid?
+      evaluated: |
+        Injuries are tough — listen to your body! Maybe this 10K
+        isn't meant to be. There will always be more races. Rest is
+        the best medicine. Have you tried meditation? It helps with
+        the disappointment.
+
+  # ───────────── College Elective ─────────────
+  - id: college-elective-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I'm a sophomore CS major with one open humanities elective
+        slot next semester. My options are: Intro to Philosophy of
+        Mind, Public Speaking, Latin American Literature, or
+        Linguistics 101. I want something that strengthens my
+        thinking for grad-school CS applications. Which should I
+        pick and why?
+      evaluated: |
+        Pick Linguistics 101.
+
+        For a CS application, the strongest signal you can send is
+        that you can reason formally about messy systems —
+        linguistics maps onto CS more directly than the others:
+        formal grammars, syntax trees, phonological rules, finite-
+        state machines. It's almost free overlap with theory of
+        computation and NLP. Admissions readers also recognize that
+        bridge.
+
+        Runner-up: Philosophy of Mind, if your interest leans toward
+        AI/ML grad work — it pairs well with arguments around
+        cognition, consciousness, and what counts as understanding.
+        Less directly useful as a "skill," but it shows the kind of
+        intellectual range adcoms appreciate.
+
+        Skip Public Speaking (useful life skill, but won't move a
+        grad app) and Latin American Lit (great course, but the
+        signal-to-grad-school is weakest of the four).
+
+        Tactical note: take Linguistics, and ask the professor in
+        office hours about NLP/comp-ling research opportunities by
+        midterm — that's the kind of relationship that turns an
+        elective into a recommendation letter.
+
+  - id: college-elective-good
+    human_score: good
+    inputs:
+      user_query: |
+        I'm a sophomore CS major with one open humanities elective
+        slot next semester. My options are: Intro to Philosophy of
+        Mind, Public Speaking, Latin American Literature, or
+        Linguistics 101. I want something that strengthens my
+        thinking for grad-school CS applications. Which should I
+        pick and why?
+      evaluated: |
+        I'd lean toward Linguistics 101 or Philosophy of Mind. Both
+        connect to CS topics — linguistics ties in with NLP and
+        formal grammars, and philosophy of mind connects to AI
+        questions. Either one would round out a CS application
+        well, more so than public speaking or literature in your
+        case.
+
+  - id: college-elective-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I'm a sophomore CS major with one open humanities elective
+        slot next semester. My options are: Intro to Philosophy of
+        Mind, Public Speaking, Latin American Literature, or
+        Linguistics 101. I want something that strengthens my
+        thinking for grad-school CS applications. Which should I
+        pick and why?
+      evaluated: |
+        Electives are a great opportunity to broaden your education.
+        Consider what interests you, what skills you want to build,
+        the workload, the professor's reputation, and how the course
+        fits with your other classes. All four of your options have
+        merit. Talk to your academic advisor for personalized
+        guidance.
+
+  # ───────────── Roommate Dispute ─────────────
+  - id: roommate-dispute-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        My roommate keeps leaving dirty dishes in the sink for days.
+        I've hinted twice and it hasn't changed. We're otherwise
+        friendly and I don't want to blow up the relationship. How
+        do I bring this up directly without it becoming a fight?
+      evaluated: |
+        Hints are easy to miss; you need one direct, low-temperature
+        conversation. Do it in person, not over text, and not in the
+        moment when the sink is full (defensive).
+
+        A script that usually lands well:
+
+        "Hey, can we talk for two minutes about the kitchen? Not a
+        big deal, but the dishes in the sink have been getting to me
+        more than I expected. Can we agree on a rule — like dishes
+        rinsed and in the dishwasher by the end of the day they're
+        used? I'd rather just sort it now than keep stewing on it."
+
+        Three things this does: names a concrete behavior, proposes
+        a specific rule (not a vague "be tidier"), and signals you
+        value the relationship enough to bring it up directly. Then
+        actually listen — there may be context you don't know.
+
+        If it still doesn't change after a week, follow up once:
+        "Hey, the dish thing again — what's making it hard? Can we
+        adjust the rule?" Most disputes resolve at step one or two.
+
+  - id: roommate-dispute-good
+    human_score: good
+    inputs:
+      user_query: |
+        My roommate keeps leaving dirty dishes in the sink for days.
+        I've hinted twice and it hasn't changed. We're otherwise
+        friendly and I don't want to blow up the relationship. How
+        do I bring this up directly without it becoming a fight?
+      evaluated: |
+        Have a direct conversation in person at a calm moment, not
+        right after seeing dirty dishes. Be specific about the
+        behavior and propose a concrete rule (like dishes done by
+        end of day). Keep your tone friendly and listen to their
+        side. Most people respond better to a clear ask than to
+        repeated hints.
+
+  - id: roommate-dispute-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        My roommate keeps leaving dirty dishes in the sink for days.
+        I've hinted twice and it hasn't changed. We're otherwise
+        friendly and I don't want to blow up the relationship. How
+        do I bring this up directly without it becoming a fight?
+      evaluated: |
+        Good communication is the key to healthy relationships. Use
+        "I" statements, choose a good time to talk, be respectful,
+        listen actively, and try to find a compromise. Conflict
+        resolution is an important life skill. Don't let things
+        build up.
+
+  # ───────────── Gift for Bird Watcher ─────────────
+  - id: gift-bird-watcher-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I need a $75-ish birthday gift for my dad. He's a serious
+        backyard bird watcher — he already has nice binoculars
+        (Nikon Monarchs) and a battered field guide. He lives in the
+        Pacific Northwest. What's a thoughtful, non-generic gift?
+      evaluated: |
+        Skip the obvious birdhouse-and-feeder route — he almost
+        certainly has those. Two strong options at your budget:
+
+        1. Merlin Bird ID Premium-ish bundle (~$70). The Merlin app
+           itself is free, but you can pair it with a small Bluetooth
+           lavalier mic clipped outside his window to dramatically
+           improve sound-ID accuracy for soft or distant calls. The
+           Hollyland Lark M1 single-mic set is around $55–70 and
+           punches above its weight; the upgrade is genuine for a
+           sound-ID user in a forested PNW yard.
+
+        2. Sibley's Birds West, 2nd edition (~$30), plus the Cornell
+           Lab's "Pacific Northwest Specialty Birds" wall print
+           (~$30) and a notebook for field notes (~$15). Anchors his
+           region specifically and the "battered field guide" is a
+           tell — he probably needs a fresh one but hasn't bothered.
+
+        Either lands as thoughtful precisely because it engages with
+        his actual practice. Option 1 is the bigger "wow"; option 2
+        is safer if he's a traditionalist.
+
+  - id: gift-bird-watcher-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I need a $75-ish birthday gift for my dad. He's a serious
+        backyard bird watcher — he already has nice binoculars
+        (Nikon Monarchs) and a battered field guide. He lives in the
+        Pacific Northwest. What's a thoughtful, non-generic gift?
+      evaluated: |
+        Gifts are so personal! The best gifts come from the heart.
+        Have you thought about a handwritten letter? Dads love
+        sentimental things. Or you could just take him out to dinner
+        — quality time means more than any object.
+
+  # ───────────── Learn Guitar in Limited Time ─────────────
+  - id: learn-guitar-weekend-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I have an acoustic guitar that's been sitting unused for a
+        year. I have a wedding in 6 weeks and want to be able to
+        play and sing one specific song ("Can't Help Falling in
+        Love") well enough not to embarrass myself. I can practice
+        30 min/day on weekdays. Where do I start?
+      evaluated: |
+        Drop "learn guitar" and just learn this one song. 6 weeks at
+        30 min/day is plenty for a beginner-friendly chord song like
+        this.
+
+        Week 1: tune the guitar (use the free GuitarTuna app).
+        Learn just four chords: C, G, Am, F. Skip the full-barre F
+        — use the easier "mini-F" (4-string version). 15 min/day on
+        clean chord shapes, 15 min on switching between C↔G and
+        Am↔F.
+        Week 2: keep working chord switches to one second or
+        faster. Add a simple down-down-down-down strum in time with
+        a metronome at 60 BPM.
+        Weeks 3–4: play along with the song using a chord chart
+        from Ultimate-Guitar (search the song title; pick a 4–5 star
+        chord version, capo as suggested for an easier key).
+        Practice singing one line at a time while playing — this is
+        the hardest part for most people.
+        Weeks 5–6: full play-throughs daily, end-to-end. Record
+        yourself on your phone once a week; it'll feel awkward but
+        it surfaces the wobbly parts faster than anything else.
+
+        Day of: don't drink before, capo your easier key, breathe
+        before starting. Aim for "competent and heartfelt," not
+        "perfect."
+
+  - id: learn-guitar-weekend-good
+    human_score: good
+    inputs:
+      user_query: |
+        I have an acoustic guitar that's been sitting unused for a
+        year. I have a wedding in 6 weeks and want to be able to
+        play and sing one specific song ("Can't Help Falling in
+        Love") well enough not to embarrass myself. I can practice
+        30 min/day on weekdays. Where do I start?
+      evaluated: |
+        Focus only on that one song rather than learning guitar
+        broadly. Look up the chords online (it's a fairly simple
+        progression), use a capo for an easier key if needed, and
+        spend the first couple of weeks just on clean chord changes.
+        Then add a basic strumming pattern, then add singing on top.
+        Record yourself once a week to catch mistakes. You should
+        be fine in 6 weeks.
+
+  - id: learn-guitar-weekend-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I have an acoustic guitar that's been sitting unused for a
+        year. I have a wedding in 6 weeks and want to be able to
+        play and sing one specific song ("Can't Help Falling in
+        Love") well enough not to embarrass myself. I can practice
+        30 min/day on weekdays. Where do I start?
+      evaluated: |
+        Learning guitar takes practice and patience. Start with the
+        basics: tuning, posture, basic chords, strumming. There are
+        many free resources online including YouTube tutorials and
+        apps. Be consistent with practice — daily is better than
+        long weekend sessions. Have fun with it.

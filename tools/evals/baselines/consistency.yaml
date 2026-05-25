@@ -1,0 +1,639 @@
+evaluator: consistency
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED passage on factual/logical consistency with REFERENCE.
+    Contradictions count; stylistic differences do not. Labelers judge only
+    against the reference text, not external knowledge.
+  source: synthetic
+
+samples:
+  # ───────────── Mercury (planet facts) ─────────────
+  - id: mercury-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Mercury is the closest planet to the Sun and the smallest planet in
+        our solar system. It has no moons and completes one orbit of the Sun
+        in about 88 Earth days.
+      evaluated: |
+        Mercury sits nearer to the Sun than any other planet and is the
+        smallest in our solar system. It has no moons of its own and
+        finishes a full lap around the Sun in roughly 88 Earth days.
+
+  - id: mercury-good
+    human_score: good
+    inputs:
+      reference: |
+        Mercury is the closest planet to the Sun and the smallest planet in
+        our solar system. It has no moons and completes one orbit of the Sun
+        in about 88 Earth days.
+      evaluated: |
+        Mercury is the closest planet to the Sun and the smallest in the
+        solar system. It has no moons and orbits the Sun in around 90 Earth
+        days.
+
+  - id: mercury-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Mercury is the closest planet to the Sun and the smallest planet in
+        our solar system. It has no moons and completes one orbit of the Sun
+        in about 88 Earth days.
+      evaluated: |
+        Mercury is the closest planet to the Sun. It is the second smallest
+        planet in the solar system and has two small moons. Its orbit lasts
+        about 88 Earth days.
+
+  - id: mercury-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Mercury is the closest planet to the Sun and the smallest planet in
+        our solar system. It has no moons and completes one orbit of the Sun
+        in about 88 Earth days.
+      evaluated: |
+        Venus is the closest planet to the Sun and the largest planet in the
+        solar system. Mercury has three moons and takes 365 Earth days to
+        orbit the Sun.
+
+  # ───────────── Battle of Hastings ─────────────
+  - id: hastings-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The Battle of Hastings was fought in 1066 between the Norman army of
+        William the Conqueror and the English forces of King Harold II.
+        William won, and Harold was killed during the battle.
+      evaluated: |
+        Fought in 1066, the Battle of Hastings pitted William the Conqueror's
+        Norman army against King Harold II's English forces. William emerged
+        victorious, and Harold died on the battlefield.
+
+  - id: hastings-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The Battle of Hastings was fought in 1066 between the Norman army of
+        William the Conqueror and the English forces of King Harold II.
+        William won, and Harold was killed during the battle.
+      evaluated: |
+        In 1066 the Normans under William the Conqueror faced the English
+        under King Harold II at Hastings. The Normans won the engagement and
+        Harold was slain in the fighting.
+
+  - id: hastings-good
+    human_score: good
+    inputs:
+      reference: |
+        The Battle of Hastings was fought in 1066 between the Norman army of
+        William the Conqueror and the English forces of King Harold II.
+        William won, and Harold was killed during the battle.
+      evaluated: |
+        The Battle of Hastings took place in 1066. William the Conqueror led
+        the Normans against the English under King Harold II. William won.
+        Harold was killed by an arrow to the eye during the battle.
+
+  - id: hastings-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The Battle of Hastings was fought in 1066 between the Norman army of
+        William the Conqueror and the English forces of King Harold II.
+        William won, and Harold was killed during the battle.
+      evaluated: |
+        The Battle of Hastings was fought in 1166 between the French army of
+        Harold the Conqueror and the Scottish forces of King William II.
+        Harold lost the battle but survived and later took the throne.
+
+  # ───────────── Tennis tiebreak rules ─────────────
+  - id: tennis-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        In standard tennis tiebreaks, the first player to reach 7 points
+        wins, but they must lead by at least 2 points. Players alternate
+        serve after the first point, then every two points thereafter.
+      evaluated: |
+        A standard tennis tiebreak is decided by the first player to reach
+        7 points, provided they are ahead by at least 2. Service alternates
+        between players after the first point and then every two points
+        afterward.
+
+  - id: tennis-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        In standard tennis tiebreaks, the first player to reach 7 points
+        wins, but they must lead by at least 2 points. Players alternate
+        serve after the first point, then every two points thereafter.
+      evaluated: |
+        Tiebreaks in standard tennis go to whichever player first hits 7
+        points, so long as their lead is at least 2. After the opening
+        point, serve switches, and from then on it changes every two
+        points.
+
+  - id: tennis-fair
+    human_score: fair
+    inputs:
+      reference: |
+        In standard tennis tiebreaks, the first player to reach 7 points
+        wins, but they must lead by at least 2 points. Players alternate
+        serve after the first point, then every two points thereafter.
+      evaluated: |
+        In a standard tennis tiebreak the first to 7 points wins, even by a
+        single point. Serve switches every three points throughout the
+        tiebreak.
+
+  - id: tennis-poor
+    human_score: poor
+    inputs:
+      reference: |
+        In standard tennis tiebreaks, the first player to reach 7 points
+        wins, but they must lead by at least 2 points. Players alternate
+        serve after the first point, then every two points thereafter.
+      evaluated: |
+        In a standard tennis tiebreak, the first player to reach 5 points
+        wins outright with no lead requirement. One player serves the entire
+        tiebreak from start to finish.
+
+  # ───────────── Smartphone spec sheet ─────────────
+  - id: phone-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The Model X phone has a 6.1-inch OLED display, 128 GB of storage,
+        and a 4,000 mAh battery. It supports wireless charging and is rated
+        IP68 for water resistance.
+      evaluated: |
+        Model X features a 6.1-inch OLED screen, 128 GB of internal storage,
+        and a 4,000 mAh battery. Wireless charging is supported, and the
+        phone carries an IP68 water-resistance rating.
+
+  - id: phone-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The Model X phone has a 6.1-inch OLED display, 128 GB of storage,
+        and a 4,000 mAh battery. It supports wireless charging and is rated
+        IP68 for water resistance.
+      evaluated: |
+        The Model X comes with a 6.1-inch OLED display and 128 GB of
+        storage. Its battery holds 4,000 mAh, it can charge wirelessly, and
+        it is IP68 rated against water.
+
+  - id: phone-good
+    human_score: good
+    inputs:
+      reference: |
+        The Model X phone has a 6.1-inch OLED display, 128 GB of storage,
+        and a 4,000 mAh battery. It supports wireless charging and is rated
+        IP68 for water resistance.
+      evaluated: |
+        Model X has a 6.1-inch OLED display, 128 GB of storage, and a
+        4,000 mAh battery. It supports wireless charging, is IP68 rated, and
+        ships in three colors.
+
+  - id: phone-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The Model X phone has a 6.1-inch OLED display, 128 GB of storage,
+        and a 4,000 mAh battery. It supports wireless charging and is rated
+        IP68 for water resistance.
+      evaluated: |
+        Model X has a 6.1-inch LCD display, 128 GB of storage, and a
+        4,000 mAh battery. It supports wireless charging and is rated IP67
+        for water resistance.
+
+  - id: phone-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The Model X phone has a 6.1-inch OLED display, 128 GB of storage,
+        and a 4,000 mAh battery. It supports wireless charging and is rated
+        IP68 for water resistance.
+      evaluated: |
+        Model X comes with a 6.7-inch LCD display and 256 GB of storage. Its
+        battery is 3,000 mAh, it does not support wireless charging, and it
+        has no water-resistance rating.
+
+  # ───────────── Mitochondria ─────────────
+  - id: mitochondria-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Mitochondria are organelles found in most eukaryotic cells. They
+        generate most of the cell's supply of ATP, which serves as a source
+        of chemical energy.
+      evaluated: |
+        Mitochondria are organelles present in the great majority of
+        eukaryotic cells. They produce most of the ATP a cell uses, which
+        functions as its chemical energy currency.
+
+  - id: mitochondria-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Mitochondria are organelles found in most eukaryotic cells. They
+        generate most of the cell's supply of ATP, which serves as a source
+        of chemical energy.
+      evaluated: |
+        Found in nearly all eukaryotic cells, mitochondria are the organelles
+        responsible for generating the bulk of the cell's ATP, the molecule
+        that delivers chemical energy where it is needed.
+
+  - id: mitochondria-good
+    human_score: good
+    inputs:
+      reference: |
+        Mitochondria are organelles found in most eukaryotic cells. They
+        generate most of the cell's supply of ATP, which serves as a source
+        of chemical energy.
+      evaluated: |
+        Mitochondria are organelles in most eukaryotic cells. They make ATP,
+        the cell's chemical energy source, and they have their own small
+        ring of DNA.
+
+  - id: mitochondria-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Mitochondria are organelles found in most eukaryotic cells. They
+        generate most of the cell's supply of ATP, which serves as a source
+        of chemical energy.
+      evaluated: |
+        Mitochondria are organelles present in all prokaryotic cells. They
+        produce most of the cell's ATP for chemical energy.
+
+  - id: mitochondria-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Mitochondria are organelles found in most eukaryotic cells. They
+        generate most of the cell's supply of ATP, which serves as a source
+        of chemical energy.
+      evaluated: |
+        Mitochondria are large molecules found only in plant cells. They
+        store DNA but do not produce ATP, which is instead made in the
+        nucleus.
+
+  # ───────────── Small claims court ─────────────
+  - id: smallclaims-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        In a small claims court, parties usually represent themselves
+        without lawyers. The court handles disputes below a set monetary
+        limit, and the judge issues a decision after a brief hearing.
+      evaluated: |
+        People taking a dispute to small claims court usually do so without
+        lawyers. The court only takes cases under a specified dollar limit,
+        and once the brief hearing ends the judge announces a decision.
+
+  - id: smallclaims-good
+    human_score: good
+    inputs:
+      reference: |
+        In a small claims court, parties usually represent themselves
+        without lawyers. The court handles disputes below a set monetary
+        limit, and the judge issues a decision after a brief hearing.
+      evaluated: |
+        In small claims court the parties usually represent themselves and
+        the court handles disputes below a monetary limit. The judge issues
+        a decision after a brief hearing, and decisions can sometimes be
+        appealed to a higher court.
+
+  - id: smallclaims-fair
+    human_score: fair
+    inputs:
+      reference: |
+        In a small claims court, parties usually represent themselves
+        without lawyers. The court handles disputes below a set monetary
+        limit, and the judge issues a decision after a brief hearing.
+      evaluated: |
+        Small claims court requires both parties to hire lawyers. It hears
+        disputes under a monetary limit, and the judge gives a decision
+        after a short hearing.
+
+  - id: smallclaims-poor
+    human_score: poor
+    inputs:
+      reference: |
+        In a small claims court, parties usually represent themselves
+        without lawyers. The court handles disputes below a set monetary
+        limit, and the judge issues a decision after a brief hearing.
+      evaluated: |
+        Small claims court requires each side to be represented by a lawyer.
+        There is no monetary limit on the disputes it can hear, and rulings
+        are issued in writing weeks later by a jury rather than a judge.
+
+  # ───────────── Pancake recipe ─────────────
+  - id: pancakes-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        To make basic pancakes, whisk together flour, milk, egg, and a pinch
+        of salt. Pour the batter into a hot, lightly oiled pan and cook for
+        about two minutes per side until golden.
+      evaluated: |
+        For basic pancakes, whisk flour, milk, an egg, and a pinch of salt
+        into a batter. Ladle it onto a hot, lightly oiled pan and cook each
+        side for roughly two minutes, until golden.
+
+  - id: pancakes-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        To make basic pancakes, whisk together flour, milk, egg, and a pinch
+        of salt. Pour the batter into a hot, lightly oiled pan and cook for
+        about two minutes per side until golden.
+      evaluated: |
+        Combine flour, milk, one egg, and a pinch of salt and whisk into a
+        batter. Pour the batter onto a hot pan greased with a little oil and
+        cook each side about two minutes, until the pancake turns golden.
+
+  - id: pancakes-good
+    human_score: good
+    inputs:
+      reference: |
+        To make basic pancakes, whisk together flour, milk, egg, and a pinch
+        of salt. Pour the batter into a hot, lightly oiled pan and cook for
+        about two minutes per side until golden.
+      evaluated: |
+        Whisk together flour, milk, an egg, and a pinch of salt. Pour the
+        batter onto a hot, lightly oiled pan and cook about two minutes per
+        side until golden brown and fluffy.
+
+  # ───────────── HTTP status codes ─────────────
+  - id: http-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        HTTP status code 200 indicates a successful request. 404 means the
+        requested resource could not be found. 500 signals an internal
+        server error.
+      evaluated: |
+        A 200 HTTP status code reports that a request succeeded. A 404 means
+        the server could not find the requested resource. A 500 indicates an
+        internal server error.
+
+  - id: http-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        HTTP status code 200 indicates a successful request. 404 means the
+        requested resource could not be found. 500 signals an internal
+        server error.
+      evaluated: |
+        HTTP returns 200 when a request succeeds, 404 when the requested
+        resource is missing, and 500 when the server hits an internal error
+        while processing the request.
+
+  - id: http-good
+    human_score: good
+    inputs:
+      reference: |
+        HTTP status code 200 indicates a successful request. 404 means the
+        requested resource could not be found. 500 signals an internal
+        server error.
+      evaluated: |
+        HTTP 200 means a successful request. 404 means the resource was not
+        found. 500 means an internal server error. 301 is used for permanent
+        redirects.
+
+  # ───────────── Mount Everest ─────────────
+  - id: everest-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Mount Everest, located on the border between Nepal and the Tibet
+        region of China, is the highest mountain above sea level at about
+        8,849 meters. It was first summited in 1953 by Edmund Hillary and
+        Tenzing Norgay.
+      evaluated: |
+        Everest sits on the Nepal–Tibet (China) border and rises to roughly
+        8,849 meters above sea level, making it Earth's tallest mountain by
+        that measure. Edmund Hillary and Tenzing Norgay reached its summit
+        for the first time in 1953.
+
+  - id: everest-good
+    human_score: good
+    inputs:
+      reference: |
+        Mount Everest, located on the border between Nepal and the Tibet
+        region of China, is the highest mountain above sea level at about
+        8,849 meters. It was first summited in 1953 by Edmund Hillary and
+        Tenzing Norgay.
+      evaluated: |
+        Mount Everest, on the Nepal–Tibet border, is the highest mountain on
+        Earth at about 8,850 meters above sea level. It was first climbed in
+        1953 by Edmund Hillary and Tenzing Norgay, who used supplemental
+        oxygen.
+
+  - id: everest-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Mount Everest, located on the border between Nepal and the Tibet
+        region of China, is the highest mountain above sea level at about
+        8,849 meters. It was first summited in 1953 by Edmund Hillary and
+        Tenzing Norgay.
+      evaluated: |
+        Mount Everest, on the border between Nepal and India, is the
+        world's highest mountain at about 8,849 meters. It was first
+        summited in 1953 by Edmund Hillary and Tenzing Norgay.
+
+  - id: everest-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Mount Everest, located on the border between Nepal and the Tibet
+        region of China, is the highest mountain above sea level at about
+        8,849 meters. It was first summited in 1953 by Edmund Hillary and
+        Tenzing Norgay.
+      evaluated: |
+        Mount Everest stands between Bhutan and India and reaches about
+        7,200 meters above sea level, making it the second-highest mountain
+        on Earth. It was first climbed solo in 1924 by George Mallory.
+
+  # ───────────── Bond yields ─────────────
+  - id: bonds-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Bond prices and yields move in opposite directions. When the price
+        of a bond rises, its yield falls, and when the price falls, the
+        yield rises.
+      evaluated: |
+        The price of a bond and its yield move in opposite directions: a
+        rising price corresponds to a falling yield, while a falling price
+        corresponds to a rising yield.
+
+  - id: bonds-good
+    human_score: good
+    inputs:
+      reference: |
+        Bond prices and yields move in opposite directions. When the price
+        of a bond rises, its yield falls, and when the price falls, the
+        yield rises.
+      evaluated: |
+        Bond prices and yields move in opposite directions, so when a bond's
+        price rises its yield falls. Bonds are generally seen as safer
+        investments than stocks.
+
+  - id: bonds-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Bond prices and yields move in opposite directions. When the price
+        of a bond rises, its yield falls, and when the price falls, the
+        yield rises.
+      evaluated: |
+        Bond prices and yields tend to move together. When the price of a
+        bond rises, its yield usually rises as well.
+
+  - id: bonds-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Bond prices and yields move in opposite directions. When the price
+        of a bond rises, its yield falls, and when the price falls, the
+        yield rises.
+      evaluated: |
+        Bond prices and yields always move in the same direction. When a
+        bond's price rises, its yield rises with it, and when the price
+        falls, the yield falls too.
+
+  # ───────────── Ibuprofen ─────────────
+  - id: ibuprofen-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Ibuprofen is an over-the-counter pain reliever that reduces
+        inflammation, pain, and fever. Adults typically take 200 to 400 mg
+        every 4 to 6 hours, and it should be taken with food to reduce
+        stomach upset.
+      evaluated: |
+        Ibuprofen is sold over the counter and is used to ease pain,
+        inflammation, and fever. Adults generally take between 200 and
+        400 mg every four to six hours, ideally with food so the stomach is
+        less irritated.
+
+  - id: ibuprofen-good
+    human_score: good
+    inputs:
+      reference: |
+        Ibuprofen is an over-the-counter pain reliever that reduces
+        inflammation, pain, and fever. Adults typically take 200 to 400 mg
+        every 4 to 6 hours, and it should be taken with food to reduce
+        stomach upset.
+      evaluated: |
+        Ibuprofen is an over-the-counter medicine for pain, fever, and
+        inflammation. Adults take 200 to 400 mg every 4 to 6 hours with
+        food, and it can also lower blood pressure.
+
+  - id: ibuprofen-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Ibuprofen is an over-the-counter pain reliever that reduces
+        inflammation, pain, and fever. Adults typically take 200 to 400 mg
+        every 4 to 6 hours, and it should be taken with food to reduce
+        stomach upset.
+      evaluated: |
+        Ibuprofen is a prescription-only painkiller that helps with
+        inflammation, pain, and fever. Adults usually take 200 to 400 mg
+        every 4 to 6 hours, ideally with food.
+
+  - id: ibuprofen-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Ibuprofen is an over-the-counter pain reliever that reduces
+        inflammation, pain, and fever. Adults typically take 200 to 400 mg
+        every 4 to 6 hours, and it should be taken with food to reduce
+        stomach upset.
+      evaluated: |
+        Ibuprofen is a prescription antibiotic used to treat infections. It
+        does not affect pain or fever. Adults take 1,000 mg once a day on an
+        empty stomach.
+
+  # ───────────── French passé composé ─────────────
+  - id: french-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        In French, the passé composé is formed with a present-tense
+        auxiliary verb — either "avoir" or "être" — followed by the past
+        participle of the main verb. Most verbs use "avoir", but a small
+        group of motion and reflexive verbs use "être".
+      evaluated: |
+        The French passé composé pairs a present-tense auxiliary verb,
+        either "avoir" or "être", with the past participle of the main verb.
+        Most verbs take "avoir", while a small set of motion and reflexive
+        verbs take "être".
+
+  - id: french-fair
+    human_score: fair
+    inputs:
+      reference: |
+        In French, the passé composé is formed with a present-tense
+        auxiliary verb — either "avoir" or "être" — followed by the past
+        participle of the main verb. Most verbs use "avoir", but a small
+        group of motion and reflexive verbs use "être".
+      evaluated: |
+        The French passé composé uses an imperfect-tense auxiliary verb
+        followed by the past participle. Most verbs use "être", and only a
+        few verbs use "avoir".
+
+  - id: french-poor
+    human_score: poor
+    inputs:
+      reference: |
+        In French, the passé composé is formed with a present-tense
+        auxiliary verb — either "avoir" or "être" — followed by the past
+        participle of the main verb. Most verbs use "avoir", but a small
+        group of motion and reflexive verbs use "être".
+      evaluated: |
+        The French passé composé is a single-word tense formed by adding the
+        ending "-ais" to the verb stem. There are no auxiliary verbs
+        involved and no past participles.
+
+  # ───────────── Octopus behavior ─────────────
+  - id: octopus-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Octopuses are invertebrates with eight arms and three hearts. They
+        can change the color and texture of their skin for camouflage, and
+        most species are solitary outside of mating.
+      evaluated: |
+        An octopus is an invertebrate, equipped with eight arms and three
+        hearts. It can shift both the color and the texture of its skin to
+        blend in, and most species live alone except when mating.
+
+  - id: octopus-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Octopuses are invertebrates with eight arms and three hearts. They
+        can change the color and texture of their skin for camouflage, and
+        most species are solitary outside of mating.
+      evaluated: |
+        Octopuses lack a backbone, have eight arms, and possess three
+        hearts. They camouflage themselves by altering the color and texture
+        of their skin, and outside of mating most species keep to
+        themselves.
+
+  - id: octopus-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Octopuses are invertebrates with eight arms and three hearts. They
+        can change the color and texture of their skin for camouflage, and
+        most species are solitary outside of mating.
+      evaluated: |
+        Octopuses are vertebrates with eight arms and a single heart. They
+        change their skin color for camouflage, and most species live alone
+        except during mating.

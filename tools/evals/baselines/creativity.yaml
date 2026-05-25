@@ -1,0 +1,394 @@
+evaluator: creativity
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED content on originality and imaginative framing
+    relative to typical examples of the same form (poem, tagline, pitch,
+    etc.). Ignore grammar, accuracy, and topic.
+  source: synthetic
+
+samples:
+  # ───────────── Short poem (theme: autumn) ─────────────
+  - id: poem-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Leaves are falling from the trees,
+        Blowing gently in the breeze.
+        Autumn colors red and gold,
+        Days grow short and nights grow cold.
+
+  - id: poem-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        October paints the world in gold,
+        A season warm before the cold.
+        The harvest moon hangs in the sky,
+        And summer whispers its goodbye.
+
+  - id: poem-good
+    human_score: good
+    inputs:
+      evaluated: |
+        The maples cash their summer in
+        for coins of rust and bronze.
+        A squirrel counts the windfall twice
+        before the bare boughs yawn.
+
+  - id: poem-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Autumn is the year exhaling —
+        a slow surrender of pigment,
+        the trees undressing in public
+        without ever once apologising.
+
+  - id: poem-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        October is a librarian
+        re-shelving the light,
+        stamping each leaf overdue,
+        whispering hush to the geese
+        as they file out one last time.
+
+  # ───────────── Product tagline (meal-kit delivery service) ─────────────
+  - id: tagline-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Delicious meals delivered fresh to your door.
+
+  - id: tagline-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Eat better. Cook smarter. Live well.
+
+  - id: tagline-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Dinner, already half-made.
+
+  - id: tagline-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Tomorrow's dinner is already in the mail.
+
+  - id: tagline-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        We sent the recipe. You take the credit.
+
+  # ───────────── Opening sentence of a short story ─────────────
+  - id: opener-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        It was a dark and stormy night when John walked into the old,
+        abandoned house at the end of the lonely road.
+
+  - id: opener-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Sarah had always known this day would come, but she still wasn't
+        ready when the letter finally arrived.
+
+  - id: opener-good
+    human_score: good
+    inputs:
+      evaluated: |
+        The town only had one traffic light, and it was wrong about
+        everything.
+
+  - id: opener-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        The day my grandmother forgot my name, she also remembered
+        seventeen new ones, all of them mine.
+
+  - id: opener-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        On the morning the second sun rose, the cats stayed inside, and
+        that was how we knew which one to trust.
+
+  # ───────────── Metaphor for memory ─────────────
+  - id: metaphor-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Memory is like a filing cabinet where you store all your
+        experiences and pull them out when you need them.
+
+  - id: metaphor-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Memory is a library, with old books on dusty shelves and a
+        librarian who isn't always there to help you find them.
+
+  - id: metaphor-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Memory is a city you used to live in — most of the streets are
+        still there, but the addresses have moved.
+
+  - id: metaphor-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Memory is a radio playing in another room: you catch a chorus,
+        miss a verse, and argue later about what song it was.
+
+  - id: metaphor-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Memory is a forger working from a description of a painting it
+        once owned — every copy more confident, less true, and signed
+        in your handwriting.
+
+  # ───────────── Business idea pitch ─────────────
+  - id: pitch-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        It's like Uber, but for dog walking. You open the app, request a
+        walker, and they come walk your dog. We take a 20% commission.
+
+  - id: pitch-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        A subscription box for plant lovers. Every month you get a new
+        houseplant, a custom pot, and a care guide tailored to your home.
+
+  - id: pitch-good
+    human_score: good
+    inputs:
+      evaluated: |
+        A rental service for kitchen appliances you only need twice a
+        year — pasta makers, ice-cream churns, fondue pots. Borrow,
+        cook, return; we handle the cleaning.
+
+  - id: pitch-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        A grief-management app that books a "second funeral" twelve
+        months later — a small, scheduled ritual for the version of you
+        that wasn't ready to say goodbye the first time.
+
+  - id: pitch-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        A bookstore where every title is anonymised — no author, no
+        cover, no blurb, just the first paragraph printed on the spine.
+        You buy the sentence, not the brand. We reveal the rest at the
+        register, and a third of customers ask to put it back.
+
+  # ───────────── Character description ─────────────
+  - id: character-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        She had long blonde hair, blue eyes, and a beautiful smile. She
+        was tall and slender and always wore the latest fashion.
+
+  - id: character-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        He was a grizzled old detective with a drinking problem and a
+        heart of gold, haunted by the one case he could never solve.
+
+  - id: character-good
+    human_score: good
+    inputs:
+      evaluated: |
+        She spoke to waiters the way other people spoke to confession
+        booths, and tipped accordingly.
+
+  - id: character-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        He had the posture of a man who had once been told, by someone
+        important, that he was tall — and had been verifying it in
+        mirrors ever since.
+
+  - id: character-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        She kept three watches, all five minutes fast, all set to
+        different time zones she had never visited; her punctuality was
+        a kind of homesickness for places that hadn't happened yet.
+
+  # ───────────── Song lyric snippet ─────────────
+  - id: lyric-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Baby, I love you, you're the only one,
+        Without you, girl, I'm so undone.
+        My heart is yours, forever true,
+        I just can't stop thinking 'bout you.
+
+  - id: lyric-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        We were dancing in the moonlight,
+        Holding on so tight,
+        Promised we'd be alright,
+        Through the long, lonely night.
+
+  - id: lyric-good
+    human_score: good
+    inputs:
+      evaluated: |
+        You left a coffee cup beside the bed —
+        I poured it out, then drank it instead.
+        Cold and bitter, just like you said
+        love should never be.
+
+  - id: lyric-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        I keep your voicemail like a houseplant,
+        water it on Sundays with the sound up loud,
+        and lie to friends about how well it's doing.
+
+  - id: lyric-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        We split the dog. We split the cutlery.
+        We split the difference and the difference split us back.
+        Now I sleep diagonally —
+        a country with no flag, just border.
+
+  # ───────────── Joke / punchline ─────────────
+  - id: joke-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Why did the chicken cross the road? To get to the other side.
+
+  - id: joke-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        I told my wife she was drawing her eyebrows too high. She
+        looked surprised.
+
+  - id: joke-good
+    human_score: good
+    inputs:
+      evaluated: |
+        My therapist says I have a preoccupation with vengeance. We'll
+        see about that.
+
+  - id: joke-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        I joined a support group for procrastinators. We haven't met
+        yet, but the group chat is incredible.
+
+  - id: joke-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        My grandfather warned me never to trust a man who counted his
+        money in public. He's been dead nine years and I still haven't
+        figured out how he was paying for the funeral.
+
+  # ───────────── Recipe name and one-line description ─────────────
+  - id: recipe-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Classic Spaghetti Bolognese — a hearty Italian pasta dish with
+        rich meat sauce, perfect for the whole family.
+
+  - id: recipe-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Grandma's Sunday Roast Chicken — tender, golden, and bursting
+        with herb-infused flavor in every bite.
+
+  - id: recipe-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Reluctant Risotto — the dish that finally taught me to stand
+        still and stir for twenty minutes.
+
+  - id: recipe-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Apology Carbonara — eggs, pepper, pork, and one minute of eye
+        contact with the person you forgot to call back.
+
+  - id: recipe-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Tuesday's Confession Stew — whatever the fridge has been
+        meaning to tell you, slow-cooked until it stops insisting and
+        finally agrees.
+
+  # ───────────── Journal entry opener ─────────────
+  - id: journal-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Dear Diary, today was a really long day. I'm so tired. Work was
+        crazy and I just want to go to bed.
+
+  - id: journal-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Today I realized that life is short and we should all try to
+        live in the moment more, even when things feel hard.
+
+  - id: journal-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Three things happened today and only one of them was on the
+        calendar, which I think is the right ratio.
+
+  - id: journal-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        I caught myself rehearsing an argument with someone who hasn't
+        spoken to me in four years, and I think I won, which is worse.
+
+  - id: journal-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Today the cashier called me by the name on someone else's
+        receipt and I answered to it for nine full seconds — long
+        enough to wonder whether the other person was, somewhere
+        across town, having a better Tuesday in my name.

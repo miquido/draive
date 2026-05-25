@@ -1,0 +1,918 @@
+evaluator: coverage
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED summary on how much of the important information in
+    REFERENCE it preserves. Ignore conciseness and style; only retention of
+    key facts matters.
+  source: synthetic
+
+samples:
+  # ───────────── Book plot summary: "The Lighthouse Keeper" ─────────────
+  # Reference claims:
+  #   1. Protagonist is Mara, a young cartographer.
+  #   2. She inherits a remote island lighthouse from her grandfather.
+  #   3. She discovers her grandfather's hidden journals.
+  #   4. The journals reveal a shipwreck cover-up from the 1920s.
+  #   5. Mara is pursued by descendants of the original conspirators.
+  #   6. She publishes the truth and restores the lighthouse as a museum.
+  - id: book-plot-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        In "The Lighthouse Keeper," a young cartographer named Mara inherits
+        a remote island lighthouse from her late grandfather. Sorting through
+        the building, she discovers a stack of his hidden journals. The
+        journals describe a 1920s shipwreck the local authorities had quietly
+        covered up, along with the names of the families who profited. As
+        Mara investigates further, descendants of those original conspirators
+        begin to pursue her across the island. In the final chapters she
+        succeeds in publishing the truth and restores the lighthouse as a
+        small public museum dedicated to the lost ship.
+      evaluated: |
+        The novel follows Mara, a young cartographer who inherits a remote
+        island lighthouse from her grandfather. While clearing out the
+        building she finds her grandfather's hidden journals, which document
+        a 1920s shipwreck that local authorities had covered up. As she digs
+        deeper, descendants of the original conspirators begin hunting her
+        across the island. By the end Mara publishes the journals and
+        converts the lighthouse into a museum honouring the lost ship.
+
+  - id: book-plot-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        In "The Lighthouse Keeper," a young cartographer named Mara inherits
+        a remote island lighthouse from her late grandfather. Sorting through
+        the building, she discovers a stack of his hidden journals. The
+        journals describe a 1920s shipwreck the local authorities had quietly
+        covered up, along with the names of the families who profited. As
+        Mara investigates further, descendants of those original conspirators
+        begin to pursue her across the island. In the final chapters she
+        succeeds in publishing the truth and restores the lighthouse as a
+        small public museum dedicated to the lost ship.
+      evaluated: |
+        Mara, a cartographer, inherits a remote island lighthouse from her
+        grandfather. She finds his hidden journals, which describe a covered-up
+        shipwreck from the 1920s. Descendants of the people involved begin to
+        chase her across the island. She eventually publishes the journals and
+        turns the lighthouse into a museum.
+
+  - id: book-plot-good
+    human_score: good
+    inputs:
+      reference: |
+        In "The Lighthouse Keeper," a young cartographer named Mara inherits
+        a remote island lighthouse from her late grandfather. Sorting through
+        the building, she discovers a stack of his hidden journals. The
+        journals describe a 1920s shipwreck the local authorities had quietly
+        covered up, along with the names of the families who profited. As
+        Mara investigates further, descendants of those original conspirators
+        begin to pursue her across the island. In the final chapters she
+        succeeds in publishing the truth and restores the lighthouse as a
+        small public museum dedicated to the lost ship.
+      evaluated: |
+        Mara inherits a lighthouse from her grandfather and finds his old
+        journals there. The journals describe a shipwreck that had been
+        covered up. People come after her because of what she discovers.
+        At the end she opens a small museum at the lighthouse.
+
+  - id: book-plot-fair
+    human_score: fair
+    inputs:
+      reference: |
+        In "The Lighthouse Keeper," a young cartographer named Mara inherits
+        a remote island lighthouse from her late grandfather. Sorting through
+        the building, she discovers a stack of his hidden journals. The
+        journals describe a 1920s shipwreck the local authorities had quietly
+        covered up, along with the names of the families who profited. As
+        Mara investigates further, descendants of those original conspirators
+        begin to pursue her across the island. In the final chapters she
+        succeeds in publishing the truth and restores the lighthouse as a
+        small public museum dedicated to the lost ship.
+      evaluated: |
+        A woman inherits a lighthouse and finds journals inside. There is a
+        secret about a shipwreck. The book ends with her solving the mystery.
+
+  - id: book-plot-poor
+    human_score: poor
+    inputs:
+      reference: |
+        In "The Lighthouse Keeper," a young cartographer named Mara inherits
+        a remote island lighthouse from her late grandfather. Sorting through
+        the building, she discovers a stack of his hidden journals. The
+        journals describe a 1920s shipwreck the local authorities had quietly
+        covered up, along with the names of the families who profited. As
+        Mara investigates further, descendants of those original conspirators
+        begin to pursue her across the island. In the final chapters she
+        succeeds in publishing the truth and restores the lighthouse as a
+        small public museum dedicated to the lost ship.
+      evaluated: |
+        It is a mystery novel set on an island. The main character is a
+        woman. The writing is atmospheric and many readers said the prose was
+        lovely. There is a lighthouse in it.
+
+  # ───────────── Scientific finding press release: superconductor ─────────────
+  # Reference claims:
+  #   1. Researchers at ETH Zurich discovered a new superconducting material.
+  #   2. The material is a copper-bismuth alloy.
+  #   3. It superconducts at 195 K (about -78 °C).
+  #   4. That is roughly 60 K higher than the previous best for this family.
+  #   5. The discovery was made by combining machine-learning screening with lab synthesis.
+  #   6. Practical applications are still years away due to material brittleness.
+  #   7. Findings were published in Nature on April 14th.
+  - id: science-press-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Researchers at ETH Zurich announced the discovery of a new
+        superconducting material — a copper-bismuth alloy — that loses all
+        electrical resistance at 195 K, roughly -78 °C. The result is about
+        60 K higher than the previous record for this family of materials.
+        The team identified the candidate compound by combining
+        machine-learning screening of thousands of compositions with
+        subsequent lab synthesis. They cautioned that practical applications
+        remain years away because the alloy is brittle and difficult to form
+        into wires. The findings were published in Nature on April 14th.
+      evaluated: |
+        ETH Zurich researchers have reported a new superconducting copper-
+        bismuth alloy that loses resistance at 195 K (around -78 °C), about
+        60 K above the previous record for this family of materials. The
+        candidate was identified through machine-learning screening followed
+        by lab synthesis. The authors warn that practical use is still years
+        out because the alloy is brittle and hard to draw into wires. The
+        work appeared in Nature on April 14th.
+
+  - id: science-press-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Researchers at ETH Zurich announced the discovery of a new
+        superconducting material — a copper-bismuth alloy — that loses all
+        electrical resistance at 195 K, roughly -78 °C. The result is about
+        60 K higher than the previous record for this family of materials.
+        The team identified the candidate compound by combining
+        machine-learning screening of thousands of compositions with
+        subsequent lab synthesis. They cautioned that practical applications
+        remain years away because the alloy is brittle and difficult to form
+        into wires. The findings were published in Nature on April 14th.
+      evaluated: |
+        A team at ETH Zurich has discovered a copper-bismuth alloy that
+        superconducts at 195 K, around 60 K higher than the previous best in
+        its family. They found the compound using machine-learning screening
+        combined with lab synthesis. The material is brittle, so practical
+        applications are still some years away. The work was published in
+        Nature.
+
+  - id: science-press-good
+    human_score: good
+    inputs:
+      reference: |
+        Researchers at ETH Zurich announced the discovery of a new
+        superconducting material — a copper-bismuth alloy — that loses all
+        electrical resistance at 195 K, roughly -78 °C. The result is about
+        60 K higher than the previous record for this family of materials.
+        The team identified the candidate compound by combining
+        machine-learning screening of thousands of compositions with
+        subsequent lab synthesis. They cautioned that practical applications
+        remain years away because the alloy is brittle and difficult to form
+        into wires. The findings were published in Nature on April 14th.
+      evaluated: |
+        Researchers found a new superconductor made of copper and bismuth.
+        It works at 195 K. They used machine learning to find it. The
+        material is brittle, so it is not yet ready for use. The paper is in
+        Nature.
+
+  - id: science-press-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Researchers at ETH Zurich announced the discovery of a new
+        superconducting material — a copper-bismuth alloy — that loses all
+        electrical resistance at 195 K, roughly -78 °C. The result is about
+        60 K higher than the previous record for this family of materials.
+        The team identified the candidate compound by combining
+        machine-learning screening of thousands of compositions with
+        subsequent lab synthesis. They cautioned that practical applications
+        remain years away because the alloy is brittle and difficult to form
+        into wires. The findings were published in Nature on April 14th.
+      evaluated: |
+        Scientists discovered a new superconductor. It involves copper. The
+        result was published in a journal. Machine learning was mentioned.
+
+  - id: science-press-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Researchers at ETH Zurich announced the discovery of a new
+        superconducting material — a copper-bismuth alloy — that loses all
+        electrical resistance at 195 K, roughly -78 °C. The result is about
+        60 K higher than the previous record for this family of materials.
+        The team identified the candidate compound by combining
+        machine-learning screening of thousands of compositions with
+        subsequent lab synthesis. They cautioned that practical applications
+        remain years away because the alloy is brittle and difficult to form
+        into wires. The findings were published in Nature on April 14th.
+      evaluated: |
+        A new scientific paper came out. Superconductors are interesting and
+        could one day be used in trains and power grids. Switzerland has
+        many universities.
+
+  # ───────────── Product feature list: new smartphone ─────────────
+  # Reference claims:
+  #   1. 6.7-inch OLED display with 120 Hz refresh rate.
+  #   2. Triple rear camera (50 MP main, ultra-wide, 5x telephoto).
+  #   3. In-house "Quartz Q3" chip.
+  #   4. 5,000 mAh battery with 65 W wired charging and 30 W wireless.
+  #   5. IP68 dust and water resistance.
+  #   6. Starts at $899 and ships May 30th.
+  - id: product-features-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The new Aurelius Pro smartphone features a 6.7-inch OLED display
+        running at a 120 Hz refresh rate. The triple rear camera includes a
+        50 MP main sensor, an ultra-wide, and a 5x telephoto. It is powered
+        by the company's in-house "Quartz Q3" chip. A 5,000 mAh battery
+        supports 65 W wired charging and 30 W wireless charging. The phone
+        carries an IP68 rating for dust and water resistance, starts at $899,
+        and ships on May 30th.
+      evaluated: |
+        The Aurelius Pro ships May 30th starting at $899. It has a 6.7-inch
+        120 Hz OLED display and a triple rear camera (50 MP main, ultra-wide,
+        and 5x telephoto). Inside is the new Quartz Q3 chip and a 5,000 mAh
+        battery that supports 65 W wired and 30 W wireless charging. It is
+        IP68-rated for dust and water resistance.
+
+  - id: product-features-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The new Aurelius Pro smartphone features a 6.7-inch OLED display
+        running at a 120 Hz refresh rate. The triple rear camera includes a
+        50 MP main sensor, an ultra-wide, and a 5x telephoto. It is powered
+        by the company's in-house "Quartz Q3" chip. A 5,000 mAh battery
+        supports 65 W wired charging and 30 W wireless charging. The phone
+        carries an IP68 rating for dust and water resistance, starts at $899,
+        and ships on May 30th.
+      evaluated: |
+        The Aurelius Pro has a 6.7-inch 120 Hz OLED screen, a triple camera
+        (50 MP main, ultra-wide, 5x telephoto), the Quartz Q3 chip, and a
+        5,000 mAh battery with 65 W wired charging. It is IP68-rated and
+        starts at $899.
+
+  - id: product-features-good
+    human_score: good
+    inputs:
+      reference: |
+        The new Aurelius Pro smartphone features a 6.7-inch OLED display
+        running at a 120 Hz refresh rate. The triple rear camera includes a
+        50 MP main sensor, an ultra-wide, and a 5x telephoto. It is powered
+        by the company's in-house "Quartz Q3" chip. A 5,000 mAh battery
+        supports 65 W wired charging and 30 W wireless charging. The phone
+        carries an IP68 rating for dust and water resistance, starts at $899,
+        and ships on May 30th.
+      evaluated: |
+        The Aurelius Pro has a 6.7-inch OLED display and a triple rear
+        camera with a 50 MP main sensor. It runs on the Quartz Q3 chip and
+        has a 5,000 mAh battery. It starts at $899.
+
+  - id: product-features-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The new Aurelius Pro smartphone features a 6.7-inch OLED display
+        running at a 120 Hz refresh rate. The triple rear camera includes a
+        50 MP main sensor, an ultra-wide, and a 5x telephoto. It is powered
+        by the company's in-house "Quartz Q3" chip. A 5,000 mAh battery
+        supports 65 W wired charging and 30 W wireless charging. The phone
+        carries an IP68 rating for dust and water resistance, starts at $899,
+        and ships on May 30th.
+      evaluated: |
+        The Aurelius Pro is a new phone with a large OLED display and three
+        cameras on the back. It comes in several colours.
+
+  - id: product-features-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The new Aurelius Pro smartphone features a 6.7-inch OLED display
+        running at a 120 Hz refresh rate. The triple rear camera includes a
+        50 MP main sensor, an ultra-wide, and a 5x telephoto. It is powered
+        by the company's in-house "Quartz Q3" chip. A 5,000 mAh battery
+        supports 65 W wired charging and 30 W wireless charging. The phone
+        carries an IP68 rating for dust and water resistance, starts at $899,
+        and ships on May 30th.
+      evaluated: |
+        The Aurelius Pro is the company's new flagship phone. Reviewers
+        praised its in-hand feel and its packaging is fully recyclable.
+
+  # ───────────── Court ruling: Hartfield v. Bayview Mills ─────────────
+  # Reference claims:
+  #   1. State supreme court ruled 5-2.
+  #   2. Held that Bayview Mills' discharge violated the state Clean Waters Act.
+  #   3. Reversed a lower-court decision that had dismissed the case.
+  #   4. The court awarded $12 million in damages to downstream residents.
+  #   5. Ordered Bayview Mills to install new filtration by year-end.
+  #   6. The ruling is expected to set precedent for similar cases statewide.
+  - id: court-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        In a 5-2 decision, the state supreme court ruled that Bayview Mills'
+        wastewater discharge violated the state Clean Waters Act, reversing
+        a lower-court ruling that had dismissed the case. The court awarded
+        $12 million in damages to downstream residents and ordered Bayview
+        Mills to install new filtration equipment by the end of the year.
+        Legal analysts say the ruling will set precedent for similar
+        environmental cases across the state.
+      evaluated: |
+        The state supreme court ruled 5-2 that Bayview Mills' discharge
+        violated the Clean Waters Act, reversing a lower court that had
+        dismissed the case. It awarded $12 million in damages to downstream
+        residents and ordered Bayview Mills to install new filtration by
+        year-end. The decision is expected to set precedent for similar
+        environmental cases statewide.
+
+  - id: court-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        In a 5-2 decision, the state supreme court ruled that Bayview Mills'
+        wastewater discharge violated the state Clean Waters Act, reversing
+        a lower-court ruling that had dismissed the case. The court awarded
+        $12 million in damages to downstream residents and ordered Bayview
+        Mills to install new filtration equipment by the end of the year.
+        Legal analysts say the ruling will set precedent for similar
+        environmental cases across the state.
+      evaluated: |
+        The state supreme court found, 5-2, that Bayview Mills had violated
+        the Clean Waters Act, reversing the lower court. Downstream residents
+        were awarded $12 million, and Bayview Mills must install filtration
+        by year-end. The ruling is expected to influence similar cases.
+
+  - id: court-good
+    human_score: good
+    inputs:
+      reference: |
+        In a 5-2 decision, the state supreme court ruled that Bayview Mills'
+        wastewater discharge violated the state Clean Waters Act, reversing
+        a lower-court ruling that had dismissed the case. The court awarded
+        $12 million in damages to downstream residents and ordered Bayview
+        Mills to install new filtration equipment by the end of the year.
+        Legal analysts say the ruling will set precedent for similar
+        environmental cases across the state.
+      evaluated: |
+        The supreme court ruled against Bayview Mills, finding that it
+        broke the Clean Waters Act. The company was ordered to pay damages
+        and install new filtration. The case is seen as important precedent.
+
+  - id: court-fair
+    human_score: fair
+    inputs:
+      reference: |
+        In a 5-2 decision, the state supreme court ruled that Bayview Mills'
+        wastewater discharge violated the state Clean Waters Act, reversing
+        a lower-court ruling that had dismissed the case. The court awarded
+        $12 million in damages to downstream residents and ordered Bayview
+        Mills to install new filtration equipment by the end of the year.
+        Legal analysts say the ruling will set precedent for similar
+        environmental cases across the state.
+      evaluated: |
+        The supreme court ruled against Bayview Mills in an environmental
+        case. Damages were awarded.
+
+  - id: court-poor
+    human_score: poor
+    inputs:
+      reference: |
+        In a 5-2 decision, the state supreme court ruled that Bayview Mills'
+        wastewater discharge violated the state Clean Waters Act, reversing
+        a lower-court ruling that had dismissed the case. The court awarded
+        $12 million in damages to downstream residents and ordered Bayview
+        Mills to install new filtration equipment by the end of the year.
+        Legal analysts say the ruling will set precedent for similar
+        environmental cases across the state.
+      evaluated: |
+        There was a court case about a company. The supreme court was
+        involved. Environmental regulation is a much-debated topic this
+        year.
+
+  # ───────────── Recipe: classic French onion soup ─────────────
+  # Reference claims:
+  #   1. Slice 1 kg of yellow onions thinly.
+  #   2. Caramelise in butter over low heat for at least 45 minutes.
+  #   3. Deglaze with dry white wine.
+  #   4. Add beef stock and a bouquet garni; simmer 30 minutes.
+  #   5. Ladle into oven-safe bowls and top with toasted baguette slices.
+  #   6. Cover with Gruyère cheese and broil until bubbly and brown.
+  - id: recipe-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        To make classic French onion soup, slice 1 kg of yellow onions
+        thinly and caramelise them in butter over low heat for at least 45
+        minutes, stirring occasionally. Deglaze the pot with dry white wine,
+        then add beef stock and a bouquet garni and simmer for 30 minutes.
+        Ladle the soup into oven-safe bowls, top each with toasted slices of
+        baguette, cover with grated Gruyère cheese, and broil until the
+        cheese is bubbly and golden brown.
+      evaluated: |
+        Slice 1 kg of yellow onions thinly and caramelise them in butter
+        over low heat for at least 45 minutes. Deglaze with dry white wine,
+        then add beef stock and a bouquet garni and simmer for 30 minutes.
+        Ladle into oven-safe bowls, top with toasted baguette slices and
+        grated Gruyère, then broil until bubbly and golden brown.
+
+  - id: recipe-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        To make classic French onion soup, slice 1 kg of yellow onions
+        thinly and caramelise them in butter over low heat for at least 45
+        minutes, stirring occasionally. Deglaze the pot with dry white wine,
+        then add beef stock and a bouquet garni and simmer for 30 minutes.
+        Ladle the soup into oven-safe bowls, top each with toasted slices of
+        baguette, cover with grated Gruyère cheese, and broil until the
+        cheese is bubbly and golden brown.
+      evaluated: |
+        Thinly slice 1 kg of onions and caramelise them in butter for around
+        45 minutes. Deglaze with white wine, add beef stock and a bouquet
+        garni, and simmer. Pour into bowls, top with toasted baguette and
+        Gruyère, then broil until brown.
+
+  - id: recipe-good
+    human_score: good
+    inputs:
+      reference: |
+        To make classic French onion soup, slice 1 kg of yellow onions
+        thinly and caramelise them in butter over low heat for at least 45
+        minutes, stirring occasionally. Deglaze the pot with dry white wine,
+        then add beef stock and a bouquet garni and simmer for 30 minutes.
+        Ladle the soup into oven-safe bowls, top each with toasted slices of
+        baguette, cover with grated Gruyère cheese, and broil until the
+        cheese is bubbly and golden brown.
+      evaluated: |
+        Caramelise sliced onions in butter for a long time. Add beef stock
+        and simmer. Pour into bowls, top with bread and cheese, and put
+        under the broiler.
+
+  - id: recipe-fair
+    human_score: fair
+    inputs:
+      reference: |
+        To make classic French onion soup, slice 1 kg of yellow onions
+        thinly and caramelise them in butter over low heat for at least 45
+        minutes, stirring occasionally. Deglaze the pot with dry white wine,
+        then add beef stock and a bouquet garni and simmer for 30 minutes.
+        Ladle the soup into oven-safe bowls, top each with toasted slices of
+        baguette, cover with grated Gruyère cheese, and broil until the
+        cheese is bubbly and golden brown.
+      evaluated: |
+        Cook onions until soft. Pour into bowls and add cheese on top before
+        broiling.
+
+  - id: recipe-poor
+    human_score: poor
+    inputs:
+      reference: |
+        To make classic French onion soup, slice 1 kg of yellow onions
+        thinly and caramelise them in butter over low heat for at least 45
+        minutes, stirring occasionally. Deglaze the pot with dry white wine,
+        then add beef stock and a bouquet garni and simmer for 30 minutes.
+        Ladle the soup into oven-safe bowls, top each with toasted slices of
+        baguette, cover with grated Gruyère cheese, and broil until the
+        cheese is bubbly and golden brown.
+      evaluated: |
+        French onion soup is a classic bistro dish, often served in winter.
+        Onions are the main ingredient.
+
+  # ───────────── Sports match recap: City FC vs Northport United ─────────────
+  # Reference claims:
+  #   1. City FC beat Northport United 3-1.
+  #   2. Game played at the Riverside Stadium on Saturday.
+  #   3. Anya Patel scored twice for City FC.
+  #   4. Marco Lien scored the third goal in the 78th minute.
+  #   5. Northport's lone goal came from a 34th-minute penalty by Erik Sten.
+  #   6. City FC moves to first place in the league standings.
+  - id: sports-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        City FC defeated Northport United 3-1 at Riverside Stadium on
+        Saturday. Anya Patel scored twice for City FC, with Marco Lien
+        adding a third goal in the 78th minute. Northport's only response
+        came from a 34th-minute penalty converted by Erik Sten. The result
+        lifts City FC into first place in the league standings.
+      evaluated: |
+        City FC beat Northport United 3-1 at Riverside Stadium on Saturday.
+        Anya Patel scored twice and Marco Lien added a third in the 78th
+        minute. Northport's lone goal came from a 34th-minute Erik Sten
+        penalty. City FC moves to first place in the league.
+
+  - id: sports-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        City FC defeated Northport United 3-1 at Riverside Stadium on
+        Saturday. Anya Patel scored twice for City FC, with Marco Lien
+        adding a third goal in the 78th minute. Northport's only response
+        came from a 34th-minute penalty converted by Erik Sten. The result
+        lifts City FC into first place in the league standings.
+      evaluated: |
+        City FC beat Northport United 3-1 at Riverside Stadium. Anya Patel
+        scored twice, Marco Lien added a third, and Erik Sten scored a
+        penalty for Northport. City FC now lead the league.
+
+  - id: sports-good
+    human_score: good
+    inputs:
+      reference: |
+        City FC defeated Northport United 3-1 at Riverside Stadium on
+        Saturday. Anya Patel scored twice for City FC, with Marco Lien
+        adding a third goal in the 78th minute. Northport's only response
+        came from a 34th-minute penalty converted by Erik Sten. The result
+        lifts City FC into first place in the league standings.
+      evaluated: |
+        City FC won 3-1 over Northport United. Anya Patel scored twice.
+        Northport scored a penalty. City FC now top the league.
+
+  - id: sports-fair
+    human_score: fair
+    inputs:
+      reference: |
+        City FC defeated Northport United 3-1 at Riverside Stadium on
+        Saturday. Anya Patel scored twice for City FC, with Marco Lien
+        adding a third goal in the 78th minute. Northport's only response
+        came from a 34th-minute penalty converted by Erik Sten. The result
+        lifts City FC into first place in the league standings.
+      evaluated: |
+        City FC won the match against Northport. Patel was the standout
+        player.
+
+  - id: sports-poor
+    human_score: poor
+    inputs:
+      reference: |
+        City FC defeated Northport United 3-1 at Riverside Stadium on
+        Saturday. Anya Patel scored twice for City FC, with Marco Lien
+        adding a third goal in the 78th minute. Northport's only response
+        came from a 34th-minute penalty converted by Erik Sten. The result
+        lifts City FC into first place in the league standings.
+      evaluated: |
+        There was a football match on Saturday. City FC played. The crowd
+        was reportedly the largest of the season.
+
+  # ───────────── Software release notes: Helios 4.2 ─────────────
+  # Reference claims:
+  #   1. Adds native ARM64 support on Linux.
+  #   2. New dark theme.
+  #   3. Plugin API now supports asynchronous lifecycle hooks.
+  #   4. Fixes a long-standing memory leak in the file watcher.
+  #   5. Drops support for Python 3.8.
+  #   6. Bundled SQLite driver upgraded to 3.45.
+  - id: release-notes-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Helios 4.2 adds native ARM64 support on Linux, introduces a new
+        dark theme, and extends the plugin API with asynchronous lifecycle
+        hooks. This release also fixes a long-standing memory leak in the
+        file watcher. Support for Python 3.8 has been dropped, and the
+        bundled SQLite driver has been upgraded to version 3.45.
+      evaluated: |
+        Helios 4.2 introduces native ARM64 builds on Linux, a new dark
+        theme, and async lifecycle hooks in the plugin API. It also fixes a
+        memory leak in the file watcher. Python 3.8 is no longer supported,
+        and the bundled SQLite driver is upgraded to 3.45.
+
+  - id: release-notes-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Helios 4.2 adds native ARM64 support on Linux, introduces a new
+        dark theme, and extends the plugin API with asynchronous lifecycle
+        hooks. This release also fixes a long-standing memory leak in the
+        file watcher. Support for Python 3.8 has been dropped, and the
+        bundled SQLite driver has been upgraded to version 3.45.
+      evaluated: |
+        Helios 4.2 adds native ARM64 Linux builds, a dark theme, and async
+        plugin lifecycle hooks. It also fixes a file-watcher memory leak.
+        Python 3.8 is dropped in this release.
+
+  - id: release-notes-good
+    human_score: good
+    inputs:
+      reference: |
+        Helios 4.2 adds native ARM64 support on Linux, introduces a new
+        dark theme, and extends the plugin API with asynchronous lifecycle
+        hooks. This release also fixes a long-standing memory leak in the
+        file watcher. Support for Python 3.8 has been dropped, and the
+        bundled SQLite driver has been upgraded to version 3.45.
+      evaluated: |
+        Helios 4.2 adds ARM64 support on Linux and a dark theme. The plugin
+        API has been extended. A memory leak was fixed.
+
+  - id: release-notes-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Helios 4.2 adds native ARM64 support on Linux, introduces a new
+        dark theme, and extends the plugin API with asynchronous lifecycle
+        hooks. This release also fixes a long-standing memory leak in the
+        file watcher. Support for Python 3.8 has been dropped, and the
+        bundled SQLite driver has been upgraded to version 3.45.
+      evaluated: |
+        Helios 4.2 has a new dark theme and various bug fixes.
+
+  - id: release-notes-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Helios 4.2 adds native ARM64 support on Linux, introduces a new
+        dark theme, and extends the plugin API with asynchronous lifecycle
+        hooks. This release also fixes a long-standing memory leak in the
+        file watcher. Support for Python 3.8 has been dropped, and the
+        bundled SQLite driver has been upgraded to version 3.45.
+      evaluated: |
+        Helios 4.2 is out. The team thanks contributors for their work this
+        cycle.
+
+  # ───────────── Clinical trial result: multi-stage drug study ─────────────
+  # Reference claims:
+  #   1. Phase 3 trial of "Bestralin" for treatment-resistant hypertension.
+  #   2. 1,200 patients across 14 sites.
+  #   3. Primary endpoint: systolic blood pressure reduction at 24 weeks.
+  #   4. Bestralin group dropped 15 mmHg vs 4 mmHg for placebo (p < 0.001).
+  #   5. Most common side effect was mild dizziness in 8% of treated patients.
+  #   6. Manufacturer plans to file for FDA approval in Q3.
+  - id: clinical-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Researchers reported results from a phase 3 trial of Bestralin, a
+        new oral drug for treatment-resistant hypertension. The trial
+        enrolled 1,200 patients across 14 sites. The primary endpoint was
+        systolic blood pressure reduction at 24 weeks. Patients in the
+        Bestralin group saw their systolic pressure drop by an average of
+        15 mmHg, compared with 4 mmHg in the placebo group (p < 0.001). The
+        most common side effect was mild dizziness, reported in 8% of
+        treated patients. The manufacturer plans to file for FDA approval
+        in the third quarter.
+      evaluated: |
+        A phase 3 trial of Bestralin for treatment-resistant hypertension
+        enrolled 1,200 patients across 14 sites, with systolic blood
+        pressure at 24 weeks as the primary endpoint. The Bestralin group
+        averaged a 15 mmHg drop versus 4 mmHg for placebo (p < 0.001). Mild
+        dizziness was reported by 8% of treated patients. The manufacturer
+        plans to file for FDA approval in Q3.
+
+  - id: clinical-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Researchers reported results from a phase 3 trial of Bestralin, a
+        new oral drug for treatment-resistant hypertension. The trial
+        enrolled 1,200 patients across 14 sites. The primary endpoint was
+        systolic blood pressure reduction at 24 weeks. Patients in the
+        Bestralin group saw their systolic pressure drop by an average of
+        15 mmHg, compared with 4 mmHg in the placebo group (p < 0.001). The
+        most common side effect was mild dizziness, reported in 8% of
+        treated patients. The manufacturer plans to file for FDA approval
+        in the third quarter.
+      evaluated: |
+        Phase 3 results for Bestralin (treatment-resistant hypertension)
+        showed a 15 mmHg systolic drop at 24 weeks versus 4 mmHg for
+        placebo, with 1,200 patients enrolled. Mild dizziness was the most
+        common side effect. The maker plans an FDA filing later this year.
+
+  - id: clinical-good
+    human_score: good
+    inputs:
+      reference: |
+        Researchers reported results from a phase 3 trial of Bestralin, a
+        new oral drug for treatment-resistant hypertension. The trial
+        enrolled 1,200 patients across 14 sites. The primary endpoint was
+        systolic blood pressure reduction at 24 weeks. Patients in the
+        Bestralin group saw their systolic pressure drop by an average of
+        15 mmHg, compared with 4 mmHg in the placebo group (p < 0.001). The
+        most common side effect was mild dizziness, reported in 8% of
+        treated patients. The manufacturer plans to file for FDA approval
+        in the third quarter.
+      evaluated: |
+        Bestralin, a new hypertension drug, lowered blood pressure
+        substantially compared with placebo in a large phase 3 trial. The
+        company plans to seek FDA approval.
+
+  - id: clinical-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Researchers reported results from a phase 3 trial of Bestralin, a
+        new oral drug for treatment-resistant hypertension. The trial
+        enrolled 1,200 patients across 14 sites. The primary endpoint was
+        systolic blood pressure reduction at 24 weeks. Patients in the
+        Bestralin group saw their systolic pressure drop by an average of
+        15 mmHg, compared with 4 mmHg in the placebo group (p < 0.001). The
+        most common side effect was mild dizziness, reported in 8% of
+        treated patients. The manufacturer plans to file for FDA approval
+        in the third quarter.
+      evaluated: |
+        A new blood pressure drug performed well in a phase 3 trial.
+
+  - id: clinical-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Researchers reported results from a phase 3 trial of Bestralin, a
+        new oral drug for treatment-resistant hypertension. The trial
+        enrolled 1,200 patients across 14 sites. The primary endpoint was
+        systolic blood pressure reduction at 24 weeks. Patients in the
+        Bestralin group saw their systolic pressure drop by an average of
+        15 mmHg, compared with 4 mmHg in the placebo group (p < 0.001). The
+        most common side effect was mild dizziness, reported in 8% of
+        treated patients. The manufacturer plans to file for FDA approval
+        in the third quarter.
+      evaluated: |
+        A drug trial was completed. High blood pressure affects a large
+        share of adults worldwide and remains a major public-health concern.
+
+  # ───────────── Travel itinerary: 3-day Lisbon trip ─────────────
+  # Reference claims:
+  #   1. Day 1: walking tour of Alfama, lunch at Time Out Market, evening fado.
+  #   2. Day 2: train to Sintra, visit Pena Palace and Quinta da Regaleira.
+  #   3. Day 3: tram 28 ride, Belém pastries, MAAT museum, sunset at Miradouro da Senhora do Monte.
+  #   4. Recommended pre-booking Pena Palace tickets.
+  #   5. Suggested mid-range hotel in Chiado district.
+  - id: itinerary-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        A three-day Lisbon itinerary: on day one, take a walking tour of
+        Alfama, have lunch at the Time Out Market, and end the evening at a
+        fado house. On day two, take the train to Sintra to visit Pena
+        Palace and Quinta da Regaleira; tickets to Pena Palace should be
+        booked in advance. On day three, ride tram 28, taste the pastries
+        in Belém, visit the MAAT museum, and watch the sunset from
+        Miradouro da Senhora do Monte. The itinerary recommends a mid-range
+        hotel in the Chiado district.
+      evaluated: |
+        Day 1: a walking tour of Alfama, lunch at Time Out Market, and an
+        evening of fado. Day 2: train to Sintra for Pena Palace and Quinta
+        da Regaleira; pre-book Pena Palace. Day 3: ride tram 28, eat
+        pastries in Belém, visit the MAAT museum, and watch the sunset
+        from Miradouro da Senhora do Monte. Stay in a mid-range hotel in
+        Chiado.
+
+  - id: itinerary-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A three-day Lisbon itinerary: on day one, take a walking tour of
+        Alfama, have lunch at the Time Out Market, and end the evening at a
+        fado house. On day two, take the train to Sintra to visit Pena
+        Palace and Quinta da Regaleira; tickets to Pena Palace should be
+        booked in advance. On day three, ride tram 28, taste the pastries
+        in Belém, visit the MAAT museum, and watch the sunset from
+        Miradouro da Senhora do Monte. The itinerary recommends a mid-range
+        hotel in the Chiado district.
+      evaluated: |
+        Day 1: walk around Alfama, lunch at Time Out Market, fado in the
+        evening. Day 2: day trip to Sintra for Pena Palace and Quinta da
+        Regaleira. Day 3: tram 28, Belém pastries, and a sunset viewpoint.
+        Stay in Chiado.
+
+  - id: itinerary-good
+    human_score: good
+    inputs:
+      reference: |
+        A three-day Lisbon itinerary: on day one, take a walking tour of
+        Alfama, have lunch at the Time Out Market, and end the evening at a
+        fado house. On day two, take the train to Sintra to visit Pena
+        Palace and Quinta da Regaleira; tickets to Pena Palace should be
+        booked in advance. On day three, ride tram 28, taste the pastries
+        in Belém, visit the MAAT museum, and watch the sunset from
+        Miradouro da Senhora do Monte. The itinerary recommends a mid-range
+        hotel in the Chiado district.
+      evaluated: |
+        Day 1 is Alfama and fado. Day 2 is a Sintra day trip with Pena
+        Palace. Day 3 includes Belém pastries and the tram.
+
+  - id: itinerary-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A three-day Lisbon itinerary: on day one, take a walking tour of
+        Alfama, have lunch at the Time Out Market, and end the evening at a
+        fado house. On day two, take the train to Sintra to visit Pena
+        Palace and Quinta da Regaleira; tickets to Pena Palace should be
+        booked in advance. On day three, ride tram 28, taste the pastries
+        in Belém, visit the MAAT museum, and watch the sunset from
+        Miradouro da Senhora do Monte. The itinerary recommends a mid-range
+        hotel in the Chiado district.
+      evaluated: |
+        A three-day Lisbon trip including a day in Sintra and time around
+        Alfama.
+
+  - id: itinerary-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A three-day Lisbon itinerary: on day one, take a walking tour of
+        Alfama, have lunch at the Time Out Market, and end the evening at a
+        fado house. On day two, take the train to Sintra to visit Pena
+        Palace and Quinta da Regaleira; tickets to Pena Palace should be
+        booked in advance. On day three, ride tram 28, taste the pastries
+        in Belém, visit the MAAT museum, and watch the sunset from
+        Miradouro da Senhora do Monte. The itinerary recommends a mid-range
+        hotel in the Chiado district.
+      evaluated: |
+        Lisbon is a popular weekend destination and the city is well served
+        by direct flights from most of Europe.
+
+  # ───────────── Training plan: 12-week marathon program ─────────────
+  # Reference claims:
+  #   1. Phase 1 (weeks 1-4): base mileage building, three easy runs per week.
+  #   2. Phase 2 (weeks 5-8): introduce tempo runs and one weekly long run up to 28 km.
+  #   3. Phase 3 (weeks 9-11): peak mileage with interval workouts.
+  #   4. Week 12: taper with reduced volume.
+  #   5. Plan includes two rest days per week throughout.
+  #   6. Strength training twice a week is recommended.
+  - id: training-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        A 12-week marathon training plan in four phases. Phase 1 (weeks 1
+        through 4) builds base mileage with three easy runs per week. Phase
+        2 (weeks 5 through 8) introduces tempo runs and a weekly long run
+        that grows to 28 km. Phase 3 (weeks 9 through 11) is peak mileage
+        with interval workouts. Week 12 is a taper with reduced volume.
+        Throughout the program, runners take two rest days a week and are
+        encouraged to add strength training twice a week.
+      evaluated: |
+        A 12-week marathon plan in four phases. Phase 1 (weeks 1-4) builds
+        base mileage with three easy runs a week. Phase 2 (weeks 5-8) adds
+        tempo runs and a weekly long run up to 28 km. Phase 3 (weeks 9-11)
+        is peak mileage with intervals. Week 12 is a taper. Two rest days a
+        week throughout, plus strength training twice a week.
+
+  - id: training-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A 12-week marathon training plan in four phases. Phase 1 (weeks 1
+        through 4) builds base mileage with three easy runs per week. Phase
+        2 (weeks 5 through 8) introduces tempo runs and a weekly long run
+        that grows to 28 km. Phase 3 (weeks 9 through 11) is peak mileage
+        with interval workouts. Week 12 is a taper with reduced volume.
+        Throughout the program, runners take two rest days a week and are
+        encouraged to add strength training twice a week.
+      evaluated: |
+        A 12-week marathon program: weeks 1-4 build base mileage with easy
+        runs; weeks 5-8 add tempo runs and a long run growing to 28 km;
+        weeks 9-11 peak with intervals; week 12 is a taper. Two rest days a
+        week and strength work are recommended.
+
+  - id: training-good
+    human_score: good
+    inputs:
+      reference: |
+        A 12-week marathon training plan in four phases. Phase 1 (weeks 1
+        through 4) builds base mileage with three easy runs per week. Phase
+        2 (weeks 5 through 8) introduces tempo runs and a weekly long run
+        that grows to 28 km. Phase 3 (weeks 9 through 11) is peak mileage
+        with interval workouts. Week 12 is a taper with reduced volume.
+        Throughout the program, runners take two rest days a week and are
+        encouraged to add strength training twice a week.
+      evaluated: |
+        The 12-week plan starts with easy base runs, then adds tempo and
+        long runs, peaks with intervals, and ends with a taper.
+
+  - id: training-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A 12-week marathon training plan in four phases. Phase 1 (weeks 1
+        through 4) builds base mileage with three easy runs per week. Phase
+        2 (weeks 5 through 8) introduces tempo runs and a weekly long run
+        that grows to 28 km. Phase 3 (weeks 9 through 11) is peak mileage
+        with interval workouts. Week 12 is a taper with reduced volume.
+        Throughout the program, runners take two rest days a week and are
+        encouraged to add strength training twice a week.
+      evaluated: |
+        The plan runs 12 weeks and ends with a taper before the race.
+
+  - id: training-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A 12-week marathon training plan in four phases. Phase 1 (weeks 1
+        through 4) builds base mileage with three easy runs per week. Phase
+        2 (weeks 5 through 8) introduces tempo runs and a weekly long run
+        that grows to 28 km. Phase 3 (weeks 9 through 11) is peak mileage
+        with interval workouts. Week 12 is a taper with reduced volume.
+        Throughout the program, runners take two rest days a week and are
+        encouraged to add strength training twice a week.
+      evaluated: |
+        Training for a marathon takes commitment. Most runners benefit from
+        a structured plan and proper shoes.

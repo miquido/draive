@@ -65,7 +65,6 @@ import argparse
 import asyncio
 import sys
 from collections.abc import Callable
-from dataclasses import dataclass
 
 from haiway import Disposable, State, ctx, load_env, setup_logging
 
@@ -75,8 +74,7 @@ from draive.helpers import InstructionPreparationAmbiguity, prepare_instructions
 from draive.openai import OpenAI, OpenAIResponsesConfig
 
 
-@dataclass(frozen=True)
-class ProviderSpec:
+class ProviderSpec(State):
     key: str
     display_name: str
     default_model: str

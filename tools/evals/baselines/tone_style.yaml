@@ -1,0 +1,604 @@
+evaluator: tone_style
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED passage on how closely its voice matches
+    EXPECTED_TONE_STYLE. Judge only formality, mood, persona, vocabulary,
+    audience fit. Content is held constant across each cluster.
+  source: synthetic
+
+samples:
+  # ───────────── Fitness push notification (warm, conversational, encouraging, 2nd-person) ─────────────
+  - id: fitness-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Warm, conversational, encouraging, second-person — fitness app push
+        notification. Short, upbeat, friendly, never preachy.
+      evaluated: |
+        Hey, you've got this! Just a quick 20-minute walk today and you'll
+        be three days into your streak. Lace up — we'll be cheering you on.
+
+  - id: fitness-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Warm, conversational, encouraging, second-person — fitness app push
+        notification. Short, upbeat, friendly, never preachy.
+      evaluated: |
+        Time for your walk! A quick 20 minutes today keeps your three-day
+        streak alive. You can do this — go grab those shoes.
+
+  - id: fitness-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Warm, conversational, encouraging, second-person — fitness app push
+        notification. Short, upbeat, friendly, never preachy.
+      evaluated: |
+        Reminder: a 20-minute walk today will continue your three-day
+        streak. Keeping up daily activity is important for your goals, so
+        please try to fit it in.
+
+  - id: fitness-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Warm, conversational, encouraging, second-person — fitness app push
+        notification. Short, upbeat, friendly, never preachy.
+      evaluated: |
+        The user is hereby notified that, pursuant to the established
+        activity protocol, a minimum twenty-minute ambulatory exercise
+        session is required this calendar day in order to preserve the
+        ongoing three-day adherence record. Non-compliance will result in
+        termination of the aforementioned streak.
+
+  # ───────────── Court judgment summary (formal, 3rd-person, neutral) ─────────────
+  - id: judgment-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Highly formal, third-person, neutral, suitable for a court judgment
+        summary. Restrained vocabulary, no contractions, no emotion.
+      evaluated: |
+        The Court finds that the defendant breached the contractual
+        obligations set forth in clause 4.2 of the agreement dated 14
+        January 2023. Accordingly, judgment is entered in favour of the
+        claimant in the sum of £42,500, together with interest and costs
+        to be assessed.
+
+  - id: judgment-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Highly formal, third-person, neutral, suitable for a court judgment
+        summary. Restrained vocabulary, no contractions, no emotion.
+      evaluated: |
+        The court concludes that the defendant breached clause 4.2 of the
+        agreement dated 14 January 2023. Judgment is therefore entered for
+        the claimant in the amount of £42,500, plus interest and costs.
+
+  - id: judgment-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Highly formal, third-person, neutral, suitable for a court judgment
+        summary. Restrained vocabulary, no contractions, no emotion.
+      evaluated: |
+        So basically the judge decided the defendant broke clause 4.2 of
+        the 14 January 2023 contract. They've got to pay the claimant
+        £42,500, plus interest and costs. Pretty clear-cut.
+
+  - id: judgment-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Highly formal, third-person, neutral, suitable for a court judgment
+        summary. Restrained vocabulary, no contractions, no emotion.
+      evaluated: |
+        OMG the defendant TOTALLY messed up clause 4.2!!! Like, they
+        completely violated the contract from January 2023 and now they
+        owe the claimant a whopping £42,500 plus interest and costs.
+        Yikes. Big oof for them honestly.
+
+  # ───────────── Startup landing-page headline (cheeky, witty, snappy) ─────────────
+  - id: landing-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Cheeky, witty, snappy — a startup landing-page headline for a
+        password manager. Punchy, confident, a little irreverent.
+      evaluated: |
+        Passwords were a mistake. We're the apology.
+
+  - id: landing-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Cheeky, witty, snappy — a startup landing-page headline for a
+        password manager. Punchy, confident, a little irreverent.
+      evaluated: |
+        Forget your passwords. Seriously — we'll remember them for you.
+
+  - id: landing-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Cheeky, witty, snappy — a startup landing-page headline for a
+        password manager. Punchy, confident, a little irreverent.
+      evaluated: |
+        Our password manager helps users securely store and retrieve their
+        login credentials across multiple devices and browsers, making
+        account management more convenient and reducing the burden of
+        memorisation.
+
+  - id: landing-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Cheeky, witty, snappy — a startup landing-page headline for a
+        password manager. Punchy, confident, a little irreverent.
+      evaluated: |
+        The undersigned software product is a centralised credential
+        repository solution engineered to facilitate the secure storage,
+        retrieval, and synchronisation of user authentication artefacts
+        across heterogeneous computing environments in accordance with
+        prevailing information-security best practices.
+
+  # ───────────── Bereavement card (empathetic, slow-paced, no humor) ─────────────
+  - id: bereavement-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Empathetic, slow-paced, no humor — bereavement greeting card for
+        the loss of a parent. Quiet, sincere, gentle.
+      evaluated: |
+        There are no words that can hold the weight of losing your mother.
+        Please know that we are thinking of you, and of her, and that we
+        carry a small piece of your sorrow with you.
+
+  - id: bereavement-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Empathetic, slow-paced, no humor — bereavement greeting card for
+        the loss of a parent. Quiet, sincere, gentle.
+      evaluated: |
+        I am so sorry about your mother. She was deeply loved, and her
+        absence is felt by everyone who knew her. We are here whenever
+        you need us.
+
+  - id: bereavement-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Empathetic, slow-paced, no humor — bereavement greeting card for
+        the loss of a parent. Quiet, sincere, gentle.
+      evaluated: |
+        Sorry to hear about your mom's passing. She was a great person and
+        will be missed by lots of people. Let me know if you need anything
+        at all, I mean it.
+
+  - id: bereavement-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Empathetic, slow-paced, no humor — bereavement greeting card for
+        the loss of a parent. Quiet, sincere, gentle.
+      evaluated: |
+        Heard about your mom — what a bummer! At least she had a good run,
+        right? LOL anyway, life goes on, you'll be back on your feet in
+        no time. Keep your chin up, champ!
+
+  # ───────────── Radio operator status report (dry, technical, abbreviated) ─────────────
+  - id: radio-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Dry, technical, abbreviated — radio operator status report.
+        Clipped sentences, procedural phrasing, callsigns and codes.
+      evaluated: |
+        Alpha-Six, this is Bravo-Two. Position grid four-seven-niner-two,
+        zero-three-one-five. Two pax, one vehicle. Fuel seven-zero
+        percent. Over.
+
+  - id: radio-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Dry, technical, abbreviated — radio operator status report.
+        Clipped sentences, procedural phrasing, callsigns and codes.
+      evaluated: |
+        Bravo-Two reporting in. Grid 4792, time 0315. Two personnel, one
+        vehicle on station. Fuel state 70 percent. Standing by.
+
+  - id: radio-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Dry, technical, abbreviated — radio operator status report.
+        Clipped sentences, procedural phrasing, callsigns and codes.
+      evaluated: |
+        This is Bravo-Two checking in. We are at grid 4792 as of 0315
+        hours. There are two of us with one vehicle, and we have about 70
+        percent fuel left. Awaiting further orders.
+
+  - id: radio-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Dry, technical, abbreviated — radio operator status report.
+        Clipped sentences, procedural phrasing, callsigns and codes.
+      evaluated: |
+        Hi everyone, just wanted to give a quick update! We made it to
+        grid 4792 around quarter past three this morning. Both of us are
+        doing fine and the vehicle is in good shape, with roughly 70
+        percent of the tank still full. Talk soon!
+
+  # ───────────── Children's storybook (playful, rhyming) ─────────────
+  - id: storybook-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Playful, rhyming, suitable for a children's storybook page about a
+        bunny finding a carrot. Simple words, a singsong cadence.
+      evaluated: |
+        Little Bun hopped down the lane, past a puddle, past the rain.
+        There, beneath a leafy top, sat a carrot — hop, hop, hop!
+
+  - id: storybook-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Playful, rhyming, suitable for a children's storybook page about a
+        bunny finding a carrot. Simple words, a singsong cadence.
+      evaluated: |
+        Bunny hopped down the path past a puddle. He looked around and
+        found a big orange carrot under a green leaf. He was very happy
+        and started to nibble it right away.
+
+  - id: storybook-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Playful, rhyming, suitable for a children's storybook page about a
+        bunny finding a carrot. Simple words, a singsong cadence.
+      evaluated: |
+        A rabbit moved along a rural footpath in the early afternoon. It
+        eventually located a carrot growing beneath some leaves at the
+        edge of the path. The rabbit then began to eat the carrot.
+
+  - id: storybook-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Playful, rhyming, suitable for a children's storybook page about a
+        bunny finding a carrot. Simple words, a singsong cadence.
+      evaluated: |
+        The specimen (Oryctolagus cuniculus) traversed approximately 4.6
+        metres of damp terrain before locating a Daucus carota tuber
+        partially obscured by adjacent foliage, whereupon mastication
+        commenced.
+
+  # ───────────── Military briefing (crisp, no-nonsense, 2nd-person) ─────────────
+  - id: military-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Crisp, no-nonsense, second-person, military briefing. Imperative
+        verbs, no filler, direct address to the team.
+      evaluated: |
+        Listen up. You move out at oh-six-hundred. Primary objective:
+        secure the bridge. Hold it until relieved. No comms unless
+        contact. Any questions, ask now.
+
+  - id: military-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Crisp, no-nonsense, second-person, military briefing. Imperative
+        verbs, no filler, direct address to the team.
+      evaluated: |
+        The team will be heading out at six in the morning. The objective
+        is to take and hold the bridge until another unit relieves you.
+        Radios should stay off unless you encounter resistance. Please
+        raise any questions now.
+
+  - id: military-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Crisp, no-nonsense, second-person, military briefing. Imperative
+        verbs, no filler, direct address to the team.
+      evaluated: |
+        So tomorrow morning at six we're going to head over to the bridge
+        and try to take control of it, and then just sort of hang out
+        there until somebody else shows up to take over for us. Try not
+        to use the radios too much unless something happens.
+
+  - id: military-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Crisp, no-nonsense, second-person, military briefing. Imperative
+        verbs, no filler, direct address to the team.
+      evaluated: |
+        Hi friends! So tomorrow we have a really fun little adventure
+        planned — we'll be heading over to the cutest little bridge
+        bright and early at six o'clock. The goal is just to hang around
+        and chill there until our friends come and join us. Maybe leave
+        the chatty radios alone unless something exciting pops up. Hugs!
+
+  # ───────────── Travel magazine opener (lush, descriptive, sensory) ─────────────
+  - id: travel-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Lush, descriptive, sensory — travel magazine article opener about
+        arriving in Kyoto at dawn. Long sentences, rich imagery, evocative.
+      evaluated: |
+        The train slides into Kyoto just as the eastern hills begin to
+        blush, and the city greets you in half-light — the faint perfume
+        of cedar drifting from a distant temple, the soft clack of wooden
+        sandals on stone, a single magpie answering the silence from a
+        rooftop the colour of old tea.
+
+  - id: travel-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Lush, descriptive, sensory — travel magazine article opener about
+        arriving in Kyoto at dawn. Long sentences, rich imagery, evocative.
+      evaluated: |
+        Kyoto arrives at dawn in a quiet hush: cedar smoke drifting from a
+        nearby temple, wooden sandals tapping somewhere down the lane,
+        the eastern hills slowly pinking behind tiled roofs that have
+        weathered to the colour of old tea.
+
+  - id: travel-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Lush, descriptive, sensory — travel magazine article opener about
+        arriving in Kyoto at dawn. Long sentences, rich imagery, evocative.
+      evaluated: |
+        Arrived Kyoto 05:42. Temp 14C. Cedar smell present. Foot traffic
+        light. Sunrise observed at 05:58. Roof tiles brown. Magpie noted.
+        Proceeded to hotel.
+
+  # ───────────── Corporate dissent memo (polite, hedged, diplomatic) ─────────────
+  - id: memo-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Polite, hedged, diplomatic — internal corporate dissent memo
+        disagreeing with a hiring freeze. Careful, deferential, but firm.
+      evaluated: |
+        Thank you for sharing the hiring-freeze proposal. I understand the
+        rationale, but I do have some reservations about the timing,
+        especially given our Q3 engineering commitments. I'd appreciate
+        the opportunity to walk through a couple of alternatives with you.
+
+  - id: memo-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Polite, hedged, diplomatic — internal corporate dissent memo
+        disagreeing with a hiring freeze. Careful, deferential, but firm.
+      evaluated: |
+        I disagree with the hiring freeze. I get why we want to control
+        costs, but the timing is bad — Q3 engineering work will suffer.
+        I think we should look at other options before locking this in.
+
+  - id: memo-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Polite, hedged, diplomatic — internal corporate dissent memo
+        disagreeing with a hiring freeze. Careful, deferential, but firm.
+      evaluated: |
+        Nope, the hiring freeze isn't going to work — Q3 is already on
+        fire and pulling headcount will only make it worse. We need to
+        revisit this fast.
+
+  # ───────────── Teen Discord message (casual, slang-heavy) ─────────────
+  - id: discord-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Casual, slang-heavy — 14-year-old's Discord message reacting to a
+        friend's new gaming headset. Lowercase, emojis welcome, internet
+        slang, rapid-fire.
+      evaluated: |
+        bro that headset is INSANE lowkey jealous 😭 mic prob slaps too,
+        we gotta queue ranked tn fr fr
+
+  - id: discord-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Casual, slang-heavy — 14-year-old's Discord message reacting to a
+        friend's new gaming headset. Lowercase, emojis welcome, internet
+        slang, rapid-fire.
+      evaluated: |
+        nice headset! the mic actually sounds really good. we should
+        definitely play some ranked tonight if you're free.
+
+  - id: discord-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Casual, slang-heavy — 14-year-old's Discord message reacting to a
+        friend's new gaming headset. Lowercase, emojis welcome, internet
+        slang, rapid-fire.
+      evaluated: |
+        I should like to congratulate you on the acquisition of your new
+        audio peripheral. The microphone, by all accounts, appears to be
+        of excellent fidelity. Might I propose we engage in competitive
+        play this evening, should your schedule permit?
+
+  # ───────────── Shakespearean stage direction (formal, archaic) ─────────────
+  - id: shakespeare-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Formal, archaic — Shakespearean stage direction describing a duel
+        in a courtyard. Early Modern English flavour, theatrical phrasing.
+      evaluated: |
+        Enter ROMEO and TYBALT, swords drawn. They circle one another upon
+        the cobbles, the moon high above. Trumpets sound within. Tybalt
+        thrusteth; Romeo parries and, with a cry, runs him through. Exit
+        Tybalt, borne off by attendants.
+
+  - id: shakespeare-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Formal, archaic — Shakespearean stage direction describing a duel
+        in a courtyard. Early Modern English flavour, theatrical phrasing.
+      evaluated: |
+        Romeo and Tybalt come on stage holding swords. They walk around
+        each other in the courtyard. Tybalt attacks first, but Romeo
+        blocks it and stabs him. Tybalt is dragged away.
+
+  - id: shakespeare-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Formal, archaic — Shakespearean stage direction describing a duel
+        in a courtyard. Early Modern English flavour, theatrical phrasing.
+      evaluated: |
+        ok so romeo and tybalt show up with swords lol. they walk around
+        the courtyard kinda sizing each other up and then tybalt yeets
+        forward but romeo blocks and just absolutely sends him. rip
+        tybalt, gets dragged off stage 💀
+
+  # ───────────── Pediatrician explainer (patient, reassuring) ─────────────
+  - id: pediatrician-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Patient, reassuring — pediatrician explaining a vaccination to a
+        nervous five-year-old. Simple words, gentle, calm, kind.
+      evaluated: |
+        You're being very brave. The needle gives a quick little pinch,
+        and then it's over. I'll count to three, and you can hold on to
+        your mum the whole time.
+
+  - id: pediatrician-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Patient, reassuring — pediatrician explaining a vaccination to a
+        nervous five-year-old. Simple words, gentle, calm, kind.
+      evaluated: |
+        It's just a small needle. You'll feel a quick pinch and then it's
+        finished. I'll count to three so you know what's coming, and you
+        can hold your mum's hand. Try to stay still, alright?
+
+  - id: pediatrician-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Patient, reassuring — pediatrician explaining a vaccination to a
+        nervous five-year-old. Simple words, gentle, calm, kind.
+      evaluated: |
+        The injection involves intramuscular administration of the
+        vaccine. The patient will experience momentary discomfort at the
+        injection site. A countdown will be initiated, after which the
+        procedure will conclude. Parental contact is permitted.
+
+  # ───────────── Wire-service news lede (sober, fact-driven) ─────────────
+  - id: newswire-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Sober, fact-driven — wire-service news lede about an overnight
+        thunderstorm that flooded a regional town. Inverted pyramid,
+        attributed, no editorializing.
+      evaluated: |
+        An overnight thunderstorm dropped more than 80mm of rain on
+        Bridgeport in under three hours, flooding around 40 homes and
+        prompting the evacuation of a riverside care facility, emergency
+        services said on Thursday.
+
+  - id: newswire-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Sober, fact-driven — wire-service news lede about an overnight
+        thunderstorm that flooded a regional town. Inverted pyramid,
+        attributed, no editorializing.
+      evaluated: |
+        Bridgeport got hit hard by a big thunderstorm last night, with
+        over 80mm of rain in just three hours. About 40 homes were
+        flooded and a care home near the river had to be evacuated,
+        according to local emergency services.
+
+  - id: newswire-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Sober, fact-driven — wire-service news lede about an overnight
+        thunderstorm that flooded a regional town. Inverted pyramid,
+        attributed, no editorializing.
+      evaluated: |
+        What a horrible night for poor little Bridgeport! A truly
+        devastating thunderstorm absolutely battered the town with a
+        shocking 80mm of rain in only three hours, and as many as 40
+        unlucky homes were flooded. Heartbreakingly, an entire care home
+        had to be rushed out by the river — just awful.
+
+  # ───────────── Memoir opener (self-deprecating, humble, vulnerable) ─────────────
+  - id: memoir-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Self-deprecating, humble, vulnerable — memoir first paragraph
+        about the author's first day at university. Reflective, quietly
+        honest, mildly funny at the narrator's own expense.
+      evaluated: |
+        I arrived at the university clutching a misread map and a jumper
+        my mother had chosen, both of which gave me away as exactly the
+        nervous eighteen-year-old I was trying not to be. I told myself
+        I looked fine. The nearest pigeon disagreed.
+
+  - id: memoir-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Self-deprecating, humble, vulnerable — memoir first paragraph
+        about the author's first day at university. Reflective, quietly
+        honest, mildly funny at the narrator's own expense.
+      evaluated: |
+        On my first day at university I showed up with the wrong map and
+        a jumper my mum had bought me. I felt very out of place at
+        eighteen and was clearly trying too hard to look like I belonged.
+        Looking back it's pretty funny.
+
+  - id: memoir-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Self-deprecating, humble, vulnerable — memoir first paragraph
+        about the author's first day at university. Reflective, quietly
+        honest, mildly funny at the narrator's own expense.
+      evaluated: |
+        On the first day of university I went through the front gates and
+        located the relevant building on my map. I was wearing a jumper
+        purchased by my mother. The orientation programme commenced at
+        ten in the morning and I attended as scheduled.
+
+  - id: memoir-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Self-deprecating, humble, vulnerable — memoir first paragraph
+        about the author's first day at university. Reflective, quietly
+        honest, mildly funny at the narrator's own expense.
+      evaluated: |
+        I strode through the university gates on day one already knowing
+        I was destined for greatness. The other freshers, frankly,
+        looked beneath me. My jumper was perfect. My map was perfect. The
+        pigeons, sensing brilliance, parted before me as I made my
+        magnificent entrance.
