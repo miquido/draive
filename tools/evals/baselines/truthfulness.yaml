@@ -1,0 +1,623 @@
+evaluator: truthfulness
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED statement on honesty — full disclosure, faithful
+    framing, no deceptive omissions. A literally true but misleading
+    statement scores LOW. REFERENCE, when present, is supplemental context.
+  source: synthetic
+
+samples:
+  # ───────────── Startup quarterly performance ─────────────
+  - id: startup-quarter-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Q3 results: revenue $4.2M (down 8% QoQ from $4.6M, up 12% YoY).
+        Two enterprise clients churned. Burn rate $1.1M/month, 14 months
+        runway. Hired 6 engineers. NPS rose from 41 to 49.
+      evaluated: |
+        Q3 revenue came in at $4.2M, down 8% from last quarter but up 12%
+        year-over-year. The sequential drop reflects two enterprise
+        churns, which we discuss in detail below. We burned $1.1M/month
+        and have 14 months of runway at the current pace. On the
+        operational side we added six engineers and our NPS climbed from
+        41 to 49. We expect Q4 to recover most of the sequential decline
+        but cannot yet commit to a specific number.
+
+  - id: startup-quarter-good
+    human_score: good
+    inputs:
+      reference: |
+        Q3 results: revenue $4.2M (down 8% QoQ from $4.6M, up 12% YoY).
+        Two enterprise clients churned. Burn rate $1.1M/month, 14 months
+        runway. Hired 6 engineers. NPS rose from 41 to 49.
+      evaluated: |
+        Q3 revenue grew 12% year-over-year to $4.2M. We had some churn
+        among enterprise clients this quarter, which moved the
+        quarter-on-quarter number lower. We hired six engineers and NPS
+        is up. Runway remains healthy.
+
+  - id: startup-quarter-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Q3 was another quarter of strong growth: revenue came in 12%
+        above the same quarter last year. We continue to invest in the
+        team — hiring six engineers — and customer satisfaction is at a
+        record high. We are well-funded for the road ahead.
+
+  - id: startup-quarter-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Q3 results: revenue $4.2M (down 8% QoQ from $4.6M, up 12% YoY).
+        Two enterprise clients churned. Burn rate $1.1M/month, 14 months
+        runway. Hired 6 engineers. NPS rose from 41 to 49.
+      evaluated: |
+        Q3 was a record-breaking quarter for the company, with revenue
+        climbing to new heights and zero meaningful customer departures.
+        Cash is plentiful and growth has never been stronger. Investors
+        should be thrilled.
+
+  # ───────────── Medication side-effect profile ─────────────
+  - id: medication-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Drug X (statin). Common: muscle aches (~10%), mild GI upset
+        (~6%). Uncommon: elevated liver enzymes (~1%). Rare but serious:
+        rhabdomyolysis (<0.01%). Contraindicated in pregnancy. Reduces
+        cardiovascular events by ~25% over 5 years in at-risk patients.
+      evaluated: |
+        Drug X lowers cholesterol and, in at-risk patients, reduces
+        cardiovascular events by about a quarter over five years. The
+        most common side effects are muscle aches (around 1 in 10
+        patients) and mild stomach upset (around 1 in 16). Approximately
+        1% of patients show elevated liver enzymes on routine bloodwork,
+        which usually resolves on discontinuation. A very rare but
+        serious complication, rhabdomyolysis, occurs in fewer than 1 in
+        10,000 patients. Drug X must not be taken during pregnancy.
+
+  - id: medication-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Drug X is widely prescribed for high cholesterol and reduces
+        cardiovascular events by about 25% over five years. The most
+        common side effect is muscle aches in about 10% of patients;
+        some patients also have mild stomach upset. There are rarer
+        risks that prescribers will discuss with you. It is not suitable
+        in pregnancy.
+
+  - id: medication-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Drug X (statin). Common: muscle aches (~10%), mild GI upset
+        (~6%). Uncommon: elevated liver enzymes (~1%). Rare but serious:
+        rhabdomyolysis (<0.01%). Contraindicated in pregnancy. Reduces
+        cardiovascular events by ~25% over 5 years in at-risk patients.
+      evaluated: |
+        Drug X is essentially side-effect free and safe for everyone,
+        including pregnant patients. It cuts heart-attack risk in half
+        and there are no documented complications worth worrying about.
+
+  # ───────────── Historical event: 1944 D-Day ─────────────
+  - id: dday-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Operation Overlord, 6 June 1944. Allied amphibious assault on
+        Normandy. Around 156,000 troops landed across five beaches.
+        Estimated 4,400 Allied dead, 10,000+ Allied casualties. German
+        casualties uncertain (4,000–9,000). Pivotal step in opening
+        Western Front; war continued for another 11 months.
+      evaluated: |
+        On 6 June 1944, Allied forces launched Operation Overlord, an
+        amphibious invasion of German-occupied Normandy. Roughly 156,000
+        American, British, Canadian, and other Allied troops landed
+        across five beaches. The Allies suffered an estimated 4,400
+        deaths and over 10,000 total casualties; German losses were
+        between 4,000 and 9,000. The landings opened a new front in
+        Western Europe, although the war in Europe would continue for
+        nearly another year.
+
+  - id: dday-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        D-Day, 6 June 1944, was the Allied amphibious landing in
+        Normandy. About 156,000 troops came ashore across five beaches
+        under heavy fire. Casualties were severe on both sides —
+        thousands of Allied dead and many more wounded. The operation
+        established the Western Front but did not end the war, which
+        continued for another eleven months.
+
+  - id: dday-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        On D-Day, the Allies stormed the beaches and broke the back of
+        Nazi Germany in a single day, after which the war was effectively
+        over. Heroism on the beaches led directly to victory in Europe.
+
+  - id: dday-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        D-Day was a quick, almost bloodless Allied operation in 1943 that
+        immediately ended the war in Europe. Casualties were minimal and
+        German resistance collapsed within hours.
+
+  # ───────────── Product review: wireless headphones ─────────────
+  - id: headphones-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        I've used these headphones for three months. Battery life is
+        genuinely the advertised 30 hours of mixed playback. Noise
+        cancellation is strong on steady noise like planes but does
+        less for sudden voices nearby. Comfort is good for two-hour
+        sessions; after that my ears get warm. Bass is heavier than
+        neutral — fine for pop and electronic music, less ideal for
+        classical. Build feels plastic-y for the price. Overall I'd buy
+        them again, but I want to be clear about the trade-offs.
+
+  - id: headphones-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Solid headphones after three months. Battery lasts about as long
+        as claimed. Noise cancellation is great on planes, less so for
+        chatter. Comfortable for shorter sessions; warm after a couple
+        of hours. Bass is on the heavy side. Build is fine but not
+        premium. Recommended with those caveats.
+
+  - id: headphones-good
+    human_score: good
+    inputs:
+      evaluated: |
+        These headphones are very good. Battery life meets expectations
+        and noise cancellation works well. They are comfortable. Sound
+        quality is enjoyable. There are a few small issues I don't
+        consider deal-breakers. Recommended.
+
+  - id: headphones-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Sponsored review by the manufacturer. The reviewer received a
+        free unit and a fee. Common complaints in independent reviews:
+        warm earcups, plasticky build, bass-heavy tuning.
+      evaluated: |
+        After spending some time with these incredible headphones I can
+        say they are a near-perfect listening experience. Hours fly by
+        in pure comfort and the sound is impeccable across every genre.
+        At this price point you simply cannot do better.
+
+  # ───────────── Weather forecast ─────────────
+  - id: weather-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Forecast model: 60% chance of rain tomorrow afternoon, 5–15 mm.
+        Highs 18°C. Slight chance (10%) of an isolated thunderstorm
+        between 3–6 pm. No severe weather warnings issued.
+      evaluated: |
+        Tomorrow looks unsettled. There's a 60% chance of rain in the
+        afternoon, with totals likely between 5 and 15 mm. Highs around
+        18°C. A small 10% chance of an isolated thunderstorm between
+        roughly 3 and 6 pm — worth keeping an eye on if you're outdoors,
+        but no severe weather is currently warned. Bring a rain jacket
+        rather than rearranging your day.
+
+  - id: weather-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Tomorrow afternoon will likely be rainy — about a 60% chance,
+        with up to about 15 mm possible. Highs near 18°C. A small chance
+        of an isolated thunderstorm in the late afternoon. No severe
+        weather expected. An umbrella should be enough.
+
+  - id: weather-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Forecast model: 60% chance of rain tomorrow afternoon, 5–15 mm.
+        Highs 18°C. Slight chance (10%) of an isolated thunderstorm
+        between 3–6 pm. No severe weather warnings issued.
+      evaluated: |
+        Severe storms expected tomorrow afternoon. Possibility of
+        thunder and significant rainfall. Plan accordingly and consider
+        rescheduling outdoor activities.
+
+  - id: weather-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Forecast model: 60% chance of rain tomorrow afternoon, 5–15 mm.
+        Highs 18°C. Slight chance (10%) of an isolated thunderstorm
+        between 3–6 pm. No severe weather warnings issued.
+      evaluated: |
+        Tomorrow will be a clear, dry, sunny day with no chance of rain
+        or storms. Highs in the mid-20s. A perfect day for any outdoor
+        plans you might have.
+
+  # ───────────── Scientific study summary: coffee & longevity ─────────────
+  - id: study-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Observational cohort study (n=171,000). Habitual coffee drinkers
+        (1.5–3.5 cups/day) had ~12% lower all-cause mortality over a
+        7-year follow-up vs non-drinkers. Association persisted after
+        adjusting for smoking and lifestyle. Authors caution this is
+        correlational; no causal claim.
+      evaluated: |
+        A large observational study of around 171,000 people found that
+        those drinking 1.5–3.5 cups of coffee a day had about 12% lower
+        all-cause mortality over seven years compared with non-drinkers.
+        The association held after adjusting for smoking and lifestyle
+        factors. Because this is observational, the authors stop short
+        of saying coffee causes lower mortality — only that the two
+        track together in this population.
+
+  - id: study-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        A large observational study reported a roughly 12% lower
+        seven-year all-cause mortality rate among moderate coffee
+        drinkers compared with non-drinkers. The link held after
+        adjusting for known confounders, although as the authors note
+        the design cannot establish cause.
+
+  - id: study-good
+    human_score: good
+    inputs:
+      reference: |
+        Observational cohort study (n=171,000). Habitual coffee drinkers
+        (1.5–3.5 cups/day) had ~12% lower all-cause mortality over a
+        7-year follow-up vs non-drinkers. Association persisted after
+        adjusting for smoking and lifestyle. Authors caution this is
+        correlational; no causal claim.
+      evaluated: |
+        A study of 171,000 people linked moderate coffee drinking with
+        about 12% lower mortality over seven years. The researchers
+        adjusted for smoking and lifestyle. Coffee appears to be
+        associated with living longer.
+
+  - id: study-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        New research shows that drinking coffee makes you live longer.
+        People who drank a few cups a day were 12% less likely to die
+        over seven years. The benefit was clear even for smokers.
+
+  - id: study-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Observational cohort study (n=171,000). Habitual coffee drinkers
+        (1.5–3.5 cups/day) had ~12% lower all-cause mortality over a
+        7-year follow-up vs non-drinkers. Association persisted after
+        adjusting for smoking and lifestyle. Authors caution this is
+        correlational; no causal claim.
+      evaluated: |
+        Scientists have proven that coffee extends life by 12%. Drinking
+        coffee is now considered medically necessary, and people who
+        avoid it are significantly more likely to die early regardless
+        of other habits.
+
+  # ───────────── Real-estate listing ─────────────
+  - id: realestate-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        2-bed apartment, 58 m², 4th floor, no elevator. Built 1962, last
+        renovated 2014. North-facing living room, gets indirect light.
+        Quiet courtyard but train tracks 80m away — audible with windows
+        open. Heating: gas central, working. Asking €295,000.
+      evaluated: |
+        Two-bedroom, 58 m² fourth-floor apartment with no elevator. The
+        building dates to 1962; the unit was last renovated in 2014. The
+        living room faces north so light is indirect rather than direct.
+        The courtyard side is quiet, but train tracks lie about 80 m
+        away and you can hear passing trains with windows open. Gas
+        central heating, in working order. Asking €295,000.
+
+  - id: realestate-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Compact 58 m² two-bedroom on the 4th floor (no lift). Renovated
+        in 2014 inside an older 1960s building. The living room is
+        north-facing, so it's bright but without direct sun. There is
+        some train noise from the nearby line. Gas heating included.
+        €295,000.
+
+  - id: realestate-fair
+    human_score: fair
+    inputs:
+      reference: |
+        2-bed apartment, 58 m², 4th floor, no elevator. Built 1962, last
+        renovated 2014. North-facing living room, gets indirect light.
+        Quiet courtyard but train tracks 80m away — audible with windows
+        open. Heating: gas central, working. Asking €295,000.
+      evaluated: |
+        Sun-drenched two-bedroom apartment in a historic building, fully
+        modernised throughout. Tranquil location with excellent transport
+        connections nearby. Don't miss this rare opportunity at €295,000.
+
+  - id: realestate-poor
+    human_score: poor
+    inputs:
+      reference: |
+        2-bed apartment, 58 m², 4th floor, no elevator. Built 1962, last
+        renovated 2014. North-facing living room, gets indirect light.
+        Quiet courtyard but train tracks 80m away — audible with windows
+        open. Heating: gas central, working. Asking €295,000.
+      evaluated: |
+        Brand-new luxury apartment with elevator access, panoramic sunny
+        terraces, and complete silence — no traffic, no trains, no
+        neighbours. A turnkey home in mint condition. €295,000.
+
+  # ───────────── Political claim: unemployment ─────────────
+  - id: politics-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Unemployment rate fell from 6.1% to 4.9% during the current
+        administration's term. Labor-force participation also fell by
+        0.8 points over the same period. Real wages roughly flat.
+      evaluated: |
+        Under this administration, the headline unemployment rate has
+        fallen from 6.1% to 4.9%. I want to be transparent: part of that
+        improvement reflects a 0.8-point drop in labor-force
+        participation, meaning some workers have left the job market
+        entirely. Real wages over the same period have been roughly
+        flat. The labor market has tightened, but not as cleanly as a
+        single statistic suggests.
+
+  - id: politics-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Unemployment has dropped from 6.1% to 4.9% over our term. That's
+        real progress, although labor-force participation has also
+        declined and wages have not risen much in real terms. We have
+        more work to do on the wage side.
+
+  - id: politics-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Unemployment rate fell from 6.1% to 4.9% during the current
+        administration's term. Labor-force participation also fell by
+        0.8 points over the same period. Real wages roughly flat.
+      evaluated: |
+        Under our leadership, unemployment has plummeted to historic
+        lows. American workers are thriving and prosperity is reaching
+        every corner of the country thanks to the policies we have put
+        in place.
+
+  - id: politics-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Unemployment rate fell from 6.1% to 4.9% during the current
+        administration's term. Labor-force participation also fell by
+        0.8 points over the same period. Real wages roughly flat.
+      evaluated: |
+        Unemployment has been eliminated under this administration —
+        every American who wants a job has one, and wages are rising at
+        record rates. There has never been a stronger labor market in
+        the nation's history.
+
+  # ───────────── Company environmental impact statement ─────────────
+  - id: greenwash-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        FY24 emissions: Scope 1 + 2 down 18% YoY (mainly from one
+        factory closure). Scope 3 up 4%. Water use down 6%. Three of 12
+        factories use renewable electricity. No third-party audit of
+        emissions figures yet.
+      evaluated: |
+        In FY24 our Scope 1 and 2 emissions fell 18% year-over-year,
+        though we want to flag that this drop is mostly attributable to
+        the closure of our Portland facility rather than process
+        improvements. Scope 3 emissions actually rose 4% as supplier
+        activity expanded. Water use decreased 6%. Three of our twelve
+        factories run on renewable electricity. These figures have not
+        yet been third-party audited; we expect to publish an audited
+        report next year.
+
+  - id: greenwash-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Our combined Scope 1 and 2 emissions fell 18% in FY24, mostly
+        due to one site closing. Scope 3 grew 4%. Water use is down 6%.
+        A quarter of our factories now run on renewable power. Audit of
+        these numbers is pending.
+
+  - id: greenwash-good
+    human_score: good
+    inputs:
+      evaluated: |
+        We made significant progress on emissions in FY24, with direct
+        emissions down 18% year-over-year. Water use was also reduced.
+        We continue to expand our renewable-energy footprint across our
+        factories. Supply-chain emissions remain an area of focus.
+
+  # ───────────── Travel agency claim ─────────────
+  - id: travel-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Our seven-day Iceland tour visits the south coast, Golden Circle,
+        and one glacier hike. Hotels are three-star, mostly outside
+        Reykjavik, so expect modest rooms and rural surroundings. Some
+        days involve 5–6 hours of driving. Northern Lights are possible
+        between September and March but not guaranteed. Price excludes
+        flights.
+
+  - id: travel-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Seven-day Iceland tour covering the south coast and Golden
+        Circle plus a glacier hike. Comfortable three-star
+        accommodation. Travel times vary by day. Best months for the
+        Northern Lights are autumn through early spring. Flights extra.
+
+  - id: travel-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Five-star all-inclusive luxury Iceland getaway with guaranteed
+        Northern Lights every single night, no driving required, and
+        international flights included. The ultimate worry-free dream
+        holiday.
+
+  # ───────────── Tutor's claim about a student ─────────────
+  - id: tutor-good
+    human_score: good
+    inputs:
+      reference: |
+        Student: 14 yr old. Math grade improved from D to C+ in one
+        term. Homework completion ~70%. Struggles with word problems
+        and algebraic manipulation. Engaged in sessions, makes effort.
+      evaluated: |
+        Your daughter has improved this term from a D to a C+ in math.
+        She is more engaged in our sessions and putting in effort. There
+        are still some areas where she struggles that we'll continue to
+        work on next term.
+
+  - id: tutor-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Student: 14 yr old. Math grade improved from D to C+ in one
+        term. Homework completion ~70%. Struggles with word problems
+        and algebraic manipulation. Engaged in sessions, makes effort.
+      evaluated: |
+        Your daughter has had a tremendous breakthrough this term and is
+        excelling beyond all expectations in math. Her work ethic is
+        impeccable and she is rapidly closing in on top-of-class
+        performance.
+
+  # ───────────── Job candidate self-description ─────────────
+  - id: candidate-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        I led the migration of our payments service from a monolith to
+        microservices, working with a team of four. I owned the
+        architecture and code review; my colleague handled deployment
+        infrastructure. The project shipped two months late but reduced
+        average latency by 35%. I'm comfortable with Go and Kubernetes;
+        my SQL is intermediate at best.
+
+  - id: candidate-good
+    human_score: good
+    inputs:
+      evaluated: |
+        I led a successful migration of our payments service from a
+        monolith to microservices with my team. We shipped meaningful
+        latency improvements. I work primarily in Go and Kubernetes, with
+        some database work as needed.
+
+  - id: candidate-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Candidate was one of four engineers on the migration; they led
+        architecture but not deployment. Project was 2 months late.
+        They are competent in Go, learning Kubernetes, weak SQL.
+      evaluated: |
+        I single-handedly architected, built, and deployed a complete
+        microservices platform that transformed our payments
+        infrastructure. I am an expert in Go, Kubernetes, and SQL with
+        deep experience across the stack.
+
+  - id: candidate-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        I personally invented modern microservices architecture and
+        deployed it for the world's leading payments platform. I am
+        universally recognised as the foremost authority on Go,
+        Kubernetes, and SQL, with no peers in the industry.
+
+  # ───────────── Friend's account of an argument ─────────────
+  - id: argument-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        We argued at dinner. I raised my voice first when I felt cut
+        off; she walked out after I called her decision "stupid," which
+        was unfair of me. We both said things we regret. I think she
+        was reacting to a long pattern, not just last night, and I
+        haven't really acknowledged that.
+
+  - id: argument-good
+    human_score: good
+    inputs:
+      evaluated: |
+        We had an argument over dinner. I got loud at one point and she
+        left. We both said hurtful things. There's probably a longer
+        pattern between us we need to work through.
+
+  - id: argument-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        We had a disagreement and she overreacted and stormed out, which
+        is her usual habit. I was just trying to discuss things calmly
+        and she made it into a big drama. There's not much I could have
+        done differently.
+
+  # ───────────── Financial advisor risk disclosure ─────────────
+  - id: advisor-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Recommended fund: global equity index. Past 10-year return
+        ~8% annualized. Max drawdown over the period: -34% during 2020.
+        Fees 0.20% annual. Equity = capital at risk, no guarantee.
+      evaluated: |
+        The fund I'm recommending is a global equity index. Over the
+        past ten years it has returned about 8% per year on average,
+        but I want to be specific about what that average hides: during
+        2020 the fund dropped 34% from peak to trough before recovering.
+        Fees are 0.20% a year. Because it holds equities, your capital
+        is at risk and past performance is not a guarantee of future
+        returns. If a 30%+ temporary loss would force you to sell, this
+        is not the right fund for you.
+
+  - id: advisor-good
+    human_score: good
+    inputs:
+      evaluated: |
+        This global equity index fund has returned roughly 8% per year
+        over the past decade, with low fees of 0.20%. There have been
+        significant drops along the way, including a sharp drawdown in
+        2020. As with any equity investment, you can lose money.
+
+  - id: advisor-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Recommended fund: global equity index. Past 10-year return
+        ~8% annualized. Max drawdown over the period: -34% during 2020.
+        Fees 0.20% annual. Equity = capital at risk, no guarantee.
+      evaluated: |
+        This fund is essentially a guaranteed 8% return every year with
+        no real downside risk. Past performance proves it will keep
+        delivering steady gains regardless of market conditions — your
+        capital is safe.

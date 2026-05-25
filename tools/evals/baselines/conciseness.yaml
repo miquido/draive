@@ -1,0 +1,845 @@
+evaluator: conciseness
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED passage purely on conciseness relative to REFERENCE.
+    All rewrites convey the same core information; judge only how compactly.
+  source: synthetic
+
+samples:
+  # ───────────── Refund policy ─────────────
+  - id: refund-policy-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Customers may return unused items within 30 days of delivery for a
+        full refund. The original receipt is required, and refunds are
+        issued to the original payment method within 5 business days.
+      evaluated: |
+        Unused items: 30-day return window, receipt required; refunds hit
+        the original payment method within 5 business days.
+
+  - id: refund-policy-good
+    human_score: good
+    inputs:
+      reference: |
+        Customers may return unused items within 30 days of delivery for a
+        full refund. The original receipt is required, and refunds are
+        issued to the original payment method within 5 business days.
+      evaluated: |
+        If you have an unused item, you can send it back within 30 days
+        after delivery. You will need to have the original receipt with
+        you. Once the return is processed, the refund will be sent to the
+        payment method you used, and that usually takes 5 business days.
+
+  - id: refund-policy-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Customers may return unused items within 30 days of delivery for a
+        full refund. The original receipt is required, and refunds are
+        issued to the original payment method within 5 business days.
+      evaluated: |
+        So basically, if you happen to have an item that you have not used
+        yet, then what you can do is go ahead and return it, and you have
+        a window of 30 days from the day it was delivered to you. You'll
+        want to make sure you keep the receipt, because the original
+        receipt is something that will be required for the return to be
+        processed. After everything goes through, the refund itself will
+        be sent back to the same payment method that was originally used,
+        and that part typically takes around 5 business days to complete.
+
+  - id: refund-policy-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Customers may return unused items within 30 days of delivery for a
+        full refund. The original receipt is required, and refunds are
+        issued to the original payment method within 5 business days.
+      evaluated: |
+        It is important to note that, in essence, what this basically
+        means is that our valued customers, should they find themselves
+        in a situation where they have purchased an item from us and have
+        not yet made any use of that item whatsoever, do in fact have the
+        option, at their discretion, to send said item back to us. The
+        time period during which this can be done, it should be mentioned,
+        is a full 30 days, and those 30 days are counted from the very
+        day on which the item was delivered to the customer in question.
+        Furthermore, and this is something we cannot stress enough, the
+        original receipt — that is to say, the receipt that was given at
+        the time of the original purchase — is absolutely required in
+        order for the return to proceed. Once all of that has been taken
+        care of and the return has been received and processed on our
+        end, the refund itself will then, in turn, be issued back to the
+        customer using the very same payment method that was originally
+        used at the time of purchase, and the typical timeline for that
+        to happen is approximately 5 business days.
+
+  # ───────────── Research finding ─────────────
+  - id: research-finding-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A 2023 study of 4,000 office workers found that those who took a
+        10-minute walk after lunch reported 22% fewer afternoon energy
+        slumps compared to coworkers who remained at their desks.
+      evaluated: |
+        In a 2023 study of 4,000 office workers, taking a 10-minute walk
+        after lunch was linked to 22% fewer afternoon energy slumps
+        compared with staying at the desk.
+
+  - id: research-finding-good
+    human_score: good
+    inputs:
+      reference: |
+        A 2023 study of 4,000 office workers found that those who took a
+        10-minute walk after lunch reported 22% fewer afternoon energy
+        slumps compared to coworkers who remained at their desks.
+      evaluated: |
+        A study from 2023 looked at 4,000 office workers. It found that
+        the ones who went for a walk for about 10 minutes after their
+        lunch break ended up reporting fewer afternoon energy dips. The
+        difference came out to about 22% fewer slumps than the workers
+        who chose to stay at their desks.
+
+  - id: research-finding-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A 2023 study of 4,000 office workers found that those who took a
+        10-minute walk after lunch reported 22% fewer afternoon energy
+        slumps compared to coworkers who remained at their desks.
+      evaluated: |
+        There was a study, conducted back in the year 2023, and what this
+        particular study did was take a look at a group of office workers
+        — quite a large group, in fact, with the number being 4,000 in
+        total. What the study went on to find was that the workers in
+        question who made the choice to go on a walk, with that walk
+        lasting around 10 minutes, after they had finished eating their
+        lunch, those workers reported having afternoon energy slumps about
+        22% less often than was the case for the other workers, who chose
+        instead to simply stay seated at their desks.
+
+  - id: research-finding-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A 2023 study of 4,000 office workers found that those who took a
+        10-minute walk after lunch reported 22% fewer afternoon energy
+        slumps compared to coworkers who remained at their desks.
+      evaluated: |
+        It is, perhaps, worth mentioning at the outset that there exists
+        a study, and this study, which was carried out in the relatively
+        recent year of 2023, set out to examine the working habits and
+        general wellbeing of a sizable population of individuals — namely,
+        office workers, of whom there were a grand total of 4,000 who
+        agreed to participate. What the researchers behind this study
+        were ultimately able to discover, after analyzing the data they
+        had collected, was a finding that, in essence, what this basically
+        means is the following: among the workers who, on a regular basis,
+        made the decision to go out and take a walk of approximately 10
+        minutes in length, with that walk taking place shortly after the
+        conclusion of their lunchtime meal, there was a noticeable and
+        measurable reduction in the frequency with which they reported
+        experiencing those familiar afternoon energy slumps that so many
+        office workers know all too well. The exact number, when compared
+        with those of their coworkers who chose instead to remain at
+        their desks during that same time period, came out to a
+        difference of around 22 percentage points, or roughly 22% fewer
+        slumps overall.
+
+  # ───────────── Meeting note ─────────────
+  - id: meeting-note-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The team agreed to ship the new dashboard in v2.4, slipping the
+        export feature to v2.5. Maria will own the migration script and
+        Tom will draft release notes by Friday.
+      evaluated: |
+        Dashboard ships in v2.4; export deferred to v2.5. Maria: migration
+        script. Tom: release notes by Friday.
+
+  - id: meeting-note-good
+    human_score: good
+    inputs:
+      reference: |
+        The team agreed to ship the new dashboard in v2.4, slipping the
+        export feature to v2.5. Maria will own the migration script and
+        Tom will draft release notes by Friday.
+      evaluated: |
+        The team came to an agreement that the new dashboard will be
+        shipped as part of v2.4. The export feature is being moved out
+        and will instead land in v2.5. Maria is going to be the owner of
+        the migration script, and Tom is going to draft the release notes
+        and have them ready by Friday.
+
+  - id: meeting-note-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The team agreed to ship the new dashboard in v2.4, slipping the
+        export feature to v2.5. Maria will own the migration script and
+        Tom will draft release notes by Friday.
+      evaluated: |
+        After some discussion, what the team ended up agreeing on was
+        that the new dashboard, which has been in the works for a while
+        now, will be the one to go out as part of the v2.4 release. The
+        export feature, on the other hand, will not be making it into
+        that particular release and will instead be pushed back so that
+        it can ship in v2.5 instead. As for ownership, Maria is the one
+        who will be taking on responsibility for the migration script,
+        and Tom will be the one who handles drafting up the release
+        notes, with a deadline of having them ready to go by the end of
+        the day on Friday.
+
+  # ───────────── Movie plot ─────────────
+  - id: movie-plot-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        A young farmer discovers he is the heir to a galactic kingdom and
+        joins a band of rebels to destroy an evil empire's superweapon
+        before it can annihilate the last free planet.
+      evaluated: |
+        A farm boy turned heir joins rebels to blow up the empire's
+        superweapon before it destroys the last free planet.
+
+  - id: movie-plot-good
+    human_score: good
+    inputs:
+      reference: |
+        A young farmer discovers he is the heir to a galactic kingdom and
+        joins a band of rebels to destroy an evil empire's superweapon
+        before it can annihilate the last free planet.
+      evaluated: |
+        A young farmer ends up finding out that he is the heir to a
+        galactic kingdom. He then joins a band of rebels who are trying
+        to destroy the evil empire's superweapon, and they have to do
+        this before the weapon can wipe out the last free planet.
+
+  - id: movie-plot-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A young farmer discovers he is the heir to a galactic kingdom and
+        joins a band of rebels to destroy an evil empire's superweapon
+        before it can annihilate the last free planet.
+      evaluated: |
+        The story is about this young guy, who at the start of things is
+        just a regular farmer leading a pretty ordinary kind of life.
+        However, as the story progresses, he comes to discover something
+        very surprising about himself — namely, that he is, in fact, the
+        heir to a kingdom that spans the whole galaxy. After learning
+        this, he decides to throw in his lot with a group of rebels who
+        are fighting against the empire, and together they set off on a
+        mission to destroy the empire's massive superweapon before that
+        weapon gets the chance to annihilate what happens to be the last
+        free planet in the galaxy.
+
+  - id: movie-plot-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A young farmer discovers he is the heir to a galactic kingdom and
+        joins a band of rebels to destroy an evil empire's superweapon
+        before it can annihilate the last free planet.
+      evaluated: |
+        It is, in many ways, a rather classic kind of tale, and the
+        general gist of what the story is about, when you really get
+        down to it, is something along the following lines. There is, to
+        start with, this young man, and at the time we first meet him in
+        the story he is, for all intents and purposes, leading the life
+        of a simple and unassuming farmer, working the land and going
+        about his days without any inkling whatsoever of what is to come.
+        As the plot unfolds, however, it becomes clear, both to him and
+        to the audience, that he is in fact something much more than just
+        a humble farmer — he is, as it turns out, the rightful heir to a
+        vast and sprawling kingdom that extends across the entirety of
+        the known galaxy. Once this revelation has taken place, he goes
+        on to align himself with a band of plucky rebels who have been
+        waging a long and difficult campaign against an evil and
+        oppressive empire. Together, this newly assembled group sets
+        themselves to the task of destroying the empire's most fearsome
+        creation, a superweapon of immense power, and they must do this
+        with great urgency, because if they fail, the weapon will go on
+        to annihilate what is, by this point in the story, the very last
+        free planet remaining in the entire galaxy.
+
+  # ───────────── Kitchen tool ─────────────
+  - id: kitchen-tool-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A microplane is a fine grater used to zest citrus, grate hard
+        cheeses, and shave whole spices like nutmeg into a powder.
+      evaluated: |
+        A microplane is a fine grater. It zests citrus, grates hard
+        cheeses, and shaves whole spices such as nutmeg into a powder.
+
+  - id: kitchen-tool-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A microplane is a fine grater used to zest citrus, grate hard
+        cheeses, and shave whole spices like nutmeg into a powder.
+      evaluated: |
+        The microplane is a tool that you can use in the kitchen, and
+        what it does, essentially, is act as a grater that is quite a
+        bit finer than your typical box grater. People use it for a
+        variety of different purposes, including taking the zest off of
+        citrus fruits, as well as for grating hard cheeses down into
+        small flakes, and you can also use it to shave whole spices,
+        such as nutmeg for instance, into a fine powder.
+
+  - id: kitchen-tool-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A microplane is a fine grater used to zest citrus, grate hard
+        cheeses, and shave whole spices like nutmeg into a powder.
+      evaluated: |
+        When it comes to the wide variety of tools that one might find
+        in any well-equipped kitchen, the microplane is one such tool
+        that is, perhaps, deserving of a closer look. What it is, at the
+        most basic level, is a grater — though it should be noted that
+        it is a grater of a particularly fine variety, which sets it
+        apart from the more familiar kinds of graters such as the box
+        grater that many home cooks are likely to have on hand. The uses
+        to which the microplane can be put are, as it turns out, fairly
+        numerous, and these uses include, but are by no means limited
+        to, the following: it can be used to remove the zest from the
+        outer layer of citrus fruits, it can be employed in the grating
+        of hard cheeses into fine, snow-like flakes, and it is also
+        quite useful when it comes to the shaving of whole spices, with
+        nutmeg being perhaps the most familiar example, down into a
+        powder-like form.
+
+  # ───────────── Tax concept ─────────────
+  - id: tax-concept-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A tax deduction reduces the income on which you owe tax, while a
+        tax credit directly reduces the tax bill itself. A $100 credit
+        saves more than a $100 deduction at every income level.
+      evaluated: |
+        A deduction lowers the income you're taxed on; a credit lowers
+        the tax bill directly. A $100 credit always saves more than a
+        $100 deduction.
+
+  - id: tax-concept-good
+    human_score: good
+    inputs:
+      reference: |
+        A tax deduction reduces the income on which you owe tax, while a
+        tax credit directly reduces the tax bill itself. A $100 credit
+        saves more than a $100 deduction at every income level.
+      evaluated: |
+        A tax deduction works by lowering the amount of income that you
+        are taxed on. A tax credit, on the other hand, reduces the tax
+        bill itself. Because of this, a $100 credit will save you more
+        money than a $100 deduction, no matter what income level you're
+        at.
+
+  - id: tax-concept-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A tax deduction reduces the income on which you owe tax, while a
+        tax credit directly reduces the tax bill itself. A $100 credit
+        saves more than a $100 deduction at every income level.
+      evaluated: |
+        When it comes to the way that taxes work, a tax deduction is
+        essentially something that has the effect of reducing the amount
+        of your income that ends up being subject to taxation. A tax
+        credit, by contrast, is something that works in a somewhat
+        different manner, in that it directly reduces the actual tax
+        bill that you owe. As a result of this difference, what ends up
+        being true is that a credit in the amount of $100 will always
+        save you more money than a deduction of the same $100 amount,
+        and this is the case regardless of what income level you happen
+        to be at.
+
+  # ───────────── Sports rule ─────────────
+  - id: sports-rule-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        In soccer, a player is offside if they are nearer to the opponent's
+        goal line than both the ball and the second-last defender at the
+        moment the ball is played to them by a teammate.
+      evaluated: |
+        Offside: at the pass, the receiving player is closer to the goal
+        line than both the ball and the second-last defender.
+
+  - id: sports-rule-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        In soccer, a player is offside if they are nearer to the opponent's
+        goal line than both the ball and the second-last defender at the
+        moment the ball is played to them by a teammate.
+      evaluated: |
+        In soccer, a player is offside when, at the moment a teammate
+        plays the ball, they are closer to the opponent's goal line than
+        both the ball and the second-last defender.
+
+  - id: sports-rule-poor
+    human_score: poor
+    inputs:
+      reference: |
+        In soccer, a player is offside if they are nearer to the opponent's
+        goal line than both the ball and the second-last defender at the
+        moment the ball is played to them by a teammate.
+      evaluated: |
+        Within the sport that is most commonly known around the world
+        under the name of soccer — though it should be noted that in
+        certain other parts of the world, such as in the United Kingdom,
+        the very same sport is more often referred to by the name of
+        football instead — there exists a rule, one which is among the
+        more frequently misunderstood of the rules of the game, and that
+        particular rule goes by the name of offside. What this rule
+        states, in essence, what this basically means, is the following:
+        a player on the field of play is to be considered offside in the
+        event that, at the very moment in time at which the ball happens
+        to be played in their direction by one of their fellow teammates,
+        that player is positioned in such a way that they are nearer to
+        the goal line of their opponents than two things — the first of
+        these two things being the ball itself, and the second of them
+        being the defender on the opposing team who happens, at that
+        moment, to be the second-to-last defender from the back.
+
+  # ───────────── Chemical reaction ─────────────
+  - id: chemical-reaction-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        When baking soda meets vinegar, the acetic acid in the vinegar
+        reacts with the sodium bicarbonate to release carbon dioxide gas,
+        which is what produces the visible foaming.
+      evaluated: |
+        Mixing baking soda and vinegar lets the acetic acid react with
+        sodium bicarbonate, releasing carbon dioxide gas — the foam you
+        see.
+
+  - id: chemical-reaction-good
+    human_score: good
+    inputs:
+      reference: |
+        When baking soda meets vinegar, the acetic acid in the vinegar
+        reacts with the sodium bicarbonate to release carbon dioxide gas,
+        which is what produces the visible foaming.
+      evaluated: |
+        When you mix baking soda together with vinegar, the acetic acid
+        that is in the vinegar reacts with the sodium bicarbonate, which
+        is what baking soda is made of. This reaction releases carbon
+        dioxide as a gas, and that gas is what creates the foam that you
+        can see.
+
+  - id: chemical-reaction-fair
+    human_score: fair
+    inputs:
+      reference: |
+        When baking soda meets vinegar, the acetic acid in the vinegar
+        reacts with the sodium bicarbonate to release carbon dioxide gas,
+        which is what produces the visible foaming.
+      evaluated: |
+        When you take some baking soda and you go ahead and add it
+        together with some vinegar, what ends up happening is that a
+        chemical reaction takes place between the two of them. More
+        specifically, the acetic acid, which is the acid that is found
+        within vinegar, ends up reacting with the sodium bicarbonate,
+        which is the compound that baking soda is essentially made of.
+        The result of this reaction is the release of a gas — carbon
+        dioxide, to be precise — and it is this gas that is responsible
+        for producing the foaming that you can clearly see with your own
+        eyes.
+
+  - id: chemical-reaction-poor
+    human_score: poor
+    inputs:
+      reference: |
+        When baking soda meets vinegar, the acetic acid in the vinegar
+        reacts with the sodium bicarbonate to release carbon dioxide gas,
+        which is what produces the visible foaming.
+      evaluated: |
+        It is, perhaps, worth taking a moment to consider what is
+        actually going on, at the chemical level, when one happens to
+        bring together two of the more commonly encountered substances
+        in any ordinary household kitchen — namely, the substance known
+        as baking soda on the one hand, and the substance known as
+        vinegar on the other. As it happens, when these two things are
+        brought into contact with one another, a reaction takes place,
+        and the reaction in question is, in essence, what this basically
+        means, the following sort of thing. The vinegar, you see,
+        contains within it a particular kind of acid that goes by the
+        name of acetic acid, and the baking soda, for its part, is
+        composed of a compound that is referred to as sodium bicarbonate.
+        When the acetic acid in the vinegar comes into contact with the
+        sodium bicarbonate in the baking soda, the two of them react
+        together, and what this reaction produces, among other things,
+        is a gas — specifically, carbon dioxide gas. It is this very
+        carbon dioxide gas, as it bubbles up out of the mixture, that is
+        ultimately responsible for the visible foaming effect that one
+        can plainly observe with one's own eyes.
+
+  # ───────────── Product spec ─────────────
+  - id: product-spec-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The laptop has a 14-inch OLED display at 2880x1800, weighs 1.2 kg,
+        runs on an ARM chip, and gets up to 18 hours of battery life.
+      evaluated: |
+        14-inch 2880x1800 OLED display, 1.2 kg, ARM chip, up to 18 hours
+        of battery life.
+
+  - id: product-spec-good
+    human_score: good
+    inputs:
+      reference: |
+        The laptop has a 14-inch OLED display at 2880x1800, weighs 1.2 kg,
+        runs on an ARM chip, and gets up to 18 hours of battery life.
+      evaluated: |
+        The laptop comes with a 14-inch OLED display, and the resolution
+        of that display is 2880x1800. It weighs 1.2 kg, runs on an ARM
+        chip, and you can get up to 18 hours of battery life from it.
+
+  - id: product-spec-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The laptop has a 14-inch OLED display at 2880x1800, weighs 1.2 kg,
+        runs on an ARM chip, and gets up to 18 hours of battery life.
+      evaluated: |
+        When it comes to the specifications of this particular laptop,
+        there are a number of things that are worth taking note of. To
+        begin with, the display that the laptop is equipped with is one
+        that measures 14 inches when measured diagonally across, and it
+        is, more specifically, an OLED display, which is a type of
+        display that is known for offering deep blacks and vivid colors.
+        The resolution at which this display operates is 2880 by 1800
+        pixels. Moving on to the weight of the device itself, the laptop
+        tips the scales at a relatively light 1.2 kilograms. Under the
+        hood, the chip that powers all of this is an ARM chip, and as
+        for the battery, the manufacturer claims that you can expect to
+        get up to 18 hours of battery life out of it on a single charge.
+
+  # ───────────── News event ─────────────
+  - id: news-event-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        A magnitude 6.2 earthquake struck off the coast of central Japan
+        early Sunday, prompting a brief tsunami advisory that was lifted
+        within two hours; no major damage has been reported.
+      evaluated: |
+        A 6.2 quake hit off central Japan Sunday morning; a brief tsunami
+        advisory was lifted within 2 hours; no major damage reported.
+
+  - id: news-event-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A magnitude 6.2 earthquake struck off the coast of central Japan
+        early Sunday, prompting a brief tsunami advisory that was lifted
+        within two hours; no major damage has been reported.
+      evaluated: |
+        A magnitude 6.2 earthquake struck off central Japan early Sunday.
+        A short tsunami advisory was issued and then lifted within two
+        hours, with no major damage reported.
+
+  - id: news-event-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A magnitude 6.2 earthquake struck off the coast of central Japan
+        early Sunday, prompting a brief tsunami advisory that was lifted
+        within two hours; no major damage has been reported.
+      evaluated: |
+        In what is being described as a notable seismic event, an
+        earthquake with a magnitude that has been measured at 6.2 on the
+        relevant scale struck during the early morning hours on Sunday,
+        with its location being off the coast of the central part of the
+        country of Japan. In the immediate aftermath of the earthquake,
+        the relevant authorities went ahead and issued a tsunami advisory
+        for the area, although that advisory was relatively short-lived
+        and ended up being lifted within a window of approximately two
+        hours. As of the time of this report, there have not been any
+        reports of major damage resulting from the quake.
+
+  # ───────────── UI behavior ─────────────
+  - id: ui-behavior-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Pressing the Escape key closes any open dialog and returns focus
+        to the element that originally opened it. If no dialog is open,
+        the keypress is ignored.
+      evaluated: |
+        Escape closes the open dialog and restores focus to its opener;
+        otherwise no-op.
+
+  - id: ui-behavior-good
+    human_score: good
+    inputs:
+      reference: |
+        Pressing the Escape key closes any open dialog and returns focus
+        to the element that originally opened it. If no dialog is open,
+        the keypress is ignored.
+      evaluated: |
+        When the user presses the Escape key, any dialog that happens to
+        be open at that moment will close. Focus will then be returned to
+        whichever element it was that originally opened the dialog in the
+        first place. In the case that no dialog is currently open, then
+        nothing happens — the keypress is simply ignored.
+
+  - id: ui-behavior-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Pressing the Escape key closes any open dialog and returns focus
+        to the element that originally opened it. If no dialog is open,
+        the keypress is ignored.
+      evaluated: |
+        In terms of how the user interface behaves in response to certain
+        key presses, one particular behavior that is worth describing has
+        to do with what happens when the user goes ahead and presses the
+        key on the keyboard that is commonly known as the Escape key. In
+        the event that there is, at the time of the keypress, a dialog
+        that happens to be open on the screen, that dialog will then be
+        closed as a direct result of the Escape keypress. Furthermore,
+        the focus, which is to say the part of the interface that is
+        currently active for input, will be returned to whichever
+        element it was that was originally responsible for having opened
+        the dialog in the first place. On the other hand, if there is no
+        dialog open at the time the key is pressed, then the keypress
+        will simply be ignored and nothing will happen.
+
+  # ───────────── Historical event ─────────────
+  - id: historical-event-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The Berlin Wall fell on November 9, 1989, after East German
+        officials mistakenly announced that border crossings to the West
+        were immediately open, drawing crowds that the guards declined
+        to hold back.
+      evaluated: |
+        On 9 Nov 1989, a botched East German announcement opened the
+        border; crowds arrived and guards stood down — the Wall fell.
+
+  - id: historical-event-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The Berlin Wall fell on November 9, 1989, after East German
+        officials mistakenly announced that border crossings to the West
+        were immediately open, drawing crowds that the guards declined
+        to hold back.
+      evaluated: |
+        On November 9, 1989, East German officials wrongly announced
+        that border crossings were open immediately. Crowds gathered,
+        guards refused to push back, and the Wall fell.
+
+  - id: historical-event-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The Berlin Wall fell on November 9, 1989, after East German
+        officials mistakenly announced that border crossings to the West
+        were immediately open, drawing crowds that the guards declined
+        to hold back.
+      evaluated: |
+        It is, perhaps, one of the most well-known and frequently
+        discussed events of the late twentieth century, and the date on
+        which it occurred — that date being the ninth day of the month
+        of November in the year 1989 — is one that has come to be widely
+        remembered as the day on which the Berlin Wall, the wall that
+        had for so many years stood as a physical and symbolic divider
+        between the eastern and western halves of the city of Berlin,
+        finally came down. The series of events that led up to this
+        moment, when one takes the time to look back on them, are
+        themselves rather remarkable. What happened, in essence, what
+        this basically means, was that certain officials within the East
+        German government, in the course of giving a public announcement,
+        ended up making a mistake — they stated, incorrectly, that the
+        border crossings leading into West Germany were, as of that very
+        moment, open for passage. As soon as this announcement reached
+        the ears of the public, large crowds of people began to gather
+        at the various crossing points along the wall, and the guards
+        who were stationed at those crossings, finding themselves faced
+        with such overwhelming numbers, made the decision not to hold
+        the crowds back.
+
+  # ───────────── API behavior ─────────────
+  - id: api-behavior-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The endpoint accepts a JSON body with a query string and an
+        optional limit. It returns a list of matching records sorted by
+        relevance, or a 400 error if the query is empty.
+      evaluated: |
+        POST JSON {query, limit?} → list sorted by relevance; empty
+        query → 400.
+
+  - id: api-behavior-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The endpoint accepts a JSON body with a query string and an
+        optional limit. It returns a list of matching records sorted by
+        relevance, or a 400 error if the query is empty.
+      evaluated: |
+        The endpoint takes JSON with a query and optional limit. It
+        returns matches sorted by relevance, or a 400 if the query is
+        empty.
+
+  - id: api-behavior-good
+    human_score: good
+    inputs:
+      reference: |
+        The endpoint accepts a JSON body with a query string and an
+        optional limit. It returns a list of matching records sorted by
+        relevance, or a 400 error if the query is empty.
+      evaluated: |
+        The endpoint accepts a JSON body that contains a query string
+        and also an optional limit field. In response, it returns a list
+        of records that match the query, with the records being sorted
+        according to relevance. If the query that you send happens to be
+        empty, the endpoint will return a 400 error instead.
+
+  # ───────────── How to use a tool ─────────────
+  - id: tool-usage-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        To use the command, type `grep` followed by the pattern in quotes
+        and the file path. Add the -i flag for case-insensitive matching
+        and -r to search recursively through directories.
+      evaluated: |
+        `grep "pattern" path`; -i = case-insensitive, -r = recursive.
+
+  - id: tool-usage-good
+    human_score: good
+    inputs:
+      reference: |
+        To use the command, type `grep` followed by the pattern in quotes
+        and the file path. Add the -i flag for case-insensitive matching
+        and -r to search recursively through directories.
+      evaluated: |
+        To use the command, you type `grep`, then put the pattern in
+        quotes, and after that the file path. There are also some flags
+        you can add: the -i flag makes the matching case-insensitive,
+        and the -r flag tells it to search through directories
+        recursively.
+
+  - id: tool-usage-poor
+    human_score: poor
+    inputs:
+      reference: |
+        To use the command, type `grep` followed by the pattern in quotes
+        and the file path. Add the -i flag for case-insensitive matching
+        and -r to search recursively through directories.
+      evaluated: |
+        When the time comes that you find yourself wanting to make use
+        of the command in question, what you'll want to do, as a general
+        matter, is the following: begin by typing out the name of the
+        command itself, which in this case is `grep`, and then, once you
+        have done that, what comes next is the pattern that you are
+        looking to search for — that pattern, it should be noted, ought
+        to be enclosed within a pair of quotation marks so that the
+        shell handles it correctly. After the pattern has been written
+        out in that way, the next thing to follow is the path to the
+        file or files in which you would like the search to be carried
+        out. In addition to these basic components of the command, there
+        are also a couple of flags that you may find it useful to make
+        use of, depending on the circumstances of your particular
+        search. The first of these is the -i flag, which, when included,
+        has the effect of making the matching process case-insensitive,
+        meaning that uppercase and lowercase letters will be treated as
+        equivalent. The second flag worth mentioning is the -r flag,
+        which, when added to the command, causes the search to proceed
+        recursively through the contents of any directories that are
+        included in the path.
+
+  # ───────────── Recipe step ─────────────
+  - id: recipe-step-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        To make caramel, heat sugar in a heavy pan over medium heat
+        without stirring until it melts and turns amber, then remove
+        from heat and carefully whisk in warm cream.
+      evaluated: |
+        Melt sugar in a heavy pan over medium heat, no stirring, until
+        amber; off heat, whisk in warm cream.
+
+  - id: recipe-step-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        To make caramel, heat sugar in a heavy pan over medium heat
+        without stirring until it melts and turns amber, then remove
+        from heat and carefully whisk in warm cream.
+      evaluated: |
+        For caramel, heat sugar in a heavy pan on medium without
+        stirring until it melts and turns amber. Take it off the heat,
+        then carefully whisk in warm cream.
+
+  - id: recipe-step-fair
+    human_score: fair
+    inputs:
+      reference: |
+        To make caramel, heat sugar in a heavy pan over medium heat
+        without stirring until it melts and turns amber, then remove
+        from heat and carefully whisk in warm cream.
+      evaluated: |
+        If what you happen to be in the mood to make is caramel, then
+        the way that you go about doing it is as follows. You start by
+        taking some sugar and placing it into a pan — and that pan, by
+        the way, should be one of the heavier varieties rather than a
+        thin one. You then place the pan over a burner set to medium
+        heat. As the sugar warms up, the important thing to remember is
+        that you should not, under any circumstances, stir it; instead,
+        just let it sit and melt on its own until it has fully
+        liquefied and taken on a nice amber color. Once that has
+        happened, the next thing you'll want to do is take the pan off
+        the heat, and then, very carefully, whisk in some cream that you
+        have already warmed up.
+
+  - id: recipe-step-poor
+    human_score: poor
+    inputs:
+      reference: |
+        To make caramel, heat sugar in a heavy pan over medium heat
+        without stirring until it melts and turns amber, then remove
+        from heat and carefully whisk in warm cream.
+      evaluated: |
+        In the event that you are, on a given day, finding yourself in
+        the kind of mood where what you would like to do is prepare and
+        make some caramel from scratch in your own kitchen, then the
+        process by which this is accomplished, while not particularly
+        complicated, does involve a number of steps that are worth going
+        over in some detail. To begin with, the very first thing that
+        you will need to do is gather up some sugar, the amount of which
+        will of course depend on how much caramel you are looking to
+        produce, and then take that sugar and transfer it into a pan.
+        Now, when it comes to the pan that you choose to use for this
+        particular task, it is worth pointing out that not just any pan
+        will do — what you want is a pan that is on the heavier side,
+        as opposed to one of the thinner, lighter sorts of pans, because
+        a heavier pan will conduct heat more evenly. Once you have got
+        the sugar in the pan, the next step is to place that pan onto
+        the stovetop and turn the burner underneath it on to a medium
+        heat setting. Here is where one of the more important pieces of
+        advice comes in: as the sugar begins to heat up, you should make
+        absolutely sure that you do not stir it — just leave it alone
+        and let it do its thing, melting gradually and changing color
+        until it has reached a lovely amber hue. At that point, what
+        you will want to do is remove the pan from the heat source, and
+        then, taking great care because the mixture will be extremely
+        hot, you will whisk in some cream that you have previously
+        warmed up.

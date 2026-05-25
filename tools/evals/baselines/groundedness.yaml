@@ -1,0 +1,806 @@
+evaluator: groundedness
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED answer on how well each claim can be traced to
+    REFERENCE. Outside-world truth does not matter; only reference support.
+  source: synthetic
+
+samples:
+  # ───────────── Company FAQ: return policy (all 5 bins) ─────────────
+  - id: returns-faq-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Acme Goods accepts returns within 30 days of delivery. Items must be
+        unused and in their original packaging. Refunds are issued to the
+        original payment method within 7 business days of receipt at the
+        warehouse. Customers pay return shipping unless the item arrived
+        damaged.
+      evaluated: |
+        You can return an item to Acme Goods within 30 days of delivery,
+        provided it is unused and still in its original packaging. Once the
+        warehouse receives the return, the refund is issued back to your
+        original payment method within 7 business days. Return shipping is
+        paid by the customer, except when the item arrived damaged.
+
+  - id: returns-faq-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Acme Goods accepts returns within 30 days of delivery. Items must be
+        unused and in their original packaging. Refunds are issued to the
+        original payment method within 7 business days of receipt at the
+        warehouse. Customers pay return shipping unless the item arrived
+        damaged.
+      evaluated: |
+        Acme Goods lets you return any item within 30 days, as long as it is
+        unused and in the original packaging. After the warehouse receives the
+        return, you will see the refund on your original payment method within
+        about a week. If the item was damaged on arrival, Acme covers the
+        return shipping; otherwise the customer pays it.
+
+  - id: returns-faq-good
+    human_score: good
+    inputs:
+      reference: |
+        Acme Goods accepts returns within 30 days of delivery. Items must be
+        unused and in their original packaging. Refunds are issued to the
+        original payment method within 7 business days of receipt at the
+        warehouse. Customers pay return shipping unless the item arrived
+        damaged.
+      evaluated: |
+        Acme Goods accepts returns within 30 days of delivery if the item is
+        unused and in its original packaging. Refunds go back to the original
+        payment method within 7 business days. The customer pays return
+        shipping unless the item arrived damaged. Acme also offers free
+        exchanges for items in a different size.
+
+  - id: returns-faq-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Acme Goods accepts returns within 30 days of delivery. Items must be
+        unused and in their original packaging. Refunds are issued to the
+        original payment method within 7 business days of receipt at the
+        warehouse. Customers pay return shipping unless the item arrived
+        damaged.
+      evaluated: |
+        Acme Goods lets you return items within 30 days of delivery. You will
+        be refunded to your original payment method. Acme also offers store
+        credit at 110% of the purchase price as an alternative to a cash
+        refund, and gold-tier members get free return shipping on all orders.
+        A printable return label is emailed to you within an hour.
+
+  - id: returns-faq-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Acme Goods accepts returns within 30 days of delivery. Items must be
+        unused and in their original packaging. Refunds are issued to the
+        original payment method within 7 business days of receipt at the
+        warehouse. Customers pay return shipping unless the item arrived
+        damaged.
+      evaluated: |
+        Acme Goods accepts returns within 60 days of delivery and offers a
+        full refund plus a $10 goodwill credit on every return. Items can be
+        dropped off at any partner pharmacy free of charge. Acme operates a
+        dedicated returns warehouse in Reno, Nevada, and processes refunds in
+        under 24 hours through its mobile app.
+
+  # ───────────── Museum exhibit: Egyptian mummies (all 5 bins) ─────────────
+  - id: museum-mummies-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The Hall of Ancient Egypt displays twelve mummies from the New Kingdom
+        period. Each mummy was preserved through a 70-day embalming process
+        that included the removal of internal organs and the use of natron
+        salt to dry the body. The mummies on display were donated by the
+        Cairo Museum in 1923.
+      evaluated: |
+        The Hall of Ancient Egypt shows twelve mummies from the New Kingdom
+        period. Their preservation took 70 days and involved removing internal
+        organs and drying the body with natron salt. All twelve were donated
+        to the museum by the Cairo Museum in 1923.
+
+  - id: museum-mummies-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The Hall of Ancient Egypt displays twelve mummies from the New Kingdom
+        period. Each mummy was preserved through a 70-day embalming process
+        that included the removal of internal organs and the use of natron
+        salt to dry the body. The mummies on display were donated by the
+        Cairo Museum in 1923.
+      evaluated: |
+        The twelve mummies in the Hall of Ancient Egypt date to the New
+        Kingdom. Embalmers spent about 70 days on each one: they removed the
+        internal organs and used natron salt to dry the body. The mummies came
+        to the museum as a donation from the Cairo Museum in 1923.
+
+  - id: museum-mummies-good
+    human_score: good
+    inputs:
+      reference: |
+        The Hall of Ancient Egypt displays twelve mummies from the New Kingdom
+        period. Each mummy was preserved through a 70-day embalming process
+        that included the removal of internal organs and the use of natron
+        salt to dry the body. The mummies on display were donated by the
+        Cairo Museum in 1923.
+      evaluated: |
+        The Hall of Ancient Egypt features twelve New Kingdom mummies. Each
+        underwent a 70-day embalming process involving organ removal and
+        natron drying. The mummies were donated by the Cairo Museum in 1923.
+        Visitors can also see a reconstructed embalming workshop next to the
+        cases.
+
+  - id: museum-mummies-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The Hall of Ancient Egypt displays twelve mummies from the New Kingdom
+        period. Each mummy was preserved through a 70-day embalming process
+        that included the removal of internal organs and the use of natron
+        salt to dry the body. The mummies on display were donated by the
+        Cairo Museum in 1923.
+      evaluated: |
+        Twelve mummies are on display in the Hall of Ancient Egypt. The
+        mummification process took 70 days. Three of the mummies belong to
+        royal scribes from the reign of Ramesses II, and one is believed to be
+        a daughter of a high priest at Karnak. The hall reopened in 2018 after
+        a major renovation funded by a Swiss foundation.
+
+  - id: museum-mummies-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The Hall of Ancient Egypt displays twelve mummies from the New Kingdom
+        period. Each mummy was preserved through a 70-day embalming process
+        that included the removal of internal organs and the use of natron
+        salt to dry the body. The mummies on display were donated by the
+        Cairo Museum in 1923.
+      evaluated: |
+        The Hall of Ancient Egypt holds 24 mummies, including the famous
+        mummy of Pharaoh Tutankhamun on loan from Luxor. The exhibit features
+        an interactive sarcophagus opening every hour and a gift shop selling
+        replica canopic jars. The collection was assembled by Howard Carter
+        during his expeditions in the 1920s.
+
+  # ───── News brief: city marathon (omit fair) ─────
+  - id: marathon-news-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Last Sunday, 14,000 runners completed the Portsmouth City Marathon.
+        The men's race was won by Daniel Okafor in 2 hours 11 minutes; the
+        women's race by Lina Berg in 2 hours 26 minutes. The course ran along
+        the harbour and finished at Victoria Park. Organisers raised £180,000
+        for local charities.
+      evaluated: |
+        About 14,000 runners finished last Sunday's Portsmouth City Marathon.
+        Daniel Okafor won the men's race in 2 hours 11 minutes, and Lina Berg
+        took the women's title in 2 hours 26 minutes. The course followed the
+        harbour and ended at Victoria Park, and organisers raised £180,000 for
+        local charities.
+
+  - id: marathon-news-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Last Sunday, 14,000 runners completed the Portsmouth City Marathon.
+        The men's race was won by Daniel Okafor in 2 hours 11 minutes; the
+        women's race by Lina Berg in 2 hours 26 minutes. The course ran along
+        the harbour and finished at Victoria Park. Organisers raised £180,000
+        for local charities.
+      evaluated: |
+        Portsmouth's marathon last Sunday saw 14,000 finishers. Daniel Okafor
+        crossed the line first in the men's race at 2:11; Lina Berg won the
+        women's race in 2:26. Runners followed a harbour-side route ending at
+        Victoria Park, and the event raised £180,000 for local charities.
+
+  - id: marathon-news-good
+    human_score: good
+    inputs:
+      reference: |
+        Last Sunday, 14,000 runners completed the Portsmouth City Marathon.
+        The men's race was won by Daniel Okafor in 2 hours 11 minutes; the
+        women's race by Lina Berg in 2 hours 26 minutes. The course ran along
+        the harbour and finished at Victoria Park. Organisers raised £180,000
+        for local charities.
+      evaluated: |
+        14,000 runners finished the Portsmouth City Marathon last Sunday.
+        Daniel Okafor won the men's race in 2:11 and Lina Berg won the
+        women's race in 2:26. The course finished at Victoria Park. The race
+        is now in its 18th edition and is a qualifier for the national
+        championships.
+
+  - id: marathon-news-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Last Sunday, 14,000 runners completed the Portsmouth City Marathon.
+        The men's race was won by Daniel Okafor in 2 hours 11 minutes; the
+        women's race by Lina Berg in 2 hours 26 minutes. The course ran along
+        the harbour and finished at Victoria Park. Organisers raised £180,000
+        for local charities.
+      evaluated: |
+        Over 30,000 runners turned out for the Portsmouth City Marathon, with
+        the Kenyan team sweeping the podium in both races. Last year's
+        champion failed to defend her title after dropping out at mile 18 due
+        to a hamstring injury. The mayor handed out medals at the finish line,
+        and the event was broadcast live on national television.
+
+  # ───── Biography: Marie Curie (omit excellent) ─────
+  - id: curie-bio-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Marie Curie was a Polish-born physicist and chemist who worked most of
+        her life in France. She discovered the elements polonium and radium
+        and won two Nobel Prizes: in Physics in 1903 and in Chemistry in 1911.
+        She was the first woman to win a Nobel Prize.
+      evaluated: |
+        Marie Curie was a physicist and chemist, born in Poland, who spent
+        most of her working life in France. She discovered the elements
+        polonium and radium. She won two Nobel Prizes — one in Physics in 1903
+        and one in Chemistry in 1911 — and was the first woman ever to receive
+        a Nobel Prize.
+
+  - id: curie-bio-good
+    human_score: good
+    inputs:
+      reference: |
+        Marie Curie was a Polish-born physicist and chemist who worked most of
+        her life in France. She discovered the elements polonium and radium
+        and won two Nobel Prizes: in Physics in 1903 and in Chemistry in 1911.
+        She was the first woman to win a Nobel Prize.
+      evaluated: |
+        Marie Curie was a Polish-born scientist who worked in France. She
+        discovered polonium and radium. She won Nobel Prizes in Physics
+        (1903) and Chemistry (1911) and was the first woman to do so. She also
+        founded the Curie Institutes, which remain major centres of cancer
+        research today.
+
+  - id: curie-bio-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Marie Curie was a Polish-born physicist and chemist who worked most of
+        her life in France. She discovered the elements polonium and radium
+        and won two Nobel Prizes: in Physics in 1903 and in Chemistry in 1911.
+        She was the first woman to win a Nobel Prize.
+      evaluated: |
+        Marie Curie was a Polish-born scientist who discovered radium. She
+        married fellow physicist Pierre Curie, with whom she shared her first
+        Nobel Prize. She named the element polonium after her homeland. Her
+        notebooks remain radioactive to this day and are stored in
+        lead-lined boxes at the Bibliothèque Nationale.
+
+  - id: curie-bio-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Marie Curie was a Polish-born physicist and chemist who worked most of
+        her life in France. She discovered the elements polonium and radium
+        and won two Nobel Prizes: in Physics in 1903 and in Chemistry in 1911.
+        She was the first woman to win a Nobel Prize.
+      evaluated: |
+        Marie Curie was a French biologist who pioneered the use of X-rays in
+        field hospitals during World War I. She was born in Warsaw in 1880,
+        moved to Paris at sixteen, and later served as the first female
+        professor at Oxford University. Her daughter Irène won the Nobel
+        Prize in Medicine in 1935.
+
+  # ───── Science abstract: CRISPR (omit perfect) ─────
+  - id: crispr-abstract-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        We report a CRISPR-Cas9 protocol that edits the BCL11A enhancer in
+        human haematopoietic stem cells. Edited cells maintained engraftment
+        in immunodeficient mice for 16 weeks and showed a 78% reduction in
+        target-site reads. No off-target edits were detected at the top ten
+        predicted sites.
+      evaluated: |
+        This study describes a CRISPR-Cas9 protocol used to edit the BCL11A
+        enhancer in human haematopoietic stem cells. The edited cells engraft
+        in immunodeficient mice for 16 weeks. Target-site reads dropped by
+        about 78%, and the ten most likely off-target sites showed no
+        detectable editing.
+
+  - id: crispr-abstract-good
+    human_score: good
+    inputs:
+      reference: |
+        We report a CRISPR-Cas9 protocol that edits the BCL11A enhancer in
+        human haematopoietic stem cells. Edited cells maintained engraftment
+        in immunodeficient mice for 16 weeks and showed a 78% reduction in
+        target-site reads. No off-target edits were detected at the top ten
+        predicted sites.
+      evaluated: |
+        The paper presents a CRISPR-Cas9 protocol for editing the BCL11A
+        enhancer in human haematopoietic stem cells. Engraftment in
+        immunodeficient mice was maintained for 16 weeks with a 78% reduction
+        in target-site reads, and no off-target edits were seen at the top
+        ten predicted sites. The protocol is designed to reactivate fetal
+        haemoglobin as a therapy for sickle cell disease.
+
+  - id: crispr-abstract-fair
+    human_score: fair
+    inputs:
+      reference: |
+        We report a CRISPR-Cas9 protocol that edits the BCL11A enhancer in
+        human haematopoietic stem cells. Edited cells maintained engraftment
+        in immunodeficient mice for 16 weeks and showed a 78% reduction in
+        target-site reads. No off-target edits were detected at the top ten
+        predicted sites.
+      evaluated: |
+        The team edits the BCL11A enhancer in haematopoietic stem cells using
+        CRISPR-Cas9. The protocol uses electroporation of a ribonucleoprotein
+        complex and reaches over 90% editing efficiency in less than 24
+        hours. Engrafted cells were tracked in NSG mice for 16 weeks. A
+        clinical trial based on this approach is now in Phase II.
+
+  - id: crispr-abstract-poor
+    human_score: poor
+    inputs:
+      reference: |
+        We report a CRISPR-Cas9 protocol that edits the BCL11A enhancer in
+        human haematopoietic stem cells. Edited cells maintained engraftment
+        in immunodeficient mice for 16 weeks and showed a 78% reduction in
+        target-site reads. No off-target edits were detected at the top ten
+        predicted sites.
+      evaluated: |
+        Researchers used base-editing technology to introduce a single
+        nucleotide change in the HBB gene of CD34+ cells from sickle cell
+        patients. The edited cells were transplanted into 12 patients, all of
+        whom showed sustained fetal haemoglobin expression above 30% after
+        one year. The treatment received FDA approval in 2024.
+
+  # ───── History textbook: French Revolution (omit excellent) ─────
+  - id: french-revolution-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The French Revolution began in 1789 with the storming of the Bastille
+        on 14 July. The National Assembly abolished feudal privileges in
+        August of that year and adopted the Declaration of the Rights of Man
+        and of the Citizen the same month. King Louis XVI was executed in
+        January 1793.
+      evaluated: |
+        The French Revolution began in 1789, marked by the storming of the
+        Bastille on 14 July. In August of that year the National Assembly
+        abolished feudal privileges and adopted the Declaration of the Rights
+        of Man and of the Citizen. King Louis XVI was executed in
+        January 1793.
+
+  - id: french-revolution-good
+    human_score: good
+    inputs:
+      reference: |
+        The French Revolution began in 1789 with the storming of the Bastille
+        on 14 July. The National Assembly abolished feudal privileges in
+        August of that year and adopted the Declaration of the Rights of Man
+        and of the Citizen the same month. King Louis XVI was executed in
+        January 1793.
+      evaluated: |
+        The French Revolution started in 1789 with the storming of the
+        Bastille on 14 July. The National Assembly abolished feudal
+        privileges in August and adopted the Declaration of the Rights of
+        Man and of the Citizen the same month. Louis XVI was executed in
+        January 1793. The Reign of Terror followed shortly after under
+        Robespierre.
+
+  - id: french-revolution-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The French Revolution began in 1789 with the storming of the Bastille
+        on 14 July. The National Assembly abolished feudal privileges in
+        August of that year and adopted the Declaration of the Rights of Man
+        and of the Citizen the same month. King Louis XVI was executed in
+        January 1793.
+      evaluated: |
+        The French Revolution started in 1789. The Bastille was stormed by a
+        Parisian crowd that freed seven prisoners, only one of whom was a
+        political detainee. Lafayette commanded the new National Guard, and
+        the revolution went through several phases before Napoleon Bonaparte
+        seized power in 1799 with the coup of 18 Brumaire.
+
+  - id: french-revolution-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The French Revolution began in 1789 with the storming of the Bastille
+        on 14 July. The National Assembly abolished feudal privileges in
+        August of that year and adopted the Declaration of the Rights of Man
+        and of the Citizen the same month. King Louis XVI was executed in
+        January 1793.
+      evaluated: |
+        The French Revolution began in 1788 when Louis XVI dissolved the
+        Estates-General and ordered the army to occupy Paris. Marie
+        Antoinette was executed within days of her husband, and the
+        guillotine was invented expressly for her execution by Dr Joseph-
+        Ignace Guillotin. The revolution ended with Napoleon's coronation in
+        1804.
+
+  # ───── Biology: insect classification (omit good) ─────
+  - id: insects-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Insects are arthropods of the class Insecta. They have a hard
+        exoskeleton, a three-part body — head, thorax, and abdomen — and
+        three pairs of jointed legs attached to the thorax. Most adult
+        insects also have a pair of antennae and one or two pairs of wings.
+      evaluated: |
+        Insects belong to the arthropod class Insecta. They are covered by a
+        hard exoskeleton and have a body divided into three parts: head,
+        thorax, and abdomen. Three pairs of jointed legs are attached to the
+        thorax, and most adult insects also have a pair of antennae and one
+        or two pairs of wings.
+
+  - id: insects-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Insects are arthropods of the class Insecta. They have a hard
+        exoskeleton, a three-part body — head, thorax, and abdomen — and
+        three pairs of jointed legs attached to the thorax. Most adult
+        insects also have a pair of antennae and one or two pairs of wings.
+      evaluated: |
+        Insects form the class Insecta within the arthropods. They share a
+        hard exoskeleton and a three-part body of head, thorax, and abdomen.
+        Their three pairs of jointed legs all attach to the thorax. As adults,
+        most insects also have antennae and one or two pairs of wings.
+
+  - id: insects-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Insects are arthropods of the class Insecta. They have a hard
+        exoskeleton, a three-part body — head, thorax, and abdomen — and
+        three pairs of jointed legs attached to the thorax. Most adult
+        insects also have a pair of antennae and one or two pairs of wings.
+      evaluated: |
+        Insects are arthropods with six legs. They breathe through a network
+        of tiny tubes called tracheae that open at spiracles along the body.
+        They have compound eyes made of thousands of facets and undergo
+        either complete or incomplete metamorphosis. The largest order is
+        Coleoptera, the beetles, with around 400,000 known species.
+
+  - id: insects-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Insects are arthropods of the class Insecta. They have a hard
+        exoskeleton, a three-part body — head, thorax, and abdomen — and
+        three pairs of jointed legs attached to the thorax. Most adult
+        insects also have a pair of antennae and one or two pairs of wings.
+      evaluated: |
+        Insects are small invertebrates that include spiders, scorpions, and
+        centipedes. They typically lay eggs in water and most species live
+        for less than 24 hours. The oldest known insect fossil is 600 million
+        years old, predating the dinosaurs by hundreds of millions of years.
+        Bees produce honey using nectar from over 200 species of flowers.
+
+  # ───── Geography fact sheet: Iceland (omit fair) ─────
+  - id: iceland-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Iceland is a Nordic island country in the North Atlantic with a
+        population of about 380,000. Its capital is Reykjavik. The country
+        lies on the Mid-Atlantic Ridge and has more than 30 active volcanic
+        systems. Geothermal energy supplies the majority of its heating and
+        electricity.
+      evaluated: |
+        Iceland is a Nordic island country in the North Atlantic, home to
+        about 380,000 people. Its capital is Reykjavik. The country sits on
+        the Mid-Atlantic Ridge and contains more than 30 active volcanic
+        systems. Most of its heating and electricity comes from geothermal
+        energy.
+
+  - id: iceland-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Iceland is a Nordic island country in the North Atlantic with a
+        population of about 380,000. Its capital is Reykjavik. The country
+        lies on the Mid-Atlantic Ridge and has more than 30 active volcanic
+        systems. Geothermal energy supplies the majority of its heating and
+        electricity.
+      evaluated: |
+        Iceland is a Nordic island nation in the North Atlantic with around
+        380,000 inhabitants and Reykjavik as its capital. Sitting on the
+        Mid-Atlantic Ridge, the country contains over 30 active volcanic
+        systems, and the bulk of its heating and electricity comes from
+        geothermal sources.
+
+  - id: iceland-good
+    human_score: good
+    inputs:
+      reference: |
+        Iceland is a Nordic island country in the North Atlantic with a
+        population of about 380,000. Its capital is Reykjavik. The country
+        lies on the Mid-Atlantic Ridge and has more than 30 active volcanic
+        systems. Geothermal energy supplies the majority of its heating and
+        electricity.
+      evaluated: |
+        Iceland is a Nordic island country in the North Atlantic with about
+        380,000 people. Its capital, Reykjavik, is the northernmost capital
+        of any sovereign state. The country sits on the Mid-Atlantic Ridge
+        and has more than 30 active volcanic systems, and geothermal energy
+        supplies most of its heating and electricity.
+
+  - id: iceland-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Iceland is a Nordic island country in the North Atlantic with a
+        population of about 380,000. Its capital is Reykjavik. The country
+        lies on the Mid-Atlantic Ridge and has more than 30 active volcanic
+        systems. Geothermal energy supplies the majority of its heating and
+        electricity.
+      evaluated: |
+        Iceland is a small European republic with around 1.2 million
+        inhabitants and uses the euro. Its capital is Akureyri. Iceland's
+        economy is dominated by oil exports from the Drangajökull field, and
+        most residents speak Norwegian as a second language. The country
+        joined NATO in 2003.
+
+  # ───── Sport rule: tennis tiebreak (omit poor) ─────
+  - id: tennis-tiebreak-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        A standard tennis tiebreak is played when a set reaches 6-6 in games.
+        The first player to reach 7 points with a margin of at least 2
+        wins the tiebreak and the set. Players switch ends every 6 points
+        during the tiebreak.
+      evaluated: |
+        A standard tennis tiebreak begins when a set is tied at 6-6 in games.
+        The first player to reach 7 points with a margin of at least 2 wins
+        the tiebreak and the set. Players switch ends every 6 points during
+        the tiebreak.
+
+  - id: tennis-tiebreak-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A standard tennis tiebreak is played when a set reaches 6-6 in games.
+        The first player to reach 7 points with a margin of at least 2
+        wins the tiebreak and the set. Players switch ends every 6 points
+        during the tiebreak.
+      evaluated: |
+        When a tennis set is tied at 6 games each, a tiebreak is played. The
+        first player to 7 points wins, but only if they lead by 2 or more.
+        Players change ends every 6 points during the tiebreak.
+
+  - id: tennis-tiebreak-good
+    human_score: good
+    inputs:
+      reference: |
+        A standard tennis tiebreak is played when a set reaches 6-6 in games.
+        The first player to reach 7 points with a margin of at least 2
+        wins the tiebreak and the set. Players switch ends every 6 points
+        during the tiebreak.
+      evaluated: |
+        A tiebreak is played when a tennis set is tied at 6-6. The first
+        player to reach 7 points with a 2-point lead wins. Players change
+        ends every 6 points. The tiebreak's points are counted using simple
+        numbers (1, 2, 3) instead of the usual 15-30-40 system.
+
+  - id: tennis-tiebreak-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A standard tennis tiebreak is played when a set reaches 6-6 in games.
+        The first player to reach 7 points with a margin of at least 2
+        wins the tiebreak and the set. Players switch ends every 6 points
+        during the tiebreak.
+      evaluated: |
+        A tiebreak settles a tied set in tennis. The first to 7 points wins
+        the tiebreak. The Wimbledon final set tiebreak is played to 10
+        points, while at the Australian Open it is a super-tiebreak to 10
+        played in place of a deciding set. The server begins with one point
+        and then the players alternate two serves each.
+
+  # ───── Recipe: simple pancakes (omit poor) ─────
+  - id: pancakes-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        To make basic pancakes, whisk together 200 g of flour, 2 eggs, 300 ml
+        of milk, and a pinch of salt until smooth. Heat a non-stick pan over
+        medium heat with a little butter. Pour a small ladle of batter into
+        the pan and cook for about 1 minute per side, flipping when bubbles
+        appear on the surface.
+      evaluated: |
+        Whisk together 200 g of flour, 2 eggs, 300 ml of milk, and a pinch of
+        salt until smooth. Heat a non-stick pan over medium heat with a
+        little butter. Pour a small ladle of batter into the pan and cook
+        for about a minute per side, flipping when bubbles appear on the
+        surface.
+
+  - id: pancakes-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        To make basic pancakes, whisk together 200 g of flour, 2 eggs, 300 ml
+        of milk, and a pinch of salt until smooth. Heat a non-stick pan over
+        medium heat with a little butter. Pour a small ladle of batter into
+        the pan and cook for about 1 minute per side, flipping when bubbles
+        appear on the surface.
+      evaluated: |
+        Combine 200 g flour, 2 eggs, 300 ml milk, and a pinch of salt and
+        whisk until the batter is smooth. Heat a non-stick pan on medium
+        heat with a small amount of butter. Ladle in some batter and cook
+        each pancake for around a minute on each side, flipping once bubbles
+        rise to the top.
+
+  - id: pancakes-good
+    human_score: good
+    inputs:
+      reference: |
+        To make basic pancakes, whisk together 200 g of flour, 2 eggs, 300 ml
+        of milk, and a pinch of salt until smooth. Heat a non-stick pan over
+        medium heat with a little butter. Pour a small ladle of batter into
+        the pan and cook for about 1 minute per side, flipping when bubbles
+        appear on the surface.
+      evaluated: |
+        Whisk 200 g of flour, 2 eggs, 300 ml of milk and a pinch of salt into
+        a smooth batter. Cook ladlefuls in a buttered non-stick pan over
+        medium heat, flipping when bubbles appear. Serve immediately with
+        maple syrup and fresh berries, or roll them up around a slice of
+        ham for a savoury breakfast.
+
+  - id: pancakes-fair
+    human_score: fair
+    inputs:
+      reference: |
+        To make basic pancakes, whisk together 200 g of flour, 2 eggs, 300 ml
+        of milk, and a pinch of salt until smooth. Heat a non-stick pan over
+        medium heat with a little butter. Pour a small ladle of batter into
+        the pan and cook for about 1 minute per side, flipping when bubbles
+        appear on the surface.
+      evaluated: |
+        Mix 200 g flour with 2 eggs and 300 ml of milk. Whisk in 1 tablespoon
+        of melted butter, 2 teaspoons of baking powder, and 1 tablespoon of
+        sugar for a fluffier result. Let the batter rest for 30 minutes
+        before cooking. Fry in a cast-iron skillet preheated to 180 °C and
+        finish under the broiler.
+
+  # ───── Financial brochure: index fund (omit perfect) ─────
+  - id: index-fund-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The Apex 500 Index Fund tracks the performance of the 500 largest
+        listed companies in the country. The fund charges an annual
+        management fee of 0.04% and has a minimum initial investment of $100.
+        Distributions are paid quarterly. The fund is available through a
+        standard brokerage account.
+      evaluated: |
+        The Apex 500 Index Fund tracks the 500 largest listed companies in
+        the country. It charges an annual management fee of 0.04% and
+        requires a minimum initial investment of $100. Distributions are
+        paid quarterly, and the fund can be bought through a standard
+        brokerage account.
+
+  - id: index-fund-good
+    human_score: good
+    inputs:
+      reference: |
+        The Apex 500 Index Fund tracks the performance of the 500 largest
+        listed companies in the country. The fund charges an annual
+        management fee of 0.04% and has a minimum initial investment of $100.
+        Distributions are paid quarterly. The fund is available through a
+        standard brokerage account.
+      evaluated: |
+        The Apex 500 Index Fund follows the 500 largest listed companies.
+        Its annual management fee is 0.04%, the minimum initial investment
+        is $100, and distributions are paid quarterly. The fund is sold
+        through a standard brokerage account and is also available inside
+        most tax-advantaged retirement accounts.
+
+  - id: index-fund-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The Apex 500 Index Fund tracks the performance of the 500 largest
+        listed companies in the country. The fund charges an annual
+        management fee of 0.04% and has a minimum initial investment of $100.
+        Distributions are paid quarterly. The fund is available through a
+        standard brokerage account.
+      evaluated: |
+        The Apex 500 tracks the 500 largest listed companies and charges a
+        0.04% management fee. The fund uses a full-replication strategy and
+        rebalances semi-annually in March and September. Apex publishes the
+        fund's full holdings each business day on its website, and the
+        tracking error has averaged 3 basis points over the past five years.
+
+  - id: index-fund-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The Apex 500 Index Fund tracks the performance of the 500 largest
+        listed companies in the country. The fund charges an annual
+        management fee of 0.04% and has a minimum initial investment of $100.
+        Distributions are paid quarterly. The fund is available through a
+        standard brokerage account.
+      evaluated: |
+        The Apex 500 is an actively managed fund focused on growth stocks in
+        the technology and healthcare sectors. It charges a 1.25% management
+        fee plus a 10% performance fee above its benchmark. The minimum
+        investment is $50,000, and the fund is only available to accredited
+        investors through Apex's private wealth channel.
+
+  # ───── Legal terms summary: NDA (omit good) ─────
+  - id: nda-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Under this Non-Disclosure Agreement, the Recipient agrees not to
+        disclose Confidential Information shared by the Discloser to any
+        third party for a period of three years from the Effective Date. The
+        obligations do not apply to information that is already public,
+        independently developed, or lawfully received from another source.
+      evaluated: |
+        Under this Non-Disclosure Agreement, the Recipient agrees not to
+        disclose Confidential Information shared by the Discloser to any
+        third party for three years from the Effective Date. These
+        obligations do not apply to information that is already public, was
+        independently developed, or was lawfully received from another
+        source.
+
+  - id: nda-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Under this Non-Disclosure Agreement, the Recipient agrees not to
+        disclose Confidential Information shared by the Discloser to any
+        third party for a period of three years from the Effective Date. The
+        obligations do not apply to information that is already public,
+        independently developed, or lawfully received from another source.
+      evaluated: |
+        The Recipient promises not to share the Discloser's Confidential
+        Information with any third party for three years starting on the
+        Effective Date. The non-disclosure obligation does not cover
+        information that is already public, that the Recipient developed
+        independently, or that they lawfully received from another source.
+
+  - id: nda-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Under this Non-Disclosure Agreement, the Recipient agrees not to
+        disclose Confidential Information shared by the Discloser to any
+        third party for a period of three years from the Effective Date. The
+        obligations do not apply to information that is already public,
+        independently developed, or lawfully received from another source.
+      evaluated: |
+        The Recipient must not share the Discloser's Confidential Information
+        with any third party for three years after the Effective Date. The
+        agreement is governed by Delaware law and any dispute is decided in
+        the courts of New Castle County. The Recipient also agrees to a
+        two-year non-solicitation of the Discloser's employees and a $50,000
+        liquidated damages clause per breach.
+
+  - id: nda-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Under this Non-Disclosure Agreement, the Recipient agrees not to
+        disclose Confidential Information shared by the Discloser to any
+        third party for a period of three years from the Effective Date. The
+        obligations do not apply to information that is already public,
+        independently developed, or lawfully received from another source.
+      evaluated: |
+        This Non-Disclosure Agreement is a mutual five-year contract under
+        which either party may seek liquidated damages of up to $250,000 per
+        breach. Disputes are resolved through binding arbitration in
+        Singapore under ICC rules. The Recipient must return or destroy all
+        Confidential Information within 14 days of termination and provide a
+        notarised certificate of destruction.

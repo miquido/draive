@@ -1,0 +1,828 @@
+evaluator: completeness
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED response purely on how thoroughly it addresses every
+    aspect of USER_QUERY. Ignore factual correctness, style, and fluency.
+  source: synthetic
+
+samples:
+  # ───────────── Cooking: hard-boiled eggs ─────────────
+  - id: hard-boiled-eggs-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        How do I make hard-boiled eggs? Please cover (1) how long to boil
+        them, (2) whether to start in cold or boiling water, (3) how to
+        peel them easily, and (4) how long they keep in the fridge.
+      evaluated: |
+        Start the eggs in cold water and bring them to a boil, then cook
+        for about 10 minutes for hard yolks. After cooking, dunk them in
+        an ice bath so they cool quickly and the shells come off cleanly.
+        In their shells in the fridge they will stay good for around a
+        week.
+
+  - id: hard-boiled-eggs-good
+    human_score: good
+    inputs:
+      user_query: |
+        How do I make hard-boiled eggs? Please cover (1) how long to boil
+        them, (2) whether to start in cold or boiling water, (3) how to
+        peel them easily, and (4) how long they keep in the fridge.
+      evaluated: |
+        Boil the eggs for about 10 minutes. Putting them into ice water
+        afterwards makes them easier to peel. You can keep them in the
+        fridge for several days.
+
+  - id: hard-boiled-eggs-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        How do I make hard-boiled eggs? Please cover (1) how long to boil
+        them, (2) whether to start in cold or boiling water, (3) how to
+        peel them easily, and (4) how long they keep in the fridge.
+      evaluated: |
+        Boil the eggs in water for around 10 minutes and they will be
+        hard. Older eggs sometimes peel a little easier than very fresh
+        ones.
+
+  # ───────────── Docker setup ─────────────
+  - id: docker-setup-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I want to get started with Docker on macOS. Can you cover
+        (1) how to install Docker Desktop, (2) what the difference is
+        between an image and a container, (3) the basic command to run a
+        container from an image, and (4) how to see currently running
+        containers?
+      evaluated: |
+        Download Docker Desktop from docker.com and install it like any
+        other Mac app. An image is a packaged template that contains an
+        app and its dependencies, while a container is a running copy of
+        that image. To start a container you use `docker run <image>`,
+        and to see what is currently running you use `docker ps`.
+
+  - id: docker-setup-good
+    human_score: good
+    inputs:
+      user_query: |
+        I want to get started with Docker on macOS. Can you cover
+        (1) how to install Docker Desktop, (2) what the difference is
+        between an image and a container, (3) the basic command to run a
+        container from an image, and (4) how to see currently running
+        containers?
+      evaluated: |
+        Install Docker Desktop from the Docker website. To start a
+        container, run `docker run <image>`. Use `docker ps` to see what
+        is running. Images and containers are different concepts — an
+        image is more like a template.
+
+  - id: docker-setup-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I want to get started with Docker on macOS. Can you cover
+        (1) how to install Docker Desktop, (2) what the difference is
+        between an image and a container, (3) the basic command to run a
+        container from an image, and (4) how to see currently running
+        containers?
+      evaluated: |
+        Docker Desktop runs on macOS once you install it. You can pull
+        images and run things from them. It is widely used for
+        development work and CI pipelines.
+
+  # ───────────── Travel planning: Tokyo ─────────────
+  - id: tokyo-trip-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I'm planning a one-week trip to Tokyo in October. Could you
+        cover (1) the best way to get from Narita Airport to the city
+        center, (2) a recommended neighborhood to stay in for a first
+        visit, (3) the most useful transit pass, and (4) two or three
+        must-see attractions?
+      evaluated: |
+        From Narita, the Narita Express train reaches Tokyo, Shinjuku,
+        and Shibuya stations in about an hour; if you want to save
+        money, the Keisei Skyliner to Ueno is a cheaper alternative.
+        For a first visit, Shinjuku is a great base — it's central,
+        served by many train lines, and full of restaurants and hotels;
+        Shibuya and the area around Tokyo Station are good alternatives.
+        Pick up a Suica or Pasmo IC card on arrival; you can tap it on
+        almost every train, subway, and bus in the city, and use it at
+        many shops too. For must-see sights, plan a visit to Senso-ji
+        Temple in Asakusa, the Shibuya Scramble crossing and surrounding
+        district, and the gardens of the Imperial Palace; if you have a
+        spare day, the views from Tokyo Skytree are also worthwhile.
+
+  - id: tokyo-trip-good
+    human_score: good
+    inputs:
+      user_query: |
+        I'm planning a one-week trip to Tokyo in October. Could you
+        cover (1) the best way to get from Narita Airport to the city
+        center, (2) a recommended neighborhood to stay in for a first
+        visit, (3) the most useful transit pass, and (4) two or three
+        must-see attractions?
+      evaluated: |
+        From Narita, take the Narita Express train. A Suica card is
+        very useful for the metro. Visit Senso-ji and the Shibuya
+        crossing while you're there.
+
+  - id: tokyo-trip-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I'm planning a one-week trip to Tokyo in October. Could you
+        cover (1) the best way to get from Narita Airport to the city
+        center, (2) a recommended neighborhood to stay in for a first
+        visit, (3) the most useful transit pass, and (4) two or three
+        must-see attractions?
+      evaluated: |
+        Tokyo has many tourists in October because the weather is
+        pleasant. You should bring comfortable shoes for walking.
+
+  # ───────────── Fitness: starting running ─────────────
+  - id: starting-running-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I want to start running for fitness. Could you address (1) how
+        often to run per week as a beginner, (2) how to avoid common
+        injuries, (3) what kind of shoes to look for, and (4) how to
+        progress over the first three months?
+      evaluated: |
+        As a beginner, aim for three runs per week with at least one
+        rest day between sessions — this gives connective tissue time
+        to adapt and limits overuse risk. To avoid common injuries,
+        warm up with a few minutes of brisk walking before each run,
+        keep an easy conversational pace for most sessions, and
+        increase your weekly mileage by no more than about 10% per
+        week. For shoes, visit a running store if you can and look for
+        a neutral cushioned trainer that matches your foot shape; the
+        most important thing is comfort, not brand. Over the first
+        three months, follow a walk/run plan: in month one alternate
+        short runs with walking breaks, in month two work toward 20–30
+        continuous minutes of running, and in month three add a
+        slightly longer weekend run and start to think about pace.
+
+  - id: starting-running-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I want to start running for fitness. Could you address (1) how
+        often to run per week as a beginner, (2) how to avoid common
+        injuries, (3) what kind of shoes to look for, and (4) how to
+        progress over the first three months?
+      evaluated: |
+        Running is great for cardiovascular health. Start slowly and
+        try to enjoy it. Many people use apps to track their runs.
+
+  - id: starting-running-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I want to start running for fitness. Could you address (1) how
+        often to run per week as a beginner, (2) how to avoid common
+        injuries, (3) what kind of shoes to look for, and (4) how to
+        progress over the first three months?
+      evaluated: |
+        Running has been a popular sport for decades. Olympic marathons
+        are exciting to watch on television.
+
+  # ───────────── Finance: emergency fund ─────────────
+  - id: emergency-fund-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        Can you explain emergency funds? Please cover (1) what an
+        emergency fund is, (2) how many months of expenses it should
+        cover, (3) where to keep the money, and (4) how to build one
+        from scratch.
+      evaluated: |
+        An emergency fund is a pool of cash set aside specifically for
+        unexpected expenses such as job loss, urgent medical bills, or
+        major home repairs — it keeps you from having to borrow at high
+        interest or sell investments at a bad time. A common rule of
+        thumb is three to six months of essential living expenses; six
+        to nine months is wiser if your income is variable or you're
+        the sole earner. Keep the money somewhere safe and accessible
+        but separate from your everyday checking, typically a
+        high-yield savings or money-market account at an FDIC-insured
+        bank — not in stocks. To build one from scratch, start with a
+        small initial goal like one month of expenses, automate a
+        recurring transfer right after payday, and funnel windfalls
+        (bonuses, tax refunds) into the account until you reach your
+        target.
+
+  - id: emergency-fund-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        Can you explain emergency funds? Please cover (1) what an
+        emergency fund is, (2) how many months of expenses it should
+        cover, (3) where to keep the money, and (4) how to build one
+        from scratch.
+      evaluated: |
+        An emergency fund is savings that you can use if something
+        unexpected happens.
+
+  - id: emergency-fund-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        Can you explain emergency funds? Please cover (1) what an
+        emergency fund is, (2) how many months of expenses it should
+        cover, (3) where to keep the money, and (4) how to build one
+        from scratch.
+      evaluated: |
+        Personal finance influencers have become very popular on
+        social media in recent years.
+
+  # ───────────── Legal/admin: US passport renewal ─────────────
+  - id: passport-renewal-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        How do I renew my US passport by mail? Please cover (1) which
+        form to use, (2) what documents I need to send, (3) the current
+        fee, and (4) roughly how long it takes.
+      evaluated: |
+        To renew a US passport by mail, use Form DS-82 — it's available
+        only to adults whose most recent passport is undamaged, was
+        issued within the past 15 years, was issued when they were 16
+        or older, and was issued in their current name (or you can
+        document a name change). You'll need to mail in the completed
+        DS-82, your most recent passport, one new color passport photo
+        meeting the State Department's specifications, and proof of any
+        legal name change if applicable. The fee is currently $130 for
+        a passport book, plus a $60 expedited service surcharge if you
+        want faster processing. Standard processing typically takes
+        6–8 weeks, and expedited service usually takes 2–3 weeks; both
+        timelines can vary, so check the State Department's status page
+        before assuming.
+
+  - id: passport-renewal-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        How do I renew my US passport by mail? Please cover (1) which
+        form to use, (2) what documents I need to send, (3) the current
+        fee, and (4) roughly how long it takes.
+      evaluated: |
+        Use Form DS-82 if you qualify for mail renewal. Send your
+        previous passport, the completed form, and a new passport
+        photo. The fee is $130 for a standard passport book. Routine
+        processing usually takes around 6 to 8 weeks.
+
+  - id: passport-renewal-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        How do I renew my US passport by mail? Please cover (1) which
+        form to use, (2) what documents I need to send, (3) the current
+        fee, and (4) roughly how long it takes.
+      evaluated: |
+        Passport renewal involves filling out a form from the State
+        Department. There is a fee involved.
+
+  - id: passport-renewal-good
+    human_score: good
+    inputs:
+      user_query: |
+        How do I renew my US passport by mail? Please cover (1) which
+        form to use, (2) what documents I need to send, (3) the current
+        fee, and (4) roughly how long it takes.
+      evaluated: |
+        You fill out Form DS-82 and mail it with your old passport. The
+        fee is around $130. It can take a couple of months to come
+        back.
+
+  # ───────────── Recipe scaling ─────────────
+  - id: recipe-scaling-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I have a chocolate chip cookie recipe that serves 12 and I want
+        to make it for 30. Can you explain (1) the multiplier I should
+        use, (2) which ingredients scale linearly, (3) which ones don't
+        (like baking soda or salt), and (4) any adjustments to baking
+        time?
+      evaluated: |
+        For 30 cookies from a 12-cookie recipe, multiply by 2.5. Most
+        ingredients — flour, sugar, butter, eggs, chocolate chips —
+        scale linearly at that 2.5x rate. Leaveners (baking soda,
+        baking powder) and salt usually don't scale linearly at large
+        multiples; start at about 2x and adjust to taste. The baking
+        time per tray stays roughly the same since each cookie is the
+        same size; you'll just need more trays or batches.
+
+  - id: recipe-scaling-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I have a chocolate chip cookie recipe that serves 12 and I want
+        to make it for 30. Can you explain (1) the multiplier I should
+        use, (2) which ingredients scale linearly, (3) which ones don't
+        (like baking soda or salt), and (4) any adjustments to baking
+        time?
+      evaluated: |
+        Multiply the recipe by 2.5 to get to 30 cookies. Most things
+        scale up normally.
+
+  - id: recipe-scaling-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I have a chocolate chip cookie recipe that serves 12 and I want
+        to make it for 30. Can you explain (1) the multiplier I should
+        use, (2) which ingredients scale linearly, (3) which ones don't
+        (like baking soda or salt), and (4) any adjustments to baking
+        time?
+      evaluated: |
+        Chocolate chip cookies are a classic American dessert that
+        almost everyone loves.
+
+  # ───────────── Debugging: Python ImportError ─────────────
+  - id: python-import-error-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        My Python script keeps failing with ImportError. Could you
+        cover (1) common causes of ImportError, (2) how to check if a
+        package is actually installed, (3) how virtual environments
+        relate to this, and (4) the difference between ImportError and
+        ModuleNotFoundError?
+      evaluated: |
+        Common causes include the package not being installed at all,
+        being installed in a different Python environment than the one
+        running your script, a typo in the import name, a circular
+        import inside your own code, or a module that exists but does
+        not export the name you tried to import. To check whether a
+        package is actually installed, run `pip show <package>` or
+        `python -m pip list` from the same interpreter you use to run
+        the script — `which python` and `which pip` should point at the
+        same environment. Virtual environments are central to this
+        because each venv has its own isolated set of installed
+        packages; if you forgot to activate the venv (or activated a
+        different one), a package you installed earlier will appear
+        "missing." Finally, `ModuleNotFoundError` is a subclass of
+        `ImportError` — it's specifically raised when the named module
+        cannot be located at all, while a plain `ImportError` can also
+        mean the module was found but a specific name inside it
+        couldn't be imported.
+
+  - id: python-import-error-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        My Python script keeps failing with ImportError. Could you
+        cover (1) common causes of ImportError, (2) how to check if a
+        package is actually installed, (3) how virtual environments
+        relate to this, and (4) the difference between ImportError and
+        ModuleNotFoundError?
+      evaluated: |
+        ImportError usually means the package isn't installed, isn't
+        installed in the active environment, or the name you're
+        importing doesn't exist. Use `pip list` (or `pip show <pkg>`)
+        with the same interpreter that runs your script to confirm.
+        Virtual environments isolate packages per project, so an
+        un-activated venv can make a package look missing.
+        `ModuleNotFoundError` is a subclass of `ImportError` raised
+        specifically when the module itself can't be found.
+
+  - id: python-import-error-good
+    human_score: good
+    inputs:
+      user_query: |
+        My Python script keeps failing with ImportError. Could you
+        cover (1) common causes of ImportError, (2) how to check if a
+        package is actually installed, (3) how virtual environments
+        relate to this, and (4) the difference between ImportError and
+        ModuleNotFoundError?
+      evaluated: |
+        ImportError happens when Python can't import what you asked
+        for, often because the package isn't installed. Run `pip list`
+        to check. Virtual environments have their own packages, so the
+        wrong env can cause this too.
+
+  - id: python-import-error-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        My Python script keeps failing with ImportError. Could you
+        cover (1) common causes of ImportError, (2) how to check if a
+        package is actually installed, (3) how virtual environments
+        relate to this, and (4) the difference between ImportError and
+        ModuleNotFoundError?
+      evaluated: |
+        ImportError usually means the package isn't installed where
+        Python is looking.
+
+  - id: python-import-error-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        My Python script keeps failing with ImportError. Could you
+        cover (1) common causes of ImportError, (2) how to check if a
+        package is actually installed, (3) how virtual environments
+        relate to this, and (4) the difference between ImportError and
+        ModuleNotFoundError?
+      evaluated: |
+        Python is a widely used programming language with a large
+        ecosystem of third-party libraries.
+
+  # ───────────── Study planning ─────────────
+  - id: study-plan-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I have a calculus exam in three weeks. Can you help me plan?
+        Please cover (1) how to break the topics into a weekly
+        schedule, (2) the most effective study techniques for math,
+        (3) how to use practice problems versus reviewing notes, and
+        (4) what to do in the last 48 hours before the exam.
+      evaluated: |
+        Start by listing every topic the exam covers and grouping them
+        into three weekly chunks: in week one tackle the earlier
+        foundational topics (limits, derivatives), in week two move to
+        integration and applications, and reserve week three for
+        mixed review and weak spots. For math specifically, active
+        techniques beat passive ones: do worked examples without
+        looking at the solution, use spaced repetition for definitions
+        and key theorems, and explain each technique out loud as if
+        teaching it. Practice problems should be the bulk of your
+        time — aim for roughly 70% problem-solving and 30% reviewing
+        notes, and treat each missed problem as an opportunity to fix
+        a specific gap. In the last 48 hours, switch from learning new
+        material to consolidating: do one full timed mock exam, review
+        only your error log, sleep at least 7–8 hours the night before,
+        and keep the morning of the exam light — a short warm-up of
+        easy problems is better than cramming new ones.
+
+  - id: study-plan-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I have a calculus exam in three weeks. Can you help me plan?
+        Please cover (1) how to break the topics into a weekly
+        schedule, (2) the most effective study techniques for math,
+        (3) how to use practice problems versus reviewing notes, and
+        (4) what to do in the last 48 hours before the exam.
+      evaluated: |
+        Split the topics across three weeks — foundational material
+        first, harder topics second, and full review in the last week.
+        For math, practice problems beat re-reading notes; spend most
+        of your time solving and only review notes to fill specific
+        gaps. In the final two days, take a timed mock exam, review
+        your mistakes, and sleep well the night before.
+
+  - id: study-plan-good
+    human_score: good
+    inputs:
+      user_query: |
+        I have a calculus exam in three weeks. Can you help me plan?
+        Please cover (1) how to break the topics into a weekly
+        schedule, (2) the most effective study techniques for math,
+        (3) how to use practice problems versus reviewing notes, and
+        (4) what to do in the last 48 hours before the exam.
+      evaluated: |
+        Divide the topics over the three weeks, with the last week
+        for review. Solve lots of practice problems — they're more
+        useful than re-reading notes. Make sure you sleep well before
+        the exam.
+
+  - id: study-plan-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I have a calculus exam in three weeks. Can you help me plan?
+        Please cover (1) how to break the topics into a weekly
+        schedule, (2) the most effective study techniques for math,
+        (3) how to use practice problems versus reviewing notes, and
+        (4) what to do in the last 48 hours before the exam.
+      evaluated: |
+        Calculus was developed independently by Newton and Leibniz in
+        the 17th century.
+
+  # ───────────── Parenting: toddler sleep ─────────────
+  - id: toddler-sleep-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        My two-year-old is fighting bedtime. Can you cover (1) how
+        many hours of sleep a toddler typically needs, (2) what a
+        consistent bedtime routine should include, (3) how to handle
+        the child getting out of bed repeatedly, and (4) when to
+        consider talking to a pediatrician?
+      evaluated: |
+        Two-year-olds generally need about 11–14 hours of sleep in a
+        24-hour period, often a single afternoon nap of 1–2 hours plus
+        10–12 hours overnight. A predictable wind-down routine helps
+        signal sleep: dim lights about 30 minutes before bed, give a
+        warm bath or a quiet activity, read one or two books, and end
+        in the dark room with the same words each night. If the child
+        keeps getting out of bed, calmly walk them back without
+        engaging in long conversation — minimal eye contact, a quick
+        "It's sleep time," and leave. Consistency matters more than
+        any single technique; expect a few rough nights before the
+        pattern improves. Consider talking to your pediatrician if
+        sleep resistance lasts more than a few weeks despite a
+        consistent routine, or if you notice loud snoring, pauses in
+        breathing, persistent night terrors, or daytime behavior
+        suggesting they're severely under-rested.
+
+  - id: toddler-sleep-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        My two-year-old is fighting bedtime. Can you cover (1) how
+        many hours of sleep a toddler typically needs, (2) what a
+        consistent bedtime routine should include, (3) how to handle
+        the child getting out of bed repeatedly, and (4) when to
+        consider talking to a pediatrician?
+      evaluated: |
+        Toddlers usually need 11–14 hours of sleep total each day. A
+        good routine is bath, books, and bed at the same time each
+        night. If they keep getting out of bed, calmly return them
+        without much interaction. Talk to a pediatrician if problems
+        persist for more than a few weeks or if you notice snoring or
+        breathing issues during sleep.
+
+  - id: toddler-sleep-good
+    human_score: good
+    inputs:
+      user_query: |
+        My two-year-old is fighting bedtime. Can you cover (1) how
+        many hours of sleep a toddler typically needs, (2) what a
+        consistent bedtime routine should include, (3) how to handle
+        the child getting out of bed repeatedly, and (4) when to
+        consider talking to a pediatrician?
+      evaluated: |
+        Two-year-olds need a lot of sleep, around 12 hours total. Try
+        to keep a consistent routine — bath, story, lights out. If
+        they keep getting up, gently put them back without making a
+        fuss.
+
+  - id: toddler-sleep-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        My two-year-old is fighting bedtime. Can you cover (1) how
+        many hours of sleep a toddler typically needs, (2) what a
+        consistent bedtime routine should include, (3) how to handle
+        the child getting out of bed repeatedly, and (4) when to
+        consider talking to a pediatrician?
+      evaluated: |
+        Bedtime can be a stressful part of the day for parents of
+        young children.
+
+  # ───────────── Home repair: leaky faucet ─────────────
+  - id: leaky-faucet-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        My bathroom faucet is dripping. Can you cover (1) how to
+        figure out what type of faucet I have, (2) how to shut off the
+        water before repair, (3) the most common cause of a drip, and
+        (4) the basic tools I'll need?
+      evaluated: |
+        Most household faucets fall into one of four families:
+        compression (separate hot/cold handles that screw down),
+        cartridge (single or double handle that pivots smoothly),
+        ball-type (single handle that rotates over a rounded base),
+        and ceramic-disc (single handle on a wide cylindrical body).
+        The shape of the handle and base usually tells you which
+        you've got. Before any repair, close the shut-off valves
+        under the sink by turning them clockwise; if there are no
+        local valves, shut off the main water supply for the house.
+        The most common cause of a drip is a worn rubber washer or
+        O-ring on a compression faucet, or a worn cartridge on
+        single-handle faucets. For tools, you'll typically need an
+        adjustable wrench, a Phillips and a flat-head screwdriver,
+        needle-nose pliers, and replacement washers or a cartridge
+        matched to your faucet brand and model — taking the old part
+        to the hardware store is the easiest way to find the right
+        replacement.
+
+  - id: leaky-faucet-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        My bathroom faucet is dripping. Can you cover (1) how to
+        figure out what type of faucet I have, (2) how to shut off the
+        water before repair, (3) the most common cause of a drip, and
+        (4) the basic tools I'll need?
+      evaluated: |
+        Faucets are usually compression, cartridge, ball, or
+        ceramic-disc — the handle style tells you which. Shut off
+        the supply at the valves under the sink before disassembly.
+        A worn washer or cartridge is the typical cause of a drip.
+        Have an adjustable wrench, screwdrivers, and a replacement
+        part ready.
+
+  - id: leaky-faucet-good
+    human_score: good
+    inputs:
+      user_query: |
+        My bathroom faucet is dripping. Can you cover (1) how to
+        figure out what type of faucet I have, (2) how to shut off the
+        water before repair, (3) the most common cause of a drip, and
+        (4) the basic tools I'll need?
+      evaluated: |
+        Faucets come in a few different types based on the handle.
+        Shut off the water under the sink before you start. A worn
+        washer is often the cause. You'll need a wrench.
+
+  - id: leaky-faucet-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        My bathroom faucet is dripping. Can you cover (1) how to
+        figure out what type of faucet I have, (2) how to shut off the
+        water before repair, (3) the most common cause of a drip, and
+        (4) the basic tools I'll need?
+      evaluated: |
+        Drips are usually caused by a worn washer inside the faucet.
+
+  - id: leaky-faucet-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        My bathroom faucet is dripping. Can you cover (1) how to
+        figure out what type of faucet I have, (2) how to shut off the
+        water before repair, (3) the most common cause of a drip, and
+        (4) the basic tools I'll need?
+      evaluated: |
+        A dripping faucet wastes a surprising amount of water over the
+        course of a year.
+
+  # ───────────── Learning a language: Spanish ─────────────
+  - id: learning-spanish-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I want to start learning Spanish. Could you cover (1) how to
+        build a daily practice habit, (2) good resources for a
+        beginner, (3) the most effective way to build vocabulary, and
+        (4) how to practice speaking when I don't know any native
+        speakers yet?
+      evaluated: |
+        Aim for a short, consistent daily session — even 15–20 minutes
+        every day will outperform an occasional long session because
+        memory consolidates with repeated exposure. For beginner
+        resources, combine a structured course like Language Transfer
+        (free) or the Pimsleur audio series with an app like Duolingo
+        or Anki for spaced repetition; a beginner grammar book such
+        as "Madrigal's Magic Key to Spanish" rounds out the basics.
+        For vocabulary, use spaced-repetition flashcards built from
+        words you encounter in real input (short readings, podcasts,
+        TV) rather than memorising pre-made frequency lists; learn
+        words in context with example sentences. To practice speaking
+        without a partner, do daily out-loud shadowing of native
+        audio, narrate your routine to yourself in Spanish, record
+        and play back short monologues, and once you have a few
+        hundred words, schedule sessions with paid tutors on iTalki or
+        free language-exchange partners on Tandem.
+
+  - id: learning-spanish-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I want to start learning Spanish. Could you cover (1) how to
+        build a daily practice habit, (2) good resources for a
+        beginner, (3) the most effective way to build vocabulary, and
+        (4) how to practice speaking when I don't know any native
+        speakers yet?
+      evaluated: |
+        Try for a short daily session, even 15 minutes. Useful
+        beginner resources include Duolingo, Pimsleur, and Language
+        Transfer. Build vocabulary with spaced-repetition flashcards
+        (Anki works well). For speaking, shadow native audio out loud
+        and book sessions with online tutors on iTalki when you're
+        ready.
+
+  - id: learning-spanish-good
+    human_score: good
+    inputs:
+      user_query: |
+        I want to start learning Spanish. Could you cover (1) how to
+        build a daily practice habit, (2) good resources for a
+        beginner, (3) the most effective way to build vocabulary, and
+        (4) how to practice speaking when I don't know any native
+        speakers yet?
+      evaluated: |
+        Practice a little every day. Duolingo is a popular starting
+        resource. Use flashcards for vocabulary. To practice speaking,
+        you can find tutors online.
+
+  - id: learning-spanish-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I want to start learning Spanish. Could you cover (1) how to
+        build a daily practice habit, (2) good resources for a
+        beginner, (3) the most effective way to build vocabulary, and
+        (4) how to practice speaking when I don't know any native
+        speakers yet?
+      evaluated: |
+        Daily practice with an app like Duolingo will get you started.
+
+  - id: learning-spanish-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I want to start learning Spanish. Could you cover (1) how to
+        build a daily practice habit, (2) good resources for a
+        beginner, (3) the most effective way to build vocabulary, and
+        (4) how to practice speaking when I don't know any native
+        speakers yet?
+      evaluated: |
+        Spanish is one of the most widely spoken languages in the
+        world, with major variants in Spain and across Latin America.
+
+  # ───────────── Comparing products: laptops ─────────────
+  - id: laptop-comparison-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I'm comparing the MacBook Air M3 and a Dell XPS 13 for general
+        productivity work. Could you cover (1) battery life
+        differences, (2) typical price gap, (3) repairability and
+        upgradeability, and (4) which suits a Windows-vs-macOS
+        preference?
+      evaluated: |
+        On battery life, the MacBook Air M3 typically delivers around
+        15–18 hours of mixed use, while the XPS 13 with current Intel
+        chips lands closer to 8–12 hours depending on configuration —
+        the Apple silicon platform is meaningfully more efficient.
+        Pricing puts the base MacBook Air around $1,099 and the base
+        XPS 13 around $999, but matching specs (16 GB RAM, 512 GB SSD)
+        usually leaves them within $100 of each other; the XPS often
+        has steeper sale discounts. Repairability and upgrades favor
+        neither strongly: both have soldered RAM, but the XPS at least
+        has a user-accessible NVMe SSD, while the MacBook Air's
+        storage is soldered to the board. On OS, the choice is mostly
+        about ecosystem — pick the MacBook Air if you're invested in
+        iCloud, iMessage, Continuity with an iPhone, or macOS-only
+        tools; pick the XPS 13 if you need full Windows compatibility,
+        x86 software, or tighter integration with Microsoft 365 and
+        Active Directory environments.
+
+  - id: laptop-comparison-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I'm comparing the MacBook Air M3 and a Dell XPS 13 for general
+        productivity work. Could you cover (1) battery life
+        differences, (2) typical price gap, (3) repairability and
+        upgradeability, and (4) which suits a Windows-vs-macOS
+        preference?
+      evaluated: |
+        Battery life clearly favors the MacBook Air — around 15+
+        hours versus roughly 8–12 on the XPS. Prices are similar at
+        comparable specs, though the XPS often discounts more
+        aggressively. Both are limited on upgrades, with soldered RAM
+        on both, although the XPS's SSD is replaceable. Pick the
+        MacBook for macOS and iPhone integration, and the XPS for
+        Windows-only software.
+
+  - id: laptop-comparison-good
+    human_score: good
+    inputs:
+      user_query: |
+        I'm comparing the MacBook Air M3 and a Dell XPS 13 for general
+        productivity work. Could you cover (1) battery life
+        differences, (2) typical price gap, (3) repairability and
+        upgradeability, and (4) which suits a Windows-vs-macOS
+        preference?
+      evaluated: |
+        The MacBook Air has better battery life. Prices are close at
+        equivalent configurations. Choose based on whether you prefer
+        macOS or Windows.
+
+  - id: laptop-comparison-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I'm comparing the MacBook Air M3 and a Dell XPS 13 for general
+        productivity work. Could you cover (1) battery life
+        differences, (2) typical price gap, (3) repairability and
+        upgradeability, and (4) which suits a Windows-vs-macOS
+        preference?
+      evaluated: |
+        Both are excellent ultraportable laptops for productivity.
+
+  - id: laptop-comparison-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I'm comparing the MacBook Air M3 and a Dell XPS 13 for general
+        productivity work. Could you cover (1) battery life
+        differences, (2) typical price gap, (3) repairability and
+        upgradeability, and (4) which suits a Windows-vs-macOS
+        preference?
+      evaluated: |
+        Laptops have become much thinner and lighter over the past
+        decade, with significant improvements in battery technology.

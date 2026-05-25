@@ -16,7 +16,7 @@ def test_extract_evaluation_result_parses_single_rating_and_comment() -> None:
 
     result = extract_evaluation_result(content)
 
-    assert result.value == 0.5
+    assert result.value == 0.6
     assert result.meta["comment"] == "Reasoned view"
 
 
@@ -41,7 +41,7 @@ def test_extract_evaluation_result_rejects_multiple_ratings() -> None:
 def test_extract_evaluation_result_does_not_require_comment() -> None:
     content = _content_with_tags(MultimodalTag.of("good", name="rating"))
 
-    assert extract_evaluation_result(content).value == 0.5
+    assert extract_evaluation_result(content).value == 0.6
     assert extract_evaluation_result(content).meta["comment"] is None
 
 

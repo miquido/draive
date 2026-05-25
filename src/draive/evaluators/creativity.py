@@ -128,12 +128,13 @@ Evaluated metric is creativity - the degree of originality, novelty, and innovat
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
+Judge originality relative to a competent baseline response to the same prompt, not against literary or commercial masterpieces. "Perfect" does not require genius — it requires a clear, non-obvious creative choice carried through the piece.
 Assign a creativity score using exact name of one of the following values:
-- "poor" is very low creativity, the content is entirely conventional, generic, or lacks any original or novel elements.
-- "fair" is low creativity, the content shows minimal originality with mostly conventional ideas and approaches.
-- "good" is moderate creativity, the content demonstrates some original thinking and creative elements mixed with conventional approaches.
-- "excellent" is high creativity, the content shows significant originality, innovative thinking, and creative approaches with minor conventional elements.
-- "perfect" is very high creativity, the content is highly original, innovative, and demonstrates exceptional creative thinking throughout.
+- "poor" - entirely conventional, formulaic, or trope-driven; no original choice visible.
+- "fair" - mostly conventional with at most one mildly original element; the response would be predictable from the prompt alone.
+- "good" - some genuinely creative elements mixed with conventional structure; one or two non-obvious choices.
+- "excellent" - clearly original framing, perspective, or combination; the response distinguishes itself from a generic answer.
+- "perfect" - the piece is built around a strong creative choice (unusual angle, fresh metaphor, unexpected combination) and carries it through; it does not need to be unprecedented to qualify.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 
@@ -155,12 +156,13 @@ Assess the degree of originality, novelty, and innovative thinking demonstrated 
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
+Judge originality relative to a competent baseline response to the same request, not against literary masterpieces. "Perfect" does not require genius — it requires a clear, non-obvious creative choice carried through.
 Assign a creativity score using exact name of one of the following values:
-- "poor" is very low creativity, model outputs are entirely conventional, generic, or lack any original or novel elements.
-- "fair" is low creativity, model outputs show minimal originality with mostly conventional ideas and approaches.
-- "good" is moderate creativity, model outputs demonstrate some original thinking and creative elements mixed with conventional approaches.
-- "excellent" is high creativity, model outputs show significant originality and innovative thinking with minor conventional elements.
-- "perfect" is very high creativity, model outputs are highly original, innovative, and demonstrate exceptional creative thinking throughout.
+- "poor" - entirely conventional, formulaic, or trope-driven model outputs; no original choice visible.
+- "fair" - mostly conventional outputs with at most one mildly original element.
+- "good" - outputs show some genuinely creative elements alongside conventional structure.
+- "excellent" - outputs use a clearly original framing, perspective, or combination that distinguishes them from a generic answer.
+- "perfect" - outputs are built around a strong creative choice and carry it through; need not be unprecedented to qualify.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 

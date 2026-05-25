@@ -129,6 +129,7 @@ You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
 Compare the REFERENCE and the EVALUATED content by carefully examining them, then rate the EVALUATED content using solely a coverage metric according to the EVALUATION_CRITERIA.
+Before scoring, extract the key points from the REFERENCE as a numbered checklist of distinct facts, claims, or arguments — focus on points a knowledgeable reader would consider essential, not every minor detail. For each item, mark it as fully covered, partially covered, or absent in the EVALUATED content. Score from this checklist. Do not penalize the EVALUATED content for omitting trivia or for paraphrasing differently — coverage is about substance, not wording.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
@@ -139,12 +140,13 @@ EVALUATED content with good coverage includes all the important information from
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
+Anchor the score to the fraction of essential checklist items fully covered; count a partially-covered item as half. Different wording that conveys the same information is full coverage.
 Assign a coverage score using exact name of one of the following values:
-- "poor" is very low coverage - the content misses most key points from the reference content.
-- "fair" is low coverage - the content includes some key points but omits several important ones.
-- "good" is moderate coverage - the content covers most key points but misses a few important details.
-- "excellent" is high coverage - the content includes nearly all key points with minor omissions.
-- "perfect" is very high coverage - the content comprehensively covers all key points from the reference content.
+- "poor" - fewer than about a quarter of essential points are covered; most of the reference is absent.
+- "fair" - roughly a quarter to half of essential points are covered; several important ones missing or mentioned only in passing.
+- "good" - roughly half to three-quarters of essential points covered; a few important details missing.
+- "excellent" - nearly all essential points covered substantively; only minor or peripheral items missing.
+- "perfect" - every essential point from the reference is represented in the evaluated content, regardless of paraphrasing.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 
@@ -157,6 +159,7 @@ You are evaluating model results produced within a conversation context accordin
 <INSTRUCTION>
 Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess whether they cover all key points from the source material.
 When REFERENCE is explicitly provided, evaluate model outputs for coverage of its key points; otherwise assess whether outputs address all key points raised by user inputs across the context.
+Before scoring, extract the essential points from the source material as a numbered checklist, then mark each as fully covered, partially covered, or absent in the model outputs. Score from this checklist. Do not penalize for omitting trivia or for paraphrasing differently.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
@@ -167,12 +170,13 @@ Assess whether model outputs include all important information from the source m
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
+Anchor the score to the fraction of essential checklist items fully covered; count a partially-covered item as half. Different wording that conveys the same information is full coverage.
 Assign a coverage score using exact name of one of the following values:
-- "poor" is very low coverage, model outputs miss most key points from the source material.
-- "fair" is low coverage, model outputs include some key points but omit several important ones.
-- "good" is moderate coverage, model outputs cover most key points but miss a few important details.
-- "excellent" is high coverage, model outputs include nearly all key points with minor omissions.
-- "perfect" is very high coverage, model outputs comprehensively cover all key points from the source material.
+- "poor" - fewer than about a quarter of essential points are covered.
+- "fair" - roughly a quarter to half of essential points covered; several important ones missing.
+- "good" - roughly half to three-quarters of essential points covered; a few important details missing.
+- "excellent" - nearly all essential points covered substantively; only minor or peripheral items missing.
+- "perfect" - every essential point is represented in the model outputs, regardless of paraphrasing.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 

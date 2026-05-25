@@ -1,0 +1,787 @@
+evaluator: expectations
+metadata:
+  labelers: ["draive-team"]
+  labeling_protocol: |
+    Rate the EVALUATED content on how many EXPECTATIONS bullets it satisfies.
+    Each bullet must be verifiable from the evaluated text alone.
+  source: synthetic
+
+samples:
+  # ───────────── Code review checklist ─────────────
+  - id: code-review-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must reference the function name `parse_config` by name.
+        - Must mention that unit tests are needed or missing.
+        - Must propose at least one concrete fix or improvement.
+        - Must be written in a polite, professional tone.
+      evaluated: |
+        Thanks for the patch! In `parse_config`, the early return when the
+        path is missing swallows the error silently — could we raise a
+        `ConfigError` with the offending key instead so callers get a
+        useful trace? I also didn't see any unit tests covering the new
+        branch; a couple of cases for the missing-key and malformed-yaml
+        paths would give us confidence here. Otherwise the change looks
+        clean — happy to re-review once those are in.
+
+  - id: code-review-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must reference the function name `parse_config` by name.
+        - Must mention that unit tests are needed or missing.
+        - Must propose at least one concrete fix or improvement.
+        - Must be written in a polite, professional tone.
+      evaluated: |
+        Nice work overall. In `parse_config`, I'd suggest raising a typed
+        exception rather than returning `None` when the file is missing —
+        callers downstream are checking for truthiness and that's fragile.
+        Could you also add a unit test for the malformed-yaml branch?
+        Thanks!
+
+  - id: code-review-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must reference the function name `parse_config` by name.
+        - Must mention that unit tests are needed or missing.
+        - Must propose at least one concrete fix or improvement.
+        - Must be written in a polite, professional tone.
+      evaluated: |
+        Looks reasonable. In `parse_config` I'd recommend raising an
+        exception instead of returning None when the path is bad — that
+        would make failures easier to debug. Thanks for the patch.
+
+  - id: code-review-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must reference the function name `parse_config` by name.
+        - Must mention that unit tests are needed or missing.
+        - Must propose at least one concrete fix or improvement.
+        - Must be written in a polite, professional tone.
+      evaluated: |
+        Add some tests please. Also the error handling needs work — maybe
+        raise something instead of returning None.
+
+  - id: code-review-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must reference the function name `parse_config` by name.
+        - Must mention that unit tests are needed or missing.
+        - Must propose at least one concrete fix or improvement.
+        - Must be written in a polite, professional tone.
+      evaluated: |
+        This is bad. Rewrite it.
+
+  # ───────────── Email response checklist ─────────────
+  - id: email-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must include a greeting addressing the recipient by name (Sarah).
+        - Must directly answer the question about delivery date.
+        - Must mention an expected timeline or specific date.
+        - Must end with a polite closing and signature.
+      evaluated: |
+        Hi Sarah,
+
+        Thanks for checking in. Yes, the shipment is on track — the order
+        left our warehouse this morning and is scheduled to arrive at your
+        office on Thursday, May 28th, before 5pm. I'll send the tracking
+        link as soon as the carrier publishes it.
+
+        Best regards,
+        Marco
+
+  - id: email-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must include a greeting addressing the recipient by name (Sarah).
+        - Must directly answer the question about delivery date.
+        - Must mention an expected timeline or specific date.
+        - Must end with a polite closing and signature.
+      evaluated: |
+        Hi Sarah,
+
+        Yes, the package is on its way and should arrive Thursday, May
+        28th. Let me know if anything else comes up.
+
+        Marco
+
+  - id: email-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must include a greeting addressing the recipient by name (Sarah).
+        - Must directly answer the question about delivery date.
+        - Must mention an expected timeline or specific date.
+        - Must end with a polite closing and signature.
+      evaluated: |
+        Hi Sarah, the package shipped and should arrive Thursday. Thanks!
+
+  - id: email-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must include a greeting addressing the recipient by name (Sarah).
+        - Must directly answer the question about delivery date.
+        - Must mention an expected timeline or specific date.
+        - Must end with a polite closing and signature.
+      evaluated: |
+        Hi Sarah, package is on the way, will be there soon.
+
+  - id: email-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must include a greeting addressing the recipient by name (Sarah).
+        - Must directly answer the question about delivery date.
+        - Must mention an expected timeline or specific date.
+        - Must end with a polite closing and signature.
+      evaluated: |
+        shipped
+
+  # ───────────── Recipe checklist ─────────────
+  - id: recipe-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must list all required ingredients with quantities.
+        - Must list the cooking steps in numbered order.
+        - Must state total cooking time.
+        - Must state how many servings the recipe yields.
+        - Must mention oven temperature.
+      evaluated: |
+        Simple Roast Chicken (serves 4, total time 90 minutes)
+
+        Ingredients:
+        - 1 whole chicken (about 1.6 kg)
+        - 2 tablespoons olive oil
+        - 1 teaspoon salt
+        - 1/2 teaspoon black pepper
+        - 1 lemon, halved
+        - 4 sprigs fresh thyme
+
+        Steps:
+        1. Preheat the oven to 200°C (400°F).
+        2. Pat the chicken dry and rub with olive oil, salt, and pepper.
+        3. Stuff the cavity with the lemon halves and thyme.
+        4. Roast in a baking dish for 75 minutes, until juices run clear.
+        5. Rest the chicken for 10 minutes before carving.
+
+  - id: recipe-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must list all required ingredients with quantities.
+        - Must list the cooking steps in numbered order.
+        - Must state total cooking time.
+        - Must state how many servings the recipe yields.
+        - Must mention oven temperature.
+      evaluated: |
+        Roast Chicken — serves 4, ready in about 90 minutes.
+
+        Ingredients: 1 whole chicken (1.6 kg), 2 tbsp olive oil, 1 tsp
+        salt, 1/2 tsp pepper, 1 lemon.
+
+        Steps:
+        1. Rub chicken with oil, salt, and pepper.
+        2. Place lemon halves inside the cavity.
+        3. Roast for about 75 minutes (oven hot enough to brown the
+           skin, around 200°C).
+        4. Rest before carving.
+
+  - id: recipe-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must list all required ingredients with quantities.
+        - Must list the cooking steps in numbered order.
+        - Must state total cooking time.
+        - Must state how many servings the recipe yields.
+        - Must mention oven temperature.
+      evaluated: |
+        Roast Chicken, serves 4.
+
+        You'll need a 1.6 kg chicken, 2 tbsp olive oil, 1 tsp salt,
+        1/2 tsp pepper, and a lemon.
+
+        1. Preheat oven to 200°C.
+        2. Season the chicken with oil, salt, pepper.
+        3. Put lemon in the cavity.
+        4. Roast until done.
+        5. Rest and carve.
+
+  - id: recipe-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must list all required ingredients with quantities.
+        - Must list the cooking steps in numbered order.
+        - Must state total cooking time.
+        - Must state how many servings the recipe yields.
+        - Must mention oven temperature.
+      evaluated: |
+        Roast Chicken (serves 4). Take a chicken, season it with salt
+        and pepper, put it in the oven until it's done. Lemon helps.
+
+  - id: recipe-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must list all required ingredients with quantities.
+        - Must list the cooking steps in numbered order.
+        - Must state total cooking time.
+        - Must state how many servings the recipe yields.
+        - Must mention oven temperature.
+      evaluated: |
+        Chicken is tasty. Roast it.
+
+  # ───────────── Bug report checklist ─────────────
+  - id: bug-report-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must include numbered steps to reproduce the problem.
+        - Must state the expected behavior.
+        - Must state the actual observed behavior.
+        - Must include the environment (OS, browser, or app version).
+        - Must indicate a severity level.
+      evaluated: |
+        Title: Checkout button unresponsive after coupon applied
+
+        Severity: High
+
+        Environment: macOS 14.4, Chrome 125.0.6422.77, app version 3.8.1
+
+        Steps to reproduce:
+        1. Log in with a standard customer account.
+        2. Add any product to the cart.
+        3. Apply coupon code SAVE10.
+        4. Click the "Checkout" button.
+
+        Expected: The browser navigates to the payment page.
+
+        Actual: The button highlights briefly but no navigation occurs;
+        no error is shown and the console logs `Uncaught TypeError:
+        cannot read property 'total' of undefined`.
+
+  - id: bug-report-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must include numbered steps to reproduce the problem.
+        - Must state the expected behavior.
+        - Must state the actual observed behavior.
+        - Must include the environment (OS, browser, or app version).
+        - Must indicate a severity level.
+      evaluated: |
+        Severity: High. Environment: Chrome on macOS, app 3.8.1.
+
+        Steps:
+        1. Add product to cart.
+        2. Apply SAVE10 coupon.
+        3. Click Checkout.
+
+        Expected: navigate to payment. Actual: nothing happens.
+
+  - id: bug-report-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must include numbered steps to reproduce the problem.
+        - Must state the expected behavior.
+        - Must state the actual observed behavior.
+        - Must include the environment (OS, browser, or app version).
+        - Must indicate a severity level.
+      evaluated: |
+        On Chrome, app version 3.8.1, the checkout button doesn't work
+        after applying coupon SAVE10:
+        1. Add product to cart.
+        2. Apply coupon.
+        3. Click Checkout.
+
+        It should go to the payment page, but nothing happens.
+
+  - id: bug-report-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must include numbered steps to reproduce the problem.
+        - Must state the expected behavior.
+        - Must state the actual observed behavior.
+        - Must include the environment (OS, browser, or app version).
+        - Must indicate a severity level.
+      evaluated: |
+        Checkout button doesn't work in Chrome when I apply a coupon.
+        Should take me to the next page but doesn't.
+
+  - id: bug-report-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must include numbered steps to reproduce the problem.
+        - Must state the expected behavior.
+        - Must state the actual observed behavior.
+        - Must include the environment (OS, browser, or app version).
+        - Must indicate a severity level.
+      evaluated: |
+        checkout broken pls fix
+
+  # ───────────── Job application response ─────────────
+  - id: job-app-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must acknowledge receipt of the candidate's application.
+        - Must mention a specific interview date or slot.
+        - Must request the candidate's availability or confirmation.
+        - Must include a sign-off with the sender's name or company.
+      evaluated: |
+        Dear Priya,
+
+        Thank you for applying for the Senior Backend Engineer role at
+        Lumen Labs — we've received your application and were impressed
+        by your background.
+
+        We'd like to invite you to a first-round technical interview on
+        Tuesday, June 3rd at 10:00 AM CEST, via Google Meet. Could you
+        please confirm whether that slot works, or suggest a couple of
+        alternative times next week if not?
+
+        Best regards,
+        Hannah Lim
+        Talent Team, Lumen Labs
+
+  - id: job-app-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must acknowledge receipt of the candidate's application.
+        - Must mention a specific interview date or slot.
+        - Must request the candidate's availability or confirmation.
+        - Must include a sign-off with the sender's name or company.
+      evaluated: |
+        Hi Priya,
+
+        Thanks for your application! We'd like to schedule a first
+        interview for Tuesday, June 3rd at 10:00. Please let us know if
+        that works.
+
+        Hannah, Lumen Labs
+
+  - id: job-app-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must acknowledge receipt of the candidate's application.
+        - Must mention a specific interview date or slot.
+        - Must request the candidate's availability or confirmation.
+        - Must include a sign-off with the sender's name or company.
+      evaluated: |
+        Hi Priya, thanks for applying. Can you do an interview on June
+        3rd? Let me know.
+
+        Hannah
+
+  - id: job-app-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must acknowledge receipt of the candidate's application.
+        - Must mention a specific interview date or slot.
+        - Must request the candidate's availability or confirmation.
+        - Must include a sign-off with the sender's name or company.
+      evaluated: |
+        We got your application. Are you free next week for a call?
+
+  - id: job-app-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must acknowledge receipt of the candidate's application.
+        - Must mention a specific interview date or slot.
+        - Must request the candidate's availability or confirmation.
+        - Must include a sign-off with the sender's name or company.
+      evaluated: |
+        ok
+
+  # ───────────── Marketing copy checklist ─────────────
+  - id: marketing-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must include a clear call-to-action (CTA).
+        - Must mention the price.
+        - Must include at least one stated benefit of the product.
+        - Must be no more than 3 sentences long.
+      evaluated: |
+        Sleep deeper from the very first night with the new Cloud9 pillow
+        — its cooling memory-foam core stays at the perfect temperature
+        all night long. Just $49 for a limited time. Order yours today
+        at cloud9sleep.com.
+
+  - id: marketing-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must include a clear call-to-action (CTA).
+        - Must mention the price.
+        - Must include at least one stated benefit of the product.
+        - Must be no more than 3 sentences long.
+      evaluated: |
+        Sleep cooler all night with the Cloud9 pillow. $49 today only.
+        Shop now at cloud9sleep.com.
+
+  - id: marketing-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must include a clear call-to-action (CTA).
+        - Must mention the price.
+        - Must include at least one stated benefit of the product.
+        - Must be no more than 3 sentences long.
+      evaluated: |
+        Sleep cooler with Cloud9 — just $49. The cooling foam helps you
+        rest better.
+
+  - id: marketing-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must include a clear call-to-action (CTA).
+        - Must mention the price.
+        - Must include at least one stated benefit of the product.
+        - Must be no more than 3 sentences long.
+      evaluated: |
+        Cloud9 keeps you cool while you sleep. Available now.
+
+  - id: marketing-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must include a clear call-to-action (CTA).
+        - Must mention the price.
+        - Must include at least one stated benefit of the product.
+        - Must be no more than 3 sentences long.
+      evaluated: |
+        Pillows are nice. We sell some. They come in colors. The factory
+        is in Italy. We've been around for a while.
+
+  # ───────────── Technical spec section ─────────────
+  - id: tech-spec-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must define the function inputs (names and types).
+        - Must define the function output (return value and type).
+        - Must list at least one error case or failure mode.
+        - Must state a performance requirement (latency, throughput, or
+          time/space complexity).
+      evaluated: |
+        `lookup_user(user_id: str) -> User`
+
+        Inputs:
+        - `user_id`: a non-empty string containing the user's UUID.
+
+        Output:
+        - Returns a `User` object populated from the primary database.
+
+        Errors:
+        - Raises `UserNotFoundError` if no user matches the given ID.
+        - Raises `DatabaseUnavailableError` after 3 failed retries.
+
+        Performance:
+        - Must complete in under 50 ms at p95 under nominal load
+          (1k requests/second).
+
+  - id: tech-spec-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must define the function inputs (names and types).
+        - Must define the function output (return value and type).
+        - Must list at least one error case or failure mode.
+        - Must state a performance requirement (latency, throughput, or
+          time/space complexity).
+      evaluated: |
+        `lookup_user(user_id: str) -> User`
+
+        Takes a UUID string and returns a User object. Raises
+        UserNotFoundError when the ID does not exist. Should return
+        within 50 ms at p95.
+
+  - id: tech-spec-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must define the function inputs (names and types).
+        - Must define the function output (return value and type).
+        - Must list at least one error case or failure mode.
+        - Must state a performance requirement (latency, throughput, or
+          time/space complexity).
+      evaluated: |
+        `lookup_user(user_id: str)` returns a User object. Raises
+        UserNotFoundError when the ID doesn't exist.
+
+  - id: tech-spec-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must define the function inputs (names and types).
+        - Must define the function output (return value and type).
+        - Must list at least one error case or failure mode.
+        - Must state a performance requirement (latency, throughput, or
+          time/space complexity).
+      evaluated: |
+        `lookup_user(user_id)` finds a user. Returns the user.
+
+  - id: tech-spec-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must define the function inputs (names and types).
+        - Must define the function output (return value and type).
+        - Must list at least one error case or failure mode.
+        - Must state a performance requirement (latency, throughput, or
+          time/space complexity).
+      evaluated: |
+        Looks up a user. Pretty standard.
+
+  # ───────────── Customer apology ─────────────
+  - id: apology-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must explicitly acknowledge the customer's specific issue.
+        - Must take responsibility on behalf of the company.
+        - Must offer a concrete remedy (refund, replacement, credit).
+        - Must describe a step taken to prevent recurrence.
+      evaluated: |
+        Dear Mr. Alvarez,
+
+        I'm sorry that your recent order arrived two weeks late and with
+        a cracked screen — that is genuinely not the experience we want
+        you to have. The delay was on us: a routing error in our
+        warehouse held the package back, and we should have caught it.
+
+        We've already issued a full refund of $349 to your original
+        payment method, and a replacement unit is shipping today via
+        express courier at no charge.
+
+        To stop this happening again, we've added an automated daily
+        audit of stuck warehouse shipments and assigned a named contact
+        to monitor it.
+
+        Thank you for your patience.
+        Customer Care, Northwind
+
+  - id: apology-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must explicitly acknowledge the customer's specific issue.
+        - Must take responsibility on behalf of the company.
+        - Must offer a concrete remedy (refund, replacement, credit).
+        - Must describe a step taken to prevent recurrence.
+      evaluated: |
+        Hi Mr. Alvarez,
+
+        I'm sorry your order arrived late and damaged — that's our
+        fault. We've refunded $349 and are shipping a replacement
+        today. We've also added a new warehouse alert so stuck
+        shipments are flagged sooner.
+
+        Best, Customer Care
+
+  - id: apology-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must explicitly acknowledge the customer's specific issue.
+        - Must take responsibility on behalf of the company.
+        - Must offer a concrete remedy (refund, replacement, credit).
+        - Must describe a step taken to prevent recurrence.
+      evaluated: |
+        We're sorry your order was late and damaged — that's on us.
+        We've issued a full refund and a replacement is on the way.
+
+  - id: apology-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must explicitly acknowledge the customer's specific issue.
+        - Must take responsibility on behalf of the company.
+        - Must offer a concrete remedy (refund, replacement, credit).
+        - Must describe a step taken to prevent recurrence.
+      evaluated: |
+        Sorry about your order. We'll send another one.
+
+  - id: apology-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must explicitly acknowledge the customer's specific issue.
+        - Must take responsibility on behalf of the company.
+        - Must offer a concrete remedy (refund, replacement, credit).
+        - Must describe a step taken to prevent recurrence.
+      evaluated: |
+        Thanks for getting in touch. Have a great day!
+
+  # ───────────── Lesson plan ─────────────
+  - id: lesson-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must state a clear learning objective.
+        - Must list the materials needed.
+        - Must describe at least two activities or exercises.
+        - Must include an assessment or way to check understanding.
+      evaluated: |
+        Topic: Introduction to fractions (Grade 4, 45 minutes)
+
+        Learning objective: Students will be able to identify and write
+        unit fractions (1/2, 1/3, 1/4) from visual representations.
+
+        Materials needed: paper plates, scissors, colored markers,
+        fraction-strip worksheet, exit ticket.
+
+        Activities:
+        1. Plate-folding (10 min) — Students fold paper plates into 2,
+           3, and 4 equal parts and label each section.
+        2. Fraction-strip matching (15 min) — In pairs, students match
+           shaded strips to written fractions on a worksheet.
+        3. Class discussion (10 min) — Volunteers share one fraction
+           they noticed and explain why it's that fraction.
+
+        Assessment: 5-question exit ticket — students label four
+        shaded shapes with the correct fraction and answer one
+        explanation question.
+
+  - id: lesson-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must state a clear learning objective.
+        - Must list the materials needed.
+        - Must describe at least two activities or exercises.
+        - Must include an assessment or way to check understanding.
+      evaluated: |
+        Topic: Introduction to fractions.
+
+        Objective: Students will identify unit fractions from visuals.
+
+        Materials: paper plates, markers, worksheet.
+
+        Activities: (1) fold paper plates into halves, thirds, and
+        quarters; (2) match shaded fraction strips on a worksheet.
+
+        Check: short exit ticket with four shaded shapes to label.
+
+  - id: lesson-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must state a clear learning objective.
+        - Must list the materials needed.
+        - Must describe at least two activities or exercises.
+        - Must include an assessment or way to check understanding.
+      evaluated: |
+        Objective: Students learn unit fractions.
+
+        Materials: paper plates and markers.
+
+        Activities: fold plates into halves and quarters; do a matching
+        worksheet.
+
+  - id: lesson-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must state a clear learning objective.
+        - Must list the materials needed.
+        - Must describe at least two activities or exercises.
+        - Must include an assessment or way to check understanding.
+      evaluated: |
+        Students will fold paper plates to learn fractions. They'll
+        also do a worksheet.
+
+  - id: lesson-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must state a clear learning objective.
+        - Must list the materials needed.
+        - Must describe at least two activities or exercises.
+        - Must include an assessment or way to check understanding.
+      evaluated: |
+        Fractions are important. Teach them somehow.
+
+  # ───────────── Tweet checklist ─────────────
+  - id: tweet-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must be at most 280 characters.
+        - Must include at least one hashtag.
+        - Must mention the product name `Lumen Notes`.
+        - Must include a link (any http(s) URL).
+      evaluated: |
+        Just launched Lumen Notes — a markdown-first notebook that syncs
+        across all your devices, offline-first, with end-to-end
+        encryption. Try it free at https://lumennotes.app #productivity
+        #launch
+
+  - id: tweet-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must be at most 280 characters.
+        - Must include at least one hashtag.
+        - Must mention the product name `Lumen Notes`.
+        - Must include a link (any http(s) URL).
+      evaluated: |
+        Lumen Notes is now live — markdown notes that sync everywhere,
+        offline-first. https://lumennotes.app #launch
+
+  - id: tweet-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must be at most 280 characters.
+        - Must include at least one hashtag.
+        - Must mention the product name `Lumen Notes`.
+        - Must include a link (any http(s) URL).
+      evaluated: |
+        Lumen Notes is now live! Markdown notes that sync everywhere.
+        https://lumennotes.app
+
+  - id: tweet-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must be at most 280 characters.
+        - Must include at least one hashtag.
+        - Must mention the product name `Lumen Notes`.
+        - Must include a link (any http(s) URL).
+      evaluated: |
+        Lumen Notes is now live!
+
+  - id: tweet-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must be at most 280 characters.
+        - Must include at least one hashtag.
+        - Must mention the product name `Lumen Notes`.
+        - Must include a link (any http(s) URL).
+      evaluated: |
+        We made a new thing and you should care about it because it is
+        very good and it does things that are useful and we worked hard
+        and we hope you will enjoy it and please share it with your
+        friends and colleagues and family members because it is really
+        quite something.

@@ -14,19 +14,17 @@ type EvaluationScoreValue = (
         "good",
         "excellent",
         "perfect",
-        "max",
     ]
     | float
     | bool
 )
 
 NONE: Final[float] = 0.0
-POOR: Final[float] = 0.1
-FAIR: Final[float] = 0.3
-GOOD: Final[float] = 0.5
-EXCELLENT: Final[float] = 0.7
-PERFECT: Final[float] = 0.9
-MAX: Final[float] = 1.0
+POOR: Final[float] = 0.2
+FAIR: Final[float] = 0.4
+GOOD: Final[float] = 0.6
+EXCELLENT: Final[float] = 0.8
+PERFECT: Final[float] = 1.0
 
 
 def evaluation_score_value(  # noqa: C901, PLR0911
@@ -42,7 +40,7 @@ def evaluation_score_value(  # noqa: C901, PLR0911
     ----------
     value : EvaluationScoreValue
         Score value to convert. Can be:
-        - Named level: "none", "poor", "fair", "good", "excellent", "perfect", "max"
+        - Named level: "none", "poor", "fair", "good", "excellent", "perfect"
         - Float: Must be between 0.0 and 1.0
         - Boolean: False becomes 0.0, True becomes 1.0
 
@@ -53,21 +51,21 @@ def evaluation_score_value(  # noqa: C901, PLR0911
 
     Raises
     ------
-    AssertionError
-        If float value is outside [0, 1] range
     ValueError
-        If value is not a recognized score type
+        If a numeric value is outside [0, 1] range, or the value is not a
+        recognized score type
     """
     match value:
-        case float() as value:
-            assert 0 <= value <= 1, "Score value has to be in range from 0 to 1"  # nosec: B101
-            return value
-
+        # Match bool before int/float — bool is a subclass of int (not float),
+        # but listing it first makes the intent explicit and order-independent.
         case False:
             return 0.0
 
         case True:
             return 1.0
+
+        case float() as value:
+            return evaluation_score_verifier(value)
 
         case "none":
             return NONE
@@ -87,12 +85,8 @@ def evaluation_score_value(  # noqa: C901, PLR0911
         case "perfect":
             return PERFECT
 
-        case "max":
-            return MAX
-
         case int() as value:
-            assert 0 <= value <= 1, "Score value has to be in range from 0 to 1"  # nosec: B101
-            return float(value)
+            return evaluation_score_verifier(float(value))
 
         case _:
             raise ValueError(f"Invalid evaluation score value - {value}")

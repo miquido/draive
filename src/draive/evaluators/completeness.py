@@ -138,6 +138,7 @@ You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
 Compare the USER_QUERY and the EVALUATED content by carefully examining them, then rate the EVALUATED content using solely a completeness metric according to the EVALUATION_CRITERIA.
+Before scoring, enumerate every distinct sub-question, requirement, or explicit constraint in the USER_QUERY as a numbered checklist, and mark each item as fully addressed, partially addressed, or unaddressed in the EVALUATED content. Base the rating on this checklist; do not score on overall impression or surface fluency. A confidently written response that skips a sub-question is incomplete.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
@@ -147,12 +148,13 @@ Evaluated metric is completeness - the extent to which the EVALUATED content ful
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
+Anchor the score to the fraction of distinct checklist items fully addressed; count a partially-addressed item as half. Be strict: tone or thoroughness on covered items does not compensate for skipped items.
 Assign a completeness score using exact name of one of the following values:
-- "poor" is very low completeness, the content addresses very few aspects of the user's query, leaving most questions unanswered.
-- "fair" is low completeness, the content addresses some aspects of the user's query but leaves several important parts unanswered or incomplete.
-- "good" is moderate completeness, the content addresses most aspects of the user's query but may miss some details or minor components.
-- "excellent" is high completeness, the content addresses nearly all aspects of the user's query with only minor gaps or omissions.
-- "perfect" is very high completeness, the content fully and comprehensively addresses all aspects of the user's query without any significant omissions.
+- "poor" - fewer than about a quarter of the items are fully addressed; most of the query is unanswered.
+- "fair" - roughly a quarter to half of the items are addressed; several important parts are missing or only superficially touched.
+- "good" - roughly half to three-quarters of the items are addressed; a few important sub-questions remain missing or shallow.
+- "excellent" - nearly all items addressed substantively; only minor or peripheral elements are missing.
+- "perfect" - every distinct sub-question, requirement, and constraint in the query receives a substantive, on-topic answer; nothing material is omitted.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 
@@ -165,6 +167,7 @@ You are evaluating model results produced within a conversation context accordin
 <INSTRUCTION>
 Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess whether they completely address all aspects of user queries or requests present in the context.
 When USER_QUERY is explicitly provided, use it as the primary query to evaluate completeness against; otherwise infer the user's full intent and scope from the context itself.
+Before scoring, enumerate every distinct sub-question, requirement, or explicit constraint requested as a numbered checklist, and mark each item as fully addressed, partially addressed, or unaddressed by the model outputs. Base the rating on this checklist; do not score on overall impression or surface fluency.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
@@ -175,12 +178,13 @@ Assess whether model outputs fully address all parts of the user's request, incl
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
+Anchor the score to the fraction of distinct checklist items fully addressed; count a partially-addressed item as half. Be strict: tone or thoroughness on covered items does not compensate for skipped items.
 Assign a completeness score using exact name of one of the following values:
-- "poor" is very low completeness, model outputs address very few aspects of the user's request, leaving most questions unanswered.
-- "fair" is low completeness, model outputs address some aspects but leave several important parts unanswered or incomplete.
-- "good" is moderate completeness, model outputs address most aspects but may miss some details or minor components.
-- "excellent" is high completeness, model outputs address nearly all aspects with only minor gaps or omissions.
-- "perfect" is very high completeness, model outputs fully and comprehensively address all aspects of the user's request without significant omissions.
+- "poor" - fewer than about a quarter of items fully addressed; most of the request is unanswered.
+- "fair" - roughly a quarter to half of items addressed; several important parts missing or superficially touched.
+- "good" - roughly half to three-quarters of items addressed; a few important items missing or shallow.
+- "excellent" - nearly all items addressed substantively; only minor or peripheral elements missing.
+- "perfect" - every distinct sub-question, sub-task, and constraint receives a substantive, on-topic answer; nothing material is omitted.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 
