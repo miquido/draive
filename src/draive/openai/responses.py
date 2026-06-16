@@ -197,6 +197,7 @@ class OpenAIResponses(OpenAIAPI):
                                             TextContent.empty,
                                             meta={
                                                 "kind": "reasoning",
+                                                "id": event.item.id,
                                                 "encrypted": event.item.encrypted_content,
                                             },
                                         )
@@ -507,14 +508,14 @@ def _model_output_to_params(
             match block.meta.kind:
                 case "reasoning":
                     encrypted: str | None = block.meta.get_str("encrypted")
-                    if not encrypted:
-                        continue  # Only include reasoning when we have encrypted content.
+                    item_id: str | None = block.meta.get_str("id")
+                    # Encrypted content is cryptographically bound to its original
+                    # item id; replaying it with a fabricated id is rejected by the API.
+                    if not encrypted or not item_id:
+                        continue  # Only include reasoning when we have encrypted content and id.
 
                     yield ResponseReasoningItemParam(
-                        id=block.meta.get_str(
-                            "id",
-                            default=f"rs_{uuid4()}",
-                        ),
+                        id=item_id,
                         type="reasoning",
                         summary=[
                             {
