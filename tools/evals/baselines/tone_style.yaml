@@ -602,3 +602,381 @@ samples:
         looked beneath me. My jumper was perfect. My map was perfect. The
         pigeons, sensing brilliance, parted before me as I made my
         magnificent entrance.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: tone-style-empty-01-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: ""
+
+  - id: tone-style-empty-02-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: ""
+
+  - id: tone-style-empty-03-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: ""
+
+  - id: tone-style-empty-04-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: ""
+
+  - id: tone-style-empty-05-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: ""
+
+  - id: tone-style-empty-06-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: ""
+
+  - id: tone-style-empty-07-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: ""
+
+  - id: tone-style-empty-08-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: ""
+
+  - id: tone-style-empty-09-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: ""
+
+  - id: tone-style-empty-10-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: ""
+
+  - id: tone-style-invalid-content-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Customer apology email ─────────────
+  - id: apology-email-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Concise, empathetic, professional apology email to a customer
+        whose replacement order shipped two days late.
+      evaluated: |
+        I'm sorry your replacement order shipped two days later than
+        promised. I understand how frustrating that is, and we have
+        upgraded the shipment at no extra cost. Thank you for your
+        patience while we correct this.
+
+  - id: apology-email-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Concise, empathetic, professional apology email to a customer
+        whose replacement order shipped two days late.
+      evaluated: |
+        We apologize that your replacement order shipped two days late.
+        We understand the inconvenience and have upgraded delivery at no
+        additional charge.
+
+  - id: apology-email-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Concise, empathetic, professional apology email to a customer
+        whose replacement order shipped two days late.
+      evaluated: |
+        Sorry about the late replacement order. It shipped two days later
+        than expected, so we upgraded the delivery for free.
+
+  - id: apology-email-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Concise, empathetic, professional apology email to a customer
+        whose replacement order shipped two days late.
+      evaluated: |
+        Hey, your replacement was late, which is annoying. We bumped the
+        shipping, so it should get there soon.
+
+  - id: apology-email-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Concise, empathetic, professional apology email to a customer
+        whose replacement order shipped two days late.
+      evaluated: |
+        Your order was only two days late, so this is not a major issue.
+        Anyway, the shipment is moving now.
+
+  # ───────────── Pirate tavern menu (boisterous, salty, themed) ─────────────
+  - id: pirate-menu-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Boisterous, salty, themed — a pirate tavern menu describing a fish
+        stew. Swaggering nautical slang, hearty and theatrical.
+      evaluated: |
+        Belly up, ye scurvy dogs! Our Kraken's Cauldron be a roilin' stew o'
+        the day's catch, drowned in spiced broth an' served with a hunk o'
+        hardtack. Eat hearty — ye'll need yer strength when the tide turns.
+
+  - id: pirate-menu-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Boisterous, salty, themed — a pirate tavern menu describing a fish
+        stew. Swaggering nautical slang, hearty and theatrical.
+      evaluated: |
+        Haul in for the Kraken's Cauldron, a mighty stew of the day's catch
+        simmered in spiced broth and served with a wedge of hardtack. Fill
+        yer belly, sailor — there be hungry seas ahead.
+
+  - id: pirate-menu-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Boisterous, salty, themed — a pirate tavern menu describing a fish
+        stew. Swaggering nautical slang, hearty and theatrical.
+      evaluated: |
+        Try our Kraken's Cauldron, a hearty fish stew made with the catch
+        of the day in a spiced broth, served with a piece of hardtack.
+        It's filling and great for a cold night by the harbour.
+
+  - id: pirate-menu-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Boisterous, salty, themed — a pirate tavern menu describing a fish
+        stew. Swaggering nautical slang, hearty and theatrical.
+      evaluated: |
+        Kraken's Cauldron is a fish stew featuring the daily catch in a
+        seasoned broth, accompanied by a portion of hardtack. It is a
+        substantial dish suitable as a main course.
+
+  - id: pirate-menu-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Boisterous, salty, themed — a pirate tavern menu describing a fish
+        stew. Swaggering nautical slang, hearty and theatrical.
+      evaluated: |
+        Menu item: fish stew. Composition: assorted fish, broth, spices,
+        one unit hardtack. Allergen note: contains fish and gluten.
+        Portion size: 450g. Price excludes applicable tax.
+
+  # ───────────── Yoga class closing (soothing, meditative, slow) ─────────────
+  - id: yoga-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Soothing, meditative, slow-paced — yoga instructor guiding the
+        closing relaxation. Soft second-person, calming imagery, unhurried.
+      evaluated: |
+        Let your eyes close, and let the breath move on its own. Feel the
+        floor holding you, fully. There is nowhere to be and nothing to do
+        right now — just rest here, soft and easy, and let the day melt
+        gently away.
+
+  - id: yoga-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Soothing, meditative, slow-paced — yoga instructor guiding the
+        closing relaxation. Soft second-person, calming imagery, unhurried.
+      evaluated: |
+        Close your eyes and let your breathing settle. Notice the ground
+        beneath you and let your whole body grow heavy and calm. Stay here
+        a while, releasing the day with each slow breath out.
+
+  - id: yoga-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Soothing, meditative, slow-paced — yoga instructor guiding the
+        closing relaxation. Soft second-person, calming imagery, unhurried.
+      evaluated: |
+        Close your eyes and relax your body on the mat. Take some slow,
+        deep breaths and try to let go of any tension. Rest here for a
+        few minutes before we finish the class.
+
+  - id: yoga-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Soothing, meditative, slow-paced — yoga instructor guiding the
+        closing relaxation. Soft second-person, calming imagery, unhurried.
+      evaluated: |
+        Okay everyone, we're basically done, so just lie down and chill
+        for a bit. Shut your eyes, breathe, whatever feels good. We'll
+        wrap up in like five minutes, no rush.
+
+  - id: yoga-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Soothing, meditative, slow-paced — yoga instructor guiding the
+        closing relaxation. Soft second-person, calming imagery, unhurried.
+      evaluated: |
+        FINAL RELAXATION PHASE — DURATION 5 MIN. Assume supine position.
+        Close eyes. Maintain diaphragmatic breathing at a steady rate.
+        Remain stationary until the instructor signals completion. Do not
+        fall asleep.
+
+  # ───────────── Heavy-metal album review (intense, hyperbolic, edgy) ─────────────
+  - id: metal-review-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Intense, hyperbolic, edgy — heavy-metal zine album review.
+        Visceral imagery, exclamatory energy, slang of the scene.
+      evaluated: |
+        This record is an absolute monster — riffs that hit like a wrecking
+        ball, drums that pummel you into the floor, and a vocal that sounds
+        like it crawled out of a pit. Crank it to eleven and let it melt
+        your face off. Essential.
+
+  - id: metal-review-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Intense, hyperbolic, edgy — heavy-metal zine album review.
+        Visceral imagery, exclamatory energy, slang of the scene.
+      evaluated: |
+        Brutal from the first second — bone-rattling riffs, relentless
+        blast beats, and a snarling vocal that refuses to let up. It's
+        loud, it's savage, and it absolutely rips. Turn it up.
+
+  - id: metal-review-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Intense, hyperbolic, edgy — heavy-metal zine album review.
+        Visceral imagery, exclamatory energy, slang of the scene.
+      evaluated: |
+        This is a really heavy, aggressive album with strong riffs, fast
+        drumming, and harsh vocals throughout. Fans of the genre will
+        find a lot to like, and it's a solid, energetic listen.
+
+  - id: metal-review-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Intense, hyperbolic, edgy — heavy-metal zine album review.
+        Visceral imagery, exclamatory energy, slang of the scene.
+      evaluated: |
+        The album features distorted guitars and double-bass drumming
+        across ten tracks. The vocal style is harsh rather than melodic.
+        Production quality is consistent and the runtime is about
+        forty-two minutes.
+
+  - id: metal-review-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Intense, hyperbolic, edgy — heavy-metal zine album review.
+        Visceral imagery, exclamatory energy, slang of the scene.
+      evaluated: |
+        We are pleased to present a balanced overview of this musical
+        release. The instrumentation is robust and the recording is
+        professionally executed. Listeners with an interest in the style
+        may wish to give it their kind consideration. Thank you.
+
+  # ───────────── Onboarding tooltip (friendly, plain, ultra-brief) ─────────────
+  - id: tooltip-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Friendly, plain, ultra-brief — in-app onboarding tooltip pointing
+        out the new dashboard button. One short sentence, helpful, light.
+      evaluated: |
+        New here? Tap Dashboard any time to see everything at a glance.
+
+  - id: tooltip-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Friendly, plain, ultra-brief — in-app onboarding tooltip pointing
+        out the new dashboard button. One short sentence, helpful, light.
+      evaluated: |
+        Hit Dashboard whenever you want a quick overview of your stuff.
+
+  - id: tooltip-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Friendly, plain, ultra-brief — in-app onboarding tooltip pointing
+        out the new dashboard button. One short sentence, helpful, light.
+      evaluated: |
+        You can use the Dashboard button to view a summary of your account
+        and recent activity in one place.
+
+  - id: tooltip-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Friendly, plain, ultra-brief — in-app onboarding tooltip pointing
+        out the new dashboard button. One short sentence, helpful, light.
+      evaluated: |
+        The Dashboard view aggregates account metrics, recent activity,
+        and configurable widgets into a single consolidated interface that
+        users may access from the primary navigation bar at any time.
+
+  - id: tooltip-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Friendly, plain, ultra-brief — in-app onboarding tooltip pointing
+        out the new dashboard button. One short sentence, helpful, light.
+      evaluated: |
+        ATTENTION USER: The DASHBOARD module is NOW AVAILABLE!!! Failure to
+        familiarise yourself with this CRITICAL feature may result in a
+        SUBOPTIMAL EXPERIENCE. Click IMMEDIATELY to proceed. You have been
+        warned.
+
+  # ───────────── More invalid / empty responses (none) ─────────────
+  - id: tone-style-empty-11-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: ""
+
+  - id: tone-style-empty-12-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: "    "
+
+  - id: tone-style-whitespace-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: |
+
+
+
+  - id: tone-style-invalid-content-02-none
+    human_score: none
+    inputs:
+      expected_tone_style: "Concise, empathetic, professional apology email."
+      evaluated: |
+        \x00\x00 ?????? ||||||||
+        ===NULL=== <broken/ {[(

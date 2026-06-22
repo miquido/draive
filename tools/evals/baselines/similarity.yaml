@@ -519,3 +519,349 @@ samples:
       evaluated: |
         The neighborhood film club is screening a silent-era classic this
         Thursday evening.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: similarity-empty-01-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: ""
+
+  - id: similarity-empty-02-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: ""
+
+  - id: similarity-empty-03-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: ""
+
+  - id: similarity-empty-04-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: ""
+
+  - id: similarity-empty-05-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: ""
+
+  - id: similarity-empty-06-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: ""
+
+  - id: similarity-empty-07-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: ""
+
+  - id: similarity-empty-08-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: ""
+
+  - id: similarity-empty-09-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: ""
+
+  - id: similarity-empty-10-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: ""
+
+  - id: similarity-invalid-content-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Community pool hours ─────────────
+  - id: pool-hours-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The community pool closes at 7 p.m. on weekdays.
+      evaluated: |
+        On weekdays, the community pool shuts at 7 p.m.
+
+  - id: pool-hours-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The community pool closes at 7 p.m. on weekdays.
+      evaluated: |
+        The pool's weekday closing time is 7 in the evening.
+
+  - id: pool-hours-good
+    human_score: good
+    inputs:
+      reference: |
+        The community pool closes at 7 p.m. on weekdays.
+      evaluated: |
+        The community pool has evening hours during the workweek and is
+        not open late at night.
+
+  - id: pool-hours-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The community pool closes at 7 p.m. on weekdays.
+      evaluated: |
+        The community pool offers swimming lessons on some weekday
+        evenings.
+
+  - id: pool-hours-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The community pool closes at 7 p.m. on weekdays.
+      evaluated: |
+        The city recycling center accepts glass bottles on Saturday
+        mornings.
+
+  # ───────────── Flight delay notice ─────────────
+  - id: flight-delay-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Flight LH204 to Munich has been delayed by two hours due to a
+        technical issue and will now depart at 16:40.
+      evaluated: |
+        Because of a technical problem, flight LH204 bound for Munich is
+        running two hours behind and is now scheduled to leave at 16:40.
+
+  - id: flight-delay-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Flight LH204 to Munich has been delayed by two hours due to a
+        technical issue and will now depart at 16:40.
+      evaluated: |
+        The Munich flight LH204 has slipped by a couple of hours over a
+        technical fault, with a revised departure of 16:40.
+
+  - id: flight-delay-good
+    human_score: good
+    inputs:
+      reference: |
+        Flight LH204 to Munich has been delayed by two hours due to a
+        technical issue and will now depart at 16:40.
+      evaluated: |
+        Several afternoon departures from the airport are running late
+        today after a string of technical and weather problems.
+
+  - id: flight-delay-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Flight LH204 to Munich has been delayed by two hours due to a
+        technical issue and will now depart at 16:40.
+      evaluated: |
+        Munich's airport is one of the busiest hubs in central Europe and
+        handles tens of millions of passengers each year.
+
+  - id: flight-delay-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Flight LH204 to Munich has been delayed by two hours due to a
+        technical issue and will now depart at 16:40.
+      evaluated: |
+        The bakery introduced a new line of gluten-free pastries earlier
+        this month.
+
+  # ───────────── Software release note ─────────────
+  - id: release-note-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Version 2.3 fixes the login bug and improves the speed of the
+        search feature.
+      evaluated: |
+        Release 2.3 resolves the sign-in defect and makes searching faster.
+
+  - id: release-note-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Version 2.3 fixes the login bug and improves the speed of the
+        search feature.
+      evaluated: |
+        The 2.3 update squashes the authentication issue and speeds up
+        search noticeably.
+
+  - id: release-note-good
+    human_score: good
+    inputs:
+      reference: |
+        Version 2.3 fixes the login bug and improves the speed of the
+        search feature.
+      evaluated: |
+        The latest update rolls out several stability fixes and general
+        performance improvements across the app.
+
+  - id: release-note-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Version 2.3 fixes the login bug and improves the speed of the
+        search feature.
+      evaluated: |
+        The development team follows a two-week release cycle with
+        automated testing on every commit.
+
+  - id: release-note-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Version 2.3 fixes the login bug and improves the speed of the
+        search feature.
+      evaluated: |
+        The cafeteria will be closed for renovations during the first week
+        of next month.
+
+  # ───────────── Restaurant review ─────────────
+  - id: restaurant-review-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The pasta was excellent and the service was friendly, but the
+        restaurant was far too noisy.
+      evaluated: |
+        Great pasta and warm, attentive staff, though the dining room was
+        simply too loud.
+
+  - id: restaurant-review-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The pasta was excellent and the service was friendly, but the
+        restaurant was far too noisy.
+      evaluated: |
+        Lovely pasta and a welcoming team let down only by how noisy the
+        place got.
+
+  - id: restaurant-review-good
+    human_score: good
+    inputs:
+      reference: |
+        The pasta was excellent and the service was friendly, but the
+        restaurant was far too noisy.
+      evaluated: |
+        We had a mixed time at the Italian place: the food and staff were
+        nice enough, though it wasn't the most relaxing evening.
+
+  - id: restaurant-review-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The pasta was excellent and the service was friendly, but the
+        restaurant was far too noisy.
+      evaluated: |
+        Italian cuisine varies enormously from one region to the next, with
+        the north favouring butter and rice over olive oil and pasta.
+
+  - id: restaurant-review-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The pasta was excellent and the service was friendly, but the
+        restaurant was far too noisy.
+      evaluated: |
+        The hardware store extended its opening hours for the holiday
+        season.
+
+  # ───────────── Public transit notice ─────────────
+  - id: transit-notice-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Line 3 of the metro will be closed this weekend for maintenance,
+        with replacement buses running instead.
+      evaluated: |
+        Metro Line 3 is shut for upkeep over the weekend, and substitute
+        buses will operate in its place.
+
+  - id: transit-notice-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Line 3 of the metro will be closed this weekend for maintenance,
+        with replacement buses running instead.
+      evaluated: |
+        Because of maintenance work, the number 3 underground line won't
+        run this weekend, so buses will cover the route instead.
+
+  - id: transit-notice-good
+    human_score: good
+    inputs:
+      reference: |
+        Line 3 of the metro will be closed this weekend for maintenance,
+        with replacement buses running instead.
+      evaluated: |
+        Parts of the city's transit network will see disruptions over the
+        coming days while engineering work is carried out.
+
+  - id: transit-notice-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Line 3 of the metro will be closed this weekend for maintenance,
+        with replacement buses running instead.
+      evaluated: |
+        The metro system has been expanding steadily, with two new lines
+        planned over the next decade.
+
+  - id: transit-notice-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Line 3 of the metro will be closed this weekend for maintenance,
+        with replacement buses running instead.
+      evaluated: |
+        The local chess club meets every Tuesday evening in the community
+        hall.
+
+  # ───────────── More invalid / empty responses (none) ─────────────
+  - id: similarity-empty-11-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: ""
+
+  - id: similarity-empty-12-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: "    "
+
+  - id: similarity-whitespace-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: |
+
+
+
+  - id: similarity-invalid-content-02-none
+    human_score: none
+    inputs:
+      reference: "The community pool closes at 7 p.m. on weekdays."
+      evaluated: |
+        \x00\x00 ?????? ||||||||
+        ===NULL=== <broken/ {[(

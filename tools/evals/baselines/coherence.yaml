@@ -725,3 +725,444 @@ samples:
       evaluated: |
         Plastic things. A printer. Layers somewhere. 3D model. Resin word.
         Nozzle.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: coherence-empty-01-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: ""
+
+  - id: coherence-empty-02-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: ""
+
+  - id: coherence-empty-03-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: ""
+
+  - id: coherence-empty-04-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: ""
+
+  - id: coherence-empty-05-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: ""
+
+  - id: coherence-empty-06-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: ""
+
+  - id: coherence-empty-07-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: ""
+
+  - id: coherence-empty-08-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: ""
+
+  - id: coherence-empty-09-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: ""
+
+  - id: coherence-empty-10-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: ""
+
+  - id: coherence-invalid-content-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Solar panel maintenance ─────────────
+  - id: solar-panel-maintenance-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Home solar panels should be inspected for debris, shading, loose
+        wiring, and unusual drops in production. Cleaning is usually only
+        needed when rain does not remove dust or pollen.
+      evaluated: |
+        Keeping a home solar array healthy starts with a regular visual
+        inspection. Walk the system periodically and look for debris such as
+        leaves or branches resting on the panels, and watch for new shade
+        cast by trees or structures that have grown or changed since
+        installation. At the same time, check that wiring and connectors are
+        secure, since loose cables can interrupt output. The clearest warning
+        sign is an unexplained drop in production, which often points to one
+        of these issues. Cleaning is rarely the main concern: ordinary rain
+        washes away most dust on its own, so a deliberate wash is only worth
+        the effort when stubborn pollen or a long dry spell leaves a film
+        that rain cannot clear.
+
+  - id: solar-panel-maintenance-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Home solar panels should be inspected for debris, shading, loose
+        wiring, and unusual drops in production. Cleaning is usually only
+        needed when rain does not remove dust or pollen.
+      evaluated: |
+        Check solar panels periodically for leaves, new shade, loose
+        cables, and production drops. Most systems do not need frequent
+        washing because rain clears normal dust, but a light cleaning can
+        help after heavy pollen or dry weather.
+
+  - id: solar-panel-maintenance-good
+    human_score: good
+    inputs:
+      reference: |
+        Home solar panels should be inspected for debris, shading, loose
+        wiring, and unusual drops in production. Cleaning is usually only
+        needed when rain does not remove dust or pollen.
+      evaluated: |
+        Look for debris on the panels and check whether a tree has started
+        casting shade. Production drops can mean something is wrong. Loose
+        wires are another sign to inspect. Cleaning sometimes helps when
+        the panels stay dusty for a long time.
+
+  - id: solar-panel-maintenance-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Home solar panels should be inspected for debris, shading, loose
+        wiring, and unusual drops in production. Cleaning is usually only
+        needed when rain does not remove dust or pollen.
+      evaluated: |
+        Solar panels make electricity. Dust can sit there. Trees grow and
+        make shade. Wires can be loose. Rain happens, and production may
+        drop, so look at the system sometimes.
+
+  - id: solar-panel-maintenance-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Home solar panels should be inspected for debris, shading, loose
+        wiring, and unusual drops in production. Cleaning is usually only
+        needed when rain does not remove dust or pollen.
+      evaluated: |
+        Panels. Rain. Wires maybe. A tree, then numbers. Dust and sunlight
+        are around the roof, and inspection is a thing.
+
+  - id: rain-garden-maintenance-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A rain garden needs native plants, loose soil, and a shallow basin
+        that captures runoff long enough for water to soak into the ground.
+      evaluated: |
+        Garden water. Native. Soil is loose maybe, basin short. Runoff
+        into somewhere, plants after the driveway thought.
+
+  # ───────────── How a rainbow forms ─────────────
+  - id: rainbow-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        A rainbow forms when sunlight enters raindrops, bends as it passes
+        into the water, reflects off the back of each drop, and bends again
+        on the way out, separating the light into its colors.
+      evaluated: |
+        A rainbow appears when sunlight meets a sky full of raindrops. As a
+        ray of sunlight enters a single drop, it slows slightly and bends,
+        because light travels more slowly in water than in air. Inside the
+        drop, the light strikes the curved back surface and reflects toward
+        the front again. On its way back out, it bends a second time. Each
+        color in the sunlight bends by a slightly different amount, so the
+        single white ray fans out into a band of red, orange, yellow, green,
+        blue, and violet. Millions of drops each send one color toward your
+        eye from a slightly different angle, and together they paint the arc
+        you see in the sky.
+
+  - id: rainbow-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A rainbow forms when sunlight enters raindrops, bends as it passes
+        into the water, reflects off the back of each drop, and bends again
+        on the way out, separating the light into its colors.
+      evaluated: |
+        A rainbow forms when sunlight passes through raindrops. The light
+        bends as it enters each drop, reflects off the back, and bends once
+        more as it leaves. Because each color bends a little differently,
+        the white light is split into separate colors. Many drops together
+        send those colors to your eye, forming the arc you see.
+
+  - id: rainbow-good
+    human_score: good
+    inputs:
+      reference: |
+        A rainbow forms when sunlight enters raindrops, bends as it passes
+        into the water, reflects off the back of each drop, and bends again
+        on the way out, separating the light into its colors.
+      evaluated: |
+        Rainbows come from sunlight and rain. Light goes into the drops.
+        It bends in the water. Colors come out. There are several colors in
+        order. The light bounces inside the drop. You see an arc in the sky.
+        It happens when the sun is out during rain.
+
+  - id: rainbow-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A rainbow forms when sunlight enters raindrops, bends as it passes
+        into the water, reflects off the back of each drop, and bends again
+        on the way out, separating the light into its colors.
+      evaluated: |
+        Rain. Sun. Colors in the sky. Light bends. Drops of water. Arc
+        shape. Red and blue. Bouncing somewhere.
+
+  - id: rainbow-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A rainbow forms when sunlight enters raindrops, bends as it passes
+        into the water, reflects off the back of each drop, and bends again
+        on the way out, separating the light into its colors.
+      evaluated: |
+        Colors. Sky thing. Rain maybe. Sun is up. Pretty. Arc. Water drop
+        word.
+
+  # ───────────── How lightning forms ─────────────
+  - id: lightning-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Lightning forms when charges separate inside a storm cloud,
+        building a strong electric field that eventually overcomes the
+        air's resistance and discharges as a bright bolt.
+      evaluated: |
+        Lightning begins inside a towering storm cloud, where strong updrafts
+        toss ice crystals and water droplets against one another. These
+        collisions strip away electric charge, and the lighter, positively
+        charged particles drift to the top of the cloud while the heavier,
+        negatively charged ones gather near the bottom. As the separation
+        grows, so does the electric field between the regions, and between
+        the cloud and the ground below. Eventually the field becomes so
+        intense that it tears electrons free from the air molecules in its
+        path, carving a conductive channel. Charge then surges through that
+        channel in a fraction of a second, heating the air explosively and
+        producing the brilliant flash we see and the thunder we hear.
+
+  - id: lightning-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Lightning forms when charges separate inside a storm cloud,
+        building a strong electric field that eventually overcomes the
+        air's resistance and discharges as a bright bolt.
+      evaluated: |
+        Inside a storm cloud, colliding ice and water particles separate
+        electric charge, so the top of the cloud becomes positive and the
+        bottom negative. This builds a strong electric field. When the
+        field grows strong enough to break through the air, charge rushes
+        along a sudden channel, heating the air and flashing as a bolt of
+        lightning.
+
+  - id: lightning-good
+    human_score: good
+    inputs:
+      reference: |
+        Lightning forms when charges separate inside a storm cloud,
+        building a strong electric field that eventually overcomes the
+        air's resistance and discharges as a bright bolt.
+      evaluated: |
+        Lightning happens in storm clouds. Charges build up inside. The top
+        and bottom of the cloud are different charges. When it gets strong
+        enough, a bolt jumps out. The air gets very hot. Thunder comes after.
+        Ice in the cloud is part of it somehow.
+
+  - id: lightning-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Lightning forms when charges separate inside a storm cloud,
+        building a strong electric field that eventually overcomes the
+        air's resistance and discharges as a bright bolt.
+      evaluated: |
+        Clouds. Electricity. A flash. Thunder is loud. Charge word. Storm.
+        Hot air. Bolt.
+
+  - id: lightning-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Lightning forms when charges separate inside a storm cloud,
+        building a strong electric field that eventually overcomes the
+        air's resistance and discharges as a bright bolt.
+      evaluated: |
+        Flash. Loud. Sky. Storm thing. Electric maybe. Scary at night.
+
+  # ───────────── How antibiotics work ─────────────
+  - id: antibiotics-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Antibiotics treat bacterial infections by interfering with
+        processes that bacteria need to survive or multiply, such as
+        building their cell walls or copying their DNA, without harming
+        human cells in the same way.
+      evaluated: |
+        Antibiotics work by attacking machinery that bacteria depend on but
+        human cells either lack or build differently. Some drugs, like
+        penicillin, jam the construction of the rigid wall a bacterium needs
+        to hold its shape; without a sound wall, the cell bursts under its
+        own internal pressure. Others block the enzymes bacteria use to copy
+        their DNA or to assemble proteins, so the microbes can neither repair
+        themselves nor divide. Because these targets differ from our own
+        cells' equivalents, the drug can cripple the bacteria while largely
+        sparing the patient. Over time, though, bacteria that happen to carry
+        resistant traits survive treatment and multiply, which is why
+        finishing a prescribed course and avoiding needless use both matter.
+
+  - id: antibiotics-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Antibiotics treat bacterial infections by interfering with
+        processes that bacteria need to survive or multiply, such as
+        building their cell walls or copying their DNA, without harming
+        human cells in the same way.
+      evaluated: |
+        Antibiotics fight bacterial infections by disrupting things bacteria
+        rely on to live and reproduce. Some block the building of the cell
+        wall, so the bacterium bursts; others stop it from copying its DNA
+        or making proteins. These targets differ from our own cells, so the
+        drug harms the bacteria far more than the patient. Overusing
+        antibiotics, though, lets resistant bacteria survive and spread.
+
+  - id: antibiotics-good
+    human_score: good
+    inputs:
+      reference: |
+        Antibiotics treat bacterial infections by interfering with
+        processes that bacteria need to survive or multiply, such as
+        building their cell walls or copying their DNA, without harming
+        human cells in the same way.
+      evaluated: |
+        Antibiotics kill bacteria. They stop the bacteria from doing things
+        they need. Some break the cell wall. Some stop them copying DNA.
+        Human cells are different so they are mostly safe. Bacteria can
+        become resistant. You should finish the whole course of pills.
+
+  - id: antibiotics-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Antibiotics treat bacterial infections by interfering with
+        processes that bacteria need to survive or multiply, such as
+        building their cell walls or copying their DNA, without harming
+        human cells in the same way.
+      evaluated: |
+        Bacteria. Pills. Cell wall. DNA. Resistance is bad. Penicillin.
+        Infections. Doctor gives them.
+
+  - id: antibiotics-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Antibiotics treat bacterial infections by interfering with
+        processes that bacteria need to survive or multiply, such as
+        building their cell walls or copying their DNA, without harming
+        human cells in the same way.
+      evaluated: |
+        Medicine. Germs. Pills from doctor. Bacteria word. Wall maybe.
+        Sick then better.
+
+  # ───────────── How a volcano erupts ─────────────
+  - id: volcano-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A volcano erupts when molten rock from deep underground rises
+        through a vent because it is less dense than the surrounding rock
+        and is pushed up by dissolved gases.
+      evaluated: |
+        A volcano erupts because molten rock, called magma, forms deep
+        underground where it is hotter than the surrounding rock. Being
+        lighter than that solid rock, the magma rises toward the surface.
+        Gases dissolved in it expand as the pressure drops, pushing the
+        magma up faster through a vent. When it reaches the surface, the
+        magma escapes as lava and the released gases drive the eruption.
+
+  - id: volcano-good
+    human_score: good
+    inputs:
+      reference: |
+        A volcano erupts when molten rock from deep underground rises
+        through a vent because it is less dense than the surrounding rock
+        and is pushed up by dissolved gases.
+      evaluated: |
+        Volcanoes erupt because of magma. Magma is hot melted rock
+        underground. It is lighter so it goes up. Gases push it. It comes
+        out as lava. There is a vent at the top. Eruptions can be big.
+
+  - id: volcano-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A volcano erupts when molten rock from deep underground rises
+        through a vent because it is less dense than the surrounding rock
+        and is pushed up by dissolved gases.
+      evaluated: |
+        Magma. Lava. Hot. Underground. Gas. Vent word. It goes up. Eruption.
+
+  - id: volcano-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A volcano erupts when molten rock from deep underground rises
+        through a vent because it is less dense than the surrounding rock
+        and is pushed up by dissolved gases.
+      evaluated: |
+        Lava. Hot mountain. Boom. Red stuff. Smoke maybe. Rock.
+
+  # ───────────── More unrated empty responses (none) ─────────────
+  - id: coherence-empty-11-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: ""
+
+  - id: coherence-empty-12-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: ""
+
+  - id: coherence-empty-13-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: ""
+
+  - id: coherence-invalid-content-02-none
+    human_score: none
+    inputs:
+      reference: "A coherent response can only be judged when evaluated content is present."
+      evaluated: |
+        @@@@@ ;;;;; @@@@@
+        \\\\ no-parse \\\\
+        ((( dangling

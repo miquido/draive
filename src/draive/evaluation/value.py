@@ -1,22 +1,33 @@
 from typing import Final, Literal
 
 __all__ = (
+    "EVALUATION_SCORE_LEVELS",
+    "EvaluationScoreLevel",
     "EvaluationScoreValue",
     "evaluation_score_value",
     "evaluation_score_verifier",
 )
 
-type EvaluationScoreValue = (
-    Literal[
-        "none",
-        "poor",
-        "fair",
-        "good",
-        "excellent",
-        "perfect",
-    ]
-    | float
-    | bool
+type EvaluationScoreLevel = Literal[
+    "none",
+    "poor",
+    "fair",
+    "good",
+    "excellent",
+    "perfect",
+]
+
+type EvaluationScoreValue = EvaluationScoreLevel | float | bool
+
+# Canonical named rating levels in ascending order - the single source of truth
+# for the discrete evaluation scale shared across the evaluation package.
+EVALUATION_SCORE_LEVELS: Final[tuple[EvaluationScoreLevel, ...]] = (
+    "none",
+    "poor",
+    "fair",
+    "good",
+    "excellent",
+    "perfect",
 )
 
 NONE: Final[float] = 0.0

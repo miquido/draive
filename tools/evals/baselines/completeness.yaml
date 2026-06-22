@@ -826,3 +826,474 @@ samples:
       evaluated: |
         Laptops have become much thinner and lighter over the past
         decade, with significant improvements in battery technology.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: completeness-empty-01-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: ""
+
+  - id: completeness-empty-02-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: ""
+
+  - id: completeness-empty-03-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: ""
+
+  - id: completeness-empty-04-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: ""
+
+  - id: completeness-empty-05-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: ""
+
+  - id: completeness-empty-06-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: ""
+
+  - id: completeness-empty-07-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: ""
+
+  - id: completeness-empty-08-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: ""
+
+  - id: completeness-empty-09-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: ""
+
+  - id: completeness-empty-10-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: ""
+
+  - id: completeness-invalid-content-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Balcony garden setup ─────────────
+  - id: balcony-garden-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I want to start a small balcony garden. Please cover (1) how to
+        check weight and drainage limits, (2) what containers and soil to
+        use, (3) which beginner plants work well, and (4) how to water
+        without bothering neighbors below.
+      evaluated: |
+        First check the balcony rules and weight limit, then choose light
+        containers with drainage holes and saucers so water is contained.
+        Use a potting mix rather than garden soil because it drains better
+        and weighs less. Start with herbs such as basil, mint in its own
+        pot, parsley, or compact tomatoes if the balcony gets enough sun.
+        Water slowly in the morning until the soil is moist but not
+        overflowing, empty saucers after a few minutes, and use trays or
+        self-watering planters to prevent drips onto neighbors.
+
+  - id: balcony-garden-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I want to start a small balcony garden. Please cover (1) how to
+        check weight and drainage limits, (2) what containers and soil to
+        use, (3) which beginner plants work well, and (4) how to water
+        without bothering neighbors below.
+      evaluated: |
+        Confirm your lease or building rules and avoid overloading the
+        balcony. Use lightweight pots with drainage holes, saucers, and
+        potting mix. Herbs like basil, parsley, chives, and mint are good
+        beginner choices; cherry tomatoes can work with strong sun. Water
+        slowly and use trays so runoff does not drip below.
+
+  - id: balcony-garden-good
+    human_score: good
+    inputs:
+      user_query: |
+        I want to start a small balcony garden. Please cover (1) how to
+        check weight and drainage limits, (2) what containers and soil to
+        use, (3) which beginner plants work well, and (4) how to water
+        without bothering neighbors below.
+      evaluated: |
+        Use light pots with drainage and potting soil. Herbs are a good
+        place to start, especially basil, parsley, and mint. Check that
+        your building allows planters and do not let water drip onto the
+        balcony below.
+
+  - id: balcony-garden-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I want to start a small balcony garden. Please cover (1) how to
+        check weight and drainage limits, (2) what containers and soil to
+        use, (3) which beginner plants work well, and (4) how to water
+        without bothering neighbors below.
+      evaluated: |
+        Start with a few pots and use soil from a garden center. Herbs are
+        easy plants for beginners. Water them when the soil feels dry.
+
+  - id: balcony-garden-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I want to start a small balcony garden. Please cover (1) how to
+        check weight and drainage limits, (2) what containers and soil to
+        use, (3) which beginner plants work well, and (4) how to water
+        without bothering neighbors below.
+      evaluated: |
+        Gardening is relaxing. Put some plants outside and see which ones
+        you like best.
+
+  # ───────────── Backing up a phone ─────────────
+  - id: phone-backup-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I want to back up my iPhone before upgrading. Could you cover
+        (1) the difference between iCloud and computer backups, (2) how to
+        check that a backup actually completed, (3) what data a backup does
+        and doesn't include, and (4) how to restore onto the new phone?
+      evaluated: |
+        There are two main ways to back up. An iCloud backup runs wirelessly
+        and stores an encrypted copy in Apple's cloud, while a computer
+        backup made through Finder (or iTunes on Windows) saves a full local
+        copy that can also be encrypted to include passwords and Health data.
+        To confirm an iCloud backup finished, open Settings, tap your name,
+        then iCloud > iCloud Backup, and check the "last successful backup"
+        time; for a computer backup, look at the device's backup list in
+        Finder for today's date. A backup includes app data, settings,
+        messages, photos (if not already synced separately), and your home
+        layout, but it does not include the apps themselves (they
+        re-download) or anything already stored only in other clouds. To
+        restore, turn on the new phone, and on the setup screen choose
+        "Restore from iCloud Backup" or connect it to the computer and pick
+        the saved backup, then let it download apps and data.
+
+  - id: phone-backup-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I want to back up my iPhone before upgrading. Could you cover
+        (1) the difference between iCloud and computer backups, (2) how to
+        check that a backup actually completed, (3) what data a backup does
+        and doesn't include, and (4) how to restore onto the new phone?
+      evaluated: |
+        iCloud backups run wirelessly to Apple's cloud, while computer
+        backups via Finder save a local copy you can encrypt. Check an
+        iCloud backup under Settings > your name > iCloud > iCloud Backup
+        for the last completed time. A backup covers settings, messages,
+        and app data but not the apps themselves, which re-download. On the
+        new phone, choose "Restore from iCloud Backup" during setup or
+        restore from the computer copy.
+
+  - id: phone-backup-good
+    human_score: good
+    inputs:
+      user_query: |
+        I want to back up my iPhone before upgrading. Could you cover
+        (1) the difference between iCloud and computer backups, (2) how to
+        check that a backup actually completed, (3) what data a backup does
+        and doesn't include, and (4) how to restore onto the new phone?
+      evaluated: |
+        You can back up to iCloud or to a computer. iCloud is wireless and
+        the computer keeps a local copy. Check the last backup time in the
+        iCloud settings. To set up the new phone, restore from the backup
+        during the first-time setup.
+
+  - id: phone-backup-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I want to back up my iPhone before upgrading. Could you cover
+        (1) the difference between iCloud and computer backups, (2) how to
+        check that a backup actually completed, (3) what data a backup does
+        and doesn't include, and (4) how to restore onto the new phone?
+      evaluated: |
+        You can use iCloud to back up your phone before upgrading.
+
+  - id: phone-backup-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I want to back up my iPhone before upgrading. Could you cover
+        (1) the difference between iCloud and computer backups, (2) how to
+        check that a backup actually completed, (3) what data a backup does
+        and doesn't include, and (4) how to restore onto the new phone?
+      evaluated: |
+        New iPhones are released by Apple roughly once a year, usually in
+        the autumn.
+
+  # ───────────── Starting a compost bin ─────────────
+  - id: compost-bin-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I want to start composting kitchen scraps in my backyard. Could you
+        cover (1) what materials I can and can't compost, (2) the right
+        balance of greens and browns, (3) how often to turn the pile, and
+        (4) how long until the compost is ready to use?
+      evaluated: |
+        You can compost fruit and vegetable scraps, coffee grounds, eggshells,
+        and yard trimmings, but avoid meat, dairy, oily food, and pet waste,
+        which attract pests and smell. Aim for a rough balance of "greens"
+        (nitrogen-rich material like food scraps and fresh grass) and "browns"
+        (carbon-rich material like dry leaves, cardboard, and straw); a common
+        target is roughly two to three parts browns for each part greens by
+        volume, adjusting if the pile gets slimy (add browns) or stays dry
+        (add greens and water). Turn the pile about once a week to add oxygen
+        and speed decomposition; more frequent turning makes it finish faster.
+        Under good conditions the compost is usually ready in two to six
+        months, when it looks dark and crumbly and smells earthy rather than
+        sour.
+
+  - id: compost-bin-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I want to start composting kitchen scraps in my backyard. Could you
+        cover (1) what materials I can and can't compost, (2) the right
+        balance of greens and browns, (3) how often to turn the pile, and
+        (4) how long until the compost is ready to use?
+      evaluated: |
+        Compost fruit and vegetable scraps, coffee grounds, and yard waste,
+        but skip meat, dairy, and oils. Balance nitrogen-rich greens with
+        carbon-rich browns like dry leaves, leaning toward more browns. Turn
+        the pile about weekly to add air. It's usually ready in a few months
+        once it's dark, crumbly, and earthy-smelling.
+
+  - id: compost-bin-good
+    human_score: good
+    inputs:
+      user_query: |
+        I want to start composting kitchen scraps in my backyard. Could you
+        cover (1) what materials I can and can't compost, (2) the right
+        balance of greens and browns, (3) how often to turn the pile, and
+        (4) how long until the compost is ready to use?
+      evaluated: |
+        Add vegetable scraps and leaves, but not meat. Mix greens and browns
+        together. Turn it now and then so it breaks down. After a few months
+        it should be ready.
+
+  - id: compost-bin-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I want to start composting kitchen scraps in my backyard. Could you
+        cover (1) what materials I can and can't compost, (2) the right
+        balance of greens and browns, (3) how often to turn the pile, and
+        (4) how long until the compost is ready to use?
+      evaluated: |
+        Put your kitchen scraps in a pile and they will eventually rot down.
+
+  - id: compost-bin-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I want to start composting kitchen scraps in my backyard. Could you
+        cover (1) what materials I can and can't compost, (2) the right
+        balance of greens and browns, (3) how often to turn the pile, and
+        (4) how long until the compost is ready to use?
+      evaluated: |
+        Composting has become much more popular as people try to reduce the
+        amount of household waste they send to landfills.
+
+  # ───────────── Changing a flat tire ─────────────
+  - id: change-tire-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I've never changed a flat tire. Could you cover (1) how to safely
+        position the car before starting, (2) the correct order for
+        loosening lug nuts and jacking up the car, (3) how to swap the
+        wheel, and (4) what to do with the spare afterward?
+      evaluated: |
+        First get the car somewhere safe: pull onto level, firm ground away
+        from traffic, set the parking brake, turn on hazard lights, and chock
+        the wheel diagonally opposite the flat. Loosen the lug nuts about a
+        half turn while the tire is still on the ground (so the wheel can't
+        spin), then place the jack at the manufacturer's lift point and raise
+        the car until the flat clears the ground. Now fully remove the lug
+        nuts, pull off the flat, lift the spare on, and hand-tighten the nuts
+        in a star or crisscross pattern. Lower the car, then torque the nuts
+        fully in that same crisscross order. Afterward, remember most spares
+        are temporary "donuts" rated for low speed and short distances, so
+        drive gently and get the original tire repaired or replaced and the
+        nuts re-torqued as soon as possible.
+
+  - id: change-tire-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I've never changed a flat tire. Could you cover (1) how to safely
+        position the car before starting, (2) the correct order for
+        loosening lug nuts and jacking up the car, (3) how to swap the
+        wheel, and (4) what to do with the spare afterward?
+      evaluated: |
+        Park on level ground, set the parking brake, and turn on hazards.
+        Loosen the lug nuts slightly before jacking, since the wheel needs
+        to be on the ground to resist turning. Raise the car at its lift
+        point, remove the nuts and the flat, fit the spare, and tighten the
+        nuts in a crisscross pattern after lowering. Note that a compact
+        spare is temporary, so drive slowly and get the tire fixed soon.
+
+  - id: change-tire-good
+    human_score: good
+    inputs:
+      user_query: |
+        I've never changed a flat tire. Could you cover (1) how to safely
+        position the car before starting, (2) the correct order for
+        loosening lug nuts and jacking up the car, (3) how to swap the
+        wheel, and (4) what to do with the spare afterward?
+      evaluated: |
+        Park safely and put the brake on. Loosen the bolts a bit, then jack
+        the car up. Take the flat off and put the spare on, then tighten the
+        bolts. Get the real tire fixed later.
+
+  - id: change-tire-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I've never changed a flat tire. Could you cover (1) how to safely
+        position the car before starting, (2) the correct order for
+        loosening lug nuts and jacking up the car, (3) how to swap the
+        wheel, and (4) what to do with the spare afterward?
+      evaluated: |
+        You use the jack to lift the car and then put the spare tire on.
+
+  - id: change-tire-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I've never changed a flat tire. Could you cover (1) how to safely
+        position the car before starting, (2) the correct order for
+        loosening lug nuts and jacking up the car, (3) how to swap the
+        wheel, and (4) what to do with the spare afterward?
+      evaluated: |
+        Flat tires often happen at the most inconvenient times, like late at
+        night or during bad weather.
+
+  # ───────────── Choosing a first houseplant ─────────────
+  - id: first-houseplant-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I want a low-maintenance houseplant for a dim apartment. Could you
+        cover (1) two or three plants that tolerate low light, (2) how often
+        to water them, (3) signs I'm overwatering, and (4) whether they're
+        safe around pets?
+      evaluated: |
+        For a dim apartment, good low-light choices include the snake plant
+        (Sansevieria), ZZ plant, and pothos — all tolerate shade and
+        neglect well. Water them sparingly: roughly every two to three weeks,
+        and only once the top inch or two of soil is dry; in low light they
+        use water slowly, so err on the side of less. Signs of overwatering
+        include yellowing leaves, soft or mushy stems, a soggy or sour-smelling
+        soil surface, and gnats hovering around the pot. On pet safety, the
+        snake plant and ZZ plant are mildly toxic if chewed and can cause
+        stomach upset, and pothos is toxic to cats and dogs, so if you have
+        pets that nibble plants, place them out of reach or choose a pet-safe
+        alternative like a spider plant or parlor palm.
+
+  - id: first-houseplant-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I want a low-maintenance houseplant for a dim apartment. Could you
+        cover (1) two or three plants that tolerate low light, (2) how often
+        to water them, (3) signs I'm overwatering, and (4) whether they're
+        safe around pets?
+      evaluated: |
+        Snake plant, ZZ plant, and pothos all handle low light and little
+        care. Water only when the top of the soil dries out, about every two
+        to three weeks. Yellow leaves and mushy stems usually mean you're
+        overwatering. Be aware these are mildly toxic to pets if chewed, so
+        keep them out of reach if your animals nibble.
+
+  - id: first-houseplant-good
+    human_score: good
+    inputs:
+      user_query: |
+        I want a low-maintenance houseplant for a dim apartment. Could you
+        cover (1) two or three plants that tolerate low light, (2) how often
+        to water them, (3) signs I'm overwatering, and (4) whether they're
+        safe around pets?
+      evaluated: |
+        A snake plant or pothos will do fine in low light. Water them every
+        couple of weeks. If the leaves go yellow you might be giving too
+        much water.
+
+  - id: first-houseplant-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I want a low-maintenance houseplant for a dim apartment. Could you
+        cover (1) two or three plants that tolerate low light, (2) how often
+        to water them, (3) signs I'm overwatering, and (4) whether they're
+        safe around pets?
+      evaluated: |
+        A pothos is an easy plant that can live in a darker room.
+
+  - id: first-houseplant-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I want a low-maintenance houseplant for a dim apartment. Could you
+        cover (1) two or three plants that tolerate low light, (2) how often
+        to water them, (3) signs I'm overwatering, and (4) whether they're
+        safe around pets?
+      evaluated: |
+        Houseplants can really brighten up a living space and have become a
+        popular part of home decor.
+
+  # ───────────── More unrated empty responses (none) ─────────────
+  - id: completeness-empty-11-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: ""
+
+  - id: completeness-empty-12-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: ""
+
+  - id: completeness-empty-13-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: ""
+
+  - id: completeness-invalid-content-02-none
+    human_score: none
+    inputs:
+      user_query: "List three practical steps for preparing a small balcony garden."
+      evaluated: |
+        @@@@@ ;;;;; @@@@@
+        \\\\ no-parse \\\\
+        ((( dangling

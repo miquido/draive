@@ -741,3 +741,415 @@ samples:
         derived from prepayment-model-implied effective durations require
         dynamic rebalancing against the Treasury and swap curves as
         rate-driven CPR projections shift.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: readability-empty-01-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: readability-empty-02-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: readability-empty-03-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: readability-empty-04-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: readability-empty-05-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: readability-empty-06-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: readability-empty-07-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: readability-empty-08-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: readability-empty-09-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: readability-empty-10-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: readability-invalid-content-none
+    human_score: none
+    inputs:
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Bike tire pressure ─────────────
+  - id: tire-pressure-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: casual cyclists.
+      evaluated: |
+        Check the number printed on the side of your tire. It shows the
+        safe pressure range. Add air until the tire feels firm and the
+        pump gauge is inside that range. Softer tires feel comfortable but
+        can pinch on bumps; harder tires roll faster but may feel rough.
+
+  - id: tire-pressure-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: casual cyclists.
+      evaluated: |
+        Your bike tire has a pressure range printed on its side. Use a pump
+        with a gauge and fill the tire to a number inside that range. Lower
+        pressure is more comfortable, while higher pressure rolls more
+        easily.
+
+  - id: tire-pressure-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: casual cyclists.
+      evaluated: |
+        Look on the side of the tire for the pressure range, then use a
+        pump with a gauge. Choose a number in the range. More air makes the
+        bike roll faster but can feel less comfortable.
+
+  - id: tire-pressure-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: casual cyclists.
+      evaluated: |
+        Bicycle tire inflation should correspond to the pressure interval
+        displayed on the casing. A gauge-equipped pump is recommended for
+        selecting an appropriate value.
+
+  - id: tire-pressure-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: casual cyclists.
+      evaluated: |
+        Pneumatic casing optimisation involves rider-mass normalisation,
+        impedance losses, hysteretic deformation, and surface-dependent
+        pressure modulation within manufacturer-stated tolerances.
+
+  # ───────────── Volcanoes for elementary students ─────────────
+  - id: volcano-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: 8-year-olds learning what a volcano is.
+      evaluated: |
+        A volcano is a mountain that can open up and let out hot rock from
+        deep inside the Earth. Down there, the rock is so hot that it melts.
+        When too much builds up, it pushes out the top. The melted rock that
+        comes out is called lava. It is bright orange and very, very hot. As
+        the lava cools, it turns hard like stone.
+
+  - id: volcano-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: 8-year-olds learning what a volcano is.
+      evaluated: |
+        A volcano is an opening in the Earth's surface where melted rock can
+        rise up from below. Deep underground it is hot enough to melt rock
+        into a thick liquid. When pressure builds, this liquid pushes up and
+        spills out as lava, sometimes along with ash and gas. Once the lava
+        reaches the air, it slowly cools down and becomes solid rock again.
+
+  - id: volcano-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: 8-year-olds learning what a volcano is.
+      evaluated: |
+        A volcano is a rupture in the planet's crust through which molten
+        rock, known as magma, ascends from the mantle below. When the
+        internal pressure exceeds the strength of the overlying material,
+        an eruption occurs, releasing lava, volcanic gases, and pyroclastic
+        material. Over successive eruptions, the accumulated deposits build
+        the characteristic conical landform.
+
+  - id: volcano-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: 8-year-olds learning what a volcano is.
+      evaluated: |
+        Volcanism is the surface expression of magmatic processes whereby
+        partial melting of mantle peridotite generates buoyant silicate
+        melts that ascend through the lithosphere, accumulating in crustal
+        magma chambers whose periodic depressurisation drives effusive or
+        explosive eruptions, the style of which is governed by magma
+        viscosity, volatile content, and ascent rate.
+
+  - id: volcano-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: 8-year-olds learning what a volcano is.
+      evaluated: |
+        Eruptive regime transitions are dictated by the interplay between
+        magma rheology, exsolved volatile flux, and conduit fragmentation
+        thresholds, wherein the Plinian-to-effusive continuum is
+        parameterised by the dimensionless ascent number coupling
+        decompression-driven nucleation kinetics to bubble-growth-limited
+        permeability development within the vesiculating melt column.
+
+  # ───────────── How the heart works for patients ─────────────
+  - id: heart-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: adult patients with no medical background, learning how
+        the heart pumps blood.
+      evaluated: |
+        Your heart is a muscle about the size of your fist. Its job is to
+        push blood around your body. Blood carries oxygen and food that your
+        body needs to keep going. The heart squeezes, and that squeeze pushes
+        the blood out through tubes called blood vessels. Then it relaxes and
+        fills up again. It does this all day and all night, without you
+        having to think about it.
+
+  - id: heart-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: adult patients with no medical background, learning how
+        the heart pumps blood.
+      evaluated: |
+        The heart is a muscular pump that keeps blood moving through your
+        body. Each beat is a squeeze that pushes blood out to your lungs to
+        pick up oxygen, and then out to the rest of your body to deliver it.
+        Between beats, the heart relaxes and refills with blood. This steady
+        cycle of squeezing and relaxing repeats around the clock to keep
+        every part of you supplied.
+
+  - id: heart-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: adult patients with no medical background, learning how
+        the heart pumps blood.
+      evaluated: |
+        The heart functions as a dual pump composed of four chambers: two
+        atria and two ventricles. Deoxygenated blood returning from the body
+        enters the right atrium, passes to the right ventricle, and is
+        ejected to the pulmonary circulation for oxygenation. Oxygenated
+        blood then returns to the left side and is pumped via the left
+        ventricle into the systemic circulation through the aorta.
+
+  - id: heart-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: adult patients with no medical background, learning how
+        the heart pumps blood.
+      evaluated: |
+        Cardiac output is the product of stroke volume and heart rate,
+        modulated by preload, afterload, and contractility in accordance
+        with the Frank-Starling mechanism; ventricular ejection is governed
+        by the pressure-volume relationship across the cardiac cycle, with
+        systolic ejection commencing once intraventricular pressure exceeds
+        aortic diastolic pressure and the semilunar valves open.
+
+  - id: heart-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: adult patients with no medical background, learning how
+        the heart pumps blood.
+      evaluated: |
+        Excitation-contraction coupling in cardiomyocytes is initiated by
+        sarcolemmal depolarisation triggering L-type calcium channel influx,
+        which evokes calcium-induced calcium release from the sarcoplasmic
+        reticulum via ryanodine receptors, elevating cytosolic Ca2+ to
+        saturate troponin C and disinhibit actomyosin cross-bridge cycling,
+        with relaxation contingent on SERCA2a-mediated calcium reuptake and
+        sodium-calcium exchanger extrusion.
+
+  # ───────────── What a database is for new developers ─────────────
+  - id: database-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: people new to computers, learning what a database is.
+      evaluated: |
+        A database is a place to keep information so a computer can find it
+        again later. Think of it like a big, well-organised filing cabinet.
+        You put facts into it, such as names and phone numbers, and you can
+        ask it questions like "what is Maria's phone number?" The computer
+        looks through the cabinet and gives you the answer fast. It keeps
+        the information safe even after you turn the computer off.
+
+  - id: database-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: people new to computers, learning what a database is.
+      evaluated: |
+        A database is an organised store of information that a computer can
+        search quickly. Instead of scattering facts across many files, you
+        keep them together in a structured way, often in tables made of rows
+        and columns. Because the information is organised, the computer can
+        find, add, or update exactly what you need without reading
+        everything. Many apps you use every day rely on a database behind
+        the scenes.
+
+  - id: database-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: people new to computers, learning what a database is.
+      evaluated: |
+        A database is a structured collection of data managed by a database
+        management system, which handles storage, retrieval, and integrity.
+        Relational databases organise data into tables linked by keys, and
+        users query that data using a language such as SQL. The system
+        enforces constraints and supports transactions to ensure the data
+        remains consistent even when many users access it at once.
+
+  - id: database-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: people new to computers, learning what a database is.
+      evaluated: |
+        A relational database management system persists normalised
+        relations subject to integrity constraints, exposing a declarative
+        query interface whose execution plans are optimised by a
+        cost-based optimiser over indexed access paths, while concurrency
+        is mediated through multiversion concurrency control and isolation
+        levels that trade off serialisability against throughput.
+
+  - id: database-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: people new to computers, learning what a database is.
+      evaluated: |
+        Distributed transactional stores reconcile the CAP-theoretic tension
+        via tunable consistency models, employing consensus protocols such
+        as Raft or Paxos to replicate a write-ahead log across quorums,
+        while LSM-tree storage engines amortise write amplification through
+        leveled compaction and Bloom-filter-gated SSTable lookups under
+        snapshot-isolation semantics enforced by multiversion timestamp
+        ordering.
+
+  # ───────────── Tides for beachgoers ─────────────
+  - id: tides-perfect
+    human_score: perfect
+    inputs:
+      guidelines: |
+        Audience: families at the beach, no science background, learning
+        what causes tides.
+      evaluated: |
+        Tides are the slow rise and fall of the sea each day. They happen
+        because the Moon pulls on the water in the oceans. The side of the
+        Earth facing the Moon gets pulled the most, so the water there bulges
+        up. As the Earth turns, different beaches pass through these bulges.
+        That is why the water comes up the sand and then goes back out, twice
+        a day at most beaches.
+
+  - id: tides-excellent
+    human_score: excellent
+    inputs:
+      guidelines: |
+        Audience: families at the beach, no science background, learning
+        what causes tides.
+      evaluated: |
+        Tides are the regular rise and fall of the ocean, caused mainly by
+        the Moon's gravity pulling on Earth's water. The pull is strongest on
+        the side of Earth nearest the Moon, which makes the sea bulge outward
+        there. As our planet spins through the day, each stretch of coast
+        moves into and out of these bulges, so the water rises and falls.
+        The Sun adds a smaller pull that makes some tides bigger than others.
+
+  - id: tides-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: families at the beach, no science background, learning
+        what causes tides.
+      evaluated: |
+        Tides result from the gravitational attraction exerted by the Moon
+        and, to a lesser degree, the Sun on Earth's oceans. This attraction
+        produces two tidal bulges, one on the near side and one on the far
+        side of the planet. As Earth rotates beneath these bulges, coastal
+        locations experience a semi-diurnal cycle of high and low water,
+        the amplitude of which varies with lunar and solar alignment.
+
+  - id: tides-fair
+    human_score: fair
+    inputs:
+      guidelines: |
+        Audience: families at the beach, no science background, learning
+        what causes tides.
+      evaluated: |
+        The equilibrium tidal potential, derived from the differential
+        gravitational acceleration across Earth's finite diameter, yields
+        a second-degree spherical-harmonic deformation of the geoid, while
+        the dynamical theory superimposes resonant amphidromic systems whose
+        co-tidal lines rotate about nodal points under the constraint of the
+        Laplace tidal equations and basin-specific bathymetry.
+
+  - id: tides-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: families at the beach, no science background, learning
+        what causes tides.
+      evaluated: |
+        Harmonic decomposition of the tidal signal partitions the elevation
+        record into constituents — M2, S2, N2, K1, O1 — each characterised
+        by a Doodson number encoding its astronomical argument, with
+        nodal-modulation factors correcting amplitudes and phases over the
+        18.6-year lunar regression cycle of the ascending node, subsequently
+        reconstructed via least-squares admittance analysis against the
+        equilibrium forcing.
+
+  # ───────────── More unrated empty / invalid responses (none) ─────────────
+  - id: readability-empty-11-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: readability-empty-12-none
+    human_score: none
+    inputs:
+      evaluated: "     "
+
+  - id: readability-empty-13-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: readability-invalid-content-02-none
+    human_score: none
+    inputs:
+      evaluated: |
+        %%%% &&&& **** ::::
+        <<< not closed
+        ]]] ]]] ]]]

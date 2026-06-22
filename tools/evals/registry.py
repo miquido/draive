@@ -27,7 +27,6 @@ from draive.evaluators import (
 
 __all__ = (
     "EvaluatorEntry",
-    "all_entries",
     "available_evaluators",
     "lookup_evaluator",
 )
@@ -185,7 +184,3 @@ def lookup_evaluator(name: str, /) -> EvaluatorEntry:
         raise KeyError(
             f"Unknown evaluator '{name}'. Available: {', '.join(available_evaluators())}"
         ) from exc
-
-
-def all_entries() -> tuple[EvaluatorEntry, ...]:
-    return _ENTRIES

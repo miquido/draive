@@ -446,3 +446,297 @@ samples:
         For the first hour film is mostly leaning on its lead actors, and
         after that it is becoming quietly something more strange and more
         tender than what the trailer is letting you to expect.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: fluency-empty-01-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: fluency-empty-02-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: fluency-empty-03-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: fluency-empty-04-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: fluency-empty-05-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: fluency-empty-06-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: fluency-empty-07-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: fluency-empty-08-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: fluency-empty-09-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: fluency-empty-10-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: fluency-invalid-content-none
+    human_score: none
+    inputs:
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Train delay notice ─────────────
+  - id: train-delay-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        The 8:15 train is delayed by twenty minutes because of signal
+        maintenance near the central station. Passengers may use their
+        tickets on the next regional service without paying an extra fare.
+
+  - id: train-delay-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        The 8:15 train has been delayed by twenty minutes due to signal
+        maintenance near the central station. Tickets will be accepted on
+        the next regional service.
+
+  - id: train-delay-good
+    human_score: good
+    inputs:
+      evaluated: |
+        The 8:15 train is delayed for twenty minutes because signal
+        maintenance is happening near central station. You can use the
+        ticket on the next regional train.
+
+  - id: train-delay-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        The 8:15 train delay twenty minutes because signal maintenance near
+        central station, and passengers can using same ticket on next
+        regional service.
+
+  - id: train-delay-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Train 8:15 delayed twenty minute signal fixing by central station,
+        ticket next regional can use no fare extra doing.
+
+  # ───────────── Coffee tasting note ─────────────
+  - id: coffee-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        This single-origin Ethiopian opens with bright notes of jasmine and
+        bergamot, settles into a silky body, and finishes with a clean
+        sweetness that lingers long after the cup is empty.
+
+  - id: coffee-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        This single-origin Ethiopian opens with bright notes of jasmine and
+        bergamot, then settles into a silky body and a clean, sweet finish
+        that stays with you after the cup is empty.
+
+  - id: coffee-good
+    human_score: good
+    inputs:
+      evaluated: |
+        This Ethiopian coffee starts with bright jasmine and bergamot notes.
+        It has a silky body and a clean, sweet finish that stays in your
+        mouth after you finish the cup.
+
+  - id: coffee-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        This Ethiopia coffee is starting with the bright jasmine and bergamot
+        smell. Body is silky one, and finish is clean sweet which is staying
+        in mouth after the cup is becoming empty.
+
+  - id: coffee-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Coffee Ethiopia open bright. Jasmine, bergamot smell inside. Body
+        silky have. Finish sweet clean, mouth stay long after cup empty
+        already happen.
+
+  # ───────────── Job rejection note ─────────────
+  - id: rejection-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Thank you for taking the time to interview with us. After careful
+        consideration, we've decided to move forward with another candidate,
+        but we were genuinely impressed by your work and hope our paths cross
+        again.
+
+  - id: rejection-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Thank you for taking the time to interview with us. After much
+        thought, we have decided to go ahead with another candidate, though
+        we were truly impressed by your work and hope to cross paths again.
+
+  - id: rejection-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Thanks a lot for coming in to interview with us. After thinking it
+        over carefully, we decided to go with a different candidate, but we
+        were really impressed by your work and hope to meet again sometime.
+
+  - id: rejection-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Thank you for the taking time to interview with us. After the careful
+        thinking, we are deciding to go forward with other candidate, but we
+        were impressed truly by your work and hoping to cross the paths again.
+
+  - id: rejection-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Thank you time interview with us give. After think careful, we choose
+        other person candidate. Your work impress us much. Hope path cross
+        again some future time.
+
+  # ───────────── Tech support reply ─────────────
+  - id: support-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        It sounds like the app is failing to reconnect after your phone goes
+        to sleep. Try toggling background refresh off and on for the app,
+        then restart your device; that clears the stale session in most
+        cases.
+
+  - id: support-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        It sounds like the app fails to reconnect after your phone goes to
+        sleep. Try switching background refresh off and back on for the app,
+        and then restart your device, which clears the stale session in most
+        cases.
+
+  - id: support-good
+    human_score: good
+    inputs:
+      evaluated: |
+        It looks like the app is not reconnecting after your phone goes to
+        sleep. Please turn the background refresh off and then on again for
+        the app, and after that restart your phone. This fixes the stale
+        session most of the time.
+
+  - id: support-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        It is looking like the app is not reconnect after phone going to the
+        sleep. Please to turn off and on again the background refresh for app,
+        and after restart your phone, which is clearing the stale session in
+        the most cases.
+
+  - id: support-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        App no reconnect when phone sleep go. Background refresh off on do for
+        app please. Phone restart after. Stale session clear most time it is
+        happening like this way.
+
+  # ───────────── Wine label blurb ─────────────
+  - id: wine-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Grown on sun-drenched hillside terraces, this Syrah pours a deep
+        garnet and carries the scent of black pepper and ripe plum, with
+        velvety tannins that round out a long, warming finish.
+
+  - id: wine-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Grown on sunny hillside terraces, this Syrah pours a deep garnet and
+        offers aromas of black pepper and ripe plum, with velvety tannins
+        that round out a long, warm finish.
+
+  - id: wine-good
+    human_score: good
+    inputs:
+      evaluated: |
+        This Syrah is grown on sunny terraces on the hillside. It pours a deep
+        garnet color and smells of black pepper and ripe plum, and the soft
+        tannins make for a long, warm finish.
+
+  - id: wine-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        This Syrah is growing on the sunny hillside terraces. It is pouring
+        deep garnet and is carrying smell of black pepper and ripe plum, with
+        the velvet tannins which are rounding the long warm finish out.
+
+  - id: wine-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Syrah grow sunny hill terrace. Pour deep garnet color have. Smell
+        black pepper, plum ripe inside. Tannin velvet soft. Finish long warm
+        very, round out it does.
+
+  # ───────────── More unrated empty / invalid (none) ─────────────
+  - id: fluency-empty-11-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: fluency-empty-12-none
+    human_score: none
+    inputs:
+      evaluated: "   "
+
+  - id: fluency-whitespace-none
+    human_score: none
+    inputs:
+      evaluated: |
+
+
+
+  - id: fluency-invalid-content-02-none
+    human_score: none
+    inputs:
+      evaluated: |
+        @#$%^ &*()_+ <<>><<
+        ||||||| ;;;;; :::::
+        \\\\\ ///// {{{{{

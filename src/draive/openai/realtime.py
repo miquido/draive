@@ -404,7 +404,7 @@ class OpenAIRealtime(OpenAIAPI):
                 )
 
             finally:
-                await scope.__aexit__(  # noqa: F821 # exit scope
+                await scope.__aexit__(  # exit scope
                     exc_type,
                     exc_val,
                     exc_tb,

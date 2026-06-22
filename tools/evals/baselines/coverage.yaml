@@ -916,3 +916,493 @@ samples:
       evaluated: |
         Training for a marathon takes commitment. Most runners benefit from
         a structured plan and proper shoes.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: coverage-empty-01-none
+    human_score: none
+    inputs:
+      reference: "Composting needs brown material, green material, air, and moisture."
+      evaluated: ""
+
+  - id: coverage-empty-02-none
+    human_score: none
+    inputs:
+      reference: "Composting needs brown material, green material, air, and moisture."
+      evaluated: ""
+
+  - id: coverage-empty-03-none
+    human_score: none
+    inputs:
+      reference: "Composting needs brown material, green material, air, and moisture."
+      evaluated: ""
+
+  - id: coverage-empty-04-none
+    human_score: none
+    inputs:
+      reference: "Composting needs brown material, green material, air, and moisture."
+      evaluated: ""
+
+  - id: coverage-empty-05-none
+    human_score: none
+    inputs:
+      reference: "Composting needs brown material, green material, air, and moisture."
+      evaluated: ""
+
+  - id: coverage-empty-06-none
+    human_score: none
+    inputs:
+      reference: "Composting needs brown material, green material, air, and moisture."
+      evaluated: ""
+
+  - id: coverage-empty-07-none
+    human_score: none
+    inputs:
+      reference: "Composting needs brown material, green material, air, and moisture."
+      evaluated: ""
+
+  - id: coverage-empty-08-none
+    human_score: none
+    inputs:
+      reference: "Composting needs brown material, green material, air, and moisture."
+      evaluated: ""
+
+  - id: coverage-empty-09-none
+    human_score: none
+    inputs:
+      reference: "Composting needs brown material, green material, air, and moisture."
+      evaluated: ""
+
+  - id: coverage-empty-10-none
+    human_score: none
+    inputs:
+      reference: "Composting needs brown material, green material, air, and moisture."
+      evaluated: ""
+
+  - id: coverage-invalid-content-none
+    human_score: none
+    inputs:
+      reference: "Composting needs brown material, green material, air, and moisture."
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Composting basics ─────────────
+  - id: composting-basics-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        A healthy compost pile balances carbon-rich brown material such as
+        dry leaves or cardboard with nitrogen-rich green material such as
+        vegetable scraps. It should stay damp like a wrung sponge, be
+        turned for air, and exclude meat, dairy, and oily foods.
+      evaluated: |
+        Good compost balances browns like dry leaves or cardboard with
+        greens like vegetable scraps. Keep the pile damp like a wrung
+        sponge, turn it so air reaches the center, and leave out meat,
+        dairy, and oily foods.
+
+  - id: composting-basics-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A healthy compost pile balances carbon-rich brown material such as
+        dry leaves or cardboard with nitrogen-rich green material such as
+        vegetable scraps. It should stay damp like a wrung sponge, be
+        turned for air, and exclude meat, dairy, and oily foods.
+      evaluated: |
+        Compost works best with a mix of dry browns such as leaves and
+        cardboard plus green scraps from the kitchen. Keep it lightly damp,
+        turn it for air, and avoid adding meat or dairy.
+
+  - id: composting-basics-good
+    human_score: good
+    inputs:
+      reference: |
+        A healthy compost pile balances carbon-rich brown material such as
+        dry leaves or cardboard with nitrogen-rich green material such as
+        vegetable scraps. It should stay damp like a wrung sponge, be
+        turned for air, and exclude meat, dairy, and oily foods.
+      evaluated: |
+        Mix dry leaves with vegetable scraps and turn the pile sometimes.
+        Do not put meat or dairy in it.
+
+  - id: composting-basics-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A healthy compost pile balances carbon-rich brown material such as
+        dry leaves or cardboard with nitrogen-rich green material such as
+        vegetable scraps. It should stay damp like a wrung sponge, be
+        turned for air, and exclude meat, dairy, and oily foods.
+      evaluated: |
+        Compost piles use food scraps and leaves. Turning them can help.
+
+  - id: composting-basics-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A healthy compost pile balances carbon-rich brown material such as
+        dry leaves or cardboard with nitrogen-rich green material such as
+        vegetable scraps. It should stay damp like a wrung sponge, be
+        turned for air, and exclude meat, dairy, and oily foods.
+      evaluated: |
+        Gardening is easier when the soil is good and the weather is mild.
+
+  # ───────────── Conference keynote announcement: DevSummit 2026 ─────────────
+  # Reference claims:
+  #   1. DevSummit 2026 keynote will be delivered by Dr. Lena Okafor.
+  #   2. Held at the Metro Convention Center on October 9th.
+  #   3. Theme is "Resilient Systems at Scale".
+  #   4. Keynote will unveil an open-source observability toolkit called Pulsewatch.
+  #   5. Early-bird tickets are 30% off until August 1st.
+  #   6. The talk will be livestreamed for free.
+  - id: keynote-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        DevSummit 2026's opening keynote will be delivered by Dr. Lena
+        Okafor at the Metro Convention Center on October 9th. Built around
+        the theme "Resilient Systems at Scale," the keynote will unveil a new
+        open-source observability toolkit called Pulsewatch. Early-bird
+        tickets are 30% off until August 1st, and the talk will be
+        livestreamed for free.
+      evaluated: |
+        Dr. Lena Okafor will give the DevSummit 2026 keynote at the Metro
+        Convention Center on October 9th, themed "Resilient Systems at
+        Scale." She will unveil an open-source observability toolkit called
+        Pulsewatch. Early-bird tickets are 30% off through August 1st, and
+        the talk will be livestreamed for free.
+
+  - id: keynote-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        DevSummit 2026's opening keynote will be delivered by Dr. Lena
+        Okafor at the Metro Convention Center on October 9th. Built around
+        the theme "Resilient Systems at Scale," the keynote will unveil a new
+        open-source observability toolkit called Pulsewatch. Early-bird
+        tickets are 30% off until August 1st, and the talk will be
+        livestreamed for free.
+      evaluated: |
+        Dr. Lena Okafor headlines DevSummit 2026 on October 9th with a
+        keynote on "Resilient Systems at Scale," where she will introduce an
+        open-source observability toolkit called Pulsewatch. The talk will be
+        livestreamed for free.
+
+  - id: keynote-good
+    human_score: good
+    inputs:
+      reference: |
+        DevSummit 2026's opening keynote will be delivered by Dr. Lena
+        Okafor at the Metro Convention Center on October 9th. Built around
+        the theme "Resilient Systems at Scale," the keynote will unveil a new
+        open-source observability toolkit called Pulsewatch. Early-bird
+        tickets are 30% off until August 1st, and the talk will be
+        livestreamed for free.
+      evaluated: |
+        Dr. Lena Okafor will deliver the DevSummit 2026 keynote in October
+        and announce a new open-source tool called Pulsewatch. The session
+        will be streamed online.
+
+  - id: keynote-fair
+    human_score: fair
+    inputs:
+      reference: |
+        DevSummit 2026's opening keynote will be delivered by Dr. Lena
+        Okafor at the Metro Convention Center on October 9th. Built around
+        the theme "Resilient Systems at Scale," the keynote will unveil a new
+        open-source observability toolkit called Pulsewatch. Early-bird
+        tickets are 30% off until August 1st, and the talk will be
+        livestreamed for free.
+      evaluated: |
+        DevSummit 2026 will have a keynote about resilient systems. There is
+        an early-bird ticket discount.
+
+  - id: keynote-poor
+    human_score: poor
+    inputs:
+      reference: |
+        DevSummit 2026's opening keynote will be delivered by Dr. Lena
+        Okafor at the Metro Convention Center on October 9th. Built around
+        the theme "Resilient Systems at Scale," the keynote will unveil a new
+        open-source observability toolkit called Pulsewatch. Early-bird
+        tickets are 30% off until August 1st, and the talk will be
+        livestreamed for free.
+      evaluated: |
+        Developer conferences are a great way to network and learn about new
+        technology. Many of them sell out quickly each year.
+
+  # ───────────── Historical event: the Apollo 13 mission ─────────────
+  # Reference claims:
+  #   1. Apollo 13 launched in April 1970, intended as the third crewed Moon landing.
+  #   2. An oxygen tank exploded two days into the flight.
+  #   3. The crew was James Lovell, Jack Swigert, and Fred Haise.
+  #   4. The lunar landing was aborted.
+  #   5. The crew used the lunar module as a lifeboat.
+  #   6. All three astronauts returned safely to Earth.
+  - id: apollo-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Apollo 13 launched in April 1970 as what was meant to be the third
+        crewed Moon landing. Two days into the flight, an oxygen tank
+        exploded, crippling the spacecraft. The crew — James Lovell, Jack
+        Swigert, and Fred Haise — aborted the planned lunar landing and used
+        the lunar module as a lifeboat. All three astronauts returned safely
+        to Earth.
+      evaluated: |
+        Launched in April 1970 as the planned third crewed Moon landing,
+        Apollo 13 suffered an oxygen-tank explosion two days into the
+        mission. The crew — James Lovell, Jack Swigert, and Fred Haise —
+        aborted the landing and used the lunar module as a lifeboat. All
+        three returned safely to Earth.
+
+  - id: apollo-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Apollo 13 launched in April 1970 as what was meant to be the third
+        crewed Moon landing. Two days into the flight, an oxygen tank
+        exploded, crippling the spacecraft. The crew — James Lovell, Jack
+        Swigert, and Fred Haise — aborted the planned lunar landing and used
+        the lunar module as a lifeboat. All three astronauts returned safely
+        to Earth.
+      evaluated: |
+        Apollo 13, launched in April 1970, was meant to be the third Moon
+        landing but was crippled when an oxygen tank exploded. The crew
+        aborted the landing, sheltered in the lunar module, and all returned
+        safely to Earth.
+
+  - id: apollo-good
+    human_score: good
+    inputs:
+      reference: |
+        Apollo 13 launched in April 1970 as what was meant to be the third
+        crewed Moon landing. Two days into the flight, an oxygen tank
+        exploded, crippling the spacecraft. The crew — James Lovell, Jack
+        Swigert, and Fred Haise — aborted the planned lunar landing and used
+        the lunar module as a lifeboat. All three astronauts returned safely
+        to Earth.
+      evaluated: |
+        Apollo 13 was a Moon mission that went wrong after an explosion on
+        board. The landing was cancelled, but the astronauts made it back to
+        Earth alive.
+
+  - id: apollo-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Apollo 13 launched in April 1970 as what was meant to be the third
+        crewed Moon landing. Two days into the flight, an oxygen tank
+        exploded, crippling the spacecraft. The crew — James Lovell, Jack
+        Swigert, and Fred Haise — aborted the planned lunar landing and used
+        the lunar module as a lifeboat. All three astronauts returned safely
+        to Earth.
+      evaluated: |
+        Apollo 13 was a space mission that had a serious problem. The crew
+        came home.
+
+  - id: apollo-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Apollo 13 launched in April 1970 as what was meant to be the third
+        crewed Moon landing. Two days into the flight, an oxygen tank
+        exploded, crippling the spacecraft. The crew — James Lovell, Jack
+        Swigert, and Fred Haise — aborted the planned lunar landing and used
+        the lunar module as a lifeboat. All three astronauts returned safely
+        to Earth.
+      evaluated: |
+        Space exploration captured the public imagination throughout the
+        twentieth century and inspired countless films and books.
+
+  # ───────────── Insurance policy summary: home contents cover ─────────────
+  # Reference claims:
+  #   1. Covers loss or damage to household contents up to £40,000.
+  #   2. Includes accidental damage as standard.
+  #   3. Excludes items individually worth more than £2,000 unless specified.
+  #   4. Has a £150 excess per claim.
+  #   5. Provides £1 million of personal liability cover.
+  #   6. Policy must be renewed annually.
+  - id: insurance-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The home contents policy covers loss or damage to household contents
+        up to £40,000 and includes accidental damage as standard. Items
+        individually worth more than £2,000 are excluded unless specified.
+        Each claim carries a £150 excess. The policy also provides £1 million
+        of personal liability cover and must be renewed annually.
+      evaluated: |
+        This policy covers loss or damage to household contents up to
+        £40,000, with accidental damage included as standard. Items worth
+        more than £2,000 each are excluded unless listed. There is a £150
+        excess per claim, £1 million of personal liability cover, and the
+        policy renews annually.
+
+  - id: insurance-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The home contents policy covers loss or damage to household contents
+        up to £40,000 and includes accidental damage as standard. Items
+        individually worth more than £2,000 are excluded unless specified.
+        Each claim carries a £150 excess. The policy also provides £1 million
+        of personal liability cover and must be renewed annually.
+      evaluated: |
+        Contents are covered up to £40,000 with accidental damage included.
+        Single items over £2,000 must be specified or they are excluded.
+        There is a £150 excess per claim and £1 million of liability cover.
+
+  - id: insurance-good
+    human_score: good
+    inputs:
+      reference: |
+        The home contents policy covers loss or damage to household contents
+        up to £40,000 and includes accidental damage as standard. Items
+        individually worth more than £2,000 are excluded unless specified.
+        Each claim carries a £150 excess. The policy also provides £1 million
+        of personal liability cover and must be renewed annually.
+      evaluated: |
+        The policy covers contents up to £40,000 and includes accidental
+        damage. There is an excess on each claim and some personal liability
+        cover.
+
+  - id: insurance-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The home contents policy covers loss or damage to household contents
+        up to £40,000 and includes accidental damage as standard. Items
+        individually worth more than £2,000 are excluded unless specified.
+        Each claim carries a £150 excess. The policy also provides £1 million
+        of personal liability cover and must be renewed annually.
+      evaluated: |
+        The policy covers household contents and has to be renewed each year.
+
+  - id: insurance-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The home contents policy covers loss or damage to household contents
+        up to £40,000 and includes accidental damage as standard. Items
+        individually worth more than £2,000 are excluded unless specified.
+        Each claim carries a £150 excess. The policy also provides £1 million
+        of personal liability cover and must be renewed annually.
+      evaluated: |
+        Home insurance gives many households peace of mind, and shopping
+        around can often help you find a better deal.
+
+  # ───────────── Documentary synopsis: "Rivers of Ice" ─────────────
+  # Reference claims:
+  #   1. Three-part documentary about the world's retreating glaciers.
+  #   2. Filmed over four years across the Alps, Andes, and Himalayas.
+  #   3. Narrated by oceanographer Dr. Priya Anand.
+  #   4. Features time-lapse footage showing decades of ice loss.
+  #   5. Argues that meltwater threatens water supplies for two billion people.
+  #   6. Premieres on streaming this winter.
+  - id: documentary-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        "Rivers of Ice" is a three-part documentary about the world's
+        retreating glaciers, filmed over four years across the Alps, the
+        Andes, and the Himalayas. Narrated by oceanographer Dr. Priya Anand,
+        it features time-lapse footage capturing decades of ice loss and
+        argues that meltwater threatens water supplies for two billion
+        people. It premieres on streaming this winter.
+      evaluated: |
+        "Rivers of Ice" is a three-part documentary on retreating glaciers,
+        shot over four years in the Alps, Andes, and Himalayas. Oceanographer
+        Dr. Priya Anand narrates, and time-lapse footage captures decades of
+        ice loss. The film argues meltwater endangers water supplies for two
+        billion people, and it premieres on streaming this winter.
+
+  - id: documentary-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        "Rivers of Ice" is a three-part documentary about the world's
+        retreating glaciers, filmed over four years across the Alps, the
+        Andes, and the Himalayas. Narrated by oceanographer Dr. Priya Anand,
+        it features time-lapse footage capturing decades of ice loss and
+        argues that meltwater threatens water supplies for two billion
+        people. It premieres on streaming this winter.
+      evaluated: |
+        "Rivers of Ice" is a three-part documentary about retreating
+        glaciers, filmed across the Alps, Andes, and Himalayas and narrated
+        by Dr. Priya Anand. Through time-lapse footage it shows ice loss and
+        warns of threats to water supplies, premiering on streaming this
+        winter.
+
+  - id: documentary-good
+    human_score: good
+    inputs:
+      reference: |
+        "Rivers of Ice" is a three-part documentary about the world's
+        retreating glaciers, filmed over four years across the Alps, the
+        Andes, and the Himalayas. Narrated by oceanographer Dr. Priya Anand,
+        it features time-lapse footage capturing decades of ice loss and
+        argues that meltwater threatens water supplies for two billion
+        people. It premieres on streaming this winter.
+      evaluated: |
+        "Rivers of Ice" is a documentary about glaciers melting around the
+        world. It uses time-lapse footage and warns about the effect on water
+        supplies.
+
+  - id: documentary-fair
+    human_score: fair
+    inputs:
+      reference: |
+        "Rivers of Ice" is a three-part documentary about the world's
+        retreating glaciers, filmed over four years across the Alps, the
+        Andes, and the Himalayas. Narrated by oceanographer Dr. Priya Anand,
+        it features time-lapse footage capturing decades of ice loss and
+        argues that meltwater threatens water supplies for two billion
+        people. It premieres on streaming this winter.
+      evaluated: |
+        "Rivers of Ice" is a documentary about glaciers that comes out this
+        winter.
+
+  - id: documentary-poor
+    human_score: poor
+    inputs:
+      reference: |
+        "Rivers of Ice" is a three-part documentary about the world's
+        retreating glaciers, filmed over four years across the Alps, the
+        Andes, and the Himalayas. Narrated by oceanographer Dr. Priya Anand,
+        it features time-lapse footage capturing decades of ice loss and
+        argues that meltwater threatens water supplies for two billion
+        people. It premieres on streaming this winter.
+      evaluated: |
+        Nature documentaries have become enormously popular, and many viewers
+        find their cinematography breathtaking.
+
+  # ───────────── Additional unrated empty/invalid responses (none) ─────────────
+  - id: coverage-empty-11-none
+    human_score: none
+    inputs:
+      reference: "Sourdough bread relies on a fermented starter of flour and water."
+      evaluated: ""
+
+  - id: coverage-empty-12-none
+    human_score: none
+    inputs:
+      reference: "Sourdough bread relies on a fermented starter of flour and water."
+      evaluated: ""
+
+  - id: coverage-empty-13-none
+    human_score: none
+    inputs:
+      reference: "Sourdough bread relies on a fermented starter of flour and water."
+      evaluated: "  "
+
+  - id: coverage-invalid-content-02-none
+    human_score: none
+    inputs:
+      reference: "Sourdough bread relies on a fermented starter of flour and water."
+      evaluated: |
+        \xff\xfe ???? NULNULNUL
+        ===EMPTY===
+        (((((

@@ -83,4 +83,5 @@ docs/diagrams/out/
 .vscode/
 .idea/
 local_cache/
+.ollama_models/
 .zed/

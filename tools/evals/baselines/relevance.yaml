@@ -845,3 +845,473 @@ samples:
         utensils, a handful of meals, and only the layers you'll
         actually wear. Weight saved at the start of the trail
         compounds with every kilometre.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: relevance-empty-01-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: ""
+
+  - id: relevance-empty-02-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: ""
+
+  - id: relevance-empty-03-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: ""
+
+  - id: relevance-empty-04-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: ""
+
+  - id: relevance-empty-05-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: ""
+
+  - id: relevance-empty-06-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: ""
+
+  - id: relevance-empty-07-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: ""
+
+  - id: relevance-empty-08-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: ""
+
+  - id: relevance-empty-09-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: ""
+
+  - id: relevance-empty-10-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: ""
+
+  - id: relevance-invalid-content-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Tomato seed starting ─────────────
+  - id: tomato-seed-starting-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        How to start tomato seeds indoors before spring planting, including
+        timing, seed trays, light, watering, and hardening off.
+      evaluated: |
+        Start tomato seeds indoors six to eight weeks before your last
+        frost date. Sow them in seed trays with moist seed-starting mix,
+        keep them under bright grow lights, water gently when the surface
+        begins to dry, and harden the seedlings outdoors gradually before
+        transplanting.
+
+  - id: tomato-seed-starting-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        How to start tomato seeds indoors before spring planting, including
+        timing, seed trays, light, watering, and hardening off.
+      evaluated: |
+        Tomato seeds are usually started indoors several weeks before the
+        last frost. Use trays and seed-starting mix, give the seedlings
+        strong light, keep them evenly moist, and acclimate them outside
+        before planting.
+
+  - id: tomato-seed-starting-good
+    human_score: good
+    inputs:
+      reference: |
+        How to start tomato seeds indoors before spring planting, including
+        timing, seed trays, light, watering, and hardening off.
+      evaluated: |
+        Tomato seedlings need a warm indoor start before spring. Use small
+        pots or trays, give them light, and move them outside only after
+        they have adjusted to outdoor conditions.
+
+  - id: tomato-seed-starting-fair
+    human_score: fair
+    inputs:
+      reference: |
+        How to start tomato seeds indoors before spring planting, including
+        timing, seed trays, light, watering, and hardening off.
+      evaluated: |
+        Tomatoes like warm weather and regular watering. A sunny garden bed
+        helps them grow well once spring is underway.
+
+  - id: tomato-seed-starting-poor
+    human_score: poor
+    inputs:
+      reference: |
+        How to start tomato seeds indoors before spring planting, including
+        timing, seed trays, light, watering, and hardening off.
+      evaluated: |
+        Houseplants such as pothos and snake plants tolerate low light and
+        are good choices for offices and apartments.
+
+  # ───────────── Backing up your phone ─────────────
+  - id: phone-backup-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        How to back up a smartphone so that photos, contacts, and app data
+        can be restored after loss, damage, or a switch to a new device.
+      evaluated: |
+        Decide first whether you want a cloud backup, a local one, or both.
+        For cloud, sign in to your phone's built-in service and enable
+        backup for photos, contacts, messages, and app data, then let the
+        first sync complete over Wi-Fi while the phone is charging. For a
+        local copy, connect the phone to a computer and copy the photo and
+        video libraries off manually, or use the manufacturer's desktop
+        tool to capture a full device image. Verify the backup actually
+        worked by checking the timestamp and file counts before you rely on
+        it. When you move to a new device, sign in with the same account
+        and choose "restore from backup" during setup so contacts, photos,
+        and apps come back in place.
+
+  - id: phone-backup-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        How to back up a smartphone so that photos, contacts, and app data
+        can be restored after loss, damage, or a switch to a new device.
+      evaluated: |
+        Turn on your phone's built-in cloud backup and let it sync photos,
+        contacts, and app data over Wi-Fi while charging. It's worth knowing
+        that the free storage tiers fill up fast once you have a few
+        thousand photos, which is why so many people end up paying a small
+        monthly fee. Keep a local copy too if you can, by copying your
+        photo library to a computer now and then. When you switch phones,
+        sign in with the same account and pick "restore from backup" during
+        setup, and everything lands back where it was.
+
+  - id: phone-backup-good
+    human_score: good
+    inputs:
+      reference: |
+        How to back up a smartphone so that photos, contacts, and app data
+        can be restored after loss, damage, or a switch to a new device.
+      evaluated: |
+        Enable cloud backup so your photos, contacts, and app data sync
+        automatically. Beyond backups, though, a little phone hygiene goes
+        a long way: clear out apps you no longer open, review which ones
+        have permission to track your location, and turn on automatic
+        security updates. A screen lock with a strong passcode and
+        two-factor authentication on your main account do more for your
+        data than almost anything else, since a lost phone is only a real
+        problem if someone can get into it.
+
+  - id: phone-backup-fair
+    human_score: fair
+    inputs:
+      reference: |
+        How to back up a smartphone so that photos, contacts, and app data
+        can be restored after loss, damage, or a switch to a new device.
+      evaluated: |
+        Smartphones have become the primary camera for most people, which
+        means our most important memories now live on a device that is
+        easily lost, dropped, or stolen. The shift from physical photo
+        albums to digital libraries happened remarkably fast, and it has
+        changed how families keep and share their histories. Storage has
+        grown cheap enough that few people ever delete anything anymore.
+
+  - id: phone-backup-poor
+    human_score: poor
+    inputs:
+      reference: |
+        How to back up a smartphone so that photos, contacts, and app data
+        can be restored after loss, damage, or a switch to a new device.
+      evaluated: |
+        Composting at home turns kitchen scraps into rich soil. Layer green
+        material like vegetable peelings with brown material like dry
+        leaves or shredded cardboard, keep the pile roughly as damp as a
+        wrung-out sponge, and turn it every week or two to add air. In a
+        few months the mixture breaks down into dark, crumbly compost you
+        can dig into garden beds.
+
+  # ───────────── Brewing loose-leaf tea ─────────────
+  - id: tea-brewing-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        How to brew a good cup of loose-leaf tea, covering water
+        temperature, leaf quantity, and steeping time for common types.
+      evaluated: |
+        Start with fresh, just-boiled water, but match the temperature to
+        the leaf: black and herbal teas take a full boil, oolongs around
+        ninety degrees, and delicate greens nearer seventy-five, since
+        boiling water scorches them and turns them bitter. Use roughly one
+        slightly heaped teaspoon of leaf per cup, giving the leaves room to
+        unfurl rather than cramming them into a tight ball. Steep black tea
+        three to five minutes, green tea two to three, and oolong a little
+        longer, tasting as you go. Strain the leaves out promptly so the
+        brew doesn't over-extract, and remember that good leaves are happy
+        to be steeped a second or third time.
+
+  - id: tea-brewing-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        How to brew a good cup of loose-leaf tea, covering water
+        temperature, leaf quantity, and steeping time for common types.
+      evaluated: |
+        Match the water temperature to the tea — boiling for black, cooler
+        for green so it doesn't turn bitter — and use about a teaspoon of
+        leaf per cup. The whole reason loose leaf beats most bags is that
+        the leaves have room to open up and release their flavour, which is
+        also why those roomy pyramid bags caught on. Steep black tea a few
+        minutes and green tea less, taste as you go, and strain promptly so
+        it doesn't get astringent.
+
+  - id: tea-brewing-good
+    human_score: good
+    inputs:
+      reference: |
+        How to brew a good cup of loose-leaf tea, covering water
+        temperature, leaf quantity, and steeping time for common types.
+      evaluated: |
+        Use water at the right temperature for the leaf and steep it just
+        long enough — too long turns tea bitter. Once you have the brewing
+        down, the next rabbit hole is gear. Cast-iron tetsubin pots hold
+        heat beautifully, glass teapots let you watch the leaves dance,
+        and gaiwans suit quick repeated infusions. Plenty of people also
+        debate spring versus filtered water, and whether a dedicated
+        variable-temperature kettle is worth the counter space.
+
+  - id: tea-brewing-fair
+    human_score: fair
+    inputs:
+      reference: |
+        How to brew a good cup of loose-leaf tea, covering water
+        temperature, leaf quantity, and steeping time for common types.
+      evaluated: |
+        Tea is the most widely consumed drink in the world after water,
+        with deep traditions in China, Japan, India, and Britain. The
+        Japanese tea ceremony treats preparation as a meditative art,
+        while the British afternoon tea grew out of nineteenth-century
+        social custom. All true tea comes from the same plant, Camellia
+        sinensis; the differences between green, oolong, and black come
+        down to how the leaves are processed after picking.
+
+  - id: tea-brewing-poor
+    human_score: poor
+    inputs:
+      reference: |
+        How to brew a good cup of loose-leaf tea, covering water
+        temperature, leaf quantity, and steeping time for common types.
+      evaluated: |
+        Replacing a worn bicycle chain is straightforward with the right
+        tool. Use a chain checker to confirm the old chain is stretched,
+        break it with a chain tool, and thread the new one through the
+        derailleurs following the same path. Size it to match the old
+        chain, join it with the supplied quick link, and shift through the
+        gears to confirm smooth movement.
+
+  # ───────────── Writing a cover letter ─────────────
+  - id: cover-letter-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        How to write a strong cover letter for a job application: structure,
+        what to include, and how to tailor it to the role.
+      evaluated: |
+        Open with a specific, confident first line that names the role and
+        signals why you're a strong fit, rather than a generic "I am
+        writing to apply." In the body, pick two or three achievements that
+        map directly onto the job's stated requirements and describe them
+        with concrete results, not vague adjectives. Tailor every letter to
+        the posting: echo the language the employer uses and show you
+        understand what the team actually needs. Keep it to a single page,
+        close by stating clearly that you'd welcome an interview, and proof
+        it carefully — a typo in the first paragraph undoes a lot of good
+        work.
+
+  - id: cover-letter-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        How to write a strong cover letter for a job application: structure,
+        what to include, and how to tailor it to the role.
+      evaluated: |
+        Skip the generic opener and lead with why you fit this specific
+        role, then back it with two or three concrete achievements that
+        match the posting. Recruiters reportedly spend only seconds on a
+        first pass, so the top of the page has to earn its keep. Mirror the
+        employer's own language, keep it to one page, and close by asking
+        clearly for an interview. Always run a final proofread, because a
+        typo near the top costs you more than people expect.
+
+  - id: cover-letter-good
+    human_score: good
+    inputs:
+      reference: |
+        How to write a strong cover letter for a job application: structure,
+        what to include, and how to tailor it to the role.
+      evaluated: |
+        A strong cover letter is tailored to the role and highlights a few
+        relevant achievements on a single page. Of course, the letter is
+        only one piece of the application. Your resume needs to be clean
+        and scannable, with consistent formatting and reverse-chronological
+        experience. Many companies now run applications through tracking
+        software first, so plain layouts and the right keywords help your
+        documents survive the automated screen before a human ever sees
+        them.
+
+  - id: cover-letter-fair
+    human_score: fair
+    inputs:
+      reference: |
+        How to write a strong cover letter for a job application: structure,
+        what to include, and how to tailor it to the role.
+      evaluated: |
+        Job searching today looks very different from a generation ago.
+        Most openings are now found and applied to online, networking has
+        moved largely onto professional social platforms, and a growing
+        share of roles are remote or hybrid. The sheer volume of
+        applications each posting attracts has made standing out harder,
+        and referrals from people already inside a company carry more
+        weight than ever.
+
+  - id: cover-letter-poor
+    human_score: poor
+    inputs:
+      reference: |
+        How to write a strong cover letter for a job application: structure,
+        what to include, and how to tailor it to the role.
+      evaluated: |
+        Repotting a houseplant is best done in spring. Choose a pot only
+        slightly larger than the current one, ease the plant out, and
+        gently loosen any roots circling the bottom. Set it in fresh
+        potting mix at the same depth it grew before, firm the soil lightly
+        around the base, and water thoroughly to settle everything in.
+
+  # ───────────── Jump-starting a car battery ─────────────
+  - id: jump-start-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        How to jump-start a car with a dead battery using jumper cables and
+        a second vehicle.
+      evaluated: |
+        Park the working car close enough to reach but not touching the
+        dead one, and switch both engines off. Connect one red clamp to the
+        positive terminal of the dead battery and the other red clamp to the
+        positive terminal of the good battery. Attach one black clamp to the
+        negative terminal of the good battery, and the final black clamp to
+        an unpainted metal point on the dead car's engine block, away from
+        the battery, to avoid sparks near it. Start the working car and let
+        it run a couple of minutes, then start the dead car. Once it's
+        running, remove the clamps in the reverse order, and keep the
+        revived car running or driving for a while to recharge.
+
+  - id: jump-start-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        How to jump-start a car with a dead battery using jumper cables and
+        a second vehicle.
+      evaluated: |
+        Bring the two cars close, engines off. Clamp red to positive on the
+        dead battery, red to positive on the good one, black to negative on
+        the good one, and the last black to bare metal on the dead car's
+        engine rather than the battery. Lithium jump packs have made the
+        second car optional for many drivers these days, but the clamp
+        order is the same idea. Start the donor car, then the dead one,
+        remove the cables in reverse, and drive a while to recharge.
+
+  - id: jump-start-good
+    human_score: good
+    inputs:
+      reference: |
+        How to jump-start a car with a dead battery using jumper cables and
+        a second vehicle.
+      evaluated: |
+        Connect the cables positive to positive and negative to a ground
+        point, start the good car, then the dead one. Worth stepping back,
+        though: a battery that dies repeatedly is usually telling you
+        something. Most car batteries last only three to five years, and
+        cold weather, short trips that never fully recharge them, and a
+        dome light left on overnight all shorten that life. If yours keeps
+        going flat, it may be time to test the alternator or simply replace
+        the battery.
+
+  - id: jump-start-fair
+    human_score: fair
+    inputs:
+      reference: |
+        How to jump-start a car with a dead battery using jumper cables and
+        a second vehicle.
+      evaluated: |
+        Car batteries are a fascinating bit of everyday chemistry. The
+        familiar lead-acid design has barely changed in principle for over
+        a century, storing energy in plates of lead suspended in sulfuric
+        acid. Electric vehicles, by contrast, rely on lithium-ion packs
+        that store far more energy by weight, which is the single biggest
+        reason their range has improved so quickly in recent years.
+
+  - id: jump-start-poor
+    human_score: poor
+    inputs:
+      reference: |
+        How to jump-start a car with a dead battery using jumper cables and
+        a second vehicle.
+      evaluated: |
+        Proofing pizza dough slowly in the fridge develops far better
+        flavour than a quick rise on the counter. Mix flour, water, salt,
+        and a small amount of yeast, knead briefly, and let it ferment cold
+        for a day or two. Bring it back to room temperature before shaping,
+        stretch it by hand rather than rolling, and bake it as hot as your
+        oven will go.
+
+  # ───────────── More invalid / empty responses (none) ─────────────
+  - id: relevance-empty-11-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: ""
+
+  - id: relevance-empty-12-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: "   "
+
+  - id: relevance-whitespace-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: |
+
+
+
+  - id: relevance-invalid-content-02-none
+    human_score: none
+    inputs:
+      reference: "How to start tomato seeds indoors before spring planting."
+      evaluated: |
+        \x00\x00 ?????? ||||||||
+        ===NULL=== <broken/ {[(

@@ -843,3 +843,506 @@ samples:
         then, taking great care because the mixture will be extremely
         hot, you will whisk in some cream that you have previously
         warmed up.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: conciseness-empty-01-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: ""
+
+  - id: conciseness-empty-02-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: ""
+
+  - id: conciseness-empty-03-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: ""
+
+  - id: conciseness-empty-04-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: ""
+
+  - id: conciseness-empty-05-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: ""
+
+  - id: conciseness-empty-06-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: ""
+
+  - id: conciseness-empty-07-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: ""
+
+  - id: conciseness-empty-08-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: ""
+
+  - id: conciseness-empty-09-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: ""
+
+  - id: conciseness-empty-10-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: ""
+
+  - id: conciseness-invalid-content-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Office summer hours ─────────────
+  - id: office-summer-hours-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The office closes at 4 p.m. on Fridays during July and August.
+      evaluated: |
+        July-August Fridays: office closes at 4 p.m.
+
+  - id: office-summer-hours-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The office closes at 4 p.m. on Fridays during July and August.
+      evaluated: |
+        During July and August, the office closes at 4 p.m. on Fridays.
+
+  - id: office-summer-hours-good
+    human_score: good
+    inputs:
+      reference: |
+        The office closes at 4 p.m. on Fridays during July and August.
+      evaluated: |
+        In the summer months of July and August, the office will close at
+        4 p.m. every Friday.
+
+  - id: office-summer-hours-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The office closes at 4 p.m. on Fridays during July and August.
+      evaluated: |
+        Please note that for the months of July and August, when Friday
+        comes around each week, the office will be closing earlier than
+        usual, specifically at 4 p.m.
+
+  - id: office-summer-hours-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The office closes at 4 p.m. on Fridays during July and August.
+      evaluated: |
+        We would like to make sure everyone is fully aware that, as part
+        of our seasonal scheduling adjustments for the two summer months
+        known as July and August, the office's closing time on the final
+        workday of each week, which is Friday, will be moved to the earlier
+        time of 4 p.m. in the afternoon.
+
+  # ───────────── Password requirement ─────────────
+  - id: password-rule-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Passwords must be at least 12 characters long and include one
+        uppercase letter, one number, and one symbol. They expire every 90
+        days and cannot reuse the last five passwords.
+      evaluated: |
+        Min 12 chars with an uppercase, a number, and a symbol; expires every
+        90 days; no reuse of the last 5.
+
+  - id: password-rule-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Passwords must be at least 12 characters long and include one
+        uppercase letter, one number, and one symbol. They expire every 90
+        days and cannot reuse the last five passwords.
+      evaluated: |
+        Passwords need at least 12 characters with one uppercase letter, one
+        number, and one symbol. They expire every 90 days, and you can't
+        reuse your last five.
+
+  - id: password-rule-good
+    human_score: good
+    inputs:
+      reference: |
+        Passwords must be at least 12 characters long and include one
+        uppercase letter, one number, and one symbol. They expire every 90
+        days and cannot reuse the last five passwords.
+      evaluated: |
+        Your password has to be a minimum of 12 characters in length, and it
+        needs to contain at least one uppercase letter, at least one number,
+        and at least one symbol. On top of that, the password will expire
+        after 90 days, and you are not allowed to reuse any of your last five
+        passwords.
+
+  - id: password-rule-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Passwords must be at least 12 characters long and include one
+        uppercase letter, one number, and one symbol. They expire every 90
+        days and cannot reuse the last five passwords.
+      evaluated: |
+        When it comes to the passwords that you are required to set up for
+        your account, there are a number of rules that you will need to keep
+        in mind. To begin with, the password that you choose has to be at
+        least 12 characters in terms of its overall length. Beyond just the
+        length, however, there are also requirements regarding the kinds of
+        characters that need to be included, and these are that you must have
+        at least one letter that is uppercase, at least one character that is
+        a number, and at least one character that counts as a symbol. In
+        addition to all of that, it is also the case that the password will
+        end up expiring once a period of 90 days has gone by, and when you go
+        to set a new one, you will not be permitted to reuse any of the five
+        passwords that you most recently had.
+
+  - id: password-rule-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Passwords must be at least 12 characters long and include one
+        uppercase letter, one number, and one symbol. They expire every 90
+        days and cannot reuse the last five passwords.
+      evaluated: |
+        It is, perhaps, worth taking a moment at the very outset to lay out,
+        in a thorough and comprehensive manner, the full set of requirements
+        and stipulations that govern the creation and ongoing maintenance of
+        the passwords associated with one's account on our system. To start
+        with the most fundamental of these requirements, there is the matter
+        of length, and on this particular point what must be understood is
+        that any password which a user elects to create is obligated to
+        consist of no fewer than 12 individual characters when counted in
+        total. Moving beyond the question of mere length, however, we arrive
+        at the equally important question of composition — that is to say,
+        the specific varieties of characters that any valid password is
+        required to contain within it. On this front, the rules specify that
+        there must be present, somewhere within the password, at minimum one
+        letter rendered in uppercase form, at minimum one character that is
+        numerical in nature, and, finally, at minimum one character that
+        falls into the category of symbols. And as if all of the foregoing
+        were not enough, there remain still further considerations to bear
+        in mind, the first of which concerns expiration: every password,
+        once set, will remain valid only for a span of 90 days, after which
+        point it will expire and require replacement. The second and final
+        consideration concerns the matter of reuse, on which the rule is
+        that none of the five passwords most recently used may be selected
+        again.
+
+  # ───────────── Library borrowing limit ─────────────
+  - id: library-limit-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Members may borrow up to 10 items at a time for three weeks, with
+        one free renewal unless another member has placed a hold.
+      evaluated: |
+        Up to 10 items for 3 weeks; one free renewal unless someone's placed
+        a hold.
+
+  - id: library-limit-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Members may borrow up to 10 items at a time for three weeks, with
+        one free renewal unless another member has placed a hold.
+      evaluated: |
+        Members can borrow up to 10 items for three weeks and renew once for
+        free, unless another member has a hold on the item.
+
+  - id: library-limit-good
+    human_score: good
+    inputs:
+      reference: |
+        Members may borrow up to 10 items at a time for three weeks, with
+        one free renewal unless another member has placed a hold.
+      evaluated: |
+        As a member, you are able to check out as many as 10 items all at
+        once, and you get to keep them for a period of three weeks. You are
+        also allowed to renew them one time at no cost, though this is only
+        possible if no other member has put a hold on the item.
+
+  - id: library-limit-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Members may borrow up to 10 items at a time for three weeks, with
+        one free renewal unless another member has placed a hold.
+      evaluated: |
+        For those who hold a membership with the library, the borrowing
+        privileges that come along with that membership are as follows. At
+        any one given time, a member is entitled to have in their possession
+        a number of borrowed items that can go as high as, but not beyond,
+        a total of 10 separate items. The length of time for which these
+        items may be kept before they are due to be returned is a span
+        amounting to three full weeks. Should a member wish to hold on to an
+        item for a little while longer, there does exist the option of
+        renewing the loan one single time, and this renewal carries with it
+        no charge whatsoever — provided, that is, that no other member of the
+        library has in the meantime gone ahead and placed a hold upon that
+        very same item.
+
+  - id: library-limit-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Members may borrow up to 10 items at a time for three weeks, with
+        one free renewal unless another member has placed a hold.
+      evaluated: |
+        It seems only appropriate, before anything else is said, to set out
+        in as full and complete a fashion as can reasonably be managed the
+        various rules, conditions, and limitations that together make up the
+        borrowing policy applicable to those individuals who happen to be
+        members in good standing of this particular library institution. The
+        first such matter that warrants our attention is the question of
+        quantity — that is to say, precisely how many items a given member
+        is permitted to have checked out and in their possession at any one
+        single moment in time. On this point, the policy is quite clear in
+        establishing that the maximum number of items allowable is a figure
+        of 10, and that under no ordinary circumstances may this figure be
+        exceeded. Turning next to the matter of duration, we find that the
+        period of time during which a member may retain the items they have
+        borrowed, before such items must be returned, is one that extends to
+        a length of three weeks in total. There is, moreover, a provision
+        made for the extension of this period, in that a member who desires
+        to keep an item somewhat longer is afforded the opportunity to renew
+        the loan on one occasion, and to do so without incurring any fee or
+        cost. This renewal option, it must be carefully noted, is contingent
+        upon a single important condition — namely, that no other member of
+        the library has, in the intervening time, submitted a hold request
+        in respect of the item in question.
+
+  # ───────────── Coffee brewing instruction ─────────────
+  - id: coffee-brew-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Use about two tablespoons of ground coffee per six ounces of water,
+        pour water just off the boil over the grounds, and let it steep for
+        roughly four minutes before pressing or straining.
+      evaluated: |
+        ~2 tbsp grounds per 6 oz water; pour just-off-boil water over,
+        steep ~4 min, then press or strain.
+
+  - id: coffee-brew-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Use about two tablespoons of ground coffee per six ounces of water,
+        pour water just off the boil over the grounds, and let it steep for
+        roughly four minutes before pressing or straining.
+      evaluated: |
+        Use about two tablespoons of grounds per six ounces of water. Pour
+        water that's just off the boil over them, steep for around four
+        minutes, then press or strain.
+
+  - id: coffee-brew-good
+    human_score: good
+    inputs:
+      reference: |
+        Use about two tablespoons of ground coffee per six ounces of water,
+        pour water just off the boil over the grounds, and let it steep for
+        roughly four minutes before pressing or straining.
+      evaluated: |
+        For each six ounces of water that you plan to use, you'll want to
+        measure out roughly two tablespoons of ground coffee. Take water
+        that has just come off the boil and pour it over the grounds. Let
+        the whole thing sit and steep for about four minutes or so, and then
+        go ahead and press it down or strain it out.
+
+  - id: coffee-brew-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Use about two tablespoons of ground coffee per six ounces of water,
+        pour water just off the boil over the grounds, and let it steep for
+        roughly four minutes before pressing or straining.
+      evaluated: |
+        When the time comes that you would like to set about brewing yourself
+        a cup of coffee, the approach that you'll want to take, generally
+        speaking, runs more or less as follows. You begin by giving some
+        thought to the amount of water you intend to use, and for every six
+        ounces of that water, the quantity of ground coffee that you ought to
+        be measuring out comes to somewhere in the neighborhood of two
+        tablespoons. Once you have your grounds ready and waiting, the next
+        thing to do is to take some water that has only just finished coming
+        to a boil and to pour that water over the top of the grounds. From
+        there, what is called for is a period of patience, during which you
+        allow the coffee to steep for a duration that amounts to roughly four
+        minutes, and only after that has elapsed do you then proceed to press
+        the coffee down or otherwise strain it.
+
+  - id: coffee-brew-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Use about two tablespoons of ground coffee per six ounces of water,
+        pour water just off the boil over the grounds, and let it steep for
+        roughly four minutes before pressing or straining.
+      evaluated: |
+        It is, in many respects, a most pleasant and worthwhile undertaking
+        to prepare for oneself a freshly brewed cup of coffee, and while the
+        process by which this is accomplished is not, on the whole, an
+        especially difficult one, there are nonetheless a number of steps and
+        considerations involved that would seem to merit a careful and
+        unhurried explanation. To begin at the beginning, then, one must first
+        turn one's attention to the question of proportions, and more
+        particularly to the relationship between the quantity of water on the
+        one hand and the quantity of ground coffee on the other. The
+        guideline that is generally put forward in this regard holds that for
+        each and every six ounces of water that one proposes to make use of,
+        the corresponding amount of ground coffee that ought to be measured
+        out and set aside is an amount in the vicinity of two tablespoons.
+        Having attended to that initial matter of measurement, one then
+        proceeds to the question of the water itself, and here the advice is
+        to take water that has been heated to the point of boiling and then
+        allowed to settle just slightly below that point, and to pour this
+        water, in a steady fashion, over the grounds that have been prepared.
+        What follows next is a span of waiting, the purpose of which is to
+        permit the coffee to steep and to develop its flavor, and the
+        duration of this steeping is one that ought to come to approximately
+        four minutes in length. Only once those four minutes have fully run
+        their course should one then move on to the concluding step, which
+        consists of either pressing the grounds down toward the bottom of the
+        vessel or else straining the liquid so as to separate it from them.
+
+  # ───────────── Gym membership cancellation ─────────────
+  - id: gym-cancel-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        To cancel a membership, give 30 days' written notice; the final
+        payment is still charged, and access continues until the end of that
+        notice period.
+      evaluated: |
+        Cancel with 30 days' written notice; one final charge applies and
+        access lasts until the notice ends.
+
+  - id: gym-cancel-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        To cancel a membership, give 30 days' written notice; the final
+        payment is still charged, and access continues until the end of that
+        notice period.
+      evaluated: |
+        To cancel, give 30 days' written notice. You'll still be charged one
+        final payment, and your access continues until the notice period
+        ends.
+
+  - id: gym-cancel-good
+    human_score: good
+    inputs:
+      reference: |
+        To cancel a membership, give 30 days' written notice; the final
+        payment is still charged, and access continues until the end of that
+        notice period.
+      evaluated: |
+        If you want to cancel your membership, you'll need to provide written
+        notice 30 days ahead of time. There will still be one more payment
+        that gets charged to you, and you'll be able to keep using the gym
+        right up until that 30-day notice period comes to an end.
+
+  - id: gym-cancel-fair
+    human_score: fair
+    inputs:
+      reference: |
+        To cancel a membership, give 30 days' written notice; the final
+        payment is still charged, and access continues until the end of that
+        notice period.
+      evaluated: |
+        In the event that you have reached the decision that you would like
+        to go ahead and cancel the membership that you currently hold with
+        us, the procedure that you will need to follow involves a few points
+        that are worth spelling out. The first of these is that you are
+        required to furnish us with notice of your intention to cancel, that
+        this notice must be provided in written form, and that it must be
+        given a full 30 days in advance. It should further be understood that
+        one additional payment, the final one, will still be charged to your
+        account in the usual way. And finally, you may rest assured that your
+        ability to make use of the facilities will continue uninterrupted
+        right up until the moment that the aforementioned notice period has
+        reached its conclusion.
+
+  - id: gym-cancel-poor
+    human_score: poor
+    inputs:
+      reference: |
+        To cancel a membership, give 30 days' written notice; the final
+        payment is still charged, and access continues until the end of that
+        notice period.
+      evaluated: |
+        Should you find yourself, at some point during the course of your
+        association with our establishment, arriving at the considered
+        conclusion that the time has come for you to bring your membership to
+        an end, then it falls to us, in the interest of clarity and the
+        avoidance of any possible confusion, to set forth in some considerable
+        detail the precise nature of the steps, obligations, and consequences
+        that attend upon any such decision to cancel. The very first of the
+        matters to be addressed concerns the giving of notice, and on this
+        subject the requirement is twofold in nature: not only must such
+        notice be communicated to us in a form that is written rather than
+        merely spoken, but it must in addition be furnished to us a full 30
+        days prior to the point at which the cancellation is to take effect.
+        Beyond the question of notice, there is the further matter of payment
+        to be reckoned with, and here it should be understood, plainly and
+        without ambiguity, that one final payment will, in keeping with the
+        ordinary arrangements, still be charged to your account
+        notwithstanding your decision to cancel. And lastly, lest there be
+        any uncertainty on the point, you should know that your access to and
+        use of the facilities will by no means be cut off immediately, but
+        will instead persist, fully and without interruption, all the way up
+        until such time as the 30-day notice period in question has run
+        entirely to its end.
+
+  # ───────────── More unrated empty responses (none) ─────────────
+  - id: conciseness-empty-11-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: ""
+
+  - id: conciseness-empty-12-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: ""
+
+  - id: conciseness-empty-13-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: ""
+
+  - id: conciseness-invalid-content-02-none
+    human_score: none
+    inputs:
+      reference: "The office closes at 4 p.m. on Fridays during July and August."
+      evaluated: |
+        @@@@@ ;;;;; @@@@@
+        \\\\ no-parse \\\\
+        ((( dangling

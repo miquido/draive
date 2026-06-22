@@ -637,3 +637,410 @@ samples:
         Octopuses are vertebrates with eight arms and a single heart. They
         change their skin color for camouflage, and most species live alone
         except during mating.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: consistency-empty-01-none
+    human_score: none
+    inputs:
+      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
+      evaluated: ""
+
+  - id: consistency-empty-02-none
+    human_score: none
+    inputs:
+      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
+      evaluated: ""
+
+  - id: consistency-empty-03-none
+    human_score: none
+    inputs:
+      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
+      evaluated: ""
+
+  - id: consistency-empty-04-none
+    human_score: none
+    inputs:
+      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
+      evaluated: ""
+
+  - id: consistency-empty-05-none
+    human_score: none
+    inputs:
+      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
+      evaluated: ""
+
+  - id: consistency-empty-06-none
+    human_score: none
+    inputs:
+      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
+      evaluated: ""
+
+  - id: consistency-empty-07-none
+    human_score: none
+    inputs:
+      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
+      evaluated: ""
+
+  - id: consistency-empty-08-none
+    human_score: none
+    inputs:
+      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
+      evaluated: ""
+
+  - id: consistency-empty-09-none
+    human_score: none
+    inputs:
+      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
+      evaluated: ""
+
+  - id: consistency-empty-10-none
+    human_score: none
+    inputs:
+      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
+      evaluated: ""
+
+  - id: consistency-invalid-content-none
+    human_score: none
+    inputs:
+      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Museum hours ─────────────
+  - id: museum-hours-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The city museum opens at 10 a.m. and closes at 6 p.m. on Saturdays.
+        Admission is free for children under twelve.
+      evaluated: |
+        On Saturdays, the city museum is open from 10 a.m. until 6 p.m.,
+        and children under twelve can enter for free.
+
+  - id: museum-hours-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The city museum opens at 10 a.m. and closes at 6 p.m. on Saturdays.
+        Admission is free for children under twelve.
+      evaluated: |
+        The city museum's Saturday hours are 10 a.m. to 6 p.m. Kids under
+        twelve do not pay admission.
+
+  - id: museum-hours-good
+    human_score: good
+    inputs:
+      reference: |
+        The city museum opens at 10 a.m. and closes at 6 p.m. on Saturdays.
+        Admission is free for children under twelve.
+      evaluated: |
+        The museum is open on Saturdays from about 10 a.m. to the early
+        evening, and younger children can visit without paying.
+
+  - id: museum-hours-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The city museum opens at 10 a.m. and closes at 6 p.m. on Saturdays.
+        Admission is free for children under twelve.
+      evaluated: |
+        The city museum opens at noon on Saturdays and closes at 6 p.m.
+        Children under twelve pay a reduced admission fee.
+
+  - id: museum-hours-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The city museum opens at 10 a.m. and closes at 6 p.m. on Saturdays.
+        Admission is free for children under twelve.
+      evaluated: |
+        The city museum is closed on Saturdays, and everyone must buy a
+        full-price ticket regardless of age.
+
+  # ───────────── Photosynthesis ─────────────
+  - id: photosynthesis-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Photosynthesis is the process by which green plants use sunlight to
+        convert carbon dioxide and water into glucose and oxygen. The
+        reaction takes place mainly in the chloroplasts and releases oxygen
+        as a by-product.
+      evaluated: |
+        Through photosynthesis, green plants harness sunlight to turn carbon
+        dioxide and water into glucose and oxygen. This mostly happens inside
+        the chloroplasts, and oxygen is given off as a by-product.
+
+  - id: photosynthesis-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Photosynthesis is the process by which green plants use sunlight to
+        convert carbon dioxide and water into glucose and oxygen. The
+        reaction takes place mainly in the chloroplasts and releases oxygen
+        as a by-product.
+      evaluated: |
+        In photosynthesis, sunlight drives green plants to combine carbon
+        dioxide and water into glucose, with oxygen released as a leftover.
+        The chloroplasts are where most of this occurs.
+
+  - id: photosynthesis-good
+    human_score: good
+    inputs:
+      reference: |
+        Photosynthesis is the process by which green plants use sunlight to
+        convert carbon dioxide and water into glucose and oxygen. The
+        reaction takes place mainly in the chloroplasts and releases oxygen
+        as a by-product.
+      evaluated: |
+        Photosynthesis lets green plants use sunlight to make glucose and
+        oxygen from carbon dioxide and water. It happens in the chloroplasts,
+        which contain a green pigment called chlorophyll that absorbs light.
+
+  - id: photosynthesis-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Photosynthesis is the process by which green plants use sunlight to
+        convert carbon dioxide and water into glucose and oxygen. The
+        reaction takes place mainly in the chloroplasts and releases oxygen
+        as a by-product.
+      evaluated: |
+        Photosynthesis is how green plants use sunlight to convert carbon
+        dioxide and water into glucose and oxygen. The reaction takes place
+        mainly in the mitochondria of the plant cell.
+
+  - id: photosynthesis-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Photosynthesis is the process by which green plants use sunlight to
+        convert carbon dioxide and water into glucose and oxygen. The
+        reaction takes place mainly in the chloroplasts and releases oxygen
+        as a by-product.
+      evaluated: |
+        Photosynthesis is how plants absorb oxygen in darkness and release
+        carbon dioxide and glucose. It happens in the roots, and sunlight
+        plays no part in it.
+
+  # ───────────── Declaration of Independence ─────────────
+  - id: declaration-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The United States Declaration of Independence was adopted by the
+        Second Continental Congress on July 4, 1776. Its principal author
+        was Thomas Jefferson, and it announced that the thirteen colonies
+        regarded themselves as independent from Britain.
+      evaluated: |
+        Adopted by the Second Continental Congress on July 4, 1776, the
+        United States Declaration of Independence was chiefly written by
+        Thomas Jefferson and proclaimed that the thirteen colonies considered
+        themselves free of Britain.
+
+  - id: declaration-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The United States Declaration of Independence was adopted by the
+        Second Continental Congress on July 4, 1776. Its principal author
+        was Thomas Jefferson, and it announced that the thirteen colonies
+        regarded themselves as independent from Britain.
+      evaluated: |
+        On July 4, 1776, the Second Continental Congress adopted the
+        Declaration of Independence. Thomas Jefferson was its main author,
+        and the document declared the thirteen colonies independent of
+        Britain.
+
+  - id: declaration-good
+    human_score: good
+    inputs:
+      reference: |
+        The United States Declaration of Independence was adopted by the
+        Second Continental Congress on July 4, 1776. Its principal author
+        was Thomas Jefferson, and it announced that the thirteen colonies
+        regarded themselves as independent from Britain.
+      evaluated: |
+        The Declaration of Independence was adopted on July 4, 1776, by the
+        Second Continental Congress. Thomas Jefferson was its principal
+        author, and it broke the colonies away from Britain. Most delegates
+        actually signed the engrossed copy in August.
+
+  - id: declaration-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The United States Declaration of Independence was adopted by the
+        Second Continental Congress on July 4, 1776. Its principal author
+        was Thomas Jefferson, and it announced that the thirteen colonies
+        regarded themselves as independent from Britain.
+      evaluated: |
+        The Declaration of Independence was adopted by the Second Continental
+        Congress on July 4, 1776. Its principal author was Benjamin Franklin,
+        and it declared the thirteen colonies independent from Britain.
+
+  - id: declaration-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The United States Declaration of Independence was adopted by the
+        Second Continental Congress on July 4, 1776. Its principal author
+        was Thomas Jefferson, and it announced that the thirteen colonies
+        regarded themselves as independent from Britain.
+      evaluated: |
+        The Declaration of Independence was signed in 1789 by the British
+        Parliament. Written mainly by George Washington, it granted the
+        twenty colonies continued membership in the British Empire.
+
+  # ───────────── Honeybee colony roles ─────────────
+  - id: honeybee-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        A honeybee colony has one queen, who lays the eggs, many female
+        workers, who gather nectar and tend the hive, and male drones, whose
+        main role is to mate with a queen.
+      evaluated: |
+        In a honeybee colony there is a single queen that lays the eggs,
+        numerous female workers that collect nectar and care for the hive,
+        and male drones whose chief purpose is to mate with a queen.
+
+  - id: honeybee-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A honeybee colony has one queen, who lays the eggs, many female
+        workers, who gather nectar and tend the hive, and male drones, whose
+        main role is to mate with a queen.
+      evaluated: |
+        A honeybee colony is built around one egg-laying queen, a large
+        number of female workers that forage for nectar and look after the
+        hive, and male drones that exist mainly to mate with a queen.
+
+  - id: honeybee-good
+    human_score: good
+    inputs:
+      reference: |
+        A honeybee colony has one queen, who lays the eggs, many female
+        workers, who gather nectar and tend the hive, and male drones, whose
+        main role is to mate with a queen.
+      evaluated: |
+        A honeybee colony has one queen that lays eggs, many female workers
+        that gather nectar and maintain the hive, and male drones that mate
+        with a queen. A queen can live for several years, far longer than a
+        worker.
+
+  - id: honeybee-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A honeybee colony has one queen, who lays the eggs, many female
+        workers, who gather nectar and tend the hive, and male drones, whose
+        main role is to mate with a queen.
+      evaluated: |
+        A honeybee colony has several queens that lay the eggs, many female
+        workers that gather nectar and tend the hive, and male drones whose
+        main role is to mate with a queen.
+
+  - id: honeybee-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A honeybee colony has one queen, who lays the eggs, many female
+        workers, who gather nectar and tend the hive, and male drones, whose
+        main role is to mate with a queen.
+      evaluated: |
+        A honeybee colony has one male king that lays all the eggs. The
+        workers are male and never leave the hive, while the female drones
+        gather nectar and defend the colony.
+
+  # ───────────── Light speed in a vacuum ─────────────
+  - id: lightspeed-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Light travels through a vacuum at about 299,792 kilometers per
+        second. This speed is the same for all observers and represents the
+        upper limit for the speed of any signal in the universe.
+      evaluated: |
+        In a vacuum, light moves at roughly 299,792 kilometers per second.
+        Every observer measures this same value, and it is the maximum speed
+        at which any signal can travel in the universe.
+
+  - id: lightspeed-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Light travels through a vacuum at about 299,792 kilometers per
+        second. This speed is the same for all observers and represents the
+        upper limit for the speed of any signal in the universe.
+      evaluated: |
+        The speed of light in a vacuum is about 299,792 km/s. It is identical
+        for all observers and stands as the universe's cap on how fast any
+        signal can move.
+
+  - id: lightspeed-good
+    human_score: good
+    inputs:
+      reference: |
+        Light travels through a vacuum at about 299,792 kilometers per
+        second. This speed is the same for all observers and represents the
+        upper limit for the speed of any signal in the universe.
+      evaluated: |
+        Light travels through a vacuum at around 299,792 kilometers per
+        second, the same for every observer and the upper limit for any
+        signal. In water or glass, light slows down noticeably.
+
+  - id: lightspeed-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Light travels through a vacuum at about 299,792 kilometers per
+        second. This speed is the same for all observers and represents the
+        upper limit for the speed of any signal in the universe.
+      evaluated: |
+        Light travels through a vacuum at about 299,792 kilometers per hour.
+        This speed is the same for all observers and represents the upper
+        limit for any signal in the universe.
+
+  - id: lightspeed-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Light travels through a vacuum at about 299,792 kilometers per
+        second. This speed is the same for all observers and represents the
+        upper limit for the speed of any signal in the universe.
+      evaluated: |
+        Light crawls through a vacuum at about 300 kilometers per second and
+        its measured speed depends entirely on how fast the observer is
+        moving. Many ordinary signals travel far faster than light.
+
+  # ───────────── Additional unrated empty/invalid responses (none) ─────────────
+  - id: consistency-empty-11-none
+    human_score: none
+    inputs:
+      reference: "The ferry to the island departs every hour on the half hour."
+      evaluated: ""
+
+  - id: consistency-empty-12-none
+    human_score: none
+    inputs:
+      reference: "The ferry to the island departs every hour on the half hour."
+      evaluated: ""
+
+  - id: consistency-empty-13-none
+    human_score: none
+    inputs:
+      reference: "The ferry to the island departs every hour on the half hour."
+      evaluated: "   "
+
+  - id: consistency-invalid-content-02-none
+    human_score: none
+    inputs:
+      reference: "The ferry to the island departs every hour on the half hour."
+      evaluated: |
+        ��� \x00\x00 ?????
+        ===NO_OUTPUT_PRODUCED===
+        }}}}{{{{

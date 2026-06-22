@@ -1,11 +1,12 @@
 from collections.abc import Callable, Sequence
+from typing import cast
 
 from haiway import Disposable, State, ctx, execute_concurrently
 
 from draive.evaluation import EvaluatorResult
+from draive.evaluators import cohen_kappa_evaluator
 
 from .baseline import BaselineDocument, BaselineSample
-from .kappa import KappaReport, kappa_report
 from .registry import EvaluatorEntry, lookup_evaluator
 
 __all__ = (
@@ -20,7 +21,6 @@ class SampleOutcome(State):
     sample_id: str
     human_score: float
     evaluator_score: float
-    evaluator_result: EvaluatorResult
 
 
 class SampleFailure(State):
@@ -28,10 +28,18 @@ class SampleFailure(State):
     error: str
 
 
+def _agreement_metric(
+    result: EvaluatorResult,
+    key: str,
+    /,
+) -> float:
+    return float(cast(float, result.meta[key]))
+
+
 class SuiteResult(State):
     evaluator: str
     outcomes: Sequence[SampleOutcome]
-    report: KappaReport
+    agreement: EvaluatorResult
     failures: Sequence[SampleFailure] = ()
 
     def render(self) -> str:
@@ -39,7 +47,16 @@ class SuiteResult(State):
         lines: list[str] = [
             header,
             "=" * len(header),
-            self.report.render(),
+            f"samples: {int(_agreement_metric(self.agreement, 'sample_count'))}",
+            f"exact agreement: {_agreement_metric(self.agreement, 'exact_agreement') * 100:.1f}%",
+            f"Cohen's kappa (nominal):            "
+            f"{_agreement_metric(self.agreement, 'cohen_kappa'):.3f}",
+            f"Cohen's kappa (quadratic weighted): "
+            f"{_agreement_metric(self.agreement, 'quadratic_weighted_kappa'):.3f}",
+            "",
+            "interpretation (Landis & Koch, 1977):",
+            "  < 0.00 poor | 0.00-0.20 slight | 0.21-0.40 fair",
+            "  0.41-0.60 moderate | 0.61-0.80 substantial | 0.81-1.00 almost perfect",
             "",
             "per-sample comparison (human -> evaluator):",
         ]
@@ -73,7 +90,6 @@ async def _evaluate_sample(
         sample_id=sample.id,
         human_score=sample.human_score,
         evaluator_score=result.score,
-        evaluator_result=result,
     )
 
 
@@ -132,14 +148,15 @@ async def run_suite(
 
     outcomes.sort(key=lambda outcome: outcome.sample_id)
 
-    report: KappaReport = kappa_report(
-        tuple(outcome.human_score for outcome in outcomes),
+    # Measure evaluator <-> human agreement with the shipped framework evaluator.
+    agreement: EvaluatorResult = await cohen_kappa_evaluator(
         tuple(outcome.evaluator_score for outcome in outcomes),
+        reference=tuple(outcome.human_score for outcome in outcomes),
     )
 
     return SuiteResult(
         evaluator=document.evaluator,
         outcomes=tuple(outcomes),
-        report=report,
+        agreement=agreement,
         failures=tuple(failures),
     )

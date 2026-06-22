@@ -405,7 +405,7 @@ class GeminiLive(GeminiAPI):
                 )
 
             finally:
-                await scope.__aexit__(  # noqa: F821
+                await scope.__aexit__(
                     exc_type,
                     exc_val,
                     exc_tb,

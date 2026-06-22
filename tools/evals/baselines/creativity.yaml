@@ -392,3 +392,255 @@ samples:
         receipt and I answered to it for nine full seconds — long
         enough to wonder whether the other person was, somewhere
         across town, having a better Tuesday in my name.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: creativity-empty-01-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: creativity-empty-02-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: creativity-empty-03-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: creativity-empty-04-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: creativity-empty-05-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: creativity-empty-06-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: creativity-empty-07-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: creativity-empty-08-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: creativity-empty-09-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: creativity-empty-10-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: creativity-invalid-content-none
+    human_score: none
+    inputs:
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Rainy city fragments ─────────────
+  - id: rainy-city-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        It was raining in the city. People walked quickly with umbrellas.
+        The streets were wet and everyone wanted to get home.
+
+  - id: rainy-city-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Rain fell on the busy city like tears from the sky, and every
+        person hurried home beneath a sea of umbrellas.
+
+  - id: rainy-city-good
+    human_score: good
+    inputs:
+      evaluated: |
+        The rain made the crosswalk lights smear into red and green commas,
+        as if the city were pausing between thoughts.
+
+  - id: rainy-city-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        By dusk the gutters were carrying tiny paper boats made from
+        receipts, each one stamped with proof that somebody had tried to
+        buy a drier day.
+
+  - id: rainy-city-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        The city put on its rain voice: taxis hissed like kettles, awnings
+        bowed under silver coins, and every window briefly became a person
+        watching the weather decide who they were.
+
+  # ───────────── Six-word story ─────────────
+  - id: sixword-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Born June. Died June. Lived August.
+
+  - id: sixword-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Wanted: someone to forget me back.
+
+  - id: sixword-good
+    human_score: good
+    inputs:
+      evaluated: |
+        We kept the dog. Split everything.
+
+  - id: sixword-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        She left, and he never recovered.
+
+  - id: sixword-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        It was a very sad goodbye.
+
+  # ───────────── Slogan for a public library ─────────────
+  - id: library-slogan-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Overdue is just our word for "you weren't finished living it yet."
+
+  - id: library-slogan-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Quiet enough to hear a different century.
+
+  - id: library-slogan-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Borrow a life you'll have to give back.
+
+  - id: library-slogan-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Open a book, open your mind.
+
+  - id: library-slogan-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Visit your local library for books, movies, and free Wi-Fi.
+
+  # ───────────── Description of silence ─────────────
+  - id: silence-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        The silence had a grain to it, like a record still spinning after
+        the song — you could hear the room remembering the noise it had
+        just been asked to give back.
+
+  - id: silence-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        It was the kind of silence that arrives one second before the phone
+        rings, already knowing the news.
+
+  - id: silence-good
+    human_score: good
+    inputs:
+      evaluated: |
+        The silence was thick enough that I could hear myself deciding not
+        to speak.
+
+  - id: silence-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        The silence in the room was deafening, and you could have heard a
+        pin drop.
+
+  - id: silence-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        The room was very quiet. No one was talking and there was no sound
+        at all.
+
+  # ───────────── Fortune-cookie message ─────────────
+  - id: fortune-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        The door you keep checking is locked from your side.
+
+  - id: fortune-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        You will soon meet someone who remembers a version of you that you
+        retired years ago.
+
+  - id: fortune-good
+    human_score: good
+    inputs:
+      evaluated: |
+        The thing you are putting off is also putting you off.
+
+  - id: fortune-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        A pleasant surprise is waiting for you just around the corner.
+
+  - id: fortune-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        You will have good luck and great success in the future.
+
+  # ───────────── Additional unrated empty/invalid responses (none) ─────────────
+  - id: creativity-empty-11-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: creativity-empty-12-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: creativity-empty-13-none
+    human_score: none
+    inputs:
+      evaluated: "    "
+
+  - id: creativity-invalid-content-02-none
+    human_score: none
+    inputs:
+      evaluated: |
+        \x00\x00\x00 ?????? ������
+        <NO_TEXT_GENERATED>
+        ][][][

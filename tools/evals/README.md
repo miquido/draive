@@ -29,11 +29,19 @@ uv run tools/evals/verify_evaluator.py \
     --provider gemini \
     --baseline tools/evals/baselines/relevance.yaml \
     --continue-on-error
+
+# Verify against a local Ollama model, for example M-Prometheus GGUF.
+uv run tools/evals/verify_evaluator.py \
+    --provider ollama \
+    --baseline tools/evals/baselines/fluency.yaml \
+    --concurrency 1
 ```
 
-Supported providers: `anthropic`, `openai`, `gemini`. Set the matching
-API key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY`); a
-local `.env` next to the script is loaded automatically.
+Supported providers: `anthropic`, `openai`, `gemini`, `mistral`, `ollama`.
+Set the matching API key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+`GOOGLE_API_KEY`, or `MISTRAL_API_KEY`) for hosted providers. For Ollama,
+ensure the local server is running and the selected model is available. A local
+`.env` next to the script is loaded automatically.
 
 Exit codes:
 - `0` — verification ran and every sample succeeded.
@@ -59,15 +67,7 @@ Landis & Koch interpretation:
 - `0.61–0.80` substantial
 - `0.81–1.00` almost perfect
 
-## Calibration (optional)
-
-Once you have a baseline with paired human/evaluator scores, `calibration.py`
-can fit either:
-
-- `fit_offset` — a single bias added to raw scores (use when the evaluator
-  is systematically lenient or strict but ordering is good).
-- `fit_isotonic` — a non-decreasing piecewise-linear mapping fitted with
-  pool-adjacent-violators (use when the bias varies along the scale).
-
-`apply_calibration` / `calibrate_score` then map a raw evaluator score
-into the calibrated range, clamped to `[0, 1]`.
+The agreement itself is computed by draive's own `cohen_kappa_evaluator`
+(`draive.evaluators.cohen_kappa_evaluator`) — the runner feeds it the
+evaluator scores against the human baseline, so the verification suite and
+the shipped framework share a single kappa implementation.

@@ -785,3 +785,446 @@ samples:
         and we hope you will enjoy it and please share it with your
         friends and colleagues and family members because it is really
         quite something.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: expectations-empty-01-none
+    human_score: none
+    inputs:
+      expectations: "Mention the workshop date, start time, room, and ID requirement."
+      evaluated: ""
+
+  - id: expectations-empty-02-none
+    human_score: none
+    inputs:
+      expectations: "Mention the workshop date, start time, room, and ID requirement."
+      evaluated: ""
+
+  - id: expectations-empty-03-none
+    human_score: none
+    inputs:
+      expectations: "Mention the workshop date, start time, room, and ID requirement."
+      evaluated: ""
+
+  - id: expectations-empty-04-none
+    human_score: none
+    inputs:
+      expectations: "Mention the workshop date, start time, room, and ID requirement."
+      evaluated: ""
+
+  - id: expectations-empty-05-none
+    human_score: none
+    inputs:
+      expectations: "Mention the workshop date, start time, room, and ID requirement."
+      evaluated: ""
+
+  - id: expectations-empty-06-none
+    human_score: none
+    inputs:
+      expectations: "Mention the workshop date, start time, room, and ID requirement."
+      evaluated: ""
+
+  - id: expectations-empty-07-none
+    human_score: none
+    inputs:
+      expectations: "Mention the workshop date, start time, room, and ID requirement."
+      evaluated: ""
+
+  - id: expectations-empty-08-none
+    human_score: none
+    inputs:
+      expectations: "Mention the workshop date, start time, room, and ID requirement."
+      evaluated: ""
+
+  - id: expectations-empty-09-none
+    human_score: none
+    inputs:
+      expectations: "Mention the workshop date, start time, room, and ID requirement."
+      evaluated: ""
+
+  - id: expectations-empty-10-none
+    human_score: none
+    inputs:
+      expectations: "Mention the workshop date, start time, room, and ID requirement."
+      evaluated: ""
+
+  - id: expectations-invalid-content-none
+    human_score: none
+    inputs:
+      expectations: "Mention the workshop date, start time, room, and ID requirement."
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Workshop reminder ─────────────
+  - id: workshop-reminder-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Mention the workshop date: 12 March.
+        - Mention the start time: 9:30 a.m.
+        - Mention the room: B204.
+        - Tell attendees to bring photo ID.
+      evaluated: |
+        Reminder: the workshop is on 12 March at 9:30 a.m. in room B204.
+        Please bring photo ID for check-in.
+
+  - id: workshop-reminder-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Mention the workshop date: 12 March.
+        - Mention the start time: 9:30 a.m.
+        - Mention the room: B204.
+        - Tell attendees to bring photo ID.
+      evaluated: |
+        The workshop starts at 9:30 a.m. on 12 March in B204. Bring photo
+        ID when you arrive.
+
+  - id: workshop-reminder-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Mention the workshop date: 12 March.
+        - Mention the start time: 9:30 a.m.
+        - Mention the room: B204.
+        - Tell attendees to bring photo ID.
+      evaluated: |
+        The workshop is on 12 March at 9:30 a.m. Please bring photo ID.
+
+  - id: workshop-reminder-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Mention the workshop date: 12 March.
+        - Mention the start time: 9:30 a.m.
+        - Mention the room: B204.
+        - Tell attendees to bring photo ID.
+      evaluated: |
+        The workshop is on 12 March in room B204.
+
+  - id: workshop-reminder-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Mention the workshop date: 12 March.
+        - Mention the start time: 9:30 a.m.
+        - Mention the room: B204.
+        - Tell attendees to bring photo ID.
+      evaluated: |
+        We look forward to seeing everyone at the workshop.
+
+  # ───────────── Meeting minutes checklist ─────────────
+  - id: minutes-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must list the meeting date.
+        - Must name the attendees.
+        - Must record at least one decision that was made.
+        - Must list action items with an owner for each.
+      evaluated: |
+        Project Sync — Minutes
+
+        Date: 14 April 2026.
+        Attendees: Lena Ortiz, David Cho, Priya Nair, Tomasz Wójcik.
+
+        Decisions:
+        - Approved moving the launch to 5 May to allow extra QA time.
+        - Agreed to drop the legacy export format from v2.
+
+        Action items:
+        - Lena: circulate the revised launch timeline by Friday.
+        - David: spin up the staging environment for QA.
+        - Priya: draft the deprecation notice for the export format.
+
+  - id: minutes-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must list the meeting date.
+        - Must name the attendees.
+        - Must record at least one decision that was made.
+        - Must list action items with an owner for each.
+      evaluated: |
+        Minutes, 14 April 2026. Present: Lena, David, Priya, Tomasz.
+
+        Decision: launch moves to 5 May.
+
+        Actions:
+        - Lena to send the new timeline.
+        - David to set up staging for QA.
+
+  - id: minutes-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must list the meeting date.
+        - Must name the attendees.
+        - Must record at least one decision that was made.
+        - Must list action items with an owner for each.
+      evaluated: |
+        Met on 14 April with Lena, David, and Priya. We decided to push the
+        launch to 5 May. David will set up staging.
+
+  - id: minutes-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must list the meeting date.
+        - Must name the attendees.
+        - Must record at least one decision that was made.
+        - Must list action items with an owner for each.
+      evaluated: |
+        The team met and decided to push the launch back. Someone needs to
+        set up staging.
+
+  - id: minutes-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must list the meeting date.
+        - Must name the attendees.
+        - Must record at least one decision that was made.
+        - Must list action items with an owner for each.
+      evaluated: |
+        Had a meeting. It went fine.
+
+  # ───────────── Press release checklist ─────────────
+  - id: press-release-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must include a dateline with city and date.
+        - Must include at least one quote attributed to a named person.
+        - Must state what is being announced.
+        - Must include a boilerplate "About" line for the company.
+      evaluated: |
+        BERLIN, 22 June 2026 — Aurora Robotics today announced Pathfinder X,
+        an autonomous warehouse robot that cuts order-picking time by 40%.
+
+        "Pathfinder X is the result of three years of work with our logistics
+        partners," said Dr. Mira Haas, CEO of Aurora Robotics. "It lets teams
+        focus on the work that machines can't do."
+
+        The robot ships to enterprise customers in Q4 2026.
+
+        About Aurora Robotics: Founded in 2018, Aurora Robotics builds
+        autonomous systems for industrial warehouses across Europe.
+
+  - id: press-release-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must include a dateline with city and date.
+        - Must include at least one quote attributed to a named person.
+        - Must state what is being announced.
+        - Must include a boilerplate "About" line for the company.
+      evaluated: |
+        BERLIN, 22 June 2026 — Aurora Robotics announced Pathfinder X, a new
+        warehouse robot.
+
+        "We're proud of this launch," said CEO Mira Haas.
+
+        About Aurora Robotics: the company builds warehouse automation.
+
+  - id: press-release-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must include a dateline with city and date.
+        - Must include at least one quote attributed to a named person.
+        - Must state what is being announced.
+        - Must include a boilerplate "About" line for the company.
+      evaluated: |
+        BERLIN, 22 June 2026 — Aurora Robotics announced a new warehouse
+        robot called Pathfinder X. "We're excited," said Mira Haas.
+
+  - id: press-release-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must include a dateline with city and date.
+        - Must include at least one quote attributed to a named person.
+        - Must state what is being announced.
+        - Must include a boilerplate "About" line for the company.
+      evaluated: |
+        Aurora Robotics has announced a new warehouse robot. The CEO said
+        the team is excited about it.
+
+  - id: press-release-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must include a dateline with city and date.
+        - Must include at least one quote attributed to a named person.
+        - Must state what is being announced.
+        - Must include a boilerplate "About" line for the company.
+      evaluated: |
+        Big news coming soon. Stay tuned!
+
+  # ───────────── API endpoint doc checklist ─────────────
+  - id: api-doc-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must state the HTTP method and path.
+        - Must describe the request parameters or body.
+        - Must describe the response shape on success.
+        - Must list at least one error status code and its meaning.
+      evaluated: |
+        POST /v1/invoices
+
+        Request body (JSON):
+        - `customer_id` (string, required): the customer's UUID.
+        - `amount_cents` (integer, required): total amount in cents.
+        - `currency` (string, optional): ISO 4217 code, defaults to "USD".
+
+        Success response (201 Created):
+        - Returns the created invoice object with `id`, `status`, and
+          `created_at` fields.
+
+        Errors:
+        - 400 Bad Request — a required field is missing or malformed.
+        - 404 Not Found — no customer matches `customer_id`.
+
+  - id: api-doc-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must state the HTTP method and path.
+        - Must describe the request parameters or body.
+        - Must describe the response shape on success.
+        - Must list at least one error status code and its meaning.
+      evaluated: |
+        POST /v1/invoices
+
+        Body: `customer_id` (string), `amount_cents` (int). Returns the new
+        invoice with an `id` and `status`. Returns 404 if the customer does
+        not exist.
+
+  - id: api-doc-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must state the HTTP method and path.
+        - Must describe the request parameters or body.
+        - Must describe the response shape on success.
+        - Must list at least one error status code and its meaning.
+      evaluated: |
+        POST /v1/invoices — send `customer_id` and `amount_cents`. It returns
+        the created invoice object.
+
+  - id: api-doc-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must state the HTTP method and path.
+        - Must describe the request parameters or body.
+        - Must describe the response shape on success.
+        - Must list at least one error status code and its meaning.
+      evaluated: |
+        Call /v1/invoices with the customer and amount to make an invoice.
+
+  - id: api-doc-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must state the HTTP method and path.
+        - Must describe the request parameters or body.
+        - Must describe the response shape on success.
+        - Must list at least one error status code and its meaning.
+      evaluated: |
+        Use the invoices endpoint to create invoices.
+
+  # ───────────── Event invitation checklist ─────────────
+  - id: invite-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        - Must state the event name.
+        - Must state the date and start time.
+        - Must state the venue or location.
+        - Must include an RSVP instruction with a deadline.
+      evaluated: |
+        You're invited to the Riverside Jazz Evening!
+
+        Join us on Saturday, 18 July at 7:00 p.m. at the Old Mill Gardens,
+        24 Canal Street.
+
+        Please RSVP to events@oldmill.example by 11 July so we can reserve
+        your seat.
+
+  - id: invite-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        - Must state the event name.
+        - Must state the date and start time.
+        - Must state the venue or location.
+        - Must include an RSVP instruction with a deadline.
+      evaluated: |
+        Riverside Jazz Evening — Saturday 18 July, 7:00 p.m., at the Old Mill
+        Gardens. Please RSVP by 11 July.
+
+  - id: invite-good
+    human_score: good
+    inputs:
+      expectations: |
+        - Must state the event name.
+        - Must state the date and start time.
+        - Must state the venue or location.
+        - Must include an RSVP instruction with a deadline.
+      evaluated: |
+        Come to the Riverside Jazz Evening on 18 July at the Old Mill
+        Gardens. Let us know if you can make it.
+
+  - id: invite-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        - Must state the event name.
+        - Must state the date and start time.
+        - Must state the venue or location.
+        - Must include an RSVP instruction with a deadline.
+      evaluated: |
+        There's a jazz evening on 18 July. Hope you can come!
+
+  - id: invite-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        - Must state the event name.
+        - Must state the date and start time.
+        - Must state the venue or location.
+        - Must include an RSVP instruction with a deadline.
+      evaluated: |
+        We're having an event soon. Details to follow.
+
+  # ───────────── More unrated empty / invalid (none) ─────────────
+  - id: expectations-empty-11-none
+    human_score: none
+    inputs:
+      expectations: "List the event name, date, start time, venue, and RSVP deadline."
+      evaluated: ""
+
+  - id: expectations-empty-12-none
+    human_score: none
+    inputs:
+      expectations: "List the event name, date, start time, venue, and RSVP deadline."
+      evaluated: "   "
+
+  - id: expectations-whitespace-none
+    human_score: none
+    inputs:
+      expectations: "List the event name, date, start time, venue, and RSVP deadline."
+      evaluated: |
+
+  - id: expectations-invalid-content-02-none
+    human_score: none
+    inputs:
+      expectations: "List the event name, date, start time, venue, and RSVP deadline."
+      evaluated: |
+        %%%%% @@@@@ &&&&&
+        \x00\x00 NUL NUL
+        ))))))) ((((((( ]][[
