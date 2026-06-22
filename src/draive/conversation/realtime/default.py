@@ -205,7 +205,7 @@ def realtime_conversation_preparing(  # noqa: C901, PLR0915
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        await session_scope.__aexit__(  # noqa: F821
+        await session_scope.__aexit__(
             exc_type,
             exc_val,
             exc_tb,

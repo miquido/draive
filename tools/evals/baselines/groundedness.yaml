@@ -804,3 +804,455 @@ samples:
         Singapore under ICC rules. The Recipient must return or destroy all
         Confidential Information within 14 days of termination and provide a
         notarised certificate of destruction.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: groundedness-empty-01-none
+    human_score: none
+    inputs:
+      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
+      evaluated: ""
+
+  - id: groundedness-empty-02-none
+    human_score: none
+    inputs:
+      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
+      evaluated: ""
+
+  - id: groundedness-empty-03-none
+    human_score: none
+    inputs:
+      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
+      evaluated: ""
+
+  - id: groundedness-empty-04-none
+    human_score: none
+    inputs:
+      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
+      evaluated: ""
+
+  - id: groundedness-empty-05-none
+    human_score: none
+    inputs:
+      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
+      evaluated: ""
+
+  - id: groundedness-empty-06-none
+    human_score: none
+    inputs:
+      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
+      evaluated: ""
+
+  - id: groundedness-empty-07-none
+    human_score: none
+    inputs:
+      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
+      evaluated: ""
+
+  - id: groundedness-empty-08-none
+    human_score: none
+    inputs:
+      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
+      evaluated: ""
+
+  - id: groundedness-empty-09-none
+    human_score: none
+    inputs:
+      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
+      evaluated: ""
+
+  - id: groundedness-empty-10-none
+    human_score: none
+    inputs:
+      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
+      evaluated: ""
+
+  - id: groundedness-invalid-content-none
+    human_score: none
+    inputs:
+      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Library schedule ─────────────
+  - id: library-schedule-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The neighborhood library is closed every Monday. From Tuesday
+        through Friday it opens at 9 a.m. and closes at 7 p.m. Weekend
+        hours are 10 a.m. to 4 p.m.
+      evaluated: |
+        The library is closed on Mondays. It is open from 9 a.m. to 7 p.m.
+        Tuesday through Friday, and from 10 a.m. to 4 p.m. on weekends.
+
+  - id: library-schedule-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The neighborhood library is closed every Monday. From Tuesday
+        through Friday it opens at 9 a.m. and closes at 7 p.m. Weekend
+        hours are 10 a.m. to 4 p.m.
+      evaluated: |
+        The library does not open on Mondays. On weekdays from Tuesday to
+        Friday it runs 9 a.m. to 7 p.m., with shorter 10 a.m. to 4 p.m.
+        hours on Saturday and Sunday.
+
+  - id: library-schedule-good
+    human_score: good
+    inputs:
+      reference: |
+        The neighborhood library is closed every Monday. From Tuesday
+        through Friday it opens at 9 a.m. and closes at 7 p.m. Weekend
+        hours are 10 a.m. to 4 p.m.
+      evaluated: |
+        The library is closed on Mondays and opens at 9 a.m. during the
+        workweek. It also has shorter hours on weekends.
+
+  - id: library-schedule-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The neighborhood library is closed every Monday. From Tuesday
+        through Friday it opens at 9 a.m. and closes at 7 p.m. Weekend
+        hours are 10 a.m. to 4 p.m.
+      evaluated: |
+        The library is closed on Mondays and stays open until 9 p.m. on
+        weekdays. It opens at 8 a.m. on weekends.
+
+  - id: library-schedule-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The neighborhood library is closed every Monday. From Tuesday
+        through Friday it opens at 9 a.m. and closes at 7 p.m. Weekend
+        hours are 10 a.m. to 4 p.m.
+      evaluated: |
+        The library is open every day around the clock and has a cafe, a
+        printing shop, and evening concerts every Friday.
+
+  # ───────────── Software release notes: v3.2 (all 5 bins) ─────────────
+  - id: release-notes-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Version 3.2 of the Nimbus app adds dark mode, lets users export
+        reports as PDF, and fixes a crash that occurred when opening large
+        spreadsheets. The update requires iOS 16 or later and is rolling out
+        to all regions this week.
+      evaluated: |
+        Nimbus 3.2 introduces dark mode, adds the ability to export reports
+        as PDF, and fixes a crash that happened when opening large
+        spreadsheets. It needs iOS 16 or later and is rolling out to every
+        region this week.
+
+  - id: release-notes-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Version 3.2 of the Nimbus app adds dark mode, lets users export
+        reports as PDF, and fixes a crash that occurred when opening large
+        spreadsheets. The update requires iOS 16 or later and is rolling out
+        to all regions this week.
+      evaluated: |
+        With version 3.2, Nimbus now offers a dark mode and the option to
+        save reports as PDF files. A crash that used to strike when large
+        spreadsheets were opened has been resolved. You will need iOS 16 or
+        newer, and the rollout reaches all regions over the course of this
+        week.
+
+  - id: release-notes-good
+    human_score: good
+    inputs:
+      reference: |
+        Version 3.2 of the Nimbus app adds dark mode, lets users export
+        reports as PDF, and fixes a crash that occurred when opening large
+        spreadsheets. The update requires iOS 16 or later and is rolling out
+        to all regions this week.
+      evaluated: |
+        Nimbus 3.2 adds dark mode, PDF export for reports, and a fix for the
+        large-spreadsheet crash. It requires iOS 16 or later. The release
+        also includes a redesigned settings screen and faster sync over
+        cellular networks.
+
+  - id: release-notes-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Version 3.2 of the Nimbus app adds dark mode, lets users export
+        reports as PDF, and fixes a crash that occurred when opening large
+        spreadsheets. The update requires iOS 16 or later and is rolling out
+        to all regions this week.
+      evaluated: |
+        Nimbus 3.2 adds dark mode and squashes the spreadsheet crash. It also
+        introduces a built-in AI assistant that drafts reports for you, a new
+        team-sharing tier priced at $9 per month, and support for Apple
+        Watch. Android users get the same features in a parallel 3.2 build.
+
+  - id: release-notes-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Version 3.2 of the Nimbus app adds dark mode, lets users export
+        reports as PDF, and fixes a crash that occurred when opening large
+        spreadsheets. The update requires iOS 16 or later and is rolling out
+        to all regions this week.
+      evaluated: |
+        Nimbus 3.2 is a paid major upgrade costing $19.99 that drops support
+        for everything before iOS 18. It removes the spreadsheet feature
+        entirely, switches the app to a subscription-only model, and is
+        available exclusively in North America for the first three months.
+
+  # ───────────── Park notice: trail closure (all 5 bins) ─────────────
+  - id: trail-closure-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The Ridgeline Trail in Cedar Valley Park is closed from 3 March to
+        17 March for bridge repairs. Hikers should use the Lakeside Trail as
+        an alternative. The parking lot at the north entrance remains open
+        during the closure.
+      evaluated: |
+        Cedar Valley Park's Ridgeline Trail is closed from 3 March through
+        17 March while a bridge is repaired. Hikers are asked to use the
+        Lakeside Trail instead. The north entrance parking lot stays open
+        throughout the closure.
+
+  - id: trail-closure-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The Ridgeline Trail in Cedar Valley Park is closed from 3 March to
+        17 March for bridge repairs. Hikers should use the Lakeside Trail as
+        an alternative. The parking lot at the north entrance remains open
+        during the closure.
+      evaluated: |
+        Between 3 and 17 March, the Ridgeline Trail at Cedar Valley Park is
+        shut so a bridge can be repaired. While it is closed, take the
+        Lakeside Trail in its place. You can still park at the north entrance
+        lot, which remains open the whole time.
+
+  - id: trail-closure-good
+    human_score: good
+    inputs:
+      reference: |
+        The Ridgeline Trail in Cedar Valley Park is closed from 3 March to
+        17 March for bridge repairs. Hikers should use the Lakeside Trail as
+        an alternative. The parking lot at the north entrance remains open
+        during the closure.
+      evaluated: |
+        The Ridgeline Trail in Cedar Valley Park is closed from 3 to 17 March
+        for bridge repairs, and hikers should use the Lakeside Trail instead.
+        The north parking lot stays open. Rangers will lead free guided
+        walks on the Lakeside Trail every weekend during the closure.
+
+  - id: trail-closure-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The Ridgeline Trail in Cedar Valley Park is closed from 3 March to
+        17 March for bridge repairs. Hikers should use the Lakeside Trail as
+        an alternative. The parking lot at the north entrance remains open
+        during the closure.
+      evaluated: |
+        The Ridgeline Trail is closed in March for repairs. The work is
+        funded by a $1.2 million state grant and includes replacing two
+        bridges and resurfacing the entire trail with crushed granite.
+        Dogs are now banned on the Lakeside Trail, and the north parking
+        lot will charge a $5 daily fee starting this season.
+
+  - id: trail-closure-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The Ridgeline Trail in Cedar Valley Park is closed from 3 March to
+        17 March for bridge repairs. Hikers should use the Lakeside Trail as
+        an alternative. The parking lot at the north entrance remains open
+        during the closure.
+      evaluated: |
+        Cedar Valley Park is closed entirely for the whole of March due to
+        wildfire damage. All trails, including Lakeside, are off-limits, and
+        both parking lots are barricaded. The park will reopen in summer
+        once a new visitor centre and zipline course are completed.
+
+  # ───────────── Product spec: e-bike (all 5 bins) ─────────────
+  - id: ebike-spec-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The Volt C1 e-bike has a 500-watt motor and a removable 48-volt
+        battery that gives a range of up to 60 kilometres on a single
+        charge. It weighs 22 kilograms, has hydraulic disc brakes, and
+        comes with a two-year warranty.
+      evaluated: |
+        The Volt C1 e-bike is fitted with a 500-watt motor and a removable
+        48-volt battery offering up to 60 kilometres of range per charge. It
+        weighs 22 kilograms, uses hydraulic disc brakes, and is backed by a
+        two-year warranty.
+
+  - id: ebike-spec-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The Volt C1 e-bike has a 500-watt motor and a removable 48-volt
+        battery that gives a range of up to 60 kilometres on a single
+        charge. It weighs 22 kilograms, has hydraulic disc brakes, and
+        comes with a two-year warranty.
+      evaluated: |
+        Powered by a 500-watt motor, the Volt C1 carries a removable 48-volt
+        battery good for as much as 60 kilometres on one charge. The bike
+        tips the scales at 22 kilograms, stops with hydraulic disc brakes,
+        and includes a warranty that lasts two years.
+
+  - id: ebike-spec-good
+    human_score: good
+    inputs:
+      reference: |
+        The Volt C1 e-bike has a 500-watt motor and a removable 48-volt
+        battery that gives a range of up to 60 kilometres on a single
+        charge. It weighs 22 kilograms, has hydraulic disc brakes, and
+        comes with a two-year warranty.
+      evaluated: |
+        The Volt C1 has a 500-watt motor, a removable 48-volt battery with
+        up to 60 kilometres of range, hydraulic disc brakes, and a two-year
+        warranty. It also folds in half for easy storage and includes
+        built-in front and rear lights powered by the main battery.
+
+  - id: ebike-spec-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The Volt C1 e-bike has a 500-watt motor and a removable 48-volt
+        battery that gives a range of up to 60 kilometres on a single
+        charge. It weighs 22 kilograms, has hydraulic disc brakes, and
+        comes with a two-year warranty.
+      evaluated: |
+        The Volt C1 weighs 22 kilograms and uses hydraulic disc brakes. Its
+        motor delivers a top assisted speed of 45 km/h and the battery
+        recharges fully in just 90 minutes. The frame is made from
+        aerospace-grade carbon fibre, and every purchase includes a free
+        helmet and a lifetime battery-replacement plan.
+
+  - id: ebike-spec-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The Volt C1 e-bike has a 500-watt motor and a removable 48-volt
+        battery that gives a range of up to 60 kilometres on a single
+        charge. It weighs 22 kilograms, has hydraulic disc brakes, and
+        comes with a two-year warranty.
+      evaluated: |
+        The Volt C1 is a 750-watt off-road e-bike with a fixed 36-volt
+        battery and a range of 120 kilometres. It weighs just 14 kilograms
+        thanks to its titanium frame, uses regenerative rim brakes, and is
+        sold with a lifetime warranty plus free roadside assistance for
+        ten years.
+
+  # ───────────── Charity report: clean water (all 5 bins) ─────────────
+  - id: charity-water-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        In 2023 the Wellspring charity built 120 wells across rural Malawi,
+        giving an estimated 90,000 people access to clean water. The project
+        was funded entirely by individual donations and used local labour
+        for construction. Each well is maintained by a trained village
+        committee.
+      evaluated: |
+        During 2023, Wellspring constructed 120 wells in rural Malawi,
+        providing about 90,000 people with access to clean water. The work
+        was paid for entirely by individual donations and carried out by
+        local labour. A trained village committee looks after each well.
+
+  - id: charity-water-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        In 2023 the Wellspring charity built 120 wells across rural Malawi,
+        giving an estimated 90,000 people access to clean water. The project
+        was funded entirely by individual donations and used local labour
+        for construction. Each well is maintained by a trained village
+        committee.
+      evaluated: |
+        Wellspring's 2023 effort delivered 120 new wells throughout rural
+        Malawi, bringing clean water to roughly 90,000 people. Individual
+        donors covered the entire cost, and the wells were built by local
+        workers. Each one is now kept up by a village committee that has
+        received training.
+
+  - id: charity-water-good
+    human_score: good
+    inputs:
+      reference: |
+        In 2023 the Wellspring charity built 120 wells across rural Malawi,
+        giving an estimated 90,000 people access to clean water. The project
+        was funded entirely by individual donations and used local labour
+        for construction. Each well is maintained by a trained village
+        committee.
+      evaluated: |
+        In 2023 Wellspring built 120 wells in rural Malawi, reaching about
+        90,000 people with clean water, all funded by individual donations
+        and built with local labour. The charity also plans to expand into
+        neighbouring Zambia next year and has opened a regional office in
+        Lilongwe.
+
+  - id: charity-water-fair
+    human_score: fair
+    inputs:
+      reference: |
+        In 2023 the Wellspring charity built 120 wells across rural Malawi,
+        giving an estimated 90,000 people access to clean water. The project
+        was funded entirely by individual donations and used local labour
+        for construction. Each well is maintained by a trained village
+        committee.
+      evaluated: |
+        Wellspring worked in Malawi in 2023. The charity spends 92 cents of
+        every dollar directly on field projects and was rated four stars by
+        an independent watchdog. Its founder, a former hydrologist, started
+        the organisation in 2009, and it now employs more than 200 staff
+        across six African countries.
+
+  - id: charity-water-poor
+    human_score: poor
+    inputs:
+      reference: |
+        In 2023 the Wellspring charity built 120 wells across rural Malawi,
+        giving an estimated 90,000 people access to clean water. The project
+        was funded entirely by individual donations and used local labour
+        for construction. Each well is maintained by a trained village
+        committee.
+      evaluated: |
+        In 2023 Wellspring installed 500 desalination plants along the coast
+        of Kenya, serving two million people. The programme was financed by
+        a single grant from the World Bank and built by an international
+        engineering contractor. The charity has since shifted its focus
+        entirely to solar power projects.
+
+  # ───────────── More unrated empty / invalid responses (none) ─────────────
+  - id: groundedness-empty-11-none
+    human_score: none
+    inputs:
+      reference: "The clinic accepts walk-in patients between 8 a.m. and noon on weekdays."
+      evaluated: ""
+
+  - id: groundedness-empty-12-none
+    human_score: none
+    inputs:
+      reference: "The clinic accepts walk-in patients between 8 a.m. and noon on weekdays."
+      evaluated: "   "
+
+  - id: groundedness-empty-13-none
+    human_score: none
+    inputs:
+      reference: "The clinic accepts walk-in patients between 8 a.m. and noon on weekdays."
+      evaluated: ""
+
+  - id: groundedness-invalid-content-02-none
+    human_score: none
+    inputs:
+      reference: "The clinic accepts walk-in patients between 8 a.m. and noon on weekdays."
+      evaluated: |
+        \x00\x00 ??? %%% ~~~
+        ]]]]]]]]]]
+        ((( no closing

@@ -3,7 +3,7 @@
 # /// script
 # requires-python = ">=3.14"
 # dependencies = [
-#     "draive[openai,anthropic,gemini]",
+#     "draive[openai,anthropic,gemini,mistral,ollama]",
 #     "pyyaml~=6.0",
 # ]
 # ///
@@ -56,6 +56,8 @@ from haiway import Disposable, State, load_env, setup_logging  # noqa: E402
 
 from draive.anthropic import Anthropic, AnthropicConfig  # noqa: E402
 from draive.gemini import Gemini, GeminiConfig  # noqa: E402
+from draive.mistral import Mistral, MistralChatConfig  # noqa: E402
+from draive.ollama import Ollama, OllamaChatConfig  # noqa: E402
 from draive.openai import OpenAI, OpenAIResponsesConfig  # noqa: E402
 from evals.baseline import BaselineDocument, load_baseline  # noqa: E402
 from evals.registry import available_evaluators, lookup_evaluator  # noqa: E402
@@ -98,6 +100,24 @@ PROVIDERS: Final[dict[str, ProviderSpec]] = {
         config_factory=lambda model: GeminiConfig(model=model),
         disposable_factory=Gemini,
     ),
+    "mistral": ProviderSpec(
+        key="mistral",
+        display_name="Mistral",
+        default_model="mistral-small-latest",
+        config_factory=lambda model: MistralChatConfig(model=model),
+        disposable_factory=Mistral,
+    ),
+    "ollama": ProviderSpec(
+        key="ollama",
+        display_name="Ollama",
+        default_model="hf.co/mradermacher/M-Prometheus-3B-i1-GGUF:Q4_K_M",
+        config_factory=lambda model: OllamaChatConfig(
+            model=model,
+            temperature=0,
+            max_output_tokens=512,
+        ),
+        disposable_factory=Ollama,
+    ),
 }
 
 
@@ -118,7 +138,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--provider",
         type=_parse_provider,
-        help="LLM provider to use as the evaluator judge (anthropic|openai|gemini)",
+        help="LLM provider to use as the evaluator judge (anthropic|openai|gemini|mistral|ollama)",
         metavar="PROVIDER",
     )
     parser.add_argument(

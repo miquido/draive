@@ -1084,3 +1084,556 @@ samples:
         many free resources online including YouTube tutorials and
         apps. Be consistent with practice — daily is better than
         long weekend sessions. Have fun with it.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: helpfulness-empty-01-none
+    human_score: none
+    inputs:
+      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
+      evaluated: ""
+
+  - id: helpfulness-empty-02-none
+    human_score: none
+    inputs:
+      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
+      evaluated: ""
+
+  - id: helpfulness-empty-03-none
+    human_score: none
+    inputs:
+      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
+      evaluated: ""
+
+  - id: helpfulness-empty-04-none
+    human_score: none
+    inputs:
+      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
+      evaluated: ""
+
+  - id: helpfulness-empty-05-none
+    human_score: none
+    inputs:
+      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
+      evaluated: ""
+
+  - id: helpfulness-empty-06-none
+    human_score: none
+    inputs:
+      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
+      evaluated: ""
+
+  - id: helpfulness-empty-07-none
+    human_score: none
+    inputs:
+      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
+      evaluated: ""
+
+  - id: helpfulness-empty-08-none
+    human_score: none
+    inputs:
+      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
+      evaluated: ""
+
+  - id: helpfulness-empty-09-none
+    human_score: none
+    inputs:
+      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
+      evaluated: ""
+
+  - id: helpfulness-empty-10-none
+    human_score: none
+    inputs:
+      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
+      evaluated: ""
+
+  - id: helpfulness-invalid-content-none
+    human_score: none
+    inputs:
+      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Red wine stain ─────────────
+  - id: red-wine-stain-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        How do I remove a fresh red wine stain from a cotton shirt? I am
+        at home and have dish soap, white vinegar, baking soda, and laundry
+        detergent.
+      evaluated: |
+        Blot first; do not rub, because rubbing pushes the wine into the
+        cotton. Hold the stained area under cold running water from the
+        back of the fabric. Work in a little dish soap plus white vinegar,
+        let it sit for about 10 minutes, then rinse. If color remains, make
+        a loose baking-soda paste for a few minutes, rinse again, and wash
+        with detergent on a cool cycle. Check the shirt before drying
+        because heat can set any remaining stain.
+
+  - id: red-wine-stain-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        How do I remove a fresh red wine stain from a cotton shirt? I am
+        at home and have dish soap, white vinegar, baking soda, and laundry
+        detergent.
+      evaluated: |
+        Blot the stain gently, then flush it from the back with cold water.
+        Work in a little dish soap and white vinegar, wait about 10 minutes,
+        and rinse. If it is still visible, try a short baking-soda paste
+        treatment, then wash with detergent in cold water. Do not put the
+        shirt in the dryer until the stain is gone.
+
+  - id: red-wine-stain-good
+    human_score: good
+    inputs:
+      user_query: |
+        How do I remove a fresh red wine stain from a cotton shirt? I am
+        at home and have dish soap, white vinegar, baking soda, and laundry
+        detergent.
+      evaluated: |
+        Blot the wine, rinse with cold water, then use dish soap and white
+        vinegar before washing. Avoid hot water and do not dry it until the
+        stain is gone.
+
+  - id: red-wine-stain-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        How do I remove a fresh red wine stain from a cotton shirt? I am
+        at home and have dish soap, white vinegar, baking soda, and laundry
+        detergent.
+      evaluated: |
+        Put some detergent on the stain and wash the shirt. Baking soda may
+        also help.
+
+  - id: red-wine-stain-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        How do I remove a fresh red wine stain from a cotton shirt? I am
+        at home and have dish soap, white vinegar, baking soda, and laundry
+        detergent.
+      evaluated: |
+        Red wine is a common stain. Cotton shirts are comfortable, and many
+        people prefer darker colors because stains show less.
+
+  # ───────────── Reset Wi-Fi router ─────────────
+  - id: reset-router-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        My home Wi-Fi suddenly stopped working. The router (a Netgear
+        Nighthawk) has a solid white power light but no internet light.
+        Devices connect to the network but say "no internet." I haven't
+        changed anything. How do I get it back online?
+      evaluated: |
+        "Connected but no internet" with a dark internet light means the
+        router talks to your devices fine but isn't getting a signal from
+        your ISP. Work outward from the modem:
+
+        1. Power-cycle the chain in order. Unplug the modem AND the
+           Nighthawk. Wait 60 seconds. Plug the modem back in first and
+           wait until its lights settle (~2 min), THEN plug the router
+           back in. Order matters: the router needs a live modem to
+           pull an address.
+        2. Check the cable between modem and router's yellow WAN/Internet
+           port. Reseat both ends; try a different Ethernet cable if you
+           have one — a flaky cable is a common cause of exactly this.
+        3. If the modem itself shows no online/downstream light after its
+           reboot, the outage is upstream — call your ISP and ask if
+           there's a service issue at your address.
+        4. If the modem is online but the router still won't get internet,
+           log into the router (192.168.1.1) → check the Internet status
+           page. If it shows "no IP," click "Release/Renew" or reboot once
+           more.
+
+        Most cases clear at step 1. If after a clean modem-then-router
+        reboot the modem is online but the router isn't, you've isolated
+        it to the cable or the router's WAN port — try the spare cable
+        next.
+
+  - id: reset-router-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        My home Wi-Fi suddenly stopped working. The router (a Netgear
+        Nighthawk) has a solid white power light but no internet light.
+        Devices connect to the network but say "no internet." I haven't
+        changed anything. How do I get it back online?
+      evaluated: |
+        No internet light usually means the router isn't getting a signal
+        from your modem or ISP. Unplug both the modem and the router, wait
+        a minute, then power the modem back on first and let it fully boot
+        before turning the router back on. Also reseat the cable between
+        the modem and the router's internet port, or swap in a different
+        cable. If the modem's own online light stays off after rebooting,
+        the problem is on your ISP's side, so call them.
+
+  - id: reset-router-good
+    human_score: good
+    inputs:
+      user_query: |
+        My home Wi-Fi suddenly stopped working. The router (a Netgear
+        Nighthawk) has a solid white power light but no internet light.
+        Devices connect to the network but say "no internet." I haven't
+        changed anything. How do I get it back online?
+      evaluated: |
+        Try rebooting your equipment. Unplug the modem and router for a
+        minute and plug them back in. Check that the cable between them is
+        connected properly. If it still doesn't work, the issue might be
+        with your internet provider, so you could contact them.
+
+  - id: reset-router-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        My home Wi-Fi suddenly stopped working. The router (a Netgear
+        Nighthawk) has a solid white power light but no internet light.
+        Devices connect to the network but say "no internet." I haven't
+        changed anything. How do I get it back online?
+      evaluated: |
+        Network troubleshooting involves several steps. You should check
+        your cables, restart your equipment, update firmware, check for
+        outages, and verify your settings. Routers can have many issues.
+        Keeping your firmware up to date and your router in a central
+        location helps maintain a good connection.
+
+  - id: reset-router-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        My home Wi-Fi suddenly stopped working. The router (a Netgear
+        Nighthawk) has a solid white power light but no internet light.
+        Devices connect to the network but say "no internet." I haven't
+        changed anything. How do I get it back online?
+      evaluated: |
+        Technology can be so frustrating! Wi-Fi problems happen to everyone.
+        Have you thought about switching providers? Or maybe it's a sign to
+        take a break from screens for a while. The internet will still be
+        there tomorrow.
+
+  # ───────────── Negotiate salary offer ─────────────
+  - id: salary-negotiation-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I got a job offer for a senior backend role at $135k. Market for
+        this role in my city is more like $150-160k and I have a competing
+        offer at $148k. I really want this job but I want to negotiate.
+        How should I respond to the recruiter?
+      evaluated: |
+        You're in a strong spot: you have market data and a real competing
+        offer. Negotiate on base first, by email so the recruiter can take
+        it to the hiring manager in writing.
+
+        Anchor slightly above your target so there's room to settle at
+        $155k. A script:
+
+        "Thank you — I'm genuinely excited about this role and the team.
+        I'd like to make it work. Based on my research for senior backend
+        roles in [city], the range is $150–160k, and I currently have a
+        competing offer at $148k. To move forward enthusiastically, I'm
+        looking for a base of $158k. I'm flexible on how we get there —
+        base, signing bonus, or an early review — and happy to sign quickly
+        once we land on a number."
+
+        Key moves:
+        - Lead with enthusiasm so it reads as "help me say yes," not a
+          threat.
+        - Name the competing offer once, as a fact, not a club.
+        - Give one specific number, not a range (ranges get read as the
+          low end).
+        - Offer flexibility on structure — if they're capped on base, a
+          $10k signing bonus or a 6-month review to $160k is real money.
+
+        If they counter at $148–150k, that's a win versus $135k; accept or
+        ask for the signing bonus to bridge the gap. Don't accept on the
+        call — say "let me review the full package and confirm tomorrow."
+
+  - id: salary-negotiation-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I got a job offer for a senior backend role at $135k. Market for
+        this role in my city is more like $150-160k and I have a competing
+        offer at $148k. I really want this job but I want to negotiate.
+        How should I respond to the recruiter?
+      evaluated: |
+        Reply by email, stay warm, and give one specific number above your
+        target. Something like: "I'm excited about this role and want to
+        make it work. Senior backend roles here run $150–160k, and I have
+        a competing offer at $148k, so I'm hoping we can get the base to
+        $158k. I'm flexible on whether that's base or a signing bonus."
+        Lead with enthusiasm, mention the competing offer once as a fact,
+        and stay open on structure. Even if they meet you partway, you'll
+        beat the $135k starting point.
+
+  - id: salary-negotiation-good
+    human_score: good
+    inputs:
+      user_query: |
+        I got a job offer for a senior backend role at $135k. Market for
+        this role in my city is more like $150-160k and I have a competing
+        offer at $148k. I really want this job but I want to negotiate.
+        How should I respond to the recruiter?
+      evaluated: |
+        You have good leverage with the market data and your other offer.
+        Tell the recruiter you're enthusiastic about the role but the offer
+        is below market and below your competing offer, and ask if they can
+        improve the base. Mention a target number around the market range.
+        Be polite and keep the door open. They'll likely come back with a
+        higher figure.
+
+  - id: salary-negotiation-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        I got a job offer for a senior backend role at $135k. Market for
+        this role in my city is more like $150-160k and I have a competing
+        offer at $148k. I really want this job but I want to negotiate.
+        How should I respond to the recruiter?
+      evaluated: |
+        Salary negotiation is an important skill. You should research market
+        rates, know your worth, be confident, consider the whole package
+        not just base pay, and be willing to walk away. Practice what you
+        want to say beforehand. Remember that most offers have some room
+        for negotiation.
+
+  - id: salary-negotiation-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I got a job offer for a senior backend role at $135k. Market for
+        this role in my city is more like $150-160k and I have a competing
+        offer at $148k. I really want this job but I want to negotiate.
+        How should I respond to the recruiter?
+      evaluated: |
+        Congratulations on the offer! Money isn't everything, you know.
+        Have you thought about whether you'll actually be happy there?
+        Culture matters more than salary in the long run. Maybe just take
+        whichever job feels right in your heart.
+
+  # ───────────── Houseplant dying ─────────────
+  - id: dying-plant-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        My peace lily's leaves are turning yellow and drooping. It's by a
+        north-facing window, I water it every 3 days, and it's in a pot
+        with no drainage hole. The soil feels wet. What's wrong and how do
+        I save it?
+      evaluated: |
+        The smoking gun is right there: wet soil plus a pot with no drainage
+        hole. You're overwatering, and the water has nowhere to go, so the
+        roots are sitting in standing water and starting to rot. Yellow,
+        drooping leaves on a peace lily are the classic overwatering sign
+        (counterintuitively, droopy can mean too much OR too little — the
+        wet soil tells you it's too much here).
+
+        Do this today:
+        1. Take the plant out of the pot and look at the roots. Healthy
+           roots are firm and white; rotted ones are brown, mushy, and
+           smell. Snip away any mushy roots with clean scissors.
+        2. Repot into a container WITH drainage holes, using fresh, lightly
+           damp potting mix. If you love the decorative pot, keep it as a
+           "cachepot" — put the plant in a plain plastic nursery pot with
+           holes, set that inside the pretty one, and never let water pool
+           in the bottom.
+        3. New watering rule: water only when the top 2–3 cm of soil feels
+           dry to your finger — for a peace lily that's usually about once
+           a week, not every 3 days. When you water, let it drain fully.
+
+        Light is fine — peace lilies tolerate a north window. Give it a
+        week or two; new growth means you caught it in time.
+
+  - id: dying-plant-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        My peace lily's leaves are turning yellow and drooping. It's by a
+        north-facing window, I water it every 3 days, and it's in a pot
+        with no drainage hole. The soil feels wet. What's wrong and how do
+        I save it?
+      evaluated: |
+        You're overwatering, and the pot with no drainage is making it
+        worse — the roots are sitting in water and starting to rot, which
+        is why the leaves yellow and droop. Repot it into a container with
+        drainage holes and fresh potting mix, trimming off any brown, mushy
+        roots first. Then water only when the top couple of centimetres of
+        soil feel dry, which for a peace lily is usually about once a week.
+        The north window is fine for light.
+
+  - id: dying-plant-good
+    human_score: good
+    inputs:
+      user_query: |
+        My peace lily's leaves are turning yellow and drooping. It's by a
+        north-facing window, I water it every 3 days, and it's in a pot
+        with no drainage hole. The soil feels wet. What's wrong and how do
+        I save it?
+      evaluated: |
+        It sounds like you're watering too much, especially since the pot
+        has no drainage and the soil is wet. Peace lilies don't like soggy
+        roots. Move it to a pot with drainage holes and let the soil dry
+        out a bit between waterings instead of every three days. That
+        should help the yellowing.
+
+  - id: dying-plant-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        My peace lily's leaves are turning yellow and drooping. It's by a
+        north-facing window, I water it every 3 days, and it's in a pot
+        with no drainage hole. The soil feels wet. What's wrong and how do
+        I save it?
+      evaluated: |
+        Yellowing leaves can have many causes: overwatering, underwatering,
+        too much light, too little light, nutrient deficiency, pests, or
+        temperature stress. Houseplants need the right balance of water,
+        light, and nutrients. Make sure you're meeting your plant's needs
+        and it should recover.
+
+  - id: dying-plant-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        My peace lily's leaves are turning yellow and drooping. It's by a
+        north-facing window, I water it every 3 days, and it's in a pot
+        with no drainage hole. The soil feels wet. What's wrong and how do
+        I save it?
+      evaluated: |
+        Plants are living things and sometimes it's just their time. Have
+        you considered getting a fake plant instead? They look great and
+        you never have to water them. Or a succulent — those are basically
+        impossible to kill. Don't be too hard on yourself.
+
+  # ───────────── Toddler won't sleep ─────────────
+  - id: toddler-sleep-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        My 2-year-old has started fighting bedtime hard — crying, getting
+        out of bed, calling for us for over an hour. It started about two
+        weeks ago. Bedtime is 7:30, he still naps 2 hours at daycare. We're
+        exhausted. What can we actually do?
+      evaluated: |
+        Two things jump out: the timing ("started two weeks ago") points to
+        a normal developmental sleep regression or a too-early bedtime, and
+        the 2-hour daycare nap may now be too much daytime sleep for a
+        2-year-old. Here's a concrete plan.
+
+        First, fix the sleep pressure math. A 2-year-old needs roughly
+        11–12 hours total. If he naps 2 hours and you want 11 hours
+        overnight, he physically can't fall asleep at 7:30 if he woke at
+        6:30 and napped midday — he's simply not tired yet. Try:
+        - Cap the nap at ~1 to 1.5 hours (ask daycare to wake him).
+        - Temporarily push bedtime to 8:00–8:15 for a week so he's
+          genuinely sleepy when he goes down, then walk it back by 15 min
+          every few nights.
+
+        Second, make the boundary calm and boring. The crying-and-getting-
+        out routine is partly testing a new skill (climbing out, calling
+        out). Pick one approach and be 100% consistent for at least a week:
+        - Do a short, fixed wind-down (bath, 2 books, song) and a clear
+          "goodnight, see you in the morning."
+        - If he gets out, walk him back with as little talk/eye contact as
+          possible — "it's sleep time" — every single time. The boredom is
+          the point; engagement (even frustrated) rewards the behavior.
+
+        Two weeks of a too-late nap + too-early bedtime is exactly the
+        recipe for an hour of bedtime battles. Adjust the schedule first;
+        most of the drama fades within a week once the sleep pressure is
+        right. If it persists past 2–3 weeks of consistency, mention it at
+        his next pediatric check.
+
+  - id: toddler-sleep-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        My 2-year-old has started fighting bedtime hard — crying, getting
+        out of bed, calling for us for over an hour. It started about two
+        weeks ago. Bedtime is 7:30, he still naps 2 hours at daycare. We're
+        exhausted. What can we actually do?
+      evaluated: |
+        At this age a 2-hour nap plus a 7:30 bedtime is often too much
+        sleep packed too close together, so he's not tired enough to settle.
+        Try capping the daycare nap at around an hour and pushing bedtime
+        a little later for now, then nudging it earlier again over time.
+        Pair that with a short, consistent wind-down and a calm, low-drama
+        response when he gets out of bed: walk him back quietly every time
+        without much talk. Give it a week of consistency before judging it.
+
+  - id: toddler-sleep-good
+    human_score: good
+    inputs:
+      user_query: |
+        My 2-year-old has started fighting bedtime hard — crying, getting
+        out of bed, calling for us for over an hour. It started about two
+        weeks ago. Bedtime is 7:30, he still naps 2 hours at daycare. We're
+        exhausted. What can we actually do?
+      evaluated: |
+        The long daycare nap might be making 7:30 too early for him to fall
+        asleep, so you could try shortening the nap or moving bedtime a bit
+        later. A consistent bedtime routine helps too — same steps every
+        night. When he gets out of bed, calmly put him back without making
+        it a big interaction. Stick with it for a while to see if it works.
+
+  - id: toddler-sleep-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        My 2-year-old has started fighting bedtime hard — crying, getting
+        out of bed, calling for us for over an hour. It started about two
+        weeks ago. Bedtime is 7:30, he still naps 2 hours at daycare. We're
+        exhausted. What can we actually do?
+      evaluated: |
+        Toddler sleep can be challenging. Experts recommend a consistent
+        bedtime routine, a calm sleep environment, limiting screen time
+        before bed, and being patient. Every child is different and sleep
+        patterns change as they grow. Make sure your child is getting
+        enough total sleep for their age.
+
+  - id: toddler-sleep-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        My 2-year-old has started fighting bedtime hard — crying, getting
+        out of bed, calling for us for over an hour. It started about two
+        weeks ago. Bedtime is 7:30, he still naps 2 hours at daycare. We're
+        exhausted. What can we actually do?
+      evaluated: |
+        Parenting is the hardest job in the world! They grow up so fast —
+        try to cherish these moments even the tough ones. Have you read any
+        parenting books? There are so many out there. Trust your instincts;
+        you know your child better than anyone.
+
+  # ───────────── More unrated empty responses (none) ─────────────
+  - id: helpfulness-empty-11-none
+    human_score: none
+    inputs:
+      user_query: "What is a good first programming language for a complete beginner?"
+      evaluated: ""
+
+  - id: helpfulness-empty-12-none
+    human_score: none
+    inputs:
+      user_query: "What is a good first programming language for a complete beginner?"
+      evaluated: "    "
+
+  - id: helpfulness-empty-13-none
+    human_score: none
+    inputs:
+      user_query: "What is a good first programming language for a complete beginner?"
+      evaluated: ""
+
+  - id: helpfulness-invalid-content-02-none
+    human_score: none
+    inputs:
+      user_query: "What is a good first programming language for a complete beginner?"
+      evaluated: |
+        @@@@@ |||| ===== \\\\\
+        {{{ no close
+        <broken>

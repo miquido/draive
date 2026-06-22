@@ -1,3 +1,4 @@
+from draive.evaluators.cohen_kappa import cohen_kappa_evaluator
 from draive.evaluators.coherence import coherence_context_evaluator, coherence_evaluator
 from draive.evaluators.completeness import completeness_context_evaluator, completeness_evaluator
 from draive.evaluators.conciseness import conciseness_context_evaluator, conciseness_evaluator
@@ -34,6 +35,7 @@ from draive.evaluators.truthfulness import truthfulness_context_evaluator, truth
 
 __all__ = (
     "ToolUsageRequirement",
+    "cohen_kappa_evaluator",
     "coherence_context_evaluator",
     "coherence_evaluator",
     "completeness_context_evaluator",

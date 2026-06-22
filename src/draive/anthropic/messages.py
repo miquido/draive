@@ -275,12 +275,10 @@ class AnthropicMessages(AnthropicAPI):
                             case "message_stop":
                                 continue  # let it finish
 
-                            case other:
-                                raise ModelOutputInvalid(
-                                    provider=self._provider,
-                                    model=config.model,
-                                    reason=f"Unsupported stream event: {other}",
-                                )
+                            case "text" | "input_json" | "thinking" | "signature" | "citation":
+                                # Cumulative snapshot events emitted by the SDK stream helper;
+                                # the underlying data already arrives via content_block_delta.
+                                continue
 
                 assert tool_accumulator is None  # nosec: B101
             except AnthropicRateLimitError as exc:

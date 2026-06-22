@@ -433,3 +433,288 @@ samples:
         Water freezes at 100 degrees Celsius and boils at 0 degrees
         Celsius. The speed of light is about 30 km per hour. Isaac Newton
         invented the steam engine and discovered penicillin.
+
+  # ───────────── Unrated empty responses (none) ─────────────
+  - id: factual-accuracy-empty-01-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: factual-accuracy-empty-02-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: factual-accuracy-empty-03-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: factual-accuracy-empty-04-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: factual-accuracy-empty-05-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: factual-accuracy-empty-06-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: factual-accuracy-empty-07-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: factual-accuracy-empty-08-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: factual-accuracy-empty-09-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: factual-accuracy-empty-10-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: factual-accuracy-invalid-content-none
+    human_score: none
+    inputs:
+      evaluated: |
+        <<<INVALID_CONTENT>>>
+        [[[ ### ### ### ]]]
+        {{unclosed
+
+  # ───────────── Stable general facts ─────────────
+  - id: stable-facts-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Earth has one natural moon. Water's chemical formula is H2O. Paris
+        is the capital of France, and Mount Everest is the highest mountain
+        above sea level.
+
+  - id: stable-facts-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Earth has one natural moon, water is H2O, and Paris is France's
+        capital. Mount Everest is generally described as Earth's highest
+        mountain above sea level.
+
+  - id: stable-facts-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Earth has one moon, water is H2O, and Paris is the capital of
+        France. Mars has one moon.
+
+  - id: stable-facts-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Earth has two natural moons. Water is H2O, Paris is the capital of
+        France, and Mount Everest is the tallest mountain in South America.
+
+  - id: stable-facts-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Earth has no moon, water is made of helium, Paris is the capital of
+        Spain, and Mount Everest is in Brazil.
+
+  # ───────────── Programming languages ─────────────
+  - id: languages-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Python was created by Guido van Rossum and first released in 1991.
+        JavaScript and Java are distinct languages with different designers.
+        C was developed at Bell Labs by Dennis Ritchie in the early 1970s.
+
+  - id: languages-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Python was created by Guido van Rossum and first appeared in 1991. C
+        was developed by Dennis Ritchie at Bell Labs in the early 1970s.
+        Despite the similar names, Java and JavaScript are unrelated
+        languages.
+
+  - id: languages-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Python was created by Guido van Rossum and first released in 1991. C
+        was developed at Bell Labs by Dennis Ritchie. Java was first released
+        in 2005.
+
+  - id: languages-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Python was created by James Gosling and first released in 1991. C was
+        developed at Bell Labs. Java and JavaScript are the same language with
+        two names.
+
+  - id: languages-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Python was created by Bill Gates in 1965. C was invented by Steve
+        Jobs at Apple. Java is just a newer version of the Python language,
+        and JavaScript was the first programming language ever written.
+
+  # ───────────── Animal facts ─────────────
+  - id: animals-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        The blue whale is the largest animal known to have ever lived.
+        Cheetahs are the fastest land animals over short distances. Honeybees
+        communicate the location of food through a waggle dance, and octopuses
+        have three hearts.
+
+  - id: animals-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        The blue whale is the largest animal that has ever lived. The cheetah
+        is the fastest land animal over short sprints. An octopus has three
+        hearts and blue, copper-based blood.
+
+  - id: animals-good
+    human_score: good
+    inputs:
+      evaluated: |
+        The blue whale is the largest animal alive today. Cheetahs are the
+        fastest land animals. Octopuses have three hearts. Spiders are
+        insects.
+
+  - id: animals-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        The elephant is the largest animal that has ever lived. Cheetahs are
+        the fastest land animals. An octopus has one heart, and bats are
+        blind.
+
+  - id: animals-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        The largest animal that ever lived is the housecat. Snails are the
+        fastest land animals. Octopuses have no hearts at all, and birds are
+        a kind of fish that learned to fly.
+
+  # ───────────── Currencies and countries ─────────────
+  - id: currencies-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        The currency of Japan is the yen, and the currency of the United
+        Kingdom is the pound sterling. The euro is the official currency of
+        Germany, France, and Italy. The United States uses the dollar.
+
+  - id: currencies-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Japan uses the yen and the United Kingdom uses the pound sterling.
+        The euro is the shared currency of many European Union members,
+        including France and Germany. India's currency is the rupee.
+
+  - id: currencies-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Japan uses the yen, the UK uses the pound, and the United States uses
+        the dollar. Switzerland uses the euro.
+
+  - id: currencies-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Japan uses the won, and the United Kingdom uses the euro. The United
+        States uses the dollar, and Germany uses the deutsche mark today.
+
+  - id: currencies-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Japan uses the dollar, the United Kingdom uses the yen, and the
+        United States uses the pound. France's official currency is the
+        peso, and Germany uses the ruble.
+
+  # ───────────── Famous authors and works ─────────────
+  - id: authors-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        William Shakespeare wrote Hamlet and Romeo and Juliet. Jane Austen
+        wrote Pride and Prejudice. George Orwell wrote 1984 and Animal Farm,
+        and Mary Shelley wrote Frankenstein.
+
+  - id: authors-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        William Shakespeare wrote Hamlet, and Jane Austen wrote Pride and
+        Prejudice. George Orwell, the pen name of Eric Arthur Blair, wrote
+        both 1984 and Animal Farm.
+
+  - id: authors-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Shakespeare wrote Hamlet, Jane Austen wrote Pride and Prejudice, and
+        George Orwell wrote 1984. Charles Dickens wrote Frankenstein.
+
+  - id: authors-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        Shakespeare wrote Pride and Prejudice. Jane Austen wrote Hamlet.
+        George Orwell wrote 1984, and Mary Shelley wrote Frankenstein.
+
+  - id: authors-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Mark Twain wrote Hamlet and Romeo and Juliet. Pride and Prejudice was
+        written by Isaac Newton. The novel 1984 was written by Leonardo da
+        Vinci, and Frankenstein was written by Plato.
+
+  # ───────────── More unrated empty / invalid (none) ─────────────
+  - id: factual-accuracy-empty-11-none
+    human_score: none
+    inputs:
+      evaluated: ""
+
+  - id: factual-accuracy-empty-12-none
+    human_score: none
+    inputs:
+      evaluated: "   "
+
+  - id: factual-accuracy-whitespace-none
+    human_score: none
+    inputs:
+      evaluated: |
+
+
+
+  - id: factual-accuracy-invalid-content-02-none
+    human_score: none
+    inputs:
+      evaluated: |
+        $$$ ^^^ ~~~ ??? !!!
+        <broken><tags><without>
+        0xDEADBEEF |||| ====
