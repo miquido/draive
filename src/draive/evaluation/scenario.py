@@ -429,7 +429,16 @@ class EvaluatorScenario[Value, **Args](Immutable):
                 f"Evaluator scenario `{self.name}` failed due to an error",
                 exception=exc,
             )
-            results = ()
+            # Preserve the error within a failed result instead of discarding it - an
+            # empty result set would hide the cause of the scenario failure.
+            results = (
+                EvaluatorResult.of(
+                    self.name,
+                    score=0.0,
+                    threshold=1.0,
+                    meta=Meta.empty.with_error(exc),
+                ),
+            )
 
         return EvaluatorScenarioResult(
             scenario=self.name,
