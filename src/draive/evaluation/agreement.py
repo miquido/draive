@@ -43,8 +43,7 @@ def quantize_score(
     ValueError
         If the value is outside the [0, 1] range.
     """
-    if not 0.0 <= value <= 1.0:
-        raise ValueError(f"Score outside [0, 1]: {value}")
+    assert 0.0 <= value <= 1.0  # nosec: B101
 
     # On an exact tie between two adjacent levels (e.g. 0.1, 0.3) ``min`` keeps the
     # first match, biasing toward the lower level - a deliberate, stable choice.

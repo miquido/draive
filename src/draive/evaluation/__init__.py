@@ -11,6 +11,10 @@ from draive.evaluation.evaluator import (
     PreparedEvaluator,
     evaluator,
 )
+from draive.evaluation.reference import (
+    EvaluationReference,
+    reference_conformance,
+)
 from draive.evaluation.scenario import (
     EvaluatorScenario,
     EvaluatorScenarioDefinition,
@@ -37,6 +41,7 @@ from draive.evaluation.value import (
 
 __all__ = (
     "EVALUATION_SCORE_LEVELS",
+    "EvaluationReference",
     "EvaluationScore",
     "EvaluationScoreLevel",
     "EvaluationScoreValue",
@@ -62,4 +67,5 @@ __all__ = (
     "evaluator_suite",
     "quadratic_weighted_kappa",
     "quantize_score",
+    "reference_conformance",
 )
