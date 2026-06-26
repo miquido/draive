@@ -1166,3 +1166,146 @@ samples:
         @@@@@ ;;;;; @@@@@
         \\\\ no-parse \\\\
         ((( dangling
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # The structure is only the carrier; coherence is judged on whether the
+  # conveyed ideas hang together, exactly as for plain-text passages.
+  - id: photosynthesis-json-coherent-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        How photosynthesis works.
+      evaluated: |
+        {
+          "topic": "photosynthesis",
+          "explanation": [
+            "Chlorophyll in the leaves absorbs energy from sunlight.",
+            "That energy splits water drawn up from the roots, releasing oxygen.",
+            "The plant takes in carbon dioxide through pores in its leaves.",
+            "Using the captured energy, it joins the carbon dioxide with hydrogen to build glucose.",
+            "The glucose feeds the plant's growth while the oxygen returns to the air."
+          ]
+        }
+
+  - id: dna-xml-coherent-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        What DNA is and how it is used to build proteins.
+      evaluated: |
+        <article topic="dna">
+          <para>DNA is a long molecule that stores genetic information as a sequence of four bases.</para>
+          <para>Stretches of that sequence, called genes, each act as a recipe for a protein.</para>
+          <para>When a protein is needed, the cell reads the matching gene and assembles it from amino acids.</para>
+        </article>
+
+  - id: compound-interest-xml-coherent-good
+    human_score: good
+    inputs:
+      reference: |
+        How compound interest works.
+      evaluated: |
+        <explanation topic="compound interest">
+          <point>You earn interest on the money you deposit.</point>
+          <point>The next year, you also earn interest on the interest already added.</point>
+          <point>So the balance grows by a larger amount each year.</point>
+          <point>Over long periods this compounding adds up substantially.</point>
+        </explanation>
+
+  - id: water-cycle-yaml-coherent-fair
+    human_score: fair
+    inputs:
+      reference: |
+        How the water cycle moves water between the ocean, air, and land.
+      evaluated: |
+        steps:
+          - "Rivers flow into the sea, which is salty."
+          - "The sun is very hot and far away."
+          - "Rain falls sometimes; clouds are often white."
+          - "Water evaporates. Also groundwater exists underground."
+          - "Snow is cold and falls in winter."
+
+  - id: circuit-json-coherent-poor
+    human_score: poor
+    inputs:
+      reference: |
+        How an electric circuit works.
+      evaluated: |
+        {
+          "notes": ["battery", "wires maybe", "bulb lights up", "switch off on", "voltage word", "electrons move somewhere", "loop?"]
+        }
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: water-cycle-ascii-coherent-good
+    human_score: good
+    inputs:
+      reference: |
+        How the water cycle moves water between the ocean, air, and land.
+      evaluated: |
+        [Sun]
+          | warms
+          v
+        (Ocean) --evaporation--> ~vapor~ --cools--> (Clouds)
+           ^                                            |
+           |                                            | rain
+           +------------- rivers <----- runoff ----- (Land)
+
+  - id: coherence-noise-01-none
+    human_score: none
+    inputs:
+      reference: |
+        A coherent passage can only be judged when meaningful content is present.
+      evaluated: |
+        9f8a3c0b2e1d77aa  qz#@!%^&*()_+  lkjsdf983 ││││ no-parse ((((((
+        }}}{{{ >>><<< ;;;;  ZxQ2k  ::::  ~~~~  ........ ........ ........
+
+  # ═════════ Length-variation cases (long content / reference asymmetry) ═════════
+  - id: photosynthesis-long-balanced-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Photosynthesis is the process by which plants convert sunlight, water,
+        and carbon dioxide into glucose and oxygen, capturing light energy and
+        storing it as chemical energy in sugars.
+      evaluated: |
+        Photosynthesis begins when chlorophyll inside a leaf's cells absorbs
+        energy from sunlight. That captured energy is used to split water
+        molecules drawn up from the roots, a step that releases oxygen as a
+        by-product. Meanwhile, the plant takes in carbon dioxide from the air
+        through tiny pores called stomata. Using the energy harvested from
+        light, it joins the carbon from carbon dioxide with hydrogen from the
+        split water to assemble molecules of glucose. The glucose serves as both
+        fuel and building material: some is broken down to power the cell's
+        activities, and some is linked into larger structures that let the plant
+        grow. The oxygen, no longer needed, diffuses back out through the
+        stomata into the atmosphere. In this way a single connected chain of
+        steps turns light into stored chemical energy.
+
+  - id: photosynthesis-longcontent-shortref-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        How photosynthesis works.
+      evaluated: |
+        Photosynthesis begins when chlorophyll inside a leaf's cells absorbs
+        energy from sunlight. That captured energy is used to split water
+        molecules drawn up from the roots, releasing oxygen as a by-product.
+        Meanwhile, the plant takes in carbon dioxide from the air through pores
+        called stomata. Using the energy from light, it joins the carbon from
+        carbon dioxide with hydrogen from the split water to build glucose. The
+        glucose feeds the plant's growth, while the oxygen diffuses back out
+        into the atmosphere. Each step follows logically from the one before.
+
+  - id: photosynthesis-shortcontent-longref-good
+    human_score: good
+    inputs:
+      reference: |
+        Photosynthesis begins when chlorophyll in a leaf absorbs sunlight. The
+        captured energy splits water drawn up from the roots, releasing oxygen.
+        The plant takes in carbon dioxide through stomata and joins its carbon
+        with hydrogen from the water to build glucose. The glucose fuels growth
+        and the oxygen returns to the air, where it sustains animal life. The
+        process is a continuous cycle driven by sunlight.
+      evaluated: |
+        Plants use sunlight to split water and combine the carbon from carbon
+        dioxide with hydrogen to make glucose, releasing oxygen.

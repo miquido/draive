@@ -731,8 +731,6 @@ samples:
     inputs:
       evaluated: |
 
-
-
   - id: fluency-invalid-content-02-none
     human_score: none
     inputs:
@@ -740,3 +738,82 @@ samples:
         @#$%^ &*()_+ <<>><<
         ||||||| ;;;;; :::::
         \\\\\ ///// {{{{{
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # Judged on the linguistic fluency of the natural-language text carried by
+  # the structure; the wrapper itself is ignored.
+  - id: reviews-json-fluency-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        {
+          "reviews": [
+            { "stars": 5, "text": "The headphones are comfortable and the sound is crisp, even at low volume." },
+            { "stars": 3, "text": "Battery life is decent, but the case feels flimsy and scratches easily." }
+          ]
+        }
+
+  - id: bio-xml-fluency-good
+    human_score: good
+    inputs:
+      evaluated: |
+        <profile>
+          <bio>Ana is a backend engineer who enjoys building reliable systems and mentoring new developers.</bio>
+        </profile>
+
+  - id: reviews-json-fluency-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        {
+          "reviews": [
+            { "stars": 4, "text": "Sound good is and comfortable wear for the long time it." },
+            { "stars": 2, "text": "Battery the not last long and case break easy." }
+          ]
+        }
+
+  - id: notes-yaml-fluency-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        notes:
+          - "thing happen then more thing but no because when which"
+          - "the the the and of of to to a a a"
+
+  - id: summary-xml-fluency-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        <summary>The migration completed without downtime, and all services reported healthy within minutes.</summary>
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: banner-ascii-fluency-good
+    human_score: good
+    inputs:
+      evaluated: |
+        _   _      _ _
+        | | | | ___| | | ___
+        | |_| |/ _ \ | |/ _ \
+        |  _  |  __/ | | (_) |
+        |_| |_|\___|_|_|\___/
+        Welcome aboard — we are glad to have you with us.
+
+  - id: fluency-noise-01-none
+    human_score: none
+    inputs:
+      evaluated: |
+        xq9z @@@ ;;;; ░▒▓ )(*&^ .... <<>> kkk 8347 lkjsdf no words just noise
+
+  # ═════════ Length-variation cases (long content) ═════════
+  - id: fluency-long-content-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Moving to a new city is equal parts thrilling and disorienting. For the
+        first few weeks, even small errands feel like puzzles: you learn which
+        bus actually shows up on time, which café will let you sit for an hour
+        with one coffee, and which neighbour is happy to sign for a parcel. The
+        loneliness can be sharp at first, but it tends to soften as routines
+        take hold. One day you give a stranger directions without thinking, and
+        you realise the unfamiliar streets have quietly become your own. The
+        city stops being a place you are visiting and starts being home.

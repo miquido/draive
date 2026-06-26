@@ -14,11 +14,11 @@ from haiway import (
     ctx,
 )
 
-from draive.evaluation.agreement import quantize_score
 from draive.evaluation.reference import EvaluationReference, reference_conformance
 from draive.evaluation.score import EvaluationScore
 from draive.evaluation.value import (
     EvaluationScoreValue,
+    evaluation_score_level,
     evaluation_score_value,
     evaluation_score_verifier,
 )
@@ -58,7 +58,7 @@ class EvaluatorResult(State, serializable=True):
         ----------
         evaluator : str
             Name of the evaluator that produced this result
-        score : EvaluationResult | EvaluationScore | EvaluationScoreValue
+        score : EvaluationScore | EvaluationScoreValue
             The evaluation score in various formats
         threshold : EvaluationScoreValue
             The minimum score value required to pass
@@ -70,21 +70,19 @@ class EvaluatorResult(State, serializable=True):
         Self
             New EvaluatorResult instance
         """
-        evaluation_score: EvaluationScoreValue
-        evaluation_meta: Meta
         if isinstance(score, EvaluationScore):
-            evaluation_score = score.value
-            evaluation_meta = score.meta.merged_with(meta)
-
-        else:
-            evaluation_score = evaluation_score_value(score)
-            evaluation_meta = Meta.of(meta)
+            return cls(
+                evaluator=evaluator,
+                score=score.value,
+                threshold=evaluation_score_value(threshold),
+                meta=score.meta.merged_with(meta),
+            )
 
         return cls(
             evaluator=evaluator,
-            score=evaluation_score,
+            score=evaluation_score_value(score),
             threshold=evaluation_score_value(threshold),
-            meta=evaluation_meta,
+            meta=Meta.of(meta),
         )
 
     evaluator: Annotated[
@@ -428,97 +426,6 @@ class Evaluator[Value, **Args](Immutable):
 
         return evaluate
 
-    @staticmethod
-    def referenced(
-        evaluator: PreparedEvaluator[Value],
-        /,
-        *,
-        reference: Callable[[Value], EvaluationReference | EvaluationScoreValue]
-        | AttributePath[Value, EvaluationReference | EvaluationScoreValue]
-        | EvaluationReference,
-        weighting: Literal["quadratic", "nominal"] = "quadratic",
-    ) -> PreparedEvaluator[Value]:
-        """
-        Create an evaluator that scores agreement with a reference instead of the raw score.
-
-        Runs the wrapped evaluator and then replaces its score with how well that score
-        conforms to a reference window pulled from the same evaluated value - the ground
-        truth lives in the value itself (e.g. a field of the suite case parameters), so no
-        extra surface is added to carry it. A prediction inside the accepted window is full
-        agreement; outside, the ``weighting`` controls the falloff (see ``reference_conformance``).
-
-        Parameters
-        ----------
-        evaluator : PreparedEvaluator[Value]
-            Evaluator producing the predicted score to compare against the reference.
-        reference : Callable | AttributePath | EvaluationReference
-            Source of the accepted reference window. A callable or attribute path resolves it
-            per value; a bare ``EvaluationReference`` applies the same window to every value.
-            A resolved raw ``EvaluationScoreValue`` is treated as an exact single-point window.
-            A constant exact point must be passed as ``EvaluationReference.of(value)`` - a bare
-            score value is only accepted when resolved per value.
-        weighting : Literal["quadratic", "nominal"]
-            Falloff for predictions outside the window, by default "quadratic".
-
-        Returns
-        -------
-        PreparedEvaluator[Value]
-            Evaluator whose result score is the reference conformance, keeping the wrapped
-            evaluator's name and threshold and recording the comparison in result metadata.
-        """
-        selector: Callable[[Value], EvaluationReference | EvaluationScoreValue]
-        if isinstance(reference, AttributePath):
-            selector = cast(
-                Callable[[Value], EvaluationReference | EvaluationScoreValue],
-                reference,
-            )
-
-        elif isinstance(reference, EvaluationReference):
-            selector = lambda _: reference  # noqa: E731
-
-        else:
-            assert isinstance(reference, Callable)  # nosec: B101
-            selector = reference
-
-        async def evaluate(
-            value: Value,
-        ) -> EvaluatorResult:
-            result: EvaluatorResult = await evaluator(value)
-
-            # Do not score conformance for a failed evaluation - the 0.0 score is a failure
-            # marker, not a prediction, and could spuriously land within the reference window.
-            if result.meta.error is not None:
-                return result
-
-            selected: EvaluationReference | EvaluationScoreValue = selector(value)
-            reference_window: EvaluationReference = (
-                selected
-                if isinstance(selected, EvaluationReference)
-                else EvaluationReference.of(selected)
-            )
-
-            return EvaluatorResult.of(
-                result.evaluator,
-                score=reference_conformance(
-                    result.score,
-                    reference_window,
-                    weighting=weighting,
-                ),
-                threshold=result.threshold,
-                meta=result.meta.merged_with(
-                    {
-                        "predicted_score": result.score,
-                        "predicted_level": quantize_score(result.score),
-                        "reference_lower": reference_window.lower,
-                        "reference_upper": reference_window.upper,
-                        "within_reference": reference_window.contains(result.score),
-                        "reference_weighting": weighting,
-                    }
-                ),
-            )
-
-        return evaluate
-
     name: str
     threshold: float
     meta: Meta
@@ -533,11 +440,12 @@ class Evaluator[Value, **Args](Immutable):
         state: Collection[State],
         meta: Meta,
     ) -> None:
-        assert (  # nosec: B101
-            threshold is None or 0 <= threshold <= 1
-        ), "Evaluator threshold has to be a value between 0 and 1"
+        assert 0 <= threshold <= 1, (  # nosec: B101
+            "Evaluator threshold has to be a value between 0 and 1"
+        )
+        normalized_name: str = name.lower().replace(" ", "_")
         assert re.match(  # nosec: B101
-            r"^[a-z][a-z0-9_]*$", name.lower()
+            r"^[a-z][a-z0-9_]*$", normalized_name
         ), "Evaluator name should follow snake case rules"
 
         object.__setattr__(
@@ -548,7 +456,7 @@ class Evaluator[Value, **Args](Immutable):
         object.__setattr__(
             self,
             "name",
-            name.lower().replace(" ", "_"),
+            normalized_name,
         )
         object.__setattr__(
             self,
@@ -671,6 +579,104 @@ class Evaluator[Value, **Args](Immutable):
             threshold=self.threshold,
             state=self._state,
             meta=self.meta.merged_with(meta),
+        )
+
+    def referenced(
+        self,
+        *,
+        reference: Callable[[Value], EvaluationReference | EvaluationScoreValue]
+        | AttributePath[Value, EvaluationReference | EvaluationScoreValue]
+        | EvaluationReference
+        | EvaluationScoreValue,
+        weighting: Literal["quadratic", "nominal"] = "quadratic",
+    ) -> Self:
+        """
+        Create a copy that scores agreement with a reference instead of the raw score.
+
+        Runs the wrapped evaluation and then replaces its score with how well that score
+        conforms to a reference window pulled from the same evaluated value - the ground
+        truth lives in the value itself (e.g. a field of the suite case parameters), so no
+        extra surface is added to carry it. A prediction inside the accepted window is full
+        agreement; outside, the ``weighting`` controls the falloff (see ``reference_conformance``).
+
+        Parameters
+        ----------
+        reference : Callable | AttributePath | EvaluationReference | EvaluationScoreValue
+            Source of the accepted reference window. A callable or attribute path resolves it
+            per value; a bare ``EvaluationReference`` (or raw ``EvaluationScoreValue``, treated
+            as an exact single-point window) applies the same window to every value. A value
+            resolved to a raw ``EvaluationScoreValue`` is likewise treated as an exact point.
+        weighting : Literal["quadratic", "nominal"]
+            Falloff for predictions outside the window, by default "quadratic".
+
+        Returns
+        -------
+        Self
+            New evaluator whose result score is the reference conformance, keeping this
+            evaluator's name and threshold and recording the comparison in result metadata.
+        """
+        selector: Callable[[Value], EvaluationReference | EvaluationScoreValue]
+        if isinstance(reference, AttributePath):
+            selector = cast(
+                Callable[[Value], EvaluationReference | EvaluationScoreValue],
+                reference,
+            )
+
+        elif isinstance(reference, EvaluationReference):
+            selector = lambda _: reference  # noqa: E731
+
+        elif callable(reference):
+            # `EvaluationScoreValue` is a `Literal`-bearing alias and so unusable with
+            # `isinstance`; a resolver is told from a constant via `callable`, and anything
+            # else is a constant score value applied to every evaluated value.
+            selector = reference
+
+        else:
+            constant: EvaluationScoreValue = reference
+            selector = lambda _: constant  # noqa: E731
+
+        async def evaluate(
+            value: Value,
+            /,
+            *args: Args.args,
+            **kwargs: Args.kwargs,
+        ) -> EvaluationScore:
+            result: EvaluationScore = EvaluationScore.of(
+                await self._definition(
+                    value,
+                    *args,
+                    **kwargs,
+                )
+            )
+            if "error" in result.meta:
+                return result
+
+            reference: EvaluationReference = EvaluationReference.of(selector(value))
+
+            return EvaluationScore.of(
+                reference_conformance(
+                    result.value,
+                    reference,
+                    weighting=weighting,
+                ),
+                meta=result.meta.merged_with(
+                    {
+                        "predicted_score": result.value,
+                        "predicted_level": evaluation_score_level(result.value),
+                        "reference_lower": reference.lower,
+                        "reference_upper": reference.upper,
+                        "within_reference": reference.contains(result.value),
+                        "reference_weighting": weighting,
+                    }
+                ),
+            )
+
+        return self.__class__(
+            name=self.name,
+            definition=evaluate,
+            threshold=self.threshold,
+            state=self._state,
+            meta=self.meta,
         )
 
     def prepared(

@@ -10,9 +10,8 @@ from draive.evaluation import (
 from draive.evaluation.agreement import (
     cohen_kappa,
     quadratic_weighted_kappa,
-    quantize_score,
 )
-from draive.evaluation.value import evaluation_score_value
+from draive.evaluation.value import evaluation_score_level, evaluation_score_value
 
 __all__ = ("cohen_kappa_evaluator",)
 
@@ -96,8 +95,12 @@ async def cohen_kappa_evaluator(
             },
         )
 
-    evaluated_bins: list[str] = [quantize_score(_rating_value(rating)) for rating in evaluated]
-    reference_bins: list[str] = [quantize_score(_rating_value(rating)) for rating in reference]
+    evaluated_bins: Sequence[str] = tuple(
+        evaluation_score_level(_rating_value(rating)) for rating in evaluated
+    )
+    reference_bins: Sequence[str] = tuple(
+        evaluation_score_level(_rating_value(rating)) for rating in reference
+    )
 
     nominal: float = cohen_kappa(reference_bins, evaluated_bins)
     quadratic: float = quadratic_weighted_kappa(reference_bins, evaluated_bins)

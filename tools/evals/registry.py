@@ -114,7 +114,9 @@ _ENTRIES: Final[tuple[EvaluatorEntry, ...]] = (
     _entry(
         factual_accuracy_evaluator,
         required=(),
-        description="Factual correctness judged against world knowledge (no reference).",
+        optional=("guidelines", "reference"),
+        description="Factual correctness judged against a reference when provided, "
+        "else world knowledge.",
     ),
     _entry(
         fluency_evaluator,

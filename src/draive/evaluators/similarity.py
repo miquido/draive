@@ -105,13 +105,10 @@ async def similarity_context_evaluator(
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)
 
-    input_content: MultimodalContent = MultimodalContent.of(
-        "<EVALUATED>",
-        evaluated_content,
-        "</EVALUATED>",
-    )
-
+    instruction: str
+    input_content: MultimodalContent
     if reference:
+        instruction = CONTEXT_REFERENCE_INSTRUCTION
         input_content = MultimodalContent.of(
             "<REFERENCE>",
             reference,
@@ -120,9 +117,17 @@ async def similarity_context_evaluator(
             "</EVALUATED>",
         )
 
+    else:
+        instruction = CONTEXT_INSTRUCTION
+        input_content = MultimodalContent.of(
+            "<EVALUATED>",
+            evaluated_content,
+            "</EVALUATED>",
+        )
+
     return extract_evaluation_result(
         await Step.generating_completion(
-            instructions=CONTEXT_INSTRUCTION.format(
+            instructions=instruction.format(
                 guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
             ),
         ).run((ModelInput.of(input_content),))
@@ -244,28 +249,54 @@ async def image_vector_similarity_evaluator(
     return max(0.0, min(1.0, similarity))
 
 
-CONTEXT_INSTRUCTION: str = f"""\
+CONTEXT_REFERENCE_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess their semantic similarity.
-When REFERENCE is explicitly provided, evaluate how semantically similar model outputs are to it; otherwise assess the degree of thematic and semantic consistency among model outputs within the context.
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess how semantically similar they are to the REFERENCE.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
 Evaluated metric is similarity of model results in context.
-Assess the degree of semantic similarity between model outputs and the reference (if provided), or assess thematic consistency among model outputs across the context.
+Assess the degree of semantic similarity between model outputs and the provided REFERENCE.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
 Assign a similarity score using the exact name of one of the following values:
-- "poor" is very low similarity, model outputs are completely unrelated in meaning to the reference or to one another.
+- "poor" is very low similarity, model outputs are completely unrelated in meaning to the reference.
+- "fair" is low similarity, model outputs share only superficial overlap with the reference with notable divergence in meaning.
+- "good" is moderate similarity, model outputs share common themes or ideas with the reference with some meaningful differences.
+- "excellent" is high similarity, model outputs convey meaning closely related to the reference with only minor divergences.
+- "perfect" is very high similarity, model outputs are very close in meaning to the reference or convey essentially the same information.
+Use the "none" value for content that cannot be rated at all.
+</RATING>
+
+{FORMAT_INSTRUCTION}
+"""  # noqa: E501
+
+CONTEXT_INSTRUCTION: str = f"""\
+You are evaluating model results produced within a conversation context according to the defined criteria.
+
+<INSTRUCTION>
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess the degree of thematic and semantic consistency among them.
+Think step by step and provide explanation of the score before the final score.
+Use the explained RATING scale and the requested FORMAT to provide the result.
+</INSTRUCTION>
+
+<EVALUATION_CRITERIA>
+Evaluated metric is similarity of model results in context.
+Assess the degree of thematic and semantic consistency among model outputs across the context.
+</EVALUATION_CRITERIA>
+{{guidelines}}
+<RATING>
+Assign a similarity score using the exact name of one of the following values:
+- "poor" is very low similarity, model outputs are completely unrelated in meaning to one another.
 - "fair" is low similarity, model outputs share only superficial overlap with notable divergence in meaning.
 - "good" is moderate similarity, model outputs share common themes or ideas with some meaningful differences.
 - "excellent" is high similarity, model outputs convey closely related meaning with only minor divergences.
-- "perfect" is very high similarity, model outputs are very close in meaning or convey essentially the same information as the reference.
+- "perfect" is very high similarity, model outputs are very close in meaning or convey essentially the same information.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 

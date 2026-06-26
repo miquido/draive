@@ -644,3 +644,92 @@ samples:
         \x00\x00\x00 ?????? ������
         <NO_TEXT_GENERATED>
         ][][][
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # Judged on the originality of the content carried by the structure.
+  - id: bestiary-json-creative-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        {
+          "creature": "Lantern Whale",
+          "habitat": "the cloud-seas above drowned cities",
+          "diet": "collected echoes of forgotten names",
+          "lore": "Sailors say its song rewrites the constellation it swims beneath.",
+          "abilities": ["tideglow", "memory-tow", "silent breach"]
+        }
+
+  - id: poem-xml-creative-good
+    human_score: good
+    inputs:
+      evaluated: |
+        <poem theme="autumn">
+          <line>The server logs go quiet,</line>
+          <line>leaves of stderr fall,</line>
+          <line>and one last warning drifts</line>
+          <line>uncaught, through it all.</line>
+        </poem>
+
+  - id: worldbuild-yaml-creative-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        realm: The Folded Coast
+        seasons: [Glasswind, Longtide, Emberhush]
+        law: "Shadows are taxed; the wealthy walk at noon."
+        capital:
+          name: Hemlock-on-Mirror
+          built_on: the back of a sleeping tide-beast
+
+  - id: recipe-yaml-creative-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        recipe: toast
+        steps:
+          - put bread in toaster
+          - wait
+          - remove toast
+
+  - id: config-json-creative-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        { "key1": "value1", "key2": "value2", "key3": "value3" }
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: creature-ascii-creative-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        /\_/\    ___
+        ( o.o ) /   \    The Ember-Coil:
+        > ^ <   \___/    guardian of forgotten changelogs,
+        /|   |\          it hoards every deleted TODO and hums them back at dawn.
+
+  - id: smiley-ascii-creative-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        :-)
+
+  - id: creativity-noise-01-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        asdf 8347 ;;;; @@@@ ░▒▓ )(*& kqz9 .... <<>> nothing here just noise
+
+  # ═════════ Length-variation cases (long content) ═════════
+  - id: creativity-long-content-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        The lighthouse keeper had not seen a ship in forty years, so she began
+        sending messages to the only audience left: the fog. Each night she
+        spelled out a single word in long and short flashes — "stay," then
+        "almost," then "soon" — and each morning she swore the fog had thinned a
+        little in reply, as if it were learning to listen. By winter the words
+        had grown into sentences, and the fog answered in shapes: a heron, a
+        sail, the face of someone she had stopped letting herself remember. The
+        townsfolk below called her mad. They had never tried, she thought, to
+        say something kind to the weather and wait long enough for it to answer.

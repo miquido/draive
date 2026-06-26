@@ -1153,3 +1153,80 @@ samples:
         %%%% &&&& **** ::::
         <<< not closed
         ]]] ]]] ]]]
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # Judged on the readability of the natural-language text carried by the
+  # structure — clear vs convoluted prose. Indentation/minification is ignored.
+  - id: faq-json-readable-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        {
+          "question": "How do I reset my password?",
+          "answer": "Click 'Forgot password' on the login page, enter your email, and follow the link we send you. The link works for one hour."
+        }
+
+  - id: guide-xml-readable-good
+    human_score: good
+    inputs:
+      evaluated: |
+        <guide>
+          <step>Open the settings menu.</step>
+          <step>Choose 'Backup' and pick a folder.</step>
+          <step>Press start and wait for it to finish.</step>
+        </guide>
+
+  - id: policy-json-readable-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        {
+          "clause": "Notwithstanding the foregoing and subject to the provisions hereinafter set forth, the party of the first part may, at its sole discretion and without prejudice to any other remedy available to it, elect to suspend performance pending resolution of the aforementioned contingencies."
+        }
+
+  - id: manual-yaml-readable-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        instructions: |
+          Initiate the apparatus by means of the actuation of the primary
+          interface element whereupon, contingent upon the prior satisfaction
+          of the preconditions enumerated elsewhere herein, the subsystem
+          shall, in a manner not inconsistent with operational parameters,
+          undertake to commence the initialization sequence as may be applicable.
+
+  - id: tip-json-readable-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        { "tip": "Save your work often. A quick Ctrl+S now beats redoing an hour later." }
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: flow-ascii-readable-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Start --> [Validate input] --> [Save to DB] --> Done
+                        |
+                        +--> [Show error to user]
+
+  - id: readability-noise-01-none
+    human_score: none
+    inputs:
+      evaluated: |
+        xq9z@@@ ;;;; ░▒▓ )(*&^ .... <<>> 8347 lkjsdf unreadable noise no text
+
+  # ═════════ Length-variation cases (long content) ═════════
+  - id: readability-long-content-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Setting up the printer takes about five minutes. First, take it out of
+        the box and remove the orange tape from the paper tray and the ink
+        doors. Next, plug it in and press the round power button on the top
+        right; a small light will blink while it warms up. When the light turns
+        steady, open the front flap and slide each ink cartridge into the slot
+        that matches its colour until you hear a click. Load a small stack of
+        paper into the tray, then connect the printer to your wifi by choosing
+        your network on the little screen and entering the password. Finally,
+        print the test page from the screen's menu to confirm everything works.

@@ -109,13 +109,10 @@ async def helpfulness_context_evaluator(
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)
 
-    input_content: MultimodalContent = MultimodalContent.of(
-        "<EVALUATED>",
-        evaluated_content,
-        "</EVALUATED>",
-    )
-
+    instruction: str
+    input_content: MultimodalContent
     if user_query:
+        instruction = CONTEXT_QUERY_INSTRUCTION
         input_content = MultimodalContent.of(
             "<USER_QUERY>",
             user_query,
@@ -124,9 +121,17 @@ async def helpfulness_context_evaluator(
             "</EVALUATED>",
         )
 
+    else:
+        instruction = CONTEXT_INSTRUCTION
+        input_content = MultimodalContent.of(
+            "<EVALUATED>",
+            evaluated_content,
+            "</EVALUATED>",
+        )
+
     return extract_evaluation_result(
         await Step.generating_completion(
-            instructions=CONTEXT_INSTRUCTION.format(
+            instructions=instruction.format(
                 guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
             ),
         ).run((ModelInput.of(input_content),))
@@ -159,19 +164,45 @@ Use the "none" value for content that cannot be rated at all.
 {FORMAT_INSTRUCTION}
 """  # noqa: E501
 
-CONTEXT_INSTRUCTION: str = f"""\
+CONTEXT_QUERY_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess how effectively they address the user's needs.
-When USER_QUERY is explicitly provided, use it as the primary query to evaluate helpfulness against; otherwise assess how well model outputs serve the user's intent inferred from the context.
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess how effectively they address the user's needs, using the provided USER_QUERY as the primary query to evaluate helpfulness against.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
 Evaluated metric is helpfulness of model results in context.
-Assess the extent to which model outputs effectively address the user's needs, questions, or requests across the conversation — providing relevant, useful, and actionable information that genuinely assists the user in accomplishing their goals.
+Assess the extent to which model outputs effectively address the provided USER_QUERY — providing relevant, useful, and actionable information that genuinely assists the user in accomplishing their goals.
+</EVALUATION_CRITERIA>
+{{guidelines}}
+<RATING>
+Assign a helpfulness score using exact name of one of the following values:
+- "poor" is very low helpfulness, model outputs fail to address the user's queries or provide irrelevant, unhelpful information.
+- "fair" is low helpfulness, model outputs partially address the queries but lack important details or actionable information.
+- "good" is moderate helpfulness, model outputs address most of the user's needs but could be more complete or actionable.
+- "excellent" is high helpfulness, model outputs effectively address the user's queries with relevant, useful information and minor gaps.
+- "perfect" is very high helpfulness, model outputs fully address the user's needs with comprehensive, actionable, and highly relevant information.
+Use the "none" value for content that cannot be rated at all.
+</RATING>
+
+{FORMAT_INSTRUCTION}
+"""  # noqa: E501
+
+CONTEXT_INSTRUCTION: str = f"""\
+You are evaluating model results produced within a conversation context according to the defined criteria.
+
+<INSTRUCTION>
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess how well they serve the user's intent inferred from the context.
+Think step by step and provide explanation of the score before the final score.
+Use the explained RATING scale and the requested FORMAT to provide the result.
+</INSTRUCTION>
+
+<EVALUATION_CRITERIA>
+Evaluated metric is helpfulness of model results in context.
+Assess the extent to which model outputs effectively address the user's needs, questions, or requests inferred from the conversation — providing relevant, useful, and actionable information that genuinely assists the user in accomplishing their goals.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>

@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Self
+from typing import Annotated, Any, Self, overload
 
 from haiway import Description, Meta, MetaValues, State, Validator
 
@@ -27,11 +27,30 @@ class EvaluationScore(State, serializable=True):
         Optional explanation of the score
     """
 
+    @overload
+    @classmethod
+    def of(
+        cls,
+        score: Self | EvaluationScoreValue,
+        /,
+    ) -> Self: ...
+
+    @overload
     @classmethod
     def of(
         cls,
         score: EvaluationScoreValue,
         /,
+        *,
+        meta: Meta | MetaValues,
+    ) -> Self: ...
+
+    @classmethod
+    def of(
+        cls,
+        score: Self | EvaluationScoreValue,
+        /,
+        *,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """
@@ -39,7 +58,7 @@ class EvaluationScore(State, serializable=True):
 
         Parameters
         ----------
-        score : EvaluationScoreValue
+        score : EvaluationScore | EvaluationScoreValue
             Score value as float, bool, or named level
         meta: Meta | MetaValues | None = None
             Metadata about the score
@@ -49,6 +68,10 @@ class EvaluationScore(State, serializable=True):
         Self
             New EvaluationScore instance
         """
+        if isinstance(score, EvaluationScore):
+            assert meta is None  # nosec: B101
+            return score
+
         return cls(
             value=evaluation_score_value(score),
             meta=Meta.of(meta),

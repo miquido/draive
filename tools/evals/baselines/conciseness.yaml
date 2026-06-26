@@ -1346,3 +1346,130 @@ samples:
         @@@@@ ;;;;; @@@@@
         \\\\ no-parse \\\\
         ((( dangling
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # Judged on how concisely the content conveys the reference information —
+  # redundant, padded wording scores low. Nesting/indentation is ignored.
+  - id: profile-json-concise-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Convey that user Ana is an active administrator.
+      evaluated: |
+        { "name": "Ana", "role": "admin", "active": true }
+
+  - id: profile-json-concise-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Convey that user Ana is an active administrator.
+      evaluated: |
+        {
+          "summary": "Ana is the user. The user's name is Ana. Ana is an administrator. As an administrator, Ana has admin privileges. Ana is currently active, which means Ana is not inactive at this time.",
+          "name": "Ana"
+        }
+
+  - id: status-xml-concise-good
+    human_score: good
+    inputs:
+      reference: |
+        Report that the nightly build passed and was deployed.
+      evaluated: |
+        <status>
+          <build>passed</build>
+          <deploy>completed</deploy>
+        </status>
+
+  - id: status-xml-concise-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Report that the nightly build passed and was deployed.
+      evaluated: |
+        <status>
+          <message>We are pleased to inform you that the nightly build, which runs every night, has passed successfully without any failures whatsoever. The build passing means that it did not fail. Following the successful build that passed, the deployment was then carried out, and that deployment completed. To reiterate, the build passed and the deployment completed successfully, as already described above.</message>
+        </status>
+
+  - id: notes-yaml-concise-good
+    human_score: good
+    inputs:
+      reference: |
+        Standup note: finished the login fix, starting the search index next.
+      evaluated: |
+        done: login fix
+        next: search index
+
+  - id: notes-yaml-concise-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Standup note: finished the login fix, starting the search index next.
+      evaluated: |
+        update: |
+          So yesterday I worked on the login fix, and I am happy to report that
+          the login fix is now finished and fully completed. Now that the login
+          fix is done, the next thing I am going to start working on next is the
+          search index, which is the next task that I will begin working on.
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: trend-ascii-concise-good
+    human_score: good
+    inputs:
+      reference: |
+        Convey the value trend 1, 3, 2, 5, 4 compactly.
+      evaluated: |
+        trend: _.-^- (1 3 2 5 4)
+
+  - id: conciseness-noise-01-none
+    human_score: none
+    inputs:
+      reference: |
+        Convey that user Ana is an active administrator.
+      evaluated: |
+        zzz### 0x9f ░▒▓ qK!@  .... ,,,, ;;;; ((((  >>>><<<<  noise-noise-noise
+
+  # ═════════ Length-variation cases (long content / reference asymmetry) ═════════
+  - id: incident-long-balanced-good
+    human_score: good
+    inputs:
+      reference: |
+        Summarize the incident: at 14:05 the payments API began returning 500
+        errors; the on-call engineer rolled back the 14:00 deploy at 14:20,
+        errors stopped by 14:25, and a follow-up was filed to add a missing
+        database index.
+      evaluated: |
+        At 14:05 the payments API started returning 500 errors. The on-call
+        engineer traced it to the 14:00 deploy and rolled that deploy back at
+        14:20. Errors cleared by 14:25. A follow-up task was filed to add the
+        database index that the deploy had assumed was present.
+
+  - id: build-longcontent-shortref-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Convey that the nightly build passed and was deployed.
+      evaluated: |
+        I am very pleased to be able to take this opportunity to inform you
+        that the nightly build, which as you know runs automatically every
+        single night without fail, has on this particular occasion completed
+        its run, and moreover it has completed that run successfully, meaning
+        that it passed. Now, the fact that the build passed is significant,
+        because a build that passes is a build that did not fail. Following on
+        from that successful and passing build, the deployment process was then
+        initiated and subsequently carried through to completion, so the deploy
+        is done. To summarize everything stated above: the build passed and the
+        deployment completed successfully.
+
+  - id: incident-shortcontent-longref-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        At 14:05 the payments API began returning 500 errors to roughly a third
+        of requests. The on-call engineer was paged, investigated dashboards,
+        and identified the 14:00 deploy as the cause because it assumed a
+        database index that did not yet exist. They rolled the deploy back at
+        14:20, and error rates returned to normal by 14:25. A follow-up ticket
+        was opened to add the missing index before re-attempting the change.
+      evaluated: |
+        14:00 deploy assumed a missing DB index -> 500s from 14:05; rolled back
+        14:20, recovered 14:25; follow-up filed to add the index.

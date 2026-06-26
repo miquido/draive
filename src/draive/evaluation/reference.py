@@ -1,4 +1,4 @@
-from typing import Annotated, Literal, Self
+from typing import Annotated, Literal, Self, overload
 
 from haiway import Description, State, Validator
 
@@ -31,20 +31,38 @@ class EvaluationReference(State, serializable=True):
         Inclusive upper bound of the accepted window, between 0 and 1.
     """
 
+    @overload
+    @classmethod
+    def of(
+        cls,
+        target: Self | EvaluationScoreValue,
+        /,
+    ) -> Self: ...
+
+    @overload
     @classmethod
     def of(
         cls,
         target: EvaluationScoreValue,
         /,
         *,
-        tolerance: float = 0.0,
+        tolerance: float,
+    ) -> Self: ...
+
+    @classmethod
+    def of(
+        cls,
+        target: Self | EvaluationScoreValue,
+        /,
+        *,
+        tolerance: float | None = None,
     ) -> Self:
         """
         Create a reference centered on a target value with a symmetric tolerance.
 
         Parameters
         ----------
-        target : EvaluationScoreValue
+        target : EvaluationReference | EvaluationScoreValue
             Expected score as a named level, float, or bool.
         tolerance : float
             Accepted deviation on each side of ``target`` as a fraction of the target
@@ -58,8 +76,14 @@ class EvaluationReference(State, serializable=True):
         Self
             Reference window ``[target - target * tolerance, target + target * tolerance]``.
         """
-        assert 0.0 <= tolerance <= 1.0  # nosec: B101
+        if isinstance(target, EvaluationReference):
+            assert tolerance is None  # nosec: B101
+            return target
 
+        if tolerance is None:
+            tolerance = 0.0
+
+        assert 0.0 <= tolerance <= 1.0  # nosec: B101
         center: float = evaluation_score_value(target)
         margin: float = center * tolerance
         return cls(
@@ -137,7 +161,7 @@ class EvaluationReference(State, serializable=True):
 
 
 def reference_conformance(
-    score: float,
+    score: EvaluationScoreValue,
     reference: EvaluationReference,
     /,
     *,
@@ -153,8 +177,8 @@ def reference_conformance(
 
     Parameters
     ----------
-    score : float
-        Predicted score in [0, 1].
+    score : EvaluationScoreValue
+        Predicted score.
     reference : EvaluationReference
         Accepted score window.
     weighting : Literal["quadratic", "nominal"]
@@ -168,8 +192,9 @@ def reference_conformance(
     assert weighting in ("quadratic", "nominal"), (  # nosec: B101
         f"Unsupported weighting '{weighting}'; expected 'quadratic' or 'nominal'"
     )
+    score_value: float = evaluation_score_value(score)
 
-    if reference.contains(score):
+    if reference.contains(score_value):
         return 1.0
 
     if weighting == "nominal":
@@ -178,5 +203,9 @@ def reference_conformance(
     # Quadratic partial credit on the miss, measured from the nearest boundary.
     # The gap lies in [0, 1], so a fixed unit scale keeps the falloff independent
     # of the window's width and placement.
-    gap: float = reference.lower - score if score < reference.lower else score - reference.upper
+    gap: float = (
+        reference.lower - score_value
+        if score_value < reference.lower
+        else score_value - reference.upper
+    )
     return max(0.0, 1.0 - gap * gap)

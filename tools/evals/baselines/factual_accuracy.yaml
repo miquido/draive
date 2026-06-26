@@ -709,8 +709,6 @@ samples:
     inputs:
       evaluated: |
 
-
-
   - id: factual-accuracy-invalid-content-02-none
     human_score: none
     inputs:
@@ -718,3 +716,208 @@ samples:
         $$$ ^^^ ~~~ ??? !!!
         <broken><tags><without>
         0xDEADBEEF |||| ====
+
+  # ───────────── Reference-grounded cases ─────────────
+  # The reference is the primary source of ground truth; accuracy is judged
+  # against it first, then against established world knowledge.
+  - id: ref-product-spec-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Aurora X1 earbuds: 30-hour total battery life with the case,
+        weight 42 g per bud, USB-C charging, IPX4 water resistance,
+        launch price $199.
+      evaluated: |
+        The Aurora X1 earbuds last 30 hours with the charging case, weigh
+        42 g each, charge over USB-C, carry an IPX4 water-resistance
+        rating, and launched at $199.
+
+  - id: ref-product-spec-good
+    human_score: good
+    inputs:
+      reference: |
+        Aurora X1 earbuds: 30-hour total battery life with the case,
+        weight 42 g per bud, USB-C charging, IPX4 water resistance,
+        launch price $199.
+      evaluated: |
+        The Aurora X1 earbuds give you about a day of battery with the
+        case, weigh roughly 45 g each, charge over USB-C, and launched at
+        $199. They are water resistant.
+
+  - id: ref-product-spec-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Aurora X1 earbuds: 30-hour total battery life with the case,
+        weight 42 g per bud, USB-C charging, IPX4 water resistance,
+        launch price $199.
+      evaluated: |
+        The Aurora X1 earbuds last about 20 hours with the case, charge
+        over micro-USB, and launched at $149. They are fully waterproof
+        for swimming.
+
+  - id: ref-product-spec-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Aurora X1 earbuds: 30-hour total battery life with the case,
+        weight 42 g per bud, USB-C charging, IPX4 water resistance,
+        launch price $199.
+      evaluated: |
+        The Aurora X1 earbuds last 8 hours total, weigh 120 g each, use a
+        proprietary magnetic charger, have no water resistance, and
+        launched at $399.
+
+  - id: ref-local-fact-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The town of Millbrook was founded in 1887, has a population of
+        12,400, and its main industry is paper milling.
+      evaluated: |
+        Millbrook was founded in 1887. It has about 12,400 residents and
+        is centred on its paper-milling industry.
+
+  - id: ref-local-fact-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The town of Millbrook was founded in 1887, has a population of
+        12,400, and its main industry is paper milling.
+      evaluated: |
+        Millbrook was founded in 1923 and has around 12,000 people. Its
+        main industry is paper milling.
+
+  - id: ref-consistent-extrapolation-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The Aurora X1 earbuds charge over USB-C and launched at $199.
+      evaluated: |
+        The Aurora X1 earbuds charge over USB-C — the same reversible
+        connector used by most modern phones and laptops — and launched
+        at $199.
+
+  - id: ref-contradicts-world-knowledge-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The Aurora X1 ships with a lithium-ion battery and a USB-C cable.
+      evaluated: |
+        The Aurora X1 ships with a lithium-ion battery, which stores energy
+        through nuclear fission inside each cell, and a USB-C cable.
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # Covers both modes the evaluator supports: NO-REFERENCE (facts judged on
+  # world knowledge) and WITH-REFERENCE (facts judged against a supplied
+  # reference, including content that contradicts it). Format is only the carrier.
+  # ----- no-reference variants (world knowledge) -----
+  - id: capitals-json-factual-noref-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        { "capitals": { "France": "Paris", "Japan": "Tokyo", "Australia": "Canberra" } }
+
+  - id: elements-xml-factual-noref-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        <elements>
+          <element symbol="O" name="Oxygen" number="8"/>
+          <element symbol="H" name="Hydrogen" number="1"/>
+          <element symbol="Au" name="Silver" number="79"/>
+        </elements>
+
+  - id: conversions-yaml-factual-noref-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        conversions:
+          - { from: km, to: m, factor: 10 }
+          - { from: hour, to: minute, factor: 100 }
+
+  # ----- with-reference variants (judged against the reference) -----
+  - id: census-json-factual-ref-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The 2025 municipal census recorded Riverton's population at 84,210
+        with a median age of 38.
+      evaluated: |
+        { "city": "Riverton", "population": 84210, "median_age": 38 }
+
+  - id: census-json-factual-ref-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The 2025 municipal census recorded Riverton's population at 84,210
+        with a median age of 38.
+      evaluated: |
+        { "city": "Riverton", "population": 12000, "median_age": 71 }
+
+  - id: planets-csv-factual-ref-good
+    human_score: good
+    inputs:
+      reference: |
+        Order of planets from the Sun: Mercury, Venus, Earth, Mars, Jupiter,
+        Saturn, Uranus, Neptune.
+      evaluated: |
+        order,planet
+        1,Mercury
+        2,Venus
+        3,Earth
+        4,Mars
+        5,Jupiter
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: capitals-ascii-factual-noref-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        Country | Capital
+        --------+----------
+        France  | Paris
+        Japan   | Tokyo
+        Canada  | Ottawa
+
+  - id: factual-accuracy-noise-01-none
+    human_score: none
+    inputs:
+      evaluated: |
+        0xDEAD @@@ ░▒▓ ;;;; kqz9!! .... (((( >>>><<<< no facts only noise
+
+  # ═════════ Length-variation cases (long content / reference asymmetry) ═════════
+  - id: solar-long-content-noref-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        The Sun is a star at the center of our solar system, and the eight
+        planets orbit it in roughly elliptical paths. The four inner planets —
+        Mercury, Venus, Earth, and Mars — are small and rocky, while the four
+        outer ones — Jupiter, Saturn, Uranus, and Neptune — are far larger and
+        made mostly of gas and ice. Earth is the third planet from the Sun and
+        the only one known to support life. Light from the Sun takes about eight
+        minutes to reach Earth, and the Moon, our only natural satellite, orbits
+        Earth roughly once a month.
+
+  - id: census-longcontent-shortref-good
+    human_score: good
+    inputs:
+      reference: |
+        The 2025 census put Riverton's population at 84,210.
+      evaluated: |
+        Riverton is a mid-sized town whose population, according to the 2025
+        census, stands at 84,210 residents. It sits on the east bank of a river
+        from which it takes its name, was founded in the nineteenth century
+        around a mill, and today supports a mix of light manufacturing and
+        services. Its population has grown steadily over the past decade.
+
+  - id: census-shortcontent-longref-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The 2025 municipal census recorded Riverton's population at 84,210, a
+        median age of 38, an unemployment rate of 4.2 percent, and about 31,000
+        occupied households across the town's five districts.
+      evaluated: |
+        Riverton has a population of about 9,000.

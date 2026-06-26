@@ -971,8 +971,6 @@ samples:
       expected_tone_style: "Concise, empathetic, professional apology email."
       evaluated: |
 
-
-
   - id: tone-style-invalid-content-02-none
     human_score: none
     inputs:
@@ -980,3 +978,94 @@ samples:
       evaluated: |
         \x00\x00 ?????? ||||||||
         ===NULL=== <broken/ {[(
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # The expected tone/style is about the *voice of the text*, not the data
+  # format; the structure is only the carrier.
+  - id: support-json-tone-perfect
+    human_score: perfect
+    inputs:
+      expected_tone_style: |
+        Warm, empathetic, customer-facing support voice.
+      evaluated: |
+        {
+          "reply": "I'm really sorry for the trouble — that sounds frustrating. I've gone ahead and refunded the order, and you should see it within a few days. Please reach out if there's anything else I can help with!"
+        }
+
+  - id: support-json-tone-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        Warm, empathetic, customer-facing support voice.
+      evaluated: |
+        {
+          "reply": "Refund processed. Ticket closed. Do not reply to this message."
+        }
+
+  - id: marketing-xml-tone-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Playful, upbeat marketing voice.
+      evaluated: |
+        <promo>
+          <headline>Say hello to your comfiest commute yet!</headline>
+          <body>Our new cushioned soles turn the daily grind into a walk in the park.</body>
+        </promo>
+
+  - id: announcement-yaml-tone-fair
+    human_score: fair
+    inputs:
+      expected_tone_style: |
+        Formal, professional internal announcement.
+      evaluated: |
+        announcement: |
+          hey all!! so the office is gonna be closed friday lol, go enjoy the
+          long weekend, catch u monday
+
+  - id: condolence-json-tone-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        Gentle, respectful, sympathetic condolence tone.
+      evaluated: |
+        {
+          "message": "I'm so sorry for your loss. Please take all the time you need, and know that we're here for you whenever you're ready."
+        }
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: party-ascii-tone-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        Playful, celebratory party-invite voice.
+      evaluated: |
+        *  .  *   YOU'RE INVITED!  *  .  *
+        \o/   Cake at 3, bring your dancing shoes!
+        / \   It's going to be a blast!
+
+  - id: tone-style-noise-01-none
+    human_score: none
+    inputs:
+      expected_tone_style: |
+        Warm, empathetic customer-facing voice.
+      evaluated: |
+        xq9z@@@ ;;;; ░▒▓ )(*&^ .... <<>> 8347 no discernible tone just noise
+
+  # ═════════ Length-variation cases (long content) ═════════
+  - id: tone-style-long-content-good
+    human_score: good
+    inputs:
+      expected_tone_style: |
+        A calm, reassuring, plain-language voice for a healthcare appointment
+        reminder — friendly but professional, no jargon, no alarm.
+      evaluated: |
+        Hello, and thank you for booking with us. This is a friendly reminder
+        that your check-up is coming up on Tuesday the 14th at 10:00 a.m. There
+        is nothing special you need to do to prepare — just bring your ID and a
+        list of any medications you are currently taking. If you take regular
+        medication in the morning, go ahead and take it as usual unless your
+        doctor has told you otherwise. Our office is on the second floor, and the
+        lift is just past the main reception. If the timing no longer works for
+        you, no problem at all — simply give us a call and we will find a slot
+        that suits you better. We look forward to seeing you.

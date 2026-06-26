@@ -100,13 +100,10 @@ async def coherence_context_evaluator(
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)
 
-    input_content: MultimodalContent = MultimodalContent.of(
-        "<EVALUATED>",
-        evaluated_content,
-        "</EVALUATED>",
-    )
-
+    instruction: str
+    input_content: MultimodalContent
     if reference:
+        instruction = CONTEXT_REFERENCE_INSTRUCTION
         input_content = MultimodalContent.of(
             "<REFERENCE>",
             reference,
@@ -115,9 +112,17 @@ async def coherence_context_evaluator(
             "</EVALUATED>",
         )
 
+    else:
+        instruction = CONTEXT_INSTRUCTION
+        input_content = MultimodalContent.of(
+            "<EVALUATED>",
+            evaluated_content,
+            "</EVALUATED>",
+        )
+
     return extract_evaluation_result(
         await Step.generating_completion(
-            instructions=CONTEXT_INSTRUCTION.format(
+            instructions=instruction.format(
                 guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
             ),
         ).run((ModelInput.of(input_content),))
@@ -152,12 +157,40 @@ Use the "none" value for content that cannot be rated at all.
 {FORMAT_INSTRUCTION}
 """  # noqa: E501
 
+CONTEXT_REFERENCE_INSTRUCTION: str = f"""\
+You are evaluating model results produced within a conversation context according to the defined criteria.
+
+<INSTRUCTION>
+Carefully examine the CONTEXT timeline. Focus on model-produced results in output elements and judge whether they are coherent with information available in the context itself.
+Treat REFERENCE as supplemental material describing the expected well-structured progression, and use it to help validate the structural alignment of the outputs.
+Think step by step and provide explanation of the score before the final score.
+Use the explained RATING scale and the requested FORMAT to provide the result.
+</INSTRUCTION>
+
+<EVALUATION_CRITERIA>
+Evaluated metric is coherence of model results in context.
+Assess whether outputs form a logically connected and well-structured progression from available contextual information (especially prior inputs and prior outputs), using the REFERENCE as a benchmark for the expected structure.
+Outputs should not be chaotic, contradictory, or disconnected from what was established in the context timeline.
+</EVALUATION_CRITERIA>
+{{guidelines}}
+<RATING>
+Assign a coherence score using exact name of one of the following values:
+- "poor" is very low coherence, outputs are chaotic or largely disconnected from context.
+- "fair" is low coherence, some context alignment exists but structure is weak.
+- "good" is moderate coherence, outputs are mostly coherent with a few structural gaps.
+- "excellent" is high coherence, outputs are well-organized and context-aligned with minor imperfections.
+- "perfect" is very high coherence, outputs are consistently well-structured and fully coherent within context.
+Use the "none" value for content that cannot be rated at all.
+</RATING>
+
+{FORMAT_INSTRUCTION}
+"""  # noqa: E501
+
 CONTEXT_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
 Carefully examine the CONTEXT timeline. Focus on model-produced results in output elements and judge whether they are coherent with information available in the context itself.
-When present, treat REFERENCE as supplemental material that can help validate alignment, but do not make REFERENCE mandatory for scoring.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>

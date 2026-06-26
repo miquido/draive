@@ -1,8 +1,4 @@
-from draive.evaluation.agreement import (
-    cohen_kappa,
-    quadratic_weighted_kappa,
-    quantize_score,
-)
+from draive.evaluation.agreement import cohen_kappa, quadratic_weighted_kappa
 from draive.evaluation.evaluation import evaluate
 from draive.evaluation.evaluator import (
     Evaluator,
@@ -35,12 +31,15 @@ from draive.evaluation.suite import (
 )
 from draive.evaluation.value import (
     EVALUATION_SCORE_LEVELS,
+    EVALUATION_SCORE_VALUES,
     EvaluationScoreLevel,
     EvaluationScoreValue,
+    evaluation_score_level,
 )
 
 __all__ = (
     "EVALUATION_SCORE_LEVELS",
+    "EVALUATION_SCORE_VALUES",
     "EvaluationReference",
     "EvaluationScore",
     "EvaluationScoreLevel",
@@ -62,10 +61,10 @@ __all__ = (
     "PreparedEvaluatorSuite",
     "cohen_kappa",
     "evaluate",
+    "evaluation_score_level",
     "evaluator",
     "evaluator_scenario",
     "evaluator_suite",
     "quadratic_weighted_kappa",
-    "quantize_score",
     "reference_conformance",
 )

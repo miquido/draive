@@ -1637,3 +1637,108 @@ samples:
         @@@@@ |||| ===== \\\\\
         {{{ no close
         <broken>
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # Judged on whether the content answers the user's need; the structure is
+  # only the carrier.
+  - id: cron-json-helpful-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I need a backup scheduled every day at 2am — give me the cron
+        expression and a plain description.
+      evaluated: |
+        {
+          "schedule": "0 2 * * *",
+          "description": "Runs every day at 02:00 (server time).",
+          "job": "backup"
+        }
+
+  - id: env-yaml-helpful-good
+    human_score: good
+    inputs:
+      user_query: |
+        Set up a Postgres service with a password and a mapped port.
+      evaluated: |
+        services:
+          db:
+            image: postgres:16
+            environment:
+              POSTGRES_PASSWORD: changeme
+            ports:
+              - "5432:5432"
+
+  - id: regex-json-helpful-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        Give me a regex that validates an email address, with one example
+        that matches.
+      evaluated: |
+        { "note": "Validating email addresses perfectly is famously hard to do." }
+
+  - id: cron-json-helpful-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I need a backup scheduled every day at 2am.
+      evaluated: |
+        { "color": "blue", "size": 12, "enabled": true }
+
+  - id: steps-yaml-helpful-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        What are the steps to rotate an API key safely?
+      evaluated: |
+        rotate_api_key:
+          - generate a new key in the dashboard
+          - deploy the new key to staging and verify
+          - roll the new key out to production
+          - revoke the old key
+          - confirm there are no errors from the revoked key
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: orgchart-ascii-helpful-good
+    human_score: good
+    inputs:
+      user_query: |
+        Give me a quick ASCII org chart: a CEO over two managers (Sales and
+        Eng), and Eng has two engineers.
+      evaluated: |
+        [CEO]
+          |
+          +--- [Sales]
+          |
+          +--- [Eng]
+                 |
+                 +--- [Eng A]
+                 +--- [Eng B]
+
+  - id: helpfulness-noise-01-none
+    human_score: none
+    inputs:
+      user_query: |
+        I need a backup scheduled every day at 2am.
+      evaluated: |
+        9f3a @@@ ░▒▓ ;;;; kqz9!! .... (((( >>>><<<< no answer just noise bytes
+
+  # ═════════ Length-variation cases (long content) ═════════
+  - id: helpfulness-long-content-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        My sourdough starter isn't rising. How do I troubleshoot and revive it?
+      evaluated: |
+        A sluggish starter is almost always about temperature, feeding, or
+        flour. First, move it somewhere warm — around 24-26°C; a cold kitchen
+        slows the yeast to a crawl. Second, feed it more often and on a steady
+        ratio: discard most of it and feed the rest equal weights of starter,
+        water, and flour (1:1:1) once or twice a day, and watch for it to roughly
+        double within 4-8 hours. Third, try a flour with more nutrients — a bit
+        of whole-wheat or rye mixed into white flour gives the microbes more to
+        work with. Use unchlorinated water, since chlorine can suppress them.
+        Give it three to five days of consistent feeding before judging; most
+        "dead" starters are just hungry and cold. If you see a layer of liquid
+        on top, that's hooch — pour it off and feed. Only genuine pink or orange
+        streaks mean you should discard and start over.

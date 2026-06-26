@@ -100,13 +100,10 @@ async def conciseness_context_evaluator(
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)
 
-    input_content: MultimodalContent = MultimodalContent.of(
-        "<EVALUATED>",
-        evaluated_content,
-        "</EVALUATED>",
-    )
-
+    instruction: str
+    input_content: MultimodalContent
     if reference:
+        instruction = CONTEXT_REFERENCE_INSTRUCTION
         input_content = MultimodalContent.of(
             "<REFERENCE>",
             reference,
@@ -115,9 +112,17 @@ async def conciseness_context_evaluator(
             "</EVALUATED>",
         )
 
+    else:
+        instruction = CONTEXT_INSTRUCTION
+        input_content = MultimodalContent.of(
+            "<EVALUATED>",
+            evaluated_content,
+            "</EVALUATED>",
+        )
+
     return extract_evaluation_result(
         await Step.generating_completion(
-            instructions=CONTEXT_INSTRUCTION.format(
+            instructions=instruction.format(
                 guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
             ),
         ).run((ModelInput.of(input_content),))
@@ -151,12 +156,38 @@ Use the "none" value for content that cannot be rated at all.
 {FORMAT_INSTRUCTION}
 """  # noqa: E501
 
+CONTEXT_REFERENCE_INSTRUCTION: str = f"""\
+You are evaluating model results produced within a conversation context according to the defined criteria.
+
+<INSTRUCTION>
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess how concise and focused they are, using the REFERENCE as the conciseness benchmark.
+Think step by step and provide explanation of the score before the final score.
+Use the explained RATING scale and the requested FORMAT to provide the result.
+</INSTRUCTION>
+
+<EVALUATION_CRITERIA>
+Evaluated metric is conciseness of model results in context.
+Assess whether model outputs are brief and to the point while covering all key information, avoiding unnecessary details, repetition, and verbose elaboration beyond what the REFERENCE establishes as the concise benchmark.
+</EVALUATION_CRITERIA>
+{{guidelines}}
+<RATING>
+Assign a conciseness score using exact name of one of the following values:
+- "poor" is very low conciseness, model outputs are excessively verbose with much irrelevant information.
+- "fair" is low conciseness, model outputs contain unnecessary details and some irrelevant information.
+- "good" is moderate conciseness, model outputs are somewhat concise but could be more focused.
+- "excellent" is high conciseness, model outputs are mostly concise with minimal unnecessary information.
+- "perfect" is very high conciseness, model outputs are highly concise, containing only essential information.
+Use the "none" value for content that cannot be rated at all.
+</RATING>
+
+{FORMAT_INSTRUCTION}
+"""  # noqa: E501
+
 CONTEXT_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess how concise and focused they are.
-When REFERENCE is explicitly provided, use it as the conciseness benchmark; otherwise assess model outputs for unnecessary verbosity relative to what the user queries required.
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess how concise and focused they are relative to what the user queries required.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
