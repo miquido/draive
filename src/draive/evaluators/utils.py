@@ -6,11 +6,12 @@ from draive.models import (
     ModelOutput,
     ModelToolRequest,
 )
-from draive.multimodal import MultimodalContent, MultimodalTag
+from draive.multimodal import Multimodal, MultimodalContent, MultimodalTag
 
 __all__ = (
     "FORMAT_INSTRUCTION",
     "extract_evaluation_result",
+    "is_empty_content",
     "model_context_multimodal",
 )
 
@@ -26,6 +27,35 @@ Include both the rating and the comment tags exactly once.
   <{RATING_TAG_NAME}>Single, lowercase rating name chosen from the available ratings list (no quotes or extra text).</{RATING_TAG_NAME}>
 </FORMAT>
 """  # noqa: E501
+
+
+def is_empty_content(
+    content: Multimodal,
+    /,
+) -> bool:
+    """
+    Check whether multimodal content has no assessable payload.
+
+    Parameters
+    ----------
+    content : Multimodal
+        Content to inspect.
+
+    Returns
+    -------
+    bool
+        True when content has no parts or only whitespace-only text. Resource
+        and artifact parts are considered assessable payloads.
+    """
+    multimodal_content: MultimodalContent = MultimodalContent.of(content)
+
+    if not multimodal_content:
+        return True
+
+    if multimodal_content.contains_resources or multimodal_content.contains_artifacts:
+        return False
+
+    return not multimodal_content.to_str().strip()
 
 
 def extract_evaluation_result(

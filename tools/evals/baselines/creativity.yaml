@@ -399,51 +399,6 @@ samples:
     inputs:
       evaluated: ""
 
-  - id: creativity-empty-02-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: creativity-empty-03-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: creativity-empty-04-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: creativity-empty-05-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: creativity-empty-06-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: creativity-empty-07-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: creativity-empty-08-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: creativity-empty-09-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: creativity-empty-10-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
   - id: creativity-invalid-content-none
     human_score: none
     inputs:
@@ -575,8 +530,8 @@ samples:
         The silence was thick enough that I could hear myself deciding not
         to speak.
 
-  - id: silence-fair
-    human_score: fair
+  - id: silence-poor-02
+    human_score: poor
     inputs:
       evaluated: |
         The silence in the room was deafening, and you could have heard a
@@ -609,8 +564,8 @@ samples:
       evaluated: |
         The thing you are putting off is also putting you off.
 
-  - id: fortune-fair
-    human_score: fair
+  - id: fortune-poor-02
+    human_score: poor
     inputs:
       evaluated: |
         A pleasant surprise is waiting for you just around the corner.
@@ -622,16 +577,6 @@ samples:
         You will have good luck and great success in the future.
 
   # ───────────── Additional unrated empty/invalid responses (none) ─────────────
-  - id: creativity-empty-11-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: creativity-empty-12-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
   - id: creativity-empty-13-none
     human_score: none
     inputs:

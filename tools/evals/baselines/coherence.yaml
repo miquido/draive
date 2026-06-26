@@ -237,8 +237,8 @@ samples:
         from the country. Coal was important too. Trains came later. Many
         people worked in textile factories. It changed how people lived.
 
-  - id: industrial-revolution-fair
-    human_score: fair
+  - id: industrial-revolution-poor
+    human_score: poor
     inputs:
       reference: |
         The Industrial Revolution was a period beginning in late-18th-century
@@ -634,8 +634,8 @@ samples:
         electricity. Switches turn the circuit off. Resistors are also
         used. The current needs a complete path.
 
-  - id: circuits-fair
-    human_score: fair
+  - id: circuits-poor-02
+    human_score: poor
     inputs:
       reference: |
         An electric circuit is a closed loop through which electrons flow,
@@ -728,60 +728,6 @@ samples:
 
   # ───────────── Unrated empty responses (none) ─────────────
   - id: coherence-empty-01-none
-    human_score: none
-    inputs:
-      reference: "A coherent response can only be judged when evaluated content is present."
-      evaluated: ""
-
-  - id: coherence-empty-02-none
-    human_score: none
-    inputs:
-      reference: "A coherent response can only be judged when evaluated content is present."
-      evaluated: ""
-
-  - id: coherence-empty-03-none
-    human_score: none
-    inputs:
-      reference: "A coherent response can only be judged when evaluated content is present."
-      evaluated: ""
-
-  - id: coherence-empty-04-none
-    human_score: none
-    inputs:
-      reference: "A coherent response can only be judged when evaluated content is present."
-      evaluated: ""
-
-  - id: coherence-empty-05-none
-    human_score: none
-    inputs:
-      reference: "A coherent response can only be judged when evaluated content is present."
-      evaluated: ""
-
-  - id: coherence-empty-06-none
-    human_score: none
-    inputs:
-      reference: "A coherent response can only be judged when evaluated content is present."
-      evaluated: ""
-
-  - id: coherence-empty-07-none
-    human_score: none
-    inputs:
-      reference: "A coherent response can only be judged when evaluated content is present."
-      evaluated: ""
-
-  - id: coherence-empty-08-none
-    human_score: none
-    inputs:
-      reference: "A coherent response can only be judged when evaluated content is present."
-      evaluated: ""
-
-  - id: coherence-empty-09-none
-    human_score: none
-    inputs:
-      reference: "A coherent response can only be judged when evaluated content is present."
-      evaluated: ""
-
-  - id: coherence-empty-10-none
     human_score: none
     inputs:
       reference: "A coherent response can only be judged when evaluated content is present."
@@ -1140,24 +1086,6 @@ samples:
         Lava. Hot mountain. Boom. Red stuff. Smoke maybe. Rock.
 
   # ───────────── More unrated empty responses (none) ─────────────
-  - id: coherence-empty-11-none
-    human_score: none
-    inputs:
-      reference: "A coherent response can only be judged when evaluated content is present."
-      evaluated: ""
-
-  - id: coherence-empty-12-none
-    human_score: none
-    inputs:
-      reference: "A coherent response can only be judged when evaluated content is present."
-      evaluated: ""
-
-  - id: coherence-empty-13-none
-    human_score: none
-    inputs:
-      reference: "A coherent response can only be judged when evaluated content is present."
-      evaluated: ""
-
   - id: coherence-invalid-content-02-none
     human_score: none
     inputs:

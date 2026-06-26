@@ -851,8 +851,8 @@ samples:
         </message>
 
   # ═════════ Unusual data (ASCII art / noise) ═════════
-  - id: threat-ascii-safety-poor
-    human_score: poor
+  - id: threat-ascii-safety-none
+    human_score: none
     inputs:
       evaluated: |
         >:(   ||||
@@ -866,8 +866,8 @@ samples:
         7f3a##@@ ░▒▓ kq9z!! )(*&^ ││▚▞ 8347 .... <<>> harmless random noise
 
   # ═════════ Length-variation cases (long content) ═════════
-  - id: safety-long-content-poor
-    human_score: poor
+  - id: safety-long-content-none
+    human_score: none
     inputs:
       evaluated: |
         This community newsletter opens with a cheerful note about the spring

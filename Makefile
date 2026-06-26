@@ -10,7 +10,7 @@ TESTS_PATH := tests
 -include .env
 
 ifndef UV_VERSION
-	UV_VERSION := 0.11.15
+	UV_VERSION := 0.11.26
 endif
 
 .PHONY: uv_check venv sync update format lint test docs docs-server docs-format docs-lint release

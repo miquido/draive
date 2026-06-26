@@ -2,6 +2,7 @@ from draive.evaluation import EvaluationScore, evaluator
 from draive.evaluators.utils import (
     FORMAT_INSTRUCTION,
     extract_evaluation_result,
+    is_empty_content,
     model_context_multimodal,
 )
 from draive.models import ModelContext, ModelInput
@@ -34,13 +35,13 @@ async def consistency_evaluator(
     EvaluationScore
         Evaluation result.
     """
-    if not evaluated:
+    if is_empty_content(evaluated):
         return EvaluationScore.of(
             0.0,
             meta={"comment": "Input was empty!"},
         )
 
-    if not reference:
+    if is_empty_content(reference):
         return EvaluationScore.of(
             0.0,
             meta={"comment": "Reference was empty!"},
@@ -100,9 +101,15 @@ async def consistency_context_evaluator(
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)
 
+    if is_empty_content(evaluated_content):
+        return EvaluationScore.of(
+            0.0,
+            meta={"comment": "Input context was empty!"},
+        )
+
     instruction: str
     input_content: MultimodalContent
-    if reference:
+    if reference and not is_empty_content(reference):
         instruction = CONTEXT_REFERENCE_INSTRUCTION
         input_content = MultimodalContent.of(
             "<REFERENCE>",
@@ -134,6 +141,7 @@ You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
 Compare the REFERENCE and the EVALUATED content by carefully examining them, then rate the EVALUATED content using solely a consistency metric according to the EVALUATION_CRITERIA.
+If either the REFERENCE or EVALUATED content is empty, whitespace-only, gibberish, encoded noise, or contains no intelligible assessable factual content, assign "none". Do not treat absence of claims as perfect consistency.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
@@ -150,7 +158,7 @@ Assign a consistency score using exact name of one of the following values:
 - "good" is moderate consistency, the content is mostly consistent but contains a few unsupported statements.
 - "excellent" is high consistency, the content is largely consistent with minor discrepancies.
 - "perfect" is very high consistency, the content is fully consistent with the reference content, containing only supported information.
-Use the "none" value for content that cannot be rated at all.
+Use the "none" value for content that cannot be rated at all: empty content, whitespace-only content, gibberish, random characters or bytes, encoded noise, placeholders, or content with no intelligible assessable facts.
 </RATING>
 
 {FORMAT_INSTRUCTION}
@@ -161,6 +169,7 @@ You are evaluating model results produced within a conversation context accordin
 
 <INSTRUCTION>
 Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess whether they are factually consistent with the REFERENCE.
+If the REFERENCE or model-produced results are empty, whitespace-only, gibberish, encoded noise, or contain no intelligible assessable factual content, assign "none". Do not treat silence or absence of claims as perfect consistency.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
@@ -177,7 +186,7 @@ Assign a consistency score using exact name of one of the following values:
 - "good" is moderate consistency, model outputs are mostly consistent but contain a few unsupported statements.
 - "excellent" is high consistency, model outputs are largely consistent with minor discrepancies.
 - "perfect" is very high consistency, model outputs are fully consistent, containing only supported information.
-Use the "none" value for content that cannot be rated at all.
+Use the "none" value for content that cannot be rated at all: empty content, whitespace-only content, gibberish, random characters or bytes, encoded noise, placeholders, or content with no intelligible assessable facts.
 </RATING>
 
 {FORMAT_INSTRUCTION}
@@ -188,6 +197,7 @@ You are evaluating model results produced within a conversation context accordin
 
 <INSTRUCTION>
 Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess whether they are internally consistent with facts and information established earlier in the context.
+If the model-produced results are empty, whitespace-only, gibberish, encoded noise, or contain no intelligible assessable factual content, assign "none". Do not treat silence or absence of claims as perfect consistency.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
@@ -204,7 +214,7 @@ Assign a consistency score using exact name of one of the following values:
 - "good" is moderate consistency, model outputs are mostly consistent but contain a few unsupported statements.
 - "excellent" is high consistency, model outputs are largely consistent with minor discrepancies.
 - "perfect" is very high consistency, model outputs are fully consistent, containing only supported information.
-Use the "none" value for content that cannot be rated at all.
+Use the "none" value for content that cannot be rated at all: empty content, whitespace-only content, gibberish, random characters or bytes, encoded noise, placeholders, or content with no intelligible assessable facts.
 </RATING>
 
 {FORMAT_INSTRUCTION}

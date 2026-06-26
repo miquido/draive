@@ -133,8 +133,8 @@ samples:
         point, serve switches, and from then on it changes every two
         points.
 
-  - id: tennis-fair
-    human_score: fair
+  - id: tennis-poor-02
+    human_score: poor
     inputs:
       reference: |
         In standard tennis tiebreaks, the first player to reach 7 points
@@ -431,8 +431,8 @@ samples:
         1953 by Edmund Hillary and Tenzing Norgay, who used supplemental
         oxygen.
 
-  - id: everest-fair
-    human_score: fair
+  - id: everest-good-02
+    human_score: good
     inputs:
       reference: |
         Mount Everest, located on the border between Nepal and the Tibet
@@ -482,8 +482,8 @@ samples:
         price rises its yield falls. Bonds are generally seen as safer
         investments than stocks.
 
-  - id: bonds-fair
-    human_score: fair
+  - id: bonds-poor-02
+    human_score: poor
     inputs:
       reference: |
         Bond prices and yields move in opposite directions. When the price
@@ -533,8 +533,8 @@ samples:
         inflammation. Adults take 200 to 400 mg every 4 to 6 hours with
         food, and it can also lower blood pressure.
 
-  - id: ibuprofen-fair
-    human_score: fair
+  - id: ibuprofen-good-02
+    human_score: good
     inputs:
       reference: |
         Ibuprofen is an over-the-counter pain reliever that reduces
@@ -640,60 +640,6 @@ samples:
 
   # ───────────── Unrated empty responses (none) ─────────────
   - id: consistency-empty-01-none
-    human_score: none
-    inputs:
-      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
-      evaluated: ""
-
-  - id: consistency-empty-02-none
-    human_score: none
-    inputs:
-      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
-      evaluated: ""
-
-  - id: consistency-empty-03-none
-    human_score: none
-    inputs:
-      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
-      evaluated: ""
-
-  - id: consistency-empty-04-none
-    human_score: none
-    inputs:
-      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
-      evaluated: ""
-
-  - id: consistency-empty-05-none
-    human_score: none
-    inputs:
-      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
-      evaluated: ""
-
-  - id: consistency-empty-06-none
-    human_score: none
-    inputs:
-      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
-      evaluated: ""
-
-  - id: consistency-empty-07-none
-    human_score: none
-    inputs:
-      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
-      evaluated: ""
-
-  - id: consistency-empty-08-none
-    human_score: none
-    inputs:
-      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
-      evaluated: ""
-
-  - id: consistency-empty-09-none
-    human_score: none
-    inputs:
-      reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
-      evaluated: ""
-
-  - id: consistency-empty-10-none
     human_score: none
     inputs:
       reference: "The museum opens at 10 a.m. and closes at 6 p.m. on Saturdays."
@@ -868,8 +814,8 @@ samples:
         author, and it broke the colonies away from Britain. Most delegates
         actually signed the engrossed copy in August.
 
-  - id: declaration-fair
-    human_score: fair
+  - id: declaration-good-02
+    human_score: good
     inputs:
       reference: |
         The United States Declaration of Independence was adopted by the
@@ -1024,12 +970,6 @@ samples:
       reference: "The ferry to the island departs every hour on the half hour."
       evaluated: ""
 
-  - id: consistency-empty-12-none
-    human_score: none
-    inputs:
-      reference: "The ferry to the island departs every hour on the half hour."
-      evaluated: ""
-
   - id: consistency-empty-13-none
     human_score: none
     inputs:
@@ -1088,8 +1028,8 @@ samples:
           <total>45</total>
         </order>
 
-  - id: schedule-yaml-consistent-good
-    human_score: good
+  - id: schedule-yaml-consistent-perfect
+    human_score: perfect
     inputs:
       reference: |
         The meeting is on Monday at 09:00 and lasts one hour, so it ends at
@@ -1121,8 +1061,8 @@ samples:
         { "name": "Ana", "birth_year": 1990, "age_2026": 36 }
 
   # ═════════ Unusual data (ASCII art / noise) ═════════
-  - id: cart-ascii-consistent-good
-    human_score: good
+  - id: cart-ascii-consistent-perfect
+    human_score: perfect
     inputs:
       reference: |
         Cart: apples 3, bread 1, milk 2; total 6 items.

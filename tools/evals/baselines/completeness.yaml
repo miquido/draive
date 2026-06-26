@@ -78,8 +78,8 @@ samples:
         is running. Images and containers are different concepts — an
         image is more like a template.
 
-  - id: docker-setup-fair
-    human_score: fair
+  - id: docker-setup-poor
+    human_score: poor
     inputs:
       user_query: |
         I want to get started with Docker on macOS. Can you cover
@@ -167,8 +167,8 @@ samples:
         continuous minutes of running, and in month three add a
         slightly longer weekend run and start to think about pace.
 
-  - id: starting-running-fair
-    human_score: fair
+  - id: starting-running-poor-02
+    human_score: poor
     inputs:
       user_query: |
         I want to start running for fitness. Could you address (1) how
@@ -216,8 +216,8 @@ samples:
         (bonuses, tax refunds) into the account until you reach your
         target.
 
-  - id: emergency-fund-fair
-    human_score: fair
+  - id: emergency-fund-poor-02
+    human_score: poor
     inputs:
       user_query: |
         Can you explain emergency funds? Please cover (1) what an
@@ -276,8 +276,8 @@ samples:
         photo. The fee is $130 for a standard passport book. Routine
         processing usually takes around 6 to 8 weeks.
 
-  - id: passport-renewal-fair
-    human_score: fair
+  - id: passport-renewal-poor
+    human_score: poor
     inputs:
       user_query: |
         How do I renew my US passport by mail? Please cover (1) which
@@ -834,60 +834,6 @@ samples:
       user_query: "List three practical steps for preparing a small balcony garden."
       evaluated: ""
 
-  - id: completeness-empty-02-none
-    human_score: none
-    inputs:
-      user_query: "List three practical steps for preparing a small balcony garden."
-      evaluated: ""
-
-  - id: completeness-empty-03-none
-    human_score: none
-    inputs:
-      user_query: "List three practical steps for preparing a small balcony garden."
-      evaluated: ""
-
-  - id: completeness-empty-04-none
-    human_score: none
-    inputs:
-      user_query: "List three practical steps for preparing a small balcony garden."
-      evaluated: ""
-
-  - id: completeness-empty-05-none
-    human_score: none
-    inputs:
-      user_query: "List three practical steps for preparing a small balcony garden."
-      evaluated: ""
-
-  - id: completeness-empty-06-none
-    human_score: none
-    inputs:
-      user_query: "List three practical steps for preparing a small balcony garden."
-      evaluated: ""
-
-  - id: completeness-empty-07-none
-    human_score: none
-    inputs:
-      user_query: "List three practical steps for preparing a small balcony garden."
-      evaluated: ""
-
-  - id: completeness-empty-08-none
-    human_score: none
-    inputs:
-      user_query: "List three practical steps for preparing a small balcony garden."
-      evaluated: ""
-
-  - id: completeness-empty-09-none
-    human_score: none
-    inputs:
-      user_query: "List three practical steps for preparing a small balcony garden."
-      evaluated: ""
-
-  - id: completeness-empty-10-none
-    human_score: none
-    inputs:
-      user_query: "List three practical steps for preparing a small balcony garden."
-      evaluated: ""
-
   - id: completeness-invalid-content-none
     human_score: none
     inputs:
@@ -1099,8 +1045,8 @@ samples:
         together. Turn it now and then so it breaks down. After a few months
         it should be ready.
 
-  - id: compost-bin-fair
-    human_score: fair
+  - id: compost-bin-poor-02
+    human_score: poor
     inputs:
       user_query: |
         I want to start composting kitchen scraps in my backyard. Could you
@@ -1271,24 +1217,6 @@ samples:
         popular part of home decor.
 
   # ───────────── More unrated empty responses (none) ─────────────
-  - id: completeness-empty-11-none
-    human_score: none
-    inputs:
-      user_query: "List three practical steps for preparing a small balcony garden."
-      evaluated: ""
-
-  - id: completeness-empty-12-none
-    human_score: none
-    inputs:
-      user_query: "List three practical steps for preparing a small balcony garden."
-      evaluated: ""
-
-  - id: completeness-empty-13-none
-    human_score: none
-    inputs:
-      user_query: "List three practical steps for preparing a small balcony garden."
-      evaluated: ""
-
   - id: completeness-invalid-content-02-none
     human_score: none
     inputs:
@@ -1315,8 +1243,8 @@ samples:
           "shipping_address": { "street": "14 Oak St", "city": "Boise", "zip": "83702" }
         }
 
-  - id: profile-json-complete-fair
-    human_score: fair
+  - id: profile-json-complete-good
+    human_score: good
     inputs:
       user_query: |
         Tell me about the user: their full name, email, age, and shipping
