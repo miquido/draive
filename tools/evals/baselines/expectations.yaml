@@ -1228,3 +1228,131 @@ samples:
         %%%%% @@@@@ &&&&&
         \x00\x00 NUL NUL
         ))))))) ((((((( ]][[
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # The expectations are about the *content* (constraints to satisfy), not
+  # the data format; the structure is only the carrier.
+  - id: laptop-json-expectations-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        Recommend a laptop. The recommendation must stay under a $1000
+        budget, mention battery life, and warn that the pick is on the
+        heavy side.
+      evaluated: |
+        {
+          "recommendation": "TitanBook 14",
+          "price_usd": 950,
+          "battery": "about 10 hours of real-world use",
+          "caveat": "It is heavier than most ultrabooks at 1.9 kg, so factor that in if you travel often."
+        }
+
+  - id: laptop-json-expectations-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        Recommend a laptop. The recommendation must stay under a $1000
+        budget, mention battery life, and warn that the pick is on the
+        heavy side.
+      evaluated: |
+        {
+          "recommendation": "TitanBook 14",
+          "price_usd": 950,
+          "battery": "about 10 hours of real-world use"
+        }
+
+  - id: meal-yaml-expectations-excellent
+    human_score: excellent
+    inputs:
+      expectations: |
+        Give a one-day meal plan that is vegetarian, high in protein, and
+        contains no nuts.
+      evaluated: |
+        breakfast: Greek yogurt with berries and pumpkin seeds
+        lunch: lentil and chickpea salad with feta
+        dinner: tofu stir-fry with edamame and rice
+        note: no nuts used; protein comes from dairy, legumes, tofu and soy
+
+  - id: meal-yaml-expectations-fair
+    human_score: fair
+    inputs:
+      expectations: |
+        Give a one-day meal plan that is vegetarian, high in protein, and
+        contains no nuts.
+      evaluated: |
+        breakfast: oatmeal with almond butter and walnuts
+        lunch: lentil salad
+        dinner: tofu stir-fry
+        note: high-protein vegetarian plan
+
+  - id: trip-xml-expectations-good
+    human_score: good
+    inputs:
+      expectations: |
+        Plan a trip that visits Rome and Florence, includes at least one
+        museum, and keeps total lodging under 400 euros.
+      evaluated: |
+        <trip>
+          <stop city="Rome" nights="2" lodging_eur="180"/>
+          <stop city="Florence" nights="1" lodging_eur="120"/>
+          <activity>Uffizi Gallery visit in Florence</activity>
+        </trip>
+
+  - id: trip-xml-expectations-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        Plan a trip that visits Rome and Florence, includes at least one
+        museum, and keeps total lodging under 400 euros.
+      evaluated: |
+        <trip>
+          <stop city="Paris" nights="3" lodging_eur="600"/>
+          <activity>afternoon shopping</activity>
+        </trip>
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: chart-ascii-expectations-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        Draw a simple ASCII bar chart of three values A=2, B=4, C=6, one bar
+        per line using '#' characters.
+      evaluated: |
+        A | ##
+        B | ####
+        C | ######
+
+  - id: expectations-noise-01-none
+    human_score: none
+    inputs:
+      expectations: |
+        Draw a simple ASCII bar chart of three values A=2, B=4, C=6.
+      evaluated: |
+        9f3a@@@ ░▒▓ ;;;; kqz!! .... (((( >>>><<<< no chart just noise bytes
+
+  # ═════════ Length-variation cases (long content) ═════════
+  - id: expectations-long-content-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        Write a cover letter that is addressed to the hiring manager, mentions
+        five years of project-management experience, names a measurable
+        achievement, expresses interest in this specific company, and closes
+        with a request for an interview.
+      evaluated: |
+        Dear Hiring Manager,
+
+        I am writing to apply for the Project Manager role at Northwind Logistics.
+        Over the past five years managing cross-functional delivery teams, I have
+        learned to keep complex projects on schedule and on budget — most
+        recently, I led a warehouse-software rollout that cut order-processing
+        time by 28 percent across six sites.
+
+        What draws me to Northwind specifically is your investment in
+        sustainable last-mile delivery; it is exactly the kind of operational
+        challenge I want to help solve. I would welcome the chance to discuss how
+        my experience could support your team, and I would be glad to arrange an
+        interview at your convenience.
+
+        Sincerely,
+        Jordan Avery

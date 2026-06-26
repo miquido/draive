@@ -1,9 +1,12 @@
+from collections.abc import Mapping, Sequence
 from typing import Final, Literal
 
 __all__ = (
     "EVALUATION_SCORE_LEVELS",
+    "EVALUATION_SCORE_VALUES",
     "EvaluationScoreLevel",
     "EvaluationScoreValue",
+    "evaluation_score_level",
     "evaluation_score_value",
     "evaluation_score_verifier",
 )
@@ -17,11 +20,7 @@ type EvaluationScoreLevel = Literal[
     "perfect",
 ]
 
-type EvaluationScoreValue = EvaluationScoreLevel | float | bool
-
-# Canonical named rating levels in ascending order - the single source of truth
-# for the discrete evaluation scale shared across the evaluation package.
-EVALUATION_SCORE_LEVELS: Final[tuple[EvaluationScoreLevel, ...]] = (
+EVALUATION_SCORE_LEVELS: Final[Sequence[EvaluationScoreLevel]] = (
     "none",
     "poor",
     "fair",
@@ -36,6 +35,8 @@ FAIR: Final[float] = 0.4
 GOOD: Final[float] = 0.6
 EXCELLENT: Final[float] = 0.8
 PERFECT: Final[float] = 1.0
+
+type EvaluationScoreValue = EvaluationScoreLevel | float | bool
 
 
 def evaluation_score_value(  # noqa: C901, PLR0911
@@ -101,6 +102,54 @@ def evaluation_score_value(  # noqa: C901, PLR0911
 
         case _:
             raise ValueError(f"Invalid evaluation score value - {value}")
+
+
+EVALUATION_SCORE_VALUES: Final[Mapping[EvaluationScoreLevel, float]] = {
+    level: evaluation_score_value(level) for level in EVALUATION_SCORE_LEVELS
+}
+
+
+def evaluation_score_level(  # noqa: PLR0911
+    value: float | bool,
+    /,
+) -> EvaluationScoreLevel:
+    """
+    Map a continuous score in [0, 1] or boolean to the named evaluation level.
+
+    Parameters
+    ----------
+    value : float | bool
+        Score value between 0.0 and 1.0 or boolean.
+
+    Returns
+    -------
+    EvaluationScoreLevel
+        Name of the matching score level.
+    """
+    if value is True:
+        return "perfect"
+
+    if value is False:
+        return "none"
+
+    assert 0.0 <= value <= 1.0  # nosec: B101
+
+    if value >= 0.999:  # noqa: PLR2004
+        return "perfect"
+
+    if value >= EXCELLENT:
+        return "excellent"
+
+    if value >= GOOD:
+        return "good"
+
+    if value >= FAIR:
+        return "fair"
+
+    if value >= POOR:
+        return "poor"
+
+    return "none"
 
 
 def evaluation_score_verifier(

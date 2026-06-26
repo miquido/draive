@@ -1044,3 +1044,142 @@ samples:
         ��� \x00\x00 ?????
         ===NO_OUTPUT_PRODUCED===
         }}}}{{{{
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # Judged on factual/logical consistency with the reference; the structure
+  # is only the carrier.
+  - id: country-json-consistent-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        France has a population of about 68 million, its capital is Paris,
+        and its currency is the euro.
+      evaluated: |
+        {
+          "country": "France",
+          "capital": "Paris",
+          "population_millions": 68,
+          "currency": "EUR"
+        }
+
+  - id: country-json-consistent-poor
+    human_score: poor
+    inputs:
+      reference: |
+        France has a population of about 68 million, its capital is Paris,
+        and its currency is the euro.
+      evaluated: |
+        {
+          "country": "France",
+          "capital": "Lyon",
+          "population_millions": 12,
+          "currency": "USD"
+        }
+
+  - id: order-xml-consistent-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Order ORD-5 contains 3 books at $10 each, for a total of $30.
+      evaluated: |
+        <order id="ORD-5">
+          <quantity>3</quantity>
+          <unit_price>10</unit_price>
+          <total>45</total>
+        </order>
+
+  - id: schedule-yaml-consistent-good
+    human_score: good
+    inputs:
+      reference: |
+        The meeting is on Monday at 09:00 and lasts one hour, so it ends at
+        10:00 in room B.
+      evaluated: |
+        meeting:
+          day: Monday
+          start: "09:00"
+          end: "10:00"
+          room: B
+
+  - id: stats-csv-consistent-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Q1 revenue was 100, Q2 was 150, Q3 was 200; each quarter grew.
+      evaluated: |
+        quarter,revenue
+        Q1,100
+        Q2,90
+        Q3,200
+
+  - id: profile-json-consistent-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Ana was born in 1990 and is 36 years old as of 2026.
+      evaluated: |
+        { "name": "Ana", "birth_year": 1990, "age_2026": 36 }
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: cart-ascii-consistent-good
+    human_score: good
+    inputs:
+      reference: |
+        Cart: apples 3, bread 1, milk 2; total 6 items.
+      evaluated: |
+        +--------+-----+
+        | item   | qty |
+        +--------+-----+
+        | apples |  3  |
+        | bread  |  1  |
+        | milk   |  2  |
+        +--------+-----+
+        | total  |  6  |
+        +--------+-----+
+
+  - id: consistency-noise-01-none
+    human_score: none
+    inputs:
+      reference: |
+        France's capital is Paris and its currency is the euro.
+      evaluated: |
+        @@@ 8f3a ░▒▓█ }{}{ ;;;; qzx9!! .... <<>> noise bytes no-parse ((((
+
+  # ═════════ Length-variation cases (long content / reference asymmetry) ═════════
+  - id: trip-long-balanced-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The tour spends 3 nights in Rome, then 2 nights in Florence, then 2
+        nights in Venice. The group travels between cities by train, and the
+        total trip lasts 7 nights.
+      evaluated: |
+        The itinerary opens with three nights in Rome, giving the group time to
+        see the major sites. From Rome they take a train north to Florence,
+        where they stay for two nights. A second train then carries them on to
+        Venice for the final two nights of the tour. Counting all three stops,
+        the trip runs to seven nights in total, and every leg between cities is
+        covered by train rather than by air or road.
+
+  - id: country-longcontent-shortref-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        France's capital is Paris and its currency is the euro.
+      evaluated: |
+        France is a country in Western Europe whose capital city is Paris, long
+        a center of art and government. Like most members of the eurozone, it
+        uses the euro as its currency for everyday transactions. The text below
+        goes on to describe its regions and cuisine, but on the two points that
+        matter here it is careful never to contradict the established facts:
+        the capital remains Paris throughout, and the currency remains the euro.
+
+  - id: trip-shortcontent-longref-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The tour spends 3 nights in Rome, then 2 nights in Florence, then 2
+        nights in Venice. The group travels between cities by train, and the
+        total trip lasts 7 nights, ending with a departure from Venice.
+      evaluated: |
+        The tour spends 5 nights in Rome and flies home from Florence.

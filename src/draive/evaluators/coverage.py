@@ -100,13 +100,10 @@ async def coverage_context_evaluator(
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)
 
-    input_content: MultimodalContent = MultimodalContent.of(
-        "<EVALUATED>",
-        evaluated_content,
-        "</EVALUATED>",
-    )
-
+    instruction: str
+    input_content: MultimodalContent
     if reference:
+        instruction = CONTEXT_REFERENCE_INSTRUCTION
         input_content = MultimodalContent.of(
             "<REFERENCE>",
             reference,
@@ -115,9 +112,17 @@ async def coverage_context_evaluator(
             "</EVALUATED>",
         )
 
+    else:
+        instruction = CONTEXT_INSTRUCTION
+        input_content = MultimodalContent.of(
+            "<EVALUATED>",
+            evaluated_content,
+            "</EVALUATED>",
+        )
+
     return extract_evaluation_result(
         await Step.generating_completion(
-            instructions=CONTEXT_INSTRUCTION.format(
+            instructions=instruction.format(
                 guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
             ),
         ).run((ModelInput.of(input_content),))
@@ -153,20 +158,48 @@ Use the "none" value for content that cannot be rated at all.
 {FORMAT_INSTRUCTION}
 """  # noqa: E501
 
-CONTEXT_INSTRUCTION: str = f"""\
+CONTEXT_REFERENCE_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess whether they cover all key points from the source material.
-When REFERENCE is explicitly provided, evaluate model outputs for coverage of its key points; otherwise assess whether outputs address all key points raised by user inputs across the context.
-Before scoring, extract the essential points from the source material as a numbered checklist, then mark each as fully covered, partially covered, or absent in the model outputs. Score from this checklist. Do not penalize for omitting trivia or for paraphrasing differently.
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess whether they cover all key points from the REFERENCE.
+Before scoring, extract the essential points from the REFERENCE as a numbered checklist, then mark each as fully covered, partially covered, or absent in the model outputs. Score from this checklist. Do not penalize for omitting trivia or for paraphrasing differently.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
 Evaluated metric is coverage of model results in context.
-Assess whether model outputs include all important information from the source material (reference or user-provided context) without omitting critical points that were expected to be addressed.
+Assess whether model outputs include all important information from the REFERENCE without omitting critical points that were expected to be addressed.
+</EVALUATION_CRITERIA>
+{{guidelines}}
+<RATING>
+Anchor the score to the fraction of essential checklist items fully covered; count a partially-covered item as half. Different wording that conveys the same information is full coverage.
+Assign a coverage score using exact name of one of the following values:
+- "poor" - fewer than about a quarter of essential points are covered.
+- "fair" - roughly a quarter to half of essential points covered; several important ones missing.
+- "good" - roughly half to three-quarters of essential points covered; a few important details missing.
+- "excellent" - nearly all essential points covered substantively; only minor or peripheral items missing.
+- "perfect" - every essential point is represented in the model outputs, regardless of paraphrasing.
+Use the "none" value for content that cannot be rated at all.
+</RATING>
+
+{FORMAT_INSTRUCTION}
+"""  # noqa: E501
+
+CONTEXT_INSTRUCTION: str = f"""\
+You are evaluating model results produced within a conversation context according to the defined criteria.
+
+<INSTRUCTION>
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess whether they address all key points raised by user inputs across the context.
+Before scoring, extract the essential points raised by the user inputs as a numbered checklist, then mark each as fully covered, partially covered, or absent in the model outputs. Score from this checklist. Do not penalize for omitting trivia or for paraphrasing differently.
+Think step by step and provide explanation of the score before the final score.
+Use the explained RATING scale and the requested FORMAT to provide the result.
+</INSTRUCTION>
+
+<EVALUATION_CRITERIA>
+Evaluated metric is coverage of model results in context.
+Assess whether model outputs include all important information expected by the user-provided context without omitting critical points that were expected to be addressed.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>

@@ -100,13 +100,10 @@ async def consistency_context_evaluator(
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)
 
-    input_content: MultimodalContent = MultimodalContent.of(
-        "<EVALUATED>",
-        evaluated_content,
-        "</EVALUATED>",
-    )
-
+    instruction: str
+    input_content: MultimodalContent
     if reference:
+        instruction = CONTEXT_REFERENCE_INSTRUCTION
         input_content = MultimodalContent.of(
             "<REFERENCE>",
             reference,
@@ -115,9 +112,17 @@ async def consistency_context_evaluator(
             "</EVALUATED>",
         )
 
+    else:
+        instruction = CONTEXT_INSTRUCTION
+        input_content = MultimodalContent.of(
+            "<EVALUATED>",
+            evaluated_content,
+            "</EVALUATED>",
+        )
+
     return extract_evaluation_result(
         await Step.generating_completion(
-            instructions=CONTEXT_INSTRUCTION.format(
+            instructions=instruction.format(
                 guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
             ),
         ).run((ModelInput.of(input_content),))
@@ -151,19 +156,45 @@ Use the "none" value for content that cannot be rated at all.
 {FORMAT_INSTRUCTION}
 """  # noqa: E501
 
-CONTEXT_INSTRUCTION: str = f"""\
+CONTEXT_REFERENCE_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess whether they are factually consistent with established information.
-When REFERENCE is explicitly provided, evaluate model outputs for consistency against it; otherwise assess whether outputs are internally consistent with facts and information established earlier in the context.
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess whether they are factually consistent with the REFERENCE.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
 Evaluated metric is consistency of model results in context.
-Assess whether model outputs contain only factual elements entailed by the reference material or the established context, without introducing contradictions, unsupported claims, or information that conflicts with what was previously stated.
+Assess whether model outputs contain only factual elements entailed by the REFERENCE, without introducing contradictions, unsupported claims, or information that conflicts with it.
+</EVALUATION_CRITERIA>
+{{guidelines}}
+<RATING>
+Assign a consistency score using exact name of one of the following values:
+- "poor" is very low consistency, model outputs contain multiple contradictions or hallucinated facts not supported by the reference.
+- "fair" is low consistency, model outputs have several instances of information inconsistent with the reference.
+- "good" is moderate consistency, model outputs are mostly consistent but contain a few unsupported statements.
+- "excellent" is high consistency, model outputs are largely consistent with minor discrepancies.
+- "perfect" is very high consistency, model outputs are fully consistent, containing only supported information.
+Use the "none" value for content that cannot be rated at all.
+</RATING>
+
+{FORMAT_INSTRUCTION}
+"""  # noqa: E501
+
+CONTEXT_INSTRUCTION: str = f"""\
+You are evaluating model results produced within a conversation context according to the defined criteria.
+
+<INSTRUCTION>
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess whether they are internally consistent with facts and information established earlier in the context.
+Think step by step and provide explanation of the score before the final score.
+Use the explained RATING scale and the requested FORMAT to provide the result.
+</INSTRUCTION>
+
+<EVALUATION_CRITERIA>
+Evaluated metric is consistency of model results in context.
+Assess whether model outputs contain only factual elements entailed by the established context, without introducing contradictions, unsupported claims, or information that conflicts with what was previously stated.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>

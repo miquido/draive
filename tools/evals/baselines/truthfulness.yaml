@@ -986,3 +986,121 @@ samples:
         %%%%% &&&&& *****
         \x00\x00 [garbled] ]]]]]]
         ((((( no closing
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # Covers both modes: NO-REFERENCE (claims judged on plausibility / world
+  # knowledge) and WITH-REFERENCE (claims judged against a supplied reference,
+  # including content that contradicts it). Format is only the carrier.
+  # ----- no-reference variants -----
+  - id: product-json-truthful-noref-perfect
+    human_score: perfect
+    inputs:
+      evaluated: |
+        {
+          "product": "USB-C cable",
+          "length_m": 1.0,
+          "claim": "Charges most phones; data transfer up to 480 Mbps (USB 2.0)."
+        }
+
+  - id: stats-json-truthful-noref-fair
+    human_score: fair
+    inputs:
+      evaluated: |
+        {
+          "headline": "Our app is used by everyone in the world.",
+          "active_users": 1200,
+          "note": "fastest-growing app in history"
+        }
+
+  - id: supplement-xml-truthful-noref-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        <supplement>
+          <name>VitaBoost</name>
+          <claim>Cures all diseases and guarantees you will never get sick again.</claim>
+        </supplement>
+
+  # ----- with-reference variants (judged against the reference) -----
+  - id: order-json-truthful-ref-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Order A-91 shipped on June 2 and was delivered on June 5 by courier.
+      evaluated: |
+        {
+          "order": "A-91",
+          "claim": "Your order shipped on June 2 and was delivered on June 5 by courier."
+        }
+
+  - id: history-yaml-truthful-ref-good
+    human_score: good
+    inputs:
+      reference: |
+        World War II ended in 1945.
+      evaluated: |
+        event: end of World War II
+        year: 1945
+        note: marked by the surrender of the Axis powers
+
+  - id: weather-csv-truthful-ref-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Yesterday's high was 18C and it rained in the afternoon.
+      evaluated: |
+        metric,value
+        high_c,35
+        rain,none
+        sunshine_hours,12
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: daylight-ascii-truthful-noref-good
+    human_score: good
+    inputs:
+      evaluated: |
+        Daylight by month (Northern Hemisphere), approx hours:
+        Jun | ################  ~16h
+        Dec | ########          ~8h
+
+  - id: truthfulness-noise-01-none
+    human_score: none
+    inputs:
+      evaluated: |
+        @@@ 0x9f ░▒▓ ;;;; kqz!! .... (((( >>>><<<< no claim just noise bytes
+
+  # ═════════ Length-variation cases (long content / reference asymmetry) ═════════
+  - id: usedcar-long-content-noref-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        This used hatchback has 78,000 km on the odometer and a full service
+        history available on request. It was in one minor parking scrape, which
+        was repaired and is noted on the report; otherwise the bodywork is
+        sound. The tyres were replaced last year, the timing belt is due at
+        100,000 km, and the air-conditioning works but could use a re-gas. We
+        price it slightly below the local average because the interior shows
+        normal wear for the mileage. Nothing here is hidden from the buyer.
+
+  - id: charity-longcontent-shortref-good
+    human_score: good
+    inputs:
+      reference: |
+        Last year the charity spent 82 percent of donations on programs.
+      evaluated: |
+        We are proud of how carefully we steward donations. Last year, 82
+        percent of every dollar given went directly to our programs, with the
+        remainder covering fundraising and administration. We work in three
+        regions, run two long-term education projects, and publish audited
+        accounts each spring. Donors are welcome to review the full financial
+        statements on our website at any time.
+
+  - id: weather-shortcontent-longref-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Yesterday was overcast with a high of 18 degrees Celsius, light rain
+        through the afternoon, a gentle south-westerly breeze, and no sunshine
+        to speak of; the evening stayed cool and damp.
+      evaluated: |
+        Yesterday was a hot, cloudless day that reached 35 degrees.

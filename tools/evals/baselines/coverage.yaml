@@ -1406,3 +1406,139 @@ samples:
         \xff\xfe ???? NULNULNUL
         ===EMPTY===
         (((((
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # Judged on how much of the reference material the content covers; the
+  # structure is only the carrier.
+  - id: spec-json-coverage-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        A laptop spec sheet: 14-inch display, 16 GB RAM, 512 GB SSD,
+        10-hour battery, 1.2 kg weight.
+      evaluated: |
+        {
+          "display_in": 14,
+          "ram_gb": 16,
+          "storage_gb": 512,
+          "battery_hours": 10,
+          "weight_kg": 1.2
+        }
+
+  - id: spec-json-coverage-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A laptop spec sheet: 14-inch display, 16 GB RAM, 512 GB SSD,
+        10-hour battery, 1.2 kg weight.
+      evaluated: |
+        { "display_in": 14, "ram_gb": 16 }
+
+  - id: recipe-xml-coverage-good
+    human_score: good
+    inputs:
+      reference: |
+        A pancake recipe needs flour, milk, eggs, sugar, and baking powder,
+        plus the steps to mix and fry.
+      evaluated: |
+        <recipe name="pancakes">
+          <ingredients>
+            <item>flour</item><item>milk</item><item>eggs</item>
+            <item>sugar</item><item>baking powder</item>
+          </ingredients>
+          <steps>
+            <step>Mix the ingredients into a batter.</step>
+            <step>Fry on a hot pan.</step>
+          </steps>
+        </recipe>
+
+  - id: team-yaml-coverage-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The team has five members: Ana, Ben, Cy, Dee, and Eli, each with a
+        named role.
+      evaluated: |
+        team:
+          - name: Ana
+            role: lead
+
+  - id: countries-csv-coverage-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Capitals: France-Paris, Japan-Tokyo, Egypt-Cairo.
+      evaluated: |
+        country,capital
+        France,Paris
+        Japan,Tokyo
+        Egypt,Cairo
+
+  - id: countries-csv-coverage-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Capitals: France-Paris, Japan-Tokyo, Egypt-Cairo.
+      evaluated: |
+        country,capital
+        France,Paris
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: capitals-ascii-coverage-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Capitals: France-Paris, Japan-Tokyo, Egypt-Cairo.
+      evaluated: |
+        Country | Capital
+        --------+--------
+        France  | Paris
+        Japan   | Tokyo
+        Egypt   | Cairo
+
+  - id: coverage-noise-01-none
+    human_score: none
+    inputs:
+      reference: |
+        Capitals: France-Paris, Japan-Tokyo, Egypt-Cairo.
+      evaluated: |
+        ###@@@ 0xDEAD ░▒▓ ;;;; kq9z!! .... (((( >>>><<<< garbled no content
+
+  # ═════════ Length-variation cases (long content / reference asymmetry) ═════════
+  - id: laptop-long-balanced-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A laptop review covering five points: a bright 14-inch display, 16 GB
+        of RAM, a 512 GB SSD, around 10 hours of battery life, and a light
+        1.2 kg weight.
+      evaluated: |
+        The display is a 14-inch panel that stays readable even outdoors thanks
+        to its brightness. Inside, 16 GB of RAM keeps a dozen browser tabs and
+        an editor running without slowdown, and the 512 GB SSD leaves plenty of
+        room for projects. Battery life is a real strength: about ten hours of
+        mixed use on a charge. Best of all, at just 1.2 kg it is light enough to
+        carry all day without noticing it in a bag.
+
+  - id: capitals-longcontent-shortref-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Capitals: France-Paris, Japan-Tokyo, Egypt-Cairo.
+      evaluated: |
+        Across the three countries in question, the seats of government are
+        well known. France administers its affairs from Paris, on the Seine.
+        Japan's capital is Tokyo, the populous metropolis on Honshu. Egypt is
+        governed from Cairo, beside the Nile. The passage also wanders into
+        history and climate, but each of the three required capitals is stated
+        plainly: Paris, Tokyo, and Cairo.
+
+  - id: laptop-shortcontent-longref-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A laptop review should cover the 14-inch display, the 16 GB of RAM, the
+        512 GB SSD, the roughly 10-hour battery life, the 1.2 kg weight, the
+        backlit keyboard, the two USB-C ports, and the one-year warranty.
+      evaluated: |
+        It has 16 GB of RAM.

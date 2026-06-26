@@ -100,13 +100,10 @@ async def relevance_context_evaluator(
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)
 
-    input_content: MultimodalContent = MultimodalContent.of(
-        "<EVALUATED>",
-        evaluated_content,
-        "</EVALUATED>",
-    )
-
+    instruction: str
+    input_content: MultimodalContent
     if reference:
+        instruction = CONTEXT_REFERENCE_INSTRUCTION
         input_content = MultimodalContent.of(
             "<REFERENCE>",
             reference,
@@ -115,9 +112,17 @@ async def relevance_context_evaluator(
             "</EVALUATED>",
         )
 
+    else:
+        instruction = CONTEXT_INSTRUCTION
+        input_content = MultimodalContent.of(
+            "<EVALUATED>",
+            evaluated_content,
+            "</EVALUATED>",
+        )
+
     return extract_evaluation_result(
         await Step.generating_completion(
-            instructions=CONTEXT_INSTRUCTION.format(
+            instructions=instruction.format(
                 guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
             ),
         ).run((ModelInput.of(input_content),))
@@ -151,12 +156,38 @@ Use the "none" value for content that cannot be rated at all.
 {FORMAT_INSTRUCTION}
 """  # noqa: E501
 
+CONTEXT_REFERENCE_INSTRUCTION: str = f"""\
+You are evaluating model results produced within a conversation context according to the defined criteria.
+
+<INSTRUCTION>
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess their relevance against the REFERENCE.
+Think step by step and provide explanation of the score before the final score.
+Use the explained RATING scale and the requested FORMAT to provide the result.
+</INSTRUCTION>
+
+<EVALUATION_CRITERIA>
+Evaluated metric is relevance of model results in context.
+Assess whether model outputs include only information pertinent to the REFERENCE, avoiding unnecessary digressions, redundancies, and content that does not serve what the REFERENCE establishes as important.
+</EVALUATION_CRITERIA>
+{{guidelines}}
+<RATING>
+Assign a relevance score using exact name of one of the following values:
+- "poor" is very low relevance, model outputs contain mostly irrelevant or redundant information relative to the reference.
+- "fair" is low relevance, model outputs include some important points but have significant irrelevant parts.
+- "good" is moderate relevance, model outputs cover most important points but include some unnecessary information.
+- "excellent" is high relevance, model outputs focus on important information with minor inclusions of less relevant content.
+- "perfect" is very high relevance, model outputs precisely capture only the most important information from the reference.
+Use the "none" value for content that cannot be rated at all.
+</RATING>
+
+{FORMAT_INSTRUCTION}
+"""  # noqa: E501
+
 CONTEXT_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
 Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess their relevance to the user's queries and intent.
-When REFERENCE is explicitly provided, evaluate model outputs for relevance against it; otherwise assess whether outputs are focused on and pertinent to user requests as expressed in the context.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>

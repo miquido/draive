@@ -1,10 +1,10 @@
 import pytest
-from haiway import State
+from haiway import Meta, State
 
 from draive.evaluation import (
     EvaluationReference,
+    EvaluationScore,
     EvaluationScoreValue,
-    Evaluator,
     evaluator,
     reference_conformance,
 )
@@ -106,8 +106,7 @@ async def _prediction(case: _Case) -> EvaluationScoreValue:
 
 @pytest.mark.asyncio
 async def test_referenced_replaces_score_with_conformance() -> None:
-    referenced = Evaluator.referenced(
-        _prediction.prepared(),
+    referenced = _prediction.referenced(
         reference=lambda case: case.expected,
     )
 
@@ -128,8 +127,7 @@ async def test_referenced_replaces_score_with_conformance() -> None:
 
 @pytest.mark.asyncio
 async def test_referenced_scores_miss_with_quadratic_falloff() -> None:
-    referenced = Evaluator.referenced(
-        _prediction.prepared(),
+    referenced = _prediction.referenced(
         reference=lambda case: case.expected,
     )
 
@@ -143,9 +141,31 @@ async def test_referenced_scores_miss_with_quadratic_falloff() -> None:
 
 
 @pytest.mark.asyncio
+async def test_referenced_preserves_returned_error_score() -> None:
+    @evaluator(name="failing_prediction")
+    async def failing_prediction(case: _Case) -> EvaluationScore:
+        return EvaluationScore.of(
+            0.0,
+            meta=Meta.empty.with_error(RuntimeError("evaluation failed")),
+        )
+
+    referenced = failing_prediction.referenced(
+        reference=EvaluationReference.of("none"),
+    )
+
+    result = await referenced(
+        _Case(predicted="none", expected=EvaluationReference.of("none")),
+    )
+
+    assert result.score == 0.0
+    assert not result.passed
+    assert "error" in result.meta
+    assert "predicted_score" not in result.meta
+
+
+@pytest.mark.asyncio
 async def test_referenced_preserves_threshold() -> None:
-    referenced = Evaluator.referenced(
-        _prediction.with_threshold("excellent").prepared(),
+    referenced = _prediction.with_threshold("excellent").referenced(
         reference=lambda case: case.expected,
         weighting="nominal",
     )
@@ -161,8 +181,7 @@ async def test_referenced_preserves_threshold() -> None:
 
 @pytest.mark.asyncio
 async def test_referenced_resolves_via_attribute_path() -> None:
-    referenced = Evaluator.referenced(
-        _prediction.prepared(),
+    referenced = _prediction.referenced(
         reference=_Case._.expected,
     )
 
@@ -175,8 +194,7 @@ async def test_referenced_resolves_via_attribute_path() -> None:
 
 @pytest.mark.asyncio
 async def test_referenced_constant_window_applies_to_every_value() -> None:
-    referenced = Evaluator.referenced(
-        _prediction.prepared(),
+    referenced = _prediction.referenced(
         reference=EvaluationReference(lower=0.6, upper=1.0),
     )
 
@@ -201,8 +219,7 @@ async def test_referenced_treats_raw_value_as_exact_point() -> None:
     async def predict(case: _RawCase) -> EvaluationScoreValue:
         return case.predicted
 
-    referenced = Evaluator.referenced(
-        predict.prepared(),
+    referenced = predict.referenced(
         reference=lambda case: case.expected,
         weighting="nominal",
     )

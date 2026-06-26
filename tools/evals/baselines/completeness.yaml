@@ -1297,3 +1297,134 @@ samples:
         @@@@@ ;;;;; @@@@@
         \\\\ no-parse \\\\
         ((( dangling
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # Judged on whether the content answers every part of the query; the
+  # JSON/XML/YAML wrapper is only the carrier.
+  - id: profile-json-complete-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        Tell me about the user: their full name, email, age, and shipping
+        address (street, city, ZIP).
+      evaluated: |
+        {
+          "full_name": "Dana Reyes",
+          "email": "dana@example.com",
+          "age": 34,
+          "shipping_address": { "street": "14 Oak St", "city": "Boise", "zip": "83702" }
+        }
+
+  - id: profile-json-complete-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        Tell me about the user: their full name, email, age, and shipping
+        address (street, city, ZIP).
+      evaluated: |
+        {
+          "full_name": "Dana Reyes",
+          "email": "dana@example.com",
+          "shipping_address": { "city": "Boise" }
+        }
+
+  - id: forecast-yaml-complete-good
+    human_score: good
+    inputs:
+      user_query: |
+        Give me the 3-day forecast: for each day the date, high, low, and
+        the expected conditions.
+      evaluated: |
+        - date: 2026-07-01
+          high: 28
+          low: 17
+          condition: sunny
+        - date: 2026-07-02
+          high: 26
+          low: 16
+          condition: cloudy
+        - date: 2026-07-03
+          high: 24
+          low: 15
+          condition: rain
+
+  - id: forecast-yaml-complete-fair
+    human_score: fair
+    inputs:
+      user_query: |
+        Give me the 3-day forecast: for each day the date, high, low, and
+        the expected conditions.
+      evaluated: |
+        - date: 2026-07-01
+          high: 28
+          low: 17
+        - date: 2026-07-02
+          high: 26
+
+  - id: invoice-xml-complete-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        Summarize the invoice: its number, the issue date, the line items
+        with quantities and prices, and the grand total.
+      evaluated: |
+        <invoice>
+          <number>INV-7</number>
+        </invoice>
+
+  - id: contacts-csv-complete-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        List the contact details (name, phone, email) for all three people:
+        Ana, Ben, and Cy.
+      evaluated: |
+        name,phone,email
+        Ana,555-0101,ana@example.com
+        Ben,555-0102,ben@example.com
+        Cy,555-0103,cy@example.com
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: revenue-ascii-complete-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        Show me an ASCII bar chart of quarterly revenue for all four quarters:
+        Q1 80, Q2 100, Q3 150, Q4 200 (in $K).
+      evaluated: |
+        Quarterly revenue ($K):
+        Q1 | ########              80
+        Q2 | ##########            100
+        Q3 | ###############       150
+        Q4 | ####################  200
+
+  - id: completeness-noise-01-none
+    human_score: none
+    inputs:
+      user_query: |
+        List the contact details (name, phone, email) for Ana, Ben, and Cy.
+      evaluated: |
+        %%%@@@   8347fjqz   ███▓▒░   ;;;,,,...   <<<>>>   k9#@!  ((((((
+
+  # ═════════ Length-variation cases (long content) ═════════
+  - id: completeness-long-content-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I'm flying with a cat for the first time. What do I need to know about
+        the carrier, the airline's rules, getting through security, and keeping
+        the cat calm during the flight?
+      evaluated: |
+        Carrier: use an airline-approved soft-sided carrier that fits under the
+        seat in front of you, with enough room for the cat to stand and turn
+        around; line it with an absorbent pad in case of accidents. Airline
+        rules: book the pet-in-cabin slot in advance because airlines cap how
+        many are allowed per flight, confirm the carrier dimensions, and bring
+        any health certificate the airline or destination requires. Security:
+        you'll be asked to take the cat out of the carrier and carry it through
+        the metal detector while the empty carrier goes through the X-ray, so
+        practise holding the cat securely beforehand and consider a harness.
+        Keeping the cat calm: skip a heavy meal right before the flight, bring a
+        familiar-smelling blanket, speak quietly, and ask your vet ahead of time
+        whether a calming aid is appropriate. That covers the carrier, the
+        rules, security, and in-flight comfort.

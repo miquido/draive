@@ -1,57 +1,13 @@
 from collections.abc import Callable, Sequence
-from typing import Final
 
 from draive.evaluation.value import (
     EVALUATION_SCORE_LEVELS,
-    EvaluationScoreLevel,
-    evaluation_score_value,
 )
 
 __all__ = (
     "cohen_kappa",
     "quadratic_weighted_kappa",
-    "quantize_score",
 )
-
-
-# Canonical float value of each named level, derived from the single source of
-# truth in draive.evaluation.value: (0.0, 0.2, 0.4, 0.6, 0.8, 1.0).
-_LEVEL_VALUES: Final[tuple[float, ...]] = tuple(
-    evaluation_score_value(level) for level in EVALUATION_SCORE_LEVELS
-)
-
-
-def quantize_score(
-    value: float,
-    /,
-) -> EvaluationScoreLevel:
-    """
-    Map a continuous score in [0, 1] to the nearest named evaluation level.
-
-    Parameters
-    ----------
-    value : float
-        Score value between 0.0 and 1.0.
-
-    Returns
-    -------
-    EvaluationScoreLevel
-        Name of the closest level (one of ``EVALUATION_SCORE_LEVELS``).
-
-    Raises
-    ------
-    ValueError
-        If the value is outside the [0, 1] range.
-    """
-    assert 0.0 <= value <= 1.0  # nosec: B101
-
-    # On an exact tie between two adjacent levels (e.g. 0.1, 0.3) ``min`` keeps the
-    # first match, biasing toward the lower level - a deliberate, stable choice.
-    closest_index: int = min(
-        range(len(_LEVEL_VALUES)),
-        key=lambda index: abs(value - _LEVEL_VALUES[index]),
-    )
-    return EVALUATION_SCORE_LEVELS[closest_index]
 
 
 def _confusion(

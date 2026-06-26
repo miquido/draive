@@ -1306,8 +1306,6 @@ samples:
       reference: "How to start tomato seeds indoors before spring planting."
       evaluated: |
 
-
-
   - id: relevance-invalid-content-02-none
     human_score: none
     inputs:
@@ -1315,3 +1313,127 @@ samples:
       evaluated: |
         \x00\x00 ?????? ||||||||
         ===NULL=== <broken/ {[(
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # Judged on topical relevance of the content to the reference; the
+  # structure is only the carrier.
+  - id: weather-json-relevant-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Current weather conditions for a city.
+      evaluated: |
+        {
+          "city": "Oslo",
+          "temperature_c": 12,
+          "condition": "light rain",
+          "humidity_pct": 80,
+          "wind_kph": 15
+        }
+
+  - id: book-xml-relevant-good
+    human_score: good
+    inputs:
+      reference: |
+        Bibliographic details for a book.
+      evaluated: |
+        <book>
+          <title>Deep Work</title>
+          <author>Cal Newport</author>
+          <isbn>9781455586691</isbn>
+          <pages>304</pages>
+        </book>
+
+  - id: weather-json-relevant-fair
+    human_score: fair
+    inputs:
+      reference: |
+        Current weather conditions for a city.
+      evaluated: |
+        {
+          "city": "Oslo",
+          "temperature_c": 12,
+          "mayor": "Anne Lindmo",
+          "founded_year": 1040,
+          "sister_cities": ["Gothenburg", "Tel Aviv"]
+        }
+
+  - id: profile-yaml-relevant-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Current weather conditions for a city.
+      evaluated: |
+        user:
+          name: Dana
+          favorite_color: teal
+          pets: [cat, parrot]
+
+  - id: nutrition-csv-relevant-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Nutrition facts for a food item.
+      evaluated: |
+        nutrient,amount,unit
+        calories,95,kcal
+        protein,0.5,g
+        sugar,19,g
+        fiber,4,g
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: weather-ascii-relevant-good
+    human_score: good
+    inputs:
+      reference: |
+        Current weather conditions for a city.
+      evaluated: |
+        Oslo - today
+        Temp : 12C
+        Sky  : light rain  (it is drizzling)
+        Wind : 15 kph -->
+
+  - id: relevance-noise-01-none
+    human_score: none
+    inputs:
+      reference: |
+        Current weather conditions for a city.
+      evaluated: |
+        @@@ 0x9f ░▒▓ ;;;; kqz!! .... (((( >>>><<<< off-topic noise bytes only
+
+  # ═════════ Length-variation cases (long content / reference asymmetry) ═════════
+  - id: weather-long-balanced-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A detailed current-weather report for a city, including temperature,
+        sky conditions, wind, humidity, and how it will feel through the day.
+      evaluated: |
+        In Oslo right now it is 12 degrees Celsius under a grey sky, with light
+        rain that is expected to continue through the early afternoon before
+        easing. A steady breeze of about 15 km/h from the south-west makes it
+        feel a touch cooler than the thermometer suggests, and humidity is high
+        at around 80 percent. By evening the rain should clear, the wind should
+        drop, and temperatures will slip to about 8 degrees overnight.
+
+  - id: weather-longcontent-shortref-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Current weather conditions for a city.
+      evaluated: |
+        In Oslo it is currently 12 degrees Celsius with light rain. The sky is
+        overcast, a south-westerly breeze is blowing at about 15 km/h, and
+        humidity sits near 80 percent. The rain is forecast to ease by early
+        afternoon, with temperatures dropping to around 8 degrees overnight.
+        Every detail here concerns the present weather in the city.
+
+  - id: gardening-shortcontent-longref-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A detailed current-weather report for a city, including the present
+        temperature, the sky conditions, the wind speed and direction, the
+        humidity, and the expected trend through the rest of the day and night.
+      evaluated: |
+        Tomatoes grow best in full sun and well-drained soil.

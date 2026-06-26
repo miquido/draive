@@ -100,13 +100,10 @@ async def groundedness_context_evaluator(
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)
 
-    input_content: MultimodalContent = MultimodalContent.of(
-        "<EVALUATED>",
-        evaluated_content,
-        "</EVALUATED>",
-    )
-
+    instruction: str
+    input_content: MultimodalContent
     if reference:
+        instruction = CONTEXT_REFERENCE_INSTRUCTION
         input_content = MultimodalContent.of(
             "<REFERENCE>",
             reference,
@@ -115,9 +112,17 @@ async def groundedness_context_evaluator(
             "</EVALUATED>",
         )
 
+    else:
+        instruction = CONTEXT_INSTRUCTION
+        input_content = MultimodalContent.of(
+            "<EVALUATED>",
+            evaluated_content,
+            "</EVALUATED>",
+        )
+
     return extract_evaluation_result(
         await Step.generating_completion(
-            instructions=CONTEXT_INSTRUCTION.format(
+            instructions=instruction.format(
                 guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n" if guidelines else "",
             ),
         ).run((ModelInput.of(input_content),))
@@ -150,19 +155,18 @@ Use the "none" value for content that cannot be rated at all.
 {FORMAT_INSTRUCTION}
 """  # noqa: E501
 
-CONTEXT_INSTRUCTION: str = f"""\
+CONTEXT_REFERENCE_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess how well they are grounded in the source material.
-When REFERENCE is explicitly provided, evaluate model outputs for groundedness against it; otherwise assess whether model outputs are anchored in and traceable to information established within the conversation context.
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess how well they are grounded in the REFERENCE.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
 Evaluated metric is groundedness of model results in context.
-Assess the extent to which model outputs directly tie back to and are anchored in the source data (reference or context), ensuring information is not only accurate but faithfully represents the original context without introducing extraneous claims, unsupported interpretations, or hallucinated details.
+Assess the extent to which model outputs directly tie back to and are anchored in the provided REFERENCE, ensuring information is not only accurate but faithfully represents the reference without introducing extraneous claims, unsupported interpretations, or hallucinated details.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
@@ -171,7 +175,34 @@ Assign a groundedness score using exact name of one of the following values:
 - "fair" is low groundedness, model outputs contain some grounded information but also significant ungrounded content.
 - "good" is moderate groundedness, model outputs are somewhat grounded but with noticeable ungrounded elements.
 - "excellent" is high groundedness, model outputs are mostly grounded with minimal unverified or unsupported claims.
-- "perfect" is very high groundedness, model outputs are fully grounded, accurately reflecting the source information.
+- "perfect" is very high groundedness, model outputs are fully grounded, accurately reflecting the reference information.
+Use the "none" value for content that cannot be rated at all.
+</RATING>
+
+{FORMAT_INSTRUCTION}
+"""  # noqa: E501
+
+CONTEXT_INSTRUCTION: str = f"""\
+You are evaluating model results produced within a conversation context according to the defined criteria.
+
+<INSTRUCTION>
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess whether they are anchored in and traceable to information established within the conversation context.
+Think step by step and provide explanation of the score before the final score.
+Use the explained RATING scale and the requested FORMAT to provide the result.
+</INSTRUCTION>
+
+<EVALUATION_CRITERIA>
+Evaluated metric is groundedness of model results in context.
+Assess the extent to which model outputs directly tie back to and are anchored in information established within the conversation context (especially prior inputs and prior outputs), ensuring information is not only accurate but faithfully represents the context without introducing extraneous claims, unsupported interpretations, or hallucinated details.
+</EVALUATION_CRITERIA>
+{{guidelines}}
+<RATING>
+Assign a groundedness score using exact name of one of the following values:
+- "poor" is very low groundedness, model outputs are mostly ungrounded with many unsupported or fabricated claims.
+- "fair" is low groundedness, model outputs contain some grounded information but also significant ungrounded content.
+- "good" is moderate groundedness, model outputs are somewhat grounded but with noticeable ungrounded elements.
+- "excellent" is high groundedness, model outputs are mostly grounded with minimal unverified or unsupported claims.
+- "perfect" is very high groundedness, model outputs are fully grounded, accurately reflecting the contextual information.
 Use the "none" value for content that cannot be rated at all.
 </RATING>
 

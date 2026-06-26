@@ -1256,3 +1256,142 @@ samples:
         \x00\x00 ??? %%% ~~~
         ]]]]]]]]]]
         ((( no closing
+
+  # ═════════ Structured-format content (JSON / XML / YAML / CSV) ═════════
+  # Judged on whether the claims in the content are grounded in the
+  # reference; the structure is only the carrier.
+  - id: meeting-json-grounded-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The standup on April 3 covered the login bug, which Ana will fix by
+        Friday, and the search rollout, which is paused pending review.
+      evaluated: |
+        {
+          "date": "April 3",
+          "items": [
+            { "topic": "login bug", "owner": "Ana", "due": "Friday" },
+            { "topic": "search rollout", "status": "paused" }
+          ]
+        }
+
+  - id: meeting-json-grounded-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The standup on April 3 covered the login bug, which Ana will fix by
+        Friday, and the search rollout, which is paused pending review.
+      evaluated: |
+        {
+          "date": "April 3",
+          "items": [
+            { "topic": "login bug", "owner": "Ben", "due": "Monday" },
+            { "topic": "budget cuts", "amount": 50000 },
+            { "topic": "new hire", "name": "Cy" }
+          ]
+        }
+
+  - id: product-xml-grounded-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The phone has a 6.1-inch screen and a 3200 mAh battery.
+      evaluated: |
+        <phone>
+          <screen_in>6.1</screen_in>
+          <battery_mah>3200</battery_mah>
+          <waterproof>true</waterproof>
+          <color>midnight</color>
+        </phone>
+
+  - id: trip-yaml-grounded-good
+    human_score: good
+    inputs:
+      reference: |
+        The trip visits Rome for two nights and Florence for one night.
+      evaluated: |
+        stops:
+          - city: Rome
+            nights: 2
+          - city: Florence
+            nights: 1
+
+  - id: facts-csv-grounded-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The store opens at 9am and closes at 6pm on weekdays.
+      evaluated: |
+        field,value
+        opens,6am
+        closes,11pm
+        open_sundays,yes
+
+  - id: meeting-json-grounded-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The standup on April 3 covered the login bug, which Ana will fix by
+        Friday.
+      evaluated: |
+        { "date": "April 3", "topic": "login bug", "owner": "Ana", "due": "Friday" }
+
+  # ═════════ Unusual data (ASCII art / noise) ═════════
+  - id: phone-ascii-grounded-good
+    human_score: good
+    inputs:
+      reference: |
+        The phone has a 6.1-inch screen and a 3200 mAh battery.
+      evaluated: |
+        Spec    | Value
+        --------+---------
+        Screen  | 6.1 in
+        Battery | 3200 mAh
+
+  - id: groundedness-noise-01-none
+    human_score: none
+    inputs:
+      reference: |
+        The store opens at 9am and closes at 6pm on weekdays.
+      evaluated: |
+        @@@ 0x9f ░▒▓ ;;;; kqz!! .... (((( >>>><<<< unrelated noise bytes here
+
+  # ═════════ Length-variation cases (long content / reference asymmetry) ═════════
+  - id: standup-long-balanced-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The April 3 standup covered three items. Ana will fix the login bug by
+        Friday. The search rollout is paused pending a security review. The
+        mobile release is on track for the 15th, owned by Ben.
+      evaluated: |
+        Three things came out of the April 3 standup. First, the login bug now
+        has an owner: Ana, who expects to have a fix in by Friday. Second, the
+        search rollout has been paused for the moment while a security review is
+        carried out. Third, the mobile release remains on track for the 15th,
+        and Ben is the one carrying it. Nothing here goes beyond what the notes
+        record.
+
+  - id: standup-longcontent-shortref-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The April 3 standup covered the login bug, which Ana will fix by Friday.
+      evaluated: |
+        At the April 3 standup the team discussed the login bug, which Ana will
+        fix by Friday. They also approved a 50,000 dollar budget increase for
+        the quarter, agreed to hire two new engineers starting in May, decided
+        to move the office to the fourth floor, and set the company offsite for
+        June in Lisbon. Morale was reported as high and the new logo was
+        approved.
+
+  - id: standup-shortcontent-longref-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The April 3 standup covered the login bug, which Ana will fix by Friday;
+        the search rollout, paused pending a security review; the mobile release,
+        on track for the 15th and owned by Ben; and a request to update the
+        on-call rotation, which Dee volunteered to handle next week.
+      evaluated: |
+        Ana will fix the login bug by Friday.
