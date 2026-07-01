@@ -851,60 +851,6 @@ samples:
       reference: "The office closes at 4 p.m. on Fridays during July and August."
       evaluated: ""
 
-  - id: conciseness-empty-02-none
-    human_score: none
-    inputs:
-      reference: "The office closes at 4 p.m. on Fridays during July and August."
-      evaluated: ""
-
-  - id: conciseness-empty-03-none
-    human_score: none
-    inputs:
-      reference: "The office closes at 4 p.m. on Fridays during July and August."
-      evaluated: ""
-
-  - id: conciseness-empty-04-none
-    human_score: none
-    inputs:
-      reference: "The office closes at 4 p.m. on Fridays during July and August."
-      evaluated: ""
-
-  - id: conciseness-empty-05-none
-    human_score: none
-    inputs:
-      reference: "The office closes at 4 p.m. on Fridays during July and August."
-      evaluated: ""
-
-  - id: conciseness-empty-06-none
-    human_score: none
-    inputs:
-      reference: "The office closes at 4 p.m. on Fridays during July and August."
-      evaluated: ""
-
-  - id: conciseness-empty-07-none
-    human_score: none
-    inputs:
-      reference: "The office closes at 4 p.m. on Fridays during July and August."
-      evaluated: ""
-
-  - id: conciseness-empty-08-none
-    human_score: none
-    inputs:
-      reference: "The office closes at 4 p.m. on Fridays during July and August."
-      evaluated: ""
-
-  - id: conciseness-empty-09-none
-    human_score: none
-    inputs:
-      reference: "The office closes at 4 p.m. on Fridays during July and August."
-      evaluated: ""
-
-  - id: conciseness-empty-10-none
-    human_score: none
-    inputs:
-      reference: "The office closes at 4 p.m. on Fridays during July and August."
-      evaluated: ""
-
   - id: conciseness-invalid-content-none
     human_score: none
     inputs:
@@ -1320,24 +1266,6 @@ samples:
         entirely to its end.
 
   # ───────────── More unrated empty responses (none) ─────────────
-  - id: conciseness-empty-11-none
-    human_score: none
-    inputs:
-      reference: "The office closes at 4 p.m. on Fridays during July and August."
-      evaluated: ""
-
-  - id: conciseness-empty-12-none
-    human_score: none
-    inputs:
-      reference: "The office closes at 4 p.m. on Fridays during July and August."
-      evaluated: ""
-
-  - id: conciseness-empty-13-none
-    human_score: none
-    inputs:
-      reference: "The office closes at 4 p.m. on Fridays during July and August."
-      evaluated: ""
-
   - id: conciseness-invalid-content-02-none
     human_score: none
     inputs:

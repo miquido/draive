@@ -1092,60 +1092,6 @@ samples:
       user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
       evaluated: ""
 
-  - id: helpfulness-empty-02-none
-    human_score: none
-    inputs:
-      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
-      evaluated: ""
-
-  - id: helpfulness-empty-03-none
-    human_score: none
-    inputs:
-      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
-      evaluated: ""
-
-  - id: helpfulness-empty-04-none
-    human_score: none
-    inputs:
-      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
-      evaluated: ""
-
-  - id: helpfulness-empty-05-none
-    human_score: none
-    inputs:
-      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
-      evaluated: ""
-
-  - id: helpfulness-empty-06-none
-    human_score: none
-    inputs:
-      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
-      evaluated: ""
-
-  - id: helpfulness-empty-07-none
-    human_score: none
-    inputs:
-      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
-      evaluated: ""
-
-  - id: helpfulness-empty-08-none
-    human_score: none
-    inputs:
-      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
-      evaluated: ""
-
-  - id: helpfulness-empty-09-none
-    human_score: none
-    inputs:
-      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
-      evaluated: ""
-
-  - id: helpfulness-empty-10-none
-    human_score: none
-    inputs:
-      user_query: "How do I remove a fresh red wine stain from a cotton shirt?"
-      evaluated: ""
-
   - id: helpfulness-invalid-content-none
     human_score: none
     inputs:
@@ -1623,12 +1569,6 @@ samples:
       user_query: "What is a good first programming language for a complete beginner?"
       evaluated: "    "
 
-  - id: helpfulness-empty-13-none
-    human_score: none
-    inputs:
-      user_query: "What is a good first programming language for a complete beginner?"
-      evaluated: ""
-
   - id: helpfulness-invalid-content-02-none
     human_score: none
     inputs:
@@ -1668,8 +1608,8 @@ samples:
             ports:
               - "5432:5432"
 
-  - id: regex-json-helpful-fair
-    human_score: fair
+  - id: regex-json-helpful-poor
+    human_score: poor
     inputs:
       user_query: |
         Give me a regex that validates an email address, with one example

@@ -86,6 +86,12 @@ async def _evaluate_sample(
         **entry.build_kwargs(sample.inputs),
     )
 
+    if "error" in result.meta:
+        # Evaluator swallowed an internal failure (e.g. a judge API error) and
+        # returned a score of 0.0 instead of raising - surface it as a sample
+        # failure rather than silently treating that placeholder as a real judgment.
+        raise RuntimeError(f"Evaluator '{entry.name}' reported an error: {result.meta['error']}")
+
     return SampleOutcome(
         sample_id=sample.id,
         human_score=sample.human_score,

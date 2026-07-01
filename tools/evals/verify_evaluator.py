@@ -96,7 +96,7 @@ PROVIDERS: Final[dict[str, ProviderSpec]] = {
     "gemini": ProviderSpec(
         key="gemini",
         display_name="Gemini",
-        default_model="gemini-2.0-flash",
+        default_model="gemini-3.5-flash",
         config_factory=lambda model: GeminiConfig(model=model),
         disposable_factory=Gemini,
     ),

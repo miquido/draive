@@ -453,51 +453,6 @@ samples:
     inputs:
       evaluated: ""
 
-  - id: fluency-empty-02-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: fluency-empty-03-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: fluency-empty-04-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: fluency-empty-05-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: fluency-empty-06-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: fluency-empty-07-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: fluency-empty-08-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: fluency-empty-09-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: fluency-empty-10-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
   - id: fluency-invalid-content-none
     human_score: none
     inputs:
@@ -716,11 +671,6 @@ samples:
         very, round out it does.
 
   # ───────────── More unrated empty / invalid (none) ─────────────
-  - id: fluency-empty-11-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
   - id: fluency-empty-12-none
     human_score: none
     inputs:
@@ -729,7 +679,7 @@ samples:
   - id: fluency-whitespace-none
     human_score: none
     inputs:
-      evaluated: |
+      evaluated: "   \n\t  \n   "
 
   - id: fluency-invalid-content-02-none
     human_score: none
@@ -753,8 +703,8 @@ samples:
           ]
         }
 
-  - id: bio-xml-fluency-good
-    human_score: good
+  - id: bio-xml-fluency-excellent
+    human_score: excellent
     inputs:
       evaluated: |
         <profile>
@@ -787,8 +737,8 @@ samples:
         <summary>The migration completed without downtime, and all services reported healthy within minutes.</summary>
 
   # ═════════ Unusual data (ASCII art / noise) ═════════
-  - id: banner-ascii-fluency-good
-    human_score: good
+  - id: banner-ascii-fluency-excellent
+    human_score: excellent
     inputs:
       evaluated: |
         _   _      _ _

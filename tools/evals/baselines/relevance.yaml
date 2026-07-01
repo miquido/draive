@@ -409,8 +409,8 @@ samples:
         your viewpoint: a low angle makes the subject feel imposing, a
         high angle makes it feel small.
 
-  - id: photo-composition-good
-    human_score: good
+  - id: photo-composition-excellent
+    human_score: excellent
     inputs:
       reference: |
         Basics of photography composition: how to arrange the elements
@@ -853,60 +853,6 @@ samples:
       reference: "How to start tomato seeds indoors before spring planting."
       evaluated: ""
 
-  - id: relevance-empty-02-none
-    human_score: none
-    inputs:
-      reference: "How to start tomato seeds indoors before spring planting."
-      evaluated: ""
-
-  - id: relevance-empty-03-none
-    human_score: none
-    inputs:
-      reference: "How to start tomato seeds indoors before spring planting."
-      evaluated: ""
-
-  - id: relevance-empty-04-none
-    human_score: none
-    inputs:
-      reference: "How to start tomato seeds indoors before spring planting."
-      evaluated: ""
-
-  - id: relevance-empty-05-none
-    human_score: none
-    inputs:
-      reference: "How to start tomato seeds indoors before spring planting."
-      evaluated: ""
-
-  - id: relevance-empty-06-none
-    human_score: none
-    inputs:
-      reference: "How to start tomato seeds indoors before spring planting."
-      evaluated: ""
-
-  - id: relevance-empty-07-none
-    human_score: none
-    inputs:
-      reference: "How to start tomato seeds indoors before spring planting."
-      evaluated: ""
-
-  - id: relevance-empty-08-none
-    human_score: none
-    inputs:
-      reference: "How to start tomato seeds indoors before spring planting."
-      evaluated: ""
-
-  - id: relevance-empty-09-none
-    human_score: none
-    inputs:
-      reference: "How to start tomato seeds indoors before spring planting."
-      evaluated: ""
-
-  - id: relevance-empty-10-none
-    human_score: none
-    inputs:
-      reference: "How to start tomato seeds indoors before spring planting."
-      evaluated: ""
-
   - id: relevance-invalid-content-none
     human_score: none
     inputs:
@@ -1288,12 +1234,6 @@ samples:
         oven will go.
 
   # ───────────── More invalid / empty responses (none) ─────────────
-  - id: relevance-empty-11-none
-    human_score: none
-    inputs:
-      reference: "How to start tomato seeds indoors before spring planting."
-      evaluated: ""
-
   - id: relevance-empty-12-none
     human_score: none
     inputs:
@@ -1304,7 +1244,7 @@ samples:
     human_score: none
     inputs:
       reference: "How to start tomato seeds indoors before spring planting."
-      evaluated: |
+      evaluated: "   \n\t  \n   "
 
   - id: relevance-invalid-content-02-none
     human_score: none
@@ -1331,8 +1271,8 @@ samples:
           "wind_kph": 15
         }
 
-  - id: book-xml-relevant-good
-    human_score: good
+  - id: book-xml-relevant-perfect
+    human_score: perfect
     inputs:
       reference: |
         Bibliographic details for a book.
@@ -1344,8 +1284,8 @@ samples:
           <pages>304</pages>
         </book>
 
-  - id: weather-json-relevant-fair
-    human_score: fair
+  - id: weather-json-relevant-poor
+    human_score: poor
     inputs:
       reference: |
         Current weather conditions for a city.
@@ -1402,8 +1342,8 @@ samples:
         @@@ 0x9f ░▒▓ ;;;; kqz!! .... (((( >>>><<<< off-topic noise bytes only
 
   # ═════════ Length-variation cases (long content / reference asymmetry) ═════════
-  - id: weather-long-balanced-excellent
-    human_score: excellent
+  - id: weather-long-balanced-perfect
+    human_score: perfect
     inputs:
       reference: |
         A detailed current-weather report for a city, including temperature,

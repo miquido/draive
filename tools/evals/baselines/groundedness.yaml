@@ -262,8 +262,8 @@ samples:
         founded the Curie Institutes, which remain major centres of cancer
         research today.
 
-  - id: curie-bio-fair
-    human_score: fair
+  - id: curie-bio-poor-02
+    human_score: poor
     inputs:
       reference: |
         Marie Curie was a Polish-born physicist and chemist who worked most of
@@ -812,60 +812,6 @@ samples:
       reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
       evaluated: ""
 
-  - id: groundedness-empty-02-none
-    human_score: none
-    inputs:
-      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
-      evaluated: ""
-
-  - id: groundedness-empty-03-none
-    human_score: none
-    inputs:
-      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
-      evaluated: ""
-
-  - id: groundedness-empty-04-none
-    human_score: none
-    inputs:
-      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
-      evaluated: ""
-
-  - id: groundedness-empty-05-none
-    human_score: none
-    inputs:
-      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
-      evaluated: ""
-
-  - id: groundedness-empty-06-none
-    human_score: none
-    inputs:
-      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
-      evaluated: ""
-
-  - id: groundedness-empty-07-none
-    human_score: none
-    inputs:
-      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
-      evaluated: ""
-
-  - id: groundedness-empty-08-none
-    human_score: none
-    inputs:
-      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
-      evaluated: ""
-
-  - id: groundedness-empty-09-none
-    human_score: none
-    inputs:
-      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
-      evaluated: ""
-
-  - id: groundedness-empty-10-none
-    human_score: none
-    inputs:
-      reference: "The library is closed on Mondays and opens at 9 a.m. Tuesday through Friday."
-      evaluated: ""
-
   - id: groundedness-invalid-content-none
     human_score: none
     inputs:
@@ -899,8 +845,8 @@ samples:
         Friday it runs 9 a.m. to 7 p.m., with shorter 10 a.m. to 4 p.m.
         hours on Saturday and Sunday.
 
-  - id: library-schedule-good
-    human_score: good
+  - id: library-schedule-excellent-02
+    human_score: excellent
     inputs:
       reference: |
         The neighborhood library is closed every Monday. From Tuesday
@@ -1242,12 +1188,6 @@ samples:
       reference: "The clinic accepts walk-in patients between 8 a.m. and noon on weekdays."
       evaluated: "   "
 
-  - id: groundedness-empty-13-none
-    human_score: none
-    inputs:
-      reference: "The clinic accepts walk-in patients between 8 a.m. and noon on weekdays."
-      evaluated: ""
-
   - id: groundedness-invalid-content-02-none
     human_score: none
     inputs:
@@ -1327,8 +1267,8 @@ samples:
         closes,11pm
         open_sundays,yes
 
-  - id: meeting-json-grounded-excellent
-    human_score: excellent
+  - id: meeting-json-grounded-perfect-02
+    human_score: perfect
     inputs:
       reference: |
         The standup on April 3 covered the login bug, which Ana will fix by

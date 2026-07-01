@@ -2,6 +2,7 @@ from draive.evaluation import EvaluationScore, evaluator
 from draive.evaluators.utils import (
     FORMAT_INSTRUCTION,
     extract_evaluation_result,
+    is_empty_content,
     model_context_multimodal,
 )
 from draive.models import ModelContext, ModelInput
@@ -34,13 +35,13 @@ async def relevance_evaluator(
     EvaluationScore
         Evaluation result.
     """
-    if not evaluated:
+    if is_empty_content(evaluated):
         return EvaluationScore.of(
             0.0,
             meta={"comment": "Input was empty!"},
         )
 
-    if not reference:
+    if is_empty_content(reference):
         return EvaluationScore.of(
             0.0,
             meta={"comment": "Reference was empty!"},
@@ -100,9 +101,15 @@ async def relevance_context_evaluator(
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)
 
+    if is_empty_content(evaluated_content):
+        return EvaluationScore.of(
+            0.0,
+            meta={"comment": "Input context was empty!"},
+        )
+
     instruction: str
     input_content: MultimodalContent
-    if reference:
+    if reference and not is_empty_content(reference):
         instruction = CONTEXT_REFERENCE_INSTRUCTION
         input_content = MultimodalContent.of(
             "<REFERENCE>",

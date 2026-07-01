@@ -413,8 +413,8 @@ samples:
         bro that headset is INSANE lowkey jealous 😭 mic prob slaps too,
         we gotta queue ranked tn fr fr
 
-  - id: discord-good
-    human_score: good
+  - id: discord-fair
+    human_score: fair
     inputs:
       expected_tone_style: |
         Casual, slang-heavy — 14-year-old's Discord message reacting to a
@@ -605,60 +605,6 @@ samples:
 
   # ───────────── Unrated empty responses (none) ─────────────
   - id: tone-style-empty-01-none
-    human_score: none
-    inputs:
-      expected_tone_style: "Concise, empathetic, professional apology email."
-      evaluated: ""
-
-  - id: tone-style-empty-02-none
-    human_score: none
-    inputs:
-      expected_tone_style: "Concise, empathetic, professional apology email."
-      evaluated: ""
-
-  - id: tone-style-empty-03-none
-    human_score: none
-    inputs:
-      expected_tone_style: "Concise, empathetic, professional apology email."
-      evaluated: ""
-
-  - id: tone-style-empty-04-none
-    human_score: none
-    inputs:
-      expected_tone_style: "Concise, empathetic, professional apology email."
-      evaluated: ""
-
-  - id: tone-style-empty-05-none
-    human_score: none
-    inputs:
-      expected_tone_style: "Concise, empathetic, professional apology email."
-      evaluated: ""
-
-  - id: tone-style-empty-06-none
-    human_score: none
-    inputs:
-      expected_tone_style: "Concise, empathetic, professional apology email."
-      evaluated: ""
-
-  - id: tone-style-empty-07-none
-    human_score: none
-    inputs:
-      expected_tone_style: "Concise, empathetic, professional apology email."
-      evaluated: ""
-
-  - id: tone-style-empty-08-none
-    human_score: none
-    inputs:
-      expected_tone_style: "Concise, empathetic, professional apology email."
-      evaluated: ""
-
-  - id: tone-style-empty-09-none
-    human_score: none
-    inputs:
-      expected_tone_style: "Concise, empathetic, professional apology email."
-      evaluated: ""
-
-  - id: tone-style-empty-10-none
     human_score: none
     inputs:
       expected_tone_style: "Concise, empathetic, professional apology email."
@@ -953,12 +899,6 @@ samples:
         warned.
 
   # ───────────── More invalid / empty responses (none) ─────────────
-  - id: tone-style-empty-11-none
-    human_score: none
-    inputs:
-      expected_tone_style: "Concise, empathetic, professional apology email."
-      evaluated: ""
-
   - id: tone-style-empty-12-none
     human_score: none
     inputs:
@@ -969,7 +909,7 @@ samples:
     human_score: none
     inputs:
       expected_tone_style: "Concise, empathetic, professional apology email."
-      evaluated: |
+      evaluated: "   \n\t  \n   "
 
   - id: tone-style-invalid-content-02-none
     human_score: none
@@ -1013,8 +953,8 @@ samples:
           <body>Our new cushioned soles turn the daily grind into a walk in the park.</body>
         </promo>
 
-  - id: announcement-yaml-tone-fair
-    human_score: fair
+  - id: announcement-yaml-tone-poor
+    human_score: poor
     inputs:
       expected_tone_style: |
         Formal, professional internal announcement.

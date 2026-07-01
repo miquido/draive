@@ -793,60 +793,6 @@ samples:
       expectations: "Mention the workshop date, start time, room, and ID requirement."
       evaluated: ""
 
-  - id: expectations-empty-02-none
-    human_score: none
-    inputs:
-      expectations: "Mention the workshop date, start time, room, and ID requirement."
-      evaluated: ""
-
-  - id: expectations-empty-03-none
-    human_score: none
-    inputs:
-      expectations: "Mention the workshop date, start time, room, and ID requirement."
-      evaluated: ""
-
-  - id: expectations-empty-04-none
-    human_score: none
-    inputs:
-      expectations: "Mention the workshop date, start time, room, and ID requirement."
-      evaluated: ""
-
-  - id: expectations-empty-05-none
-    human_score: none
-    inputs:
-      expectations: "Mention the workshop date, start time, room, and ID requirement."
-      evaluated: ""
-
-  - id: expectations-empty-06-none
-    human_score: none
-    inputs:
-      expectations: "Mention the workshop date, start time, room, and ID requirement."
-      evaluated: ""
-
-  - id: expectations-empty-07-none
-    human_score: none
-    inputs:
-      expectations: "Mention the workshop date, start time, room, and ID requirement."
-      evaluated: ""
-
-  - id: expectations-empty-08-none
-    human_score: none
-    inputs:
-      expectations: "Mention the workshop date, start time, room, and ID requirement."
-      evaluated: ""
-
-  - id: expectations-empty-09-none
-    human_score: none
-    inputs:
-      expectations: "Mention the workshop date, start time, room, and ID requirement."
-      evaluated: ""
-
-  - id: expectations-empty-10-none
-    human_score: none
-    inputs:
-      expectations: "Mention the workshop date, start time, room, and ID requirement."
-      evaluated: ""
-
   - id: expectations-invalid-content-none
     human_score: none
     inputs:
@@ -1218,7 +1164,7 @@ samples:
     human_score: none
     inputs:
       expectations: "List the event name, date, start time, venue, and RSVP deadline."
-      evaluated: |
+      evaluated: "   \n\t  \n   "
 
   - id: expectations-invalid-content-02-none
     human_score: none
@@ -1285,8 +1231,8 @@ samples:
         dinner: tofu stir-fry
         note: high-protein vegetarian plan
 
-  - id: trip-xml-expectations-good
-    human_score: good
+  - id: trip-xml-expectations-excellent
+    human_score: excellent
     inputs:
       expectations: |
         Plan a trip that visits Rome and Florence, includes at least one

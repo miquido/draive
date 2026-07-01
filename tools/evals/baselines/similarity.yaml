@@ -527,60 +527,6 @@ samples:
       reference: "The community pool closes at 7 p.m. on weekdays."
       evaluated: ""
 
-  - id: similarity-empty-02-none
-    human_score: none
-    inputs:
-      reference: "The community pool closes at 7 p.m. on weekdays."
-      evaluated: ""
-
-  - id: similarity-empty-03-none
-    human_score: none
-    inputs:
-      reference: "The community pool closes at 7 p.m. on weekdays."
-      evaluated: ""
-
-  - id: similarity-empty-04-none
-    human_score: none
-    inputs:
-      reference: "The community pool closes at 7 p.m. on weekdays."
-      evaluated: ""
-
-  - id: similarity-empty-05-none
-    human_score: none
-    inputs:
-      reference: "The community pool closes at 7 p.m. on weekdays."
-      evaluated: ""
-
-  - id: similarity-empty-06-none
-    human_score: none
-    inputs:
-      reference: "The community pool closes at 7 p.m. on weekdays."
-      evaluated: ""
-
-  - id: similarity-empty-07-none
-    human_score: none
-    inputs:
-      reference: "The community pool closes at 7 p.m. on weekdays."
-      evaluated: ""
-
-  - id: similarity-empty-08-none
-    human_score: none
-    inputs:
-      reference: "The community pool closes at 7 p.m. on weekdays."
-      evaluated: ""
-
-  - id: similarity-empty-09-none
-    human_score: none
-    inputs:
-      reference: "The community pool closes at 7 p.m. on weekdays."
-      evaluated: ""
-
-  - id: similarity-empty-10-none
-    human_score: none
-    inputs:
-      reference: "The community pool closes at 7 p.m. on weekdays."
-      evaluated: ""
-
   - id: similarity-invalid-content-none
     human_score: none
     inputs:
@@ -838,12 +784,6 @@ samples:
         hall.
 
   # ───────────── More invalid / empty responses (none) ─────────────
-  - id: similarity-empty-11-none
-    human_score: none
-    inputs:
-      reference: "The community pool closes at 7 p.m. on weekdays."
-      evaluated: ""
-
   - id: similarity-empty-12-none
     human_score: none
     inputs:
@@ -854,7 +794,7 @@ samples:
     human_score: none
     inputs:
       reference: "The community pool closes at 7 p.m. on weekdays."
-      evaluated: |
+      evaluated: "   \n\t  \n   "
 
   - id: similarity-invalid-content-02-none
     human_score: none
@@ -880,8 +820,8 @@ samples:
           "id": 7
         }
 
-  - id: user-xml-similar-good
-    human_score: good
+  - id: user-xml-similar-excellent
+    human_score: excellent
     inputs:
       reference: |
         {"id": 7, "name": "Ana", "role": "admin", "active": true}

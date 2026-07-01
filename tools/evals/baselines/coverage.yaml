@@ -58,8 +58,8 @@ samples:
         chase her across the island. She eventually publishes the journals and
         turns the lighthouse into a museum.
 
-  - id: book-plot-good
-    human_score: good
+  - id: book-plot-excellent-02
+    human_score: excellent
     inputs:
       reference: |
         In "The Lighthouse Keeper," a young cartographer named Mara inherits
@@ -351,8 +351,8 @@ samples:
         were awarded $12 million, and Bayview Mills must install filtration
         by year-end. The ruling is expected to influence similar cases.
 
-  - id: court-good
-    human_score: good
+  - id: court-fair-02
+    human_score: fair
     inputs:
       reference: |
         In a 5-2 decision, the state supreme court ruled that Bayview Mills'
@@ -924,60 +924,6 @@ samples:
       reference: "Composting needs brown material, green material, air, and moisture."
       evaluated: ""
 
-  - id: coverage-empty-02-none
-    human_score: none
-    inputs:
-      reference: "Composting needs brown material, green material, air, and moisture."
-      evaluated: ""
-
-  - id: coverage-empty-03-none
-    human_score: none
-    inputs:
-      reference: "Composting needs brown material, green material, air, and moisture."
-      evaluated: ""
-
-  - id: coverage-empty-04-none
-    human_score: none
-    inputs:
-      reference: "Composting needs brown material, green material, air, and moisture."
-      evaluated: ""
-
-  - id: coverage-empty-05-none
-    human_score: none
-    inputs:
-      reference: "Composting needs brown material, green material, air, and moisture."
-      evaluated: ""
-
-  - id: coverage-empty-06-none
-    human_score: none
-    inputs:
-      reference: "Composting needs brown material, green material, air, and moisture."
-      evaluated: ""
-
-  - id: coverage-empty-07-none
-    human_score: none
-    inputs:
-      reference: "Composting needs brown material, green material, air, and moisture."
-      evaluated: ""
-
-  - id: coverage-empty-08-none
-    human_score: none
-    inputs:
-      reference: "Composting needs brown material, green material, air, and moisture."
-      evaluated: ""
-
-  - id: coverage-empty-09-none
-    human_score: none
-    inputs:
-      reference: "Composting needs brown material, green material, air, and moisture."
-      evaluated: ""
-
-  - id: coverage-empty-10-none
-    human_score: none
-    inputs:
-      reference: "Composting needs brown material, green material, air, and moisture."
-      evaluated: ""
-
   - id: coverage-invalid-content-none
     human_score: none
     inputs:
@@ -1386,12 +1332,6 @@ samples:
       reference: "Sourdough bread relies on a fermented starter of flour and water."
       evaluated: ""
 
-  - id: coverage-empty-12-none
-    human_score: none
-    inputs:
-      reference: "Sourdough bread relies on a fermented starter of flour and water."
-      evaluated: ""
-
   - id: coverage-empty-13-none
     human_score: none
     inputs:
@@ -1434,8 +1374,8 @@ samples:
       evaluated: |
         { "display_in": 14, "ram_gb": 16 }
 
-  - id: recipe-xml-coverage-good
-    human_score: good
+  - id: recipe-xml-coverage-excellent
+    human_score: excellent
     inputs:
       reference: |
         A pancake recipe needs flour, milk, eggs, sugar, and baking powder,

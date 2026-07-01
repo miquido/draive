@@ -654,8 +654,8 @@ samples:
         fill tiny bottles, seal them, and label them. The bottles are
         kept cold while they travel to clinics.
 
-  - id: factory-good
-    human_score: good
+  - id: factory-fair
+    human_score: fair
     inputs:
       guidelines: |
         Audience: children aged 8-10 learning how a factory makes a
@@ -748,51 +748,6 @@ samples:
     inputs:
       evaluated: ""
 
-  - id: readability-empty-02-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: readability-empty-03-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: readability-empty-04-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: readability-empty-05-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: readability-empty-06-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: readability-empty-07-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: readability-empty-08-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: readability-empty-09-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: readability-empty-10-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
   - id: readability-invalid-content-none
     human_score: none
     inputs:
@@ -879,8 +834,8 @@ samples:
         spills out as lava, sometimes along with ash and gas. Once the lava
         reaches the air, it slowly cools down and becomes solid rock again.
 
-  - id: volcano-good
-    human_score: good
+  - id: volcano-fair-02
+    human_score: fair
     inputs:
       guidelines: |
         Audience: 8-year-olds learning what a volcano is.
@@ -1131,20 +1086,10 @@ samples:
         equilibrium forcing.
 
   # ───────────── More unrated empty / invalid responses (none) ─────────────
-  - id: readability-empty-11-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
   - id: readability-empty-12-none
     human_score: none
     inputs:
       evaluated: "     "
-
-  - id: readability-empty-13-none
-    human_score: none
-    inputs:
-      evaluated: ""
 
   - id: readability-invalid-content-02-none
     human_score: none

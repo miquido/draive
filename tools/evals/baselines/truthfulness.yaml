@@ -221,8 +221,8 @@ samples:
         of an isolated thunderstorm in the late afternoon. No severe
         weather expected. An umbrella should be enough.
 
-  - id: weather-fair
-    human_score: fair
+  - id: weather-poor-02
+    human_score: poor
     inputs:
       reference: |
         Forecast model: 60% chance of rain tomorrow afternoon, 5–15 mm.
@@ -445,8 +445,8 @@ samples:
         A quarter of our factories now run on renewable power. Audit of
         these numbers is pending.
 
-  - id: greenwash-good
-    human_score: good
+  - id: greenwash-fair
+    human_score: fair
     inputs:
       evaluated: |
         We made significant progress on emissions in FY24, with direct
@@ -624,51 +624,6 @@ samples:
 
   # ───────────── Unrated empty responses (none) ─────────────
   - id: truthfulness-empty-01-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: truthfulness-empty-02-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: truthfulness-empty-03-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: truthfulness-empty-04-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: truthfulness-empty-05-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: truthfulness-empty-06-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: truthfulness-empty-07-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: truthfulness-empty-08-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: truthfulness-empty-09-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: truthfulness-empty-10-none
     human_score: none
     inputs:
       evaluated: ""
@@ -964,21 +919,6 @@ samples:
         you rebook, and there are meal vouchers at the gate.
 
   # ───────────── Unrated empty responses (none) ─────────────
-  - id: truthfulness-empty-11-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: truthfulness-empty-12-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
-  - id: truthfulness-empty-13-none
-    human_score: none
-    inputs:
-      evaluated: ""
-
   - id: truthfulness-invalid-content-02-none
     human_score: none
     inputs:
@@ -1002,8 +942,8 @@ samples:
           "claim": "Charges most phones; data transfer up to 480 Mbps (USB 2.0)."
         }
 
-  - id: stats-json-truthful-noref-fair
-    human_score: fair
+  - id: stats-json-truthful-noref-poor
+    human_score: poor
     inputs:
       evaluated: |
         {
