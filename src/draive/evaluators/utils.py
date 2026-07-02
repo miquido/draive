@@ -15,17 +15,16 @@ __all__ = (
     "model_context_multimodal",
 )
 
-COMMENT_TAG_NAME: Final[str] = "comment"
-RATING_TAG_NAME: Final[str] = "rating"
 
-FORMAT_INSTRUCTION: Final[str] = f"""\
+FORMAT_INSTRUCTION: Final[str] = """\
 <FORMAT>
 Respond using exactly the following XML structure and include no other text before or after it.
-Include both the rating and the comment tags exactly once.
+Include both the justification and the rating tags exactly once as follows:
 
-  <{COMMENT_TAG_NAME}>Concise, step-by-step justification that supports the rating. Do not leave empty.</{COMMENT_TAG_NAME}>
-  <{RATING_TAG_NAME}>Single, lowercase rating name chosen from the available ratings list (no quotes or extra text).</{RATING_TAG_NAME}>
-</FORMAT>
+  <justification>Concise, step-by-step justification that supports the rating. Do not leave empty.</justification>
+  <rating>Single, lowercase rating name chosen from the available ratings list (no quotes or extra text).</rating>
+
+</FORMAT>\
 """  # noqa: E501
 
 
@@ -66,20 +65,20 @@ def extract_evaluation_result(
     comment_tag: MultimodalTag | None = None
 
     for tag in content.tags():
-        if tag.name.lower() == RATING_TAG_NAME:
+        if tag.name.lower() == "rating":
             if rating_tag is not None:
                 raise ValueError(f"Invalid evaluator result - multiple rating tags:\n{content}")
 
             rating_tag = tag
 
-        elif tag.name.lower() == COMMENT_TAG_NAME:
+        elif tag.name.lower() == "justification":
             if comment_tag is not None:
                 raise ValueError(f"Invalid evaluator result - multiple comment tags:\n{content}")
 
             comment_tag = tag
 
-    if not rating_tag:
-        raise ValueError(f"Invalid evaluator result - missing rating:\n{content}")
+    if rating_tag is None:
+        raise ValueError("Invalid evaluator result - invalid or missing rating tag")
 
     try:
         return EvaluationScore.of(
@@ -104,18 +103,24 @@ def model_context_multimodal(
             for block in element.output:
                 if isinstance(block, MultimodalContent):
                     parts.append(block)
+
                 elif isinstance(block, ModelToolRequest):
                     parts.append(f"<TOOL_CALL tool='{block.tool}'/>")
+
                 # ModelReasoning intentionally skipped
             parts.append("</CONTEXT_ELEMENT>")
+
         else:  # ModelInput
             parts.append(f"\n<CONTEXT_ELEMENT index='{index}' role='user'>")
             for block in element.input:
                 if isinstance(block, MultimodalContent):
                     parts.append(block)
+
                 else:
                     parts.append(f"<TOOL_RESPONSE tool='{block.tool}' status='{block.status}'>")
                     parts.append(block.content)
                     parts.append("</TOOL_RESPONSE>")
+
             parts.append("</CONTEXT_ELEMENT>")
+
     return MultimodalContent.of(*parts)

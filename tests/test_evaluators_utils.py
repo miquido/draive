@@ -10,7 +10,7 @@ def _content_with_tags(*tags: MultimodalTag) -> MultimodalContent:
 
 def test_extract_evaluation_result_parses_single_rating_and_comment() -> None:
     content = _content_with_tags(
-        MultimodalTag.of("Reasoned view", name="comment"),
+        MultimodalTag.of("Reasoned view", name="justification"),
         MultimodalTag.of("good", name="rating"),
     )
 

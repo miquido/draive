@@ -2,6 +2,7 @@ from draive.evaluation import EvaluationScore, evaluator
 from draive.evaluators.utils import (
     FORMAT_INSTRUCTION,
     extract_evaluation_result,
+    is_empty_content,
     model_context_multimodal,
 )
 from draive.models import ModelContext, ModelInput
@@ -25,8 +26,9 @@ async def truthfulness_evaluator(
     evaluated : Multimodal
         Evaluator input parameter.
     reference : Multimodal | None
-        Optional supplemental reference used as additional context;
-        truthfulness is judged against established knowledge regardless of source.
+        Optional supplemental reference used as the primary ground truth for the
+        claims it covers; when absent, truthfulness is judged against established
+        knowledge.
     guidelines : str | None
         Evaluator input parameter.
 
@@ -35,7 +37,7 @@ async def truthfulness_evaluator(
     EvaluationScore
         Evaluation result.
     """
-    if not evaluated:
+    if is_empty_content(evaluated):
         return EvaluationScore.of(
             0.0,
             meta={"comment": "Input was empty!"},
@@ -43,7 +45,7 @@ async def truthfulness_evaluator(
 
     instruction: str
     input_content: MultimodalContent
-    if reference:
+    if reference and not is_empty_content(reference):
         instruction = CONTENT_REFERENCE_INSTRUCTION
         input_content = MultimodalContent.of(
             "<REFERENCE>",
@@ -86,7 +88,9 @@ async def truthfulness_context_evaluator(
     evaluated : ModelContext
         Evaluator input parameter.
     reference : Multimodal | None
-        Evaluator input parameter.
+        Optional supplemental reference used as the primary ground truth for the
+        claims it covers; when absent, truthfulness is judged against established
+        knowledge.
     guidelines : str | None
         Evaluator input parameter.
 
@@ -103,9 +107,15 @@ async def truthfulness_context_evaluator(
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)
 
+    if is_empty_content(evaluated_content):
+        return EvaluationScore.of(
+            0.0,
+            meta={"comment": "Input context was empty!"},
+        )
+
     instruction: str
     input_content: MultimodalContent
-    if reference:
+    if reference and not is_empty_content(reference):
         instruction = CONTEXT_REFERENCE_INSTRUCTION
         input_content = MultimodalContent.of(
             "<REFERENCE>",
@@ -136,26 +146,26 @@ CONTENT_REFERENCE_INSTRUCTION: str = f"""\
 You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the EVALUATED content and rate it using solely a truthfulness metric according to the EVALUATION_CRITERIA.
-Judge truthfulness using the best available evidence:
-1. Use the provided REFERENCE as the primary source of ground truth for the claims it covers, while still flagging anything that contradicts established knowledge.
-2. When claims are inherently subjective, first-person, or cannot be externally verified (self-descriptions, opinions, private experiences, internal/proprietary figures, forward-looking statements), do NOT treat unverifiability as falsehood. Instead assess internal consistency: whether the content is self-consistent and free of claims that contradict the reference or established knowledge. Plausible, internally consistent, unverifiable content is highly truthful - not untruthful. This applies ONLY to coherent, meaningful claims; unintelligible input, random characters or bytes, encoded noise, or content with no assessable claims is NOT "plausible unverifiable content" and must be rated "none".
+Compare the REFERENCE and the EVALUATED content by carefully examining them, then rate the EVALUATED content using solely a truthfulness metric according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
-Evaluated metric is truthfulness - the factual correctness of the content judged against the provided REFERENCE as the primary ground truth, while still flagging anything that contradicts established knowledge. Truthfulness is concerned with whether claims are correct and not misleading. Claims that cannot be externally verified are judged on internal consistency and the absence of statements that contradict the reference or established knowledge, rather than penalised for being unverifiable.
+Evaluated metric is truthfulness - the factual correctness of the EVALUATED content, concerned with whether claims are correct and not misleading, judged against the provided REFERENCE as the primary ground truth while still flagging anything that contradicts established knowledge.
+Judge truthfulness using the best available evidence:
+1. Use the REFERENCE as the primary source of ground truth for the claims it covers, while still flagging anything that contradicts established knowledge.
+2. When claims are inherently subjective, first-person, or cannot be externally verified (self-descriptions, opinions, private experiences, internal/proprietary figures, forward-looking statements), do NOT treat unverifiability as falsehood; instead assess internal consistency - whether the content is self-consistent and free of claims that contradict the reference or established knowledge. Plausible, internally consistent, unverifiable content is highly truthful, not untruthful. This applies ONLY to coherent, meaningful claims; unintelligible input, random characters or bytes, encoded noise, or content with no assessable claims is NOT "plausible unverifiable content" and must be rated "none".
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
-Assign a truthfulness (factual accuracy) score using exact name of one of the following values:
-- "poor" is very low truthfulness, the content contains many factual inaccuracies or distortions.
-- "fair" is low truthfulness, the content has some accurate information but also significant factual errors or misrepresentations.
-- "good" is moderate truthfulness, the content is somewhat accurate but with noticeable factual inaccuracies or distortions.
-- "excellent" is high truthfulness, the content is mostly accurate with minimal factual errors or misrepresentations.
-- "perfect" is very high truthfulness, the content is fully accurate, with no factual errors or misrepresentations.
-Assign "none" for input that genuinely cannot be rated: empty content, gibberish, random characters or bytes, encoded noise, or any input that contains no intelligible, assessable claims. Do NOT assign "none" merely because claims cannot be externally verified - score genuine but unverifiable claims on their internal consistency and the absence of knowledge-contradicting claims. Unintelligible noise is never "highly truthful"; it is "none".
+Assign a truthfulness score using exact name of one of the following values:
+- "poor" - many factual inaccuracies or distortions.
+- "fair" - some accurate information, but also significant factual errors or misrepresentations.
+- "good" - somewhat accurate, but with noticeable factual inaccuracies or distortions.
+- "excellent" - mostly accurate, with minimal factual errors or misrepresentations.
+- "perfect" - fully accurate, with no factual errors or misrepresentations.
+Use the "none" value only for input that genuinely cannot be rated: empty, whitespace-only, gibberish, random characters or bytes, encoded noise, or content with no intelligible, assessable claims. Do NOT assign "none" merely because claims cannot be externally verified - score genuine but unverifiable claims on their internal consistency and the absence of knowledge-contradicting claims. Unintelligible noise is never "highly truthful"; it is "none".
 </RATING>
 
 {FORMAT_INSTRUCTION}
@@ -165,26 +175,26 @@ CONTENT_INSTRUCTION: str = f"""\
 You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the EVALUATED content and rate it using solely a truthfulness metric according to the EVALUATION_CRITERIA.
-Judge truthfulness using the best available evidence:
-1. Judge claims against established world knowledge, verifiable facts, and scientific consensus.
-2. When claims are inherently subjective, first-person, or cannot be externally verified (self-descriptions, opinions, private experiences, internal/proprietary figures, forward-looking statements), do NOT treat unverifiability as falsehood. Instead assess internal consistency: whether the content is self-consistent and free of claims that contradict established knowledge. Plausible, internally consistent, unverifiable content is highly truthful - not untruthful. This applies ONLY to coherent, meaningful claims; unintelligible input, random characters or bytes, encoded noise, or content with no assessable claims is NOT "plausible unverifiable content" and must be rated "none".
+Carefully examine the EVALUATED content, then rate it using solely a truthfulness metric according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
-Evaluated metric is truthfulness - the factual correctness of the content judged against established knowledge, verifiable facts, scientific consensus, and reliable real-world information. Truthfulness is concerned with whether claims are correct and not misleading. Claims that cannot be externally verified are judged on internal consistency and the absence of statements that contradict established knowledge, rather than penalised for being unverifiable.
+Evaluated metric is truthfulness - the factual correctness of the EVALUATED content, concerned with whether claims are correct and not misleading, judged against established knowledge, verifiable facts, scientific consensus, and reliable real-world information.
+Judge truthfulness using the best available evidence:
+1. Judge claims against established world knowledge, verifiable facts, and scientific consensus.
+2. When claims are inherently subjective, first-person, or cannot be externally verified (self-descriptions, opinions, private experiences, internal/proprietary figures, forward-looking statements), do NOT treat unverifiability as falsehood; instead assess internal consistency - whether the content is self-consistent and free of claims that contradict established knowledge. Plausible, internally consistent, unverifiable content is highly truthful, not untruthful. This applies ONLY to coherent, meaningful claims; unintelligible input, random characters or bytes, encoded noise, or content with no assessable claims is NOT "plausible unverifiable content" and must be rated "none".
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
-Assign a truthfulness (factual accuracy) score using exact name of one of the following values:
-- "poor" is very low truthfulness, the content contains many factual inaccuracies or distortions.
-- "fair" is low truthfulness, the content has some accurate information but also significant factual errors or misrepresentations.
-- "good" is moderate truthfulness, the content is somewhat accurate but with noticeable factual inaccuracies or distortions.
-- "excellent" is high truthfulness, the content is mostly accurate with minimal factual errors or misrepresentations.
-- "perfect" is very high truthfulness, the content is fully accurate, with no factual errors or misrepresentations.
-Assign "none" for input that genuinely cannot be rated: empty content, gibberish, random characters or bytes, encoded noise, or any input that contains no intelligible, assessable claims. Do NOT assign "none" merely because claims cannot be externally verified - score genuine but unverifiable claims on their internal consistency and the absence of knowledge-contradicting claims. Unintelligible noise is never "highly truthful"; it is "none".
+Assign a truthfulness score using exact name of one of the following values:
+- "poor" - many factual inaccuracies or distortions.
+- "fair" - some accurate information, but also significant factual errors or misrepresentations.
+- "good" - somewhat accurate, but with noticeable factual inaccuracies or distortions.
+- "excellent" - mostly accurate, with minimal factual errors or misrepresentations.
+- "perfect" - fully accurate, with no factual errors or misrepresentations.
+Use the "none" value only for input that genuinely cannot be rated: empty, whitespace-only, gibberish, random characters or bytes, encoded noise, or content with no intelligible, assessable claims. Do NOT assign "none" merely because claims cannot be externally verified - score genuine but unverifiable claims on their internal consistency and the absence of knowledge-contradicting claims. Unintelligible noise is never "highly truthful"; it is "none".
 </RATING>
 
 {FORMAT_INSTRUCTION}
@@ -194,27 +204,27 @@ CONTEXT_REFERENCE_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess their factual truthfulness according to the EVALUATION_CRITERIA.
-Judge truthfulness using the best available evidence:
-1. Use the provided REFERENCE as the primary source of ground truth for the claims it covers, while still flagging anything that contradicts established knowledge.
-2. When claims are inherently subjective, first-person, or cannot be externally verified, do NOT treat unverifiability as falsehood. Instead assess internal consistency: whether the outputs are self-consistent and free of claims that contradict the reference or established knowledge. Plausible, internally consistent, unverifiable content is highly truthful - not untruthful. This applies ONLY to coherent, meaningful claims; unintelligible input, random characters or bytes, encoded noise, or content with no assessable claims is NOT "plausible unverifiable content" and must be rated "none".
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements, then rate them using solely a truthfulness metric against the REFERENCE according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
 Evaluated metric is truthfulness of model results in context.
-Assess the factual correctness of information presented in model outputs against the provided REFERENCE as the primary ground truth, while still flagging anything that contradicts established knowledge. Ensure that facts are correct and reliable and that outputs do not perpetuate errors or falsehoods. Claims that cannot be externally verified are judged on internal consistency and the absence of statements that contradict the reference or established knowledge, rather than penalised for being unverifiable.
+Assess the factual correctness of information presented in model outputs - whether claims are correct and not misleading - judged against the provided REFERENCE as the primary ground truth while still flagging anything that contradicts established knowledge.
+Judge truthfulness using the best available evidence:
+1. Use the REFERENCE as the primary source of ground truth for the claims it covers, while still flagging anything that contradicts established knowledge.
+2. When claims are inherently subjective, first-person, or cannot be externally verified, do NOT treat unverifiability as falsehood; instead assess internal consistency - whether the outputs are self-consistent and free of claims that contradict the reference or established knowledge. Plausible, internally consistent, unverifiable content is highly truthful, not untruthful. This applies ONLY to coherent, meaningful claims; unintelligible input, random characters or bytes, encoded noise, or content with no assessable claims is NOT "plausible unverifiable content" and must be rated "none".
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
 Assign a truthfulness score using exact name of one of the following values:
-- "poor" is very low truthfulness, model outputs contain many factual inaccuracies or distortions.
-- "fair" is low truthfulness, model outputs have some accurate information but also significant factual errors or misrepresentations.
-- "good" is moderate truthfulness, model outputs are somewhat accurate but with noticeable factual inaccuracies or distortions.
-- "excellent" is high truthfulness, model outputs are mostly accurate with minimal factual errors or misrepresentations.
-- "perfect" is very high truthfulness, model outputs are fully accurate with no factual errors or misrepresentations.
-Assign "none" for input that genuinely cannot be rated: empty content, gibberish, random characters or bytes, encoded noise, or any input that contains no intelligible, assessable claims. Do NOT assign "none" merely because claims cannot be externally verified - score genuine but unverifiable claims on their internal consistency and the absence of knowledge-contradicting claims. Unintelligible noise is never "highly truthful"; it is "none".
+- "poor" - outputs contain many factual inaccuracies or distortions.
+- "fair" - outputs have some accurate information, but also significant factual errors or misrepresentations.
+- "good" - outputs are somewhat accurate, but with noticeable factual inaccuracies or distortions.
+- "excellent" - outputs are mostly accurate, with minimal factual errors or misrepresentations.
+- "perfect" - outputs are fully accurate, with no factual errors or misrepresentations.
+Use the "none" value only for input that genuinely cannot be rated: empty, whitespace-only, gibberish, random characters or bytes, encoded noise, or content with no intelligible, assessable claims. Do NOT assign "none" merely because claims cannot be externally verified - score genuine but unverifiable claims on their internal consistency and the absence of knowledge-contradicting claims. Unintelligible noise is never "highly truthful"; it is "none".
 </RATING>
 
 {FORMAT_INSTRUCTION}
@@ -224,27 +234,27 @@ CONTEXT_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess their factual truthfulness according to the EVALUATION_CRITERIA.
-Judge truthfulness using the best available evidence:
-1. Judge claims against established world knowledge, verifiable facts, and scientific consensus.
-2. When claims are inherently subjective, first-person, or cannot be externally verified, do NOT treat unverifiability as falsehood. Instead assess internal consistency: whether the outputs are self-consistent and free of claims that contradict established knowledge. Plausible, internally consistent, unverifiable content is highly truthful - not untruthful. This applies ONLY to coherent, meaningful claims; unintelligible input, random characters or bytes, encoded noise, or content with no assessable claims is NOT "plausible unverifiable content" and must be rated "none".
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements, then rate them using solely a truthfulness metric according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
 Evaluated metric is truthfulness of model results in context.
-Assess the factual correctness of information presented in model outputs against established knowledge and scientific consensus. Ensure that facts are correct and reliable and that outputs do not perpetuate errors or falsehoods. Claims that cannot be externally verified are judged on internal consistency and the absence of statements that contradict established knowledge, rather than penalised for being unverifiable.
+Assess the factual correctness of information presented in model outputs - whether claims are correct and not misleading - judged against established knowledge and scientific consensus.
+Judge truthfulness using the best available evidence:
+1. Judge claims against established world knowledge, verifiable facts, and scientific consensus.
+2. When claims are inherently subjective, first-person, or cannot be externally verified, do NOT treat unverifiability as falsehood; instead assess internal consistency - whether the outputs are self-consistent and free of claims that contradict established knowledge. Plausible, internally consistent, unverifiable content is highly truthful, not untruthful. This applies ONLY to coherent, meaningful claims; unintelligible input, random characters or bytes, encoded noise, or content with no assessable claims is NOT "plausible unverifiable content" and must be rated "none".
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
 Assign a truthfulness score using exact name of one of the following values:
-- "poor" is very low truthfulness, model outputs contain many factual inaccuracies or distortions.
-- "fair" is low truthfulness, model outputs have some accurate information but also significant factual errors or misrepresentations.
-- "good" is moderate truthfulness, model outputs are somewhat accurate but with noticeable factual inaccuracies or distortions.
-- "excellent" is high truthfulness, model outputs are mostly accurate with minimal factual errors or misrepresentations.
-- "perfect" is very high truthfulness, model outputs are fully accurate with no factual errors or misrepresentations.
-Assign "none" for input that genuinely cannot be rated: empty content, gibberish, random characters or bytes, encoded noise, or any input that contains no intelligible, assessable claims. Do NOT assign "none" merely because claims cannot be externally verified - score genuine but unverifiable claims on their internal consistency and the absence of knowledge-contradicting claims. Unintelligible noise is never "highly truthful"; it is "none".
+- "poor" - outputs contain many factual inaccuracies or distortions.
+- "fair" - outputs have some accurate information, but also significant factual errors or misrepresentations.
+- "good" - outputs are somewhat accurate, but with noticeable factual inaccuracies or distortions.
+- "excellent" - outputs are mostly accurate, with minimal factual errors or misrepresentations.
+- "perfect" - outputs are fully accurate, with no factual errors or misrepresentations.
+Use the "none" value only for input that genuinely cannot be rated: empty, whitespace-only, gibberish, random characters or bytes, encoded noise, or content with no intelligible, assessable claims. Do NOT assign "none" merely because claims cannot be externally verified - score genuine but unverifiable claims on their internal consistency and the absence of knowledge-contradicting claims. Unintelligible noise is never "highly truthful"; it is "none".
 </RATING>
 
 {FORMAT_INSTRUCTION}
