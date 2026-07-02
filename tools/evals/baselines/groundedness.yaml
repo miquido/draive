@@ -1335,3 +1335,135 @@ samples:
         on-call rotation, which Dee volunteered to handle next week.
       evaluated: |
         Ana will fix the login bug by Friday.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: benefits-handbook-verylong-grounded-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        Full-time employees are eligible for health, dental, and vision
+        coverage starting on the first day of the month following their
+        start date. The company covers 80 percent of the health premium for
+        the employee and 50 percent for dependents. Employees accrue 15
+        vacation days per year during their first three years, rising to 20
+        days after three years of service, and unused vacation carries over
+        up to a maximum of 10 days into the following year. The 401(k) plan
+        offers a dollar-for-dollar match up to 4 percent of salary, with
+        immediate vesting. Parental leave is 12 weeks paid at full salary
+        for the primary caregiver and 6 weeks paid for the secondary
+        caregiver, available after 6 months of employment. Employees may
+        work remotely up to 3 days per week with manager approval, and the
+        company provides a one-time 500-dollar home-office stipend for
+        remote setup.
+      evaluated: |
+        Health, dental, and vision coverage kicks in for full-time employees
+        on the first of the month after they start, with the company paying
+        80 percent of the employee's own premium and 50 percent of the cost
+        for any dependents added to the plan. Vacation starts at 15 days a
+        year for the first three years on the job, then increases to 20 days
+        a year after that three-year mark, and you can roll up to 10 unused
+        days into the next year rather than losing them. On the retirement
+        side, the 401(k) match is dollar-for-dollar up to 4 percent of
+        salary, and that match is yours immediately since it vests right
+        away rather than over time. Parental leave gives the primary
+        caregiver 12 weeks at full pay and the secondary caregiver 6 weeks at
+        full pay, and employees become eligible for it once they've been
+        with the company for 6 months. Finally, remote work is allowed up to
+        three days a week as long as a manager signs off, and new remote
+        employees get a one-time 500-dollar stipend to help set up a home
+        office.
+
+  - id: benefits-handbook-verylong-fabricated-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Full-time employees are eligible for health, dental, and vision
+        coverage starting on the first day of the month following their
+        start date. The company covers 80 percent of the health premium for
+        the employee and 50 percent for dependents. Employees accrue 15
+        vacation days per year during their first three years, rising to 20
+        days after three years of service, and unused vacation carries over
+        up to a maximum of 10 days into the following year. The 401(k) plan
+        offers a dollar-for-dollar match up to 4 percent of salary, with
+        immediate vesting. Parental leave is 12 weeks paid at full salary
+        for the primary caregiver and 6 weeks paid for the secondary
+        caregiver, available after 6 months of employment. Employees may
+        work remotely up to 3 days per week with manager approval, and the
+        company provides a one-time 500-dollar home-office stipend for
+        remote setup.
+      evaluated: |
+        Health, dental, and vision coverage begins immediately on an
+        employee's very first day, and the company covers the full premium
+        for both the employee and all dependents at no cost whatsoever,
+        making it one of the most generous plans in the industry. Vacation
+        starts generously too: new hires get 25 days a year right away, and
+        that climbs to a full 30 days after three years, with unlimited
+        rollover so no one ever loses a day they've earned. The 401(k) match
+        is equally impressive, at two dollars for every one dollar an
+        employee contributes up to 6 percent of salary, though the match
+        vests gradually over four years rather than all at once. Parental
+        leave is a full six months at full salary for either caregiver, no
+        distinction between primary and secondary, and it's available from
+        an employee's very first day with no waiting period at all. On the
+        remote-work front, employees can work from home as often as they
+        like with no manager approval required, and the home-office stipend
+        is a recurring 500 dollars every year rather than a one-time
+        payment, on top of a separate annual wellness stipend of 300
+        dollars that covers gym memberships and similar expenses.
+
+  # ═════════ Very-long-reference / short-content cases ═════════
+  - id: warranty-terms-verylongref-shortcontent-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The manufacturer's warranty on the Everline dishwasher covers parts
+        and labor for defects in materials or workmanship for a period of
+        two years from the original date of purchase, provided the unit
+        was installed by a licensed technician and proof of purchase is
+        retained. The electronic control board and motor are covered for
+        an extended period of five years, but this extended coverage
+        applies to the part only, not the labor to replace it, after the
+        initial two-year period ends. Damage caused by improper
+        installation, use of non-approved detergents, power surges, or
+        commercial use in a non-residential setting voids the entire
+        warranty. Cosmetic issues such as scratches or dents reported more
+        than 30 days after delivery are not covered. To file a claim,
+        customers must contact support with their proof of purchase and
+        serial number, after which a technician visit is scheduled; if the
+        unit cannot be repaired on-site within two visits, the
+        manufacturer will replace it with an equivalent model at no
+        charge. The warranty is non-transferable and applies only to the
+        original purchaser at the original installation address.
+      evaluated: |
+        Full parts-and-labor coverage runs two years; the control board and
+        motor are covered five years but parts-only after year two.
+        Non-approved detergents or improper installation void the
+        warranty entirely, and it can't be transferred if you sell the
+        unit or move.
+
+  - id: warranty-terms-verylongref-shortcontent-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The manufacturer's warranty on the Everline dishwasher covers parts
+        and labor for defects in materials or workmanship for a period of
+        two years from the original date of purchase, provided the unit
+        was installed by a licensed technician and proof of purchase is
+        retained. The electronic control board and motor are covered for
+        an extended period of five years, but this extended coverage
+        applies to the part only, not the labor to replace it, after the
+        initial two-year period ends. Damage caused by improper
+        installation, use of non-approved detergents, power surges, or
+        commercial use in a non-residential setting voids the entire
+        warranty. Cosmetic issues such as scratches or dents reported more
+        than 30 days after delivery are not covered. To file a claim,
+        customers must contact support with their proof of purchase and
+        serial number, after which a technician visit is scheduled; if the
+        unit cannot be repaired on-site within two visits, the
+        manufacturer will replace it with an equivalent model at no
+        charge. The warranty is non-transferable and applies only to the
+        original purchaser at the original installation address.
+      evaluated: |
+        The dishwasher comes with a full lifetime warranty on parts and
+        labor, fully transferable to a new owner, and it even covers
+        cosmetic damage reported at any time.

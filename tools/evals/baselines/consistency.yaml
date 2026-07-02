@@ -1123,3 +1123,153 @@ samples:
         total trip lasts 7 nights, ending with a departure from Venice.
       evaluated: |
         The tour spends 5 nights in Rome and flies home from Florence.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: travel-policy-verylong-consistent-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The company travel policy states that employees must book flights at
+        least fourteen days in advance whenever possible, and should choose
+        economy class for any flight under six hours; business class is
+        permitted only for flights over six hours or for employees with a
+        documented medical need. Hotel bookings should not exceed 200 dollars
+        per night in major cities and 130 dollars per night elsewhere, and
+        employees are expected to use the corporate booking tool rather than
+        booking directly with airlines or hotels. Meal expenses while
+        traveling are reimbursed up to 60 dollars per day without receipts
+        required under 25 dollars, and alcohol is not reimbursable under any
+        circumstance. Ground transportation should default to public transit
+        or ride-share rather than rental cars unless the destination lacks
+        adequate public transit, in which case a rental car may be approved
+        in advance by a manager. All expense reports must be submitted within
+        30 days of the trip's end date, and reports submitted later than that
+        require additional VP approval before reimbursement.
+      evaluated: |
+        Under the current travel policy, flights should be booked at least
+        two weeks ahead of departure when that is feasible, and the default
+        cabin class is economy for any trip shorter than six hours in the
+        air; business class is reserved for longer flights past that
+        six-hour mark, or for staff who have a documented medical reason for
+        needing it. On the hotel side, nightly rates are capped at 200
+        dollars in major cities and 130 dollars in smaller ones, and all
+        bookings — flights and hotels alike — are expected to go through the
+        corporate booking tool rather than being made directly with an
+        airline or a hotel chain. Meals are reimbursed up to 60 dollars per
+        day, and no receipt is needed for anything under 25 dollars, though
+        alcohol is excluded from reimbursement entirely regardless of the
+        amount. For getting around at the destination, public transit or a
+        ride-share is the expected default; a rental car is only appropriate
+        when the destination genuinely lacks decent public transit, and even
+        then it needs a manager's advance sign-off. Finally, expense reports
+        are due within 30 days of returning from the trip, and anything
+        filed later than that window needs sign-off from a VP before it can
+        be reimbursed.
+
+  - id: travel-policy-verylong-contradiction-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The company travel policy states that employees must book flights at
+        least fourteen days in advance whenever possible, and should choose
+        economy class for any flight under six hours; business class is
+        permitted only for flights over six hours or for employees with a
+        documented medical need. Hotel bookings should not exceed 200 dollars
+        per night in major cities and 130 dollars per night elsewhere, and
+        employees are expected to use the corporate booking tool rather than
+        booking directly with airlines or hotels. Meal expenses while
+        traveling are reimbursed up to 60 dollars per day without receipts
+        required under 25 dollars, and alcohol is not reimbursable under any
+        circumstance. Ground transportation should default to public transit
+        or ride-share rather than rental cars unless the destination lacks
+        adequate public transit, in which case a rental car may be approved
+        in advance by a manager. All expense reports must be submitted within
+        30 days of the trip's end date, and reports submitted later than that
+        require additional VP approval before reimbursement.
+      evaluated: |
+        Under the current travel policy, employees are free to book flights
+        as close to departure as they like, since there is no minimum
+        advance-booking window, and business class is available for any
+        flight regardless of length — the policy simply asks that travelers
+        use good judgment about cost. Hotel bookings should not exceed 200
+        dollars per night in major cities and 130 dollars per night
+        elsewhere, and employees are expected to use the corporate booking
+        tool rather than booking directly with airlines or hotels. Meals are
+        reimbursed up to 60 dollars per day, with no receipt required for
+        anything under 25 dollars, and this year the policy was updated to
+        also allow reasonable alcohol expenses with meals, up to two drinks
+        per dinner, as a small quality-of-life improvement for frequent
+        travelers. Ground transportation should default to public transit or
+        ride-share rather than rental cars unless the destination lacks
+        adequate public transit, in which case a rental car may be approved
+        in advance by a manager. All expense reports must be submitted within
+        30 days of the trip's end date, and reports submitted later than that
+        require additional VP approval before reimbursement, so travelers
+        should keep that deadline in mind even though the booking window
+        itself has been relaxed.
+
+  # ═════════ Very-long-reference / short-content cases ═════════
+  - id: cruise-terms-verylongref-shortcontent-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Under the cruise line's current booking terms, guests may cancel a
+        standard cabin booking free of charge up to 90 days before
+        departure, receiving a full refund of the deposit. Cancellations
+        made between 89 and 60 days before departure forfeit the deposit
+        but incur no further penalty. Cancellations between 59 and 30 days
+        before departure are charged 50 percent of the total fare, and any
+        cancellation within 29 days of departure, including no-shows, is
+        charged the full fare with no refund. Guests who purchase the
+        optional cruise-protection plan at booking may cancel for a full
+        refund, minus the cost of the plan itself, up to 48 hours before
+        departure for any of a specified list of covered reasons, including
+        illness, a death in the family, or a documented travel-document
+        issue. The protection plan does not cover cancellation for
+        reasons outside that list, such as simply changing travel plans.
+        Onboard credit issued as a promotion is non-refundable and expires
+        if unused by the end of the cruise; it cannot be transferred to a
+        future booking. Name changes on a booking are permitted at no cost
+        up to 45 days before departure, but within that window a name
+        change is treated as a cancellation and rebooking, subject to the
+        cancellation schedule above. Children under two years old cruise
+        free of the base cruise fare but are still responsible for taxes,
+        port fees, and any gratuities.
+      evaluated: |
+        Cancel 90+ days out for a full refund; 60-89 days loses the
+        deposit only; 30-59 days costs half the fare; inside 30 days it's
+        the full fare, no refund. The protection plan allows a full refund
+        (minus its own cost) up to 48 hours out, but only for specific
+        covered reasons — not for simply changing your mind.
+
+  - id: cruise-terms-verylongref-shortcontent-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Under the cruise line's current booking terms, guests may cancel a
+        standard cabin booking free of charge up to 90 days before
+        departure, receiving a full refund of the deposit. Cancellations
+        made between 89 and 60 days before departure forfeit the deposit
+        but incur no further penalty. Cancellations between 59 and 30 days
+        before departure are charged 50 percent of the total fare, and any
+        cancellation within 29 days of departure, including no-shows, is
+        charged the full fare with no refund. Guests who purchase the
+        optional cruise-protection plan at booking may cancel for a full
+        refund, minus the cost of the plan itself, up to 48 hours before
+        departure for any of a specified list of covered reasons, including
+        illness, a death in the family, or a documented travel-document
+        issue. The protection plan does not cover cancellation for
+        reasons outside that list, such as simply changing travel plans.
+        Onboard credit issued as a promotion is non-refundable and expires
+        if unused by the end of the cruise; it cannot be transferred to a
+        future booking. Name changes on a booking are permitted at no cost
+        up to 45 days before departure, but within that window a name
+        change is treated as a cancellation and rebooking, subject to the
+        cancellation schedule above. Children under two years old cruise
+        free of the base cruise fare but are still responsible for taxes,
+        port fees, and any gratuities.
+      evaluated: |
+        You can cancel any time up to the day of departure for a full
+        refund as long as you bought the protection plan, which covers
+        any reason including simply changing your mind, and unused onboard
+        credit rolls over automatically to your next cruise.

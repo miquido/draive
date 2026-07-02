@@ -932,3 +932,160 @@ samples:
         five business days, and return shipping is free for defective goods.
       evaluated: |
         You can return unused items within 30 days for a refund.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: urban-canopy-verylong-paraphrase-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Urban tree canopy delivers benefits well beyond aesthetics. Trees
+        lower ambient temperatures by shading pavement and buildings and by
+        releasing water vapor through their leaves, an effect strong enough
+        to measurably reduce a neighborhood's summer cooling costs. Their
+        root systems and canopies also slow stormwater runoff, reducing the
+        load on municipal drainage systems during heavy rain and lowering
+        the risk of localized flooding. Beyond the physical effects, studies
+        consistently link nearby greenery to lower reported stress and
+        improved mental well-being among residents, and tree-lined streets
+        are associated with higher property values and increased foot
+        traffic to local businesses. Because the benefits scale with
+        canopy size, many cities have adopted formal tree-planting targets,
+        though maintaining an aging urban forest requires sustained
+        funding that easily competes with other municipal priorities.
+      evaluated: |
+        The trees that make up a city's canopy do far more than look nice.
+        By casting shade over streets and rooftops, and by releasing
+        moisture from their leaves, they bring down the surrounding
+        temperature enough to noticeably cut summer air-conditioning bills
+        in the neighborhoods around them. Their roots and branches also help
+        manage rainfall, catching and slowing water before it overwhelms the
+        city's drainage systems, which in turn cuts down on the kind of
+        localized flooding that heavy storms can cause. It isn't just a
+        physical effect either — research repeatedly finds that people
+        living near more greenery report less stress and better overall
+        mental health, and streets lined with trees tend to have higher
+        home values and draw more people to nearby shops. Since these
+        upsides grow along with the size of the canopy itself, plenty of
+        cities have set official goals for how many trees to plant, even
+        though keeping an aging urban forest healthy takes ongoing money
+        that has to compete against every other item on a city budget.
+
+  - id: urban-canopy-verylong-distant-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Urban tree canopy delivers benefits well beyond aesthetics. Trees
+        lower ambient temperatures by shading pavement and buildings and by
+        releasing water vapor through their leaves, an effect strong enough
+        to measurably reduce a neighborhood's summer cooling costs. Their
+        root systems and canopies also slow stormwater runoff, reducing the
+        load on municipal drainage systems during heavy rain and lowering
+        the risk of localized flooding. Beyond the physical effects, studies
+        consistently link nearby greenery to lower reported stress and
+        improved mental well-being among residents, and tree-lined streets
+        are associated with higher property values and increased foot
+        traffic to local businesses. Because the benefits scale with
+        canopy size, many cities have adopted formal tree-planting targets,
+        though maintaining an aging urban forest requires sustained
+        funding that easily competes with other municipal priorities.
+      evaluated: |
+        Getting a good cup of coffee at home starts with the beans, and
+        freshness matters more than most people realize — beans start
+        losing their best flavor within a few weeks of roasting, so buying
+        smaller bags more often beats stockpiling a large one. Grinding just
+        before brewing rather than buying pre-ground coffee preserves far
+        more of the volatile aromatic compounds that give a fresh cup its
+        complexity, and matching the grind size to your brewing method
+        matters just as much: a coarse grind for a French press, a medium
+        grind for drip machines, and a fine grind for espresso.
+
+        Water quality and temperature are the next big factors. Water that's
+        too hard or too soft can throw off extraction, and water that's too
+        hot, above about 96 degrees Celsius, can scorch the grounds and pull
+        out bitter compounds, while water that's too cool under-extracts
+        and leaves the cup tasting sour or flat. Most guides recommend
+        letting boiled water rest for thirty seconds to a minute before
+        pouring it over the grounds.
+
+        Ratio matters too: a common starting point is about one to two
+        tablespoons of coffee for every six ounces of water, adjusted to
+        taste from there. Brew time varies by method, from under thirty
+        seconds for espresso to four minutes for a French press, and
+        keeping a consistent ratio and time from one brew to the next is the
+        fastest way to figure out what adjustments actually improve your
+        cup, rather than changing several variables at once and losing
+        track of what caused the difference.
+
+  # ═════════ Very-long-reference / short-content cases ═════════
+  - id: sleep-hygiene-verylongref-shortcontent-good
+    human_score: good
+    inputs:
+      reference: |
+        Good sleep hygiene starts with consistency: going to bed and waking
+        up at the same time every day, including weekends, helps regulate
+        the body's internal clock more than almost any other single habit.
+        Light exposure plays a major role too — bright light in the
+        morning, ideally sunlight, helps anchor that internal clock, while
+        dimming lights and avoiding screens in the hour or two before bed
+        reduces the blue light that suppresses melatonin production and
+        delays the feeling of sleepiness. The bedroom environment matters
+        as well: a cool room, generally between 16 and 19 degrees Celsius,
+        supports the natural drop in body temperature that accompanies
+        falling asleep, and a dark, quiet space free of light from
+        electronics further supports uninterrupted sleep.
+
+        Caffeine has a half-life of roughly five to six hours, so a cup of
+        coffee at 3 p.m. can still have a meaningful amount of caffeine in
+        the system at 9 p.m., which is why sleep specialists generally
+        recommend cutting off caffeine intake by early-to-mid afternoon.
+        Alcohol, despite making some people feel sleepy initially, actually
+        fragments sleep later in the night and reduces the amount of
+        restorative deep and REM sleep obtained. Exercise generally
+        improves sleep quality, though vigorous exercise too close to
+        bedtime can be stimulating for some people and is often better
+        scheduled earlier in the day. Finally, if you can't fall asleep
+        within about twenty minutes, most specialists recommend getting up
+        and doing something calm and low-stimulation in dim light rather
+        than lying in bed frustrated, since the brain can start to
+        associate the bed itself with wakeful frustration if this happens
+        repeatedly.
+      evaluated: |
+        Keep a consistent sleep schedule, get morning light, avoid screens
+        and caffeine late in the day, keep your room cool and dark, and
+        don't lie in bed awake if you can't sleep.
+
+  - id: sleep-hygiene-verylongref-shortcontent-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Good sleep hygiene starts with consistency: going to bed and waking
+        up at the same time every day, including weekends, helps regulate
+        the body's internal clock more than almost any other single habit.
+        Light exposure plays a major role too — bright light in the
+        morning, ideally sunlight, helps anchor that internal clock, while
+        dimming lights and avoiding screens in the hour or two before bed
+        reduces the blue light that suppresses melatonin production and
+        delays the feeling of sleepiness. The bedroom environment matters
+        as well: a cool room, generally between 16 and 19 degrees Celsius,
+        supports the natural drop in body temperature that accompanies
+        falling asleep, and a dark, quiet space free of light from
+        electronics further supports uninterrupted sleep.
+
+        Caffeine has a half-life of roughly five to six hours, so a cup of
+        coffee at 3 p.m. can still have a meaningful amount of caffeine in
+        the system at 9 p.m., which is why sleep specialists generally
+        recommend cutting off caffeine intake by early-to-mid afternoon.
+        Alcohol, despite making some people feel sleepy initially, actually
+        fragments sleep later in the night and reduces the amount of
+        restorative deep and REM sleep obtained. Exercise generally
+        improves sleep quality, though vigorous exercise too close to
+        bedtime can be stimulating for some people and is often better
+        scheduled earlier in the day. Finally, if you can't fall asleep
+        within about twenty minutes, most specialists recommend getting up
+        and doing something calm and low-stimulation in dim light rather
+        than lying in bed frustrated, since the brain can start to
+        associate the bed itself with wakeful frustration if this happens
+        repeatedly.
+      evaluated: |
+        A balanced breakfast with protein and fiber can help keep energy
+        levels steady throughout the morning.

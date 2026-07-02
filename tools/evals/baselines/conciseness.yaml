@@ -1401,3 +1401,197 @@ samples:
       evaluated: |
         14:00 deploy assumed a missing DB index -> 500s from 14:05; rolled back
         14:20, recovered 14:25; follow-up filed to add the index.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: quarterly-report-verylong-tight-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        In the third quarter, the company recorded revenue of 4.2 million
+        dollars, an increase of 11 percent over the same quarter last year,
+        driven mainly by strong renewals in the enterprise segment and a
+        smaller but growing contribution from the newly launched mobile
+        product line. Operating costs rose 6 percent, primarily due to
+        headcount growth in customer support and engineering, with twelve new
+        hires joining across those two teams during the quarter. Gross margin
+        held steady at 71 percent, essentially unchanged from the prior
+        quarter, as efficiency gains in the hosting infrastructure roughly
+        offset the added payroll expense. The sales team closed eighteen new
+        enterprise accounts, slightly below the target of twenty-two, which
+        management attributed to longer procurement cycles at two large
+        prospective customers rather than any weakening in demand. Customer
+        churn improved to 2.1 percent monthly, down from 2.6 percent the
+        prior quarter, following the rollout of a revamped onboarding
+        program earlier in the year. The mobile product, launched in the
+        first month of the quarter, reached nine thousand active users by the
+        end of the period and is expected to become a material contributor to
+        revenue within the next two quarters. Looking ahead, the leadership
+        team reaffirmed full-year revenue guidance and flagged continued
+        hiring in engineering as the top investment priority for the next two
+        quarters.
+      evaluated: |
+        Q3 revenue was $4.2M, up 11% year over year on strong enterprise
+        renewals and early mobile-product traction (9,000 active users at
+        quarter end). Costs rose 6% from twelve new support/engineering
+        hires, but gross margin held at 71% thanks to hosting efficiencies.
+        The team closed 18 of a targeted 22 enterprise accounts — shortfall
+        blamed on procurement delays, not weak demand — while monthly churn
+        improved to 2.1% after a new onboarding program. Full-year guidance
+        is unchanged; engineering hiring remains the top priority.
+
+  - id: quarterly-report-verylong-bloated-poor
+    human_score: poor
+    inputs:
+      reference: |
+        In the third quarter, the company recorded revenue of 4.2 million
+        dollars, an increase of 11 percent over the same quarter last year,
+        driven mainly by strong renewals in the enterprise segment and a
+        smaller but growing contribution from the newly launched mobile
+        product line. Operating costs rose 6 percent, primarily due to
+        headcount growth in customer support and engineering, with twelve new
+        hires joining across those two teams during the quarter. Gross margin
+        held steady at 71 percent, essentially unchanged from the prior
+        quarter, as efficiency gains in the hosting infrastructure roughly
+        offset the added payroll expense. The sales team closed eighteen new
+        enterprise accounts, slightly below the target of twenty-two, which
+        management attributed to longer procurement cycles at two large
+        prospective customers rather than any weakening in demand. Customer
+        churn improved to 2.1 percent monthly, down from 2.6 percent the
+        prior quarter, following the rollout of a revamped onboarding
+        program earlier in the year. The mobile product, launched in the
+        first month of the quarter, reached nine thousand active users by the
+        end of the period and is expected to become a material contributor to
+        revenue within the next two quarters. Looking ahead, the leadership
+        team reaffirmed full-year revenue guidance and flagged continued
+        hiring in engineering as the top investment priority for the next two
+        quarters.
+      evaluated: |
+        I wanted to take a moment to walk you through, in as much detail as
+        possible, everything that happened financially and operationally
+        during the third quarter of this year, because I think it's really
+        important that everyone has a complete and thorough picture of where
+        things stand. To begin with, when we look at the top-line revenue
+        figure for the quarter in question, what we find is that the company
+        was able to generate a total of approximately 4.2 million dollars,
+        and if you compare that number to the equivalent quarter from the
+        previous year, what becomes clear is that this actually represents
+        an increase, and specifically an increase of about 11 percent, which
+        is certainly a meaningful and noteworthy amount of growth however you
+        choose to look at it. Now, when we ask ourselves what exactly was
+        responsible for driving this particular increase in revenue, the
+        answer, or at least the primary answer, appears to be strong renewal
+        activity within what we refer to internally as the enterprise
+        segment of our customer base, and in addition to that primary driver
+        there was also a secondary, somewhat smaller, but nevertheless
+        real and growing contribution coming from the mobile product line
+        that was newly launched during this same general period of time.
+
+        Turning our attention next to the topic of operating costs, it is
+        worth noting that these costs did in fact rise during the quarter,
+        and the amount by which they rose was approximately 6 percent, and
+        the primary reason that has been identified for this increase in
+        costs relates to growth in headcount, specifically within the
+        customer support team and also within the engineering team, and to
+        put a finer point on it, a total of twelve new employees were hired
+        and joined the company across those two particular teams over the
+        course of the quarter that we are discussing. Despite this increase
+        in costs, it is important to also mention that gross margin, which
+        is obviously a very important metric, remained essentially steady,
+        holding at a level of about 71 percent, which is to say it did not
+        really change in any significant way compared to the quarter that
+        came before it, and this stability appears to be attributable to
+        efficiency gains that were achieved in the area of hosting
+        infrastructure, which in turn roughly offset, or balanced out, the
+        additional expense that came from the added payroll.
+
+        Moving along to the subject of sales performance, the sales team,
+        over the course of the quarter, was able to close a total of
+        eighteen new enterprise accounts, and while this is certainly a
+        respectable number in its own right, it does fall somewhat short of,
+        or below, the target that had been set going into the quarter, which
+        was twenty-two accounts, and when management was asked to explain
+        this shortfall, the explanation that was given centered around
+        longer-than-expected procurement cycles at two large prospective
+        customers, rather than pointing to any broader weakening in overall
+        demand for the product. On a more positive note, customer churn,
+        which is obviously a metric everyone likes to see improve, did in
+        fact improve during the quarter, moving to a level of 2.1 percent on
+        a monthly basis, down from 2.6 percent in the prior quarter, and this
+        improvement has been attributed to the rollout, earlier in the year,
+        of a revamped onboarding program aimed at new customers. As for the
+        mobile product that was mentioned earlier, having launched in the
+        very first month of the quarter, it went on to reach a total of nine
+        thousand active users by the time the quarter came to a close, and
+        the expectation going forward is that this product will become a
+        material contributor to overall revenue within the next two
+        quarters. Finally, looking ahead to what comes next, the leadership
+        team wanted to reaffirm that full-year revenue guidance remains
+        unchanged, and they also wanted to flag that continued hiring within
+        engineering will remain the top investment priority over the next
+        two quarters.
+
+  # ═════════ Very-long-reference / short-content cases ═════════
+  - id: onboarding-policy-verylongref-shortcontent-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        New employees at the company complete a structured five-day
+        onboarding program before joining their team full time. On day one,
+        HR handles paperwork, benefits enrollment, and issues a laptop and
+        building badge, followed by a welcome session with the department
+        head. Day two is dedicated to IT and security training, covering
+        password policy, two-factor authentication setup, phishing
+        awareness, and how to request access to internal systems, which
+        typically takes 24 to 48 hours to be granted after being requested
+        during this session. Day three introduces company-wide tools:
+        the project-tracking system, the internal wiki, and the
+        communication platform, along with a session on how expense
+        reports and time-off requests are submitted and approved. Day four
+        is team-specific, where the new hire's manager assigns a starter
+        project, introduces them to immediate teammates, and pairs them
+        with a designated onboarding buddy for their first ninety days. Day
+        five wraps up with a review meeting with HR to answer any
+        remaining questions, followed by a welcome lunch with the wider
+        department. Throughout the first ninety days, new hires have a
+        30-day, 60-day, and 90-day check-in with their manager to discuss
+        progress and adjust goals, and full performance expectations are
+        not applied until after the 90-day mark.
+      evaluated: |
+        Onboarding runs five days: HR and IT setup, tool training, a
+        team-specific day with a starter project and buddy, and a wrap-up
+        with HR. Check-ins follow at 30, 60, and 90 days, with full
+        performance expectations starting after day 90.
+
+  - id: onboarding-policy-verylongref-shortcontent-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        New employees at the company complete a structured five-day
+        onboarding program before joining their team full time. On day one,
+        HR handles paperwork, benefits enrollment, and issues a laptop and
+        building badge, followed by a welcome session with the department
+        head. Day two is dedicated to IT and security training, covering
+        password policy, two-factor authentication setup, phishing
+        awareness, and how to request access to internal systems, which
+        typically takes 24 to 48 hours to be granted after being requested
+        during this session. Day three introduces company-wide tools:
+        the project-tracking system, the internal wiki, and the
+        communication platform, along with a session on how expense
+        reports and time-off requests are submitted and approved. Day four
+        is team-specific, where the new hire's manager assigns a starter
+        project, introduces them to immediate teammates, and pairs them
+        with a designated onboarding buddy for their first ninety days. Day
+        five wraps up with a review meeting with HR to answer any
+        remaining questions, followed by a welcome lunch with the wider
+        department. Throughout the first ninety days, new hires have a
+        30-day, 60-day, and 90-day check-in with their manager to discuss
+        progress and adjust goals, and full performance expectations are
+        not applied until after the 90-day mark.
+      evaluated: |
+        The onboarding program lasts five days. Day one covers HR paperwork
+        and equipment; day two, IT and security setup; day three, the
+        company's core tools; day four, a team-specific starter project
+        with a buddy assigned; and day five, a wrap-up with HR. After that,
+        the new hire has check-ins at the 30, 60, and 90 day marks, and
+        isn't held to full performance expectations until day 90 has
+        passed.

@@ -871,3 +871,172 @@ samples:
         occupied households across the town's five districts.
       evaluated: |
         Riverton has a population of about 9,000.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: wright-brothers-verylong-noref-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        On December 17, 1903, Orville and Wilbur Wright achieved the first
+        sustained, controlled, powered flight of a heavier-than-air machine
+        near Kitty Hawk, North Carolina, at a site called Kill Devil Hills.
+        The brothers had spent years running a bicycle shop in Dayton, Ohio,
+        and used the mechanical skills and small profits from that business
+        to fund their aeronautical experiments. Rather than jumping straight
+        to a powered aircraft, they first built and tested a series of
+        gliders at Kitty Hawk starting in 1900, chosen for its steady winds
+        and soft sand dunes that made crash landings survivable.
+
+        Their key insight, developed through wind-tunnel tests they built
+        themselves after growing skeptical of published aerodynamic data,
+        was a system of three-axis control: wing-warping for roll, a
+        movable rudder for yaw, and an elevator for pitch. This combination
+        let a pilot actively balance the aircraft in flight, which earlier
+        experimenters had largely failed to solve. On the morning of the
+        first flight, Orville piloted the Wright Flyer for 12 seconds,
+        covering about 120 feet, while Wilbur ran alongside to help
+        stabilize the wingtip at launch. They made three more flights that
+        same day, alternating pilots, with the longest — Wilbur's final
+        flight — covering 852 feet in 59 seconds before a gust of wind
+        damaged the aircraft after landing.
+
+        The flight was witnessed by five people from the nearby Kill Devil
+        Hills life-saving station, and one of them, John T. Daniels, took the
+        now-famous photograph of the first flight, a picture he had never
+        operated a camera to take before that morning. Despite the
+        achievement, the event received little press attention at the time;
+        most newspapers either ignored it or ran inaccurate accounts, and it
+        would take several more years of public demonstrations, particularly
+        in France and later at Fort Myer, Virginia, before the brothers were
+        widely credited with the achievement.
+
+        The brothers continued refining their design over the following
+        years, forming the Wright Company in 1909 to manufacture aircraft
+        commercially. Wilbur died of typhoid fever in 1912 at age 45, while
+        Orville lived until 1948, long enough to see aviation transform from
+        a fragile 12-second curiosity into a mature industry that had
+        reshaped warfare, travel, and commerce within his own lifetime. The
+        original 1903 Flyer is now preserved and on permanent display at the
+        Smithsonian National Air and Space Museum in Washington, D.C.
+
+  - id: wright-brothers-verylong-noref-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        On October 3, 1901, Orville and Wilbur Wright achieved the first
+        sustained, controlled, powered flight of a heavier-than-air machine
+        near Cape Hatteras, North Carolina, a coastal town they chose because
+        of its proximity to their family home in Cleveland, Ohio, where they
+        ran a small printing shop that funded their early aviation
+        experiments. Before attempting powered flight, the brothers spent
+        several years testing hot-air balloons at the site, which they later
+        abandoned in favor of fixed-wing designs after concluding that
+        balloons could never be steered reliably.
+
+        Their breakthrough came from a two-axis control system — a single
+        large rudder that handled both roll and yaw simultaneously — which
+        they developed after purchasing detailed wind-tunnel data from a
+        French engineering firm rather than conducting their own tests. On
+        the day of the first flight, Wilbur piloted the aircraft for a full
+        four minutes, covering nearly two miles, while Orville filmed the
+        event using a motion-picture camera borrowed from a local
+        photography studio. The brothers reportedly made only a single
+        flight that day, choosing to end testing early after a minor engine
+        fire damaged one wing.
+
+        The flight was witnessed by a crowd of roughly two hundred local
+        townspeople who had gathered after reading an advance newspaper
+        announcement, and it was front-page news across the country within
+        days, making the Wright brothers instant national celebrities. Their
+        fame spread so quickly that the U.S. Army placed its first aircraft
+        order within the same year, well before any further demonstration
+        flights were needed in Europe.
+
+        The brothers went on to found the Wright Company in 1903, the same
+        year as their first flight, and both brothers lived well into the
+        1950s, working together at the company until Wilbur's retirement.
+        The original aircraft from that first flight was destroyed in a
+        warehouse fire in the 1920s, and only replicas exist today, including
+        one on display at the Smithsonian National Air and Space Museum,
+        which acquired it directly from the Wright family estate in 1955.
+
+  # ═════════ Very-long-reference / short-content cases ═════════
+  - id: everest-verylongref-shortcontent-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Mount Everest, known in Nepali as Sagarmatha and in Tibetan as
+        Chomolungma, stands 8,849 meters above sea level, making it the
+        highest mountain on Earth as measured from sea level. It sits on
+        the border between Nepal and the Tibet Autonomous Region of China,
+        within the Mahalangur Himal sub-range of the Himalayas. The
+        mountain was formed by the collision of the Indian and Eurasian
+        tectonic plates, a process that began roughly 50 million years ago
+        and continues today, meaning Everest is still rising by a few
+        millimeters each year. The peak was first confirmed as the world's
+        highest in 1856 by the Great Trigonometrical Survey of India,
+        though it was known locally by other names long before Western
+        surveyors measured it; the survey team designated it "Peak XV"
+        before it was later renamed after Sir George Everest, a former
+        Surveyor General of India, despite his own objection to having a
+        peak named after him.
+
+        The first confirmed summit was achieved on May 29, 1953, by Sir
+        Edmund Hillary of New Zealand and Tenzing Norgay, a Sherpa
+        mountaineer, as part of a British expedition led by John Hunt. Since
+        then, thousands of climbers have reached the summit, though the
+        mountain remains extremely dangerous: more than 300 people have
+        died attempting the climb, many of whose bodies remain on the
+        mountain because retrieval at extreme altitude is exceptionally
+        difficult and risky. The region above 8,000 meters is often called
+        the "death zone," where oxygen levels are roughly a third of those
+        at sea level, and most climbers use supplemental bottled oxygen to
+        survive there for the short time it takes to summit and descend.
+        Climbing seasons are limited to narrow weather windows, primarily
+        in May before the summer monsoon arrives, and Everest has become
+        increasingly commercialized, with guided expeditions now costing
+        climbers anywhere from 30,000 to well over 100,000 dollars
+        depending on the level of support provided.
+      evaluated: |
+        Everest's summit sits at 8,849 meters, and it was first climbed in
+        1953 by Edmund Hillary and Tenzing Norgay.
+
+  - id: everest-verylongref-shortcontent-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Mount Everest, known in Nepali as Sagarmatha and in Tibetan as
+        Chomolungma, stands 8,849 meters above sea level, making it the
+        highest mountain on Earth as measured from sea level. It sits on
+        the border between Nepal and the Tibet Autonomous Region of China,
+        within the Mahalangur Himal sub-range of the Himalayas. The
+        mountain was formed by the collision of the Indian and Eurasian
+        tectonic plates, a process that began roughly 50 million years ago
+        and continues today, meaning Everest is still rising by a few
+        millimeters each year. The peak was first confirmed as the world's
+        highest in 1856 by the Great Trigonometrical Survey of India,
+        though it was known locally by other names long before Western
+        surveyors measured it; the survey team designated it "Peak XV"
+        before it was later renamed after Sir George Everest, a former
+        Surveyor General of India, despite his own objection to having a
+        peak named after him.
+
+        The first confirmed summit was achieved on May 29, 1953, by Sir
+        Edmund Hillary of New Zealand and Tenzing Norgay, a Sherpa
+        mountaineer, as part of a British expedition led by John Hunt. Since
+        then, thousands of climbers have reached the summit, though the
+        mountain remains extremely dangerous: more than 300 people have
+        died attempting the climb, many of whose bodies remain on the
+        mountain because retrieval at extreme altitude is exceptionally
+        difficult and risky. The region above 8,000 meters is often called
+        the "death zone," where oxygen levels are roughly a third of those
+        at sea level, and most climbers use supplemental bottled oxygen to
+        survive there for the short time it takes to summit and descend.
+        Climbing seasons are limited to narrow weather windows, primarily
+        in May before the summer monsoon arrives, and Everest has become
+        increasingly commercialized, with guided expeditions now costing
+        climbers anywhere from 30,000 to well over 100,000 dollars
+        depending on the level of support provided.
+      evaluated: |
+        Everest is about 7,200 meters tall and was first summited by a
+        French team in the 1930s.

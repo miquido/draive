@@ -767,3 +767,93 @@ samples:
         take hold. One day you give a stranger directions without thinking, and
         you realise the unfamiliar streets have quietly become your own. The
         city stops being a place you are visiting and starts being home.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: language-learning-verylong-fluent-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Learning a new language as an adult is a strange kind of humility.
+        You arrive as someone capable — someone who can argue, joke, and
+        persuade fluently in your own tongue — and within minutes of opening
+        your mouth in the new one, you are reduced to the vocabulary of a
+        curious child. At first this feels like a loss, but it slowly
+        reveals itself as a gift: you start noticing the scaffolding of
+        language itself, the little hinges that native speakers never think
+        about because they were never taught them consciously in the first
+        place.
+
+        The early months are the hardest, not because the grammar is
+        difficult, but because progress is invisible from the inside. You
+        listen to a conversation and catch perhaps one word in five, and it
+        is genuinely hard to believe that this fog will ever lift. Then, one
+        ordinary afternoon, you understand an entire sentence without
+        translating it in your head first, and the sentence after that, and
+        you realize the fog has been thinning for weeks without your
+        noticing. Fluency rarely arrives as a single dramatic moment; it
+        arrives the way a tide comes in, so gradually that you only notice
+        it by comparing where the water used to be.
+
+        There is also an unexpected emotional dimension to it. Certain words
+        in the new language carry no baggage at all, and saying them feels
+        lighter than saying their equivalents at home — a kind of temporary
+        escape from the version of yourself that speaks your first language.
+        Other words resist translation entirely, carrying a texture that
+        simply does not exist in English, and learning to feel the shape of
+        that texture, rather than merely memorizing a dictionary
+        approximation of it, is one of the quiet joys of the whole process.
+
+        Mistakes stop mattering nearly as much as you feared they would.
+        Native speakers are, almost without exception, generous toward
+        someone visibly trying, and the embarrassment you rehearsed in
+        advance rarely shows up in the room. What does show up, again and
+        again, is warmth: a shopkeeper who slows down and repeats a phrase
+        patiently, a stranger who switches effortlessly into simpler
+        vocabulary without ever making you feel small for needing it. In
+        the end, the language you gain is only half the reward; the other
+        half is the reminder that being a beginner again, in your forties or
+        your sixties, is not a humiliation but a privilege most adults
+        rarely allow themselves.
+
+  - id: language-learning-verylong-disfluent-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Learning a new language when you are adult is a strange kind of
+        humility, is what many peoples say. You arrive like someone who is
+        capable — someone who can arguing, joking, and persuade fluent in
+        your own tongues — and within minutes for opening your mouth in the
+        new one, you was reduced to the vocabulary of curious child. At
+        first this feel like a loss, but it slow reveal itself for a gift:
+        you start to noticing the scaffolding of language himself, the
+        little hinges what native speakers never thinks about it because
+        they was never teached them consciously in a first place.
+
+        The early months is the more hardest, not because the grammar are
+        difficult, but because the progress is invisible from inside. You
+        are listening a conversation and you catch perhaps one word between
+        five, and it being genuinely hard for believe that this fog will
+        ever lifting. Then, on ordinary afternoon, you understanding an
+        entire sentence without translate it in your head first, and the
+        sentence after that one, and you are realizing the fog has been
+        thinning since weeks without you was noticing it. Fluency rare
+        arrive like a single dramatic moment; it arrive the way a tide is
+        coming in, so gradual that you only notice by comparing where was
+        the water used to be at.
+
+        There is also a unexpected emotional dimension for it. Certain
+        words in the new language is carrying no baggage at all, and to say
+        them feel more light than to say their equivalent at home — a kind
+        of temporary escaping from the version of you what speak your first
+        language. Other words is resisting translation entire, carrying a
+        texture what simply not exist in English, and to learn feeling the
+        shape of that texture, rather than only memorize a dictionary
+        approximation for it, is one of the quiet joy of a whole process.
+
+        Mistakes is stop mattering nearly so much as you was fearing it
+        would. Native speaker is, almost without exception, generous toward
+        someone who visible trying, and the embarrassment you was rehearsing
+        in advance rare show up in the room. What is show up, again and
+        again, is warmth: a shopkeeper who slow down and repeat a phrase
+        patient, a stranger who switch effortless into more simple
+        vocabulary without never make you feeling small for needing it.
