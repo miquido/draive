@@ -1377,3 +1377,178 @@ samples:
         humidity, and the expected trend through the rest of the day and night.
       evaluated: |
         Tomatoes grow best in full sun and well-drained soil.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: marathon-training-verylong-ontopic-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A comprehensive guide to training for a first marathon, covering
+        base mileage, long runs, nutrition, and injury prevention.
+      evaluated: |
+        Building a base is the foundation of any marathon plan, and it
+        should come before anything else. For the first four to six weeks,
+        focus purely on running consistently at an easy, conversational
+        pace three to five times a week, gradually raising total weekly
+        mileage by no more than 10 percent from one week to the next. This
+        phase feels unglamorous, but skipping it is the single most common
+        reason first-time marathoners get injured once the harder training
+        begins.
+
+        Once a solid base is in place, the long run becomes the centerpiece
+        of the week. Add one to two miles to your longest run every one or
+        two weeks, with an easier "step-back" week every third or fourth
+        week where the long run shortens to let your body absorb the
+        training. Most first-time plans peak somewhere between 18 and 21
+        miles for the longest training run, taken two to three weeks before
+        race day, leaving enough time to recover fully before tapering.
+
+        Nutrition matters both day to day and specifically around long runs.
+        On a daily basis, carbohydrates should make up the bulk of a
+        marathon trainee's calories, since they are the primary fuel for
+        the mileage being logged. Before any run over 90 minutes, practice
+        eating a carbohydrate-rich meal two to three hours beforehand, and
+        during runs over that length, practice taking in 30 to 60 grams of
+        carbohydrate per hour through gels, chews, or sports drink — race
+        day is never the time to try a new fueling strategy for the first
+        time.
+
+        Injury prevention deserves equal attention to the mileage itself.
+        Strength training twice a week, focused on the hips, glutes, and
+        core, meaningfully reduces the most common marathon injuries, which
+        tend to involve the knee and IT band rather than sudden dramatic
+        tears. Rotate running shoes between two pairs, replace them every
+        300 to 500 miles, and treat any pain that changes your gait as a
+        signal to rest immediately rather than push through it, since a
+        few missed days of training is far cheaper than the six to eight
+        weeks a stress fracture can cost you. Finally, taper properly in the
+        final two to three weeks by cutting volume while keeping some
+        intensity, so you arrive at the starting line rested rather than
+        undertrained.
+
+  - id: marathon-training-verylong-driftoff-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A comprehensive guide to training for a first marathon, covering
+        base mileage, long runs, nutrition, and injury prevention.
+      evaluated: |
+        Building a base is the foundation of any marathon plan, and it
+        should come before anything else. For the first few weeks, focus on
+        running consistently at an easy pace a few times a week, gradually
+        raising your weekly mileage rather than jumping in too fast.
+
+        Speaking of building things gradually, that same idea has honestly
+        shaped how I think about my whole career. When I started out, I
+        spent my first couple of years just showing up and learning the
+        basics of my industry before trying to take on anything ambitious,
+        and looking back, that patience paid off enormously. If there's one
+        piece of career advice I'd give anyone starting out in any field,
+        it's to resist the urge to skip the boring foundational years,
+        because that's where the real skills quietly get built.
+
+        On a completely different note, I ran my first marathon in Boston,
+        and the city itself is honestly worth a trip even if you have no
+        interest in running. The Freedom Trail winds through the historic
+        downtown past sites from the American Revolution, and you can walk
+        the whole thing in an afternoon if you're reasonably fit. The food
+        scene has come a long way too — the North End has some of the best
+        Italian restaurants outside of Italy itself, and I'd recommend
+        booking a table well in advance if you're visiting during a busy
+        season, since the good places fill up fast.
+
+        Getting back to training in general, a lot of people ask me about
+        gear, and honestly, I think the running shoe industry has become
+        oversaturated with marketing claims that don't hold up to much
+        scrutiny. There are so many models released every year, each
+        promising some breakthrough in cushioning technology, that it's
+        genuinely hard for a casual runner to tell which improvements are
+        real and which are just clever advertising copy dressed up in
+        technical-sounding language.
+
+        Anyway, if you do end up in Boston for a race, I'd also suggest
+        setting aside a day to visit one of the art museums, since the city
+        has a surprisingly strong museum scene for its size, and it's a
+        nice, low-impact way to spend a rest day with your legs up rather
+        than wandering around a hotel room being bored the day before a big
+        race.
+
+  # ═════════ Very-long-reference / short-content cases ═════════
+  - id: coral-reef-verylongref-shortcontent-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Coral reefs are built by colonies of tiny animals called coral
+        polyps, which secrete calcium carbonate skeletons that accumulate
+        over centuries into the vast reef structures visible from space,
+        like Australia's Great Barrier Reef. Each polyp hosts microscopic
+        algae called zooxanthellae in a symbiotic relationship: the algae
+        photosynthesize and share sugars with the coral, while the coral
+        provides the algae shelter and compounds needed for
+        photosynthesis, and this partnership is also what gives healthy
+        coral its vivid color. Reefs cover less than one percent of the
+        ocean floor but support roughly a quarter of all known marine
+        species at some stage of their life cycle, making them among the
+        most biodiverse ecosystems on the planet, often compared to
+        rainforests in the density and variety of life they sustain.
+
+        Reefs also provide substantial value to humans: they buffer
+        coastlines from storm surge and erosion, support fishing
+        industries that feed hundreds of millions of people, and generate
+        significant tourism revenue in many coastal economies. However,
+        reefs are highly sensitive to temperature; when water gets even
+        one or two degrees Celsius warmer than the local seasonal maximum
+        for a sustained period, polyps expel their symbiotic algae in a
+        stress response known as coral bleaching, which leaves the coral
+        white and, if conditions don't improve within weeks, often leads
+        to the coral's death. Rising ocean temperatures linked to climate
+        change have made mass bleaching events dramatically more frequent
+        over the past few decades, alongside other stressors like ocean
+        acidification, which makes it harder for polyps to build their
+        skeletons in the first place, and localized pollution and
+        overfishing, which weaken a reef's ability to recover between
+        stress events.
+      evaluated: |
+        Coral polyps build reef structures over centuries through a
+        symbiotic relationship with algae that gives coral its color.
+        Warming ocean temperatures cause bleaching, and combined with
+        acidification, this is putting these biodiversity-rich ecosystems
+        under serious threat.
+
+  - id: coral-reef-verylongref-shortcontent-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Coral reefs are built by colonies of tiny animals called coral
+        polyps, which secrete calcium carbonate skeletons that accumulate
+        over centuries into the vast reef structures visible from space,
+        like Australia's Great Barrier Reef. Each polyp hosts microscopic
+        algae called zooxanthellae in a symbiotic relationship: the algae
+        photosynthesize and share sugars with the coral, while the coral
+        provides the algae shelter and compounds needed for
+        photosynthesis, and this partnership is also what gives healthy
+        coral its vivid color. Reefs cover less than one percent of the
+        ocean floor but support roughly a quarter of all known marine
+        species at some stage of their life cycle, making them among the
+        most biodiverse ecosystems on the planet, often compared to
+        rainforests in the density and variety of life they sustain.
+
+        Reefs also provide substantial value to humans: they buffer
+        coastlines from storm surge and erosion, support fishing
+        industries that feed hundreds of millions of people, and generate
+        significant tourism revenue in many coastal economies. However,
+        reefs are highly sensitive to temperature; when water gets even
+        one or two degrees Celsius warmer than the local seasonal maximum
+        for a sustained period, polyps expel their symbiotic algae in a
+        stress response known as coral bleaching, which leaves the coral
+        white and, if conditions don't improve within weeks, often leads
+        to the coral's death. Rising ocean temperatures linked to climate
+        change have made mass bleaching events dramatically more frequent
+        over the past few decades, alongside other stressors like ocean
+        acidification, which makes it harder for polyps to build their
+        skeletons in the first place, and localized pollution and
+        overfishing, which weaken a reef's ability to recover between
+        stress events.
+      evaluated: |
+        Scuba diving is a popular hobby, and getting certified usually
+        takes a weekend course plus a few open-water dives.

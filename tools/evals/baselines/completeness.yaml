@@ -1356,3 +1356,174 @@ samples:
         familiar-smelling blanket, speak quietly, and ask your vet ahead of time
         whether a calming aid is appropriate. That covers the carrier, the
         rules, security, and in-flight comfort.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: accounting-switch-verylong-perfect
+    human_score: perfect
+    inputs:
+      user_query: |
+        I'm planning to switch my small business's accounting software this
+        quarter. Walk me through how to choose a replacement, how to migrate
+        historical data without losing anything, how to train my three
+        employees on the new system, and how to handle the transition period
+        so invoicing and payroll aren't interrupted.
+      evaluated: |
+        Choosing a replacement: start by listing what your current system
+        does that you actually rely on — invoicing, payroll, inventory,
+        multi-currency, whatever it is — and treat that as your minimum bar.
+        Shortlist two or three platforms that meet it, then run each through
+        a free trial using a copy of a real month of your data rather than
+        the vendor's demo data, since that is the only way to see how it
+        handles your specific quirks (odd tax rules, recurring invoices,
+        contractor payments). Weigh ongoing cost against time saved, and
+        check that it integrates with your bank and any point-of-sale tool
+        you already use.
+
+        Migrating historical data: export everything from the old system in
+        the most granular format it offers — usually CSV or a direct
+        accountant's export — covering the chart of accounts, open invoices,
+        vendor and customer records, and at least the last two to three years
+        of transactions for audit purposes. Before importing anything into
+        the new system, reconcile the exported totals against your old
+        system's reports so you know the export itself is complete. Import in
+        stages — chart of accounts first, then customers and vendors, then
+        historical transactions — and after each stage run a trial balance in
+        the new system and compare it line by line to the old one. Keep the
+        old system accessible (even in a read-only state) for at least a year
+        in case you need to look something up.
+
+        Training your three employees: don't try to train everyone on
+        everything at once. Split it by role — whoever handles invoicing
+        needs the invoicing and customer workflows, whoever runs payroll
+        needs that module and how it talks to your bank, and so on — and have
+        each person practice on the imported historical data rather than a
+        blank sandbox, since that surfaces the exact screens they'll actually
+        use. Most vendors offer short onboarding sessions or video libraries
+        aimed at each role; book those in the same week as the data
+        migration so the training is fresh when they start using the system
+        for real. Plan for a slower first two weeks and build that
+        expectation into everyone's workload.
+
+        Handling the transition without interrupting invoicing or payroll:
+        run both systems in parallel for one full billing cycle rather than
+        cutting over all at once. Keep issuing invoices from the old system
+        until the new one has been validated with a handful of real
+        low-stakes invoices, then switch new invoices to the new system while
+        the old one stays open only to receive payments against invoices it
+        already issued. For payroll specifically, run at least one full
+        payroll cycle in the new system in parallel with the old one before
+        making it the system of record, comparing every employee's net pay
+        line by line, since a payroll mistake is the fastest way to lose
+        staff trust in the switch. Pick a cutover date that falls right after
+        a payroll run and a billing cycle close, not in the middle of one, so
+        neither process is caught half-finished when you flip the switch.
+
+  - id: accounting-switch-verylong-padded-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I'm planning to switch my small business's accounting software this
+        quarter. Walk me through how to choose a replacement, how to migrate
+        historical data without losing anything, how to train my three
+        employees on the new system, and how to handle the transition period
+        so invoicing and payroll aren't interrupted.
+      evaluated: |
+        That's a great question, and I really appreciate you taking the time
+        to think carefully about something as important as your business's
+        accounting software, because at the end of the day, the financial
+        backbone of any organization is absolutely critical to its long-term
+        success, and it's wonderful that you're being proactive about this
+        rather than waiting until something goes wrong. Switching software is
+        a journey, not just a task, and like any journey it helps to remember
+        why you're taking it in the first place: presumably to save time,
+        reduce errors, and set your business up for smoother growth in the
+        years ahead.
+
+        When it comes to accounting software in general, there really are so
+        many options out there today, more than ever before, and the market
+        keeps evolving every year with new features, new integrations, and
+        new pricing models, which honestly can feel overwhelming if you let
+        it. Some people prefer cloud-based tools because of the flexibility,
+        while others still like having something installed locally, and
+        there isn't necessarily a single right answer for everyone — it
+        really depends on your unique situation, your goals, and what feels
+        right for your team.
+
+        It's also worth saying that change of any kind can be stressful for
+        employees, and it's natural for people to feel a little uneasy when
+        the tools they're used to are replaced with something new. Being
+        patient, communicating openly, and celebrating small wins along the
+        way can go a long way toward keeping morale high during a period of
+        transition. Many business owners find that involving their team early
+        in the process, rather than presenting them with a finished decision,
+        helps everyone feel more invested in making the change succeed.
+
+        At the end of the day, the most important thing is to stay organized,
+        keep good records, and not be afraid to ask for help if you need it —
+        whether that's from the software vendor's support team, a
+        professional bookkeeper, or your accountant. Trust the process, take
+        it one step at a time, and remember that plenty of businesses go
+        through exactly this kind of transition every single quarter and come
+        out the other side just fine. Good luck with the switch — you've got
+        this!
+
+  # ═════════ Very-long-query / short-content cases ═════════
+  - id: home-purchase-verylongquery-shortcontent-good
+    human_score: good
+    inputs:
+      user_query: |
+        My partner and I are buying our first home and the process feels
+        overwhelming, so I want to make sure we're not missing anything
+        important. We've already been pre-approved for a mortgage, and
+        we've found a house we like that's listed at 340,000 dollars. Before
+        we make an offer, what do we need to know about how much to
+        actually offer compared to the asking price? Once an offer is
+        accepted, what happens during the inspection period, and what kinds
+        of problems found during inspection are usually worth walking away
+        over versus just negotiating a credit for? We've also heard about
+        something called an appraisal that's separate from the inspection —
+        what is that for, and what happens if the house appraises for less
+        than what we offered? On the financial side, beyond the down
+        payment, what other costs should we budget for at closing, and
+        roughly how much should we set aside for those? Finally, is there
+        anything specific to first-time buyers, like assistance programs or
+        tax credits, that we should be asking our lender or agent about
+        before we get further into this?
+      evaluated: |
+        Offer close to asking in a normal market; your agent can tell you if
+        it's a buyer's or seller's market locally. During inspection, walk
+        away over foundation or major structural issues, negotiate credits
+        for smaller fixable things like an old water heater. The appraisal
+        protects the lender; if it comes in low you can renegotiate, pay the
+        difference, or walk away depending on your contract. Budget 2-5% of
+        the price for closing costs on top of your down payment. Definitely
+        ask about first-time-buyer programs — many states have down-payment
+        assistance you might qualify for.
+
+  - id: home-purchase-verylongquery-shortcontent-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        My partner and I are buying our first home and the process feels
+        overwhelming, so I want to make sure we're not missing anything
+        important. We've already been pre-approved for a mortgage, and
+        we've found a house we like that's listed at 340,000 dollars. Before
+        we make an offer, what do we need to know about how much to
+        actually offer compared to the asking price? Once an offer is
+        accepted, what happens during the inspection period, and what kinds
+        of problems found during inspection are usually worth walking away
+        over versus just negotiating a credit for? We've also heard about
+        something called an appraisal that's separate from the inspection —
+        what is that for, and what happens if the house appraises for less
+        than what we offered? On the financial side, beyond the down
+        payment, what other costs should we budget for at closing, and
+        roughly how much should we set aside for those? Finally, is there
+        anything specific to first-time buyers, like assistance programs or
+        tax credits, that we should be asking our lender or agent about
+        before we get further into this?
+      evaluated: |
+        Buying your first home is such an exciting milestone! It's totally
+        normal to feel a bit overwhelmed — everyone does. Just take it one
+        step at a time, lean on your agent for guidance, and trust that
+        things tend to work out. Congratulations on finding a place you
+        like!

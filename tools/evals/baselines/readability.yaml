@@ -1175,3 +1175,100 @@ samples:
         paper into the tray, then connect the printer to your wifi by choosing
         your network on the little screen and entering the password. Finally,
         print the test page from the screen's menu to confirm everything works.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: recipe-guide-verylong-readable-good
+    human_score: good
+    inputs:
+      guidelines: |
+        Audience: a home cook who has never made bread before.
+      evaluated: |
+        Making your first loaf of bread is easier than it looks, and this
+        guide will walk you through it one simple step at a time. Start by
+        mixing 500 grams of plain flour with 7 grams of instant yeast and 10
+        grams of salt in a large bowl — keep the salt and the yeast on
+        opposite sides of the bowl at first, since salt can slow the yeast
+        down if they touch before mixing. Add 320 milliliters of warm water,
+        not hot, and stir with a wooden spoon until you get a rough, shaggy
+        dough with no dry flour left at the bottom of the bowl.
+
+        Next comes kneading, which just means working the dough with your
+        hands to make it smooth and stretchy. Tip the dough onto a lightly
+        floured counter and push it away from you with the heel of your
+        hand, fold it back over itself, turn it a quarter turn, and repeat.
+        Do this for about ten minutes. At first the dough will feel sticky
+        and messy, but keep going — it will gradually become smoother and
+        springier, and that change is exactly how you know it's ready.
+
+        Once kneaded, place the dough back in a clean, lightly oiled bowl,
+        cover it with a damp towel or plastic wrap, and leave it somewhere
+        warm for about an hour, or until it has roughly doubled in size.
+        This waiting step is called proofing, and it's when the yeast does
+        its real work, filling the dough with tiny bubbles of gas that will
+        become the airy texture of the finished loaf. Don't rush this part;
+        a warm kitchen corner or the inside of a switched-off oven with the
+        light on works well.
+
+        After it has doubled, gently push the air out of the dough with your
+        fist — this is called knocking back — and shape it into a ball or a
+        loaf shape, then place it in a greased loaf tin or on a baking tray.
+        Cover it again and let it rise a second time for about 30 to 45
+        minutes. While it rises this second time, heat your oven to 220
+        degrees Celsius so it's fully hot and ready when the dough is.
+
+        Bake the loaf for about 25 to 30 minutes, until the crust is a deep
+        golden brown. To check it's properly cooked, take it out of the tin
+        and tap the bottom with your knuckle — it should sound hollow, a bit
+        like knocking on a door. If it sounds dense or dull, put it back in
+        for another five minutes and check again. Once it's done, let the
+        loaf cool completely on a wire rack before slicing; cutting into hot
+        bread squashes the crumb and lets too much steam escape, so as hard
+        as it is to wait, a fully cooled loaf really does slice and taste
+        better.
+
+  - id: research-abstract-verylong-jargon-poor
+    human_score: poor
+    inputs:
+      guidelines: |
+        Audience: a general reader with no scientific background.
+      evaluated: |
+        This investigation elucidates the pharmacokinetic and
+        pharmacodynamic interplay governing the bioavailability of orally
+        administered lipophilic compounds subjected to first-pass hepatic
+        metabolism via cytochrome P450 3A4-mediated oxidative
+        biotransformation pathways. Utilizing a randomized, double-blind,
+        placebo-controlled crossover design across four sequential dosing
+        cohorts, we quantified plasma concentration-time profiles through
+        high-performance liquid chromatography coupled with tandem mass
+        spectrometry, deriving area-under-the-curve parameters and terminal
+        elimination half-lives via non-compartmental analysis.
+
+        Preliminary findings indicate a statistically significant
+        attenuation in systemic exposure among subjects co-administered a
+        known CYP3A4 inducer, consistent with enzyme-mediated upregulation
+        of hepatic clearance mechanisms and a concomitant reduction in
+        absolute oral bioavailability relative to the monotherapy arm.
+        Conversely, co-administration with a potent CYP3A4 inhibitor
+        precipitated a marked elevation in peak plasma concentration and a
+        prolongation of the terminal elimination phase, suggesting
+        competitive inhibition at the enzymatic active site with attendant
+        implications for dose-adjustment protocols in polypharmacy contexts.
+
+        Secondary endpoints encompassed an assessment of interindividual
+        pharmacogenomic variability, wherein genotyping for known CYP3A4 and
+        CYP3A5 polymorphisms was cross-referenced against observed
+        metabolic phenotypes, revealing a bimodal distribution suggestive of
+        extensive versus poor metabolizer subpopulations within the cohort.
+        This heterogeneity underscores the potential utility of
+        pharmacogenomic stratification in future dose-optimization
+        paradigms, particularly within therapeutic contexts characterized
+        by a narrow therapeutic index and attendant risk of subtherapeutic
+        or supratherapeutic exposure.
+
+        Taken together, these findings substantiate the hypothesis that
+        concomitant modulation of hepatic oxidative metabolism constitutes a
+        clinically significant determinant of interpatient pharmacokinetic
+        variability, warranting further investigation via a
+        pharmacogenomically stratified prospective trial to delineate
+        optimal dosing algorithms across the full spectrum of metabolizer
+        phenotypes identified herein.

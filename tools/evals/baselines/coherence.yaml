@@ -1237,3 +1237,206 @@ samples:
       evaluated: |
         Plants use sunlight to split water and combine the carbon from carbon
         dioxide with hydrogen to make glucose, releasing oxygen.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: immune-system-verylong-coherent-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The immune system defends the body using innate defenses that respond
+        immediately to any threat and adaptive defenses that learn to target
+        specific pathogens and remember them for the future.
+      evaluated: |
+        The body's first line of defense is entirely physical and chemical, and
+        it never has to think about what it is fighting. Unbroken skin keeps
+        most microbes out simply by being a wall, while mucous membranes lining
+        the airways and gut trap invaders in sticky secretions and sweep them
+        out with cilia or stomach acid. Because these barriers work the same
+        way against every germ, they are called innate defenses, and they are
+        ready before an infection ever begins.
+
+        When something does get through — a splinter carrying bacteria, say —
+        the innate system escalates. Cells called macrophages patrol the
+        tissue and swallow anything that looks foreign, while a chemical alarm
+        brings neutrophils rushing in from the bloodstream within minutes.
+        This rush of cells and fluid is what produces the redness, heat, and
+        swelling known as inflammation; it is not a malfunction but a
+        deliberate flood of reinforcements to the site of trouble. Macrophages
+        that eat an invader also carry pieces of it to nearby lymph nodes, and
+        this is the hinge point where the story shifts to something slower and
+        far more precise.
+
+        In the lymph nodes, specialized cells present those captured fragments
+        to T cells and B cells, the core of the adaptive immune system. Unlike
+        the innate responders, each T cell and B cell recognizes only one
+        specific shape, but the body carries millions of different versions,
+        so that among that vast library there is almost always a match for
+        whatever has invaded. Once a matching B cell finds its target, it
+        multiplies rapidly and starts pouring out antibodies — Y-shaped
+        proteins that latch onto the invader, mark it for destruction, and
+        block it from infecting new cells. Matching T cells multiply as well:
+        some directly kill infected cells, while others coordinate the wider
+        response, calling in more immune cells and keeping the reaction
+        focused.
+
+        This adaptive response takes days to ramp up the first time, which is
+        why a new infection often makes a person feel worse before it gets
+        better — the innate system is holding the line while the adaptive
+        system builds its custom-fitted weapons. But once the battle is won, a
+        portion of the activated B cells and T cells do not disappear; they
+        persist for years as memory cells. If the same pathogen ever returns,
+        those memory cells recognize it instantly and mount a full antibody
+        response within hours instead of days, often clearing the threat
+        before any symptoms appear at all.
+
+        Vaccination exploits exactly this memory mechanism without requiring
+        an actual illness. By exposing the immune system to a harmless piece
+        or weakened version of a pathogen, a vaccine lets the body build the
+        same library of memory cells it would have gained from surviving the
+        disease, but without the risk of the disease itself. That is the full
+        arc: barriers that block, innate cells that respond fast but
+        generically, adaptive cells that respond slower but precisely, and
+        memory that turns a single encounter into lasting protection.
+
+  - id: immune-system-verylong-fragmented-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The immune system defends the body using innate defenses that respond
+        immediately to any threat and adaptive defenses that learn to target
+        specific pathogens and remember them for the future.
+      evaluated: |
+        White blood cells. The skin is a barrier. Antibodies. Inflammation is
+        red and hot. Memory cells remember things. Vaccines use weakened
+        germs. T cells kill stuff. Neutrophils arrive fast. Lymph nodes are
+        small. B cells make antibodies. Innate is first, adaptive is second,
+        but also bacteria exist. Mucus traps germs. Fever happens sometimes.
+        The spleen filters blood. Antibodies are Y-shaped. Some infections
+        take days. Macrophages eat things. Allergies are the immune system
+        overreacting. Autoimmune disease is the opposite problem. Cytokines
+        are signaling molecules. Skin heals itself. Chickenpox gives lifetime
+        immunity, usually. The thymus trains T cells when you're young. Pus is
+        dead cells. Colds are viruses, not bacteria. Antibiotics don't work on
+        viruses. Interferons interfere with viruses. Natural killer cells are
+        a type of white blood cell. Booster shots exist. The tonsils are
+        lymph tissue. Histamine causes swelling. Bone marrow makes blood
+        cells. Immunity can fade over time. Newborns get some immunity from
+        their mothers. Stress can weaken immunity, maybe. Sleep is also
+        important somehow. Vitamin C gets mentioned a lot. Hand-washing
+        removes germs physically. Masks block some particles. Quarantine
+        stops spread. Some people are immunocompromised. Organ transplants
+        need immune suppression. Scabs form over cuts. Saliva has enzymes in
+        it. Tears also have enzymes. The gut has bacteria that help digestion
+        and also somehow the immune system. Cancer cells can hide from immune
+        detection sometimes. Immunotherapy is a cancer treatment. Blood types
+        are a different thing but also involve antibodies. The immune system
+        is complicated and involves many types of cells doing many different
+        jobs at different times in different places throughout the whole body
+        constantly, and also there are lymphocytes, and also the liver does
+        something, and inflammation again, mentioned twice now, on purpose or
+        not it is unclear, and finally: cells, defense, protection, health.
+
+  # ═════════ Very-long-reference / short-content cases ═════════
+  - id: vaccine-pipeline-verylongref-shortcontent-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        Developing a new vaccine begins with preclinical research, where
+        scientists identify a target antigen — a piece of a virus or
+        bacterium that can train the immune system without causing disease
+        — and test candidate formulations in cell cultures and animal
+        models. This stage typically takes two to four years and is used to
+        establish a plausible immune response and an acceptable initial
+        safety profile before any human is exposed to the candidate.
+
+        If preclinical results are promising, the vaccine moves into Phase 1
+        trials, small studies of a few dozen healthy volunteers designed
+        primarily to check safety and find an appropriate dose, with immune
+        response measured as a secondary goal. Phase 2 expands to several
+        hundred participants, often across different age groups, to refine
+        the dose, gather more safety data, and get a clearer picture of the
+        immune response the vaccine produces. Phase 3 is the largest and
+        most expensive stage, typically enrolling tens of thousands of
+        participants across multiple sites and comparing vaccinated
+        volunteers against a placebo group to measure real-world efficacy
+        against the disease itself, while continuing to monitor for rare
+        side effects that smaller trials are too small to detect.
+
+        Once Phase 3 data is complete, the manufacturer submits a detailed
+        application to the relevant regulator — such as the FDA in the
+        United States or the EMA in Europe — which independently reviews
+        the trial data, inspects manufacturing facilities, and evaluates
+        whether the demonstrated benefits outweigh the observed risks
+        before granting approval or emergency authorization. Manufacturing
+        is scaled up in parallel with the trials, since building and
+        validating production lines capable of making millions of doses
+        under strict quality controls takes years and cannot simply begin
+        after approval is granted.
+
+        Even after approval, the vaccine enters a post-market surveillance
+        phase, sometimes called Phase 4, during which health agencies
+        continue to track side effects and effectiveness across the much
+        larger and more diverse population that receives the vaccine once
+        it's in general use, since rare side effects — occurring in one in
+        a hundred thousand people or fewer — often only become statistically
+        visible once millions of doses have been given. This ongoing
+        monitoring is what allows regulators to update guidance, adjust
+        dosing schedules, or in rare cases withdraw a vaccine if a
+        previously undetected risk emerges.
+      evaluated: |
+        Vaccine development moves through preclinical research, then three
+        phases of human trials that build from a handful of volunteers to
+        tens of thousands, then regulatory review, and finally ongoing
+        safety monitoring after approval, with manufacturing scaled up
+        alongside the trials rather than afterward.
+
+  - id: vaccine-pipeline-verylongref-shortcontent-poor
+    human_score: poor
+    inputs:
+      reference: |
+        Developing a new vaccine begins with preclinical research, where
+        scientists identify a target antigen — a piece of a virus or
+        bacterium that can train the immune system without causing disease
+        — and test candidate formulations in cell cultures and animal
+        models. This stage typically takes two to four years and is used to
+        establish a plausible immune response and an acceptable initial
+        safety profile before any human is exposed to the candidate.
+
+        If preclinical results are promising, the vaccine moves into Phase 1
+        trials, small studies of a few dozen healthy volunteers designed
+        primarily to check safety and find an appropriate dose, with immune
+        response measured as a secondary goal. Phase 2 expands to several
+        hundred participants, often across different age groups, to refine
+        the dose, gather more safety data, and get a clearer picture of the
+        immune response the vaccine produces. Phase 3 is the largest and
+        most expensive stage, typically enrolling tens of thousands of
+        participants across multiple sites and comparing vaccinated
+        volunteers against a placebo group to measure real-world efficacy
+        against the disease itself, while continuing to monitor for rare
+        side effects that smaller trials are too small to detect.
+
+        Once Phase 3 data is complete, the manufacturer submits a detailed
+        application to the relevant regulator — such as the FDA in the
+        United States or the EMA in Europe — which independently reviews
+        the trial data, inspects manufacturing facilities, and evaluates
+        whether the demonstrated benefits outweigh the observed risks
+        before granting approval or emergency authorization. Manufacturing
+        is scaled up in parallel with the trials, since building and
+        validating production lines capable of making millions of doses
+        under strict quality controls takes years and cannot simply begin
+        after approval is granted.
+
+        Even after approval, the vaccine enters a post-market surveillance
+        phase, sometimes called Phase 4, during which health agencies
+        continue to track side effects and effectiveness across the much
+        larger and more diverse population that receives the vaccine once
+        it's in general use, since rare side effects — occurring in one in
+        a hundred thousand people or fewer — often only become statistically
+        visible once millions of doses have been given. This ongoing
+        monitoring is what allows regulators to update guidance, adjust
+        dosing schedules, or in rare cases withdraw a vaccine if a
+        previously undetected risk emerges.
+      evaluated: |
+        Trials. Antigen is a word. FDA approves things. Phase 3 is big.
+        Manufacturing, somehow. Side effects sometimes. Years it takes.
+        Monitoring after, also volunteers, and placebo.

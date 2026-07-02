@@ -678,3 +678,102 @@ samples:
         sail, the face of someone she had stopped letting herself remember. The
         townsfolk below called her mad. They had never tried, she thought, to
         say something kind to the weather and wait long enough for it to answer.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: cartographer-verylong-creative-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Mira didn't map coastlines or mountain ranges; she mapped the exact
+        moment a feeling changed its mind. Her ledger of the town was drawn
+        not in roads but in isobars of longing, contour lines that thickened
+        wherever grief pooled in low places and thinned to nothing over the
+        bakery, which she had marked, in tiny copperplate, as a permanent
+        high-pressure zone of contentment. Clients came to her the way
+        people once came to cartographers for safe passage: a widower who
+        wanted to know exactly where, on his daily walk, the ache would
+        spike so he could plan a detour; a boy who wanted to know if the
+        nervousness he felt near a certain doorway was fear or something he
+        hadn't learned the name for yet.
+
+        She surveyed the way an old-world mapmaker surveyed unclaimed
+        territory — on foot, slowly, taking readings with instruments she'd
+        built herself. A brass dial on her wrist did not measure heat or
+        wind but the particular electricity of a room right after someone
+        has almost, but not quite, said the true thing. She marked those
+        places with a small unfilled circle, meaning: return here later, this
+        will finish becoming something. Some circles waited on her master map
+        for years. One, above a park bench near the river, had waited so long
+        that moss had grown over the actual bench before the feeling it
+        marked ever resolved, and when it finally did — two strangers, a
+        dropped umbrella, an unlikely marriage — she filled the circle in
+        with the same quiet satisfaction a surveyor feels closing a triangle
+        of measurements to zero.
+
+        The town's mayor, practical to a fault, once asked her to make
+        something useful — a map of where morale was lowest in the municipal
+        offices, so he could route a raise or a compliment like a road crew
+        patching potholes. Mira refused, gently. Feelings weren't potholes,
+        she told him; you couldn't pour asphalt over an unhappiness and drive
+        across it the next morning as though it had never been there. What
+        she could do, she said, was show him where the town's grief and its
+        joy sat close enough together that either might spread to the other
+        with a little encouragement — a bus stop next to a hospital, a
+        bakery next to a courthouse — and let him decide, as a person and not
+        an engineer, what to do with that.
+
+        In her back room, unrolled across a table too small for it, sat the
+        map she never showed anyone: a survey of her own interior weather,
+        decades of tiny readings taken in secret, one contour line at a time,
+        charting a coastline that kept quietly redrawing itself no matter how
+        carefully she pinned down its edges. She had learned, from a lifetime
+        of surveying other people's terrain, that the only country that never
+        finishes being mapped is the one you live in yourself, and she found,
+        to her surprise, that she didn't mind. A cartographer who ever
+        finished her own map, she thought, would have nothing left worth
+        walking toward.
+
+  - id: hero-journey-verylong-cliche-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        It was a dark and stormy night, the kind of night where the wind
+        howled like a wolf and the rain fell in sheets, as young Ethan stood
+        at the crossroads of destiny, not knowing that his life was about to
+        change forever. Little did he know that he was, in fact, the chosen
+        one, the last of an ancient bloodline prophesied to rise when all
+        hope seemed lost. Against all odds, he would have to journey into
+        the unknown, facing dangers he could never have imagined, in order
+        to save the kingdom from certain doom.
+
+        Ethan had always felt different, like he didn't quite belong,
+        an outsider in his own village, but he never could have guessed the
+        truth: that deep down, he had always been destined for greatness. As
+        fate would have it, a wise old mentor appeared at just the right
+        moment, as if the universe itself had sent him, to reveal the truth
+        that would change everything. "You are the one we've been waiting
+        for," the mentor said, his eyes twinkling with ancient wisdom, "the
+        chosen one, destined to fulfill the prophecy that has been passed
+        down since time immemorial."
+
+        And so, with his heart pounding and his destiny calling, Ethan set
+        out on his epic quest, a journey that would test him in ways he never
+        thought possible. Along the way, he would face trial after trial,
+        each one more dangerous than the last, but through it all, he never
+        gave up hope, because deep down, he knew that good would always
+        triumph over evil in the end. He gathered a ragtag band of
+        companions — a gruff warrior with a heart of gold, a mysterious rogue
+        with a secret past, and a wise-cracking sidekick who provided comic
+        relief at just the right moments — and together, against all odds,
+        they forged a bond that would prove unbreakable.
+
+        In the end, after facing the darkest of dark lords in a climactic
+        final battle where all hope seemed lost, Ethan discovered that the
+        greatest power of all was the power that had been inside him all
+        along: the power of friendship, and the power of believing in
+        himself. As the sun rose on a new dawn, symbolizing hope and new
+        beginnings, the kingdom rejoiced, for the chosen one had fulfilled
+        his destiny, and peace was restored to the land once more, exactly
+        as the ancient prophecy had foretold from the very beginning, proving
+        once and for all that when all hope seems lost, hope is usually
+        exactly what saves the day.

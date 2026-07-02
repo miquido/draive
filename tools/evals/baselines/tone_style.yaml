@@ -1009,3 +1009,152 @@ samples:
         lift is just past the main reception. If the timing no longer works for
         you, no problem at all — simply give us a call and we will find a slot
         that suits you better. We look forward to seeing you.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: school-newsletter-verylong-playful-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        A warm, playful, informal voice for a children's brand's parent
+        newsletter — simple words, short sentences, occasional light humor,
+        no jargon.
+      evaluated: |
+        Hey friends! Can you believe it's already back-to-school season
+        again? We can't either, and yet here we are, buying pencils like
+        it's our full-time job.
+
+        First up: our new lunchbox line is here, and it's the good kind of
+        chaos — dinosaurs, rockets, and a very determined-looking narwhal.
+        They're spill-proof (we tested this, extensively, with actual
+        juice), and they come with little name tags so your kiddo's lunch
+        doesn't accidentally go home with a classmate named Sam. Again.
+
+        Next, a gentle heads-up: our "First Week Jitters" storybook is
+        flying off the shelves, and honestly, we get it. New teacher, new
+        backpack, new everything — it's a lot for tiny humans! The book
+        follows a fuzzy little fox named Pip who's nervous about his first
+        day, and by page ten he's made a friend, found the best swing on
+        the playground, and decided school is pretty great after all. We
+        may have cried a little making it. No shame.
+
+        We also want to give a big, warm shout-out to all the parents who
+        joined our "Pack a Better Lunch" workshop last month. You showed up,
+        you asked great questions, and several of you sent us photos of
+        lunches so cute we had to show the whole team. A rainbow of fruit
+        arranged like a smiling face? Iconic. Truly.
+
+        A quick and friendly reminder that our fall catalog drops next
+        Tuesday, packed with cozy new backpacks, some very soft fleece
+        jackets, and a sticker collection that we're maybe a little too
+        excited about. If your little one has strong feelings about
+        backpack colors (and let's be honest, they usually do), it might be
+        worth peeking early, because the good ones tend to disappear fast.
+
+        Lastly, don't forget our community photo wall is open all month —
+        send us a snap of your kiddo rocking their first-day outfit, and
+        we'll feature our favorites right here in next month's newsletter.
+        Here's to a fun, only-slightly-chaotic start to the school year.
+        You've got this, and honestly, so do they.
+
+        Warmly,
+        The team
+
+  - id: school-newsletter-verylong-corporate-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        A warm, playful, informal voice for a children's brand's parent
+        newsletter — simple words, short sentences, occasional light humor,
+        no jargon.
+      evaluated: |
+        Dear Valued Stakeholder,
+
+        Please be advised that the organization's Q3 back-to-school product
+        cycle has commenced in accordance with our seasonal go-to-market
+        roadmap. Effective immediately, the newly introduced lunch
+        receptacle product line is available for procurement through
+        standard retail and e-commerce channels, featuring a curated
+        assortment of licensed graphic motifs designed to align with
+        prevailing juvenile consumer preference trends as identified in our
+        Q2 market research initiative.
+
+        In parallel, we wish to draw your attention to the release of an
+        ancillary literary asset, provisionally titled "First Week Jitters,"
+        which has been developed to address documented pain points
+        associated with early-childhood transitional anxiety in the
+        educational-onboarding context. Preliminary sell-through metrics
+        for this SKU have exceeded internal forecasts by a statistically
+        significant margin, and the product development team considers this
+        a validation of the underlying user-research methodology employed
+        during the ideation phase.
+
+        We would also like to formally acknowledge the participants of the
+        recently concluded "Pack a Better Lunch" engagement workshop.
+        Attendee feedback has been aggregated and will be incorporated into
+        the continuous-improvement framework governing future
+        educational-content programming. Select user-generated visual
+        submissions have been flagged for potential inclusion in
+        forthcoming brand-awareness collateral, pending standard usage-rights
+        clearance procedures.
+
+        Please be further advised that the Fall seasonal catalog is
+        scheduled for distribution next Tuesday, encompassing an expanded
+        assortment of outerwear SKUs, backpack products across multiple
+        price tiers, and a decorative-sticker accessory bundle intended to
+        drive incremental basket-size growth during the back-to-school
+        purchasing window. Given historical inventory-depletion patterns
+        for high-demand colorways, stakeholders are encouraged to review the
+        catalog at their earliest convenience to mitigate the risk of
+        stockout-related purchase deferral.
+
+        Finally, the customer-generated content initiative remains open for
+        submissions throughout the current calendar month, with selected
+        assets to be featured in subsequent newsletter distributions subject
+        to editorial review. We appreciate your continued engagement with
+        our brand ecosystem as we navigate this operationally significant
+        seasonal transition period.
+
+        Regards,
+        Customer Communications Division
+
+  # ═════════ Very-long-tone-brief / short-content cases ═════════
+  - id: safety-recall-verylongbrief-shortcontent-excellent
+    human_score: excellent
+    inputs:
+      expected_tone_style: |
+        This is a voice for a product safety recall notice. It must be
+        serious and direct without being alarmist, written in plain
+        language a non-expert can act on immediately. Avoid corporate
+        hedging or legal throat-clearing in the opening — lead with the
+        safety issue and the concrete action the customer should take.
+        Avoid casual language, humor, or exclamation points; this is not a
+        marketing message. Keep sentences short enough to be skimmed
+        quickly by someone who may be worried. Close with a clear, low-
+        friction way to get help, not a generic "thank you for your
+        business" sign-off.
+      evaluated: |
+        Stop using your Everline space heater, model SH-220, immediately.
+        A wiring defect can cause overheating and fire. Unplug it now and
+        do not use it again. Call 1-800-555-0199 for a free replacement;
+        have your model number ready.
+
+  - id: safety-recall-verylongbrief-shortcontent-poor
+    human_score: poor
+    inputs:
+      expected_tone_style: |
+        This is a voice for a product safety recall notice. It must be
+        serious and direct without being alarmist, written in plain
+        language a non-expert can act on immediately. Avoid corporate
+        hedging or legal throat-clearing in the opening — lead with the
+        safety issue and the concrete action the customer should take.
+        Avoid casual language, humor, or exclamation points; this is not a
+        marketing message. Keep sentences short enough to be skimmed
+        quickly by someone who may be worried. Close with a clear, low-
+        friction way to get help, not a generic "thank you for your
+        business" sign-off.
+      evaluated: |
+        Hey there! Just a quick heads up that your space heater might have
+        a tiny little quirk with the wiring — nothing to stress about, but
+        no worries, we've totally got your back! Swing by our website
+        whenever you get a chance. Thanks so much for being an awesome
+        customer!

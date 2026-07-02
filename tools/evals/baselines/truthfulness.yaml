@@ -1044,3 +1044,151 @@ samples:
         to speak of; the evening stayed cool and damp.
       evaluated: |
         Yesterday was a hot, cloudless day that reached 35 degrees.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: supplement-verylong-honest-excellent
+    human_score: excellent
+    inputs:
+      evaluated: |
+        Our ashwagandha capsules contain 300 mg of standardized root extract
+        per serving. Here's what the evidence actually supports and where it
+        falls short. Several small randomized trials, most lasting eight to
+        twelve weeks and enrolling fewer than 100 participants each, found
+        modest reductions in self-reported stress and cortisol levels
+        compared to placebo. That's a genuine signal, but it's worth being
+        clear about its limits: most of these studies were small, several
+        were funded by supplement manufacturers, and long-term safety data
+        beyond about three months of continuous use is thin.
+
+        We can't honestly claim this product cures anxiety, replaces
+        prescribed medication, or works identically for everyone — response
+        varies a lot between individuals in the trials we've reviewed, and a
+        meaningful minority of participants saw no measurable effect at all.
+        People who are pregnant, breastfeeding, or taking thyroid
+        medication, sedatives, or immunosuppressants should talk to a doctor
+        before use, since ashwagandha can interact with those and has been
+        linked to rare cases of liver irritation in case reports, even
+        though causation in those specific cases hasn't been firmly
+        established.
+
+        We source our root extract from a supplier that provides
+        third-party lab testing for heavy metals and microbial
+        contamination, and we publish those certificates of analysis on our
+        website for every batch, because supplement quality control varies
+        widely across the industry and we think customers deserve to check
+        for themselves rather than take our word for it. This product is
+        not FDA-approved, since dietary supplements aren't subject to the
+        same approval process as medications, and we are legally required
+        to and genuinely want you to know that these statements have not
+        been evaluated by the FDA and this product is not intended to
+        diagnose, treat, cure, or prevent any disease.
+
+        If you're dealing with clinical anxiety or chronic stress that's
+        affecting your daily life, we'd encourage you to see a doctor or
+        therapist rather than relying on a supplement as a first-line
+        response — this product may be a reasonable complement to that kind
+        of care for some people, based on the modest evidence available, but
+        it isn't a substitute for it.
+
+  - id: supplement-verylong-misleading-poor
+    human_score: poor
+    inputs:
+      evaluated: |
+        Our ashwagandha capsules are formulated with 300 mg of premium
+        standardized root extract, the same ancient herb trusted for
+        thousands of years in traditional wellness practices across the
+        world. Clinical studies have shown ashwagandha reduces cortisol and
+        supports a calm, balanced mood — and that's exactly the kind of
+        science-backed support your body deserves in today's stressful
+        world. Thousands of customers report feeling noticeably calmer,
+        sharper, and more like themselves within just weeks of adding this
+        powerful adaptogen to their daily routine.
+
+        Unlike harsh pharmaceutical options that come loaded with side
+        effects and dependency risks, our formula works with your body's
+        own natural stress-response system, gently guiding it back toward
+        balance the way nature intended. It's true that every body is
+        different, and it's true that individual results can vary — but
+        that's the beauty of a natural approach: it meets you where you are.
+        We've seen customers use this as part of their journey to manage
+        everything from everyday work stress to much more serious anxiety,
+        often alongside — or, for many, eventually in place of — whatever
+        they were using before.
+
+        We work with trusted growers who have cultivated ashwagandha for
+        generations, and every batch reflects that legacy of quality and
+        purity you simply can't get from a mass-produced pharmaceutical
+        pill manufactured in a sterile factory. While we are, of course,
+        required to include the standard disclaimer that this statement has
+        not been evaluated by the FDA, we think the thousands of glowing
+        reviews on our website speak louder than any bureaucratic label
+        ever could.
+
+        We believe true wellness starts with trusting your body and giving
+        it the natural support it's been asking for all along. Join the
+        thousands who've already made the switch to a calmer, more balanced
+        version of themselves — your future self will thank you for taking
+        this simple, natural step today.
+
+  # ═════════ Very-long-reference / short-content cases ═════════
+  - id: fund-performance-verylongref-shortcontent-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The Meridian Growth Fund returned 8.2 percent annually over the
+        past ten years, compared to 10.1 percent for its benchmark index
+        over the same period, meaning the fund has underperformed its
+        benchmark on a ten-year basis after fees. Over the past three
+        years specifically, the fund returned 6.5 percent annually versus
+        7.8 percent for the benchmark, so the underperformance is not
+        limited to a single distant period but has continued more
+        recently as well. The fund's expense ratio is 0.85 percent
+        annually, notably higher than the 0.15 percent typical of a
+        comparable passive index fund tracking the same benchmark, and
+        that fee gap accounts for a meaningful share of the performance
+        difference. The fund did outperform its benchmark during the 2022
+        market downturn, falling 14 percent that year versus the
+        benchmark's 19 percent decline, which the fund manager attributes
+        to its defensive positioning in that period, though this single
+        year of relative outperformance has not offset the cumulative
+        long-term shortfall. Past performance, in any case, is not a
+        guarantee of future results, and the fund's holdings have shifted
+        toward a more aggressive growth allocation over the last eighteen
+        months, which could change its risk and return profile compared
+        to the track record described above.
+      evaluated: |
+        Over the past decade this fund has actually trailed its benchmark
+        after fees, and that gap has continued in more recent years too —
+        it did hold up better during the 2022 downturn, but that one good
+        year hasn't made up for the longer-term shortfall.
+
+  - id: fund-performance-verylongref-shortcontent-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The Meridian Growth Fund returned 8.2 percent annually over the
+        past ten years, compared to 10.1 percent for its benchmark index
+        over the same period, meaning the fund has underperformed its
+        benchmark on a ten-year basis after fees. Over the past three
+        years specifically, the fund returned 6.5 percent annually versus
+        7.8 percent for the benchmark, so the underperformance is not
+        limited to a single distant period but has continued more
+        recently as well. The fund's expense ratio is 0.85 percent
+        annually, notably higher than the 0.15 percent typical of a
+        comparable passive index fund tracking the same benchmark, and
+        that fee gap accounts for a meaningful share of the performance
+        difference. The fund did outperform its benchmark during the 2022
+        market downturn, falling 14 percent that year versus the
+        benchmark's 19 percent decline, which the fund manager attributes
+        to its defensive positioning in that period, though this single
+        year of relative outperformance has not offset the cumulative
+        long-term shortfall. Past performance, in any case, is not a
+        guarantee of future results, and the fund's holdings have shifted
+        toward a more aggressive growth allocation over the last eighteen
+        months, which could change its risk and return profile compared
+        to the track record described above.
+      evaluated: |
+        This fund has a strong track record of beating the market,
+        including standout performance during the 2022 downturn, and its
+        active management consistently delivers better results than a
+        passive index fund would.

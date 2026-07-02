@@ -1482,3 +1482,569 @@ samples:
         backlit keyboard, the two USB-C ports, and the one-year warranty.
       evaluated: |
         It has 16 GB of RAM.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: product-launch-verylong-coverage-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The Aurora smart thermostat launches on September 9th at a retail
+        price of 179 dollars. It supports both wired and battery-powered
+        installation, works with the four major smart-home ecosystems, and
+        learns a household's schedule automatically within the first two
+        weeks of use. The device includes a built-in air-quality sensor that
+        tracks humidity and particulate levels, and it can automatically
+        adjust fan speed in response. Battery life on the wireless model is
+        rated at nine months per charge. The company is offering a
+        20-dollar trade-in credit for any competitor's thermostat, and early
+        reviewers have praised the app's scheduling interface while noting
+        that the physical display is harder to read in direct sunlight. A
+        firmware update planned for November will add support for a fifth
+        smart-home ecosystem and a geofencing feature that adjusts the
+        temperature based on whether anyone is home.
+      evaluated: |
+        The Aurora smart thermostat is set to launch on September 9th,
+        priced at 179 dollars. It can be installed either wired or on
+        battery power, and it's compatible with all four of the major
+        smart-home ecosystems currently in wide use. One of its more
+        notable features is that it learns a household's routine
+        automatically, typically within about two weeks of being installed,
+        without requiring manual scheduling. It also has a built-in sensor
+        for air quality that keeps track of both humidity and particulate
+        levels in the room, and it uses those readings to automatically
+        adjust its fan speed as conditions change. For anyone considering
+        the battery-powered version, Aurora rates its battery life at around
+        nine months on a single charge. To sweeten the deal for people
+        switching from a competitor, the company is running a trade-in
+        promotion that knocks 20 dollars off the price if you send in your
+        old thermostat. Early hands-on reviews have been largely positive
+        about the mobile app, particularly its scheduling interface, though
+        several reviewers flagged that the thermostat's physical display can
+        be difficult to read when it's in direct sunlight. Looking ahead, the
+        company has already announced a firmware update coming in November
+        that will bring support for a fifth smart-home ecosystem as well as a
+        geofencing feature that changes the target temperature automatically
+        depending on whether anyone is actually home.
+
+  - id: product-launch-verylong-padded-poor
+    human_score: poor
+    inputs:
+      reference: |
+        The Aurora smart thermostat launches on September 9th at a retail
+        price of 179 dollars. It supports both wired and battery-powered
+        installation, works with the four major smart-home ecosystems, and
+        learns a household's schedule automatically within the first two
+        weeks of use. The device includes a built-in air-quality sensor that
+        tracks humidity and particulate levels, and it can automatically
+        adjust fan speed in response. Battery life on the wireless model is
+        rated at nine months per charge. The company is offering a
+        20-dollar trade-in credit for any competitor's thermostat, and early
+        reviewers have praised the app's scheduling interface while noting
+        that the physical display is harder to read in direct sunlight. A
+        firmware update planned for November will add support for a fifth
+        smart-home ecosystem and a geofencing feature that adjusts the
+        temperature based on whether anyone is home.
+      evaluated: |
+        We are thrilled — genuinely thrilled — to finally be able to share
+        some exciting news with all of you today about a product that our
+        entire team has poured countless hours of hard work, creativity, and
+        passion into over the past couple of years, because at the end of
+        the day, building a truly great smart-home device isn't just about
+        engineering, it's about understanding real people and the way they
+        actually live their lives in their homes every single day. Home
+        comfort has always mattered to people, going all the way back to the
+        earliest days of central heating, and we think there's something
+        special about the idea of a device that quietly works in the
+        background to make a house feel just right without anyone having to
+        think about it too much.
+
+        Smart-home technology in general has come a long way over the last
+        decade, and it's amazing to think about how far the whole industry
+        has progressed, from simple programmable thermostats with tiny
+        buttons and dim little screens, all the way to the sophisticated,
+        connected ecosystems that so many households rely on today. We've
+        always believed that the best technology is the technology you
+        barely notice, the kind that fades into the background of daily life
+        while still making things measurably better, and that philosophy has
+        guided pretty much every decision our design and engineering teams
+        have made throughout this whole project from the very beginning.
+
+        The thermostat will be priced at 179 dollars, which we think
+        represents genuinely excellent value for what customers are getting,
+        especially when you consider everything else that's bundled into the
+        experience, including our award-winning mobile app, our dedicated
+        customer support team, and our commitment to long-term software
+        support well beyond the initial purchase. We can't wait for people
+        to get their hands on it and start experiencing, firsthand, the kind
+        of comfort and peace of mind that we believe this device is going to
+        bring into their homes, and we're incredibly grateful, as always, to
+        our loyal customers and our hardworking team for helping us get to
+        this exciting moment together.
+
+  # ═════════ Very-long-reference / short-content cases ═════════
+  - id: research-study-verylongref-shortcontent-good
+    human_score: good
+    inputs:
+      reference: |
+        A two-year observational study followed 4,300 adults aged 40 to 65
+        across twelve clinics to examine the relationship between weekly
+        step count and cardiovascular outcomes. Participants were divided
+        into four groups based on average daily steps: fewer than 4,000,
+        4,000 to 7,000, 7,000 to 10,000, and more than 10,000. Researchers
+        tracked heart attacks, strokes, and cardiovascular-related deaths
+        over the study period, along with secondary measures including
+        resting heart rate, blood pressure, and self-reported energy
+        levels. The group averaging more than 10,000 steps daily had a 41
+        percent lower rate of major cardiovascular events compared to the
+        under-4,000 group, and the 7,000-to-10,000 group still showed a 31
+        percent reduction, suggesting the benefit does not require hitting
+        a specific high threshold. Notably, walking speed appeared to
+        matter independently of total volume: participants who walked
+        faster, regardless of total daily steps, showed additional
+        reductions in resting heart rate and blood pressure. The study
+        also found that the benefits were consistent across age groups and
+        both sexes, though participants with pre-existing heart conditions
+        at enrollment saw a smaller relative improvement than healthy
+        participants. Researchers noted several limitations: step counts
+        were self-reported using consumer wearables of varying accuracy,
+        the study was observational rather than randomized so causation
+        cannot be firmly established, and the population was drawn
+        primarily from urban clinics, which may limit how well the
+        findings generalize to rural populations. The authors recommend a
+        randomized controlled trial as a next step to confirm the
+        association and better isolate the effect of walking speed from
+        total step volume.
+      evaluated: |
+        The study found that people who walked more had fewer heart
+        attacks and strokes over the two years, and walking faster helped
+        too, though the researchers said more research is needed to prove
+        it's really the walking causing the improvement.
+
+  - id: research-study-verylongref-shortcontent-poor
+    human_score: poor
+    inputs:
+      reference: |
+        A two-year observational study followed 4,300 adults aged 40 to 65
+        across twelve clinics to examine the relationship between weekly
+        step count and cardiovascular outcomes. Participants were divided
+        into four groups based on average daily steps: fewer than 4,000,
+        4,000 to 7,000, 7,000 to 10,000, and more than 10,000. Researchers
+        tracked heart attacks, strokes, and cardiovascular-related deaths
+        over the study period, along with secondary measures including
+        resting heart rate, blood pressure, and self-reported energy
+        levels. The group averaging more than 10,000 steps daily had a 41
+        percent lower rate of major cardiovascular events compared to the
+        under-4,000 group, and the 7,000-to-10,000 group still showed a 31
+        percent reduction, suggesting the benefit does not require hitting
+        a specific high threshold. Notably, walking speed appeared to
+        matter independently of total volume: participants who walked
+        faster, regardless of total daily steps, showed additional
+        reductions in resting heart rate and blood pressure. The study
+        also found that the benefits were consistent across age groups and
+        both sexes, though participants with pre-existing heart conditions
+        at enrollment saw a smaller relative improvement than healthy
+        participants. Researchers noted several limitations: step counts
+        were self-reported using consumer wearables of varying accuracy,
+        the study was observational rather than randomized so causation
+        cannot be firmly established, and the population was drawn
+        primarily from urban clinics, which may limit how well the
+        findings generalize to rural populations. The authors recommend a
+        randomized controlled trial as a next step to confirm the
+        association and better isolate the effect of walking speed from
+        total step volume.
+      evaluated: |
+        The study looked at walking and hearts. More steps was better for
+        people.
+
+  - id: research-study-verylongref-shortcontent-fair
+    human_score: fair
+    inputs:
+      reference: |
+        A two-year observational study followed 4,300 adults aged 40 to 65
+        across twelve clinics to examine the relationship between weekly
+        step count and cardiovascular outcomes. Participants were divided
+        into four groups based on average daily steps: fewer than 4,000,
+        4,000 to 7,000, 7,000 to 10,000, and more than 10,000. Researchers
+        tracked heart attacks, strokes, and cardiovascular-related deaths
+        over the study period, along with secondary measures including
+        resting heart rate, blood pressure, and self-reported energy
+        levels. The group averaging more than 10,000 steps daily had a 41
+        percent lower rate of major cardiovascular events compared to the
+        under-4,000 group, and the 7,000-to-10,000 group still showed a 31
+        percent reduction, suggesting the benefit does not require hitting
+        a specific high threshold. Notably, walking speed appeared to
+        matter independently of total volume: participants who walked
+        faster, regardless of total daily steps, showed additional
+        reductions in resting heart rate and blood pressure. The study
+        also found that the benefits were consistent across age groups and
+        both sexes, though participants with pre-existing heart conditions
+        at enrollment saw a smaller relative improvement than healthy
+        participants. Researchers noted several limitations: step counts
+        were self-reported using consumer wearables of varying accuracy,
+        the study was observational rather than randomized so causation
+        cannot be firmly established, and the population was drawn
+        primarily from urban clinics, which may limit how well the
+        findings generalize to rural populations. The authors recommend a
+        randomized controlled trial as a next step to confirm the
+        association and better isolate the effect of walking speed from
+        total step volume.
+      evaluated: |
+        The study found that people who walked more each day had fewer
+        heart attacks and strokes over the two years.
+
+  - id: research-study-verylongref-shortcontent-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        A two-year observational study followed 4,300 adults aged 40 to 65
+        across twelve clinics to examine the relationship between weekly
+        step count and cardiovascular outcomes. Participants were divided
+        into four groups based on average daily steps: fewer than 4,000,
+        4,000 to 7,000, 7,000 to 10,000, and more than 10,000. Researchers
+        tracked heart attacks, strokes, and cardiovascular-related deaths
+        over the study period, along with secondary measures including
+        resting heart rate, blood pressure, and self-reported energy
+        levels. The group averaging more than 10,000 steps daily had a 41
+        percent lower rate of major cardiovascular events compared to the
+        under-4,000 group, and the 7,000-to-10,000 group still showed a 31
+        percent reduction, suggesting the benefit does not require hitting
+        a specific high threshold. Notably, walking speed appeared to
+        matter independently of total volume: participants who walked
+        faster, regardless of total daily steps, showed additional
+        reductions in resting heart rate and blood pressure. The study
+        also found that the benefits were consistent across age groups and
+        both sexes, though participants with pre-existing heart conditions
+        at enrollment saw a smaller relative improvement than healthy
+        participants. Researchers noted several limitations: step counts
+        were self-reported using consumer wearables of varying accuracy,
+        the study was observational rather than randomized so causation
+        cannot be firmly established, and the population was drawn
+        primarily from urban clinics, which may limit how well the
+        findings generalize to rural populations. The authors recommend a
+        randomized controlled trial as a next step to confirm the
+        association and better isolate the effect of walking speed from
+        total step volume.
+      evaluated: |
+        The study found that people who walked more, especially at a
+        faster pace, had meaningfully fewer heart attacks and strokes over
+        the two years, with the biggest reduction seen in the group
+        averaging over 10,000 daily steps. Because the study was
+        observational rather than a randomized trial, the researchers
+        can't be fully certain the walking itself caused the improvement.
+
+  - id: research-study-verylongref-shortcontent-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        A two-year observational study followed 4,300 adults aged 40 to 65
+        across twelve clinics to examine the relationship between weekly
+        step count and cardiovascular outcomes. Participants were divided
+        into four groups based on average daily steps: fewer than 4,000,
+        4,000 to 7,000, 7,000 to 10,000, and more than 10,000. Researchers
+        tracked heart attacks, strokes, and cardiovascular-related deaths
+        over the study period, along with secondary measures including
+        resting heart rate, blood pressure, and self-reported energy
+        levels. The group averaging more than 10,000 steps daily had a 41
+        percent lower rate of major cardiovascular events compared to the
+        under-4,000 group, and the 7,000-to-10,000 group still showed a 31
+        percent reduction, suggesting the benefit does not require hitting
+        a specific high threshold. Notably, walking speed appeared to
+        matter independently of total volume: participants who walked
+        faster, regardless of total daily steps, showed additional
+        reductions in resting heart rate and blood pressure. The study
+        also found that the benefits were consistent across age groups and
+        both sexes, though participants with pre-existing heart conditions
+        at enrollment saw a smaller relative improvement than healthy
+        participants. Researchers noted several limitations: step counts
+        were self-reported using consumer wearables of varying accuracy,
+        the study was observational rather than randomized so causation
+        cannot be firmly established, and the population was drawn
+        primarily from urban clinics, which may limit how well the
+        findings generalize to rural populations. The authors recommend a
+        randomized controlled trial as a next step to confirm the
+        association and better isolate the effect of walking speed from
+        total step volume.
+      evaluated: |
+        The study found that people who walked more — and especially
+        those who walked faster, independent of total volume — had
+        meaningfully fewer heart attacks, strokes, and cardiovascular
+        deaths over the two years. Because the study was observational
+        rather than a randomized trial, the researchers can't be fully
+        certain the walking itself caused the improvement, rather than
+        just being associated with it.
+
+  # ═════════ Very-long-reference / short-brief cases (policy document) ═════════
+  # Reference claims:
+  #   1. Standard window: 30 days, unused with tags, receipt/order number
+  #      required, refund to original payment method in 5-7 business days.
+  #   2. Exclusions: final-sale, clearance, and gift cards are never
+  #      returnable.
+  #   3. Defective/damaged items: full refund including shipping, any time
+  #      within one year (the decisive exception to the standard rule).
+  #   4. (secondary) Exchanges for store credit accepted up to 60 days.
+  #   5. (secondary) Standard return shipping is customer-paid.
+  #   6. (secondary) Holiday purchases (Nov 1-Dec 24) get an extended
+  #      window through Jan 31.
+  - id: return-policy-verylongref-shortbrief-poor
+    human_score: poor
+    inputs:
+      reference: |
+        ShopEase's return policy allows most items to be returned within
+        30 days of the purchase date for a full refund, provided the item
+        is unused, undamaged, and still has its original tags attached. A
+        receipt or the original order confirmation number is required to
+        process any return. Refunds are issued to the original payment
+        method and typically appear within 5 to 7 business days after the
+        returned item is received and inspected. Final-sale items,
+        clearance-tagged merchandise, and gift cards are not eligible for
+        return or refund under any circumstances. Customers who would
+        prefer an exchange rather than a refund have a longer window:
+        exchanges for store credit are accepted for up to 60 days after
+        purchase. Standard return shipping costs are the customer's
+        responsibility unless the item arrives defective or damaged, in
+        which case ShopEase covers return shipping and issues a full
+        refund, including the original shipping charge, at any time
+        within one year of purchase. To accommodate holiday shopping, any
+        purchase made between November 1st and December 24th automatically
+        receives an extended return window running through January 31st
+        of the following year.
+      evaluated: |
+        You can return things if you don't like them.
+
+  - id: return-policy-verylongref-shortbrief-fair
+    human_score: fair
+    inputs:
+      reference: |
+        ShopEase's return policy allows most items to be returned within
+        30 days of the purchase date for a full refund, provided the item
+        is unused, undamaged, and still has its original tags attached. A
+        receipt or the original order confirmation number is required to
+        process any return. Refunds are issued to the original payment
+        method and typically appear within 5 to 7 business days after the
+        returned item is received and inspected. Final-sale items,
+        clearance-tagged merchandise, and gift cards are not eligible for
+        return or refund under any circumstances. Customers who would
+        prefer an exchange rather than a refund have a longer window:
+        exchanges for store credit are accepted for up to 60 days after
+        purchase. Standard return shipping costs are the customer's
+        responsibility unless the item arrives defective or damaged, in
+        which case ShopEase covers return shipping and issues a full
+        refund, including the original shipping charge, at any time
+        within one year of purchase. To accommodate holiday shopping, any
+        purchase made between November 1st and December 24th automatically
+        receives an extended return window running through January 31st
+        of the following year.
+      evaluated: |
+        Most items can be returned within 30 days if they're unused and
+        you have your receipt.
+
+  - id: return-policy-verylongref-shortbrief-good
+    human_score: good
+    inputs:
+      reference: |
+        ShopEase's return policy allows most items to be returned within
+        30 days of the purchase date for a full refund, provided the item
+        is unused, undamaged, and still has its original tags attached. A
+        receipt or the original order confirmation number is required to
+        process any return. Refunds are issued to the original payment
+        method and typically appear within 5 to 7 business days after the
+        returned item is received and inspected. Final-sale items,
+        clearance-tagged merchandise, and gift cards are not eligible for
+        return or refund under any circumstances. Customers who would
+        prefer an exchange rather than a refund have a longer window:
+        exchanges for store credit are accepted for up to 60 days after
+        purchase. Standard return shipping costs are the customer's
+        responsibility unless the item arrives defective or damaged, in
+        which case ShopEase covers return shipping and issues a full
+        refund, including the original shipping charge, at any time
+        within one year of purchase. To accommodate holiday shopping, any
+        purchase made between November 1st and December 24th automatically
+        receives an extended return window running through January 31st
+        of the following year.
+      evaluated: |
+        Most items can be returned within 30 days for a refund to your
+        original payment method, as long as they're unused with tags and
+        you have your receipt. If something arrives defective, ShopEase
+        will refund you in full — including shipping — any time within a
+        year.
+
+  - id: return-policy-verylongref-shortbrief-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        ShopEase's return policy allows most items to be returned within
+        30 days of the purchase date for a full refund, provided the item
+        is unused, undamaged, and still has its original tags attached. A
+        receipt or the original order confirmation number is required to
+        process any return. Refunds are issued to the original payment
+        method and typically appear within 5 to 7 business days after the
+        returned item is received and inspected. Final-sale items,
+        clearance-tagged merchandise, and gift cards are not eligible for
+        return or refund under any circumstances. Customers who would
+        prefer an exchange rather than a refund have a longer window:
+        exchanges for store credit are accepted for up to 60 days after
+        purchase. Standard return shipping costs are the customer's
+        responsibility unless the item arrives defective or damaged, in
+        which case ShopEase covers return shipping and issues a full
+        refund, including the original shipping charge, at any time
+        within one year of purchase. To accommodate holiday shopping, any
+        purchase made between November 1st and December 24th automatically
+        receives an extended return window running through January 31st
+        of the following year.
+      evaluated: |
+        Most items can be returned within 30 days for a refund to your
+        original payment method, as long as they're unused with tags and
+        you have a receipt — though final-sale items, clearance
+        merchandise, and gift cards can't be returned. If something
+        arrives defective or damaged, ShopEase covers return shipping and
+        refunds you in full any time within a year.
+
+  - id: return-policy-verylongref-shortbrief-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        ShopEase's return policy allows most items to be returned within
+        30 days of the purchase date for a full refund, provided the item
+        is unused, undamaged, and still has its original tags attached. A
+        receipt or the original order confirmation number is required to
+        process any return. Refunds are issued to the original payment
+        method and typically appear within 5 to 7 business days after the
+        returned item is received and inspected. Final-sale items,
+        clearance-tagged merchandise, and gift cards are not eligible for
+        return or refund under any circumstances. Customers who would
+        prefer an exchange rather than a refund have a longer window:
+        exchanges for store credit are accepted for up to 60 days after
+        purchase. Standard return shipping costs are the customer's
+        responsibility unless the item arrives defective or damaged, in
+        which case ShopEase covers return shipping and issues a full
+        refund, including the original shipping charge, at any time
+        within one year of purchase. To accommodate holiday shopping, any
+        purchase made between November 1st and December 24th automatically
+        receives an extended return window running through January 31st
+        of the following year.
+      evaluated: |
+        Returns: most items back within 30 days, unused with tags and a
+        receipt, refunded to your original payment method in 5-7 business
+        days. Final-sale, clearance, and gift-card purchases aren't
+        returnable. Prefer an exchange instead? You have 60 days for
+        store credit. Defective or damaged items get a full refund,
+        including shipping, any time within a year. And if you bought
+        between Nov 1 and Dec 24, your return window is automatically
+        extended to January 31.
+
+  # ═════════ Flat-list / enumeration references ═════════
+  # These pair with the very-long-reference/short-brief cases above but
+  # test the opposite rule: when the REFERENCE is a flat list of distinct,
+  # comparably-important items, brevity is NOT a legitimate compression —
+  # each missing named item is a plain omission and the score should track
+  # the raw fraction covered.
+  - id: team-yaml-coverage-fair
+    human_score: fair
+    inputs:
+      reference: |
+        The team has five members: Ana, Ben, Cy, Dee, and Eli, each with a
+        named role.
+      evaluated: |
+        team:
+          - name: Ana
+            role: lead
+          - name: Ben
+            role: designer
+
+  - id: team-yaml-coverage-good
+    human_score: good
+    inputs:
+      reference: |
+        The team has five members: Ana, Ben, Cy, Dee, and Eli, each with a
+        named role.
+      evaluated: |
+        team:
+          - name: Ana
+            role: lead
+          - name: Ben
+            role: designer
+          - name: Cy
+            role: engineer
+
+  - id: team-yaml-coverage-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        The team has five members: Ana, Ben, Cy, Dee, and Eli, each with a
+        named role.
+      evaluated: |
+        team:
+          - name: Ana
+            role: lead
+          - name: Ben
+            role: designer
+          - name: Cy
+            role: engineer
+          - name: Dee
+            role: analyst
+
+  - id: team-yaml-coverage-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        The team has five members: Ana, Ben, Cy, Dee, and Eli, each with a
+        named role.
+      evaluated: |
+        team:
+          - name: Ana
+            role: lead
+          - name: Ben
+            role: designer
+          - name: Cy
+            role: engineer
+          - name: Dee
+            role: analyst
+          - name: Eli
+            role: marketer
+
+  - id: camping-checklist-coverage-poor
+    human_score: poor
+    inputs:
+      reference: |
+        For the camping trip, pack a tent, a sleeping bag, a portable
+        stove, a water filter, a first-aid kit, and a headlamp.
+      evaluated: |
+        Bring a tent.
+
+  - id: camping-checklist-coverage-fair
+    human_score: fair
+    inputs:
+      reference: |
+        For the camping trip, pack a tent, a sleeping bag, a portable
+        stove, a water filter, a first-aid kit, and a headlamp.
+      evaluated: |
+        Pack a tent and a sleeping bag.
+
+  - id: camping-checklist-coverage-good
+    human_score: good
+    inputs:
+      reference: |
+        For the camping trip, pack a tent, a sleeping bag, a portable
+        stove, a water filter, a first-aid kit, and a headlamp.
+      evaluated: |
+        Pack a tent, a sleeping bag, a stove, and a water filter.
+
+  - id: camping-checklist-coverage-excellent
+    human_score: excellent
+    inputs:
+      reference: |
+        For the camping trip, pack a tent, a sleeping bag, a portable
+        stove, a water filter, a first-aid kit, and a headlamp.
+      evaluated: |
+        Pack a tent, a sleeping bag, a stove, a water filter, and a
+        first-aid kit.
+
+  - id: camping-checklist-coverage-perfect
+    human_score: perfect
+    inputs:
+      reference: |
+        For the camping trip, pack a tent, a sleeping bag, a portable
+        stove, a water filter, a first-aid kit, and a headlamp.
+      evaluated: |
+        Pack a tent, a sleeping bag, a stove, a water filter, a first-aid
+        kit, and a headlamp.

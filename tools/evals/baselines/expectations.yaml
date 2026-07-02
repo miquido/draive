@@ -1302,3 +1302,170 @@ samples:
 
         Sincerely,
         Jordan Avery
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: postmortem-verylong-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        Write an incident post-mortem that states the incident timeline,
+        names the root cause, lists at least three contributing factors,
+        assigns each corrective action to a named owner, states the
+        estimated budget impact in dollars, includes a lessons-learned
+        section, confirms explicitly whether customer data was affected, and
+        notes sign-off from two named stakeholders.
+      evaluated: |
+        Incident Post-Mortem: Billing Reconciliation Failure
+
+        Timeline: The nightly reconciliation job began failing silently at
+        02:14 on Tuesday. The failure went unnoticed until a customer flagged
+        a duplicate charge at 09:40 Wednesday, roughly 31 hours later.
+        Engineering confirmed the scope by 11:15, applied a fix at 13:50, and
+        completed a full backfill and audit of affected accounts by 22:00
+        that same day.
+
+        Root cause: A schema migration deployed Monday evening renamed the
+        `transaction_id` column that the reconciliation job used as its
+        idempotency key, silently causing every run afterward to treat
+        already-processed transactions as new.
+
+        Contributing factors: First, the reconciliation job had no schema
+        contract test, so the rename passed CI without warning. Second, the
+        job's failure mode was to log a warning and continue rather than
+        halt, so 31 hours of bad runs accumulated before anyone noticed.
+        Third, on-call alerting was only configured for job crashes, not for
+        anomalous output volume, so the duplicated charges never triggered a
+        page.
+
+        Corrective actions: A schema contract test for the reconciliation
+        job will be added by Priya on the data-platform team by the 20th. The
+        job will be changed to halt and page on unexpected key mismatches
+        instead of logging and continuing, owned by Marcus on the payments
+        team, target date the 18th. A new anomaly-volume alert on
+        reconciliation output will be added by the on-call tooling team,
+        owned by Dee, by the end of the month.
+
+        Budget impact: The incident produced approximately 340 duplicate
+        charges totaling an estimated 18,400 dollars, all of which have been
+        refunded; combined with engineering time and a one-time customer
+        goodwill credit, the total estimated cost of the incident is 26,000
+        dollars.
+
+        Customer data: No customer personal data was exposed, altered, or
+        accessed by unauthorized parties during this incident; the issue was
+        confined to transaction processing logic and did not touch the data
+        access layer.
+
+        Lessons learned: Schema changes to tables consumed by batch jobs need
+        the same contract-testing rigor as changes to live API
+        request/response shapes, since batch jobs are otherwise the easiest
+        place for a silent breaking change to hide. We also learned that
+        "log and continue" is rarely the right default for financial
+        reconciliation logic, where a loud failure is far cheaper than a
+        quiet one.
+
+        Sign-off: Reviewed and approved by Alan Ferreira, VP of Engineering,
+        and Sana Iqbal, Head of Payments, on the 22nd.
+
+  - id: postmortem-verylong-vague-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        Write an incident post-mortem that states the incident timeline,
+        names the root cause, lists at least three contributing factors,
+        assigns each corrective action to a named owner, states the
+        estimated budget impact in dollars, includes a lessons-learned
+        section, confirms explicitly whether customer data was affected, and
+        notes sign-off from two named stakeholders.
+      evaluated: |
+        Incident Post-Mortem: Billing Reconciliation Issue
+
+        Last week, our team encountered an issue with the billing
+        reconciliation process that affected a number of customer accounts.
+        We take incidents like this very seriously, and as soon as it came
+        to our attention, we mobilized quickly to investigate and resolve
+        the underlying problem. Our engineers worked diligently around the
+        clock to understand what had gone wrong and to make sure the issue
+        was fully addressed before moving on.
+
+        As we dug into the situation, it became clear that this was a
+        somewhat complex problem involving several moving parts of our
+        billing infrastructure, and pinpointing the exact cause required
+        careful, methodical investigation across multiple systems. There
+        were a number of factors at play, as is often the case with issues
+        of this nature, and our team worked collaboratively across several
+        departments to make sure nothing was overlooked as we worked toward
+        a full resolution.
+
+        We understand that incidents like this can be frustrating for
+        customers, and we want to reassure everyone that we are deeply
+        committed to preventing similar issues going forward. Our team has
+        already begun discussing ways to strengthen our processes and add
+        additional safeguards so that we can catch this type of problem more
+        quickly if anything similar were to happen again in the future. We
+        believe that continuous improvement is at the heart of good
+        engineering practice, and incidents like this, while never welcome,
+        do give us valuable opportunities to learn and grow as a team.
+
+        We also want to note that we treat the security and privacy of
+        customer information as an extremely high priority at all times,
+        and we are confident in the overall integrity of our systems. Going
+        forward, we will continue to monitor the situation closely and will
+        keep working to earn the trust that our customers place in us every
+        day. We're grateful for everyone's patience as we worked through
+        this, and we remain fully committed to transparency and to doing
+        right by the people who depend on our platform.
+
+        Thank you for your understanding, and please don't hesitate to reach
+        out if you have any questions or concerns about this or anything
+        else.
+
+  # ═════════ Very-long-expectations / short-content cases ═════════
+  - id: apartment-listing-verylongexpectations-shortcontent-perfect
+    human_score: perfect
+    inputs:
+      expectations: |
+        Write a rental listing description for a property-management
+        company's internal syndication feed. The listing must state, in a
+        form a prospective tenant or a listing-aggregator parser could
+        extract unambiguously: the monthly rent in dollars; the number of
+        bedrooms and the number of bathrooms; whether heat, water,
+        electricity, or any other utility is included in the rent, and
+        which ones are not; the interior square footage; the full pet
+        policy, including which species are allowed and any that are
+        explicitly excluded; the parking situation, including whether a
+        spot is assigned, unassigned, or unavailable, and whether it costs
+        extra; the minimum lease length the landlord requires; and the
+        earliest available move-in date. Do not include marketing
+        language, calls to action, or subjective descriptions of the
+        neighborhood — every sentence should carry one of the required
+        facts above, since this feed is consumed by automated systems as
+        well as humans and unnecessary prose adds noise to the parse.
+      evaluated: |
+        2BR/1BA, 850 sq ft, $1,850/mo, heat and water included. Cats
+        allowed, no dogs. One assigned parking spot included. 12-month
+        lease, available August 1st.
+
+  - id: apartment-listing-verylongexpectations-shortcontent-poor
+    human_score: poor
+    inputs:
+      expectations: |
+        Write a rental listing description for a property-management
+        company's internal syndication feed. The listing must state, in a
+        form a prospective tenant or a listing-aggregator parser could
+        extract unambiguously: the monthly rent in dollars; the number of
+        bedrooms and the number of bathrooms; whether heat, water,
+        electricity, or any other utility is included in the rent, and
+        which ones are not; the interior square footage; the full pet
+        policy, including which species are allowed and any that are
+        explicitly excluded; the parking situation, including whether a
+        spot is assigned, unassigned, or unavailable, and whether it costs
+        extra; the minimum lease length the landlord requires; and the
+        earliest available move-in date. Do not include marketing
+        language, calls to action, or subjective descriptions of the
+        neighborhood — every sentence should carry one of the required
+        facts above, since this feed is consumed by automated systems as
+        well as humans and unnecessary prose adds noise to the parse.
+      evaluated: |
+        Lovely apartment in a great neighborhood, close to shops and
+        transit. Won't last long — reach out today to schedule a viewing!

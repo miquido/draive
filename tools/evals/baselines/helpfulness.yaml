@@ -1682,3 +1682,170 @@ samples:
         "dead" starters are just hungry and cold. If you see a layer of liquid
         on top, that's hooch — pour it off and feed. Only genuine pink or orange
         streaks mean you should discard and start over.
+
+  # ═════════ Very-long-content cases (full-length documents) ═════════
+  - id: toddler-sleep-verylong-actionable-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        My toddler refuses to sleep in her own bed and it's affecting the
+        whole family. What can I actually do, step by step, over the next
+        couple weeks to fix this?
+      evaluated: |
+        Week one, focus on the environment and the routine rather than the
+        bed itself. Keep her room slightly cool and very dark — blackout
+        curtains matter more than most parents expect — and build a short,
+        boring, unchanging bedtime sequence: bath, pajamas, two books,
+        lights out, at the same time every single night, including
+        weekends. Consistency here does more work than almost anything else
+        you'll try, because toddlers push back hardest against unpredictable
+        rules, not firm ones.
+
+        Once the routine is steady for three or four nights, start what's
+        sometimes called the "camping out" method. Sit in a chair next to
+        her bed as she falls asleep, offering minimal talking or attention
+        — you're a calm presence, not entertainment. Every two or three
+        nights, move the chair a little further from the bed: first away
+        from the bed but still in the room, then just outside the doorway
+        with the door open, then out of sight entirely. This usually takes
+        seven to ten nights total and avoids the whiplash of going straight
+        from "in her bed" to "alone in the dark," which is what triggers
+        most of the resistance in kids this age.
+
+        When she gets up and comes to your room, and she will, walk her back
+        immediately and calmly every single time, saying as little as
+        possible — something short and identical each time, like "time for
+        bed," with no negotiation and no extra cuddling that would make the
+        walk more rewarding than staying put. The first two or three nights
+        of this will likely involve a lot of repeat trips, sometimes ten or
+        more; that's normal and it's the sign the old pattern is breaking,
+        not that the method has failed. Don't cave on the fifth trip after
+        holding firm for four — that specifically teaches her that
+        persistence eventually works, which makes the whole process longer
+        overall.
+
+        For the daytime, add a sticker chart she can see: a sticker each
+        morning she stayed in her own bed all night, with a small reward
+        after five stickers. This works far better as encouragement than as
+        a threat, so frame it entirely as something she's earning, not
+        something she's at risk of losing. If she's using a fear of the dark
+        or monsters as the reason for coming to your room, take that
+        seriously in the daytime — a "monster spray" bottle filled with
+        water she gets to spritz around her room at bedtime gives her a
+        concrete sense of control, which matters more than logically
+        disproving the monsters.
+
+        Expect a rough patch around night four or five, when kids often test
+        harder right before the new pattern sets — a sudden spike in
+        crying or new complaints ("I'm thirsty," "my leg hurts") is common
+        and usually resolves within a day or two if you hold the same calm,
+        boring response each time. By the end of two weeks, most families
+        following this consistently see the toddler falling asleep
+        independently and staying in bed most nights; if you're seeing zero
+        progress by then, it's worth ruling out something physical, like
+        sleep apnea or a room that's too warm, rather than assuming the
+        method itself has failed.
+
+  - id: toddler-sleep-verylong-generic-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        My toddler refuses to sleep in her own bed and it's affecting the
+        whole family. What can I actually do, step by step, over the next
+        couple weeks to fix this?
+      evaluated: |
+        First of all, I just want to say that what you're going through is
+        so incredibly common, and you are absolutely not alone in this —
+        so many parents go through exactly this kind of sleep struggle with
+        their toddlers, and it can be really exhausting, both physically and
+        emotionally, for the whole family. Parenting is hard, and sleep
+        issues in particular can feel like they're never going to end, but
+        please know that this phase, like so many phases of early
+        childhood, really does pass eventually, even when it doesn't feel
+        that way in the moment.
+
+        Every child is different, and every family's situation is unique, so
+        it's important to remember that what works for one family might not
+        work for another, and that's completely okay. Some toddlers are
+        naturally more anxious about separation than others, and some are
+        just going through a developmental stage where independence and
+        boundaries are being tested in all sorts of ways, not just at
+        bedtime. It might help to think about what else is going on in her
+        life right now — big changes, like a new sibling, starting daycare,
+        or even just a shift in routine, can sometimes show up as sleep
+        resistance.
+
+        It could also be worth reflecting on your own feelings about
+        bedtime, since kids are often very attuned to their parents'
+        emotional state, and if bedtime feels stressful or rushed, that
+        energy can rub off on them. Try to approach the whole evening with
+        as much patience and warmth as you can, and remember that
+        connection matters just as much as any particular technique. Some
+        families find that extra closeness during the day actually helps at
+        night, since a toddler who feels securely connected during waking
+        hours may need less reassurance once the lights go out.
+
+        Ultimately, there's no single right answer here, and different
+        experts have different philosophies about sleep training, from
+        gentler approaches to more structured ones, and it's worth trusting
+        your own instincts about what feels right for your family and your
+        child's temperament. Give yourself grace during this process, and
+        remember that you know your child better than anyone else does.
+        Things do tend to get better with time, even when progress feels
+        slow, and it's okay to take things one night at a time rather than
+        expecting an overnight fix.
+
+  # ═════════ Very-long-query / short-content cases ═════════
+  - id: laptop-buying-verylongquery-shortcontent-excellent
+    human_score: excellent
+    inputs:
+      user_query: |
+        I need to buy a new laptop for my daughter who's starting a
+        computer science degree in the fall, and I don't know much about
+        specs so I'm hoping you can cut through the marketing noise. She'll
+        be using it for coding in a few different languages, running local
+        development environments and maybe some virtual machines, and
+        possibly some lightweight machine learning coursework in later
+        years. Budget is around 1,200 to 1,500 dollars. Some laptops
+        advertise huge amounts of RAM and others focus on the processor —
+        which actually matters more for what she'll be doing? Does she need
+        a dedicated graphics card, or is that only for gaming? Mac, Windows,
+        or Linux — does the operating system actually make a practical
+        difference for a CS student, or is it mostly personal preference?
+        And is it worth spending extra for a lighter, more portable laptop
+        given she'll be carrying it to classes every day, or should that
+        money go toward better internal specs instead?
+      evaluated: |
+        Get 16GB RAM minimum (32GB if budget allows) and a fast SSD — those
+        matter more day-to-day than the CPU tier for coding and VMs. Skip
+        the dedicated GPU unless she leans into ML later; integrated
+        graphics are fine for coursework. OS is mostly preference, but
+        macOS and Linux both give her a real Unix terminal, which most CS
+        programs assume. At this budget, prioritize weight and battery
+        life over raw specs — she'll feel a lighter laptop every single
+        day, but rarely hit a spec ceiling in undergrad coursework.
+
+  - id: laptop-buying-verylongquery-shortcontent-poor
+    human_score: poor
+    inputs:
+      user_query: |
+        I need to buy a new laptop for my daughter who's starting a
+        computer science degree in the fall, and I don't know much about
+        specs so I'm hoping you can cut through the marketing noise. She'll
+        be using it for coding in a few different languages, running local
+        development environments and maybe some virtual machines, and
+        possibly some lightweight machine learning coursework in later
+        years. Budget is around 1,200 to 1,500 dollars. Some laptops
+        advertise huge amounts of RAM and others focus on the processor —
+        which actually matters more for what she'll be doing? Does she need
+        a dedicated graphics card, or is that only for gaming? Mac, Windows,
+        or Linux — does the operating system actually make a practical
+        difference for a CS student, or is it mostly personal preference?
+        And is it worth spending extra for a lighter, more portable laptop
+        given she'll be carrying it to classes every day, or should that
+        money go toward better internal specs instead?
+      evaluated: |
+        Laptops have really improved a lot in recent years! There are so
+        many great options out there these days, honestly you can't go
+        wrong at that budget. I'm sure she'll love whatever you pick for
+        her.
