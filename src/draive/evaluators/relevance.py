@@ -146,18 +146,18 @@ Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
-Evaluated metric is relevance - selection of important parts from the REFERENCE content.
-The EVALUATED content should include only important information from the REFERENCE avoiding redundancies and excess information.
+Evaluated metric is relevance - the selection of important parts from the REFERENCE content. The EVALUATED content should include only important information from the REFERENCE, avoiding redundancies and excess information.
+Judge only relevance: assess topical pertinence and the absence of redundant or off-topic material. Do not penalize brevity, limited depth, or incomplete coverage - a short but fully on-topic response is highly relevant.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
 Assign a relevance score using exact name of one of the following values:
-- "poor" is very low relevance, the content contains mostly irrelevant or redundant information.
-- "fair" is low relevance, the content includes some important points but has significant irrelevant parts.
-- "good" is moderate relevance, the content covers most important points but includes some unnecessary information.
-- "excellent" is high relevance, the content focuses on important information with minor inclusions of less relevant content.
-- "perfect" is very high relevance, the content precisely captures only the most important information from the reference.
-Use the "none" value for content that cannot be rated at all.
+- "poor" - mostly irrelevant or redundant information.
+- "fair" - some important points, but significant irrelevant parts.
+- "good" - covers most important points, but includes some unnecessary information.
+- "excellent" - focuses on important information, with minor inclusions of less relevant content.
+- "perfect" - precisely captures only the most important information from the reference.
+Use the "none" value only for content that cannot be rated at all: empty, whitespace-only, gibberish, random characters or bytes, encoded noise, or content with no intelligible, assessable payload.
 </RATING>
 
 {FORMAT_INSTRUCTION}
@@ -167,7 +167,7 @@ CONTEXT_REFERENCE_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess their relevance against the REFERENCE.
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements, then rate them using solely a relevance metric against the REFERENCE according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
@@ -175,16 +175,17 @@ Use the explained RATING scale and the requested FORMAT to provide the result.
 <EVALUATION_CRITERIA>
 Evaluated metric is relevance of model results in context.
 Assess whether model outputs include only information pertinent to the REFERENCE, avoiding unnecessary digressions, redundancies, and content that does not serve what the REFERENCE establishes as important.
+Judge only relevance: assess topical pertinence and the absence of redundant or off-topic material. Do not penalize brevity, limited depth, or incomplete coverage - a short but fully on-topic response is highly relevant.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
 Assign a relevance score using exact name of one of the following values:
-- "poor" is very low relevance, model outputs contain mostly irrelevant or redundant information relative to the reference.
-- "fair" is low relevance, model outputs include some important points but have significant irrelevant parts.
-- "good" is moderate relevance, model outputs cover most important points but include some unnecessary information.
-- "excellent" is high relevance, model outputs focus on important information with minor inclusions of less relevant content.
-- "perfect" is very high relevance, model outputs precisely capture only the most important information from the reference.
-Use the "none" value for content that cannot be rated at all.
+- "poor" - mostly irrelevant or redundant information relative to the reference.
+- "fair" - some important points, but significant irrelevant parts.
+- "good" - covers most important points, but includes some unnecessary information.
+- "excellent" - focuses on important information, with minor inclusions of less relevant content.
+- "perfect" - precisely captures only the most important information from the reference.
+Use the "none" value only when the model outputs cannot be rated at all: empty, whitespace-only, gibberish, random characters or bytes, encoded noise, or no intelligible, assessable payload.
 </RATING>
 
 {FORMAT_INSTRUCTION}
@@ -194,7 +195,7 @@ CONTEXT_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements and assess their relevance to the user's queries and intent.
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements, then rate them using solely a relevance metric according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
@@ -202,16 +203,17 @@ Use the explained RATING scale and the requested FORMAT to provide the result.
 <EVALUATION_CRITERIA>
 Evaluated metric is relevance of model results in context.
 Assess whether model outputs include only pertinent information addressing the user's queries, avoiding unnecessary digressions, redundancies, and content that does not serve the user's intent established in the conversation.
+Judge only relevance: assess topical pertinence and the absence of redundant or off-topic material. Do not penalize brevity, limited depth, or incomplete coverage - a short but fully on-topic response is highly relevant.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
 Assign a relevance score using exact name of one of the following values:
-- "poor" is very low relevance, model outputs contain mostly irrelevant or redundant information relative to user queries.
-- "fair" is low relevance, model outputs include some important points but have significant irrelevant parts.
-- "good" is moderate relevance, model outputs cover most important points but include some unnecessary information.
-- "excellent" is high relevance, model outputs focus on important information with minor inclusions of less relevant content.
-- "perfect" is very high relevance, model outputs precisely address the user's queries with only the most pertinent information.
-Use the "none" value for content that cannot be rated at all.
+- "poor" - mostly irrelevant or redundant information relative to user queries.
+- "fair" - some important points, but significant irrelevant parts.
+- "good" - covers most important points, but includes some unnecessary information.
+- "excellent" - focuses on important information, with minor inclusions of less relevant content.
+- "perfect" - precisely addresses the user's queries with only the most pertinent information.
+Use the "none" value only when the model outputs cannot be rated at all: empty, whitespace-only, gibberish, random characters or bytes, encoded noise, or no intelligible, assessable payload.
 </RATING>
 
 {FORMAT_INSTRUCTION}

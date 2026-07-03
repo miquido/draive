@@ -2,6 +2,7 @@ from draive.evaluation import EvaluationScore, evaluator
 from draive.evaluators.utils import (
     FORMAT_INSTRUCTION,
     extract_evaluation_result,
+    is_empty_content,
     model_context_multimodal,
 )
 from draive.models import ModelContext, ModelInput
@@ -31,7 +32,7 @@ async def readability_evaluator(
     EvaluationScore
         Evaluation result.
     """
-    if not evaluated:
+    if is_empty_content(evaluated):
         return EvaluationScore.of(
             0.0,
             meta={"comment": "Input was empty!"},
@@ -46,9 +47,9 @@ async def readability_evaluator(
             (
                 ModelInput.of(
                     MultimodalContent.of(
-                        "<CONTENT>",
+                        "<EVALUATED>",
                         evaluated,
-                        "</CONTENT>",
+                        "</EVALUATED>",
                     ),
                 ),
             )
@@ -86,6 +87,12 @@ async def readability_context_evaluator(
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)
 
+    if is_empty_content(evaluated_content):
+        return EvaluationScore.of(
+            0.0,
+            meta={"comment": "Input context was empty!"},
+        )
+
     return extract_evaluation_result(
         await Step.generating_completion(
             instructions=CONTEXT_INSTRUCTION.format(
@@ -95,9 +102,9 @@ async def readability_context_evaluator(
             (
                 ModelInput.of(
                     MultimodalContent.of(
-                        "<CONTENT>",
+                        "<EVALUATED>",
                         evaluated_content,
-                        "</CONTENT>",
+                        "</EVALUATED>",
                     ),
                 ),
             )
@@ -109,25 +116,25 @@ CONTENT_INSTRUCTION: str = f"""\
 You are evaluating the provided content according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine provided CONTENT, then rate it using solely a readability metric according to the EVALUATION_CRITERIA.
+Carefully examine the EVALUATED content, then rate it using solely a readability metric according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
-Evaluated metric is readability - the ease with which a reader can understand the content.
-A readable content uses clear and concise language, is well-structured,
-and avoids complex or convoluted elements.
+Evaluated metric is readability - the ease with which a reader can understand the EVALUATED content.
+Readable content uses clear, concise language, is well-structured, and avoids convoluted sentences, unexplained jargon, and disorganized presentation. Judge readability for the content's own apparent audience; dense specialist jargon aimed at a general or lay audience is a readability defect.
+Judge only readability: do not reward or penalize factual accuracy or relevance on their own.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
 Assign a readability score using exact name of one of the following values:
-- "poor" is very low readability, the content is extremely difficult to understand, with complex language and convoluted structure.
-- "fair" is low readability, the content is challenging to read, with frequent use of complex sentences, unclear language or irrelevant parts.
-- "good" is moderate readability, the content is somewhat clear but has some areas that are difficult to understand.
-- "excellent" is high readability, the content is mostly clear and easy to read, with minor instances of complexity.
-- "perfect" is very high readability, the content is highly clear, concise, and easy to understand throughout.
-Use the "none" value for content that cannot be rated at all.
+- "poor" - extremely difficult to understand; complex language and convoluted structure throughout.
+- "fair" - challenging to read; frequent complex sentences, unclear language, or disorganized parts.
+- "good" - somewhat clear but with some areas that are difficult to understand.
+- "excellent" - mostly clear and easy to read, with minor instances of complexity.
+- "perfect" - highly clear, concise, and easy to understand throughout.
+Use the "none" value only for content that cannot be rated at all: empty, whitespace-only, gibberish, random characters or bytes, encoded noise, or content with no intelligible, assessable payload.
 </RATING>
 
 {FORMAT_INSTRUCTION}
@@ -137,24 +144,25 @@ CONTEXT_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the CONTENT conversation timeline. Focus on model-produced results in output elements and rate their readability.
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements, then rate them using solely a readability metric according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
 Evaluated metric is readability of model results in context.
-Assess the ease with which a reader can understand model outputs, considering clarity of language, logical structure, appropriate formatting, and avoidance of convoluted elements across the conversation.
+Assess the ease with which a reader can understand model outputs across the conversation, considering clarity of language, logical structure, appropriate formatting, and avoidance of convoluted or jargon-heavy passages. Judge readability for the outputs' own apparent audience.
+Judge only readability: do not reward or penalize factual accuracy or relevance on their own.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
 Assign a readability score using exact name of one of the following values:
-- "poor" is very low readability, model outputs are extremely difficult to understand with complex language and convoluted structure.
-- "fair" is low readability, model outputs are challenging to read with frequent use of complex sentences or unclear language.
-- "good" is moderate readability, model outputs are somewhat clear but have some areas that are difficult to understand.
-- "excellent" is high readability, model outputs are mostly clear and easy to read with minor instances of complexity.
-- "perfect" is very high readability, model outputs are highly clear, concise, and easy to understand throughout.
-Use the "none" value for content that cannot be rated at all.
+- "poor" - outputs are extremely difficult to understand; complex language and convoluted structure throughout.
+- "fair" - outputs are challenging to read; frequent complex sentences, unclear language, or disorganized parts.
+- "good" - outputs are somewhat clear but with some areas that are difficult to understand.
+- "excellent" - outputs are mostly clear and easy to read, with minor instances of complexity.
+- "perfect" - outputs are highly clear, concise, and easy to understand throughout.
+Use the "none" value only when the model outputs cannot be rated at all: empty, whitespace-only, gibberish, random characters or bytes, encoded noise, or no intelligible, assessable payload.
 </RATING>
 
 {FORMAT_INSTRUCTION}

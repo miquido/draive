@@ -2,6 +2,7 @@ from draive.evaluation import EvaluationScore, evaluator
 from draive.evaluators.utils import (
     FORMAT_INSTRUCTION,
     extract_evaluation_result,
+    is_empty_content,
     model_context_multimodal,
 )
 from draive.models import ModelContext, ModelInput
@@ -34,13 +35,13 @@ async def coherence_evaluator(
     EvaluationScore
         Evaluation result.
     """
-    if not evaluated:
+    if is_empty_content(evaluated):
         return EvaluationScore.of(
             0.0,
             meta={"comment": "Input was empty!"},
         )
 
-    if not reference:
+    if is_empty_content(reference):
         return EvaluationScore.of(
             0.0,
             meta={"comment": "Reference was empty!"},
@@ -100,9 +101,15 @@ async def coherence_context_evaluator(
 
     evaluated_content: MultimodalContent = model_context_multimodal(evaluated)
 
+    if is_empty_content(evaluated_content):
+        return EvaluationScore.of(
+            0.0,
+            meta={"comment": "Input context was empty!"},
+        )
+
     instruction: str
     input_content: MultimodalContent
-    if reference:
+    if reference and not is_empty_content(reference):
         instruction = CONTEXT_REFERENCE_INSTRUCTION
         input_content = MultimodalContent.of(
             "<REFERENCE>",
@@ -139,19 +146,19 @@ Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
-Evaluated metric is coherence - a collective quality of the content.
-We align this dimension with the DUC (Document Understanding Conference) quality question of structure and coherence, whereby the content should be well-structured and well-organized.
-EVALUATED content should not just be a heap of related information, but should build from part to part into a coherent body of information about the topic.
+Evaluated metric is coherence - the collective structural quality of the EVALUATED content, aligned with the DUC (Document Understanding Conference) quality question of structure and coherence: the content should be well-structured and well-organized.
+The content should not be a heap of related information but should build from part to part into a coherent body of information about the topic, with logical connections and smooth transitions. Treat the REFERENCE as supplemental material describing the expected well-structured progression, and use it as a benchmark for structural alignment.
+Judge only coherence: do not reward or penalize factual accuracy or coverage on their own.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
 Assign a coherence score using exact name of one of the following values:
-- "poor" is very low coherence, the content is chaotic, lacking logical connections between parts.
-- "fair" is low coherence, some connections are visible, but the overall structure is weak.
-- "good" is moderate coherence, the content has a noticeable structure, but with some shortcomings.
-- "excellent" is high coherence, the content is well-organized with minor imperfections.
-- "perfect" is very high coherence, the content is exemplarily structured, with smooth transitions between ideas.
-Use the "none" value for content that cannot be rated at all.
+- "poor" - chaotic; lacking logical connections between parts.
+- "fair" - some connections are visible, but the overall structure is weak.
+- "good" - a noticeable structure, but with some shortcomings.
+- "excellent" - well-organized, with minor imperfections.
+- "perfect" - exemplarily structured, with smooth transitions between ideas.
+Use the "none" value only for content that cannot be rated at all: empty, whitespace-only, gibberish, random characters or bytes, encoded noise, or content with no intelligible, assessable payload.
 </RATING>
 
 {FORMAT_INSTRUCTION}
@@ -161,26 +168,25 @@ CONTEXT_REFERENCE_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the CONTEXT timeline. Focus on model-produced results in output elements and judge whether they are coherent with information available in the context itself.
-Treat REFERENCE as supplemental material describing the expected well-structured progression, and use it to help validate the structural alignment of the outputs.
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements, then rate them using solely a coherence metric against the REFERENCE according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
 Evaluated metric is coherence of model results in context.
-Assess whether outputs form a logically connected and well-structured progression from available contextual information (especially prior inputs and prior outputs), using the REFERENCE as a benchmark for the expected structure.
-Outputs should not be chaotic, contradictory, or disconnected from what was established in the context timeline.
+Assess whether model outputs form a logically connected and well-structured progression from available contextual information (especially prior inputs and prior outputs). Treat the REFERENCE as a benchmark for the expected well-structured progression. Outputs should not be chaotic, contradictory, or disconnected from what was established in the context timeline.
+Judge only coherence: do not reward or penalize factual accuracy or coverage on their own.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
 Assign a coherence score using exact name of one of the following values:
-- "poor" is very low coherence, outputs are chaotic or largely disconnected from context.
-- "fair" is low coherence, some context alignment exists but structure is weak.
-- "good" is moderate coherence, outputs are mostly coherent with a few structural gaps.
-- "excellent" is high coherence, outputs are well-organized and context-aligned with minor imperfections.
-- "perfect" is very high coherence, outputs are consistently well-structured and fully coherent within context.
-Use the "none" value for content that cannot be rated at all.
+- "poor" - outputs are chaotic or largely disconnected from context.
+- "fair" - some context alignment exists but structure is weak.
+- "good" - outputs are mostly coherent with a few structural gaps.
+- "excellent" - outputs are well-organized and context-aligned, with minor imperfections.
+- "perfect" - outputs are consistently well-structured and fully coherent within context.
+Use the "none" value only when the model outputs cannot be rated at all: empty, whitespace-only, gibberish, random characters or bytes, encoded noise, or no intelligible, assessable payload.
 </RATING>
 
 {FORMAT_INSTRUCTION}
@@ -190,25 +196,25 @@ CONTEXT_INSTRUCTION: str = f"""\
 You are evaluating model results produced within a conversation context according to the defined criteria.
 
 <INSTRUCTION>
-Carefully examine the CONTEXT timeline. Focus on model-produced results in output elements and judge whether they are coherent with information available in the context itself.
+Carefully examine the EVALUATED conversation timeline. Focus on model-produced results in output elements, then rate them using solely a coherence metric according to the EVALUATION_CRITERIA.
 Think step by step and provide explanation of the score before the final score.
 Use the explained RATING scale and the requested FORMAT to provide the result.
 </INSTRUCTION>
 
 <EVALUATION_CRITERIA>
 Evaluated metric is coherence of model results in context.
-Assess whether outputs form a logically connected and well-structured progression from available contextual information (especially prior inputs and prior outputs).
-Outputs should not be chaotic, contradictory, or disconnected from what was established in the context timeline.
+Assess whether model outputs form a logically connected and well-structured progression from available contextual information (especially prior inputs and prior outputs). Outputs should not be chaotic, contradictory, or disconnected from what was established in the context timeline.
+Judge only coherence: do not reward or penalize factual accuracy or coverage on their own.
 </EVALUATION_CRITERIA>
 {{guidelines}}
 <RATING>
 Assign a coherence score using exact name of one of the following values:
-- "poor" is very low coherence, outputs are chaotic or largely disconnected from context.
-- "fair" is low coherence, some context alignment exists but structure is weak.
-- "good" is moderate coherence, outputs are mostly coherent with a few structural gaps.
-- "excellent" is high coherence, outputs are well-organized and context-aligned with minor imperfections.
-- "perfect" is very high coherence, outputs are consistently well-structured and fully coherent within context.
-Use the "none" value for content that cannot be rated at all.
+- "poor" - outputs are chaotic or largely disconnected from context.
+- "fair" - some context alignment exists but structure is weak.
+- "good" - outputs are mostly coherent with a few structural gaps.
+- "excellent" - outputs are well-organized and context-aligned, with minor imperfections.
+- "perfect" - outputs are consistently well-structured and fully coherent within context.
+Use the "none" value only when the model outputs cannot be rated at all: empty, whitespace-only, gibberish, random characters or bytes, encoded noise, or no intelligible, assessable payload.
 </RATING>
 
 {FORMAT_INSTRUCTION}
