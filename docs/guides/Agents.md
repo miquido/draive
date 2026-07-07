@@ -20,7 +20,7 @@ The agents API is intentionally built as a thin layer over existing Draive runti
 
 - `AgentIdentity` describes the agent instance: `uri`, `name`, `description`, `meta`.
 - `AgentMessage` is the fully prepared input payload: `thread`, `created`, `content`, `meta`.
-- `AgentContext` is the scoped runtime state propagated through `ctx.scope(...)`.
+- `AgentThread` is the scoped runtime state propagated through `ctx.scope(...)`.
 - `AgentExecuting` is the executor protocol:
     `AgentMessage -> AsyncIterable[MultimodalContentPart | ProcessingEvent]`.
 
@@ -50,7 +50,7 @@ async def execute(
 
 worker: Agent = Agent.steps(
     Step(execute),
-    name="worker",
+    agent="worker",
     description="Handles a small processing task",
 )
 ```
@@ -132,7 +132,7 @@ async def system_status() -> str:
 
 
 assistant: Agent = Agent.generative(
-    name="support",
+    agent="support",
     description="Answers product support questions",
     instructions="You are a concise support assistant. Use tools when useful.",
     tools=[system_status],
@@ -171,7 +171,7 @@ level conversation APIs or pass the required context explicitly.
 
 ## 3. Preserve Thread And Metadata
 
-`Agent.call(...)` automatically reuses the current `AgentContext` when present. That allows nested
+`Agent.call(...)` automatically reuses the current `AgentThread` when present. That allows nested
 agent calls to share a logical thread and metadata.
 
 ```python
@@ -179,7 +179,7 @@ from collections.abc import AsyncIterable
 from uuid import uuid4
 
 from draive import Agent, AgentIdentity, AgentMessage, ctx
-from draive.agents.types import AgentContext
+from draive.agents import AgentThread
 from draive.multimodal import MultimodalContentPart, TextContent
 from draive.utils import ProcessingEvent
 
@@ -187,9 +187,9 @@ from draive.utils import ProcessingEvent
 async def echo(
     message: AgentMessage,
 ) -> AsyncIterable[MultimodalContentPart | ProcessingEvent]:
-    context = ctx.state(AgentContext)
+    context = ctx.state(AgentThread)
     yield TextContent.of(
-        f"thread={context.thread} source={context.meta.get_str('source')}"
+        f"thread={context.identifier} source={context.meta.get_str('source')}"
     )
 
 
@@ -201,7 +201,7 @@ agent: Agent = Agent(
 
 async with ctx.scope(
     "agents.context",
-    AgentContext.of(thread=uuid4(), meta={"source": "outer"}),
+    AgentThread.of(identifier=uuid4(), meta={"source": "outer"}),
 ):
     stream: AsyncIterable[MultimodalContentPart | ProcessingEvent] = agent.call(
         input="hello",
@@ -214,7 +214,7 @@ async with ctx.scope(
 In practice:
 
 - `thread=` on `call(...)` overrides the current context thread,
-- `meta=` is merged with the current `AgentContext.meta`,
+- `meta=` is merged with the current `AgentThread.meta`,
 - `respond(...)` is useful when you already have a prepared `AgentMessage`.
 
 This matters when agents call other agents. Nested calls inherit the active thread and metadata by
@@ -234,12 +234,12 @@ from draive.steps import Step
 
 researcher: Agent = Agent.steps(
     Step.emitting(TextContent.of("Collected facts")),
-    name="researcher",
+    agent="researcher",
     description="Collects background information",
 )
 
 writer: Agent = Agent.generative(
-    name="writer",
+    agent="writer",
     description="Writes the final response",
     instructions="Delegate research first, then answer clearly.",
     tools=[AgentsGroup.of(researcher).as_tool()],
@@ -312,19 +312,19 @@ from draive import Agent, AgentsGroup
 
 
 researcher: Agent = Agent.generative(
-    name="researcher",
+    agent="researcher",
     description="Finds facts and prepares structured findings",
     instructions="Gather only the information needed for the task.",
 )
 
 reviewer: Agent = Agent.generative(
-    name="reviewer",
+    agent="reviewer",
     description="Checks output for completeness and correctness",
     instructions="Review the provided answer and suggest corrections.",
 )
 
 coordinator: Agent = Agent.generative(
-    name="coordinator",
+    agent="coordinator",
     description="Routes tasks between specialized agents",
     instructions=(
         "Use `agent_request` to delegate work to the specialized agents. "

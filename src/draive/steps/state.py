@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Literal, Self, overload
+from typing import Literal, Self, final, overload
 
 from haiway import State
 
@@ -10,6 +10,7 @@ from draive.multimodal import ArtifactContent
 __all__ = ("StepState",)
 
 
+@final
 class StepState(State, serializable=True):
     """Immutable state container used by step pipelines.
 

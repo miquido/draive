@@ -1,14 +1,15 @@
 from collections.abc import AsyncIterable, Iterable
-from typing import Any, NoReturn, Self, final
-from uuid import UUID, uuid4
+from typing import Any, NoReturn, Self, final, overload
+from uuid import UUID
 
 from haiway import Meta, MetaValues, ctx
 
+from draive.agents.state import AgentMemory
 from draive.agents.types import (
-    AgentContext,
     AgentExecuting,
     AgentIdentity,
     AgentMessage,
+    AgentThread,
 )
 from draive.models import (
     ModelInstructions,
@@ -17,7 +18,7 @@ from draive.models import (
     ModelToolRequest,
     ModelToolResponse,
 )
-from draive.models.types import ModelToolHandling
+from draive.models.types import ModelInput, ModelToolHandling
 from draive.multimodal import (
     Multimodal,
     MultimodalContent,
@@ -50,10 +51,27 @@ class Agent:
         Immutable metadata identifying the agent.
     """
 
+    @overload
     @classmethod
     def noop(
         cls,
-        name: str,
+        agent: AgentIdentity,
+    ) -> Self: ...
+
+    @overload
+    @classmethod
+    def noop(
+        cls,
+        agent: str,
+        *,
+        description: str = "",
+        meta: Meta | MetaValues | None = None,
+    ) -> Self: ...
+
+    @classmethod
+    def noop(
+        cls,
+        agent: AgentIdentity | str,
         *,
         description: str = "",
         meta: Meta | MetaValues | None = None,
@@ -62,8 +80,8 @@ class Agent:
 
         Parameters
         ----------
-        name : str
-            Human-readable agent name.
+        name : AgentIdentity | str
+            Human-readable agent name or full identity.
         description : str, default=""
             Short description of the agent's purpose.
         meta : Meta | MetaValues | None, default=None
@@ -81,24 +99,57 @@ class Agent:
             return  # do not emit anything
             yield  # converts to AsyncGenerator
 
-        return cls(
-            identity=AgentIdentity(
-                uri=f"agent://{uuid4()}",
-                name=name,
+        identity: AgentIdentity
+        if isinstance(agent, str):
+            identity = AgentIdentity.of(
+                name=agent,
                 description=description,
-                meta=Meta.of(meta),
-            ),
+                meta=meta,
+            )
+
+        else:
+            identity = agent
+
+        return cls(
+            identity=identity,
             executing=noop,
         )
 
+    @overload
     @classmethod
     def generative(
         cls,
-        name: str,
+        agent: AgentIdentity,
+        *,
+        instructions: Template | ModelInstructions,
+        tools: Toolbox | Iterable[Tool] = Toolbox.empty,
+        memory: AgentMemory = AgentMemory.disabled,
+        output: ModelOutputSelection = "auto",
+    ) -> Self: ...
+
+    @overload
+    @classmethod
+    def generative(
+        cls,
+        agent: str,
         *,
         description: str = "",
         instructions: Template | ModelInstructions,
         tools: Toolbox | Iterable[Tool] = Toolbox.empty,
+        memory: AgentMemory = AgentMemory.disabled,
+        output: ModelOutputSelection = "auto",
+        meta: Meta | MetaValues | None = None,
+    ) -> Self: ...
+
+    @classmethod
+    def generative(
+        cls,
+        agent: AgentIdentity | str,
+        *,
+        description: str = "",
+        instructions: Template | ModelInstructions,
+        tools: Toolbox | Iterable[Tool] = Toolbox.empty,
+        memory: AgentMemory = AgentMemory.disabled,
         output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
     ) -> Self:
@@ -114,6 +165,9 @@ class Agent:
             Instructions passed to the configured generative model.
         tools : Toolbox | Iterable[Tool], default=Toolbox.empty
             Tools available to the model while handling requests.
+        memory : AgentMemory, default=AgentMemory.disabled
+            Memory used to recall context before each turn and persist it
+            afterwards. Defaults to a no-op memory scoped to a single turn.
         output : ModelOutputSelection, default="auto"
             Output selection mode forwarded to model completion.
         meta : Meta | MetaValues | None, default=None
@@ -124,23 +178,59 @@ class Agent:
         Self
             Agent instance backed by ``Step.looping_completion(...)``.
         """
+        identity: AgentIdentity
+        if isinstance(agent, str):
+            identity = AgentIdentity.of(
+                name=agent,
+                description=description,
+                meta=meta,
+            )
+
+        else:
+            identity = agent
+
         return cls.steps(
             Step.looping_completion(
                 instructions=instructions,
                 tools=tools,
                 output=output,
             ),
-            name=name,
-            description=description,
-            meta=meta,
+            agent=identity,
+            memory=memory,
         )
 
+    @overload
+    @classmethod
+    def from_skill(
+        cls,
+        skill: Skill,
+        *,
+        identity: AgentIdentity,
+        tools: Toolbox | Iterable[Tool] = Toolbox.empty,
+        memory: AgentMemory = AgentMemory.disabled,
+        output: ModelOutputSelection = "auto",
+    ) -> Self: ...
+
+    @overload
     @classmethod
     def from_skill(
         cls,
         skill: Skill,
         *,
         tools: Toolbox | Iterable[Tool] = Toolbox.empty,
+        memory: AgentMemory = AgentMemory.disabled,
+        output: ModelOutputSelection = "auto",
+        meta: Meta | MetaValues | None = None,
+    ) -> Self: ...
+
+    @classmethod
+    def from_skill(
+        cls,
+        skill: Skill,
+        *,
+        identity: AgentIdentity | None = None,
+        tools: Toolbox | Iterable[Tool] = Toolbox.empty,
+        memory: AgentMemory = AgentMemory.disabled,
         output: ModelOutputSelection = "auto",
         meta: Meta | MetaValues | None = None,
     ) -> Self:
@@ -153,6 +243,9 @@ class Agent:
             optional resources.
         tools : Toolbox | Iterable[Tool], default=Toolbox.empty
             Additional tools available while handling requests.
+        memory : AgentMemory, default=AgentMemory.disabled
+            Memory used to recall context before each turn and persist it
+            afterwards. Defaults to a no-op memory scoped to a single turn.
         output : ModelOutputSelection, default="auto"
             Output selection mode forwarded to model completion.
         meta : Meta | MetaValues | None, default=None
@@ -164,6 +257,13 @@ class Agent:
         Self
             Agent instance configured from skill metadata and instructions.
         """
+
+        if identity is None:
+            identity = AgentIdentity.of(
+                name=skill.name,
+                description=skill.description,
+                meta=skill.meta.merged_with(meta),
+            )
 
         resolved_toolbox: Toolbox
         if isinstance(tools, Toolbox):
@@ -178,10 +278,33 @@ class Agent:
                 tools=resolved_toolbox,
                 output=output,
             ),
-            name=skill.name,
-            description=skill.description,
-            meta=skill.meta.merged_with(meta),
+            agent=identity,
+            memory=memory,
         )
+
+    @overload
+    @classmethod
+    def steps(
+        cls,
+        /,
+        step: Step,
+        *steps: Step,
+        agent: AgentIdentity,
+        memory: AgentMemory = AgentMemory.disabled,
+    ) -> Self: ...
+
+    @overload
+    @classmethod
+    def steps(
+        cls,
+        /,
+        step: Step,
+        *steps: Step,
+        agent: str,
+        description: str = "",
+        memory: AgentMemory = AgentMemory.disabled,
+        meta: Meta | MetaValues | None = None,
+    ) -> Self: ...
 
     @classmethod
     def steps(
@@ -189,8 +312,9 @@ class Agent:
         /,
         step: Step,
         *steps: Step,
-        name: str,
+        agent: AgentIdentity | str,
         description: str = "",
+        memory: AgentMemory = AgentMemory.disabled,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create an agent from one or more ``Step`` pipeline stages.
@@ -201,10 +325,14 @@ class Agent:
             First step executed after the incoming message is appended as input.
         *steps : Step
             Additional steps executed sequentially after ``step``.
-        name : str
-            Human-readable agent name.
+        agent : AgentIdentity | str
+            Human-readable agent name or full identity.
         description : str, default=""
             Short description of the agent's purpose.
+        memory : AgentMemory, default=AgentMemory.disabled
+            Memory used to recall context before ``step`` runs and persist the
+            resulting context after ``*steps`` complete. Defaults to a no-op
+            memory scoped to a single turn.
         meta : Meta | MetaValues | None, default=None
             Additional metadata attached to the agent identity.
 
@@ -215,18 +343,25 @@ class Agent:
 
         Notes
         -----
-        The wrapped execution prepends ``Step.appending_input(message.content)``
-        and filters out reasoning and tool protocol chunks from the public
-        output stream.
+        The wrapped execution recalls context via ``memory.recall_step``,
+        runs ``step`` and ``*steps``, then persists the resulting context via
+        ``memory.remember_step``, and filters out reasoning and tool protocol
+        chunks from the public output stream.
         """
 
         async def execute(
             message: AgentMessage,
         ) -> AsyncIterable[MultimodalContentPart | ProcessingEvent]:
             async for chunk in Step.sequence(
-                Step.appending_input(message.content),
+                memory.recall_step(
+                    input=ModelInput.of(
+                        message.content,
+                        meta=message.meta,
+                    )
+                ),
                 step,
                 *steps,
+                memory.remember_step,
             ):
                 if isinstance(chunk, ModelReasoningChunk):
                     continue  # skip reasoning
@@ -243,13 +378,19 @@ class Agent:
                 else:
                     yield chunk  # pass content
 
-        return cls(
-            identity=AgentIdentity(
-                uri=f"agent://{uuid4()}",
-                name=name,
+        identity: AgentIdentity
+        if isinstance(agent, str):
+            identity = AgentIdentity.of(
+                name=agent,
                 description=description,
-                meta=Meta.of(meta),
-            ),
+                meta=meta,
+            )
+
+        else:
+            identity = agent
+
+        return cls(
+            identity=identity,
             executing=execute,
         )
 
@@ -301,24 +442,24 @@ class Agent:
         ----------
         thread : UUID | None, default=None
             Conversation thread identifier. When omitted, the current
-            ``AgentContext`` thread is reused or a new one is created.
+            ``AgentThread`` thread is reused or a new one is created.
         input : Multimodal
             Input payload converted into an ``AgentMessage``.
         meta : Meta | MetaValues | None, default=None
-            Metadata merged into the active ``AgentContext``.
+            Metadata merged into the active ``AgentThread``.
 
         Returns
         -------
         AsyncIterable[MultimodalContentPart | ProcessingEvent]
             Stream of output chunks emitted by the agent.
         """
-        context: AgentContext = ctx.state(
-            AgentContext,
-            default=AgentContext.of(),
+        context: AgentThread = ctx.state(
+            AgentThread,
+            default=AgentThread.of(),
         )
         return self.respond(
             AgentMessage(
-                thread=thread if thread is not None else context.thread,
+                thread=thread if thread is not None else context.identifier,
                 content=MultimodalContent.of(input),
                 meta=context.meta.merged_with(meta),
             ),
@@ -342,8 +483,8 @@ class Agent:
         """
         async with ctx.scope(
             f"agent.{self.identity.name}",
-            AgentContext.of(
-                thread=message.thread,
+            AgentThread.of(
+                message.thread,
                 meta=message.meta,
             ),
         ):

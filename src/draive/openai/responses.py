@@ -375,7 +375,7 @@ def _text_output(  # noqa: PLR0911
                     "type": "json_schema",
                     "name": output.__name__,
                     "schema": as_dict(output.__SPECIFICATION__),
-                    "strict": True,
+                    "strict": False,
                 }
             }
 
@@ -384,7 +384,7 @@ def _text_output(  # noqa: PLR0911
                 "type": "json_schema",
                 "name": output.__name__,
                 "schema": as_dict(output.__SPECIFICATION__),
-                "strict": True,
+                "strict": False,
             },
             "verbosity": cast(Literal["low", "medium", "high"], verbosity),
         }

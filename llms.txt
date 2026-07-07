@@ -96,7 +96,7 @@ answer: str = await TextGeneration.generate(
 - `Agent` is a thin immutable wrapper over an async executor.
 - `Agent.call(...)` accepts multimodal input and streams `MultimodalContentPart | ProcessingEvent`.
 - `Agent.respond(...)` is the lower-level form when you already have an `AgentMessage`.
-- `AgentContext` carries the active `thread` and merged `meta` through nested agent calls.
+- `AgentThread` carries the active thread identifier as `identifier` and merged `meta` through nested agent calls.
 - Import agent primitives from `draive` when possible: `Agent`, `AgentIdentity`, `AgentMessage`, `AgentsGroup`.
 
 ### Build An Agent From A `Step`
@@ -120,7 +120,7 @@ async def execute(
 
 worker: Agent = Agent.steps(
     Step(execute),
-    name="worker",
+    agent="worker",
     description="Performs a deterministic task",
 )
 ```
@@ -144,7 +144,7 @@ async def system_status() -> str:
 
 
 assistant: Agent = Agent.generative(
-    name="support",
+    agent="support",
     instructions="You are a concise support assistant. Use tools when useful.",
     tools=[system_status],
 )
@@ -171,12 +171,12 @@ from draive.steps import Step
 
 researcher: Agent = Agent.steps(
     Step.emitting(TextContent.of("Collected facts")),
-    name="researcher",
+    agent="researcher",
     description="Collects background information",
 )
 
 coordinator: Agent = Agent.generative(
-    name="coordinator",
+    agent="coordinator",
     instructions="Delegate research before answering.",
     tools=AgentsGroup.of(researcher).request_tool(),
 )

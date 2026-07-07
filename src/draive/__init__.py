@@ -97,12 +97,13 @@ from haiway import (
 
 from draive.agents import (
     Agent,
-    AgentContext,
     AgentException,
     AgentExecuting,
     AgentIdentity,
+    AgentMemory,
     AgentMessage,
     AgentsGroup,
+    AgentThread,
     AgentUnavailable,
 )
 from draive.conversation import (
@@ -278,11 +279,12 @@ from draive.utils import ProcessingEvent
 __all__ = (
     "MISSING",
     "Agent",
-    "AgentContext",
     "AgentException",
     "AgentExecuting",
     "AgentIdentity",
+    "AgentMemory",
     "AgentMessage",
+    "AgentThread",
     "AgentUnavailable",
     "AgentsGroup",
     "Alias",

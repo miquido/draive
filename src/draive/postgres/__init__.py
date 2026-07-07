@@ -8,12 +8,14 @@ from haiway.postgres import (
     PostgresValue,
 )
 
-from draive.postgres.memory import PostgresConversationMemory
+from draive.postgres.agent_memory import PostgresAgentMemory
+from draive.postgres.conversation_memory import PostgresConversationMemory
 from draive.postgres.templates import PostgresTemplatesRepository
 from draive.postgres.vector_index import PostgresVectorIndex
 
 __all__ = (
     "Postgres",
+    "PostgresAgentMemory",
     "PostgresConfigurationRepository",
     "PostgresConnection",
     "PostgresConnectionPool",

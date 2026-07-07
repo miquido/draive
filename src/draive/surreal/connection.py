@@ -1,3 +1,4 @@
+from asyncio import Lock
 from collections.abc import Generator, Mapping, MutableMapping, Sequence
 from types import TracebackType
 from typing import Any, final
@@ -26,6 +27,7 @@ class SurrealConnection:
         "_connection",
         "_credentials",
         "_database",
+        "_embedded_lock",
         "_namespace",
         "_url",
     )
@@ -56,6 +58,13 @@ class SurrealConnection:
         self._database: str = database
         self._credentials: Mapping[str, str] = credentials
         self._connection: AsyncWsSurrealConnection | None = None
+        # The embedded (in-process) engine is not safe under concurrent requests:
+        # gathered writes into the same HNSW-indexed table (or a KNN search racing
+        # such a write) nondeterministically panic its Rust runtime ("bytes ...
+        # advance out of bounds", SIGABRT - verified live), killing the whole
+        # process. Every embedded `_send` is therefore serialized through this
+        # per-connection lock; remote (ws) connections are unaffected.
+        self._embedded_lock: Lock = Lock()
 
     @property
     def connection(self) -> AsyncWsSurrealConnection:
@@ -124,6 +133,7 @@ class SurrealConnection:
                 namespace=namespace or self._namespace,
                 database=database or self._database,
                 credentials=credentials,
+                lock=self._embedded_lock,
             )
 
         else:
@@ -142,6 +152,7 @@ class _EmbeddedSessionContext:
         "_connection",
         "_credentials",
         "_database",
+        "_lock",
         "_namespace",
     )
 
@@ -151,41 +162,47 @@ class _EmbeddedSessionContext:
         namespace: str,
         database: str,
         credentials: Mapping[str, str],
+        lock: Lock,
     ) -> None:
         self._connection: AsyncEmbeddedSurrealConnection = connection
         self._namespace: str = namespace
         self._database: str = database
         self._credentials: Mapping[str, str] = credentials
+        self._lock: Lock = lock
 
     async def __aenter__(self) -> SurrealSession:
-        await self._connection._send(  # pyright: ignore[reportPrivateUsage]
-            RequestMessage(
-                RequestMethod.USE,
-                namespace=self._namespace,
-                database=self._database,
-            ),
-            process="",  # it is more or less ignored by surreal
-        )
-
-        if self._credentials:
+        # Serialized like every other embedded `_send` (see `SurrealConnection`'s
+        # `_embedded_lock`): the embedded engine panics under concurrent requests.
+        async with self._lock:
             await self._connection._send(  # pyright: ignore[reportPrivateUsage]
                 RequestMessage(
-                    RequestMethod.SIGN_IN,
-                    params=self._credentials,
+                    RequestMethod.USE,
+                    namespace=self._namespace,
+                    database=self._database,
                 ),
                 process="",  # it is more or less ignored by surreal
             )
+
+            if self._credentials:
+                await self._connection._send(  # pyright: ignore[reportPrivateUsage]
+                    RequestMessage(
+                        RequestMethod.SIGN_IN,
+                        params=self._credentials,
+                    ),
+                    process="",  # it is more or less ignored by surreal
+                )
 
         async def execute(
             statement: str,
             *,
             variables: Mapping[str, SurrealValue],
         ) -> Sequence[SurrealObject]:
-            return await _execute_embedded(
-                self._connection,
-                statement,
-                variables=variables,
-            )
+            async with self._lock:
+                return await _execute_embedded(
+                    self._connection,
+                    statement,
+                    variables=variables,
+                )
 
         def transaction() -> SurrealTransactionContext:
             raise RuntimeError(

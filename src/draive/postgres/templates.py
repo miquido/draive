@@ -16,6 +16,8 @@ __all__ = ("PostgresTemplatesRepository",)
 class PostgresTemplatesRepository:
     @staticmethod
     async def migrate() -> None:
+        # split into separate statements - `PostgresConnection.execute` runs through
+        # asyncpg's prepared-statement path, which rejects multi-statement strings
         await PostgresConnection.execute(
             """
             CREATE TABLE IF NOT EXISTS templates (
@@ -27,12 +29,17 @@ class PostgresTemplatesRepository:
                 created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (identifier, created)
             );
-
+            """
+        )
+        await PostgresConnection.execute(
+            """
             CREATE INDEX IF NOT EXISTS
                 templates_idx
 
-            ON
-                templates (identifier, created DESC);
+            ON templates (
+                identifier,
+                created DESC
+            );
             """
         )
 

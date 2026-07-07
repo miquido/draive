@@ -6,8 +6,9 @@ except ImportError as exc:  # pragma: no cover
         "Install via `pip install draive[surrealdb]`."
     ) from exc
 
+from draive.surreal.agent_memory import SurrealAgentMemory
 from draive.surreal.client import SurrealClient
-from draive.surreal.memory import SurrealConversationMemory
+from draive.surreal.conversation_memory import SurrealConversationMemory
 from draive.surreal.state import Surreal
 from draive.surreal.templates import SurrealTemplatesRepository
 from draive.surreal.types import SurrealBasicValue, SurrealException, SurrealObject, SurrealValue
@@ -15,6 +16,7 @@ from draive.surreal.vector import SurrealVectorIndex
 
 __all__ = (
     "Surreal",
+    "SurrealAgentMemory",
     "SurrealBasicValue",
     "SurrealClient",
     "SurrealConversationMemory",
