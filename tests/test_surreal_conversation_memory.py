@@ -5,11 +5,10 @@ from uuid import uuid4
 
 import pytest
 
-import draive.surreal.memory as surreal_memory
+import draive.surreal.conversation_memory as surreal_memory
 from draive.conversation.types import ConversationUserTurn
 from draive.multimodal import MultimodalContent
-from draive.surreal.memory import SurrealConversationMemory
-from draive.surreal.types import SurrealObject
+from draive.surreal import SurrealConversationMemory, SurrealObject
 
 
 @pytest.mark.asyncio

@@ -20,7 +20,7 @@ The agents API is intentionally built as a thin layer over existing Draive runti
 
 - `AgentIdentity` describes the agent instance: `uri`, `name`, `description`, `meta`.
 - `AgentMessage` is the fully prepared input payload: `thread`, `created`, `content`, `meta`.
-- `AgentContext` is the scoped runtime state propagated through `ctx.scope(...)`.
+- `AgentThread` is the scoped runtime state propagated through `ctx.scope(...)`.
 - `AgentExecuting` is the executor protocol:
     `AgentMessage -> AsyncIterable[MultimodalContentPart | ProcessingEvent]`.
 
@@ -50,7 +50,7 @@ async def execute(
 
 worker: Agent = Agent.steps(
     Step(execute),
-    name="worker",
+    agent="worker",
     description="Handles a small processing task",
 )
 ```
@@ -132,7 +132,7 @@ async def system_status() -> str:
 
 
 assistant: Agent = Agent.generative(
-    name="support",
+    agent="support",
     description="Answers product support questions",
     instructions="You are a concise support assistant. Use tools when useful.",
     tools=[system_status],
@@ -165,13 +165,44 @@ For each call, the agent:
 If a tool uses `handling="output"`, the tool can stream visible output directly and terminate the
 loop early.
 
-This API is request-scoped because the model context is local to a single request. The agent
-does not persist prior turns by itself. If you need longer-lived conversation semantics, use higher
-level conversation APIs or pass the required context explicitly.
+By default the model context is local to a single request; the agent does not persist prior turns
+by itself. Pass `memory=` to keep context across turns (see below), use higher level conversation
+APIs, or provide the required context explicitly.
+
+### Persist Context Across Turns With `AgentMemory`
+
+`Agent.generative(...)`, `Agent.steps(...)` and `Agent.from_skill(...)` accept a `memory` argument
+controlling how model context is recalled before each turn and persisted afterwards. The default is
+`AgentMemory.disabled`, which scopes context to a single turn.
+
+```python
+from draive import Agent, AgentMemory
+
+assistant: Agent = Agent.generative(
+    agent="support",
+    instructions="You are a concise support assistant.",
+    memory=AgentMemory.volatile(threads_limit=32),
+)
+```
+
+Memory is keyed by the active `AgentThread`, so one memory instance serves multiple concurrent
+conversation threads. Context is stored as the latest snapshot per thread: whatever is remembered
+after a turn becomes the next recalled context, exactly as provided, which allows steps to compact,
+summarize, or replace the context freely.
+
+- `AgentMemory.volatile(...)` keeps snapshots in-process, with optional LRU eviction via
+    `threads_limit`; intended for local development, tests, and single-process deployments.
+- `PostgresAgentMemory.prepare(identity)` (from `draive.postgres`) persists immutable snapshots in
+    PostgreSQL, keyed by agent identity and thread; run `PostgresAgentMemory.migrate()` once to
+    create its schema.
+- `AgentMemory(recalling=..., remembering=...)` wraps custom async callables for any other backend.
+
+Each memory instance is intended to serve exactly one agent: state is scoped per thread only, so
+sharing an instance between agents would mix their contexts within a thread.
 
 ## 3. Preserve Thread And Metadata
 
-`Agent.call(...)` automatically reuses the current `AgentContext` when present. That allows nested
+`Agent.call(...)` automatically reuses the current `AgentThread` when present. That allows nested
 agent calls to share a logical thread and metadata.
 
 ```python
@@ -179,7 +210,7 @@ from collections.abc import AsyncIterable
 from uuid import uuid4
 
 from draive import Agent, AgentIdentity, AgentMessage, ctx
-from draive.agents.types import AgentContext
+from draive.agents import AgentThread
 from draive.multimodal import MultimodalContentPart, TextContent
 from draive.utils import ProcessingEvent
 
@@ -187,9 +218,9 @@ from draive.utils import ProcessingEvent
 async def echo(
     message: AgentMessage,
 ) -> AsyncIterable[MultimodalContentPart | ProcessingEvent]:
-    context = ctx.state(AgentContext)
+    context = ctx.state(AgentThread)
     yield TextContent.of(
-        f"thread={context.thread} source={context.meta.get_str('source')}"
+        f"thread={context.identifier} source={context.meta.get_str('source')}"
     )
 
 
@@ -201,7 +232,7 @@ agent: Agent = Agent(
 
 async with ctx.scope(
     "agents.context",
-    AgentContext.of(thread=uuid4(), meta={"source": "outer"}),
+    AgentThread.of(identifier=uuid4(), meta={"source": "outer"}),
 ):
     stream: AsyncIterable[MultimodalContentPart | ProcessingEvent] = agent.call(
         input="hello",
@@ -214,7 +245,7 @@ async with ctx.scope(
 In practice:
 
 - `thread=` on `call(...)` overrides the current context thread,
-- `meta=` is merged with the current `AgentContext.meta`,
+- `meta=` is merged with the current `AgentThread.meta`,
 - `respond(...)` is useful when you already have a prepared `AgentMessage`.
 
 This matters when agents call other agents. Nested calls inherit the active thread and metadata by
@@ -234,12 +265,12 @@ from draive.steps import Step
 
 researcher: Agent = Agent.steps(
     Step.emitting(TextContent.of("Collected facts")),
-    name="researcher",
+    agent="researcher",
     description="Collects background information",
 )
 
 writer: Agent = Agent.generative(
-    name="writer",
+    agent="writer",
     description="Writes the final response",
     instructions="Delegate research first, then answer clearly.",
     tools=[AgentsGroup.of(researcher).as_tool()],
@@ -312,19 +343,19 @@ from draive import Agent, AgentsGroup
 
 
 researcher: Agent = Agent.generative(
-    name="researcher",
+    agent="researcher",
     description="Finds facts and prepares structured findings",
     instructions="Gather only the information needed for the task.",
 )
 
 reviewer: Agent = Agent.generative(
-    name="reviewer",
+    agent="reviewer",
     description="Checks output for completeness and correctness",
     instructions="Review the provided answer and suggest corrections.",
 )
 
 coordinator: Agent = Agent.generative(
-    name="coordinator",
+    agent="coordinator",
     description="Routes tasks between specialized agents",
     instructions=(
         "Use `agent_request` to delegate work to the specialized agents. "
@@ -352,7 +383,8 @@ clear role and the coordinator can select among them by name from the generated 
 - Delegate using `AgentsGroup.as_tool(handling="output")` when the delegated agent should take over visible output.
 
 Avoid using `Agent.generative(...)` as a substitute for persistent chat history. By design it loops
-only within one request while tools are being resolved.
+only within one request while tools are being resolved; use `memory=` when prior turns should be
+recalled across requests.
 
 ## 8. Public Types
 
@@ -361,7 +393,9 @@ The public agents API exported from `draive` includes:
 - `Agent`
 - `AgentExecuting`
 - `AgentIdentity`
+- `AgentMemory`
 - `AgentMessage`
+- `AgentThread`
 - `ProcessingEvent`
 - `AgentsGroup`
 

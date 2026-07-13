@@ -148,6 +148,7 @@ class ResourceReference(State, serializable=True):
     meta: Meta = Meta.empty
 
 
+@final
 class ResourceReferenceTemplate(State, serializable=True):
     @classmethod
     def of(
@@ -242,6 +243,7 @@ class ResourceContent(State, serializable=True):
         return len(self.data) > 0
 
 
+@final
 class Resource(State):
     @overload
     @classmethod

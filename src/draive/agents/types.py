@@ -1,10 +1,11 @@
 from collections.abc import AsyncIterable
 from datetime import UTC, datetime
-from typing import Protocol, Self, final, runtime_checkable
+from typing import Any, Protocol, Self, final, runtime_checkable
 from uuid import UUID, uuid4
 
 from haiway import Default, Meta, MetaValues, State
 
+from draive.models.types import ModelContext, ModelInput
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalContentPart
 from draive.utils import ProcessingEvent
 
@@ -12,7 +13,10 @@ __all__ = (
     "AgentException",
     "AgentExecuting",
     "AgentIdentity",
+    "AgentMemoryRecalling",
+    "AgentMemoryRemembering",
     "AgentMessage",
+    "AgentThread",
     "AgentUnavailable",
 )
 
@@ -27,6 +31,7 @@ class AgentException(Exception):
     """
 
 
+@final
 class AgentUnavailable(AgentException):
     """Raised when a referenced agent cannot be accessed.
 
@@ -147,13 +152,15 @@ class AgentMessage(State, serializable=True):
 
 
 @final
-class AgentContext(State):
+class AgentThread(State):
     """Scoped runtime context shared across nested agent calls.
 
     Parameters
     ----------
-    thread : UUID
-        Conversation thread identifier propagated through nested calls.
+    identifier : UUID
+        Thread identifier propagated through nested calls.
+    created : datetime
+        UTC timestamp recording when the thread context was created.
     meta : Meta
         Metadata shared within the active agent execution scope.
     """
@@ -161,15 +168,15 @@ class AgentContext(State):
     @classmethod
     def of(
         cls,
-        thread: UUID | None = None,
+        identifier: UUID | None = None,
         *,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        """Create an agent execution context.
+        """Create an agent thread execution context.
 
         Parameters
         ----------
-        thread : UUID | None, default=None
+        identifier : UUID | None, default=None
             Conversation thread identifier. When omitted, a new thread is created.
         meta : Meta | MetaValues | None, default=None
             Metadata propagated through the active context scope.
@@ -180,11 +187,12 @@ class AgentContext(State):
             New immutable agent context instance.
         """
         return cls(
-            thread=thread if thread is not None else uuid4(),
+            identifier=identifier if identifier is not None else uuid4(),
             meta=Meta.of(meta),
         )
 
-    thread: UUID = Default(default_factory=uuid4)
+    identifier: UUID = Default(default_factory=uuid4)
+    created: datetime = Default(default_factory=lambda: datetime.now(UTC))
     meta: Meta = Meta.empty
 
 
@@ -213,5 +221,77 @@ class AgentExecuting(Protocol):
         -------
         AsyncIterable[MultimodalContentPart | ProcessingEvent]
             Stream of visible output chunks and processing events.
+        """
+        ...
+
+
+@runtime_checkable
+class AgentMemoryRecalling(Protocol):
+    """Runtime contract implemented by ``AgentMemory`` recall callables.
+
+    Returns
+    -------
+    ModelContext
+        Context to use for the upcoming completion, typically prior history
+        with ``input`` appended.
+    """
+
+    async def __call__(
+        self,
+        thread: AgentThread,
+        input: ModelInput,  # noqa: A002
+        **extra: Any,
+    ) -> ModelContext:
+        """Resolve the model context to use for a new turn.
+
+        Parameters
+        ----------
+        thread : AgentThread
+            Conversation thread the recalled context is scoped to.
+        input : ModelInput
+            Newly arrived input for the current turn, not yet part of any
+            stored context.
+        **extra : Any
+            Additional implementation-specific arguments.
+
+        Returns
+        -------
+        ModelContext
+            Context to use for the upcoming completion.
+        """
+        ...
+
+
+@runtime_checkable
+class AgentMemoryRemembering(Protocol):
+    """Runtime contract implemented by ``AgentMemory`` remember callables.
+
+    Returns
+    -------
+    None
+        Completes once the context has been persisted.
+    """
+
+    async def __call__(
+        self,
+        thread: AgentThread,
+        context: ModelContext,
+        **extra: Any,
+    ) -> None:
+        """Persist context produced after a turn completes.
+
+        Parameters
+        ----------
+        thread : AgentThread
+            Conversation thread the persisted context is scoped to.
+        context : ModelContext
+            Full context accumulated for the turn.
+        **extra : Any
+            Additional implementation-specific arguments.
+
+        Returns
+        -------
+        None
+            Completes once the context has been persisted.
         """
         ...

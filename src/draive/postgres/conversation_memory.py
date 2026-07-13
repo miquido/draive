@@ -32,11 +32,18 @@ class PostgresConversationMemory:
     from uuid import uuid4
 
     from draive import ctx
-    from draive.postgres.memory import PostgresConversationMemory
+    from haiway.postgres import Postgres
+    from draive.postgres import PostgresConversationMemory
 
     async def bootstrap_memory() -> None:
         async with ctx.scope("conversation-memory"):
-            await PostgresConversationMemory.migrate()
+            # `migrate()` calls `PostgresConnection.execute`, which reads the
+            # active connection from context - it must run with a connection
+            # acquired and bound via `ctx.updating`, not just a pool in scope.
+            async with Postgres.acquire_connection() as connection:
+                with ctx.updating(connection):
+                    await PostgresConversationMemory.migrate()
+
             memory = PostgresConversationMemory.prepare(thread=uuid4())
             await memory.recall()
     ```
@@ -64,20 +71,28 @@ class PostgresConversationMemory:
             Raised when PostgreSQL command execution fails, for example due to
             connection or database-level errors.
         """
+        # split into separate statements - `PostgresConnection.execute` runs through
+        # asyncpg's prepared-statement path, which rejects multi-statement strings
         await PostgresConnection.execute(
             """
             CREATE TABLE IF NOT EXISTS conversation_memory (
                 thread_id TEXT NOT NULL,
-                turn TEXT NOT NULL,
                 identifier UUID NOT NULL,
+                turn TEXT NOT NULL,
                 payload JSONB NOT NULL,
-                created TIMESTAMPTZ NOT NULL,
-                PRIMARY KEY (thread_id, identifier),
-                UNIQUE (thread_id, identifier)
+                created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (thread_id, identifier)
             );
-
-            CREATE INDEX IF NOT EXISTS conversation_memory_idx
-                ON conversation_memory (thread_id, created DESC, identifier DESC);
+            """
+        )
+        await PostgresConnection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                conversation_memory_idx
+            ON conversation_memory (
+                thread_id,
+                created DESC
+            );
             """
         )
 

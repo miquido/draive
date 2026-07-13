@@ -1,21 +1,23 @@
 from draive.agents.agent import Agent
 from draive.agents.group import AgentsGroup
+from draive.agents.state import AgentMemory
 from draive.agents.types import (
-    AgentContext,
     AgentException,
     AgentExecuting,
     AgentIdentity,
     AgentMessage,
+    AgentThread,
     AgentUnavailable,
 )
 
 __all__ = (
     "Agent",
-    "AgentContext",
     "AgentException",
     "AgentExecuting",
     "AgentIdentity",
+    "AgentMemory",
     "AgentMessage",
+    "AgentThread",
     "AgentUnavailable",
     "AgentsGroup",
 )

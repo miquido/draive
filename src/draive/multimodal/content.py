@@ -1,5 +1,4 @@
 from collections.abc import Callable, Collection, Generator, Mapping, Sequence
-from dataclasses import dataclass
 from typing import ClassVar, Literal, Self, cast, final, overload
 
 from haiway import MISSING, BasicValue, Meta, MetaValues, Missing, State
@@ -737,43 +736,106 @@ atomic parts, and raw ``str`` values that are normalized into
 type Token = "_TextToken | _OpenToken | _CloseToken | _SelfClosingToken | MultimodalContentPart"
 
 
-@dataclass(frozen=True, slots=True)
 class _TextToken:
-    text: str
-    meta: Meta
+    __slots__ = (
+        "meta",
+        "text",
+    )
+
+    def __init__(
+        self,
+        text: str,
+        meta: Meta,
+    ) -> None:
+        self.text: str = text
+        self.meta: Meta = meta
 
 
-@dataclass(frozen=True, slots=True)
 class _OpenToken:
-    name: str
-    attrs: Meta
-    meta: Meta
-    raw: str
+    __slots__ = (
+        "attrs",
+        "meta",
+        "name",
+        "raw",
+    )
+
+    def __init__(
+        self,
+        name: str,
+        attrs: Meta,
+        meta: Meta,
+        raw: str,
+    ) -> None:
+        self.name: str = name
+        self.attrs: Meta = attrs
+        self.meta: Meta = meta
+        self.raw: str = raw
 
 
-@dataclass(frozen=True, slots=True)
 class _CloseToken:
-    name: str
-    meta: Meta
-    raw: str
+    __slots__ = (
+        "meta",
+        "name",
+        "raw",
+    )
+
+    def __init__(
+        self,
+        name: str,
+        meta: Meta,
+        raw: str,
+    ) -> None:
+        self.name: str = name
+        self.meta: Meta = meta
+        self.raw: str = raw
 
 
-@dataclass(frozen=True, slots=True)
 class _SelfClosingToken:
-    name: str
-    attrs: Meta
-    meta: Meta
-    raw: str
+    __slots__ = (
+        "attrs",
+        "meta",
+        "name",
+        "raw",
+    )
+
+    def __init__(
+        self,
+        name: str,
+        attrs: Meta,
+        meta: Meta,
+        raw: str,
+    ) -> None:
+        self.name: str = name
+        self.attrs: Meta = attrs
+        self.meta: Meta = meta
+        self.raw: str = raw
 
 
-@dataclass
 class _ActiveContext:
-    name: str
-    attrs: Meta
-    opening_meta: Meta
-    opening_raw: str
-    start_index: int
-    parts: list[MultimodalContentPart]
+    __slots__ = (
+        "attrs",
+        "name",
+        "opening_meta",
+        "opening_raw",
+        "parts",
+        "start_index",
+    )
+
+    def __init__(
+        self,
+        name: str,
+        attrs: Meta,
+        opening_meta: Meta,
+        opening_raw: str,
+        start_index: int,
+        parts: list[MultimodalContentPart],
+    ) -> None:
+        self.name: str = name
+        self.attrs: Meta = attrs
+        self.opening_meta: Meta = opening_meta
+        self.opening_raw: str = opening_raw
+        self.start_index: int = start_index
+        self.parts: list[MultimodalContentPart] = parts
 
 
 def _collect_tags(  # noqa: C901, PLR0912

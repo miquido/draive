@@ -5,8 +5,7 @@ import pytest
 from haiway import Meta, ctx
 
 from draive import Agent, AgentIdentity, AgentMessage
-from draive.agents import AgentException, AgentsGroup, AgentUnavailable
-from draive.agents.types import AgentContext
+from draive.agents import AgentException, AgentsGroup, AgentThread, AgentUnavailable
 from draive.models import (
     ModelReasoningChunk,
     ModelToolRequest,
@@ -26,7 +25,7 @@ def _multimodal_text_of(*parts: MultimodalContentPart) -> str:
 @pytest.mark.asyncio
 async def test_agent_noop_emits_no_chunks() -> None:
     agent = Agent.noop(
-        name="helper",
+        agent="helper",
         description="No operation agent",
     )
 
@@ -48,7 +47,7 @@ async def test_agent_steps_filters_reasoning_chunks() -> None:
 
     agent = Agent.steps(
         Step(execute),
-        name="helper",
+        agent="helper",
         description="Test helper",
     )
 
@@ -70,10 +69,10 @@ async def test_agent_call_reuses_context_thread_and_meta() -> None:
     async def execute(
         message: AgentMessage,
     ) -> AsyncIterable[MultimodalContentPart | ProcessingEvent]:
-        context = ctx.state(AgentContext)
+        context = ctx.state(AgentThread)
         captured["message_thread"] = message.thread
         captured["message_meta"] = message.meta
-        captured["context_thread"] = context.thread
+        captured["context_thread"] = context.identifier
         captured["context_meta"] = context.meta
         yield TextContent.of(message.content.to_str())
 
@@ -83,7 +82,7 @@ async def test_agent_call_reuses_context_thread_and_meta() -> None:
     )
     meta = Meta.of({"source": "outer"})
 
-    async with ctx.scope("test.agent.call", AgentContext.of(thread=thread, meta=meta)):
+    async with ctx.scope("test.agent.call", AgentThread.of(identifier=thread, meta=meta)):
         chunks = [chunk async for chunk in agent.call(input="hello")]
 
     assert _multimodal_text_of(*chunks) == "hello"
@@ -102,10 +101,10 @@ async def test_agent_call_overrides_context_thread_and_merges_meta() -> None:
     async def execute(
         message: AgentMessage,
     ) -> AsyncIterable[MultimodalContentPart | ProcessingEvent]:
-        context = ctx.state(AgentContext)
+        context = ctx.state(AgentThread)
         captured["message_thread"] = message.thread
         captured["message_meta"] = message.meta
-        captured["context_thread"] = context.thread
+        captured["context_thread"] = context.identifier
         captured["context_meta"] = context.meta
         yield TextContent.of(message.content.to_str())
 
@@ -116,7 +115,7 @@ async def test_agent_call_overrides_context_thread_and_merges_meta() -> None:
 
     async with ctx.scope(
         "test.agent.call.override",
-        AgentContext.of(thread=outer_thread, meta={"source": "outer", "scope": "root"}),
+        AgentThread.of(identifier=outer_thread, meta={"source": "outer", "scope": "root"}),
     ):
         chunks = [
             chunk
@@ -147,7 +146,7 @@ async def test_agent_call_overrides_context_thread_and_merges_meta() -> None:
 async def test_agents_group_request_tool_returns_response_tool_output() -> None:
     agent = Agent.steps(
         Step.emitting(ProcessingEvent.of("progress", "routing"), TextContent.of("done")),
-        name="worker",
+        agent="worker",
         description="Worker agent",
     )
     tool = AgentsGroup.of(agent).as_tool()
@@ -177,7 +176,7 @@ async def test_agents_group_request_tool_returns_response_tool_output() -> None:
 async def test_agents_group_handover_tool_streams_direct_output() -> None:
     agent = Agent.steps(
         Step.emitting(ProcessingEvent.of("progress", "routing"), TextContent.of("done")),
-        name="worker",
+        agent="worker",
         description="Worker agent",
     )
     tool = AgentsGroup.of(agent).as_tool(handling="output")
@@ -215,11 +214,11 @@ async def test_agents_group_tools_raise_for_missing_agent() -> None:
 def test_agents_group_rejects_duplicate_agent_names() -> None:
     agent_a = Agent.steps(
         Step.emitting(TextContent.of("a")),
-        name="worker",
+        agent="worker",
     )
     agent_b = Agent.steps(
         Step.emitting(TextContent.of("b")),
-        name="worker",
+        agent="worker",
     )
 
     with pytest.raises(ValueError, match="Agent `worker` is already defined"):
@@ -284,7 +283,7 @@ async def test_agents_group_call_dispatches_to_selected_agent() -> None:
     group = AgentsGroup.of(
         Agent.steps(
             Step.emitting(TextContent.of("done")),
-            name="worker",
+            agent="worker",
         )
     )
 
@@ -364,7 +363,7 @@ def test_agents_group_bind_rejects_binding_different_identity_with_same_name() -
         group.bind(
             Agent.steps(
                 Step.emitting(TextContent.of("bound")),
-                name="worker",
+                agent="worker",
                 description="Deferred worker",
             )
         )
@@ -377,7 +376,7 @@ def test_agents_group_bind_rejects_extending_with_new_name() -> None:
         group.bind(
             Agent.steps(
                 Step.emitting(TextContent.of("new")),
-                name="worker",
+                agent="worker",
             )
         )
 

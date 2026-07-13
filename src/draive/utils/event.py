@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Self
+from typing import Self, final
 
 from haiway import Default, Meta, MetaValues, State
 
@@ -8,6 +8,7 @@ from draive.multimodal import Multimodal, MultimodalContent
 __all__ = ("ProcessingEvent",)
 
 
+@final
 class ProcessingEvent(State, serializable=True):
     """Structured event emitted while running a process."""
 

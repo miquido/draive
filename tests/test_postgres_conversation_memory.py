@@ -6,10 +6,10 @@ from uuid import UUID, uuid4
 import pytest
 from haiway import Pagination
 
-import draive.postgres.memory as postgres_memory
+import draive.postgres.conversation_memory as postgres_memory
 from draive.conversation.types import ConversationTurn, ConversationUserTurn
 from draive.multimodal import MultimodalContent
-from draive.postgres.memory import PostgresConversationMemory
+from draive.postgres.conversation_memory import PostgresConversationMemory
 
 
 @dataclass(frozen=True)

@@ -7,7 +7,7 @@ except ImportError as exc:  # pragma: no cover
     ) from exc
 
 from draive.surreal.client import SurrealClient
-from draive.surreal.memory import SurrealConversationMemory
+from draive.surreal.conversation_memory import SurrealConversationMemory
 from draive.surreal.state import Surreal
 from draive.surreal.templates import SurrealTemplatesRepository
 from draive.surreal.types import SurrealBasicValue, SurrealException, SurrealObject, SurrealValue
