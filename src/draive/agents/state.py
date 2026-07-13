@@ -1,4 +1,5 @@
-from collections.abc import Collection, MutableMapping
+from collections import OrderedDict
+from collections.abc import Collection
 from typing import Any, ClassVar, Self, final
 from uuid import UUID
 
@@ -27,12 +28,13 @@ class AgentMemory(State):
     Both are scoped by ``AgentThread`` so a single memory instance can serve
     multiple concurrent conversation threads.
 
+    Each instance is intended to serve exactly one agent. State is scoped
+    per conversation thread only - not per agent - so sharing one instance
+    between multiple agents would mix their contexts within a thread. Create
+    a separate memory instance for each agent.
+
     Attributes
     ----------
-    disabled : ClassVar[Self]
-        No-op memory that passes the incoming input straight through on
-        recall and discards context on remember. Used as the default
-        ``memory`` for ``Agent`` factory methods.
     meta : Meta
         Additional metadata attached to the memory instance.
     """
@@ -43,12 +45,26 @@ class AgentMemory(State):
     def volatile(
         cls,
         *,
+        threads_limit: int | None = None,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create an in-process memory keyed by conversation thread.
 
+        Context is stored as the latest snapshot per thread: every remember
+        replaces the thread's context with the provided one and recall reads
+        it back whole. Agents may transform their context arbitrarily between
+        recall and remember (compaction, summarization, replacement) -
+        whatever is remembered becomes the next recalled context, exactly as
+        provided. Concurrent remembers within the same thread overwrite each
+        other; the last writer wins.
+
         Parameters
         ----------
+        threads_limit : int | None, default=None
+            Maximum number of threads retained at once. When exceeded, the
+            least recently used thread is evicted together with its context.
+            ``None`` disables eviction - memory then grows unboundedly with
+            the number of threads for the lifetime of the process.
         meta : Meta | MetaValues | None, default=None
             Additional metadata attached to the resulting memory instance.
 
@@ -60,21 +76,31 @@ class AgentMemory(State):
             is not shared across processes; intended for local development,
             tests, and single-process deployments.
         """
-        memory: MutableMapping[UUID, ModelContext] = {}
+        assert threads_limit is None or threads_limit > 0  # nosec: B101
+        memory: OrderedDict[UUID, ModelContext] = OrderedDict()
 
         async def recall(
             thread: AgentThread,
             input: ModelInput,  # noqa: A002
             **extra: Any,
         ) -> ModelContext:
-            return (*memory.get(thread.identifier, ()), input)
+            recalled: ModelContext | None = memory.get(thread.identifier)
+            if recalled is None:
+                return (input,)
+
+            memory.move_to_end(thread.identifier)
+            return (*recalled, input)
 
         async def remember(
             thread: AgentThread,
             context: ModelContext,
             **extra: Any,
         ) -> None:
-            memory[thread.identifier] = context
+            # the provided context replaces the thread snapshot as-is
+            memory[thread.identifier] = tuple(context)
+            memory.move_to_end(thread.identifier)
+            while threads_limit is not None and len(memory) > threads_limit:
+                memory.popitem(last=False)  # evict least recently used thread
 
         return cls(
             recalling=recall,
@@ -142,8 +168,8 @@ class AgentMemory(State):
             async with ctx.disposables(*disposables):
                 with ctx.updating(*ctx_state):
                     return await recalling(
-                        thread=thread,
-                        input=input,
+                        thread,
+                        input,
                         **extra,
                     )
 
@@ -155,8 +181,8 @@ class AgentMemory(State):
             async with ctx.disposables(*disposables):
                 with ctx.updating(*ctx_state):
                     await remembering(
-                        thread=thread,
-                        context=context,
+                        thread,
+                        context,
                         **extra,
                     )
 
@@ -192,14 +218,15 @@ class AgentMemory(State):
             history with ``input`` appended.
         """
         return await self._recalling(
-            thread=thread,
-            input=input,
+            thread,
+            input,
             **extra,
         )
 
     def recall_step(
         self,
         input: ModelInput,  # noqa: A002
+        **extra: Any,
     ) -> Step:
         """Create a ``Step`` that replaces state context with recalled context.
 
@@ -208,6 +235,9 @@ class AgentMemory(State):
         input : ModelInput
             Newly arrived input for the current turn, forwarded to
             ``recall``.
+        **extra : Any
+            Additional implementation-specific arguments forwarded to the
+            underlying recall callable.
 
         Returns
         -------
@@ -222,8 +252,9 @@ class AgentMemory(State):
         ) -> StepState:
             return state.replacing_context(
                 await self._recalling(
-                    thread=ctx.state(AgentThread),
-                    input=input,
+                    ctx.state(AgentThread),
+                    input,
+                    **extra,
                 )
             )
 
@@ -254,8 +285,8 @@ class AgentMemory(State):
             Completes once the context has been persisted.
         """
         await self._remembering(
-            thread=thread,
-            context=context,
+            thread,
+            context,
             **extra,
         )
 
@@ -276,8 +307,8 @@ class AgentMemory(State):
             state: StepState,
         ) -> StepState:
             await self._remembering(
-                thread=ctx.state(AgentThread),
-                context=state.context,
+                ctx.state(AgentThread),
+                state.context,
             )
 
             return state

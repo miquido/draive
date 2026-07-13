@@ -220,7 +220,7 @@ class StepState(State, serializable=True):
         Returns
         -------
         Self
-            Updated state instance. Returns ``self`` when ``context`` is empty.
+            Updated state instance.
         """
 
         return self.updating(context=context)

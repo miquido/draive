@@ -571,6 +571,7 @@ class ModelInput(State, serializable=True):
             meta=Meta.of(meta),
         )
 
+    kind: Literal["input"] = "input"
     input: ModelInputBlocks
     meta: Meta = Meta.empty
 
@@ -787,6 +788,7 @@ class ModelOutput(State, serializable=True):
             meta=Meta.of(meta),
         )
 
+    kind: Literal["output"] = "output"
     output: ModelOutputBlocks
     meta: Meta = Meta.empty
 

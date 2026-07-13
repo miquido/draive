@@ -1,5 +1,4 @@
-from collections.abc import MutableSequence
-from datetime import UTC, datetime, timedelta
+import json
 from typing import Any, NoReturn, final
 from uuid import UUID, uuid4
 
@@ -18,9 +17,19 @@ class PostgresAgentMemory:
 
     This utility exposes static helpers for schema migration and creating
     agent-scoped :class:`~draive.agents.state.AgentMemory` instances persisted
-    in PostgreSQL. Recalled and remembered context is stored and read back
-    as-is, keyed by the owning agent identity and the active conversation
-    thread.
+    in PostgreSQL, keyed by the owning agent identity and the active
+    conversation thread.
+
+    Context is stored as immutable snapshots: every remember inserts the full
+    context as a new snapshot row and recall reads back the latest one whole.
+    Agents may transform their context arbitrarily between recall and
+    remember (compaction, summarization, replacement) - whatever is
+    remembered becomes the next recalled context, exactly as provided.
+    Previous snapshots are never modified or deleted and remain available
+    for tracking and verification. Persistence is lock-free and write-only:
+    concurrent remembers within the same thread each store their own
+    snapshot and the one persisted last wins on recall. Snapshot history
+    grows without bound over the lifetime of a thread.
 
     Examples
     --------
@@ -73,8 +82,7 @@ class PostgresAgentMemory:
                 agent_uri TEXT NOT NULL,
                 thread_id UUID NOT NULL,
                 identifier UUID NOT NULL,
-                kind TEXT NOT NULL,
-                payload JSONB NOT NULL,
+                context JSONB NOT NULL,
                 created TIMESTAMPTZ NOT NULL,
                 PRIMARY KEY (agent_uri, thread_id, identifier)
             );
@@ -88,7 +96,7 @@ class PostgresAgentMemory:
             ON agent_memory (
                 agent_uri,
                 thread_id,
-                created ASC
+                created DESC
             );
             """
         )
@@ -160,30 +168,20 @@ class PostgresAgentMemory:
         raise RuntimeError("PostgresAgentMemory instantiation is forbidden")
 
 
-def _element_from_row(
-    row: PostgresRow,
+def _element_from_value(
+    value: Any,
     /,
 ) -> ModelContextElement:
-    match row.get_str("kind", required=True):
-        case "input":
-            return ModelInput.from_json(row.get_str("payload", required=True))
+    # elements serialize their own `kind` discriminator - dispatch on it directly
+    match value:
+        case {"kind": "input"}:
+            return ModelInput.from_json(json.dumps(value))
 
-        case "output":
-            return ModelOutput.from_json(row.get_str("payload", required=True))
+        case {"kind": "output"}:
+            return ModelOutput.from_json(json.dumps(value))
 
-        case kind:
-            raise ValueError(f"Unsupported agent memory payload kind: {kind}")
-
-
-def _element_kind(
-    element: ModelContextElement,
-    /,
-) -> str:
-    if isinstance(element, ModelInput):
-        return "input"
-
-    else:
-        return "output"
+        case other:
+            raise ValueError(f"Unsupported agent memory snapshot element: {other}")
 
 
 async def _recall(
@@ -191,28 +189,34 @@ async def _recall(
     agent_uri: str,
     thread_id: UUID,
 ) -> ModelContext:
+    snapshot: PostgresRow | None = await Postgres.fetch_one(
+        """
+        SELECT
+            context::TEXT
+
+        FROM
+            agent_memory
+
+        WHERE
+            agent_uri = $1::TEXT
+        AND
+            thread_id = $2::UUID
+
+        ORDER BY
+            created DESC,
+            identifier DESC
+
+        LIMIT 1;
+        """,  # nosec: B608
+        agent_uri,
+        thread_id,
+    )
+    if snapshot is None:
+        return ()
+
     return tuple(
-        _element_from_row(row)
-        for row in await Postgres.fetch(
-            """
-            SELECT
-                kind,
-                payload::TEXT
-
-            FROM
-                agent_memory
-
-            WHERE
-                agent_uri = $1::TEXT
-            AND
-                thread_id = $2::UUID
-
-            ORDER BY
-                created ASC;
-            """,  # nosec: B608
-            agent_uri,
-            thread_id,
-        )
+        _element_from_value(value)
+        for value in json.loads(snapshot.get_str("context", required=True))
     )
 
 
@@ -222,81 +226,30 @@ async def _remember(
     thread_id: UUID,
     context: ModelContext,
 ) -> None:
-    async with Postgres.acquire_connection() as connection:
-        async with connection.transaction():
-            await connection.execute(
-                """
-                SELECT
-                    pg_advisory_xact_lock(
-                        hashtext($1::TEXT),
-                        hashtext(($2::UUID)::TEXT)
-                    );
-                """,  # nosec: B608
+    # write-only: a new snapshot is inserted as-is, previous snapshots stay
+    # untouched for tracking and verification; the latest snapshot wins on recall
+    await Postgres.execute(
+        """
+        INSERT INTO
+            agent_memory (
                 agent_uri,
                 thread_id,
+                identifier,
+                context,
+                created
             )
 
-            await connection.execute(
-                """
-                DELETE FROM
-                    agent_memory
-
-                WHERE
-                    agent_uri = $1::TEXT
-                AND
-                    thread_id = $2::UUID;
-                """,  # nosec: B608
-                agent_uri,
-                thread_id,
-            )
-
-            # Fabricated, strictly increasing timestamps - `element.meta.created` is ignored
-            # here because it isn't guaranteed to be set or monotonic across elements, and
-            # `_recall` relies on `created` to reconstruct the original context order.
-            timestamp: datetime = datetime.now(UTC)
-            identifiers: MutableSequence[UUID] = []
-            timestamps: MutableSequence[datetime] = []
-            kinds: MutableSequence[str] = []
-            payloads: MutableSequence[str] = []
-            for position, element in enumerate(context):
-                identifiers.append(uuid4())
-                timestamps.append(timestamp + timedelta(microseconds=position))
-                kinds.append(_element_kind(element))
-                payloads.append(element.to_json())
-
-            if identifiers:
-                await connection.execute(
-                    """
-                    INSERT INTO
-                        agent_memory (
-                            agent_uri,
-                            thread_id,
-                            identifier,
-                            created,
-                            kind,
-                            payload
-                        )
-
-                    SELECT
-                        $1::TEXT,
-                        $2::UUID,
-                        value.identifier,
-                        value.created,
-                        value.kind,
-                        value.payload::JSONB
-
-                    FROM
-                        UNNEST(
-                            $3::UUID[],
-                            $4::TIMESTAMPTZ[],
-                            $5::TEXT[],
-                            $6::TEXT[]
-                        ) AS value(identifier, created, kind, payload);
-                    """,  # nosec: B608
-                    agent_uri,
-                    thread_id,
-                    identifiers,
-                    timestamps,
-                    kinds,
-                    payloads,
-                )
+        VALUES (
+            $1::TEXT,
+            $2::UUID,
+            $3::UUID,
+            $4::JSONB,
+            CURRENT_TIMESTAMP
+        );
+        """,  # nosec: B608
+        agent_uri,
+        thread_id,
+        uuid4(),
+        # elements carry their own `kind` discriminator - store their JSON directly
+        f"[{','.join(element.to_json() for element in context)}]",
+    )

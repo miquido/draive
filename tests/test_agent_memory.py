@@ -5,7 +5,7 @@ import pytest
 from haiway import State, ctx
 
 from draive.agents import AgentMemory, AgentThread
-from draive.models import ModelContext, ModelInput
+from draive.models import ModelContext, ModelInput, ModelOutput
 from draive.multimodal import MultimodalContent
 from draive.steps import StepState
 
@@ -128,3 +128,91 @@ def test_agent_memory_with_ctx_without_arguments_returns_self() -> None:
     memory = AgentMemory.volatile()
 
     assert memory.with_ctx() is memory
+
+
+@pytest.mark.asyncio
+async def test_agent_memory_volatile_accumulates_context_across_turns() -> None:
+    memory = AgentMemory.volatile()
+    thread = AgentThread.of(uuid4())
+
+    first_input = ModelInput.of(MultimodalContent.of("first"))
+    first_recalled = await memory.recall(thread=thread, input=first_input)
+    assert first_recalled == (first_input,)
+
+    first_output = ModelOutput.of(MultimodalContent.of("second"))
+    await memory.remember(thread=thread, context=(*first_recalled, first_output))
+
+    second_input = ModelInput.of(MultimodalContent.of("third"))
+    second_recalled = await memory.recall(thread=thread, input=second_input)
+    assert len(second_recalled) == 3
+    assert second_recalled[0].content.to_str() == "first"
+    assert second_recalled[1].content.to_str() == "second"
+    assert second_recalled[2] is second_input
+
+    second_output = ModelOutput.of(MultimodalContent.of("fourth"))
+    await memory.remember(thread=thread, context=(*second_recalled, second_output))
+
+    third_recalled = await memory.recall(
+        thread=thread,
+        input=ModelInput.of(MultimodalContent.of("fifth")),
+    )
+    assert [element.content.to_str() for element in third_recalled] == [
+        "first",
+        "second",
+        "third",
+        "fourth",
+        "fifth",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_agent_memory_volatile_stores_remembered_context_as_snapshot() -> None:
+    memory = AgentMemory.volatile()
+    thread = AgentThread.of(uuid4())
+
+    await memory.remember(
+        thread=thread,
+        context=(
+            ModelInput.of(MultimodalContent.of("original")),
+            ModelOutput.of(MultimodalContent.of("history")),
+        ),
+    )
+
+    # e.g. a compaction step replaced the whole context with a summary;
+    # the remembered context becomes the next recalled one, as provided
+    summary_input = ModelInput.of(MultimodalContent.of("summary of prior conversation"))
+    await memory.remember(thread=thread, context=(summary_input,))
+
+    incoming = ModelInput.of(MultimodalContent.of("next"))
+    assert await memory.recall(thread=thread, input=incoming) == (summary_input, incoming)
+
+
+@pytest.mark.asyncio
+async def test_agent_memory_volatile_evicts_least_recently_used_threads() -> None:
+    memory = AgentMemory.volatile(threads_limit=2)
+    first_thread = AgentThread.of(uuid4())
+    second_thread = AgentThread.of(uuid4())
+    third_thread = AgentThread.of(uuid4())
+
+    for thread in (first_thread, second_thread, third_thread):
+        await memory.remember(
+            thread=thread,
+            context=(ModelInput.of(MultimodalContent.of("stored")),),
+        )
+
+    # first thread exceeded the limit and was evicted
+    first_input = ModelInput.of(MultimodalContent.of("fresh"))
+    assert await memory.recall(thread=first_thread, input=first_input) == (first_input,)
+
+    # recalling the second thread marks it as recently used...
+    second_input = ModelInput.of(MultimodalContent.of("next"))
+    assert len(await memory.recall(thread=second_thread, input=second_input)) == 2
+
+    # ...so remembering a new thread evicts the third one instead
+    await memory.remember(
+        thread=AgentThread.of(uuid4()),
+        context=(ModelInput.of(MultimodalContent.of("stored")),),
+    )
+    third_input = ModelInput.of(MultimodalContent.of("fresh"))
+    assert await memory.recall(thread=third_thread, input=third_input) == (third_input,)
+    assert len(await memory.recall(thread=second_thread, input=second_input)) == 2
