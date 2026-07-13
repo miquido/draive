@@ -175,10 +175,10 @@ def _element_from_value(
     # elements serialize their own `kind` discriminator - dispatch on it directly
     match value:
         case {"kind": "input"}:
-            return ModelInput.from_json(json.dumps(value))
+            return ModelInput.from_mapping(value)
 
         case {"kind": "output"}:
-            return ModelOutput.from_json(json.dumps(value))
+            return ModelOutput.from_mapping(value)
 
         case other:
             raise ValueError(f"Unsupported agent memory snapshot element: {other}")

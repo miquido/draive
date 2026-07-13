@@ -33,7 +33,7 @@ class PostgresConversationMemory:
 
     from draive import ctx
     from haiway.postgres import Postgres
-    from draive.postgres.memory import PostgresConversationMemory
+    from draive.postgres import PostgresConversationMemory
 
     async def bootstrap_memory() -> None:
         async with ctx.scope("conversation-memory"):

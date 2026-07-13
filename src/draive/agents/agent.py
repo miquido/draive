@@ -80,7 +80,7 @@ class Agent:
 
         Parameters
         ----------
-        name : AgentIdentity | str
+        agent : AgentIdentity | str
             Human-readable agent name or full identity.
         description : str, default=""
             Short description of the agent's purpose.
@@ -157,8 +157,8 @@ class Agent:
 
         Parameters
         ----------
-        name : str
-            Human-readable agent name.
+        agent : AgentIdentity | str
+            Human-readable agent name or full identity.
         description : str, default=""
             Short description of the agent's purpose.
         instructions : Template | ModelInstructions

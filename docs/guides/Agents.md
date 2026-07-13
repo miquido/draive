@@ -165,9 +165,40 @@ For each call, the agent:
 If a tool uses `handling="output"`, the tool can stream visible output directly and terminate the
 loop early.
 
-This API is request-scoped because the model context is local to a single request. The agent
-does not persist prior turns by itself. If you need longer-lived conversation semantics, use higher
-level conversation APIs or pass the required context explicitly.
+By default the model context is local to a single request; the agent does not persist prior turns
+by itself. Pass `memory=` to keep context across turns (see below), use higher level conversation
+APIs, or provide the required context explicitly.
+
+### Persist Context Across Turns With `AgentMemory`
+
+`Agent.generative(...)`, `Agent.steps(...)` and `Agent.from_skill(...)` accept a `memory` argument
+controlling how model context is recalled before each turn and persisted afterwards. The default is
+`AgentMemory.disabled`, which scopes context to a single turn.
+
+```python
+from draive import Agent, AgentMemory
+
+assistant: Agent = Agent.generative(
+    agent="support",
+    instructions="You are a concise support assistant.",
+    memory=AgentMemory.volatile(threads_limit=32),
+)
+```
+
+Memory is keyed by the active `AgentThread`, so one memory instance serves multiple concurrent
+conversation threads. Context is stored as the latest snapshot per thread: whatever is remembered
+after a turn becomes the next recalled context, exactly as provided, which allows steps to compact,
+summarize, or replace the context freely.
+
+- `AgentMemory.volatile(...)` keeps snapshots in-process, with optional LRU eviction via
+    `threads_limit`; intended for local development, tests, and single-process deployments.
+- `PostgresAgentMemory.prepare(identity)` (from `draive.postgres`) persists immutable snapshots in
+    PostgreSQL, keyed by agent identity and thread; run `PostgresAgentMemory.migrate()` once to
+    create its schema.
+- `AgentMemory(recalling=..., remembering=...)` wraps custom async callables for any other backend.
+
+Each memory instance is intended to serve exactly one agent: state is scoped per thread only, so
+sharing an instance between agents would mix their contexts within a thread.
 
 ## 3. Preserve Thread And Metadata
 
@@ -352,7 +383,8 @@ clear role and the coordinator can select among them by name from the generated 
 - Delegate using `AgentsGroup.as_tool(handling="output")` when the delegated agent should take over visible output.
 
 Avoid using `Agent.generative(...)` as a substitute for persistent chat history. By design it loops
-only within one request while tools are being resolved.
+only within one request while tools are being resolved; use `memory=` when prior turns should be
+recalled across requests.
 
 ## 8. Public Types
 
@@ -361,7 +393,9 @@ The public agents API exported from `draive` includes:
 - `Agent`
 - `AgentExecuting`
 - `AgentIdentity`
+- `AgentMemory`
 - `AgentMessage`
+- `AgentThread`
 - `ProcessingEvent`
 - `AgentsGroup`
 
