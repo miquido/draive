@@ -165,6 +165,13 @@ async def test_agent_memory_volatile_accumulates_context_across_turns() -> None:
     ]
 
 
+def test_agent_memory_volatile_accepts_initial_keyword() -> None:
+    initial = ModelInput.of(MultimodalContent.of("initial"))
+    memory = AgentMemory.volatile(initial=(initial,))
+
+    assert isinstance(memory, AgentMemory)
+
+
 @pytest.mark.asyncio
 async def test_agent_memory_volatile_stores_remembered_context_as_snapshot() -> None:
     memory = AgentMemory.volatile()

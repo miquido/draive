@@ -44,6 +44,7 @@ class AgentMemory(State):
     @classmethod
     def volatile(
         cls,
+        initial: ModelContext = (),
         *,
         threads_limit: int | None = None,
         meta: Meta | MetaValues | None = None,
@@ -60,6 +61,8 @@ class AgentMemory(State):
 
         Parameters
         ----------
+        initial: ModelContext, default=()
+            Initial context for threads.
         threads_limit : int | None, default=None
             Maximum number of threads retained at once. When exceeded, the
             least recently used thread is evicted together with its context.
@@ -84,11 +87,9 @@ class AgentMemory(State):
             input: ModelInput,  # noqa: A002
             **extra: Any,
         ) -> ModelContext:
-            recalled: ModelContext | None = memory.get(thread.identifier)
-            if recalled is None:
-                return (input,)
-
-            memory.move_to_end(thread.identifier)
+            recalled: ModelContext = memory.get(thread.identifier, initial)
+            if thread.identifier in memory:
+                memory.move_to_end(thread.identifier)
             return (*recalled, input)
 
         async def remember(
