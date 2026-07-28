@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 from haiway import Default, Meta, MetaValues, State
 
-from draive.models.types import ModelContext, ModelInput
+from draive.models.types import ModelContext, ModelInstructions
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalContentPart
 from draive.utils import ProcessingEvent
 
@@ -13,6 +13,7 @@ __all__ = (
     "AgentException",
     "AgentExecuting",
     "AgentIdentity",
+    "AgentMemoryPreparing",
     "AgentMemoryRecalling",
     "AgentMemoryRemembering",
     "AgentMessage",
@@ -153,12 +154,21 @@ class AgentMessage(State, serializable=True):
 
 @final
 class AgentThread(State):
-    """Scoped runtime context shared across nested agent calls.
+    """Scoped runtime context of the executing agent within a conversation thread.
+
+    The ``identifier`` names the conversation thread - a connected series of
+    messages shared across nested agent calls - while ``agent_uri`` marks
+    which agent is currently executing within it. ``Agent.respond`` binds a
+    thread stamped with its own agent URI in scope for the duration of
+    message handling; nested agent calls rebind it with the same identifier
+    and their own URI. Memory operations are scoped by both.
 
     Parameters
     ----------
     identifier : UUID
         Thread identifier propagated through nested calls.
+    agent_uri : str
+        URI of the agent currently executing within the thread.
     created : datetime
         UTC timestamp recording when the thread context was created.
     meta : Meta
@@ -168,16 +178,20 @@ class AgentThread(State):
     @classmethod
     def of(
         cls,
-        identifier: UUID | None = None,
+        identifier: UUID,
         *,
+        agent_uri: str,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create an agent thread execution context.
 
         Parameters
         ----------
-        identifier : UUID | None, default=None
-            Conversation thread identifier. When omitted, a new thread is created.
+        identifier : UUID
+            Conversation thread identifier.
+        agent_uri : str
+            URI of the agent executing within the thread. Agents stamp their
+            own URI when binding the thread in scope.
         meta : Meta | MetaValues | None, default=None
             Metadata propagated through the active context scope.
 
@@ -187,11 +201,13 @@ class AgentThread(State):
             New immutable agent context instance.
         """
         return cls(
-            identifier=identifier if identifier is not None else uuid4(),
+            identifier=identifier,
+            agent_uri=agent_uri,
             meta=Meta.of(meta),
         )
 
-    identifier: UUID = Default(default_factory=uuid4)
+    identifier: UUID
+    agent_uri: str
     created: datetime = Default(default_factory=lambda: datetime.now(UTC))
     meta: Meta = Meta.empty
 
@@ -226,38 +242,86 @@ class AgentExecuting(Protocol):
 
 
 @runtime_checkable
+class AgentMemoryPreparing(Protocol):
+    """Runtime contract implemented by ``AgentMemory`` prepare callables.
+
+    Called lazily before each recall within a turn. Implementations must be
+    idempotent per agent and thread - preparation may run once per turn and
+    only the memory implementation knows whether an agent-thread pair is
+    already prepared.
+
+    Returns
+    -------
+    None
+        Completes once the memory is prepared for the agent and thread.
+    """
+
+    async def __call__(
+        self,
+        thread: AgentThread,
+        instructions: ModelInstructions,
+        **extra: Any,
+    ) -> None:
+        """Prepare memory for the agent based on its instructions.
+
+        Parameters
+        ----------
+        thread : AgentThread
+            Executing agent thread scope the preparation is applied to -
+            implementations key state by the executing agent (``agent_uri``)
+            together with the thread ``identifier``.
+        instructions : ModelInstructions
+            Instructions of the agent utilizing the memory, resolved for the
+            current turn. Resolution happens independently of the completion
+            using the same instructions.
+        **extra : Any
+            Additional implementation-specific arguments.
+
+        Returns
+        -------
+        None
+            Completes once the memory is prepared for the agent and thread.
+        """
+        ...
+
+
+@runtime_checkable
 class AgentMemoryRecalling(Protocol):
     """Runtime contract implemented by ``AgentMemory`` recall callables.
 
     Returns
     -------
     ModelContext
-        Context to use for the upcoming completion, typically prior history
-        with ``input`` appended.
+        Complete context to use for the upcoming completion, typically stored
+        history followed by the provided turn context.
     """
 
     async def __call__(
         self,
         thread: AgentThread,
-        input: ModelInput,  # noqa: A002
+        context: ModelContext,
         **extra: Any,
     ) -> ModelContext:
-        """Resolve the model context to use for a new turn.
+        """Resolve the complete model context to use for a new turn.
 
         Parameters
         ----------
         thread : AgentThread
-            Conversation thread the recalled context is scoped to.
-        input : ModelInput
-            Newly arrived input for the current turn, not yet part of any
-            stored context.
+            Executing agent thread scope the recalled context belongs to -
+            implementations key stored context by the executing agent
+            (``agent_uri``) together with the thread ``identifier``.
+        context : ModelContext
+            Context accumulated so far for the current turn, not yet part of
+            any stored context. Implementations must not assume it is a
+            single input - preceding steps may have accumulated more.
         **extra : Any
             Additional implementation-specific arguments.
 
         Returns
         -------
         ModelContext
-            Context to use for the upcoming completion.
+            Complete context to use for the upcoming completion, typically
+            stored history followed by the provided turn context.
         """
         ...
 
@@ -283,7 +347,9 @@ class AgentMemoryRemembering(Protocol):
         Parameters
         ----------
         thread : AgentThread
-            Conversation thread the persisted context is scoped to.
+            Executing agent thread scope the persisted context belongs to -
+            implementations key stored context by the executing agent
+            (``agent_uri``) together with the thread ``identifier``.
         context : ModelContext
             Full context accumulated for the turn.
         **extra : Any

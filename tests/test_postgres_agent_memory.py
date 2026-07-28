@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 import pytest
 
 import draive.postgres.agent_memory as postgres_agent_memory
-from draive.agents import AgentIdentity, AgentMemory, AgentThread
+from draive.agents import AgentMemory, AgentThread
 from draive.models import ModelContext, ModelInput, ModelOutput
 from draive.multimodal import MultimodalContent
 from draive.postgres.agent_memory import PostgresAgentMemory
@@ -35,12 +35,15 @@ def _snapshot_row(context: ModelContext) -> _FakeSnapshotRow:
     return _FakeSnapshotRow(context=f"[{','.join(element.to_json() for element in context)}]")
 
 
+def _thread(agent_uri: str = "agent://assistant") -> AgentThread:
+    return AgentThread.of(uuid4(), agent_uri=agent_uri)
+
+
 @pytest.mark.asyncio
 async def test_postgres_agent_memory_recall_returns_latest_snapshot_with_input(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    identity = AgentIdentity.of(name="assistant")
-    thread = AgentThread.of(uuid4())
+    thread = _thread()
     stored_context = (
         ModelInput.of(MultimodalContent.of("first")),
         ModelOutput.of(MultimodalContent.of("second")),
@@ -53,15 +56,15 @@ async def test_postgres_agent_memory_recall_returns_latest_snapshot_with_input(
     ) -> _FakeSnapshotRow:
         assert "ORDER BY" in statement
         assert "LIMIT 1" in statement
-        assert args == (identity.uri, thread.identifier)
+        assert args == (thread.agent_uri, thread.identifier)
         return _snapshot_row(stored_context)
 
     monkeypatch.setattr(postgres_agent_memory.Postgres, "fetch_one", fake_fetch_one)
 
-    memory: AgentMemory = PostgresAgentMemory.prepare(identity)
+    memory: AgentMemory = PostgresAgentMemory.instance()
     incoming = ModelInput.of(MultimodalContent.of("third"))
 
-    recalled = await memory.recall(thread=thread, input=incoming)
+    recalled = await memory.recall(thread=thread, context=(incoming,))
 
     assert [element.content.to_str() for element in recalled] == ["first", "second", "third"]
     assert isinstance(recalled[0], ModelInput)
@@ -75,9 +78,6 @@ async def test_postgres_agent_memory_recall_returns_latest_snapshot_with_input(
 async def test_postgres_agent_memory_recall_of_empty_thread_returns_input_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    identity = AgentIdentity.of(name="assistant")
-    thread = AgentThread.of(uuid4())
-
     async def fake_fetch_one(
         statement: str,
         /,
@@ -87,18 +87,17 @@ async def test_postgres_agent_memory_recall_of_empty_thread_returns_input_only(
 
     monkeypatch.setattr(postgres_agent_memory.Postgres, "fetch_one", fake_fetch_one)
 
-    memory: AgentMemory = PostgresAgentMemory.prepare(identity)
+    memory: AgentMemory = PostgresAgentMemory.instance()
     incoming = ModelInput.of(MultimodalContent.of("hello"))
 
-    assert await memory.recall(thread=thread, input=incoming) == (incoming,)
+    assert await memory.recall(thread=_thread(), context=(incoming,)) == (incoming,)
 
 
 @pytest.mark.asyncio
 async def test_postgres_agent_memory_remember_inserts_snapshot_write_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    identity = AgentIdentity.of(name="assistant")
-    thread = AgentThread.of(uuid4())
+    thread = _thread()
     fetched: list[tuple[str, tuple[object, ...]]] = []
     executed: list[tuple[str, tuple[object, ...]]] = []
 
@@ -119,7 +118,7 @@ async def test_postgres_agent_memory_remember_inserts_snapshot_write_only(
     monkeypatch.setattr(postgres_agent_memory.Postgres, "fetch_one", fake_fetch_one)
     monkeypatch.setattr(postgres_agent_memory.Postgres, "execute", fake_execute)
 
-    memory: AgentMemory = PostgresAgentMemory.prepare(identity)
+    memory: AgentMemory = PostgresAgentMemory.instance()
     context = (
         ModelInput.of(MultimodalContent.of("hello")),
         ModelOutput.of(MultimodalContent.of("world")),
@@ -135,7 +134,7 @@ async def test_postgres_agent_memory_remember_inserts_snapshot_write_only(
     assert "DELETE" not in insert_statement
     assert "pg_advisory" not in insert_statement
 
-    assert insert_args[0] == identity.uri
+    assert insert_args[0] == thread.agent_uri
     assert insert_args[1] == thread.identifier
     assert isinstance(insert_args[2], UUID)
 
@@ -149,8 +148,7 @@ async def test_postgres_agent_memory_remember_inserts_snapshot_write_only(
 async def test_postgres_agent_memory_remember_accepts_disjoint_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    identity = AgentIdentity.of(name="assistant")
-    thread = AgentThread.of(uuid4())
+    thread = _thread()
     snapshots: list[str] = []
 
     async def fake_fetch_one(
@@ -172,7 +170,7 @@ async def test_postgres_agent_memory_remember_accepts_disjoint_context(
     monkeypatch.setattr(postgres_agent_memory.Postgres, "fetch_one", fake_fetch_one)
     monkeypatch.setattr(postgres_agent_memory.Postgres, "execute", fake_execute)
 
-    memory: AgentMemory = PostgresAgentMemory.prepare(identity)
+    memory: AgentMemory = PostgresAgentMemory.instance()
     await memory.remember(
         thread=thread,
         context=(
@@ -188,7 +186,7 @@ async def test_postgres_agent_memory_remember_accepts_disjoint_context(
     # both snapshots retained; the latest one is recalled whole, as provided
     assert len(snapshots) == 2
     incoming = ModelInput.of(MultimodalContent.of("next"))
-    recalled = await memory.recall(thread=thread, input=incoming)
+    recalled = await memory.recall(thread=thread, context=(incoming,))
     assert recalled == (*summary, incoming)
 
 

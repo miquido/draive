@@ -9,5 +9,5 @@ class AnthropicConfig(Configuration):
     model: str
     temperature: float | Missing = MISSING
     max_output_tokens: int = 2048
-    thinking_budget: int | None | Missing = MISSING
+    thinking_budget: int | Missing | None = MISSING
     stop_sequences: Sequence[str] | Missing = MISSING

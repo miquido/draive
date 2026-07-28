@@ -13,7 +13,7 @@ class OllamaChatConfig(Configuration):
     temperature: float | Missing = MISSING
     top_k: int | Missing = MISSING
     top_p: float | Missing = MISSING
-    seed: int | None | Missing = MISSING
+    seed: int | Missing | None = MISSING
     max_output_tokens: int | Missing = MISSING
     stop_sequences: Sequence[str] | Missing = MISSING
 

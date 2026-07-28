@@ -82,7 +82,10 @@ async def test_agent_call_reuses_context_thread_and_meta() -> None:
     )
     meta = Meta.of({"source": "outer"})
 
-    async with ctx.scope("test.agent.call", AgentThread.of(identifier=thread, meta=meta)):
+    async with ctx.scope(
+        "test.agent.call",
+        AgentThread.of(identifier=thread, agent_uri="agent://outer", meta=meta),
+    ):
         chunks = [chunk async for chunk in agent.call(input="hello")]
 
     assert _multimodal_text_of(*chunks) == "hello"
@@ -115,7 +118,11 @@ async def test_agent_call_overrides_context_thread_and_merges_meta() -> None:
 
     async with ctx.scope(
         "test.agent.call.override",
-        AgentThread.of(identifier=outer_thread, meta={"source": "outer", "scope": "root"}),
+        AgentThread.of(
+            identifier=outer_thread,
+            agent_uri="agent://outer",
+            meta={"source": "outer", "scope": "root"},
+        ),
     ):
         chunks = [
             chunk

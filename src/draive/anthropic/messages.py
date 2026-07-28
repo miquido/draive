@@ -539,7 +539,7 @@ def _content_elements(
 
 
 def _thinking_budget_config(
-    budget: int | None | Missing,
+    budget: int | Missing | None,
 ) -> ThinkingConfigParam | Omit:
     if budget is MISSING:
         return omit
