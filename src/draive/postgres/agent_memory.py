@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from haiway import Meta, MetaValues, ctx
 from haiway.postgres import Postgres, PostgresConnection, PostgresRow
 
-from draive.agents import AgentIdentity, AgentMemory, AgentThread
+from draive.agents import AgentMemory, AgentThread
 from draive.models import ModelContext, ModelContextElement, ModelInput, ModelOutput
 
 __all__ = ("PostgresAgentMemory",)
@@ -16,9 +16,10 @@ class PostgresAgentMemory:
     """PostgreSQL-backed agent memory.
 
     This utility exposes static helpers for schema migration and creating
-    agent-scoped :class:`~draive.agents.state.AgentMemory` instances persisted
-    in PostgreSQL, keyed by the owning agent identity and the active
-    conversation thread.
+    :class:`~draive.agents.state.AgentMemory` instances persisted in
+    PostgreSQL, keyed by the executing agent URI and thread identifier
+    carried on the ``AgentThread`` passed to each memory operation. A single
+    instance can serve multiple agents.
 
     Context is stored as immutable snapshots: every remember inserts the full
     context as a new snapshot row and recall reads back the latest one whole.
@@ -28,14 +29,15 @@ class PostgresAgentMemory:
     Previous snapshots are never modified or deleted and remain available
     for tracking and verification. Persistence is lock-free and write-only:
     concurrent remembers within the same thread each store their own
-    snapshot and the one persisted last wins on recall. Snapshot history
-    grows without bound over the lifetime of a thread.
+    snapshot and recall picks the latest one by creation timestamp -
+    recorded at statement execution time with microsecond resolution, with
+    the snapshot identifier as a stable tie-break. Snapshot history grows
+    without bound over the lifetime of a thread.
 
     Examples
     --------
     ```python
     from draive import ctx
-    from draive.agents import AgentIdentity
     from haiway.postgres import Postgres
     from draive.postgres.agent_memory import PostgresAgentMemory
 
@@ -48,9 +50,7 @@ class PostgresAgentMemory:
                 with ctx.updating(connection):
                     await PostgresAgentMemory.migrate()
 
-            memory = PostgresAgentMemory.prepare(
-                AgentIdentity.of(name="assistant"),
-            )
+            memory = PostgresAgentMemory.instance()
     ```
     """
 
@@ -96,24 +96,26 @@ class PostgresAgentMemory:
             ON agent_memory (
                 agent_uri,
                 thread_id,
-                created DESC
+                created DESC,
+                identifier DESC
             );
             """
         )
 
     @staticmethod
-    def prepare(
-        identity: AgentIdentity,
+    def instance(
         *,
         meta: Meta | MetaValues | None = None,
     ) -> AgentMemory:
-        """Prepare agent-scoped memory operations backed by PostgreSQL.
+        """Create memory operations backed by PostgreSQL.
+
+        The executing agent is resolved per operation from the provided
+        ``AgentThread``, so a single memory instance can serve multiple
+        agents - recalled and remembered context is isolated per agent URI
+        and thread.
 
         Parameters
         ----------
-        identity : AgentIdentity
-            Identity of the agent owning the persisted memory. Recalled and
-            remembered context is isolated per agent URI.
         meta : Meta | MetaValues | None, default=None
             Additional metadata attached to the resulting memory instance.
 
@@ -121,26 +123,25 @@ class PostgresAgentMemory:
         -------
         AgentMemory
             A configured agent memory instance with recall and remember
-            handlers bound to the provided agent identity.
+            handlers scoped by the executing agent context.
 
         Raises
         ------
         Exception
             Raised by memory operations when PostgreSQL interactions fail.
         """
-        agent_uri: str = identity.uri
 
         async def recall(
             thread: AgentThread,
-            input: ModelInput,  # noqa: A002
+            context: ModelContext,
             **extra: Any,
         ) -> ModelContext:
             return (
                 *await _recall(
-                    agent_uri=agent_uri,
+                    agent_uri=thread.agent_uri,
                     thread_id=thread.identifier,
                 ),
-                input,
+                *context,
             )
 
         async def remember(
@@ -149,7 +150,7 @@ class PostgresAgentMemory:
             **extra: Any,
         ) -> None:
             await _remember(
-                agent_uri=agent_uri,
+                agent_uri=thread.agent_uri,
                 thread_id=thread.identifier,
                 context=context,
             )
@@ -227,7 +228,8 @@ async def _remember(
     context: ModelContext,
 ) -> None:
     # write-only: a new snapshot is inserted as-is, previous snapshots stay
-    # untouched for tracking and verification; the latest snapshot wins on recall
+    # untouched for tracking and verification; recall picks the latest snapshot
+    # by creation timestamp, with the identifier as a stable tie-break
     await Postgres.execute(
         """
         INSERT INTO
@@ -244,7 +246,7 @@ async def _remember(
             $2::UUID,
             $3::UUID,
             $4::JSONB,
-            CURRENT_TIMESTAMP
+            clock_timestamp()
         );
         """,  # nosec: B608
         agent_uri,

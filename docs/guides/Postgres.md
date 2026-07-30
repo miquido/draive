@@ -4,8 +4,8 @@ Draive ships with Postgres-backed implementations for common persistence interfa
 relational storage into your workflows without writing adapters. All helpers live in
 `draive.postgres` and reuse the shared `haiway.postgres.Postgres` connection states.
 
-Current adapters include `PostgresConfigurationRepository`, `PostgresTemplatesRepository`, and
-`PostgresVectorIndex`.
+Current adapters include `PostgresConfigurationRepository`, `PostgresTemplatesRepository`,
+`PostgresVectorIndex`, and `PostgresAgentMemory`.
 
 ## Bootstrapping the Postgres context
 
@@ -210,6 +210,49 @@ Search and deletion accept `AttributeRequirement` instances which are evaluated 
 payload JSON. Requirements are translated to SQL expressions (for example,
 `AttributeRequirement.equal` becomes `payload #>> '{text}' = $2`). Unsupported operators raise
 `NotImplementedError`, ensuring the query surface remains explicit.
+
+## AgentMemory implementation
+
+`PostgresAgentMemory` persists agent conversation context across turns, keyed by the executing
+agent URI and the conversation thread identifier - both carried on the `AgentThread` passed to
+each memory operation. See the [Agents](./Agents.md) guide for how `AgentMemory` participates in
+agent execution.
+
+Run the schema migration once with an acquired connection bound in context:
+
+```python
+from draive import ctx
+from draive.postgres import Postgres, PostgresAgentMemory
+
+async with ctx.scope("migration"):
+    async with Postgres.acquire_connection() as connection:
+        with ctx.updating(connection):
+            await PostgresAgentMemory.migrate()
+```
+
+Then create a memory instance and pass it to an agent:
+
+```python
+from draive import Agent
+from draive.postgres import PostgresAgentMemory
+
+assistant = Agent.generative(
+    "assistant",
+    instructions="You are a concise support assistant.",
+    memory=PostgresAgentMemory.instance(),
+)
+```
+
+Storage semantics:
+
+- Context is stored as immutable snapshots: every remember inserts the full context as a new row
+    and recall reads back the latest one whole, so steps may compact, summarize, or replace the
+    context freely between turns.
+- Persistence is lock-free and write-only: previous snapshots are never modified or deleted and
+    remain available for tracking and verification. Snapshot history grows without bound over the
+    lifetime of a thread.
+- A single memory instance can serve multiple agents; recalled and remembered context is isolated
+    per agent URI and thread, both taken from the executing `AgentThread` at call time.
 
 ## Putting it together
 

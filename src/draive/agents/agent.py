@@ -1,6 +1,6 @@
-from collections.abc import AsyncIterable, Iterable
+from collections.abc import AsyncIterable, Iterable, MutableSequence, Sequence
 from typing import Any, NoReturn, Self, final, overload
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from haiway import Meta, MetaValues, ctx
 
@@ -12,8 +12,12 @@ from draive.agents.types import (
     AgentThread,
 )
 from draive.models import (
+    GenerativeModel,
     ModelInstructions,
+    ModelOutput,
+    ModelOutputBlock,
     ModelOutputSelection,
+    ModelReasoning,
     ModelReasoningChunk,
     ModelToolRequest,
     ModelToolResponse,
@@ -24,9 +28,10 @@ from draive.multimodal import (
     MultimodalContent,
     MultimodalContentPart,
     Template,
+    TemplatesRepository,
 )
 from draive.skills import Skill
-from draive.steps import Step
+from draive.steps import Step, StepState, StepStream
 from draive.tools import Tool, Toolbox, tool
 from draive.tools.types import ToolOutputChunk
 from draive.utils import ProcessingEvent
@@ -142,7 +147,7 @@ class Agent:
     ) -> Self: ...
 
     @classmethod
-    def generative(
+    def generative(  # noqa: C901, PLR0915
         cls,
         agent: AgentIdentity | str,
         *,
@@ -166,8 +171,11 @@ class Agent:
         tools : Toolbox | Iterable[Tool], default=Toolbox.empty
             Tools available to the model while handling requests.
         memory : AgentMemory, default=AgentMemory.disabled
-            Memory used to recall context before each turn and persist it
-            afterwards. Defaults to a no-op memory scoped to a single turn.
+            Memory used to prepare and recall context before each turn and
+            persist it afterwards. Defaults to a no-op memory scoped to a
+            single turn. Context is remembered only when the turn completes
+            and its output stream is fully consumed - turns abandoned
+            mid-stream or failing with an error are not persisted.
         output : ModelOutputSelection, default="auto"
             Output selection mode forwarded to model completion.
         meta : Meta | MetaValues | None, default=None
@@ -189,14 +197,143 @@ class Agent:
         else:
             identity = agent
 
+        toolbox: Toolbox = Toolbox.of(tools)
+
+        async def step(  # noqa: C901, PLR0912, PLR0915
+            state: StepState,
+        ) -> StepStream:
+            async with ctx.scope("agent.generative"):
+                if isinstance(instructions, Template):
+                    ctx.record_info(attributes={"instructions.template": instructions.identifier})
+                    resolved_instructions: str = await TemplatesRepository.resolve_str(instructions)
+
+                else:
+                    resolved_instructions = instructions
+
+                if not ctx.contains_state(AgentThread):
+                    raise ValueError("AgentThread not specified")
+
+                thread: AgentThread = ctx.state(AgentThread)
+
+                await memory.prepare(
+                    thread=thread,
+                    instructions=resolved_instructions,
+                )
+
+                state = state.replacing_context(
+                    await memory.recall(
+                        thread=thread,
+                        context=state.context,
+                    )
+                )
+
+                iteration: int = 0
+                while True:  # loop until we get ModelOutput without tools
+                    async with ctx.scope(f"agent.generative.turn_{iteration}"):
+                        ctx.log_debug("Generating completion...")
+                        content_accumulator: MutableSequence[MultimodalContentPart] = []
+                        reasoning_accumulator: MutableSequence[ModelReasoningChunk] = []
+                        output_accumulator: MutableSequence[ModelOutputBlock] = []
+
+                        async for chunk in GenerativeModel.completion(
+                            instructions=resolved_instructions,
+                            tools=toolbox.model_tools(iteration=iteration),
+                            context=state.context,
+                            output=output,
+                        ):
+                            yield chunk
+
+                            if isinstance(chunk, ModelReasoningChunk):
+                                if content_accumulator:
+                                    output_accumulator.append(
+                                        MultimodalContent.of(*content_accumulator)
+                                    )
+                                    content_accumulator.clear()
+
+                                reasoning_accumulator.append(chunk)
+
+                            elif isinstance(chunk, ModelToolRequest):
+                                # TODO: start handling immediately
+                                if content_accumulator:
+                                    output_accumulator.append(
+                                        MultimodalContent.of(*content_accumulator)
+                                    )
+                                    content_accumulator.clear()
+
+                                if reasoning_accumulator:
+                                    output_accumulator.append(
+                                        ModelReasoning.of(reasoning_accumulator)
+                                    )
+                                    reasoning_accumulator.clear()
+
+                                output_accumulator.append(chunk)
+
+                            else:
+                                if reasoning_accumulator:
+                                    output_accumulator.append(
+                                        ModelReasoning.of(reasoning_accumulator)
+                                    )
+                                    reasoning_accumulator.clear()
+
+                                content_accumulator.append(chunk)
+
+                        if content_accumulator:
+                            output_accumulator.append(MultimodalContent.of(*content_accumulator))
+
+                        if reasoning_accumulator:
+                            output_accumulator.append(ModelReasoning.of(reasoning_accumulator))
+
+                        model_output: ModelOutput = ModelOutput.of(*output_accumulator)
+
+                        state = state.appending_context(model_output)
+                        yield state
+
+                        tool_requests: Sequence[ModelToolRequest] = model_output.tool_requests
+                        if not tool_requests:
+                            break  # end of loop
+
+                        ctx.log_debug("...handling tool requests...")
+
+                        responses: MutableSequence[ModelToolResponse] = []
+                        tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
+                        async for chunk in toolbox.handle(*tool_requests):
+                            if isinstance(chunk, ModelToolResponse):
+                                responses.append(chunk)
+                                yield chunk
+
+                            elif isinstance(chunk, ProcessingEvent):
+                                yield chunk
+
+                            else:
+                                tools_output_accumulator.append(chunk)
+                                yield chunk
+
+                        ctx.log_debug("...received tool responses...")
+
+                        if tools_output_accumulator:  # tools direct result
+                            ctx.log_debug("...tools generated output...")
+                            state = state.appending_context(
+                                ModelInput.of(*responses),
+                                ModelOutput.of(MultimodalContent.of(*tools_output_accumulator)),
+                            )
+                            yield state
+                            break  # end of loop
+
+                        else:  # regular tools result
+                            state = state.appending_context(
+                                ModelInput.of(*responses),
+                            )
+                            yield state
+                            iteration += 1  # continue next iteration
+
+                await memory.remember(
+                    thread=thread,
+                    context=state.context,
+                )
+
         return cls.steps(
-            Step.looping_completion(
-                instructions=instructions,
-                tools=tools,
-                output=output,
-            ),
+            Step(step),
             agent=identity,
-            memory=memory,
         )
 
     @overload
@@ -244,8 +381,11 @@ class Agent:
         tools : Toolbox | Iterable[Tool], default=Toolbox.empty
             Additional tools available while handling requests.
         memory : AgentMemory, default=AgentMemory.disabled
-            Memory used to recall context before each turn and persist it
-            afterwards. Defaults to a no-op memory scoped to a single turn.
+            Memory used to prepare and recall context before each turn and
+            persist it afterwards. Defaults to a no-op memory scoped to a
+            single turn. Context is remembered only when the turn completes
+            and its output stream is fully consumed - turns abandoned
+            mid-stream or failing with an error are not persisted.
         output : ModelOutputSelection, default="auto"
             Output selection mode forwarded to model completion.
         meta : Meta | MetaValues | None, default=None
@@ -270,16 +410,14 @@ class Agent:
             resolved_toolbox = tools.with_tools(skill.resources_tool())
 
         else:
-            resolved_toolbox = Toolbox.of(skill.resources_tool(), *tools)
+            resolved_toolbox = Toolbox.of(*tools, skill.resources_tool())
 
-        return cls.steps(
-            Step.looping_completion(
-                instructions=skill.instructions,
-                tools=resolved_toolbox,
-                output=output,
-            ),
-            agent=identity,
+        return cls.generative(
+            identity,
+            instructions=skill.instructions,
+            tools=resolved_toolbox,
             memory=memory,
+            output=output,
         )
 
     @overload
@@ -290,7 +428,6 @@ class Agent:
         step: Step,
         *steps: Step,
         agent: AgentIdentity,
-        memory: AgentMemory = AgentMemory.disabled,
     ) -> Self: ...
 
     @overload
@@ -302,7 +439,6 @@ class Agent:
         *steps: Step,
         agent: str,
         description: str = "",
-        memory: AgentMemory = AgentMemory.disabled,
         meta: Meta | MetaValues | None = None,
     ) -> Self: ...
 
@@ -314,7 +450,6 @@ class Agent:
         *steps: Step,
         agent: AgentIdentity | str,
         description: str = "",
-        memory: AgentMemory = AgentMemory.disabled,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create an agent from one or more ``Step`` pipeline stages.
@@ -322,17 +457,14 @@ class Agent:
         Parameters
         ----------
         step : Step
-            First step executed after the incoming message is appended as input.
+            First step executed on the initial context holding the incoming
+            message as input.
         *steps : Step
             Additional steps executed sequentially after ``step``.
         agent : AgentIdentity | str
             Human-readable agent name or full identity.
         description : str, default=""
             Short description of the agent's purpose.
-        memory : AgentMemory, default=AgentMemory.disabled
-            Memory used to recall context before ``step`` runs and persist the
-            resulting context after ``*steps`` complete. Defaults to a no-op
-            memory scoped to a single turn.
         meta : Meta | MetaValues | None, default=None
             Additional metadata attached to the agent identity.
 
@@ -343,25 +475,29 @@ class Agent:
 
         Notes
         -----
-        The wrapped execution recalls context via ``memory.recall_step``,
-        runs ``step`` and ``*steps``, then persists the resulting context via
-        ``memory.remember_step``, and filters out reasoning and tool protocol
-        chunks from the public output stream.
+        The wrapped execution seeds the pipeline context with the incoming
+        message as ``ModelInput``, runs ``step`` and ``*steps``, and filters
+        out reasoning and tool protocol chunks from the public output stream.
+        Memory is not applied implicitly - compose ``AgentMemory`` steps
+        (``prepare_step``, ``recall_step``, ``remember_step``) into the
+        pipeline where needed. ``generative`` and ``from_skill`` invoke
+        ``memory.prepare``, ``memory.recall``, and ``memory.remember``
+        directly within their step bodies instead.
         """
 
         async def execute(
             message: AgentMessage,
         ) -> AsyncIterable[MultimodalContentPart | ProcessingEvent]:
             async for chunk in Step.sequence(
-                memory.recall_step(
-                    input=ModelInput.of(
-                        message.content,
-                        meta=message.meta,
-                    )
-                ),
                 step,
                 *steps,
-                memory.remember_step,
+            ).stream(
+                (
+                    ModelInput.of(
+                        message.content,
+                        meta=message.meta,
+                    ),
+                )
             ):
                 if isinstance(chunk, ModelReasoningChunk):
                     continue  # skip reasoning
@@ -453,15 +589,28 @@ class Agent:
         AsyncIterable[MultimodalContentPart | ProcessingEvent]
             Stream of output chunks emitted by the agent.
         """
-        context: AgentThread = ctx.state(
-            AgentThread,
-            default=AgentThread.of(),
-        )
+        current: AgentThread | None
+        if ctx.contains_state(AgentThread):
+            current = ctx.state(AgentThread)
+
+        else:
+            current = None
+
+        identifier: UUID
+        if thread is not None:
+            identifier = thread
+
+        elif current is not None:
+            identifier = current.identifier
+
+        else:
+            identifier = uuid4()
+
         return self.respond(
             AgentMessage(
-                thread=thread if thread is not None else context.identifier,
+                thread=identifier,
                 content=MultimodalContent.of(input),
-                meta=context.meta.merged_with(meta),
+                meta=current.meta.merged_with(meta) if current is not None else Meta.of(meta),
             ),
         )
 
@@ -485,6 +634,7 @@ class Agent:
             f"agent.{self.identity.name}",
             AgentThread.of(
                 message.thread,
+                agent_uri=self.identity.uri,
                 meta=message.meta,
             ),
         ):

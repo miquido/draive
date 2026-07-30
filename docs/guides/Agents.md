@@ -20,7 +20,10 @@ The agents API is intentionally built as a thin layer over existing Draive runti
 
 - `AgentIdentity` describes the agent instance: `uri`, `name`, `description`, `meta`.
 - `AgentMessage` is the fully prepared input payload: `thread`, `created`, `content`, `meta`.
-- `AgentThread` is the scoped runtime state propagated through `ctx.scope(...)`.
+- `AgentThread` is the scoped runtime state propagated through `ctx.scope(...)`: its `identifier`
+    names the conversation thread shared across nested agent calls, while `agent_uri` marks the
+    URI of the agent currently executing within it - agents bind a thread stamped with their own
+    URI while handling a message.
 - `AgentExecuting` is the executor protocol:
     `AgentMessage -> AsyncIterable[MultimodalContentPart | ProcessingEvent]`.
 
@@ -171,9 +174,13 @@ APIs, or provide the required context explicitly.
 
 ### Persist Context Across Turns With `AgentMemory`
 
-`Agent.generative(...)`, `Agent.steps(...)` and `Agent.from_skill(...)` accept a `memory` argument
-controlling how model context is recalled before each turn and persisted afterwards. The default is
-`AgentMemory.disabled`, which scopes context to a single turn.
+`Agent.generative(...)` and `Agent.from_skill(...)` accept a `memory` argument controlling how
+model context is prepared and recalled before each turn and persisted afterwards. The default is
+`AgentMemory.disabled`, which scopes context to a single turn. `Agent.steps(...)` applies no memory
+implicitly - compose the predefined memory steps (`memory.prepare_step(...)`,
+`memory.recall_step()`, `memory.remember_step()`) into the pipeline where needed;
+`Agent.generative(...)` and `Agent.from_skill(...)` invoke `memory.prepare`, `memory.recall`, and
+`memory.remember` directly within their step bodies instead.
 
 ```python
 from draive import Agent, AgentMemory
@@ -185,20 +192,32 @@ assistant: Agent = Agent.generative(
 )
 ```
 
-Memory is keyed by the active `AgentThread`, so one memory instance serves multiple concurrent
-conversation threads. Context is stored as the latest snapshot per thread: whatever is remembered
-after a turn becomes the next recalled context, exactly as provided, which allows steps to compact,
-summarize, or replace the context freely.
+Memory operations receive the active `AgentThread` - the executing agent's URI together with the
+conversation thread identifier - so one memory instance can serve multiple agents and multiple
+concurrent conversation threads, as long as the implementation keys stored context by both (the
+built-in ones do). Context is stored as the latest snapshot per agent and thread: whatever is
+remembered after a turn becomes the next recalled context, exactly as provided, which allows steps
+to compact, summarize, or replace the context freely.
 
-- `AgentMemory.volatile(...)` keeps snapshots in-process, with optional LRU eviction via
-    `threads_limit`; intended for local development, tests, and single-process deployments.
-- `PostgresAgentMemory.prepare(identity)` (from `draive.postgres`) persists immutable snapshots in
-    PostgreSQL, keyed by agent identity and thread; run `PostgresAgentMemory.migrate()` once to
-    create its schema.
-- `AgentMemory(recalling=..., remembering=...)` wraps custom async callables for any other backend.
+- `AgentMemory.volatile(...)` keeps snapshots in-process, with optional LRU-like eviction via
+    `threads_limit`. An entry's usage is refreshed by `prepare` and `remember`, but not by
+    `recall`; intended for local development, tests, and single-process deployments.
+- `PostgresAgentMemory.instance()` (from `draive.postgres`) persists immutable snapshots in
+    PostgreSQL, keyed by executing agent URI and thread; run `PostgresAgentMemory.migrate()` once
+    to create its schema.
+- `AgentMemory(recalling=..., remembering=...)` wraps custom async callables for any other
+    backend; each receives the executing `AgentThread`, and an optional `preparing=` callable runs
+    before each recall to set up state based on the agent's instructions (it must be idempotent
+    per agent and thread).
 
-Each memory instance is intended to serve exactly one agent: state is scoped per thread only, so
-sharing an instance between agents would mix their contexts within a thread.
+Two behavioral notes:
+
+- Context is remembered only when a turn completes and its output stream is fully consumed;
+    turns abandoned mid-stream or failing with an error are not persisted.
+- Memory steps (`prepare_step`, `recall_step`, `remember_step`) require an `AgentThread` bound in
+    the current context and raise `AgentException` otherwise. Agents bind one stamped with their
+    own URI automatically; when running memory steps outside an agent, enter a scope with an
+    `AgentThread` instance first.
 
 ## 3. Preserve Thread And Metadata
 
@@ -232,7 +251,7 @@ agent: Agent = Agent(
 
 async with ctx.scope(
     "agents.context",
-    AgentThread.of(identifier=uuid4(), meta={"source": "outer"}),
+    AgentThread.of(identifier=uuid4(), agent_uri="agent://outer", meta={"source": "outer"}),
 ):
     stream: AsyncIterable[MultimodalContentPart | ProcessingEvent] = agent.call(
         input="hello",
@@ -394,6 +413,9 @@ The public agents API exported from `draive` includes:
 - `AgentExecuting`
 - `AgentIdentity`
 - `AgentMemory`
+- `AgentMemoryPreparing`
+- `AgentMemoryRecalling`
+- `AgentMemoryRemembering`
 - `AgentMessage`
 - `AgentThread`
 - `ProcessingEvent`
