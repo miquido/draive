@@ -1,4 +1,6 @@
+from collections.abc import AsyncIterable, Iterable, Sequence
 from types import TracebackType
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -6,9 +8,31 @@ from haiway import State, ctx
 
 from draive import Agent
 from draive.agents import AgentException, AgentMemory, AgentThread
-from draive.models import ModelContext, ModelInput, ModelOutput
-from draive.multimodal import MultimodalContent
+from draive.models import (
+    GenerativeModel,
+    ModelContext,
+    ModelContextElement,
+    ModelInput,
+    ModelOutput,
+    ModelOutputChunk,
+    ModelToolRequest,
+    ModelTools,
+)
+from draive.multimodal import MultimodalContent, MultimodalContentPart, TextContent
 from draive.steps import StepState, step
+from draive.tools import Tool, tool
+from draive.utils import ProcessingEvent
+
+
+async def _stream_of(*chunks: ModelOutputChunk) -> AsyncIterable[ModelOutputChunk]:
+    for chunk in chunks:
+        yield chunk
+
+
+def _text_of(chunks: Iterable[MultimodalContentPart | ProcessingEvent]) -> str:
+    return MultimodalContent.of(
+        *(chunk for chunk in chunks if not isinstance(chunk, ProcessingEvent))
+    ).to_str()
 
 
 class _MarkerState(State):
@@ -102,7 +126,7 @@ async def test_agent_memory_with_ctx_applies_to_steps_too() -> None:
 
 
 @pytest.mark.asyncio
-async def test_agent_memory_prepare_step_passes_thread_and_instructions() -> None:
+async def test_agent_memory_prepare_passes_thread_and_instructions() -> None:
     captured: dict[str, object] = {}
 
     async def preparing(
@@ -129,14 +153,148 @@ async def test_agent_memory_prepare_step_passes_thread_and_instructions() -> Non
     )
 
     thread = _thread()
-    state = StepState.of(())
 
-    async with ctx.scope("test", thread):
-        result = await memory.prepare_step("agent instructions").process(state)
+    async with ctx.scope("test"):
+        assert await memory.prepare(thread=thread, instructions="agent instructions") is None
 
-    assert result == state  # state passes through unchanged
     assert captured["thread"] == thread
     assert captured["instructions"] == "agent instructions"
+
+
+@pytest.mark.asyncio
+async def test_agent_generative_extends_toolbox_with_prepared_tools() -> None:
+    tool_calls: list[str] = []
+    offered_tools: list[tuple[str, ...]] = []
+
+    @tool(name="agent_tool")
+    async def agent_tool() -> str:
+        return "agent"
+
+    async def preparing(
+        thread: AgentThread,
+        instructions: str,
+        **extra: object,
+    ) -> Sequence[Tool]:
+        _ = (instructions, extra)
+
+        @tool(name="memory_recall")
+        async def memory_recall(topic: str) -> str:  # closes over prepared turn state
+            tool_calls.append(f"{topic}@{thread.agent_uri}")
+            return f"details about {topic}"
+
+        return (memory_recall,)
+
+    async def recalling(
+        thread: AgentThread,
+        context: ModelContext,
+        **extra: object,
+    ) -> ModelContext:
+        _ = (thread, extra)
+        return context
+
+    iteration: int = 0
+
+    def generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: Sequence[ModelContextElement],
+        output: Any,
+        **extra: Any,
+    ) -> AsyncIterable[ModelOutputChunk]:
+        _ = (instructions, context, output, extra)
+        nonlocal iteration
+        offered_tools.append(tuple(available.name for available in tools.specification))
+        iteration += 1
+        if iteration > 1:
+            return _stream_of(TextContent.of("final"))
+
+        return _stream_of(
+            ModelToolRequest.of(
+                "call1",
+                tool="memory_recall",
+                arguments={"topic": "budget"},
+            )
+        )
+
+    agent = Agent.generative(
+        "helper",
+        instructions="be helpful",
+        tools=[agent_tool],
+        memory=AgentMemory(
+            recalling=recalling,
+            remembering=_noop_remembering,
+            preparing=preparing,
+        ),
+    )
+
+    async with ctx.scope("test", GenerativeModel(generating=generating)):
+        chunks = [chunk async for chunk in agent.call(input="hi")]
+
+    # prepared tools stay available through all iterations of the turn
+    assert offered_tools == [
+        ("agent_tool", "memory_recall"),
+        ("agent_tool", "memory_recall"),
+    ]
+    assert tool_calls == [f"budget@{agent.identity.uri}"]
+    assert _text_of(chunks) == "final"
+
+
+@pytest.mark.parametrize("prepared", [None, (), []])
+@pytest.mark.asyncio
+async def test_agent_generative_keeps_toolbox_without_prepared_tools(
+    prepared: Sequence[Tool] | None,
+) -> None:
+    offered_tools: list[tuple[str, ...]] = []
+
+    @tool(name="agent_tool")
+    async def agent_tool() -> str:
+        return "agent"
+
+    async def preparing(
+        thread: AgentThread,
+        instructions: str,
+        **extra: object,
+    ) -> Sequence[Tool] | None:
+        _ = (thread, instructions, extra)
+        return prepared
+
+    async def recalling(
+        thread: AgentThread,
+        context: ModelContext,
+        **extra: object,
+    ) -> ModelContext:
+        _ = (thread, extra)
+        return context
+
+    def generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: Sequence[ModelContextElement],
+        output: Any,
+        **extra: Any,
+    ) -> AsyncIterable[ModelOutputChunk]:
+        _ = (instructions, context, output, extra)
+        offered_tools.append(tuple(available.name for available in tools.specification))
+        return _stream_of(TextContent.of("final"))
+
+    agent = Agent.generative(
+        "helper",
+        instructions="be helpful",
+        tools=[agent_tool],
+        memory=AgentMemory(
+            recalling=recalling,
+            remembering=_noop_remembering,
+            preparing=preparing,
+        ),
+    )
+
+    async with ctx.scope("test", GenerativeModel(generating=generating)):
+        chunks = [chunk async for chunk in agent.call(input="hi")]
+
+    assert offered_tools == [("agent_tool",)]
+    assert _text_of(chunks) == "final"
 
 
 @pytest.mark.asyncio
@@ -378,9 +536,6 @@ async def test_agent_memory_steps_require_agent_thread_in_scope() -> None:
     state = StepState.of(())
 
     async with ctx.scope("test"):  # no AgentThread bound in scope
-        with pytest.raises(AgentException):
-            await memory.prepare_step("instructions").process(state)
-
         with pytest.raises(AgentException):
             await memory.recall_step().process(state)
 
