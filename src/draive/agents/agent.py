@@ -175,7 +175,9 @@ class Agent:
             persist it afterwards. Defaults to a no-op memory scoped to a
             single turn. Context is remembered only when the turn completes
             and its output stream is fully consumed - turns abandoned
-            mid-stream or failing with an error are not persisted.
+            mid-stream or failing with an error are not persisted. Tools
+            returned by ``memory.prepare`` extend ``tools`` for the duration
+            of the turn, replacing provided tools using the same names.
         output : ModelOutputSelection, default="auto"
             Output selection mode forwarded to model completion.
         meta : Meta | MetaValues | None, default=None
@@ -215,10 +217,16 @@ class Agent:
 
                 thread: AgentThread = ctx.state(AgentThread)
 
-                await memory.prepare(
+                memory_tools: Sequence[Tool] | None = await memory.prepare(
                     thread=thread,
                     instructions=resolved_instructions,
                 )
+                agent_tools: Toolbox
+                if memory_tools:  # skip empty to avoid pointless toolbox copy
+                    agent_tools = toolbox.with_tools(*memory_tools)
+
+                else:
+                    agent_tools = toolbox
 
                 state = state.replacing_context(
                     await memory.recall(
@@ -237,7 +245,7 @@ class Agent:
 
                         async for chunk in GenerativeModel.completion(
                             instructions=resolved_instructions,
-                            tools=toolbox.model_tools(iteration=iteration),
+                            tools=agent_tools.model_tools(iteration=iteration),
                             context=state.context,
                             output=output,
                         ):
@@ -296,7 +304,7 @@ class Agent:
 
                         responses: MutableSequence[ModelToolResponse] = []
                         tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
-                        async for chunk in toolbox.handle(*tool_requests):
+                        async for chunk in agent_tools.handle(*tool_requests):
                             if isinstance(chunk, ModelToolResponse):
                                 responses.append(chunk)
                                 yield chunk
@@ -385,7 +393,9 @@ class Agent:
             persist it afterwards. Defaults to a no-op memory scoped to a
             single turn. Context is remembered only when the turn completes
             and its output stream is fully consumed - turns abandoned
-            mid-stream or failing with an error are not persisted.
+            mid-stream or failing with an error are not persisted. Tools
+            returned by ``memory.prepare`` extend ``tools`` for the duration
+            of the turn, replacing provided tools using the same names.
         output : ModelOutputSelection, default="auto"
             Output selection mode forwarded to model completion.
         meta : Meta | MetaValues | None, default=None
@@ -479,10 +489,13 @@ class Agent:
         message as ``ModelInput``, runs ``step`` and ``*steps``, and filters
         out reasoning and tool protocol chunks from the public output stream.
         Memory is not applied implicitly - compose ``AgentMemory`` steps
-        (``prepare_step``, ``recall_step``, ``remember_step``) into the
-        pipeline where needed. ``generative`` and ``from_skill`` invoke
-        ``memory.prepare``, ``memory.recall``, and ``memory.remember``
-        directly within their step bodies instead.
+        (``recall_step``, ``remember_step``) into the pipeline where needed.
+        There is no step equivalent of ``memory.prepare`` - a step cannot
+        contribute the tools it produces to the toolbox of a subsequent
+        completion step - so preparation and memory tools are available only
+        in ``generative`` and ``from_skill``, which invoke ``memory.prepare``,
+        ``memory.recall``, and ``memory.remember`` directly within their step
+        bodies.
         """
 
         async def execute(

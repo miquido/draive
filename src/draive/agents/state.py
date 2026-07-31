@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from typing import Any, ClassVar, Self, final
 from uuid import UUID
 
@@ -14,9 +14,9 @@ from draive.agents.types import (
 )
 from draive.models import ModelContext
 from draive.models.types import ModelInstructions
-from draive.multimodal import Template, TemplatesRepository
 from draive.steps.state import StepState
 from draive.steps.step import Step, step
+from draive.tools import Tool
 
 __all__ = ("AgentMemory",)
 
@@ -161,7 +161,7 @@ class AgentMemory(State):
         *ctx_state : State
             State instances injected via ``ctx.updating`` for every prepare,
             recall, and remember call, including when invoked through
-            ``prepare_step``, ``recall_step``, and ``remember_step``.
+            ``recall_step`` and ``remember_step``.
         disposables : Collection[Disposable], default=()
             Disposable resources entered for the duration of each prepare,
             recall, and remember call; any state instances they produce are
@@ -192,10 +192,10 @@ class AgentMemory(State):
             thread: AgentThread,
             instructions: ModelInstructions,
             **extra: Any,
-        ) -> None:
+        ) -> Sequence[Tool] | None:
             async with ctx.disposables(*disposables):
                 with ctx.updating(*ctx_state):
-                    await preparing(
+                    return await preparing(
                         thread,
                         instructions,
                         **extra,
@@ -239,7 +239,7 @@ class AgentMemory(State):
         thread: AgentThread,
         instructions: ModelInstructions,
         **extra: Any,
-    ) -> None:
+    ) -> Sequence[Tool] | None:
         """Prepare memory for a turn based on agent instructions.
 
         Called lazily before each recall. Implementations must be idempotent
@@ -258,66 +258,16 @@ class AgentMemory(State):
 
         Returns
         -------
-        None
-            Completes once the memory is prepared for the agent and thread.
+        Sequence[Tool] | None
+            Tools contributed by the memory for the prepared turn, merged into
+            the agent toolbox for its duration. ``None`` or empty when the
+            memory contributes no tools.
         """
         return await self._preparing(
             thread,
             instructions,
             **extra,
         )
-
-    def prepare_step(
-        self,
-        instructions: Template | ModelInstructions,
-        **extra: Any,
-    ) -> Step:
-        """Create a ``Step`` that prepares memory for the current turn.
-
-        Parameters
-        ----------
-        instructions : Template | ModelInstructions
-            Instructions of the agent utilizing the memory. ``Template``
-            values are resolved through ``TemplatesRepository`` when the step
-            executes, independently of the completion using the same
-            instructions.
-        **extra : Any
-            Additional implementation-specific arguments forwarded to the
-            underlying prepare callable.
-
-        Returns
-        -------
-        Step
-            A step reading the active ``AgentThread`` from context, preparing
-            memory with the resolved instructions, and leaving state
-            unchanged.
-
-        Raises
-        ------
-        AgentException
-            Raised when the step executes without an ``AgentThread`` bound in
-            the current context.
-        """
-
-        @step
-        async def prepare(
-            state: StepState,
-        ) -> StepState:
-            resolved_instructions: str
-            if isinstance(instructions, Template):
-                resolved_instructions = await TemplatesRepository.resolve_str(instructions)
-
-            else:
-                resolved_instructions = instructions
-
-            await self._preparing(
-                _current_thread(),
-                resolved_instructions,
-                **extra,
-            )
-            return state
-
-        return prepare
 
     async def recall(
         self,

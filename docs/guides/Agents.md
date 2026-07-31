@@ -177,10 +177,12 @@ APIs, or provide the required context explicitly.
 `Agent.generative(...)` and `Agent.from_skill(...)` accept a `memory` argument controlling how
 model context is prepared and recalled before each turn and persisted afterwards. The default is
 `AgentMemory.disabled`, which scopes context to a single turn. `Agent.steps(...)` applies no memory
-implicitly - compose the predefined memory steps (`memory.prepare_step(...)`,
-`memory.recall_step()`, `memory.remember_step()`) into the pipeline where needed;
-`Agent.generative(...)` and `Agent.from_skill(...)` invoke `memory.prepare`, `memory.recall`, and
-`memory.remember` directly within their step bodies instead.
+implicitly - compose the predefined memory steps (`memory.recall_step()`,
+`memory.remember_step()`) into the pipeline where needed; `Agent.generative(...)` and
+`Agent.from_skill(...)` invoke `memory.prepare`, `memory.recall`, and `memory.remember` directly
+within their step bodies instead. There is no `prepare` step - a step cannot contribute the tools
+it produces to the toolbox of a subsequent completion step - so preparation runs only in
+`Agent.generative(...)` and `Agent.from_skill(...)`.
 
 ```python
 from draive import Agent, AgentMemory
@@ -210,14 +212,59 @@ to compact, summarize, or replace the context freely.
     before each recall to set up state based on the agent's instructions (it must be idempotent
     per agent and thread).
 
-Two behavioral notes:
+Three behavioral notes:
 
 - Context is remembered only when a turn completes and its output stream is fully consumed;
     turns abandoned mid-stream or failing with an error are not persisted.
-- Memory steps (`prepare_step`, `recall_step`, `remember_step`) require an `AgentThread` bound in
-    the current context and raise `AgentException` otherwise. Agents bind one stamped with their
-    own URI automatically; when running memory steps outside an agent, enter a scope with an
-    `AgentThread` instance first.
+- Memory steps (`recall_step`, `remember_step`) require an `AgentThread` bound in the current
+    context and raise `AgentException` otherwise. Agents bind one stamped with their own URI
+    automatically; when running memory steps outside an agent, enter a scope with an `AgentThread`
+    instance first.
+- `preparing=` may return tools (`Sequence[Tool] | None`); see below.
+
+#### Let Memory Contribute Tools
+
+`preparing=` can return tools to extend the agent toolbox for the prepared turn, which lets memory
+expose its own operations to the model - looking up older context, recording a fact - without the
+agent knowing about the backend. Returned tools may close over whatever preparation resolved, so no
+extra keying by agent and thread is needed inside them.
+
+```python
+from collections.abc import Sequence
+from typing import Any
+
+from draive import AgentThread, ModelInstructions, Tool, tool
+
+
+async def preparing(
+    thread: AgentThread,
+    instructions: ModelInstructions,
+    **extra: Any,
+) -> Sequence[Tool]:
+    @tool(name="memory_search")
+    async def memory_search(query: str) -> str:
+        # the tool closes over the prepared turn scope
+        return await search_archive(
+            query,
+            agent_uri=thread.agent_uri,
+            thread=thread.identifier,
+        )
+
+    return (memory_search,)
+
+
+# passed as AgentMemory(recalling=..., remembering=..., preparing=preparing)
+```
+
+- Prepared tools live for one turn and stay available across all of its tool-calling iterations.
+- They are merged into the toolbox passed to the agent and **replace** provided tools using the
+    same names, so prefix memory tool names to avoid shadowing agent tools by accident.
+- They participate in the toolbox suggestion strategy; with `Toolbox.of(..., suggesting=True)` the
+    model may be required to call one of them.
+- Returning `None` or an empty sequence contributes nothing and leaves the toolbox untouched.
+- Requests and responses of prepared tools are part of the context passed to `remember`, so a
+    stored turn may reference a tool that a later turn no longer offers. Keep tool names stable, or
+    drop those context elements before remembering.
 
 ## 3. Preserve Thread And Metadata
 

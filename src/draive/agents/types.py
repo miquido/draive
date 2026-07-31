@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable
+from collections.abc import AsyncIterable, Sequence
 from datetime import UTC, datetime
 from typing import Any, Protocol, Self, final, runtime_checkable
 from uuid import UUID, uuid4
@@ -7,6 +7,7 @@ from haiway import Default, Meta, MetaValues, State
 
 from draive.models.types import ModelContext, ModelInstructions
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalContentPart
+from draive.tools import Tool
 from draive.utils import ProcessingEvent
 
 __all__ = (
@@ -252,8 +253,8 @@ class AgentMemoryPreparing(Protocol):
 
     Returns
     -------
-    None
-        Completes once the memory is prepared for the agent and thread.
+    Sequence[Tool] | None
+        Tools contributed by the memory for the prepared turn, if any.
     """
 
     async def __call__(
@@ -261,7 +262,7 @@ class AgentMemoryPreparing(Protocol):
         thread: AgentThread,
         instructions: ModelInstructions,
         **extra: Any,
-    ) -> None:
+    ) -> Sequence[Tool] | None:
         """Prepare memory for the agent based on its instructions.
 
         Parameters
@@ -279,8 +280,10 @@ class AgentMemoryPreparing(Protocol):
 
         Returns
         -------
-        None
-            Completes once the memory is prepared for the agent and thread.
+        Sequence[Tool] | None
+            Tools contributed by the memory for the prepared turn, merged into
+            the agent toolbox for its duration. ``None`` or empty when the
+            memory contributes no tools.
         """
         ...
 
