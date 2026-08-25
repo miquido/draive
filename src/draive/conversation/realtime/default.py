@@ -1,6 +1,6 @@
 from asyncio import CancelledError
 from collections import deque
-from collections.abc import Generator, MutableSequence, Sequence
+from collections.abc import AsyncGenerator, Generator, MutableSequence, Sequence
 from types import TracebackType
 from typing import Any
 
@@ -78,9 +78,12 @@ def realtime_conversation_preparing(  # noqa: C901, PLR0915
             tool_request: ModelToolRequest,
             /,
         ) -> None:
+            handling_stream: AsyncGenerator[
+                ModelToolResponse | ProcessingEvent | MultimodalContentPart
+            ] = toolbox.handle(tool_request)
             try:
                 ctx.log_debug(f"Requested tool ({tool_request.identifier}) handling...")
-                async for chunk in toolbox.handle(tool_request):
+                async for chunk in handling_stream:
                     if isinstance(chunk, ModelToolResponse):
                         tools_output.append(ConversationEvent.tool_response(chunk))
                         # deliver the result directly to input
@@ -108,6 +111,9 @@ def realtime_conversation_preparing(  # noqa: C901, PLR0915
 
             else:
                 ctx.log_debug(f"...tool request ({tool_request.identifier}) handling completed!")
+
+            finally:
+                await handling_stream.aclose()  # release the tools handling stream
 
         pending_elements: MutableSequence[ModelInput | ModelOutput] = []
 

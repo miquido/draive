@@ -40,7 +40,7 @@ from draive.openai import OpenAI, OpenAIResponsesConfig
 async def main() -> None:
     async with ctx.scope(
         "quickstart",
-        OpenAIResponsesConfig(model="gpt-5-mini"),
+        OpenAIResponsesConfig(model="gpt-5.5"),
         disposables=(OpenAI(),),
     ):
         result: str = await TextGeneration.generate(
@@ -74,7 +74,7 @@ async def current_time() -> str:
 async def with_tools() -> None:
     async with ctx.scope(
         "assistant",
-        OpenAIResponsesConfig(model="gpt-5-mini"),
+        OpenAIResponsesConfig(model="gpt-5.5"),
         disposables=(OpenAI(),),
     ):
         result = await TextGeneration.generate(
@@ -107,7 +107,7 @@ class PersonInfo(State, serializable=True):
 async def extract_person() -> None:
     async with ctx.scope(
         "extraction",
-        OpenAIResponsesConfig(model="gpt-5-mini"),
+        OpenAIResponsesConfig(model="gpt-5.5"),
         disposables=(OpenAI(),),
     ):
         person: PersonInfo = await ModelGeneration.generate(
@@ -134,7 +134,7 @@ from draive.gemini import Gemini, GeminiConfig
 async def joke_with_claude() -> None:
     async with ctx.scope(
         "claude",
-        AnthropicConfig(model="claude-3-5-haiku-20241022"),
+        AnthropicConfig(model="claude-sonnet-5"),
         disposables=(Anthropic(),),
     ):
         print(

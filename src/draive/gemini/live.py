@@ -1,14 +1,12 @@
-from base64 import b64decode, b64encode, urlsafe_b64decode
 from collections import deque
-from collections.abc import AsyncIterator, Generator, MutableSequence
+from collections.abc import AsyncIterator, MutableSequence
 from contextlib import AbstractAsyncContextManager
 from datetime import UTC, datetime
 from types import TracebackType
-from typing import Any, cast
+from typing import Any, Final
 from uuid import uuid4
 
-from google.api_core.exceptions import ResourceExhausted  # pyright: ignore[reportMissingImport]
-from google.genai.errors import ClientError
+from google.genai.errors import APIError
 from google.genai.live import AsyncSession
 from google.genai.types import (
     Blob,
@@ -18,31 +16,35 @@ from google.genai.types import (
     LiveConnectConfigDict,
     LiveServerContent,
     LiveServerMessage,
-    LiveServerSessionResumptionUpdate,
     MediaResolution,
     Modality,
-    Part,
-    PartDict,
-    ThinkingLevel,
     Transcription,
+    TurnCompleteReason,
 )
-from haiway import MISSING, Meta, as_dict, ctx
+from haiway import MISSING, ctx
 
 from draive.gemini.api import GeminiAPI
 from draive.gemini.config import GeminiConfig
-from draive.gemini.utils import speech_config, unwrap_missing
+from draive.gemini.content import (
+    block_parts,
+    function_response,
+    part_as_output_blocks,
+    part_as_stream_elements,
+)
+from draive.gemini.utils import (
+    RATE_LIMIT_STATUS_CODE,
+    combined_input_tokens,
+    speech_config,
+    thinking_config,
+    unwrap_missing,
+)
 from draive.models import (
     ModelContext,
-    ModelException,
     ModelInput,
-    ModelInputBlocks,
     ModelInstructions,
     ModelOutput,
     ModelOutputBlock,
-    ModelOutputBlocks,
-    ModelOutputChunk,
-    ModelReasoning,
-    ModelReasoningChunk,
+    ModelOutputFailed,
     ModelSession,
     ModelSessionEvent,
     ModelSessionInputChunk,
@@ -53,11 +55,32 @@ from draive.models import (
     ModelToolResponse,
     ModelTools,
 )
-from draive.models.metrics import record_model_invocation, record_usage_metrics
-from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
-from draive.resources import ResourceContent, ResourceReference
+from draive.models.metrics import (
+    model_rate_limit,
+    record_model_invocation,
+    record_usage_metrics,
+)
+from draive.multimodal import MultimodalContent, TextContent
+from draive.resources import ResourceContent
 
 __all__ = ("GeminiLive",)
+
+# turn completion reasons which indicate a failure instead of a regular completion
+_TURN_FAILURE_REASONS: Final[frozenset[TurnCompleteReason]] = frozenset(
+    (
+        TurnCompleteReason.MALFORMED_FUNCTION_CALL,
+        TurnCompleteReason.RESPONSE_REJECTED,
+        TurnCompleteReason.PROHIBITED_INPUT_CONTENT,
+        TurnCompleteReason.IMAGE_PROHIBITED_INPUT_CONTENT,
+        TurnCompleteReason.BLOCKLIST,
+        TurnCompleteReason.GENERATED_CONTENT_SAFETY,
+        TurnCompleteReason.GENERATED_IMAGE_SAFETY,
+        TurnCompleteReason.GENERATED_AUDIO_SAFETY,
+        TurnCompleteReason.GENERATED_VIDEO_SAFETY,
+        TurnCompleteReason.GENERATED_CONTENT_PROHIBITED,
+        TurnCompleteReason.GENERATED_CONTENT_BLOCKLIST,
+    )
+)
 
 
 class GeminiLive(GeminiAPI):
@@ -102,13 +125,19 @@ class GeminiLive(GeminiAPI):
                 max_output_tokens=config.max_output_tokens,
                 tools=tools,
                 output=output,
-                stop_sequences=config.stop_sequences,
+                # stop sequences are not supported within live sessions
+                top_p=config.top_p,
+                top_k=config.top_k,
+                seed=config.seed,
                 thinking_budget=config.thinking_budget,
+                thinking_level=config.thinking_level,
             )
 
             session: AsyncSession = await connection_manager.__aenter__()
 
-            if context:  # send initial context
+            # seed the session with prior context as an incomplete turn - the api rejects
+            # a completed client content turn, realtime input starts the turn instead
+            if context:
                 await session.send_client_content(
                     turns=_request_content(context),
                     turn_complete=False,
@@ -120,7 +149,6 @@ class GeminiLive(GeminiAPI):
             turn_input_transcript_parts: MutableSequence[TextContent] = []
             turn_output_transcript_parts: MutableSequence[TextContent] = []
             turn_output_blocks: MutableSequence[ModelOutputBlock] = []
-            resumption: LiveServerSessionResumptionUpdate | None = None
 
             async def read() -> ModelSessionOutputChunk:  # noqa: C901, PLR0912, PLR0915
                 nonlocal read_buffer
@@ -128,7 +156,6 @@ class GeminiLive(GeminiAPI):
                 nonlocal turn_input_transcript_parts
                 nonlocal turn_output_transcript_parts
                 nonlocal turn_output_blocks
-                nonlocal resumption
 
                 while True:
                     if read_buffer:
@@ -137,25 +164,25 @@ class GeminiLive(GeminiAPI):
                     try:
                         message: LiveServerMessage = await anext(read_stream)
 
-                    except ResourceExhausted as exc:
-                        raise ModelException(
-                            "Gemini Live session rate limited",
-                            provider="gemini",
-                            model=config.model,
-                        ) from exc
-
-                    except ClientError as exc:
-                        if exc.code == 429:  # noqa: PLR2004
-                            raise ModelException(
-                                "Gemini Live session rate limited",
+                    except APIError as exc:
+                        # the Live API reports failures through websocket close codes,
+                        # so a rate limit is only recognizable from the close reason
+                        exc_details: str = str(exc)
+                        if (
+                            exc.code == RATE_LIMIT_STATUS_CODE
+                            or "RESOURCE_EXHAUSTED" in exc_details
+                            or "quota" in exc_details.lower()
+                        ):
+                            raise model_rate_limit(
                                 provider="gemini",
                                 model=config.model,
+                                retry_after=None,
                             ) from exc
 
-                        raise ModelException(
-                            str(exc),
+                        raise ModelOutputFailed(
                             provider="gemini",
                             model=config.model,
+                            reason=str(exc),
                         ) from exc
 
                     except StopAsyncIteration:
@@ -166,9 +193,14 @@ class GeminiLive(GeminiAPI):
                         record_usage_metrics(
                             provider="gemini",
                             model=config.model,
-                            input_tokens=message.usage_metadata.prompt_token_count,
+                            input_tokens=combined_input_tokens(
+                                message.usage_metadata.prompt_token_count,
+                                message.usage_metadata.tool_use_prompt_token_count,
+                            ),
                             cached_input_tokens=message.usage_metadata.cached_content_token_count,
                             output_tokens=message.usage_metadata.response_token_count,
+                            # thinking tokens are not included within response count
+                            reasoning_output_tokens=message.usage_metadata.thoughts_token_count,
                         )
 
                     if message.server_content is not None:
@@ -214,10 +246,10 @@ class GeminiLive(GeminiAPI):
                             and server_content.model_turn.parts
                         ):
                             for part in server_content.model_turn.parts:
-                                for chunk in _part_as_stream_elements(part):
+                                for chunk in part_as_stream_elements(part):
                                     read_buffer.append(chunk)
 
-                                turn_output_blocks.extend(_part_as_output_blocks(part))
+                                turn_output_blocks.extend(part_as_output_blocks(part))
 
                         if server_content.interrupted:
                             read_buffer.append(
@@ -234,6 +266,17 @@ class GeminiLive(GeminiAPI):
                             )
 
                         if server_content.turn_complete:
+                            completion_reason: str | None = (
+                                server_content.turn_complete_reason.value
+                                if server_content.turn_complete_reason
+                                else None
+                            )
+                            if server_content.turn_complete_reason in _TURN_FAILURE_REASONS:
+                                ctx.log_warning(
+                                    "Gemini Live turn completed with a failure"
+                                    f" ({completion_reason})"
+                                )
+
                             if turn_output_transcript_parts:
                                 turn_output_blocks.append(
                                     MultimodalContent.of(*turn_output_transcript_parts)
@@ -246,11 +289,7 @@ class GeminiLive(GeminiAPI):
                                             *turn_output_blocks,
                                             meta={
                                                 "created": datetime.now(UTC).isoformat(),
-                                                "reason": (
-                                                    server_content.turn_complete_reason
-                                                    if server_content.turn_complete_reason
-                                                    else None
-                                                ),
+                                                "reason": completion_reason,
                                             },
                                         ),
                                         meta={
@@ -308,57 +347,46 @@ class GeminiLive(GeminiAPI):
                             case _:
                                 pass
 
-                    if message.session_resumption_update is not None:
-                        resumption = message.session_resumption_update
-
                     if message.go_away is not None:
+                        # routine advance notice of the connection being closed,
+                        # the actual closing surfaces through the stream itself
                         # TODO: support automatic reconnect/session resumption.
-                        raise NotImplementedError()
+                        ctx.log_warning(
+                            "Gemini Live session will be closed soon"
+                            f" (time left: {message.go_away.time_left})"
+                        )
 
-            async def write(  # noqa: C901
+            async def write_media(
+                media: ResourceContent,
+                /,
+            ) -> None:
+                # each modality has its own keyword within a single realtime input
+                blob: Blob = Blob(
+                    data=media.to_bytes(),
+                    mime_type=media.mime_type,
+                )
+                if media.mime_type.startswith("audio"):
+                    await session.send_realtime_input(audio=blob)  # pyright: ignore[reportUnknownMemberType]
+
+                elif media.mime_type.startswith("image"):
+                    await session.send_realtime_input(media=blob)  # pyright: ignore[reportUnknownMemberType]
+
+                elif media.mime_type.startswith("video"):
+                    await session.send_realtime_input(video=blob)  # pyright: ignore[reportUnknownMemberType]
+
+                else:
+                    ctx.log_warning(
+                        f"Gemini Live input media ({media.mime_type}) not supported! Skipping..."
+                    )
+
+            async def write(
                 input: ModelSessionInputChunk,  # noqa: A002
             ) -> None:
                 if isinstance(input, ResourceContent):
-                    if input.mime_type.startswith("audio"):
-                        await session.send_realtime_input(  # pyright: ignore[reportUnknownMemberType]
-                            audio=Blob(
-                                data=input.to_bytes(),
-                                mime_type=input.mime_type,
-                            )
-                        )
-
-                    elif input.mime_type.startswith("image"):
-                        await session.send_realtime_input(  # pyright: ignore[reportUnknownMemberType]
-                            media=Blob(
-                                data=input.to_bytes(),
-                                mime_type=input.mime_type,
-                            ),
-                        )
-
-                    elif input.mime_type.startswith("video"):
-                        await session.send_realtime_input(  # pyright: ignore[reportUnknownMemberType]
-                            video=Blob(
-                                data=input.to_bytes(),
-                                mime_type=input.mime_type,
-                            ),
-                        )
-
-                    else:
-                        ctx.log_error(
-                            "Gemini Live input media "
-                            f"({input.mime_type}) not supported! Skipping..."
-                        )
+                    await write_media(input)
 
                 elif isinstance(input, ModelToolResponse):
-                    await session.send_tool_response(
-                        function_responses=[
-                            {
-                                "id": input.identifier,
-                                "name": input.tool,
-                                "response": _tool_response_payload(input),
-                            }
-                        ]
-                    )
+                    await session.send_tool_response(function_responses=[function_response(input)])
 
                 elif isinstance(input, TextContent):
                     await session.send_realtime_input(  # pyright: ignore[reportUnknownMemberType]
@@ -386,6 +414,11 @@ class GeminiLive(GeminiAPI):
 
                         case _:
                             ctx.log_debug(f"Received unsupported input event: {input.event}")
+
+                else:
+                    ctx.log_warning(
+                        f"Gemini Live input ({type(input).__name__}) not supported! Skipping..."
+                    )
 
             return ModelSession(
                 reading=read,
@@ -415,20 +448,6 @@ class GeminiLive(GeminiAPI):
             opening=open_session,
             closing=close_session,
         )
-
-
-def _resolve_thinking_level(level: str) -> ThinkingLevel:
-    match level:
-        case "minimal":
-            return ThinkingLevel.MINIMAL
-        case "low":
-            return ThinkingLevel.LOW
-        case "medium":
-            return ThinkingLevel.MEDIUM
-        case "high":
-            return ThinkingLevel.HIGH
-        case _:
-            raise ValueError(f"Unsupported thinking level: {level}")
 
 
 def _resolve_media_resolution(config: GeminiConfig) -> MediaResolution | None:
@@ -465,6 +484,12 @@ def _live_connect_config(
     if config.context_window_compression is True:
         live_config["context_window_compression"] = {"sliding_window": {}}
 
+    # activity_start/activity_end can only be sent when server side detection is off
+    if config.automatic_activity_detection is False:
+        live_config["realtime_input_config"] = {
+            "automatic_activity_detection": {"disabled": True},
+        }
+
     if instructions:
         live_config["system_instruction"] = instructions
 
@@ -495,15 +520,8 @@ def _live_connect_config(
     if speech := speech_config(config):
         live_config["speech_config"] = speech
 
-    if config.thinking_level is not MISSING:
-        live_config["thinking_config"] = {
-            "thinking_level": _resolve_thinking_level(cast(str, config.thinking_level)),
-        }
-    elif config.thinking_budget is not MISSING:
-        live_config["thinking_config"] = {
-            "include_thoughts": True,
-            "thinking_budget": cast(int, config.thinking_budget),
-        }
+    if thinking := thinking_config(config):
+        live_config["thinking_config"] = thinking
 
     return live_config
 
@@ -537,18 +555,6 @@ def _resolve_response_modality(
             raise ValueError(f"Unsupported realtime output: {output}")
 
 
-def _tool_response_payload(
-    response: ModelToolResponse,
-    /,
-) -> dict[str, Any]:
-    # TODO: add media support within tool responses
-    if response.status == "error":
-        return {"error": "".join(part.to_str() for part in response.content.parts)}
-
-    else:
-        return {"output": "".join(part.to_str() for part in response.content.parts)}
-
-
 def _request_content(
     context: ModelContext,
 ) -> list[Content | ContentDict]:
@@ -558,7 +564,7 @@ def _request_content(
             content.append(
                 ContentDict(
                     role="user",
-                    parts=list(_block_parts(element.input)),
+                    parts=list(block_parts(element.input)),
                 )
             )
 
@@ -567,191 +573,8 @@ def _request_content(
             content.append(
                 ContentDict(
                     role="model",
-                    parts=list(_block_parts(element.output)),
+                    parts=list(block_parts(element.output)),
                 )
             )
 
     return content
-
-
-def _part_as_stream_elements(
-    part: Part,
-) -> Generator[ModelOutputChunk]:
-    if part.text:
-        if part.thought:
-            yield ModelReasoningChunk.of(
-                TextContent.of(part.text),
-                meta={
-                    "kind": "thought",
-                    "signature": b64encode(part.thought_signature).decode()
-                    if part.thought_signature
-                    else None,
-                },
-            )
-
-        else:
-            yield TextContent.of(part.text)
-
-    if part.function_call and part.function_call.name:
-        yield ModelToolRequest(
-            identifier=part.function_call.id or str(uuid4()),
-            tool=part.function_call.name,
-            arguments=part.function_call.args if part.function_call.args is not None else {},
-            meta=Meta.of(
-                {
-                    "signature": b64encode(part.thought_signature).decode(),
-                }
-            )
-            if part.thought_signature
-            else Meta.empty,
-        )
-
-    if part.inline_data and part.inline_data.data:
-        yield ResourceContent.of(
-            part.inline_data.data,
-            mime_type=part.inline_data.mime_type or "application/octet-stream",
-        )
-
-    if part.file_data and part.file_data.file_uri:
-        yield ResourceReference.of(
-            part.file_data.file_uri,
-            mime_type=part.file_data.mime_type,
-        )
-
-
-def _part_as_output_blocks(
-    part: Part,
-) -> Generator[ModelOutputBlock]:
-    if part.text:
-        if part.thought:
-            yield ModelReasoning.of(
-                TextContent.of(part.text),
-                meta={
-                    "kind": "thought",
-                    "signature": b64encode(part.thought_signature).decode()
-                    if part.thought_signature
-                    else None,
-                },
-            )
-
-        else:
-            yield MultimodalContent.of(TextContent.of(part.text))
-
-    if part.function_call and part.function_call.name:
-        yield ModelToolRequest.of(
-            part.function_call.id or str(uuid4()),
-            tool=part.function_call.name,
-            arguments=part.function_call.args if part.function_call.args is not None else {},
-            meta=Meta.of(
-                {
-                    "signature": b64encode(part.thought_signature).decode(),
-                }
-            )
-            if part.thought_signature
-            else Meta.empty,
-        )
-
-    if part.inline_data and part.inline_data.data:
-        yield MultimodalContent.of(
-            ResourceContent.of(
-                part.inline_data.data,
-                mime_type=part.inline_data.mime_type or "application/octet-stream",
-            )
-        )
-
-    if part.file_data and part.file_data.file_uri:
-        yield MultimodalContent.of(
-            ResourceReference.of(
-                part.file_data.file_uri,
-                mime_type=part.file_data.mime_type,
-            )
-        )
-
-
-def _block_parts(
-    blocks: ModelInputBlocks | ModelOutputBlocks,
-    /,
-) -> Generator[PartDict]:
-    for block in blocks:
-        if isinstance(block, ModelToolRequest):
-            if signature := block.meta.get_str("signature"):
-                yield {
-                    "function_call": {
-                        "id": block.identifier,
-                        "name": block.tool,
-                        "args": as_dict(block.arguments),
-                    },
-                    "thought_signature": b64decode(signature),
-                }
-
-            else:
-                yield {
-                    "function_call": {
-                        "id": block.identifier,
-                        "name": block.tool,
-                        "args": as_dict(block.arguments),
-                    }
-                }
-
-        elif isinstance(block, ModelToolResponse):
-            yield {
-                "function_response": {
-                    "id": block.identifier,
-                    "name": block.tool,
-                    "response": _tool_response_payload(block),
-                }
-            }
-
-        elif isinstance(block, ModelReasoning):
-            if block.meta.kind == "thought":
-                if signature := block.meta.get_str("signature"):
-                    yield {
-                        "text": block.reasoning.to_str(),
-                        "thought": True,
-                        "thought_signature": b64decode(signature),
-                    }
-
-                else:
-                    yield {
-                        "text": block.reasoning.to_str(),
-                        "thought": True,
-                    }
-
-            else:
-                raise ValueError(f"Unsupported reasoning element: {block.meta.kind}")
-
-        else:
-            assert isinstance(block, MultimodalContent)  # nosec: B101
-            yield from _content_parts(block)
-
-
-def _content_parts(
-    content: MultimodalContent,
-    /,
-) -> Generator[PartDict]:
-    for part in content.parts:
-        if isinstance(part, TextContent):
-            yield {"text": part.text}
-
-        elif isinstance(part, ResourceContent):
-            yield {
-                "inline_data": {
-                    "data": urlsafe_b64decode(part.data),
-                    "mime_type": part.mime_type,
-                }
-            }
-
-        elif isinstance(part, ResourceReference):
-            yield {
-                "file_data": {
-                    "file_uri": part.uri,
-                    "mime_type": part.mime_type,
-                }
-            }
-
-        else:
-            assert isinstance(part, ArtifactContent)  # nosec: B101
-            if part.hidden:
-                continue
-
-            yield {"text": part.to_str()}

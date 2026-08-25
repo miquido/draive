@@ -5,12 +5,12 @@
 In **Draive** you often need to surface multimodal data in logs, dashboards, or CLI output. Every
 model state exposes a few helpers that flatten structured content into printable strings:
 
-| Helper                                  | Output                                                  |
-| --------------------------------------- | ------------------------------------------------------- |
-| `x.to_mapping()` *(default)*            | `dict` representation                                   |
-| `x.to_json(indent: int \| None = None)` | JSON string                                             |
-| `x.to_str()`                            | Model-defined string                                    |
-| `str(x)`                                | Alias for `str(x.to_mapping())` on typed `State` models |
+| Helper                                  | Output                                             |
+| --------------------------------------- | -------------------------------------------------- |
+| `x.to_mapping(recursive: bool = True)`  | `Mapping` representation                           |
+| `x.to_json(indent: int \| None = None)` | JSON string                                        |
+| `x.to_str()`                            | Model-defined string, defaults to `str(x)`         |
+| `str(x)`                                | `ClassName(field: value)` for typed `State` models |
 
 Different model instances implement `.to_str()` in their own way, so the rendered view varies
 by content type. The sections below walk through the most common multimodal classes and show how
@@ -21,7 +21,7 @@ their printing helpers behave.
 Plain text output that mirrors the original `text` value without any extra markup or quoting.
 
 ```python
-return f"{self.text}"
+return self.text
 ```
 
 **Example:**
@@ -38,7 +38,7 @@ Hello world!
 ## ResourceContent
 
 Generates a Markdown media reference. Depending on `include_data`, the reference either embeds the
-base64 payload directly or uses a redacted placeholder.
+base64 data URI directly or leaves the link empty.
 
 !!! Note
 
@@ -47,7 +47,7 @@ base64 payload directly or uses a redacted placeholder.
 When `include_data=True`, `ResourceContent.to_str()` returns the full base64 payload:
 
 ```python
-return f"![{kind}](data:{self.mime_type};base64,{self.data})"
+return f"![{kind}]({self.to_data_uri()})"
 ```
 
 **Example:**
@@ -61,11 +61,10 @@ ctx.log_info(resource.to_str(include_data=True))
 ![](data:application/octet-stream;base64,RkY=)
 ```
 
-With the default `include_data=False`, it emits a placeholder that keeps the media type visible
-without leaking the bytes:
+With the default `include_data=False`, it keeps the media kind visible without leaking the bytes:
 
 ```python
-return f"![{kind}](REDACTED)"
+return f"![{kind}]()"
 ```
 
 **Example:**
@@ -78,13 +77,13 @@ ctx.log_info(resource.to_str())
 ```
 
 ```text
-![image](REDACTED)
+![image]()
 ```
 
 ## ArtifactContent
 
-Produces delegated artifact output when visible, otherwise suppresses content entirely for hidden
-artifacts.
+Renders the wrapped artifact payload as indented JSON when visible, otherwise suppresses content
+entirely for hidden artifacts.
 
 Hidden artifacts render as an empty string:
 
@@ -92,10 +91,30 @@ Hidden artifacts render as an empty string:
 return ""
 ```
 
-Visible artifacts reuse the nested artifact’s `to_str()` result:
+Visible artifacts are serialized to JSON:
 
 ```python
-return f"{self.artifact.to_str()}"
+return json.dumps(self.artifact, indent=2)
+```
+
+**Example:**
+
+```python
+from draive import ArtifactContent, State, ctx
+
+
+class User(State, serializable=True):
+    first_name: str
+
+
+artifact: ArtifactContent = ArtifactContent.of(User(first_name="James"), category="profile")
+ctx.log_info(artifact.to_str())
+```
+
+```text
+{
+  "first_name": "James"
+}
 ```
 
 ## MultimodalTag
@@ -112,7 +131,7 @@ return f"<{self.name}{_tag_attributes(self.meta)}/>"
 **Example:**
 
 ```text
-<TAG_NAME attr_1 attr_2="val_2"/>
+<TAG_NAME attr_1="True" attr_2="val_2"/>
 ```
 
 Otherwise it wraps the rendered child content:
@@ -124,17 +143,18 @@ return f"<{self.name}{_tag_attributes(self.meta)}>{self.content.to_str()}</{self
 **Example:**
 
 ```text
-<TAG_NAME attr_1 attr_2="val_2">Hello World!</TAG_NAME>
+<TAG_NAME attr_1="True" attr_2="val_2">Hello World!</TAG_NAME>
 ```
 
 !!! Important
 
-    `MultimodalTag` is the only multimodal element that exposes metadata inline. Values stored in `meta` appear as XML-style tag attributes.
+    `MultimodalTag` is the only multimodal element that exposes metadata inline. Values stored in `meta` appear as quoted XML-style tag attributes.
 
 ## MultimodalContent
 
 Concatenates the string form of each part, resulting in a single composite response without
-delimiters.
+delimiters. An optional `artifact_to_str` argument overrides the rendering of `ArtifactContent`
+parts.
 
 ```python
 return "".join(part.to_str() for part in self.parts)

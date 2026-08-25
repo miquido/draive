@@ -1,7 +1,6 @@
 from asyncio import gather
-from base64 import urlsafe_b64encode
+from base64 import b64encode
 from collections.abc import Callable, Sequence
-from itertools import chain
 from typing import Any, cast
 
 from cohere import EmbedByTypeResponse
@@ -29,7 +28,7 @@ class CohereEmbedding(CohereAPI):
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
         embedding_config: CohereTextEmbeddingConfig = config or ctx.state(CohereTextEmbeddingConfig)
-        async with ctx.scope("cohere_text_embedding"):
+        async with ctx.scope("embedding.invocation"):
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))
@@ -79,15 +78,13 @@ class CohereEmbedding(CohereAPI):
                 [
                     Embedded(
                         value=value,
-                        vector=embedding,
+                        vector=vector,
                     )
-                    for value, embedding in zip(
+                    for value, vector in zip(
                         values,
-                        chain.from_iterable(
-                            [
-                                cast(list[list[float]], response.embeddings.float_)
-                                for response in responses
-                            ]
+                        _response_vectors(
+                            responses,
+                            model=embedding_config.model,
                         ),
                         strict=True,
                     )
@@ -109,7 +106,7 @@ class CohereEmbedding(CohereAPI):
         embedding_config: CohereImageEmbeddingConfig = config or ctx.state(
             CohereImageEmbeddingConfig
         )
-        async with ctx.scope("cohere_image_embedding"):
+        async with ctx.scope("embedding.invocation"):
             attributes: list[bytes]
             if attribute is None:
                 attributes = cast(list[bytes], as_list(values))
@@ -146,7 +143,8 @@ class CohereEmbedding(CohereAPI):
                     self._client.embed(
                         model=embedding_config.model,
                         images=[
-                            f"data:image/jpeg;base64,{urlsafe_b64encode(image).decode('utf-8')}"
+                            f"data:{_image_mime_type(image)};base64,"
+                            f"{b64encode(image).decode('utf-8')}"
                             for image in attributes[index : index + embedding_config.batch_size]
                         ],
                         embedding_types=["float"],
@@ -161,17 +159,56 @@ class CohereEmbedding(CohereAPI):
                 [
                     Embedded(
                         value=value,
-                        vector=embedding,
+                        vector=vector,
                     )
-                    for value, embedding in zip(
+                    for value, vector in zip(
                         values,
-                        chain.from_iterable(
-                            [
-                                cast(list[list[float]], response.embeddings.float_)
-                                for response in responses
-                            ]
+                        _response_vectors(
+                            responses,
+                            model=embedding_config.model,
                         ),
                         strict=True,
                     )
                 ],
             )
+
+
+def _response_vectors(
+    responses: Sequence[EmbedByTypeResponse],
+    /,
+    *,
+    model: str,
+) -> list[Sequence[float]]:
+    # the api reports no index, its results are documented to correspond to the
+    # request order - a response without the requested type has no position to
+    # recover, refusing it beats silently misaligning every following value
+    vectors: list[Sequence[float]] = []
+    for response in responses:
+        if not response.embeddings.float_:
+            raise ValueError(
+                f"Cohere embedding using {model} returned no float vectors,"
+                " the model may not support the requested embedding type"
+            )
+
+        vectors.extend(response.embeddings.float_)
+
+    return vectors
+
+
+def _image_mime_type(
+    data: bytes,
+    /,
+) -> str:
+    # data uri requires a mime type while only raw image data is available,
+    # it has to be recognized by the image header
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+
+    elif data.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif"
+
+    elif data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "image/webp"
+
+    else:
+        return "image/jpeg"  # jpeg is the default for anything unrecognized

@@ -1,4 +1,5 @@
 from collections.abc import Mapping, Sequence
+from typing import Literal
 
 from haiway import MISSING, Configuration, Missing
 
@@ -16,6 +17,9 @@ class MistralChatConfig(Configuration):
     seed: int | Missing = MISSING
     max_output_tokens: int | Missing = MISSING
     stop_sequences: Sequence[str] | Missing = MISSING
+    # reasoning models require explicitly requesting the reasoning prompt
+    # mode to produce and report their thinking
+    prompt_mode: Literal["reasoning"] | Missing | None = MISSING
 
 
 class MistralEmbeddingConfig(Configuration):

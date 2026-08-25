@@ -5,7 +5,7 @@ relational storage into your workflows without writing adapters. All helpers liv
 `draive.postgres` and reuse the shared `haiway.postgres.Postgres` connection states.
 
 Current adapters include `PostgresConfigurationRepository`, `PostgresTemplatesRepository`,
-`PostgresVectorIndex`, and `PostgresAgentMemory`.
+`PostgresVectorIndex`, `PostgresConversationMemory`, and `PostgresAgentMemory`.
 
 ## Bootstrapping the Postgres context
 
@@ -22,7 +22,7 @@ from draive.postgres import (
 
 async with ctx.scope(
     "postgres-demo",
-    PostgresConfigurationRepository(),  # use postgres configurations
+    PostgresConfigurationRepository.prepare(),  # use postgres configurations
     PostgresTemplatesRepository.prepare(),  # use postgres templates
     disposables=(
         PostgresConnectionPool.of(dsn="postgresql://draive:secret@localhost:5432/draive"),
@@ -34,26 +34,29 @@ async with ctx.scope(
 Each adapter relies on the same connection scope, so you can freely mix them within a single
 context.
 
-When working with pgvector-backed components, add the Python package `pgvector` to your environment
-(`pip install pgvector`) and ensure every connection registers the codec. haiway ≥ 0.37.1 exposes an
-`initialize` callback on `PostgresConnectionPool.of(...)` so you can point to the schema where the
-extension is installed:
+The `postgres` extra (`pip install draive[postgres]`) pulls in `haiway[postgres]` and `asyncpg`,
+which is everything the adapters need. pgvector-backed components require only the `vector`
+**extension installed in the database** - no additional Python package. asyncpg ships no codec for
+the `VECTOR` type, so `PostgresVectorIndex` binds every vector in pgvector's own text
+representation and casts it in the statement, which needs no client-side registration.
+
+If your deployment does need per-connection setup for unrelated reasons,
+`PostgresConnectionPool.of(...)` accepts an `initialize` callback invoked for each new connection:
 
 ```python
 from asyncpg.connection import Connection
-from pgvector.asyncpg import register_vector
+
+from draive.postgres import PostgresConnectionPool
 
 
-async def initialize_pgvector(connection: Connection) -> None:
-    await register_vector(connection, schema="public")
+async def initialize_connection(connection: Connection) -> None:
+    await connection.execute("SET search_path TO embeddings, public;")
 
 PostgresConnectionPool.of(
     dsn="postgresql://draive:secret@localhost:5432/draive",
-    initialize=initialize_pgvector,
+    initialize=initialize_connection,
 )
 ```
-
-Reuse the same initializer across scopes to keep the codec registration consistent.
 
 ## ConfigurationRepository implementation
 
@@ -64,25 +67,84 @@ the implementation:
 ```sql
 CREATE TABLE configurations (
     identifier TEXT NOT NULL,
+    name TEXT NOT NULL,
     content JSONB NOT NULL,
-    created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY (identifier, created)
 );
+
+CREATE INDEX IF NOT EXISTS configurations_idx ON configurations (identifier, created DESC);
 ```
+
+`await PostgresConfigurationRepository.migrate()` creates both within an active connection scope.
 
 Key capabilities:
 
-- `configurations()` returns every known identifier using cached results (limit 1, default 10 minute
-    TTL).
-- `load(config, identifier)` fetches the newest JSON document per identifier and parses it into a
-    requested configuration type.
-- `load_raw(identifier)` fetches raw Mapping for given identifier.
+- `configurations(config)` returns every known identifier using cached results, narrowed to a single
+    configuration type when one is given (default 10 minute TTL).
+- `load(config, identifier=..., default=..., required=...)` fetches the newest JSON document per
+    identifier and parses it into the requested configuration type.
 - `define(config)` upserts a new configuration snapshot and clears both caches, guaranteeing fresh
     reads on the next call.
 - `remove(identifier)` deletes all historical snapshots for the identifier and purges caches.
 
 Tune memory pressure through `cache_limit` and `cache_expiration` arguments when instantiating the
 repository.
+
+Stored configurations are resolved explicitly - provider adapters read their configuration from the
+scope state (`ctx.state(OpenAIResponsesConfig)`), never from a repository. Load a snapshot and place
+it in the scope to apply it:
+
+```python
+from draive import ConfigurationRepository, ctx
+from draive.openai import OpenAIResponsesConfig
+
+config = await ConfigurationRepository.load(OpenAIResponsesConfig, required=True)
+
+with ctx.updating(config):
+    ...  # generation within this scope uses the loaded configuration
+```
+
+`Configuration.load(...)` resolves the repository entry first and falls back to `ctx.state(...)`
+when the repository holds nothing for the identifier.
+
+Snapshots are stored under the configuration class name by default. Pass an identifier as the first
+argument to keep several variants of the same type side by side:
+
+```python
+await ConfigurationRepository.define(OpenAIResponsesConfig(model="gpt-5.5"))  # class name
+await ConfigurationRepository.define("staging", OpenAIResponsesConfig(model="gpt-5.5"))
+staging = await OpenAIResponsesConfig.load(identifier="staging", required=True)
+```
+
+## Custom migrations
+
+Beyond the per-helper `migrate()` methods, `Postgres.execute_migrations(...)` runs application
+migrations in order and records applied versions in a `migrations` table, so re-running is a no-op.
+Each migration is a coroutine receiving the connection it runs on, within its own transaction:
+
+```python
+from draive import ctx
+from draive.postgres import Postgres, PostgresConnection, PostgresConnectionPool
+
+
+async def migration_0(connection: PostgresConnection) -> None:
+    await connection.execute("CREATE TABLE IF NOT EXISTS documents (id UUID PRIMARY KEY)")
+
+
+async def migration_1(connection: PostgresConnection) -> None:
+    await connection.execute("ALTER TABLE documents ADD COLUMN IF NOT EXISTS title TEXT")
+
+
+async with ctx.scope(
+    "migrations",
+    disposables=(PostgresConnectionPool.of(dsn="postgresql://draive:secret@localhost:5432/draive"),),
+):
+    await Postgres.execute_migrations((migration_0, migration_1))
+```
+
+Migrations are identified by position, so they have to keep their order - a renamed or reordered
+migration is reported as drift instead of being applied silently.
 
 ## TemplatesRepository implementation
 
@@ -98,19 +160,23 @@ CREATE TABLE templates (
     content TEXT NOT NULL,
     variables JSONB NOT NULL DEFAULT '{}'::jsonb,
     meta JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY (identifier, created)
 );
+
+CREATE INDEX IF NOT EXISTS templates_idx ON templates (identifier, created DESC);
 ```
+
+`await PostgresTemplatesRepository.migrate()` creates both within an active connection scope.
 
 Capabilities:
 
-- `templates()` returns cached `TemplateDeclaration` objects reflecting the newest revision per
-    identifier.
+- `templates(pagination)` returns a `Paginated[TemplateDeclaration]` reflecting the newest revision
+    per identifier.
 - `resolve(template)` and `resolve_str(template)` reuse a cached loader keyed by identifier to pull
     the latest template body before rendering arguments.
-- `define(template, content)` persists a new revision, invalidates caches, and ensures subsequent
-    reads see the updated payload.
+- `define(declaration, content=...)` persists a new revision, invalidates the loader cache, and
+    ensures subsequent reads see the updated payload.
 
 Use this adapter whenever your multimodal templates live alongside other structured content in
 Postgres and you want on-demand caching with revision history.
@@ -119,13 +185,15 @@ Postgres and you want on-demand caching with revision history.
 
 The `PostgresVectorIndex` helper persists dense embeddings in Postgres using the
 [pgvector](https://github.com/pgvector/pgvector) extension. Each indexed `State` maps to its own
-table, derived by converting the model class name to snake case (for example, `Chunk` → `chunk`).
+table named after the model class. The name is validated and interpolated unquoted, so Postgres
+folds it to lower case (`Chunk` → `chunk`, `DocumentChunk` → `documentchunk`).
 
 ### Enable pgvector and create tables
 
 Install the extension once per database and create a table for every data model you plan to index.
-The implementation expects three columns and manages timestamps automatically. For a `Chunk` model
-the migration could look like this (adjust the vector dimension to match your embedding provider):
+The implementation writes `embedding`, `payload`, `meta` and `created`, so those columns have to be
+present. For a `Chunk` model the migration could look like this (adjust the vector dimension to
+match your embedding provider):
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -146,7 +214,8 @@ CREATE INDEX IF NOT EXISTS chunk_embedding_idx
 ```
 
 The helper stores the serialized `State` instance inside `payload`, so the JSON schema mirrors
-the model definition. It writes monotonically increasing `created` timestamps to preserve insertion
+the model definition - including declared attribute aliases, which `AttributeRequirement` filters
+resolve automatically (`Chunk._.identifier` filters the stored `id` key). It writes monotonically increasing `created` timestamps to preserve insertion
 order for non-similarity queries.
 
 ### Wiring the index
@@ -160,9 +229,6 @@ from collections.abc import Sequence
 from typing import Annotated
 
 from draive import Alias, State, VectorIndex, ctx
-from asyncpg.connection import Connection
-from pgvector.asyncpg import register_vector
-
 from draive.postgres import PostgresConnectionPool, PostgresVectorIndex
 
 
@@ -171,18 +237,11 @@ class Chunk(State):
     text: str
 
 
-async def initialize_pgvector(connection: Connection) -> None:
-    await register_vector(connection, schema="embeddings")
-
-
 async with ctx.scope(
     "pgvector-demo",
     PostgresVectorIndex.prepare(),
     disposables=(
-        PostgresConnectionPool.of(
-            dsn="postgresql://draive:secret@localhost:5432/draive",
-            initialize=initialize_pgvector,
-        ),
+        PostgresConnectionPool.of(dsn="postgresql://draive:secret@localhost:5432/draive"),
     ),
 ):
     await VectorIndex.index(
@@ -207,9 +266,12 @@ pgvector. Set `rerank=False` to return rows ordered solely by the database simil
 ### Payload filtering and requirements
 
 Search and deletion accept `AttributeRequirement` instances which are evaluated against the stored
-payload JSON. Requirements are translated to SQL expressions (for example,
-`AttributeRequirement.equal` becomes `payload #>> '{text}' = $2`). Unsupported operators raise
-`NotImplementedError`, ensuring the query surface remains explicit.
+payload JSON. Requirements are translated to SQL expressions with both the attribute path and the
+compared value bound as parameters, so `AttributeRequirement.equal` becomes
+`payload #> $1::TEXT[] = $2::JSONB`. Using the `#>` accessor keeps the `jsonb` type, which is what
+allows non-string values (integers, floats, booleans, UUIDs, timestamps) to be compared at all. The
+`text_match` operator is not implemented yet and raises `NotImplementedError`, keeping the query
+surface explicit.
 
 ## AgentMemory implementation
 
@@ -222,9 +284,14 @@ Run the schema migration once with an acquired connection bound in context:
 
 ```python
 from draive import ctx
-from draive.postgres import Postgres, PostgresAgentMemory
+from draive.postgres import Postgres, PostgresAgentMemory, PostgresConnectionPool
 
-async with ctx.scope("migration"):
+async with ctx.scope(
+    "migration",
+    disposables=(
+        PostgresConnectionPool.of(dsn="postgresql://draive:secret@localhost:5432/draive"),
+    ),
+):
     async with Postgres.acquire_connection() as connection:
         with ctx.updating(connection):
             await PostgresAgentMemory.migrate()

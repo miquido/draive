@@ -1,9 +1,11 @@
-from typing import Any
+from collections.abc import Generator, Sequence
+from typing import Any, Final
 
-from haiway import ctx, not_missing
+from haiway import Missing, ctx, not_missing
 from openai.types import ModerationCreateResponse, ModerationMultiModalInputParam
 
 from draive.guardrails import GuardrailsModerationException
+from draive.models import record_guardrails_invocation
 from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIModerationConfig
@@ -11,9 +13,28 @@ from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("OpenAIContentModeration",)
 
+# categories reported by the moderation models, each one pairing a flag within
+# `categories` with a score within `category_scores` and a `<name>_threshold`
+# configuration field
+_MODERATION_CATEGORIES: Final[Sequence[str]] = (
+    "harassment",
+    "harassment_threatening",
+    "hate",
+    "hate_threatening",
+    "illicit",
+    "illicit_violent",
+    "self_harm",
+    "self_harm_instructions",
+    "self_harm_intent",
+    "sexual",
+    "sexual_minors",
+    "violence",
+    "violence_graphic",
+)
+
 
 class OpenAIContentModeration(OpenAIAPI):
-    async def content_moderation(  # noqa: C901, PLR0912, PLR0915
+    async def content_moderation(
         self,
         content: Multimodal,
         /,
@@ -22,73 +43,15 @@ class OpenAIContentModeration(OpenAIAPI):
         **extra: Any,
     ) -> None:
         moderation_config: OpenAIModerationConfig = config or ctx.state(OpenAIModerationConfig)
-        async with ctx.scope("openai.moderation"):
-            ctx.record_info(
-                attributes={
-                    "guardrails.provider": "openai",
-                    "guardrails.model": moderation_config.model,
-                },
+        async with ctx.scope("guardrails.invocation"):
+            record_guardrails_invocation(
+                provider="openai",
+                model=moderation_config.model,
             )
             content = MultimodalContent.of(content)
-            moderated_content: list[ModerationMultiModalInputParam] = []
-            for part in content.parts:
-                if isinstance(part, TextContent):
-                    moderated_content.append(
-                        {
-                            "type": "text",
-                            "text": part.text,
-                        }
-                    )
-
-                elif isinstance(part, ResourceContent):
-                    if part.mime_type.startswith("image"):
-                        moderated_content.append(
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": part.to_data_uri(),
-                                },
-                            }
-                        )
-                    else:
-                        ctx.log_warning(
-                            f"OpenAI moderation: unsupported media {part.mime_type}; "
-                            "verifying as text."
-                        )
-                        moderated_content.append(
-                            {
-                                "type": "text",
-                                "text": part.to_str(include_data=False),
-                            }
-                        )
-
-                elif isinstance(part, ResourceReference):
-                    if part.mime_type and part.mime_type.startswith("image"):
-                        moderated_content.append(
-                            {
-                                "type": "image_url",
-                                "image_url": {"url": part.uri},
-                            }
-                        )
-                    else:
-                        ctx.log_warning(
-                            "OpenAI moderation: unsupported resource reference; verifying as text."
-                        )
-                        moderated_content.append(
-                            {"type": "text", "text": part.uri},
-                        )
-
-                else:
-                    assert isinstance(part, ArtifactContent)  # nosec: B101
-                    if part.hidden:
-                        continue  # skip hidden
-
-                    moderated_content.append(
-                        {
-                            "type": "text",
-                            "text": part.to_str(),
-                        }
-                    )
+            moderated_content: list[ModerationMultiModalInputParam] = list(
+                _moderated_parts(content)
+            )
 
             response: ModerationCreateResponse = await self._client.moderations.create(
                 model=moderation_config.model,
@@ -97,137 +60,20 @@ class OpenAIContentModeration(OpenAIAPI):
 
             violations: dict[str, float] = {}
             for result in response.results:
-                if (
-                    not_missing(moderation_config.harassment_threshold)
-                    and result.category_scores.harassment >= moderation_config.harassment_threshold
-                ):
-                    violations["harassment"] = result.category_scores.harassment
-
-                elif result.categories.harassment:
-                    violations["harassment"] = result.category_scores.harassment
-
-                if (
-                    not_missing(moderation_config.harassment_threatening_threshold)
-                    and result.category_scores.harassment_threatening
-                    >= moderation_config.harassment_threatening_threshold
-                ):
-                    violations["harassment_threatening"] = (
-                        result.category_scores.harassment_threatening
+                for category in _MODERATION_CATEGORIES:
+                    score: float = getattr(result.category_scores, category)
+                    threshold: float | Missing = getattr(
+                        moderation_config,
+                        f"{category}_threshold",
                     )
+                    # a configured threshold replaces the model provided category flag,
+                    # the flag is used only when no threshold was configured
+                    if not_missing(threshold):
+                        if score >= threshold:
+                            violations[category] = score
 
-                elif result.categories.harassment_threatening:
-                    violations["harassment_threatening"] = (
-                        result.category_scores.harassment_threatening
-                    )
-
-                if (
-                    not_missing(moderation_config.hate_threshold)
-                    and result.category_scores.hate >= moderation_config.hate_threshold
-                ):
-                    violations["hate"] = result.category_scores.hate
-
-                elif result.categories.hate:
-                    violations["hate"] = result.category_scores.hate
-
-                if (
-                    not_missing(moderation_config.hate_threatening_threshold)
-                    and result.category_scores.hate_threatening
-                    >= moderation_config.hate_threatening_threshold
-                ):
-                    violations["hate_threatening"] = result.category_scores.hate_threatening
-
-                elif result.categories.hate_threatening:
-                    violations["hate_threatening"] = result.category_scores.hate_threatening
-
-                if (
-                    not_missing(moderation_config.self_harm_threshold)
-                    and result.category_scores.self_harm >= moderation_config.self_harm_threshold
-                ):
-                    violations["self_harm"] = result.category_scores.self_harm
-
-                elif result.categories.self_harm:
-                    violations["self_harm"] = result.category_scores.self_harm
-
-                if (
-                    not_missing(moderation_config.self_harm_instructions_threshold)
-                    and result.category_scores.self_harm_instructions
-                    >= moderation_config.self_harm_instructions_threshold
-                ):
-                    violations["self_harm_instructions"] = (
-                        result.category_scores.self_harm_instructions
-                    )
-
-                elif result.categories.self_harm_instructions:
-                    violations["self_harm_instructions"] = (
-                        result.category_scores.self_harm_instructions
-                    )
-
-                if (
-                    not_missing(moderation_config.self_harm_intent_threshold)
-                    and result.category_scores.self_harm_intent
-                    >= moderation_config.self_harm_intent_threshold
-                ):
-                    violations["self_harm_intent"] = result.category_scores.self_harm_intent
-
-                elif result.categories.self_harm_intent:
-                    violations["self_harm_intent"] = result.category_scores.self_harm_intent
-
-                if (
-                    not_missing(moderation_config.sexual_threshold)
-                    and result.category_scores.sexual >= moderation_config.sexual_threshold
-                ):
-                    violations["sexual"] = result.category_scores.sexual
-
-                elif result.categories.sexual:
-                    violations["sexual"] = result.category_scores.sexual
-
-                if (
-                    not_missing(moderation_config.sexual_minors_threshold)
-                    and result.category_scores.sexual_minors
-                    >= moderation_config.sexual_minors_threshold
-                ):
-                    violations["sexual_minors"] = result.category_scores.sexual_minors
-
-                elif result.categories.sexual_minors:
-                    violations["sexual_minors"] = result.category_scores.sexual_minors
-
-                if (
-                    not_missing(moderation_config.violence_threshold)
-                    and result.category_scores.violence >= moderation_config.violence_threshold
-                ):
-                    violations["violence"] = result.category_scores.violence
-
-                elif result.categories.violence:
-                    violations["violence"] = result.category_scores.violence
-
-                if (
-                    not_missing(moderation_config.violence_graphic_threshold)
-                    and result.category_scores.violence_graphic
-                    >= moderation_config.violence_graphic_threshold
-                ):
-                    violations["violence_graphic"] = result.category_scores.violence_graphic
-
-                elif result.categories.violence_graphic:
-                    violations["violence_graphic"] = result.category_scores.violence_graphic
-
-                if (
-                    not_missing(moderation_config.illicit_threshold)
-                    and result.category_scores.illicit >= moderation_config.illicit_threshold
-                ):
-                    violations["illicit"] = result.category_scores.illicit
-
-                elif result.categories.illicit:
-                    violations["illicit"] = result.category_scores.illicit
-
-                if (
-                    not_missing(moderation_config.illicit_violent_threshold)
-                    and result.category_scores.illicit_violent
-                    >= moderation_config.illicit_violent_threshold
-                ):
-                    violations["illicit_violent"] = result.category_scores.illicit_violent
-
-                elif result.categories.illicit_violent:
-                    violations["illicit_violent"] = result.category_scores.illicit_violent
+                    elif getattr(result.categories, category):
+                        violations[category] = score
 
             if violations:
                 raise GuardrailsModerationException(
@@ -235,3 +81,54 @@ class OpenAIContentModeration(OpenAIAPI):
                     violations=violations,
                     content=content,
                 )
+
+
+def _moderated_parts(
+    content: MultimodalContent,
+    /,
+) -> Generator[ModerationMultiModalInputParam]:
+    # the endpoint accepts text and images only, anything else is verified as its
+    # textual representation instead of being dropped
+    for part in content.parts:
+        if isinstance(part, TextContent):
+            yield {
+                "type": "text",
+                "text": part.text,
+            }
+
+        elif isinstance(part, ResourceContent):
+            if part.mime_type.startswith("image"):
+                yield {
+                    "type": "image_url",
+                    "image_url": {"url": part.to_data_uri()},
+                }
+
+            else:
+                ctx.log_warning(
+                    f"OpenAI moderation: unsupported media {part.mime_type}; verifying as text."
+                )
+                yield {
+                    "type": "text",
+                    "text": part.to_str(include_data=False),
+                }
+
+        elif isinstance(part, ResourceReference):
+            if part.mime_type.startswith("image"):
+                yield {
+                    "type": "image_url",
+                    "image_url": {"url": part.uri},
+                }
+
+            else:
+                # the uri is omitted, it can carry credentials within its userinfo or query
+                ctx.log_warning("OpenAI moderation: unsupported resource reference; skipping.")
+
+        else:
+            assert isinstance(part, ArtifactContent)  # nosec: B101
+            if part.hidden:
+                continue  # skip hidden
+
+            yield {
+                "type": "text",
+                "text": part.to_str(),
+            }

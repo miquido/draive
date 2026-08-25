@@ -59,6 +59,46 @@ class ModelGeneration(State):
         decoder: ModelGenerationDecoder[Generated] | None = None,
         **extra: Any,
     ) -> Generated:
+        """Generate an instance of the requested state type.
+
+        The type is always passed to the model as its requested output, letting
+        each provider use its schema backed mode where the API offers one, fall
+        back to a schema-less json mode where it does not, and finally to plain
+        output where neither exists. ``schema_injection`` additionally delivers
+        the schema through the instructions, which is what reaches providers
+        without a schema backed mode of their own.
+
+        Parameters
+        ----------
+        generated : type[Generated]
+            Serializable state type to produce.
+        instructions : Template | ModelInstructions, default=""
+            Instructions passed to the model. A ``{model_schema}`` placeholder
+            is replaced according to ``schema_injection``.
+        input : Template | Multimodal
+            Input content the generation is based on.
+        schema_injection : Literal["full", "simplified", "skip"], default="skip"
+            How to deliver the schema through the instructions - the complete
+            json schema, a simplified rendering of it, or not at all. The
+            placeholder is required for the schema to land; instructions
+            without one are passed through unchanged.
+        tools : Toolbox | Iterable[Tool], default=Toolbox.empty
+            Tools available to the model while generating.
+        examples : Iterable[tuple[Multimodal, Generated]], default=()
+            Few-shot examples prepended to the generation context.
+        decoder : ModelGenerationDecoder[Generated] | None, default=None
+            Custom decoder reading the result back. When omitted, a json
+            artifact is used when present, otherwise the completion text is
+            decoded as json. It does not change what is requested from the
+            model.
+        **extra : Any
+            Additional provider options forwarded to completion.
+
+        Returns
+        -------
+        Generated
+            Decoded instance of the requested type.
+        """
         async with ctx.scope("model_generation"):
             assert generated.__SERIALIZABLE__  # nosec: B101
             ctx.record_info(

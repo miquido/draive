@@ -1,7 +1,7 @@
 from typing import Any
 
 from haiway import getenv_str
-from mistralai import Mistral as MistralClient
+from mistralai.client import Mistral as MistralClient
 
 __all__ = ("MistralAPI",)
 
@@ -27,7 +27,7 @@ class MistralAPI:
         )
         self._api_key: str | None = api_key or getenv_str("MISTRAL_API_KEY")
         self._timeout: float | None = timeout
-        self._client: MistralClient = self._prepare_client()
+        self._client: MistralClient  # initialized lazily
 
     def _prepare_client(self) -> MistralClient:
         return MistralClient(
@@ -37,15 +37,24 @@ class MistralAPI:
         )
 
     async def _initialize_client(self) -> None:
-        if self._client.sdk_configuration.async_client is not None:
-            await self._client.sdk_configuration.async_client.aclose()
-
+        assert not hasattr(self, "_client")  # nosec: B101
         self._client = self._prepare_client()
         await self._client.__aenter__()
 
     async def _deinitialize_client(self) -> None:
-        await self._client.__aexit__(  # pyright: ignore[reportUnknownMemberType]
-            None,
-            None,
-            None,
-        )
+        try:
+            await self._client.__aexit__(  # pyright: ignore[reportUnknownMemberType]
+                None,
+                None,
+                None,
+            )
+            # `Mistral` implicitly creates a synchronous httpx client as well, which only
+            # its synchronous context manager exit closes - without it the client leaks
+            self._client.__exit__(  # pyright: ignore[reportUnknownMemberType]
+                None,
+                None,
+                None,
+            )
+
+        finally:
+            del self._client

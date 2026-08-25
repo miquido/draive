@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from datetime import UTC, datetime
 from typing import Any, Protocol, Self, final, runtime_checkable
 from uuid import UUID, uuid4
@@ -147,8 +147,8 @@ class AgentMessage(State, serializable=True):
             meta=Meta.of(meta),
         )
 
-    thread: UUID = Default(default_factory=uuid4)
-    created: datetime = Default(default_factory=lambda: datetime.now(UTC))
+    thread: UUID = Default(factory=uuid4)
+    created: datetime = Default(factory=lambda: datetime.now(UTC))
     content: MultimodalContent
     meta: Meta = Meta.empty
 
@@ -209,7 +209,7 @@ class AgentThread(State):
 
     identifier: UUID
     agent_uri: str
-    created: datetime = Default(default_factory=lambda: datetime.now(UTC))
+    created: datetime = Default(factory=lambda: datetime.now(UTC))
     meta: Meta = Meta.empty
 
 
@@ -219,14 +219,14 @@ class AgentExecuting(Protocol):
 
     Returns
     -------
-    AsyncIterable[MultimodalContentPart | ProcessingEvent]
+    AsyncGenerator[MultimodalContentPart | ProcessingEvent]
         Stream produced by the executor for each processed message.
     """
 
     def __call__(
         self,
         message: AgentMessage,
-    ) -> AsyncIterable[MultimodalContentPart | ProcessingEvent]:
+    ) -> AsyncGenerator[MultimodalContentPart | ProcessingEvent]:
         """Execute an agent for a single message.
 
         Parameters
@@ -236,7 +236,7 @@ class AgentExecuting(Protocol):
 
         Returns
         -------
-        AsyncIterable[MultimodalContentPart | ProcessingEvent]
+        AsyncGenerator[MultimodalContentPart | ProcessingEvent]
             Stream of visible output chunks and processing events.
         """
         ...

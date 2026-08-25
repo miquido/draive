@@ -26,7 +26,7 @@ class OpenAIEmbedding(OpenAIAPI):
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
         embedding_config: OpenAIEmbeddingConfig = config or ctx.state(OpenAIEmbeddingConfig)
-        async with ctx.scope("openai.text_embedding"):
+        async with ctx.scope("embedding.invocation"):
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))
@@ -83,7 +83,12 @@ class OpenAIEmbedding(OpenAIAPI):
                     )
                     for value, embedding in zip(
                         values,
-                        chain.from_iterable([response.data for response in responses]),
+                        # the api documents no ordering guarantee, the index within each
+                        # entry is what pairs it back with its input
+                        chain.from_iterable(
+                            sorted(response.data, key=lambda entry: entry.index)
+                            for response in responses
+                        ),
                         strict=True,
                     )
                 ],

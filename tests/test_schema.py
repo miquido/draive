@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from haiway import Alias, Description, State
 
@@ -35,3 +35,30 @@ def test_simplified_schema_contains_expected_markers() -> None:
     assert "str_value" in summary
     assert "nested_value" in summary
     assert "'A'|'B'|'C'" in summary
+
+
+class SchemaRecursiveModel(State):
+    name: str
+    children: Sequence[SchemaRecursiveModel]
+
+
+def test_simplified_schema_renders_recursive_reference() -> None:
+    summary = simplified_schema(SchemaRecursiveModel.__SPECIFICATION__)
+
+    assert '"children": ["#SchemaRecursiveModel"]' in summary
+
+
+class SchemaAlternativesModel(State):
+    mixed: Literal["a", 1, None]
+    flag: Literal[True]
+    union: str | Sequence[int]
+    anything: Any
+
+
+def test_simplified_schema_renders_alternatives() -> None:
+    summary = simplified_schema(SchemaAlternativesModel.__SPECIFICATION__)
+
+    assert "'a'|1|null" in summary
+    assert '"flag": "true"' in summary
+    assert '"union": "string|[\\"integer\\"]"' in summary
+    assert "string|number|integer|boolean|object|array|null" in summary

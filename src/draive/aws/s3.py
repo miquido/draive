@@ -515,14 +515,18 @@ class AWSS3Mixin(AWSAPI):
         content_type: str | None = None,
         meta: Mapping[str, BasicValue] | None = None,
     ) -> None:
+        # botocore rejects explicit `None` instead of skipping it, the key has to be absent
+        parameters: dict[str, Any] = {
+            "Bucket": bucket,
+            "Body": content,
+            "Key": name,
+            "Metadata": _sanitize_metadata(meta),
+        }
+        if content_type:
+            parameters["ContentType"] = content_type
+
         try:
-            self._s3_client.put_object(
-                Bucket=bucket,
-                Body=content,
-                Key=name,
-                ContentType=content_type if content_type else None,
-                Metadata=_sanitize_metadata(meta),
-            )
+            self._s3_client.put_object(**parameters)
 
         except ClientError as exc:
             raise _translate_client_error(
@@ -630,9 +634,7 @@ def _translate_client_error(
     bucket: str,
     key: str,
 ) -> Exception:
-    # type: ignore[reportAttributeAccessIssue]
     error_info: Mapping[str, Any] = getattr(error, "response", {}).get("Error", {})
-    # type: ignore[reportAttributeAccessIssue]
     response_metadata: Mapping[str, Any] = getattr(error, "response", {}).get(
         "ResponseMetadata",
         {},

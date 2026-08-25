@@ -42,13 +42,13 @@ from draive.openai import OpenAI, OpenAIResponsesConfig
 
 async with ctx.scope(
     "conversation",
-    OpenAIResponsesConfig(model="gpt-5-mini"),
+    OpenAIResponsesConfig(model="gpt-5.5"),
     disposables=(OpenAI(),),
 ):
     stream = Conversation.completion(
         instructions="You are a helpful assistant.",
         message="Hi! What time is it now?",
-        toolbox=Toolbox.of([utc_datetime]),
+        tools=Toolbox.of([utc_datetime]),
     )
 
     async for chunk in stream:

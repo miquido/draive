@@ -15,7 +15,8 @@ async def current_time(location: str) -> str:
     return f"Time in {location} is 09:53:22"
 ```
 
-You can call a tool directly, but only inside a context scope.
+You can call a tool directly like a regular async function. A context scope is required only
+when the tool itself uses context state, logging or observability.
 
 ```python
 from draive import ctx
@@ -37,7 +38,7 @@ load_env()
 
 async with ctx.scope(
     "tools",
-    OpenAIResponsesConfig(model="gpt-5-mini"),
+    OpenAIResponsesConfig(model="gpt-5.5"),
     disposables=(OpenAI(),),
 ):
     result: str = await TextGeneration.generate(
@@ -90,7 +91,18 @@ result = await TextGeneration.generate(
 
 `@tool(...)` supports:
 
-- `availability=...` for runtime availability checks
-- `result_formatting=...` to transform success output
-- `error_formatting=...` to shape tool failure content
-- `handling="response" | "output" | "detached"` to control model orchestration behavior
+- `name=...` and `description=...` to override the model facing tool identity
+- `parameters=...` to provide an explicit arguments JSON schema instead of the inferred one
+- `handling="response" | "output" | "output_stream"` to control whether the tool result only goes
+    back to the model or is also surfaced in the output stream
+- `meta=...` to attach metadata to the tool specification
+- `meta={"strict_parameters": True}` to have the provider enforce the argument schema, which
+    makes the model always pass every argument rather than relying on its default. A tool taking
+    a mapping argument keeps its arguments unenforced, since enforcement would drop the mapping
+
+A tool function can also be an async generator yielding content parts and `ProcessingEvent` values,
+which allows streaming partial results while the tool is still running. Streaming tools have to be
+async generators - not arbitrary async iterables - so that a `try/finally` can span the whole stream
+and release scoped state deterministically when a consumer stops early. `Toolbox.handle(...)` closes
+the tool stream it consumed; when consuming `tool.call(...)` directly and stopping before the end,
+close it explicitly instead of leaving it to garbage collection.

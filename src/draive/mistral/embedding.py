@@ -1,10 +1,9 @@
 from asyncio import gather
 from collections.abc import Callable, Sequence
-from itertools import chain
 from typing import Any, cast
 
 from haiway import State, as_list, ctx
-from mistralai import EmbeddingResponse
+from mistralai.client.models import EmbeddingResponse
 
 from draive.embedding import Embedded
 from draive.mistral.api import MistralAPI
@@ -25,7 +24,7 @@ class MistralEmbedding(MistralAPI):
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
         embedding_config: MistralEmbeddingConfig = config or ctx.state(MistralEmbeddingConfig)
-        async with ctx.scope("mistral_text_embedding"):
+        async with ctx.scope("embedding.invocation"):
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))
@@ -67,19 +66,32 @@ class MistralEmbedding(MistralAPI):
                 ]
             )
 
+            # the api documents no ordering guarantee, the index within each entry
+            # is what pairs it back with its input
+            vectors: list[Sequence[float]] = []
+            for response in responses:
+                for entry in sorted(response.data, key=lambda entry: entry.index or 0):
+                    if not entry.embedding:
+                        # dropping it would silently shorten the result and misalign
+                        # every value following it
+                        raise ValueError(
+                            f"Mistral embedding using {embedding_config.model} returned"
+                            f" no vector for input {len(vectors)}"
+                        )
+
+                    vectors.append(entry.embedding)
+
             return cast(
                 Sequence[Embedded[Value]] | Sequence[Embedded[str]],
                 [
                     Embedded(
                         value=value,
-                        vector=embedding.embedding,
+                        vector=vector,
                     )
-                    for value, embedding in zip(
+                    for value, vector in zip(
                         values,
-                        chain.from_iterable([response.data for response in responses]),
+                        vectors,
                         strict=True,
                     )
-                    # filter out missing embeddings, although all should be available
-                    if embedding.embedding
                 ],
             )

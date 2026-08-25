@@ -6,7 +6,7 @@ from uuid import UUID
 
 import pytest
 from haiway import AttributeRequirement, Pagination, State, ctx
-from surrealdb import RecordID
+from surrealdb import RecordID, Table
 
 from draive.surreal.state import Surreal, SurrealSession
 from draive.surreal.types import SurrealID, SurrealObject
@@ -181,7 +181,8 @@ async def test_surrealdb_delete_with_requirements_uses_surreal_filter_clause() -
         (
             "DELETE $_table WHERE name = $_f0;",
             {
-                "_table": "_ExampleModel",
+                # SurrealDB refuses to DELETE using a plain string variable
+                "_table": Table("_ExampleModel"),
                 "_f0": "alpha",
             },
         )
@@ -230,8 +231,10 @@ async def test_surrealdb_define_table_supports_state_schema() -> None:
             {},
         ),
         (
+            # FLEXIBLE has to follow the type, a server rejects the reversed
+            # order accepted by older versions with a parse error
             "DEFINE FIELD IF NOT EXISTS profile ON TABLE _SchemaModel "
-            "FLEXIBLE TYPE option<object>;",
+            "TYPE option<object> FLEXIBLE;",
             {},
         ),
     ]
@@ -255,11 +258,35 @@ async def test_surrealdb_define_table_accepts_raw_table_identifier() -> None:
         transaction_preparing=lambda: pytest.fail("unexpected transaction"),
     )
 
-    await database.define_table("bad table")
+    await database.define_table("raw_table")
 
     assert execution_calls == [
-        ("DEFINE TABLE IF NOT EXISTS bad table SCHEMALESS TYPE NORMAL;", {}),
+        ("DEFINE TABLE IF NOT EXISTS raw_table SCHEMALESS TYPE NORMAL;", {}),
     ]
+
+
+@pytest.mark.asyncio
+async def test_surrealdb_define_table_rejects_unsafe_table_identifier() -> None:
+    """Regression test: table names have no parameter form and are interpolated
+    into the statement, therefore each one has to be verified upfront.
+    """
+
+    async def fake_execute(
+        statement: str,
+        /,
+        *,
+        variables: Mapping[str, Any] | None = None,
+    ) -> Sequence[SurrealObject]:
+        _ = statement, variables
+        pytest.fail("unexpected statement")
+
+    database = SurrealSession(
+        statement_executing=fake_execute,
+        transaction_preparing=lambda: pytest.fail("unexpected transaction"),
+    )
+
+    with pytest.raises(ValueError):
+        await database.define_table("bad table")
 
 
 @pytest.mark.asyncio
@@ -389,8 +416,10 @@ async def test_surrealdb_related_fetches_directional_targets_with_pagination() -
     assert len(execution_calls) == 1
     statement, variables = execution_calls[0]
     assert (
-        statement == "SELECT in.* AS value FROM _Follows WHERE out = $_source "
-        "ORDER BY id DESC LIMIT $_limit START AT $_start;"
+        # SurrealDB requires each ORDER BY idiom within the projection, while the
+        # related record's own implicit `id` has to be omitted
+        statement == "SELECT in.* AS value, id OMIT value.id FROM _Follows "
+        "WHERE out = $_source ORDER BY id DESC LIMIT $_limit START AT $_start;"
     )
     assert variables is not None
     assert variables["_limit"] == 3
@@ -453,7 +482,7 @@ async def test_surreal_fetch_prepares_session_when_none_is_active() -> None:
         variables: Mapping[str, Any] | None = None,
     ) -> Sequence[SurrealObject]:
         events.append("execute")
-        assert "SELECT * FROM _ExampleModel" in statement
+        assert "SELECT * OMIT id FROM _ExampleModel" in statement
         assert variables == {
             "_limit": 2,
             "_start": 0,

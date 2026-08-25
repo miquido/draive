@@ -4,6 +4,7 @@ from haiway import AttributeRequirement, State
 
 from draive.surreal.types import SurrealValue
 from draive.surreal.utils import surreal_value
+from draive.utils.attributes import attribute_path_segments
 
 __all__ = ("prepare_filter",)
 
@@ -50,24 +51,28 @@ def _convert[Model: State](  # noqa: C901, PLR0911
         case "equal":
             parameter: str = f"_f{index}"
             return (
-                str(requirements.lhs) + f" = ${parameter}",
+                _field_reference(requirements.lhs) + f" = ${parameter}",
                 {parameter: surreal_value(requirements.rhs)},
             )
 
         case "not_equal":
             parameter: str = f"_f{index}"
             return (
-                str(requirements.lhs) + f" != ${parameter}",
+                _field_reference(requirements.lhs) + f" != ${parameter}",
                 {parameter: surreal_value(requirements.rhs)},
             )
 
         case "contained_in":
+            # 'contained_in' is the only operator built with its operands swapped
             parameter: str = f"_f{index}"
-            values: SurrealValue = surreal_value(requirements.rhs)
+            values: SurrealValue = surreal_value(requirements.lhs)
             if not isinstance(values, Sequence) or isinstance(values, str | bytes):
                 raise ValueError("'contained_in' requires a sequence")
 
-            return (str(requirements.lhs) + f" INSIDE ${parameter}", {parameter: values})
+            return (
+                _field_reference(requirements.rhs) + f" INSIDE ${parameter}",
+                {parameter: values},
+            )
 
         case "contains_any":
             parameter: str = f"_f{index}"
@@ -76,21 +81,23 @@ def _convert[Model: State](  # noqa: C901, PLR0911
                 raise ValueError("'contains_any' requires a sequence")
 
             return (
-                str(requirements.lhs) + f" CONTAINSANY ${parameter}",
+                _field_reference(requirements.lhs) + f" CONTAINSANY ${parameter}",
                 {parameter: values},
             )
 
         case "contains":
             parameter: str = f"_f{index}"
             return (
-                str(requirements.lhs) + f" CONTAINS ${parameter}",
+                _field_reference(requirements.lhs) + f" CONTAINS ${parameter}",
                 {parameter: surreal_value(requirements.rhs)},
             )
 
         case "text_match":
+            # `string(...)` is not a valid function path, values have to be cast instead
             parameter: str = f"_f{index}"
+            field: str = _field_reference(requirements.lhs)
             return (
-                f"string::contains(string({requirements.lhs!s}), string(${parameter}))",
+                f"string::contains(<string>{field}, <string>${parameter})",
                 {parameter: str(requirements.rhs)},
             )
 
@@ -98,3 +105,11 @@ def _convert[Model: State](  # noqa: C901, PLR0911
             raise NotImplementedError(
                 f"Unsupported SurrealDB requirement operator: {requirements.operator}"
             )
+
+
+def _field_reference(
+    path: object,
+    /,
+) -> str:
+    # stored documents use attribute aliases, filters have to follow them
+    return ".".join(attribute_path_segments(path))

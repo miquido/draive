@@ -1,4 +1,11 @@
-from collections.abc import AsyncIterable, Collection, Mapping, MutableMapping, MutableSet, Set
+from collections.abc import (
+    AsyncGenerator,
+    Collection,
+    Mapping,
+    MutableMapping,
+    MutableSet,
+    Set,
+)
 from typing import Any, NoReturn, Self, final
 from uuid import UUID
 
@@ -198,7 +205,7 @@ class AgentsGroup:
         thread: UUID | None = None,
         input: Multimodal,  # noqa: A002
         meta: Meta | MetaValues | None = None,
-    ) -> AsyncIterable[MultimodalContentPart | ProcessingEvent]:
+    ) -> AsyncGenerator[MultimodalContentPart | ProcessingEvent]:
         """Call a selected agent directly through the group.
 
         Parameters
@@ -214,7 +221,7 @@ class AgentsGroup:
 
         Returns
         -------
-        AsyncIterable[MultimodalContentPart | ProcessingEvent]
+        AsyncGenerator[MultimodalContentPart | ProcessingEvent]
             Stream of chunks emitted by the selected agent.
 
         Raises
@@ -223,12 +230,18 @@ class AgentsGroup:
             Raised when the referenced agent name is not defined in the group.
         """
         if selected := self._available.get(agent):
-            async for chunk in selected.call(
+            agent_stream: AsyncGenerator[MultimodalContentPart | ProcessingEvent] = selected.call(
                 thread=thread,
                 input=input,
                 meta=meta,
-            ):
-                yield chunk
+            )
+            try:
+                async for chunk in agent_stream:
+                    yield chunk
+
+            finally:
+                # release the agent when the consumer stops before its end
+                await agent_stream.aclose()
 
         else:
             raise AgentUnavailable(f"Agent `{agent}` is not defined")
@@ -329,10 +342,17 @@ class AgentsGroup:
         async def agent_request(
             agent: str,
             task: str,
-        ) -> AsyncIterable[ToolOutputChunk]:
+        ) -> AsyncGenerator[ToolOutputChunk]:
             if selected := self._available.get(agent):
-                async for chunk in selected.call(input=task):
-                    yield chunk
+                agent_stream: AsyncGenerator[MultimodalContentPart | ProcessingEvent] = (
+                    selected.call(input=task)
+                )
+                try:
+                    async for chunk in agent_stream:
+                        yield chunk
+
+                finally:
+                    await agent_stream.aclose()
 
             else:
                 raise AgentUnavailable(f"Agent `{agent}` is not defined")

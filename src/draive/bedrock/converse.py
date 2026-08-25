@@ -1,13 +1,20 @@
-from base64 import urlsafe_b64decode
-from collections.abc import AsyncIterable, Iterable, Mapping, Sequence
-from typing import Any, Literal, cast
+import json
+from base64 import b64decode, b64encode
+from collections.abc import (
+    Generator,
+    Iterable,
+    Iterator,
+    Mapping,
+    MutableSequence,
+    Sequence,
+)
+from typing import Any, Final, Literal, TypedDict, cast
 
-from haiway import MISSING, Meta, asynchronous, ctx, unwrap_missing
+from haiway import MISSING, BasicValue, Missing, asynchronous, ctx, unwrap_missing
 
 from draive.bedrock.api import BedrockAPI
 from draive.bedrock.config import BedrockChatConfig
 from draive.bedrock.models import (
-    ChatCompletionResponse,
     ChatMessage,
     ChatMessageContent,
     ChatMessageImage,
@@ -16,13 +23,17 @@ from draive.bedrock.models import (
 )
 from draive.models import (
     ModelContext,
+    ModelException,
     ModelInput,
+    ModelInputInvalid,
     ModelInstructions,
     ModelOutput,
     ModelOutputChunk,
     ModelOutputFailed,
+    ModelOutputInvalid,
     ModelOutputLimit,
     ModelOutputSelection,
+    ModelOutputStream,
     ModelReasoning,
     ModelReasoningChunk,
     ModelToolRequest,
@@ -31,10 +42,13 @@ from draive.models import (
     ModelToolSpecification,
     ModelToolsSelection,
 )
-from draive.models.metrics import record_model_invocation, record_usage_metrics
+from draive.models.metrics import (
+    model_rate_limit,
+    record_model_invocation,
+    record_usage_metrics,
+)
 from draive.multimodal import (
     ArtifactContent,
-    Multimodal,
     MultimodalContent,
     MultimodalContentPart,
     TextContent,
@@ -42,6 +56,18 @@ from draive.multimodal import (
 from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("BedrockConverse",)
+
+
+# image formats supported by the Converse API
+_IMAGE_FORMATS: Final[Mapping[str, Literal["png", "jpeg", "gif", "webp"]]] = {
+    "image/png": "png",
+    "image/jpeg": "jpeg",
+    "image/gif": "gif",
+    "image/webp": "webp",
+}
+_IMAGE_MIME_TYPES: Final[Mapping[str, str]] = {
+    image_format: mime_type for mime_type, image_format in _IMAGE_FORMATS.items()
+}
 
 
 class BedrockConverse(BedrockAPI):
@@ -53,20 +79,18 @@ class BedrockConverse(BedrockAPI):
         context: ModelContext,
         output: ModelOutputSelection,
         config: BedrockChatConfig | None = None,
-        prefill: Multimodal | None = None,
         **extra: Any,
-    ) -> AsyncIterable[ModelOutputChunk]:
+    ) -> ModelOutputStream:
         return self._completion_stream(
             instructions=instructions,
             context=context,
             tools=tools,
             output=output,
             config=config or ctx.state(BedrockChatConfig),
-            prefill=prefill,
             **extra,
         )
 
-    async def _completion(
+    async def _completion_stream(  # noqa: C901, PLR0912
         self,
         *,
         instructions: ModelInstructions,
@@ -74,9 +98,8 @@ class BedrockConverse(BedrockAPI):
         context: ModelContext,
         output: ModelOutputSelection,
         config: BedrockChatConfig,
-        prefill: Multimodal | None,
         **extra: Any,
-    ) -> ModelOutput:
+    ) -> ModelOutputStream:
         async with ctx.scope("model.invocation"):
             record_model_invocation(
                 provider="bedrock",
@@ -86,133 +109,462 @@ class BedrockConverse(BedrockAPI):
                 tools=tools,
                 output=output,
                 stop_sequences=config.stop_sequences,
+                top_p=config.top_p,
             )
 
-            # Build messages array from context
             messages: list[ChatMessage]
-
-            if prefill is not None:
-                messages = [
-                    *(_context_messages(context)),
-                    {
-                        "role": "assistant",
-                        "content": _convert_content(MultimodalContent.of(prefill).parts),
-                    },
-                ]
-
-            elif output == "json" or isinstance(output, type):
-                messages = [
-                    *(_context_messages(context)),
-                    {
-                        "role": "assistant",
-                        "content": [{"text": "{"}],
-                    },
-                ]
-
-            else:
-                messages = _context_messages(context)
-
-            tool_config: dict[str, Any] | None = _tools_as_tool_config(
-                tools.specification,
-                tool_selection=tools.selection,
-            )
-
-            # Prepare and execute Converse request
-            parameters: dict[str, Any] = {
-                "modelId": config.model,
-                "messages": messages,
-                "inferenceConfig": {
-                    "temperature": config.temperature,
-                },
-            }
-            if instructions:
-                parameters["system"] = [{"text": instructions}]
-            if tool_config:
-                parameters["toolConfig"] = tool_config
-            if config.max_output_tokens is not MISSING:
-                parameters["inferenceConfig"]["maxTokens"] = config.max_output_tokens
-            if config.top_p is not MISSING:
-                parameters["inferenceConfig"]["topP"] = config.top_p
-            if config.stop_sequences:
-                parameters["inferenceConfig"]["stopSequences"] = config.stop_sequences
-
-            completion: ChatCompletionResponse = await self._converse(parameters)
-
-            record_usage_metrics(
-                provider="bedrock",
-                model=config.model,
-                input_tokens=completion["usage"]["inputTokens"],
-                output_tokens=completion["usage"]["outputTokens"],
-            )
-
-            # Convert output content preserving order of content and tool requests
-            output_blocks = list(
-                _completion_as_output_content(completion["output"]["message"]["content"])
-            )
-
-            stop_reason = completion["stopReason"]
-            if stop_reason == "max_tokens":
-                raise ModelOutputLimit(
-                    provider="bedrock",
-                    model=config.model,
-                    max_output_tokens=unwrap_missing(config.max_output_tokens, default=0),
+            try:
+                messages = _request_messages(
+                    context,
+                    output=output,
                 )
 
-            if stop_reason in ("guardrail_intervened", "content_filtered"):
+            except Exception as exc:
+                raise ModelInputInvalid(
+                    provider="bedrock",
+                    model=config.model,
+                    reason=str(exc),
+                ) from exc
+
+            # the sdk delivers an event stream object, iterated through its own iterator
+            stream: Any
+            try:
+                stream = await self._converse_stream(
+                    _request_parameters(
+                        instructions=instructions,
+                        messages=messages,
+                        tools=tools,
+                        config=config,
+                    )
+                )
+
+            except Exception as exc:
+                raise _request_failure(
+                    exc,
+                    model=config.model,
+                ) from exc
+
+            # a tool call arrives as a start event, argument deltas and a stop event
+            tool_accumulator: _ToolAccumulator | None = None
+            events: Iterator[Mapping[str, Any]] = iter(stream)
+            try:
+                while (event := await self._next_stream_event(events)) is not None:
+                    match event:
+                        case {"contentBlockStart": {"start": {"toolUse": tool_use}}}:
+                            tool_accumulator = {
+                                "id": tool_use["toolUseId"],
+                                "tool": tool_use["name"],
+                                "arguments": [],
+                            }
+
+                        case {"contentBlockDelta": {"delta": delta}}:
+                            for chunk in _delta_chunks(
+                                delta,
+                                tool_accumulator=tool_accumulator,
+                                model=config.model,
+                            ):
+                                yield chunk
+
+                        case {"contentBlockStop": _}:
+                            if tool_accumulator is None:
+                                continue  # a content block needs no completion
+
+                            yield _accumulated_tool_request(
+                                tool_accumulator,
+                                model=config.model,
+                            )
+                            tool_accumulator = None
+
+                        case {"metadata": {"usage": usage}}:
+                            record_usage_metrics(
+                                provider="bedrock",
+                                model=config.model,
+                                input_tokens=usage.get("inputTokens"),
+                                cached_input_tokens=usage.get("cacheReadInputTokens"),
+                                output_tokens=usage.get("outputTokens"),
+                            )
+
+                        case {"messageStop": {"stopReason": str() as stop_reason}}:
+                            _verify_stop_reason(
+                                stop_reason,
+                                model=config.model,
+                                max_output_tokens=config.max_output_tokens,
+                            )
+
+                        case _:
+                            # the remaining members are modeled failures
+                            if failure := _stream_failure(
+                                event,
+                                model=config.model,
+                            ):
+                                raise failure
+
+            except ModelException as exc:
+                raise exc
+
+            except Exception as exc:
                 raise ModelOutputFailed(
                     provider="bedrock",
                     model=config.model,
-                    reason=stop_reason,
-                )
+                    reason=str(exc),
+                ) from exc
 
-            return ModelOutput.of(
-                *output_blocks,
-                meta={
-                    "model": config.model,
-                    "stop_reason": stop_reason,
-                },
-            )
-
-    async def _completion_stream(
-        self,
-        *,
-        instructions: ModelInstructions,
-        tools: ModelTools,
-        context: ModelContext,
-        output: ModelOutputSelection,
-        config: BedrockChatConfig,
-        prefill: Multimodal | None,
-        **extra: Any,
-    ) -> AsyncIterable[ModelOutputChunk]:
-        async with ctx.scope("model.completion.stream"):
-            ctx.log_warning(
-                "Bedrock completion streaming is not supported yet, using regular response instead."
-            )
-            model_output: ModelOutput = await self._completion(
-                instructions=instructions,
-                context=context,
-                tools=tools,
-                output=output,
-                config=config,
-                prefill=prefill,
-                **extra,
-            )
-
-            for block in model_output.output:
-                if isinstance(block, MultimodalContent):
-                    for part in block.parts:
-                        yield part
-
-                else:
-                    assert isinstance(block, ModelToolRequest | ModelReasoningChunk)  # nosec: B101
-                    yield block
+            finally:
+                # release the http stream, iteration may have ended
+                # before the response was completed
+                await self._close_stream(stream)
 
     @asynchronous
-    def _converse(
+    def _converse_stream(
         self,
         parameters: dict[str, Any],
-    ) -> ChatCompletionResponse:
-        return self._client.converse(**parameters)
+    ) -> Any:
+        return self._client.converse_stream(**parameters)["stream"]
+
+    @asynchronous
+    def _next_stream_event(
+        self,
+        events: Iterator[Mapping[str, Any]],
+    ) -> Mapping[str, Any] | None:
+        # the sdk stream is a blocking iterator, stepping it off the event loop
+        # keeps the loop free while waiting for the next event
+        return next(events, None)
+
+    @asynchronous
+    def _close_stream(
+        self,
+        stream: Any,
+    ) -> None:
+        # closing the event stream releases the underlying blocking response body
+        stream.close()
+
+
+class _ToolAccumulator(TypedDict):
+    id: str
+    tool: str
+    arguments: MutableSequence[str]
+
+
+def _request_messages(
+    context: ModelContext,
+    /,
+    *,
+    output: ModelOutputSelection,
+) -> list[ChatMessage]:
+    # the Converse API offers neither a schema backed nor a schema-less json
+    # mode, so every json selection falls all the way back to plain output -
+    # the requested selection is only verified here
+    _verify_output(output)
+
+    return _context_messages(context)
+
+
+def _delta_chunks(
+    delta: Mapping[str, Any],
+    /,
+    *,
+    tool_accumulator: _ToolAccumulator | None,
+    model: str,
+) -> Generator[ModelOutputChunk]:
+    match delta:
+        case {"text": str() as text}:
+            yield TextContent.of(text)
+
+        case {"toolUse": {"input": str() as arguments}}:
+            if tool_accumulator is None:
+                raise ModelOutputInvalid(
+                    provider="bedrock",
+                    model=model,
+                    reason="Tool arguments delivered without a tool call",
+                )
+
+            tool_accumulator["arguments"].append(arguments)
+
+        case {"reasoningContent": reasoning}:
+            match reasoning:
+                case {"signature": str() as signature}:
+                    # the signature closes the block it was produced for
+                    yield ModelReasoningChunk.of(
+                        TextContent.empty,
+                        final=True,
+                        meta={
+                            "kind": "reasoning",
+                            "signature": signature,
+                        },
+                    )
+
+                case {"redactedContent": bytes() as redacted}:
+                    yield ModelReasoningChunk.of(
+                        TextContent.empty,
+                        final=True,
+                        meta={
+                            "kind": "redacted_reasoning",
+                            "data": b64encode(redacted).decode(),
+                        },
+                    )
+
+                case {"text": str() as reasoning_text}:
+                    yield ModelReasoningChunk.of(
+                        TextContent.of(reasoning_text),
+                        meta={"kind": "reasoning"},
+                    )
+
+                case _:
+                    pass  # nothing to report
+
+        case {"image": {"source": {"bytes": bytes() as data}, "format": str() as data_format}}:
+            media_type: str | None = _IMAGE_MIME_TYPES.get(data_format)
+            if media_type is None:
+                raise ModelOutputInvalid(
+                    provider="bedrock",
+                    model=model,
+                    reason=f"Unsupported output image format: {data_format}",
+                )
+
+            yield ResourceContent.of(
+                data,
+                mime_type=media_type,
+            )
+
+        case _:
+            pass  # citations and tool results are not reported
+
+
+def _accumulated_tool_request(
+    accumulator: _ToolAccumulator,
+    /,
+    *,
+    model: str,
+) -> ModelToolRequest:
+    # a tool without arguments delivers no fragment at all
+    accumulated: str = "".join(accumulator["arguments"]).strip()
+    arguments: Any
+    try:
+        arguments = json.loads(accumulated) if accumulated else None
+
+    except Exception as exc:
+        raise ModelOutputInvalid(
+            provider="bedrock",
+            model=model,
+            reason=f"Tool arguments decoding error - {type(exc).__name__}: {exc}",
+        ) from exc
+
+    if arguments is not None and not isinstance(arguments, Mapping):
+        raise ModelOutputInvalid(
+            provider="bedrock",
+            model=model,
+            reason=f"Tool arguments are not an object - {type(arguments).__name__}",
+        )
+
+    return ModelToolRequest.of(
+        accumulator["id"],
+        tool=accumulator["tool"],
+        arguments=cast(Mapping[str, BasicValue] | None, arguments),
+    )
+
+
+# stop reasons describing a terminal failure instead of a regular completion
+_FAILURE_STOP_REASONS: Final[frozenset[str]] = frozenset(
+    (
+        "guardrail_intervened",
+        "content_filtered",
+        "malformed_model_output",
+        "malformed_tool_use",
+        # an exceeded context window is an input side limit - reporting it as an
+        # output limit would suggest a truncated result that can be continued
+        "model_context_window_exceeded",
+    )
+)
+
+
+def _verify_stop_reason(
+    stop_reason: str,
+    /,
+    *,
+    model: str,
+    max_output_tokens: int | Missing,
+) -> None:
+    if stop_reason == "max_tokens":
+        raise ModelOutputLimit(
+            provider="bedrock",
+            model=model,
+            max_output_tokens=unwrap_missing(max_output_tokens, default=0),
+        )
+
+    if stop_reason in _FAILURE_STOP_REASONS:
+        raise ModelOutputFailed(
+            provider="bedrock",
+            model=model,
+            reason=stop_reason,
+        )
+
+
+# failures delivered as stream members instead of raised by the request
+_STREAM_FAILURE_MEMBERS: Final[Mapping[str, str]] = {
+    "throttlingException": "ThrottlingException",
+    "serviceUnavailableException": "ServiceUnavailableException",
+    "validationException": "ValidationException",
+    "modelStreamErrorException": "ModelStreamErrorException",
+    "internalServerException": "InternalServerException",
+}
+
+
+def _stream_failure(
+    event: Mapping[str, Any],
+    /,
+    *,
+    model: str,
+) -> ModelException | None:
+    for member, code in _STREAM_FAILURE_MEMBERS.items():
+        if member not in event:
+            continue
+
+        if code == "ThrottlingException":
+            return model_rate_limit(
+                provider="bedrock",
+                model=model,
+                retry_after=None,
+            )
+
+        if code == "ValidationException":
+            return ModelInputInvalid(
+                provider="bedrock",
+                model=model,
+            )
+
+        return ModelOutputFailed(
+            provider="bedrock",
+            model=model,
+            reason=f"{code}: {event[member].get('message', '')}",
+        )
+
+    return None
+
+
+def _request_parameters(
+    *,
+    instructions: ModelInstructions,
+    messages: list[ChatMessage],
+    tools: ModelTools,
+    config: BedrockChatConfig,
+) -> dict[str, Any]:
+    parameters: dict[str, Any] = {
+        "modelId": config.model,
+        "messages": messages,
+        "inferenceConfig": {
+            "temperature": config.temperature,
+        },
+    }
+    if instructions:
+        parameters["system"] = [{"text": instructions}]
+
+    if tool_config := _tools_as_tool_config(
+        tools.specification,
+        tool_selection=tools.selection,
+    ):
+        parameters["toolConfig"] = tool_config
+
+    if config.max_output_tokens is not MISSING:
+        parameters["inferenceConfig"]["maxTokens"] = config.max_output_tokens
+
+    if config.top_p is not MISSING:
+        parameters["inferenceConfig"]["topP"] = config.top_p
+
+    if config.stop_sequences:
+        parameters["inferenceConfig"]["stopSequences"] = config.stop_sequences
+
+    if config.guardrail_identifier is not MISSING and config.guardrail_version is not MISSING:
+        parameters["guardrailConfig"] = {
+            "guardrailIdentifier": config.guardrail_identifier,
+            "guardrailVersion": config.guardrail_version,
+            # the guardrail has to see the whole response to intervene on it
+            "streamProcessingMode": "sync",
+        }
+
+    return parameters
+
+
+# request failures are reported through modeled error codes instead of dedicated types
+_THROTTLING_ERROR_CODES: Final[frozenset[str]] = frozenset(
+    (
+        "ThrottlingException",
+        "TooManyRequestsException",
+        "ServiceQuotaExceededException",
+    )
+)
+_INPUT_ERROR_CODES: Final[frozenset[str]] = frozenset(
+    (
+        "ValidationException",
+        "ServiceUnavailableException",
+    )
+)
+
+
+def _request_failure(
+    exception: Exception,
+    /,
+    *,
+    model: str,
+) -> ModelException:
+    # boto does not expose its modeled exceptions without the client, the error code
+    # within the response is what identifies the failure
+    code: str = ""
+    match getattr(exception, "response", None):
+        case {"Error": {"Code": str() as error_code}}:
+            code = error_code
+
+        case _:
+            code = type(exception).__name__
+
+    if code in _THROTTLING_ERROR_CODES:
+        return model_rate_limit(
+            provider="bedrock",
+            model=model,
+            retry_after=None,
+        )
+
+    if code in _INPUT_ERROR_CODES:
+        return ModelInputInvalid(
+            provider="bedrock",
+            model=model,
+        )
+
+    return ModelOutputFailed(
+        provider="bedrock",
+        model=model,
+        reason=str(exception),
+    )
+
+
+def _verify_output(
+    output: ModelOutputSelection,
+    /,
+) -> None:
+    """Reject output selections the Converse API cannot deliver.
+
+    Both json selections - schema backed and schema-less - are accepted and
+    fall back to plain output, since the API implements neither mode. Shaping
+    the answer is left to the caller's instructions, which
+    ``ModelGeneration.generate`` can extend with the schema on request.
+
+    Parameters
+    ----------
+    output : ModelOutputSelection
+        Requested output modality selection.
+
+    Raises
+    ------
+    NotImplementedError
+        Raised for modalities the provider cannot produce.
+    """
+    if isinstance(output, type) or output == "json":
+        return  # no dedicated mode, falls back to plain output
+
+    if output in ("auto", "text") or "text" in output:
+        return
+
+    # silently answering with text would not match the requested modality
+    raise NotImplementedError(f"{output} output is not supported by Bedrock")
 
 
 def _context_messages(  # noqa: C901, PLR0912
@@ -287,7 +639,7 @@ def _context_messages(  # noqa: C901, PLR0912
                             "toolUse": {
                                 "toolUseId": block.identifier,
                                 "name": block.tool,
-                                "input": block.arguments,
+                                "input": _json_document(block.arguments),
                             }
                         }
                     )
@@ -308,19 +660,8 @@ def _convert_content(
 
         elif isinstance(part, ResourceContent):
             # Only selected image resources are supported by Bedrock messages
-            if not part.mime_type.startswith("image"):
-                raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
-
-            if part.mime_type == "image/png":
-                fmt = "png"
-
-            elif part.mime_type == "image/jpeg":
-                fmt = "jpeg"
-
-            elif part.mime_type == "image/gif":
-                fmt = "gif"
-
-            else:
+            fmt: Literal["png", "jpeg", "gif", "webp"] | None = _IMAGE_FORMATS.get(part.mime_type)
+            if fmt is None:
                 raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
 
             converted.append(
@@ -328,9 +669,9 @@ def _convert_content(
                     "image": {
                         "format": fmt,
                         "source": {
-                            # ResourceContent.data is base64-encoded (URL-safe);
+                            # ResourceContent.data is base64-encoded,
                             # Bedrock expects raw bytes
-                            "bytes": urlsafe_b64decode(part.data),
+                            "bytes": b64decode(part.data),
                         },
                     }
                 }
@@ -357,12 +698,50 @@ def _convert_content(
     return converted
 
 
+def _json_document(value: Any) -> Any:
+    # document parameters are validated to contain only plain json values
+    match value:
+        case str() | bool() | int() | float() | None:
+            return value
+
+        case Mapping():
+            mapping: Mapping[str, Any] = cast(Mapping[str, Any], value)
+            return {key: _json_document(element) for key, element in mapping.items()}
+
+        case bytes() | bytearray():
+            return value  # not a valid document value, request validation reports it
+
+        case Sequence():
+            sequence: Sequence[Any] = cast(Sequence[Any], value)
+            return [_json_document(element) for element in sequence]
+
+        case other:
+            return other
+
+
 def _convert_tool(tool: ModelToolSpecification) -> ChatTool:
-    return {
+    input_schema: Any
+    if parameters := tool.parameters:
+        input_schema = _json_document(parameters)
+
+    else:
+        # Bedrock requires inputSchema document, provide an empty object schema when None
+        input_schema = {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        }
+
+    converted: ChatTool = {
         "name": tool.name,
-        "description": tool.description or "",
-        "inputSchema": {"json": tool.parameters},
+        "inputSchema": {"json": input_schema},
     }
+
+    # Bedrock rejects an empty description, include it only when available
+    if description := tool.description:
+        converted["description"] = description
+
+    return converted
 
 
 def _tools_as_tool_config(
@@ -393,64 +772,3 @@ def _tools_as_tool_config(
         return None
 
     return {"tools": tools_list, "toolChoice": toolChoice}
-
-
-def _completion_as_output_content(
-    completion: Iterable[Mapping[str, Any]],
-    /,
-) -> Iterable[MultimodalContent | ModelToolRequest]:
-    accumulator: list[MultimodalContentPart] = []
-    for block in completion:
-        match block:
-            case {"text": str() as text}:
-                accumulator.append(TextContent(text=text))
-
-            case {
-                "image": {
-                    "format": str() as data_format,
-                    "source": {"bytes": bytes() as data},
-                }
-            }:
-                media_type: Any
-                if data_format == "png":
-                    media_type = "image/png"
-
-                elif data_format == "jpeg":
-                    media_type = "image/jpeg"
-
-                elif data_format == "gif":
-                    media_type = "image/gif"
-
-                else:
-                    raise ValueError(f"Unsupported output image format: {data_format}")
-
-                accumulator.append(
-                    ResourceContent.of(
-                        data,
-                        mime_type=media_type,
-                    )
-                )
-
-            case {
-                "toolUse": {
-                    "toolUseId": str() as identifier,
-                    "name": str() as tool,
-                    "input": arguments,
-                }
-            }:
-                if accumulator:
-                    yield MultimodalContent.of(*accumulator)
-                    accumulator = []
-
-                yield ModelToolRequest(
-                    identifier=identifier,
-                    tool=tool,
-                    arguments=cast(Mapping[str, Any], arguments),
-                    meta=Meta.empty,
-                )
-
-            case _:
-                continue
-
-    if accumulator:
-        yield MultimodalContent.of(*accumulator)

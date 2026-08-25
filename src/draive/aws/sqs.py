@@ -1,10 +1,7 @@
 from collections.abc import (
     AsyncGenerator,
-    AsyncIterable,
-    AsyncIterator,
     Callable,
     Mapping,
-    MutableMapping,
     Sequence,
 )
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
@@ -42,8 +39,6 @@ class AWSSQSMixin(AWSAPI):
             profile_name=profile_name,
         )
 
-        self._queue_cache: MutableMapping[str, str] = {}
-
     async def _queue_access[Content](
         self,
         queue: str,
@@ -66,11 +61,22 @@ class AWSSQSMixin(AWSAPI):
 
             async def consume_messages(
                 **extra: Any,
-            ) -> AsyncIterable[MQMessage[Content]]:
-                return self._consume(
-                    queue,
-                    decoder=content_decoder,
-                )
+            ) -> AbstractAsyncContextManager[AsyncGenerator[MQMessage[Content]]]:
+                @asynccontextmanager
+                async def consumer() -> AsyncGenerator[AsyncGenerator[MQMessage[Content]]]:
+                    messages: AsyncGenerator[MQMessage[Content]] = self._consume(
+                        queue,
+                        decoder=content_decoder,
+                    )
+                    try:
+                        yield messages
+
+                    finally:
+                        # leaving the context ends the subscription - the long poll
+                        # is stopped instead of being left waiting for the next batch
+                        await messages.aclose()
+
+                return consumer()
 
             yield MQQueue[Content](
                 publishing=publish_message,
@@ -117,7 +123,7 @@ class AWSSQSMixin(AWSAPI):
         /,
         *,
         decoder: Callable[[str], Content],
-    ) -> AsyncIterator[MQMessage[Content]]:
+    ) -> AsyncGenerator[MQMessage[Content]]:
         while True:  # Continue polling until cancelled
             ctx.check_cancellation()
 
@@ -202,8 +208,11 @@ class AWSSQSMixin(AWSAPI):
         queue: str,
         operation: str,
     ) -> str:
-        if queue.startswith("https://sqs") or queue.startswith("sqs://"):
+        if queue.startswith("https://sqs"):
             return queue
+
+        # `sqs://name` is our own display form, the name still has to be resolved
+        queue = queue.removeprefix("sqs://")
 
         if url := self._queue_cache.get(queue):
             return url
@@ -256,9 +265,7 @@ def _translate_sqs_client_error(
     queue: str,
     operation: str,
 ) -> Exception:
-    # type: ignore[reportAttributeAccessIssue]
     error_info: Mapping[str, Any] = getattr(error, "response", {}).get("Error", {})
-    # type: ignore[reportAttributeAccessIssue]
     response_metadata: Mapping[str, Any] = getattr(error, "response", {}).get(
         "ResponseMetadata",
         {},

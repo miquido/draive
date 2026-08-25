@@ -165,8 +165,8 @@ def VolatileVectorIndex() -> VectorIndex:  # noqa: C901, PLR0915
                 values_vectors=[element.vector for element in filtered],
                 score_threshold=score_threshold,
                 limit=limit * 8  # feed MMR with more results
-                if limit is not None
-                else None,
+                if rerank and limit is not None
+                else limit,
             )
         ]
 

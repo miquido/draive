@@ -64,7 +64,7 @@ class ArtifactContent(State, serializable=True):
         Parameters
         ----------
         artifact : State | BasicObject
-            Source artifact. `State` inputs are serialized via `to_mapping`.
+            Source artifact. `State` inputs are serialized via `to_basic_object`.
         category : str | None, optional
             Artifact category. Required for raw mappings and optional for states.
             When omitted for states, the state class name is used.
@@ -89,7 +89,7 @@ class ArtifactContent(State, serializable=True):
         elif isinstance(artifact, State):
             return cls(
                 category=category if category is not None else artifact.__class__.__name__,
-                artifact=artifact.to_mapping(recursive=True),
+                artifact=artifact.to_basic_object(),
                 hidden=hidden,
                 meta=Meta.of(meta),
             )

@@ -36,9 +36,9 @@ from draive.openai import OpenAI, OpenAIResponsesConfig
 async def current_time(location: str) -> str:
     return f"Time in {location} is 9:53:22"
 
-async with  ctx.scope( # create execution context
+async with ctx.scope( # create execution context
     "example", # give it a name
-    OpenAIResponsesConfig(model="gpt-4o-mini"), # prepare configuration
+    OpenAIResponsesConfig(model="gpt-5.5"), # prepare configuration
     disposables=(OpenAI(),), # define resources and service clients available
 ):
     result: str = await TextGeneration.generate( # choose a right generation abstraction
@@ -90,6 +90,8 @@ documents, handling audio or images — Draive has your back.
 - **Model-Agnostic by Design**: Built-in support for major hosted and self-hosted providers.
 
 ## 🖥️ Install
+
+Draive requires Python 3.14 or newer.
 
 With pip:
 
@@ -166,6 +168,14 @@ Use AWS Bedrock-backed models.
 pip install 'draive[bedrock]'
 ```
 
+- AWS:
+
+Use AWS services client, including S3, SQS and CloudWatch observability.
+
+```bash
+pip install 'draive[aws]'
+```
+
 - MCP:
 
 Use Model Context Protocol integrations.
@@ -197,6 +207,30 @@ Use Qdrant vector database integration.
 ```bash
 pip install 'draive[qdrant]'
 ```
+
+- SurrealDB:
+
+Use SurrealDB integration, including vector index, templates and conversation memory.
+
+```bash
+pip install 'draive[surrealdb]'
+```
+
+Remote connections require a SurrealDB 3.x server - the session handling relies on RPC methods
+older servers do not provide. Namespaces and databases are not created implicitly, they have to be
+defined before use.
+
+- RabbitMQ:
+
+Use RabbitMQ messaging client.
+
+```bash
+pip install 'draive[rabbitmq]'
+```
+
+Variant extras are available for provider-specific setups: `openai_realtime` (OpenAI Realtime API),
+`anthropic_bedrock` and `cohere_bedrock` (those providers accessed through AWS Bedrock), and
+`httpx` (shared HTTP client).
 
 ## 👷 Contributing
 

@@ -1,4 +1,4 @@
-from base64 import urlsafe_b64decode
+from base64 import b64decode
 from typing import Any, Literal
 
 from haiway import asynchronous, ctx
@@ -6,6 +6,7 @@ from haiway import asynchronous, ctx
 from draive.bedrock.api import BedrockAPI
 from draive.bedrock.config import BedrockInputGuardraisConfig, BedrockOutputGuardraisConfig
 from draive.guardrails import GuardrailsModerationException
+from draive.models import record_guardrails_invocation
 from draive.multimodal import Multimodal, MultimodalContent, TextContent
 from draive.resources import ResourceContent, ResourceReference
 
@@ -24,12 +25,19 @@ class BedrockGuardrails(BedrockAPI):
         guardrails_config: BedrockInputGuardraisConfig = config or ctx.state(
             BedrockInputGuardraisConfig
         )
+        async with ctx.scope("guardrails.invocation"):
+            record_guardrails_invocation(
+                provider="bedrock",
+                identifier=guardrails_config.guardrail_identifier,
+                version=guardrails_config.guardrail_version,
+                source="input",
+            )
 
-        content = MultimodalContent.of(content)
-        await self._content_input_verification(
-            content,
-            config=guardrails_config,
-        )
+            content = MultimodalContent.of(content)
+            await self._content_input_verification(
+                content,
+                config=guardrails_config,
+            )
 
     @asynchronous
     def _content_input_verification(
@@ -73,13 +81,12 @@ class BedrockGuardrails(BedrockAPI):
         guardrails_config: BedrockOutputGuardraisConfig = config or ctx.state(
             BedrockOutputGuardraisConfig
         )
-        async with ctx.scope("bedrock_guardrails"):
-            ctx.record_info(
-                attributes={
-                    "guardrails.provider": "bedrock",
-                    "guardrails.identifier": guardrails_config.guardrail_identifier,
-                    "guardrails.version": guardrails_config.guardrail_version,
-                },
+        async with ctx.scope("guardrails.invocation"):
+            record_guardrails_invocation(
+                provider="bedrock",
+                identifier=guardrails_config.guardrail_identifier,
+                version=guardrails_config.guardrail_version,
+                source="output",
             )
 
             content = MultimodalContent.of(content)
@@ -143,7 +150,7 @@ class BedrockGuardrails(BedrockAPI):
                             {
                                 "image": {
                                     "format": "jpeg",
-                                    "source": {"bytes": urlsafe_b64decode(content_part.data)},
+                                    "source": {"bytes": b64decode(content_part.data)},
                                 }
                             }
                         )
@@ -153,22 +160,14 @@ class BedrockGuardrails(BedrockAPI):
                             {
                                 "image": {
                                     "format": "png",
-                                    "source": {"bytes": urlsafe_b64decode(content_part.data)},
-                                }
-                            }
-                        )
-
-                    elif content_part.mime_type == "image/gif":
-                        moderated_content.append(
-                            {
-                                "image": {
-                                    "format": "gif",
-                                    "source": {"bytes": urlsafe_b64decode(content_part.data)},
+                                    "source": {"bytes": b64decode(content_part.data)},
                                 }
                             }
                         )
 
                     else:
+                        # only png and jpeg images are supported by guardrails,
+                        # anything else has to be verified as text
                         ctx.log_warning(
                             "Attempting to use guardrails on unsupported media "
                             f"({content_part.mime_type}), verifying as text..."

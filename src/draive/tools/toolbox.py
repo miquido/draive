@@ -1,7 +1,6 @@
 from asyncio import Lock, Task
 from collections.abc import (
     AsyncGenerator,
-    AsyncIterable,
     Collection,
     Iterable,
     Mapping,
@@ -23,7 +22,7 @@ from draive.models import (
     ModelToolsSelection,
 )
 from draive.multimodal import MultimodalContent, MultimodalContentPart
-from draive.tools.types import Tool, ToolException, ToolsSuggesting
+from draive.tools.types import Tool, ToolException, ToolOutputChunk, ToolsSuggesting
 from draive.utils import ProcessingEvent
 
 __all__ = ("Toolbox",)
@@ -239,8 +238,11 @@ class Toolbox(State):
                 )
 
             accumulator: MutableSequence[MultimodalContentPart] = []
+            # argument validation happens on call, keep it within error handling
+            tool_stream: AsyncGenerator[ToolOutputChunk] | None = None
             try:
-                async for chunk in selected_tool.call(**arguments):
+                tool_stream = selected_tool.call(**arguments)
+                async for chunk in tool_stream:
                     if isinstance(chunk, ProcessingEvent):
                         continue  # skip events
 
@@ -252,12 +254,16 @@ class Toolbox(State):
                     tool=tool,
                 ) from exc
 
+            finally:
+                if tool_stream is not None:
+                    await tool_stream.aclose()  # release the tool stream
+
             return MultimodalContent.of(*accumulator)
 
     async def handle(  # noqa: C901
         self,
         *requests: ModelToolRequest,
-    ) -> AsyncIterable[ModelToolResponse | ProcessingEvent | MultimodalContentPart]:
+    ) -> AsyncGenerator[ModelToolResponse | ProcessingEvent | MultimodalContentPart]:
         """Execute model tool requests and stream responses, events, and output.
 
         Parameters
@@ -354,8 +360,11 @@ class Toolbox(State):
                 return  # execution finished
 
             accumulator: MutableSequence[MultimodalContentPart] = []
+            # argument validation happens on call, keep it within error handling
+            tool_stream: AsyncGenerator[ToolOutputChunk] | None = None
             try:
-                async for chunk in tool.call(**request.arguments):
+                tool_stream = tool.call(**request.arguments)
+                async for chunk in tool_stream:
                     if isinstance(chunk, ProcessingEvent):
                         ctx.record_info(event=chunk.event)
                         yield chunk.updating(
@@ -394,6 +403,10 @@ class Toolbox(State):
                     ),
                 )
 
+            finally:
+                if tool_stream is not None:
+                    await tool_stream.aclose()  # release the tool stream
+
     async def _response_execute(
         self,
         tool: Tool | None,
@@ -401,12 +414,19 @@ class Toolbox(State):
         request: ModelToolRequest,
         output_stream: AsyncQueue[ModelToolResponse | ProcessingEvent | MultimodalContentPart],
     ) -> None:
-        async for chunk in self._execute(
+        execution_stream: AsyncGenerator[
+            ModelToolResponse | ProcessingEvent | MultimodalContentPart
+        ] = self._execute(
             tool,
             request=request,
-        ):
-            if isinstance(chunk, ProcessingEvent | ModelToolResponse):
-                output_stream.enqueue(chunk)
+        )
+        try:
+            async for chunk in execution_stream:
+                if isinstance(chunk, ProcessingEvent | ModelToolResponse):
+                    output_stream.enqueue(chunk)
+
+        finally:
+            await execution_stream.aclose()  # release the execution stream
 
     async def _output_execute(
         self,
@@ -417,15 +437,22 @@ class Toolbox(State):
         output_stream: AsyncQueue[ModelToolResponse | ProcessingEvent | MultimodalContentPart],
     ) -> None:
         accumulator: MutableSequence[MultimodalContentPart] = []
-        async for chunk in self._execute(
+        execution_stream: AsyncGenerator[
+            ModelToolResponse | ProcessingEvent | MultimodalContentPart
+        ] = self._execute(
             tool,
             request=request,
-        ):
-            if isinstance(chunk, ProcessingEvent | ModelToolResponse):
-                output_stream.enqueue(chunk)
+        )
+        try:
+            async for chunk in execution_stream:
+                if isinstance(chunk, ProcessingEvent | ModelToolResponse):
+                    output_stream.enqueue(chunk)
 
-            else:
-                accumulator.append(chunk)
+                else:
+                    accumulator.append(chunk)
+
+        finally:
+            await execution_stream.aclose()  # release the execution stream
 
         async with lock:  # synchronize outputs so only one streams at the same time
             for chunk in accumulator:
@@ -440,11 +467,18 @@ class Toolbox(State):
         output_stream: AsyncQueue[ModelToolResponse | ProcessingEvent | MultimodalContentPart],
     ) -> None:
         async with lock:  # synchronize outputs so only one streams at the same time
-            async for chunk in self._execute(
+            execution_stream: AsyncGenerator[
+                ModelToolResponse | ProcessingEvent | MultimodalContentPart
+            ] = self._execute(
                 tool,
                 request=request,
-            ):
-                output_stream.enqueue(chunk)
+            )
+            try:
+                async for chunk in execution_stream:
+                    output_stream.enqueue(chunk)
+
+            finally:
+                await execution_stream.aclose()  # release the execution stream
 
     def with_tools(
         self,

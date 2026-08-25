@@ -38,7 +38,7 @@ document = "John Doe is 21 and lives in Vancouver, Canada."
 
 async with ctx.scope(
     "data_extraction",
-    OpenAIResponsesConfig(model="gpt-5-mini"),
+    OpenAIResponsesConfig(model="gpt-5.5"),
     disposables=(OpenAI(),),
 ):
     result: PersonalData = await ModelGeneration.generate(
@@ -57,11 +57,15 @@ Schema injection controls how much schema guidance is injected into instructions
 ```python
 result: PersonalData = await ModelGeneration.generate(
     PersonalData,
-    instructions="Extract fields from the input. Return JSON matching the schema:\n{%schema%}",
+    instructions="Extract fields from the input. Return JSON matching the schema:\n{model_schema}",
     input=document,
     schema_injection="simplified",
 )
 ```
+
+The schema is delivered by substituting a `{model_schema}` placeholder in the instructions, so
+instructions without one are passed through unchanged. `Template` instructions use the
+`{%model_schema%}` form instead.
 
 `schema_injection` values:
 

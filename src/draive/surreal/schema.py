@@ -4,6 +4,8 @@ from typing import Any, Literal, cast
 
 from haiway import State
 
+from draive.surreal.utils import surreal_identifier
+
 __all__ = (
     "SurrealTableKind",
     "surreal_field_definitions",
@@ -18,7 +20,7 @@ def surreal_field_definitions[Model: State](
     *,
     table: str | None = None,
 ) -> Sequence[str]:
-    table_name: str = table or model.__name__
+    table_name: str = surreal_identifier(table or model.__name__)
     schema: Mapping[str, Any] = cast(Mapping[str, Any], loads(model.json_schema()))
     properties: Mapping[str, Any] = cast(Mapping[str, Any], schema.get("properties") or {})
 
@@ -26,8 +28,10 @@ def surreal_field_definitions[Model: State](
     for field_name, field_schema in properties.items():
         surreal_type, flexible = _surreal_field_type(cast(Mapping[str, Any], field_schema))
         statements.append(
+            # FLEXIBLE has to follow the type, a SurrealDB server rejects
+            # the reversed order accepted by older versions with a parse error
             f"DEFINE FIELD IF NOT EXISTS {field_name} ON TABLE {table_name} "
-            f"{'FLEXIBLE ' if flexible else ''}TYPE {surreal_type};"
+            f"TYPE {surreal_type}{' FLEXIBLE' if flexible else ''};"
         )
 
     return tuple(statements)
@@ -37,9 +41,7 @@ def _surreal_field_type(
     schema: Mapping[str, Any],
     /,
 ) -> tuple[str, bool]:
-    if "oneOf" in schema:
-        return _surreal_union_type(cast(Sequence[Mapping[str, Any]], schema["oneOf"]))
-
+    # haiway spells unions as `anyOf`
     if "anyOf" in schema:
         return _surreal_union_type(cast(Sequence[Mapping[str, Any]], schema["anyOf"]))
 

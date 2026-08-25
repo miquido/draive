@@ -1,7 +1,6 @@
 import json
-import random
-from collections.abc import Generator, Sequence
-from typing import Any, Literal, cast
+from collections.abc import Generator, Mapping, Sequence
+from typing import Any, Final, Literal, cast
 from uuid import uuid4
 
 from haiway import MISSING, Meta, Missing, as_dict, ctx, unwrap_missing
@@ -12,6 +11,7 @@ from openai.types.responses import (
     ResponseAudioDeltaEvent,
     ResponseErrorEvent,
     ResponseFunctionToolCall,
+    ResponseInputFileContentParam,
     ResponseInputImageContentParam,
     ResponseInputItemParam,
     ResponseInputMessageContentListParam,
@@ -31,13 +31,13 @@ from openai.types.responses import (
     ToolParam,
 )
 from openai.types.responses.function_tool_param import FunctionToolParam
+from openai.types.responses.response_format_text_config_param import (
+    ResponseFormatTextConfigParam,
+)
 from openai.types.responses.response_function_tool_call_param import (
     ResponseFunctionToolCallParam,
 )
 from openai.types.responses.response_input_param import FunctionCallOutput, Message
-from openai.types.responses.response_input_param import (
-    ImageGenerationCall as ImageGenerationCallParam,
-)
 from openai.types.responses.response_output_item import ImageGenerationCall
 from openai.types.responses.response_output_text_param import (
     Annotation,
@@ -60,12 +60,12 @@ from draive.models import (
     ModelOutputLimit,
     ModelOutputSelection,
     ModelOutputStream,
-    ModelRateLimit,
     ModelReasoning,
     ModelReasoningChunk,
     ModelToolRequest,
     ModelTools,
     ModelToolSpecification,
+    model_rate_limit,
     record_model_invocation,
     record_usage_metrics,
 )
@@ -73,6 +73,7 @@ from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 from draive.openai.api import OpenAIAPI
 from draive.openai.config import OpenAIResponsesConfig
 from draive.resources import ResourceContent, ResourceReference
+from draive.utils.schema import strict_schema
 
 __all__ = ("OpenAIResponses",)
 
@@ -95,13 +96,20 @@ class OpenAIResponses(OpenAIAPI):
             record_model_invocation(
                 provider="openai",
                 model=config.model,
-                temperature=config.temperature,
                 max_output_tokens=config.max_output_tokens,
                 tools=tools,
                 output=output,
                 verbosity=config.verbosity,
                 reasoning=config.reasoning,
                 service_tier=config.service_tier,
+                truncation=config.truncation,
+            )
+
+            # an unsupported request is prepared before the call so that it is reported
+            # as itself instead of being reported as a failed generation
+            text_config: ResponseTextConfigParam | Omit = _text_output(
+                output,
+                verbosity=config.verbosity,
             )
 
             input_context: list[ResponseInputItemParam]
@@ -117,6 +125,7 @@ class OpenAIResponses(OpenAIAPI):
                 raise ModelInputInvalid(
                     provider="openai",
                     model=config.model,
+                    reason=str(exc),
                 ) from exc
 
             try:
@@ -124,25 +133,11 @@ class OpenAIResponses(OpenAIAPI):
                     model=config.model,
                     instructions=instructions or omit,
                     input=input_context,
-                    temperature=unwrap_missing(
-                        config.temperature,
-                        default=omit,
-                    ),
                     tool_choice=_tool_choice(tools),
                     tools=_tools_as_tool_params(tools.specification),
                     parallel_tool_calls=True if tools else omit,
-                    text=_text_output(
-                        output,
-                        verbosity=config.verbosity,
-                    ),
-                    reasoning=(
-                        Reasoning(
-                            effort=cast(ReasoningEffort, config.reasoning),
-                            summary=config.reasoning_summary,
-                        )
-                        if isinstance(config.reasoning, str)
-                        else omit
-                    ),
+                    text=text_config,
+                    reasoning=_reasoning(config),
                     max_output_tokens=unwrap_missing(
                         config.max_output_tokens,
                         default=omit,
@@ -154,10 +149,16 @@ class OpenAIResponses(OpenAIAPI):
                         default=omit,
                     ),
                     prompt_cache_key=cache_key or omit,
-                    include=["reasoning.encrypted_content"]
-                    # for gpt-5 model family we need to request encrypted reasoning
-                    if "gpt-5" in config.model.lower()
-                    else omit,
+                    prompt_cache_retention=unwrap_missing(
+                        config.prompt_cache_retention,
+                        default=omit,
+                    ),
+                    # responses are never stored, encrypted reasoning is what carries
+                    # the reasoning state across turns without any server side copy.
+                    # OpenAI compatible servers reachable through a custom base url
+                    # do not implement it, requesting it there breaks the request
+                    include=["reasoning.encrypted_content"] if self._base_url is None else omit,
+                    # keep the whole exchange within the caller's own context
                     store=False,
                 ) as stream:
                     async for event in stream:
@@ -192,9 +193,12 @@ class OpenAIResponses(OpenAIAPI):
                                 match event.item.type:
                                     case "reasoning":
                                         assert isinstance(event.item, ResponseReasoningItem)  # nosec: B101
-                                        # final chunk with identifiers
+                                        # final chunk with identifiers - it closes the
+                                        # block so the identity stays paired with the
+                                        # summary text it was produced for
                                         yield ModelReasoningChunk.of(
                                             TextContent.empty,
+                                            final=True,
                                             meta={
                                                 "kind": "reasoning",
                                                 "id": event.item.id,
@@ -264,7 +268,9 @@ class OpenAIResponses(OpenAIAPI):
                                     reason=f"{event.code or 'Error'}: {event.message}",
                                 )
 
-                            case "response.completed" | "response.failed":
+                            # a response truncated by max_output_tokens terminates
+                            # with `response.incomplete` instead of `response.completed`
+                            case "response.completed" | "response.failed" | "response.incomplete":
                                 if usage := event.response.usage:
                                     record_usage_metrics(
                                         provider="openai",
@@ -306,28 +312,10 @@ class OpenAIResponses(OpenAIAPI):
                                 continue  # skip other events
 
             except OpenAIRateLimitError as exc:
-                delay: float
-                try:
-                    if retry_after := exc.response.headers.get("Retry-After"):
-                        delay = float(retry_after)
-                    else:
-                        delay = random.uniform(0.3, 3.0)  # nosec: B311
-
-                except Exception:
-                    delay = random.uniform(0.3, 3.0)  # nosec: B311
-
-                ctx.record_warning(
-                    event="model.rate_limit",
-                    attributes={
-                        "model.provider": "openai",
-                        "model.name": config.model,
-                        "retry_after": delay,
-                    },
-                )
-                raise ModelRateLimit(
+                raise model_rate_limit(
                     provider="openai",
                     model=config.model,
-                    retry_after=delay,
+                    retry_after=exc.response.headers.get("Retry-After"),
                 ) from exc
 
             except ModelException as exc:
@@ -341,65 +329,89 @@ class OpenAIResponses(OpenAIAPI):
                 ) from exc
 
 
-def _text_output(  # noqa: PLR0911
+def _text_output(
     output: ModelOutputSelection,
     /,
     *,
     verbosity: Literal["low", "medium", "high"] | Missing = MISSING,
 ) -> ResponseTextConfigParam | Omit:
+    text_format: ResponseFormatTextConfigParam | None = _text_format(output)
+    if verbosity is MISSING:
+        if text_format is None:
+            return omit
+
+        return {"format": text_format}
+
+    if text_format is None:
+        return {"verbosity": cast(Literal["low", "medium", "high"], verbosity)}
+
+    return {
+        "format": text_format,
+        "verbosity": cast(Literal["low", "medium", "high"], verbosity),
+    }
+
+
+def _text_format(
+    output: ModelOutputSelection,
+    /,
+) -> ResponseFormatTextConfigParam | None:
     if output == "auto":
-        return omit
+        return None
 
     if output == "text":
-        if verbosity is MISSING:
-            return {"format": {"type": "text"}}
-
-        return {
-            "format": {"type": "text"},
-            "verbosity": cast(Literal["low", "medium", "high"], verbosity),
-        }
+        return {"type": "text"}
 
     if output == "json":
-        if verbosity is MISSING:
-            return {"format": {"type": "json_object"}}
-
-        return {
-            "format": {"type": "json_object"},
-            "verbosity": cast(Literal["low", "medium", "high"], verbosity),
-        }
+        # the json_object format additionally requires the word "json" to appear
+        # within the input itself, which cannot be satisfied without injecting
+        # content into the request - no format is requested instead, leaving the
+        # shape to the caller's own instructions. A schema backed selection maps
+        # onto json_schema below and carries a real guarantee.
+        return None
 
     if isinstance(output, type):
-        if verbosity is MISSING:
-            return {
-                "format": {
-                    "type": "json_schema",
-                    "name": output.__name__,
-                    "schema": as_dict(output.__SPECIFICATION__),
-                    "strict": False,
-                }
-            }
+        schema: Mapping[str, Any] = as_dict(output.__SPECIFICATION__)
+        # only strict mode makes the api enforce the schema, without it the model
+        # can answer with content which fails decoding
+        strict: Mapping[str, Any] | None = strict_schema(schema)
+        if strict is None:
+            ctx.log_debug(
+                f"OpenAI strict output is unavailable for {output.__name__},"
+                " the schema is delivered as a hint instead"
+            )
 
         return {
-            "format": {
-                "type": "json_schema",
-                "name": output.__name__,
-                "schema": as_dict(output.__SPECIFICATION__),
-                "strict": False,
-            },
-            "verbosity": cast(Literal["low", "medium", "high"], verbosity),
+            "type": "json_schema",
+            "name": output.__name__,
+            "schema": cast(dict[str, object], strict if strict is not None else schema),
+            "strict": strict is not None,
         }
 
     # multimodal selection containing text
     if "text" in output:
-        if verbosity is MISSING:
-            return {"format": {"type": "text"}}
+        return {"type": "text"}
 
-        return {
-            "format": {"type": "text"},
-            "verbosity": cast(Literal["low", "medium", "high"], verbosity),
-        }
+    # silently answering with text would not match the requested modality
+    raise NotImplementedError(f"{output} output is not supported by OpenAI responses")
 
-    return omit
+
+def _reasoning(
+    config: OpenAIResponsesConfig,
+    /,
+) -> Reasoning | Omit:
+    reasoning: Reasoning = {}
+    if isinstance(config.reasoning, str):
+        reasoning["effort"] = cast(ReasoningEffort, config.reasoning)
+        # a summary is only ever produced along a reasoning effort
+        reasoning["summary"] = config.reasoning_summary
+
+    if isinstance(config.reasoning_context, str):
+        reasoning["context"] = config.reasoning_context
+
+    if isinstance(config.reasoning_mode, str):
+        reasoning["mode"] = config.reasoning_mode
+
+    return reasoning or omit
 
 
 def _tool_choice(
@@ -421,28 +433,55 @@ def _tools_as_tool_params(
     tools: Sequence[ModelToolSpecification],
     /,
 ) -> Sequence[ToolParam]:
-    return [
-        cast(
-            ToolParam,
-            FunctionToolParam(
-                type="function",
-                name=tool.name,
-                description=tool.description or None,
-                parameters=cast(dict[str, object] | None, tool.parameters)
-                if tool.parameters is not None
-                else {
-                    "type": "object",
-                    "properties": {},
-                    "additionalProperties": False,
-                },
-                strict=tool.meta.get_bool(
-                    "strict_parameters",
-                    default=False,
-                ),
-            ),
+    return [_tool_as_tool_param(tool) for tool in tools]
+
+
+def _tool_as_tool_param(
+    tool: ModelToolSpecification,
+    /,
+) -> ToolParam:
+    parameters: Mapping[str, Any] = (
+        tool.parameters
+        if tool.parameters is not None
+        else {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        }
+    )
+    strict: bool = tool.meta.get_bool(
+        "strict_parameters",
+        default=False,
+    )
+    if strict:
+        # strict mode demands every argument, a schema left as declared is rejected
+        # as soon as any argument carries a default. A mapping of free form keys is
+        # stripped out of an enforced argument object, so a schema holding one has to
+        # go unenforced rather than lose whatever the model puts there.
+        converted: Mapping[str, Any] | None = strict_schema(
+            parameters,
+            open_maps=False,
         )
-        for tool in tools
-    ]
+        if converted is not None:
+            parameters = converted
+
+        else:
+            ctx.log_debug(
+                f"OpenAI strict parameters are unavailable for the {tool.name} tool,"
+                " its arguments are delivered without enforcement instead"
+            )
+            strict = False
+
+    return cast(
+        ToolParam,
+        FunctionToolParam(
+            type="function",
+            name=tool.name,
+            description=tool.description or None,
+            parameters=cast(dict[str, object], parameters),
+            strict=strict,
+        ),
+    )
 
 
 def _context_to_params(
@@ -459,7 +498,10 @@ def _context_to_params(
 
         else:
             assert isinstance(element, ModelOutput)  # nosec: B101
-            yield from _model_output_to_params(element)
+            yield from _model_output_to_params(
+                element,
+                vision_details=vision_details,
+            )
 
 
 def _model_input_to_params(
@@ -499,10 +541,14 @@ def _model_input_to_params(
 def _model_output_to_params(
     element: ModelOutput,
     /,
+    vision_details: Literal["auto", "low", "high"],
 ) -> Generator[ResponseInputItemParam]:
     for block in element.output:
         if isinstance(block, MultimodalContent):
-            yield from _output_content_blocks(block)
+            yield from _output_content_blocks(
+                block,
+                vision_details=vision_details,
+            )
 
         elif isinstance(block, ModelReasoning):
             match block.meta.kind:
@@ -541,11 +587,23 @@ def _model_output_to_params(
             )
 
 
+# non image resources are delivered as files, the api takes documents and plain text
+_FILE_MIME_TYPES: Final[Mapping[str, str]] = {
+    "application/pdf": "pdf",
+    "text/plain": "txt",
+    "text/markdown": "md",
+    "text/csv": "csv",
+    "application/json": "json",
+}
+
+
 def _input_content_parts(
     content: MultimodalContent,
     /,
     vision_details: Literal["auto", "low", "high"],
-) -> Generator[ResponseInputTextContentParam | ResponseInputImageContentParam]:
+) -> Generator[
+    ResponseInputTextContentParam | ResponseInputImageContentParam | ResponseInputFileContentParam
+]:
     for part in content.parts:
         if isinstance(part, TextContent):
             yield ResponseInputTextContentParam(
@@ -554,7 +612,15 @@ def _input_content_parts(
             )
 
         elif isinstance(part, ResourceContent):
-            # Only image resources are supported as OpenAI input content
+            if extension := _FILE_MIME_TYPES.get(part.mime_type):
+                # the api requires a filename to resolve the file kind
+                yield ResponseInputFileContentParam(
+                    type="input_file",
+                    filename=f"file.{extension}",
+                    file_data=part.to_data_uri(),
+                )
+                continue
+
             if not part.mime_type.startswith("image"):
                 raise ValueError(f"Unsupported media - {part.mime_type}")
 
@@ -565,6 +631,13 @@ def _input_content_parts(
             )
 
         elif isinstance(part, ResourceReference):
+            if part.mime_type in _FILE_MIME_TYPES:
+                yield ResponseInputFileContentParam(
+                    type="input_file",
+                    file_url=part.uri,
+                )
+                continue
+
             # Only image references supported here; require explicit image mime
             if not part.mime_type.startswith("image"):
                 raise ValueError(f"Unsupported media - {part.mime_type}")
@@ -662,32 +735,55 @@ def _text_annotations_from_meta(
 def _output_content_blocks(  # noqa: C901
     content: MultimodalContent,
     /,
-) -> Generator[ResponseOutputMessageParam | ImageGenerationCallParam]:
-    content_accumulator: list[ResponseOutputTextParam] = []
+    vision_details: Literal["auto", "low", "high"],
+) -> Generator[ResponseOutputMessageParam | Message]:
+    text_accumulator: list[ResponseOutputTextParam] = []
+    image_accumulator: list[ResponseInputImageContentParam] = []
 
-    def flush_message() -> ResponseOutputMessageParam | None:
-        nonlocal content_accumulator
-        if not content_accumulator:
+    def flush_text() -> ResponseOutputMessageParam | None:
+        nonlocal text_accumulator
+        if not text_accumulator:
             return None
 
         message = ResponseOutputMessageParam(
             id=f"msg_{uuid4()}",
             type="message",
             role="assistant",
-            content=content_accumulator,
+            content=text_accumulator,
             status="completed",
         )
-        content_accumulator = []
+        text_accumulator = []
+
+        return message
+
+    def flush_images() -> Message | None:
+        # An assistant message accepts only text and refusal parts, while replaying an
+        # `image_generation_call` requires the id of a server side item which never
+        # exists for an unstored response. A user message carrying the image is the
+        # only representation the api accepts for an image produced within a turn.
+        nonlocal image_accumulator
+        if not image_accumulator:
+            return None
+
+        message = Message(
+            type="message",
+            role="user",
+            content=cast(ResponseInputMessageContentListParam, image_accumulator),
+        )
+        image_accumulator = []
 
         return message
 
     for part in content.parts:
         if isinstance(part, TextContent):
-            content_accumulator.append(
+            if message := flush_images():
+                yield message
+
+            text_accumulator.append(
                 ResponseOutputTextParam(
                     type="output_text",
                     text=part.text,
-                    annotations=_text_annotations_from_meta(part.meta),
+                    annotations=list(_text_annotations_from_meta(part.meta)),
                 )
             )
 
@@ -695,14 +791,15 @@ def _output_content_blocks(  # noqa: C901
             if not part.mime_type.startswith("image"):
                 raise ValueError(f"Unsupported media - {part.mime_type}")
 
-            if message := flush_message():
+            if message := flush_text():
                 yield message
 
-            yield ImageGenerationCallParam(
-                id=f"img_{uuid4()}",
-                type="image_generation_call",
-                result=part.data,
-                status="completed",
+            image_accumulator.append(
+                ResponseInputImageContentParam(
+                    type="input_image",
+                    detail=vision_details,
+                    image_url=part.to_data_uri(),
+                )
             )
 
         elif isinstance(part, ResourceReference):
@@ -713,7 +810,10 @@ def _output_content_blocks(  # noqa: C901
             if part.hidden:
                 continue  # skip hidden
 
-            content_accumulator.append(
+            if message := flush_images():
+                yield message
+
+            text_accumulator.append(
                 ResponseOutputTextParam(
                     type="output_text",
                     text=part.to_str(),
@@ -721,5 +821,8 @@ def _output_content_blocks(  # noqa: C901
                 )
             )
 
-    if message := flush_message():
+    if message := flush_text():
+        yield message
+
+    if message := flush_images():
         yield message

@@ -1,12 +1,18 @@
 import json
-import random
-from collections.abc import AsyncIterable, Generator, Iterable, MutableSequence, Sequence
-from typing import Any, TypedDict, cast
+from collections.abc import (
+    Generator,
+    Iterable,
+    Mapping,
+    MutableSequence,
+    Sequence,
+)
+from typing import Any, Final, Literal, TypedDict, cast
 
 from anthropic import Omit, omit
 from anthropic import RateLimitError as AnthropicRateLimitError
 from anthropic.types import (
     CitationsDelta,
+    DocumentBlockParam,
     ImageBlockParam,
     InputJSONDelta,
     MessageParam,
@@ -27,10 +33,12 @@ from anthropic.types import (
     ToolUseBlock,
     ToolUseBlockParam,
 )
+from anthropic.types.output_config_param import OutputConfigParam
 from anthropic.types.redacted_thinking_block_param import RedactedThinkingBlockParam
 from anthropic.types.thinking_block_param import ThinkingBlockParam
 from haiway import (
     MISSING,
+    BasicValue,
     Missing,
     as_dict,
     ctx,
@@ -46,22 +54,22 @@ from draive.models import (
     ModelInputInvalid,
     ModelInstructions,
     ModelOutput,
-    ModelOutputChunk,
     ModelOutputFailed,
     ModelOutputInvalid,
     ModelOutputLimit,
     ModelOutputSelection,
-    ModelRateLimit,
+    ModelOutputStream,
     ModelReasoning,
     ModelReasoningChunk,
     ModelToolRequest,
     ModelTools,
     ModelToolSpecification,
     ModelToolsSelection,
+    model_rate_limit,
     record_model_invocation,
     record_usage_metrics,
 )
-from draive.multimodal import ArtifactContent, Multimodal, MultimodalContent, TextContent
+from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 from draive.resources import ResourceContent, ResourceReference
 
 __all__ = ("AnthropicMessages",)
@@ -76,34 +84,31 @@ class AnthropicMessages(AnthropicAPI):
         tools: ModelTools,
         output: ModelOutputSelection,
         config: AnthropicConfig | None = None,
-        prefill: Multimodal | None = None,
         **extra: Any,
-    ) -> AsyncIterable[ModelOutputChunk]:
+    ) -> ModelOutputStream:
         async with ctx.scope("model.invocation"):
             config = config or ctx.state(AnthropicConfig)
             record_model_invocation(
                 provider=self._provider,
                 model=config.model,
-                temperature=config.temperature,
                 max_output_tokens=config.max_output_tokens,
                 tools=tools,
                 output=output,
                 stop_sequences=config.stop_sequences,
-                thinking_budget=config.thinking_budget,
+                thinking=config.thinking,
+                effort=config.effort,
             )
 
-            messages: Iterable[MessageParam]
+            messages: list[MessageParam]
             try:
-                messages = _context_messages(
-                    context,
-                    prefill=prefill,
-                    output=output,
-                )
+                # eagerly materialize to convert context errors to ModelInputInvalid here
+                messages = list(_context_messages(context))
 
             except Exception as exc:
                 raise ModelInputInvalid(
                     provider=self._provider,
                     model=config.model,
+                    reason=str(exc),
                 ) from exc
 
             tools_list: Iterable[ToolParam] | Omit
@@ -115,18 +120,22 @@ class AnthropicMessages(AnthropicAPI):
 
             try:
                 tool_accumulator: _ToolAccumulator | None = None
+                # kind of the reasoning block currently open, it has to be closed on
+                # its `content_block_stop` to keep its signature from merging into the
+                # next block within the same message
+                reasoning_block: str | None = None
                 async with self._client.messages.stream(
                     model=config.model,
                     system=instructions if instructions else omit,
                     messages=messages,
-                    temperature=unwrap_missing(
-                        config.temperature,
-                        default=omit,
-                    ),
                     max_tokens=config.max_output_tokens,
-                    thinking=_thinking_budget_config(config.thinking_budget),
+                    thinking=_thinking_config(config.thinking),
                     tools=tools_list,
                     tool_choice=tool_choice,
+                    output_config=_output_config(
+                        output,
+                        effort=config.effort,
+                    ),
                     stop_sequences=unwrap_missing(
                         cast(Any, config.stop_sequences),
                         default=omit,
@@ -174,6 +183,7 @@ class AnthropicMessages(AnthropicAPI):
                                 match event.content_block.type:
                                     case "thinking":
                                         assert isinstance(event.content_block, ThinkingBlock)  # nosec: B101
+                                        reasoning_block = "thinking"
                                         if event.content_block.thinking:
                                             yield ModelReasoningChunk.of(
                                                 TextContent.of(event.content_block.thinking),
@@ -199,6 +209,7 @@ class AnthropicMessages(AnthropicAPI):
                                         assert isinstance(
                                             event.content_block, RedactedThinkingBlock
                                         )  # nosec: B101
+                                        reasoning_block = "redacted_thinking"
                                         yield ModelReasoningChunk.of(
                                             TextContent.empty,
                                             meta={
@@ -215,15 +226,64 @@ class AnthropicMessages(AnthropicAPI):
                                         )
 
                             case "content_block_stop":
+                                if reasoning_block is not None:
+                                    # closes the block, keeping its signature paired
+                                    # with the thinking text it was produced for
+                                    yield ModelReasoningChunk.of(
+                                        TextContent.empty,
+                                        final=True,
+                                        meta={"kind": reasoning_block},
+                                    )
+                                    reasoning_block = None
+                                    continue
+
                                 if tool_accumulator is None:
                                     continue
+
+                                # a tool without arguments still delivers a single, empty
+                                # json fragment - decoding it would fail on empty input
+                                accumulated_arguments: str = "".join(
+                                    tool_accumulator["arguments"]
+                                ).strip()
+                                decoded_arguments: Any
+                                try:
+                                    decoded_arguments = (
+                                        json.loads(accumulated_arguments)
+                                        if accumulated_arguments
+                                        else None
+                                    )
+
+                                except Exception as exc:
+                                    raise ModelOutputInvalid(
+                                        provider=self._provider,
+                                        model=config.model,
+                                        reason=(
+                                            "Tool arguments decoding error - "
+                                            f"{type(exc).__name__}: {exc}"
+                                        ),
+                                    ) from exc
+
+                                # a tool call takes named arguments, anything else
+                                # would reach the tool as an unusable payload
+                                if decoded_arguments is not None and not isinstance(
+                                    decoded_arguments, Mapping
+                                ):
+                                    raise ModelOutputInvalid(
+                                        provider=self._provider,
+                                        model=config.model,
+                                        reason=(
+                                            "Tool arguments are not an object -"
+                                            f" {type(decoded_arguments).__name__}"
+                                        ),
+                                    )
 
                                 yield ModelToolRequest.of(
                                     tool_accumulator["id"],
                                     tool=tool_accumulator["tool"],
-                                    arguments=json.loads("".join(tool_accumulator["arguments"]))
-                                    if tool_accumulator["arguments"]
-                                    else None,
+                                    arguments=cast(
+                                        Mapping[str, BasicValue] | None,
+                                        decoded_arguments,
+                                    ),
                                 )
                                 tool_accumulator = None
 
@@ -248,6 +308,16 @@ class AnthropicMessages(AnthropicAPI):
                                             max_output_tokens=unwrap_missing(
                                                 config.max_output_tokens, default=0
                                             ),
+                                        )
+
+                                    case "model_context_window_exceeded":
+                                        # an exceeded context window is an input side limit -
+                                        # reporting it as an output limit would suggest a
+                                        # truncated result that can be continued
+                                        raise ModelOutputFailed(
+                                            provider=self._provider,
+                                            model=config.model,
+                                            reason="model_context_window_exceeded",
                                         )
 
                                     case "refusal":
@@ -282,52 +352,10 @@ class AnthropicMessages(AnthropicAPI):
 
                 assert tool_accumulator is None  # nosec: B101
             except AnthropicRateLimitError as exc:
-                if retry_after := exc.response.headers.get("Retry-After"):
-                    try:
-                        delay = float(retry_after) + random.uniform(0.1, 3.0)  # nosec: B311
-                        ctx.record_warning(
-                            event="model.rate_limit",
-                            attributes={
-                                "model.provider": self._provider,
-                                "model.name": config.model,
-                                "retry_after": delay,
-                            },
-                        )
-                        raise ModelRateLimit(
-                            provider=self._provider,
-                            model=config.model,
-                            retry_after=delay,
-                        ) from exc
-
-                    except ValueError:
-                        delay = random.uniform(0.3, 5.0)  # nosec: B311
-                        ctx.record_warning(
-                            event="model.rate_limit",
-                            attributes={
-                                "model.provider": self._provider,
-                                "model.name": config.model,
-                                "retry_after": delay,
-                            },
-                        )
-                        raise ModelRateLimit(
-                            provider=self._provider,
-                            model=config.model,
-                            retry_after=delay,
-                        ) from exc
-
-                delay = random.uniform(0.3, 5.0)  # nosec: B311
-                ctx.record_warning(
-                    event="model.rate_limit",
-                    attributes={
-                        "model.provider": self._provider,
-                        "model.name": config.model,
-                        "retry_after": delay,
-                    },
-                )
-                raise ModelRateLimit(
+                raise model_rate_limit(
                     provider=self._provider,
                     model=config.model,
-                    retry_after=delay,
+                    retry_after=exc.response.headers.get("Retry-After"),
                 ) from exc
 
             except ModelException as exc:
@@ -350,14 +378,20 @@ class _ToolAccumulator(TypedDict):
 def _context_messages(  # noqa: C901, PLR0912
     context: ModelContext,
     /,
-    *,
-    prefill: Multimodal | None,
-    output: ModelOutputSelection,
 ) -> Generator[MessageParam]:
+    if context and isinstance(context[-1], ModelOutput):
+        # a trailing model turn would be sent as an assistant prefill, which every
+        # model available through `AnthropicConfig` rejects with a request error
+        raise ValueError(
+            "Anthropic context has to end with a model input,"
+            " a trailing model output would become an unsupported assistant prefill"
+        )
+
     for element in context:
         content: list[
             TextBlockParam
             | ImageBlockParam
+            | DocumentBlockParam
             | ThinkingBlockParam
             | RedactedThinkingBlockParam
             | ToolUseBlockParam
@@ -381,7 +415,7 @@ def _context_messages(  # noqa: C901, PLR0912
                             "type": "tool_result",
                             "is_error": block.status == "error",
                             "content": cast(  # there will be no thinking within tool results
-                                Iterable[TextBlockParam | ImageBlockParam],
+                                Iterable[TextBlockParam | ImageBlockParam],  # nor documents
                                 _content_elements(
                                     block.content,
                                     cache_type=None,
@@ -447,33 +481,17 @@ def _context_messages(  # noqa: C901, PLR0912
                 "content": content,
             }
 
-    if prefill is not None:
-        yield {
-            "role": "assistant",
-            "content": _content_elements(
-                MultimodalContent.of(prefill),
-                cache_type=None,
-            ),
-        }
 
-    elif output == "json" or isinstance(output, type):
-        yield {
-            "role": "assistant",
-            "content": (
-                {
-                    "type": "text",
-                    "text": "{",
-                },
-            ),
-        }
+# documents are delivered through a dedicated block, everything else has to be an image
+_DOCUMENT_MIME_TYPES: Final[frozenset[str]] = frozenset(("application/pdf", "text/plain"))
 
 
-def _content_elements(
+def _content_elements(  # noqa: C901
     content: MultimodalContent,
     /,
     cache_type: str | None,
-) -> Generator[TextBlockParam | ImageBlockParam]:
-    last_cacheable: TextBlockParam | ImageBlockParam | None = None
+) -> Generator[TextBlockParam | ImageBlockParam | DocumentBlockParam]:
+    last_cacheable: TextBlockParam | ImageBlockParam | DocumentBlockParam | None = None
     for part in content.parts:
         if isinstance(part, TextContent):
             text_block: TextBlockParam = {
@@ -484,7 +502,26 @@ def _content_elements(
             yield text_block
 
         elif isinstance(part, ResourceContent):
-            # Only selected image resources are supported by Anthropic message blocks
+            if part.mime_type in _DOCUMENT_MIME_TYPES:
+                document_block: DocumentBlockParam = {
+                    "type": "document",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "application/pdf",
+                        "data": part.data,
+                    }
+                    if part.mime_type == "application/pdf"
+                    else {
+                        "type": "text",
+                        "media_type": "text/plain",
+                        "data": part.to_bytes().decode(),
+                    },
+                }
+                last_cacheable = document_block
+                yield document_block
+                continue
+
+            # anything else has to be one of the supported image formats
             if not part.mime_type.startswith("image"):
                 raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
 
@@ -500,6 +537,18 @@ def _content_elements(
             yield image_block
 
         elif isinstance(part, ResourceReference):
+            if part.mime_type == "application/pdf":
+                document_block: DocumentBlockParam = {
+                    "type": "document",
+                    "source": {
+                        "type": "url",
+                        "url": part.uri,
+                    },
+                }
+                last_cacheable = document_block
+                yield document_block
+                continue
+
             # Only image resources are supported by Anthropic message blocks
             if part.mime_type and not part.mime_type.startswith("image"):
                 raise ValueError(f"Unsupported message content mime type: {part.mime_type}")
@@ -538,28 +587,56 @@ def _content_elements(
     }
 
 
-def _thinking_budget_config(
-    budget: int | Missing | None,
+def _output_config(
+    output: ModelOutputSelection,
+    /,
+    *,
+    effort: Literal["low", "medium", "high", "xhigh", "max"] | Missing,
+) -> OutputConfigParam | Omit:
+    config: OutputConfigParam = {}
+    # only a schema backed selection maps onto the structured output API - a
+    # schema-less json request has no dedicated API mode, so it stays as
+    # reliable as the caller's own instructions make it
+    if isinstance(output, type):
+        config["format"] = {
+            "type": "json_schema",
+            "schema": as_dict(output.__SPECIFICATION__),
+        }
+
+    elif output not in ("auto", "text", "json") and "text" not in output:
+        # silently answering with text would not match the requested modality
+        raise NotImplementedError(f"{output} output is not supported by Anthropic")
+
+    if effort is not MISSING:
+        config["effort"] = cast(Literal["low", "medium", "high", "xhigh", "max"], effort)
+
+    return config or omit
+
+
+def _thinking_config(
+    thinking: Literal["adaptive", "disabled"] | Missing,
+    /,
 ) -> ThinkingConfigParam | Omit:
-    if budget is MISSING:
+    # thinking is adaptive unless requested otherwise, omitting it keeps that default
+    # instead of sending a mode which some models refuse
+    if thinking is MISSING:
         return omit
 
-    assert isinstance(budget, int | None)  # nosec: B101
-
-    if budget is None or budget <= 0:
+    if thinking == "disabled":
         return {"type": "disabled"}
 
-    return {
-        "type": "enabled",
-        "budget_tokens": budget,
-    }
+    return {"type": "adaptive"}
 
 
 def _tools_as_tool_params(
     selection: ModelToolsSelection,
     specification: Sequence[ModelToolSpecification],
 ) -> tuple[ToolChoiceParam | Omit, Iterable[ToolParam] | Omit]:
-    if not specification:
+    # declaring the tools together with a "none" choice makes the model answer with
+    # no content at all - omitting them keeps the same semantics while preserving the
+    # response. Tool blocks already present within the context remain valid without
+    # their declarations.
+    if not specification or selection == "none":
         return (omit, omit)
 
     tool_params: list[ToolParam] = []
@@ -594,12 +671,6 @@ def _tools_as_tool_params(
         case "required":
             return (
                 {"type": "any"},
-                tool_params,
-            )
-
-        case "none":
-            return (
-                {"type": "none"},
                 tool_params,
             )
 

@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from typing import (
     Any,
     Protocol,
@@ -75,7 +75,7 @@ class Tool(Protocol):
     def call(
         self,
         **arguments: BasicValue,
-    ) -> AsyncIterable[ToolOutputChunk]:
+    ) -> AsyncGenerator[ToolOutputChunk]:
         """Execute the tool with basic-value arguments.
 
         Parameters
@@ -85,8 +85,10 @@ class Tool(Protocol):
 
         Returns
         -------
-        AsyncIterable[ToolOutputChunk]
-            Stream of tool output parts and optional tool events.
+        AsyncGenerator[ToolOutputChunk]
+            Stream of tool output parts and optional tool events. Consumers stopping
+            before the stream ends have to close it explicitly, releasing any nested
+            streams and scoped state held across its suspension points.
         """
         ...
 

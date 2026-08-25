@@ -14,7 +14,7 @@ from draive.openai import OpenAI, OpenAIResponsesConfig
 
 async with ctx.scope(
     "app",
-    OpenAIResponsesConfig(model="gpt-5-mini"),
+    OpenAIResponsesConfig(model="gpt-5.5"),
     disposables=(OpenAI(),),
 ):
     # Inside this block, ctx.state(...) can resolve these states.
@@ -98,13 +98,15 @@ answer = await TextGeneration.generate(
 ## 6. Add Retrieval With `VectorIndex`
 
 `VectorIndex` is a context state API. In this example we use the in-memory implementation from
-`VolatileVectorIndex()`.
+`VolatileVectorIndex()`. Indexing and searching text delegates to `TextEmbedding`, so the scope also
+needs a provider supplying it.
 
 ```python
 from collections.abc import Sequence
 
 from draive import State, VectorIndex, ctx
 from draive.helpers import VolatileVectorIndex
+from draive.openai import OpenAI, OpenAIEmbeddingConfig
 
 
 class Chunk(State, serializable=True):
@@ -117,7 +119,12 @@ chunks: Sequence[Chunk] = (
 )
 
 
-async with ctx.scope("retrieval", VolatileVectorIndex()):
+async with ctx.scope(
+    "retrieval",
+    VolatileVectorIndex(),
+    OpenAIEmbeddingConfig(model="text-embedding-3-small"),
+    disposables=(OpenAI(),),
+):
     await VectorIndex.index(Chunk, values=chunks, attribute=Chunk._.text)
     hits: Sequence[Chunk] = await VectorIndex.search(Chunk, query="semantic", limit=2)
 ```

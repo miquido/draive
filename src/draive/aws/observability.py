@@ -19,7 +19,11 @@ from haiway import (
 )
 from haiway.context import ObservabilityMetricKind
 
-from draive.aws.cloudwatch import format_metric_dimensions, translate_cloudwatch_error
+from draive.aws.cloudwatch import (
+    format_metric_dimensions,
+    format_metric_unit,
+    translate_cloudwatch_error,
+)
 from draive.aws.types import (
     AWSCloudwatchEventPutting,
     AWSCloudwatchLogPutting,
@@ -115,8 +119,8 @@ def CloudwatchObservability(  # noqa: C901, PLR0915
             if dimensions:
                 metric_data["Dimensions"] = dimensions
 
-            if unit:
-                metric_data["Unit"] = unit
+            if metric_unit := format_metric_unit(unit):
+                metric_data["Unit"] = metric_unit
 
             await asyncio.to_thread(
                 cloudwatch_client.put_metric_data,  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]

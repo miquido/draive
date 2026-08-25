@@ -1,12 +1,12 @@
 import json
-from base64 import b64decode, b64encode, urlsafe_b64decode
+from base64 import b64decode
 from collections.abc import Generator, Mapping, MutableMapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from copy import copy
 from datetime import UTC, datetime
 from types import TracebackType
 from typing import Any, Literal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from haiway import MISSING, Meta, Missing, State, ctx, without_missing
 from openai.resources.realtime.realtime import (
@@ -30,6 +30,7 @@ from openai.types.realtime.realtime_conversation_item_user_message import (
 from openai.types.realtime.realtime_conversation_item_user_message_param import (
     Content as UserContentParam,
 )
+from openai.types.realtime.realtime_response_status import RealtimeResponseStatus
 
 from draive.models import (
     ModelContext,
@@ -37,6 +38,7 @@ from draive.models import (
     ModelInput,
     ModelInstructions,
     ModelOutput,
+    ModelOutputInvalid,
     ModelSession,
     ModelSessionEvent,
     ModelSessionInputChunk,
@@ -80,11 +82,19 @@ class OpenAIRealtime(OpenAIAPI):
         )
         output_audio_format: str
         match config.output_parameters:
-            case {"format": {"type": str() as audio_input}}:
-                output_audio_format = audio_input
+            case {"format": {"type": str() as audio_output_type}}:
+                output_audio_format = audio_output_type
 
             case _:
                 output_audio_format = "audio/pcm"
+
+        input_audio_format: str
+        match config.input_parameters:
+            case {"format": {"type": str() as audio_input_type}}:
+                input_audio_format = audio_input_type
+
+            case _:
+                input_audio_format = "audio/pcm"
         # prepare connection
         connection_manager: AsyncRealtimeConnectionManager = self._client.realtime.connect(
             model=config.model,
@@ -110,6 +120,8 @@ class OpenAIRealtime(OpenAIAPI):
             await connection.session.update(session=session_config)
 
             current_items: MutableMapping[str, Meta] = {}
+            # audio appended to the input buffer since its last commit
+            buffered_audio: bool = False
 
             if context:  # send initial context
                 await _send_context(
@@ -120,6 +132,7 @@ class OpenAIRealtime(OpenAIAPI):
 
             async def read() -> ModelSessionOutputChunk:  # noqa: C901, PLR0911, PLR0912, PLR0915
                 nonlocal current_items
+                nonlocal buffered_audio
                 while True:
                     event: RealtimeServerEvent = await connection.recv()
                     match event.type:
@@ -156,14 +169,32 @@ class OpenAIRealtime(OpenAIAPI):
                             match event.item.type:
                                 # received tool call
                                 case "function_call":
-                                    assert event.item.status == "completed"  # nosec: B101
+                                    # also emitted for interrupted, incomplete or cancelled
+                                    if event.item.status != "completed":
+                                        continue  # skip unfinished tool calls
+
+                                    arguments: Mapping[str, Any] | None
+                                    try:
+                                        arguments = (
+                                            json.loads(event.item.arguments)
+                                            if event.item.arguments
+                                            else None
+                                        )
+
+                                    except Exception as exc:
+                                        raise ModelOutputInvalid(
+                                            provider="openai",
+                                            model=config.model,
+                                            reason=(
+                                                "Tool arguments decoding error - "
+                                                f"{type(exc).__name__}: {exc}"
+                                            ),
+                                        ) from exc
 
                                     return ModelToolRequest.of(
                                         event.item.call_id or str(uuid4()),
                                         tool=event.item.name,
-                                        arguments=json.loads(event.item.arguments)
-                                        if event.item.arguments
-                                        else None,
+                                        arguments=arguments,
                                         meta={  # using predefined meta keys
                                             "identifier": event.item.id,
                                             "item_id": event.item.id,
@@ -201,6 +232,8 @@ class OpenAIRealtime(OpenAIAPI):
                             )
 
                         case "input_audio_buffer.committed":
+                            # the buffer was already consumed, nothing left to commit
+                            buffered_audio = False
                             # send event that input speech has ended
                             return ModelSessionEvent.turn_commited(
                                 meta={
@@ -256,6 +289,24 @@ class OpenAIRealtime(OpenAIAPI):
                                     output_tokens=usage.output_tokens,
                                 )
 
+                            match event.response.status:
+                                case "failed":
+                                    raise ModelException(
+                                        "Realtime response failed: "
+                                        + _response_status_reason(event.response.status_details),
+                                        provider="openai",
+                                        model=config.model,
+                                    )
+
+                                case "incomplete":
+                                    ctx.log_warning(
+                                        "Realtime response incomplete: "
+                                        + _response_status_reason(event.response.status_details)
+                                    )
+
+                                case _:
+                                    pass  # nothing to report
+
                             continue  # keep going, nothing to send here
 
                         case "conversation.item.input_audio_transcription.completed":
@@ -302,7 +353,7 @@ class OpenAIRealtime(OpenAIAPI):
                                         MultimodalContent.of(
                                             *_content_to_multimodal(
                                                 event.item.content,
-                                                audio_format="audio/pcm",
+                                                audio_format=input_audio_format,
                                             )
                                         ),
                                         meta=item_meta,
@@ -352,15 +403,43 @@ class OpenAIRealtime(OpenAIAPI):
                 part: MultimodalContentPart,
                 /,
             ) -> None:
-                if isinstance(part, ResourceContent):
+                nonlocal buffered_audio
+                if isinstance(part, ResourceContent) and part.mime_type.startswith("audio"):
+                    # the input buffer accepts only audio matching the session input format
                     await connection.input_audio_buffer.append(audio=part.data)
+                    buffered_audio = True
+                    return
 
-                else:
-                    ctx.log_error("OpenAI realtime input not supported! Skipping...")
+                # everything else has to be delivered as a conversation item,
+                # the input buffer accepts audio only
+                content_parts: Sequence[UserContentParam] = tuple(
+                    _user_content_parts(MultimodalContent.of(part))
+                )
+                if not content_parts:
+                    return  # nothing supported to send, already reported
+
+                item_id: str = _item_identifier(part.meta.identifier)
+                current_items[item_id] = Meta.of(
+                    {
+                        "item_id": item_id,
+                        "identifier": item_id,
+                        "created": datetime.now(UTC).isoformat(),
+                    }
+                )
+                await connection.conversation.item.create(
+                    item={
+                        "id": item_id,
+                        "type": "message",
+                        "status": "completed",
+                        "role": "user",
+                        "content": content_parts,
+                    },
+                )
 
             async def write(
                 input: ModelSessionInputChunk,  # noqa: A002
             ) -> None:
+                nonlocal buffered_audio
                 if isinstance(input, MultimodalContentPart):
                     await send_input_part(input)
 
@@ -373,7 +452,13 @@ class OpenAIRealtime(OpenAIAPI):
                 else:
                     assert isinstance(input, ModelSessionEvent)  # nosec: B101
                     if input.event == "turn_commited":
-                        await connection.input_audio_buffer.commit()
+                        if buffered_audio:
+                            # the buffer can only be committed when it holds audio
+                            await connection.input_audio_buffer.commit()
+                            buffered_audio = False
+
+                        # committing the input does not request the response on its own
+                        await connection.response.create()
 
                     elif input.event == "context_updated":
                         ctx.log_debug("Context memory update event")
@@ -426,7 +511,7 @@ async def _send_context(
     for element in context:
         match element:
             case ModelInput() as input_element:
-                identifier: str = str(input_element.meta.identifier or uuid4())
+                identifier: str = _item_identifier(input_element.meta.identifier)
                 current_items[identifier] = input_element.meta
                 await connection.conversation.item.create(
                     item={
@@ -441,7 +526,7 @@ async def _send_context(
                 )
                 # include tool responses following the output
                 for response in input_element.tool_responses:
-                    item_id: str = str(response.meta.identifier or uuid4())
+                    item_id: str = _item_identifier(response.meta.identifier)
                     current_items[item_id] = Meta.of(
                         {
                             "item_id": item_id,
@@ -459,7 +544,7 @@ async def _send_context(
                     )
 
             case ModelOutput() as output_element:
-                identifier: str = str(output_element.meta.identifier or uuid4())
+                identifier: str = _item_identifier(output_element.meta.identifier)
                 current_items[identifier] = output_element.meta
                 # prior assistant content
                 await connection.conversation.item.create(
@@ -475,7 +560,7 @@ async def _send_context(
                 )
                 # include tool requests following the output
                 for request in output_element.tool_requests:
-                    item_id: str = str(request.meta.identifier or uuid4())
+                    item_id: str = _item_identifier(request.meta.identifier)
                     current_items[item_id] = Meta.of(
                         {
                             "item_id": item_id,
@@ -519,36 +604,32 @@ async def _reset_context(
     )
 
 
-def _user_content_parts(  # noqa: C901, PLR0912
+def _item_identifier(
+    identifier: UUID | None,
+    /,
+) -> str:
+    # the api limits conversation item identifiers to 32 characters,
+    # the uuid text form takes 36 so the hex form is used instead
+    return (identifier if identifier is not None else uuid4()).hex
+
+
+def _user_content_parts(
     content: MultimodalContent,
 ) -> Generator[UserContentParam]:
     for part in content.parts:
         if isinstance(part, TextContent):
-            if part.meta.get("transcript"):
-                yield {
-                    "type": "input_text",
-                    "transcript": part.text,
-                }
-
-            else:
-                yield {
-                    "type": "input_text",
-                    "text": part.text,
-                }
+            # `transcript` is not sent to the model, `text` is the only field reaching it
+            yield {
+                "type": "input_text",
+                "text": part.text,
+            }
 
         elif isinstance(part, ResourceContent):
             if part.mime_type.startswith("audio"):
-                # convert stored base64 (possibly urlsafe) to standard base64 string
-                raw_data: bytes
-                try:
-                    raw_data = urlsafe_b64decode(part.data)
-
-                except Exception:
-                    raw_data = b64decode(part.data)
-
                 yield {
                     "type": "input_audio",
-                    "audio": b64encode(raw_data).decode(),
+                    # `data` already holds standard base64, which is what the API takes
+                    "audio": part.data,
                 }
 
             elif part.mime_type.startswith("image"):
@@ -653,22 +734,8 @@ def _prepare_session_config(
     tools: ModelTools,
     output: ModelSessionOutputSelection,
 ) -> RealtimeSessionCreateRequestParam:
-    modalities: list[Literal["text", "audio"]]
-    match output:
-        case "auto":
-            modalities = ["audio"]
-
-        case "text":
-            modalities = ["text"]
-
-        case "audio":
-            modalities = ["audio"]
-
-        case ["text", "audio"] | ["audio", "text"]:
-            modalities = ["text", "audio"]
-
-        case _:
-            raise ValueError(f"Unsupported output: {output}")
+    # the api allows only a single output modality per session
+    modalities: list[Literal["text", "audio"]] = [_resolve_output_modality(output)]
 
     tool_choice: str | Mapping[str, str]
     match tools.selection:
@@ -709,7 +776,8 @@ def _prepare_session_config(
         {
             "type": "realtime",
             "model": config.model,
-            "instructions": instructions if instructions is not None else MISSING,
+            # an empty string would override the model's own default instructions
+            "instructions": instructions or MISSING,
             "audio": {
                 "input": config.input_parameters,
                 "output": config.output_parameters,
@@ -720,6 +788,52 @@ def _prepare_session_config(
         },
         typed=RealtimeSessionCreateRequestParam,
     )
+
+
+def _resolve_output_modality(
+    output: ModelSessionOutputSelection,
+    /,
+) -> Literal["text", "audio"]:
+    match output:
+        case "auto" | "audio":
+            return "audio"
+
+        case "text":
+            return "text"
+
+        case output_selection if "audio" in output_selection:
+            if len(output_selection) > 1:
+                ctx.log_warning(
+                    "OpenAI realtime supports a single output modality per session."
+                    " Dropping unsupported output modalities and using audio."
+                )
+
+            return "audio"
+
+        case output_selection if "text" in output_selection:
+            if len(output_selection) > 1:
+                ctx.log_warning(
+                    "OpenAI realtime supports a single output modality per session."
+                    " Dropping unsupported output modalities and using text."
+                )
+
+            return "text"
+
+        case _:
+            raise ValueError(f"Unsupported realtime output: {output}")
+
+
+def _response_status_reason(
+    status_details: RealtimeResponseStatus | None,
+    /,
+) -> str:
+    if status_details is None:
+        return "unknown"
+
+    if error := status_details.error:
+        return f"{error.type or 'error'} - {error.code or 'unknown'}"
+
+    return status_details.reason or "unknown"
 
 
 def _event_context(
@@ -756,6 +870,14 @@ def _content_to_multimodal(
                             "Failed to decode audio content",
                             exception=exc,
                         )
+
+                # assistant audio resources can't be sent back within the context while their
+                # transcript can - user audio is sent back as is, its transcript would duplicate
+                if element.type == "output_audio" and (transcript := element.transcript):
+                    yield TextContent.of(
+                        transcript,
+                        meta={"transcript": True},
+                    )
 
             case "output_text" | "input_text":
                 if text := element.text:

@@ -19,6 +19,8 @@ hidden global state.
 - Shared multimodal model for text, resources, and artifacts across generation and retrieval flows.
 - First-class evaluation and guardrails integrated in the same context/state model.
 - Provider adapters for OpenAI, Anthropic, Gemini, Mistral, Cohere, Bedrock, Ollama, and vLLM.
+- Storage and infrastructure integrations for Postgres, Qdrant, SurrealDB, MCP, AWS, RabbitMQ,
+    and OpenTelemetry.
 
 ## Architecture At A Glance
 
@@ -63,7 +65,7 @@ load_env()
 async def main() -> None:
     async with ctx.scope(
         "quickstart",
-        OpenAIResponsesConfig(model="gpt-5-mini"),
+        OpenAIResponsesConfig(model="gpt-5.5"),
         disposables=(OpenAI(),),
     ):
         result: str = await TextGeneration.generate(
@@ -105,12 +107,15 @@ class PersonInfo(State, serializable=True):
 
 async with ctx.scope(
     "typed-extraction",
-    OpenAIResponsesConfig(model="gpt-5-mini"),
+    OpenAIResponsesConfig(model="gpt-5.5"),
     disposables=(OpenAI(),),
 ):
     person: PersonInfo = await ModelGeneration.generate(
         PersonInfo,
-        instructions="Extract person details from the sentence.",
+        instructions=(
+            "Extract person details from the sentence."
+            " Respond using the following schema:\n{model_schema}"
+        ),
         input="Ava is a backend engineer experienced in Python and Postgres.",
         schema_injection="simplified",
     )
@@ -118,8 +123,11 @@ async with ctx.scope(
 
 Notes:
 
-- `serializable=True` is required for schema-based decoding into your `State`.
-- `schema_injection="simplified"` appends a compact schema description to your instructions.
+- The generated type has to be serializable - declaring it with `serializable=True` makes that a
+    checked requirement at class definition time.
+- `schema_injection` substitutes the `{model_schema}` placeholder in your instructions - `"full"`
+    with the complete JSON schema, `"simplified"` with a compact description, `"skip"` leaves the
+    instructions untouched.
 - Returned value is a validated `PersonInfo`, not raw JSON.
 
 ### Tool Use In One Scope
@@ -141,7 +149,7 @@ async def current_utc_time() -> str:
 
 async with ctx.scope(
     "tools-demo",
-    OpenAIResponsesConfig(model="gpt-5-mini"),
+    OpenAIResponsesConfig(model="gpt-5.5"),
     disposables=(OpenAI(),),
 ):
     reply: str = await TextGeneration.generate(
@@ -153,10 +161,10 @@ async with ctx.scope(
 
 This lets you keep model reasoning and side-effectful capabilities separated and typed.
 
-### Step Pipelines (Refactor-Aligned)
+### Step Pipelines
 
-The refactored pipeline abstraction is `Step` + `StepState` (from `draive.steps`). Use it when
-single-call generation is no longer enough and you need multi-stage flows.
+Multi-stage flows are built from `Step` and `StepState` (from `draive.steps`). Use them when
+single-call generation is no longer enough.
 
 Common patterns include:
 

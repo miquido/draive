@@ -1,6 +1,7 @@
 from pytest import raises
 
 from draive.multimodal.content import MultimodalContent
+from draive.multimodal.templates.types import TemplateInvalid
 from draive.multimodal.templates.variables import (
     parse_template_variables,
     resolve_multimodal_template,
@@ -89,7 +90,7 @@ def test_resolve_text_template_replaces_all_placeholders() -> None:
     template = "Hi {%name%}, welcome to {%place%}."
     arguments = {"name": "Ada", "place": "Paris"}
 
-    result = resolve_text_template(template, arguments=arguments)
+    result = resolve_text_template(template, identifier="test", arguments=arguments)
 
     assert result == "Hi Ada, welcome to Paris."
 
@@ -98,18 +99,18 @@ def test_resolve_text_template_supports_repeated_placeholder() -> None:
     template = "{%word%}-{%word%}-{%word%}"
     arguments = {"word": "repeat"}
 
-    result = resolve_text_template(template, arguments=arguments)
+    result = resolve_text_template(template, identifier="test", arguments=arguments)
 
     assert result == "repeat-repeat-repeat"
 
 
 def test_resolve_text_template_detects_missing_argument() -> None:
-    with raises(KeyError, match="Missing template argument: name"):
-        resolve_text_template("Hello {%name%}", arguments={"other": "value"})
+    with raises(TemplateInvalid, match="missing argument `name`"):
+        resolve_text_template("Hello {%name%}", identifier="test", arguments={"other": "value"})
 
 
 def test_resolve_text_template_ignores_unused_argument() -> None:
-    result = resolve_text_template("Hello world", arguments={"extra": "value"})
+    result = resolve_text_template("Hello world", identifier="test", arguments={"extra": "value"})
 
     assert result == "Hello world"
 
@@ -118,20 +119,20 @@ def test_resolve_text_template_resolves_edge_positions() -> None:
     template = "{%greeting%}, middle, {%closing%}"
     arguments = {"greeting": "Hi", "closing": "Bye"}
 
-    result = resolve_text_template(template, arguments=arguments)
+    result = resolve_text_template(template, identifier="test", arguments=arguments)
 
     assert result == "Hi, middle, Bye"
 
 
 def test_resolve_text_template_handles_empty_template() -> None:
-    assert resolve_text_template("", arguments={}) == ""
+    assert resolve_text_template("", identifier="test", arguments={}) == ""
 
 
 def test_resolve_multimodal_template_concatenates_parts() -> None:
     template = "Hello {%name%}!"
     arguments = {"name": TextContent.of("world")}
 
-    result = resolve_multimodal_template(template, arguments=arguments)
+    result = resolve_multimodal_template(template, identifier="test", arguments=arguments)
 
     assert isinstance(result, MultimodalContent)
     assert result.to_str() == "Hello world!"
@@ -144,7 +145,7 @@ def test_resolve_multimodal_template_accepts_string_parts() -> None:
         "subject": TextContent.of("Ada"),
     }
 
-    result = resolve_multimodal_template(template, arguments=arguments)
+    result = resolve_multimodal_template(template, identifier="test", arguments=arguments)
 
     assert len(result.parts) == 1
     text_part = result.parts[0]
@@ -153,13 +154,14 @@ def test_resolve_multimodal_template_accepts_string_parts() -> None:
 
 
 def test_resolve_multimodal_template_detects_missing_argument() -> None:
-    with raises(KeyError, match="Missing template argument: name"):
-        resolve_multimodal_template("Hello {%name%}", arguments={})
+    with raises(TemplateInvalid, match="missing argument `name`"):
+        resolve_multimodal_template("Hello {%name%}", identifier="test", arguments={})
 
 
 def test_resolve_multimodal_template_ignores_unused_argument() -> None:
     result = resolve_multimodal_template(
         "Plain text",
+        identifier="test",
         arguments={"extra": TextContent.of("value")},
     )
 
@@ -173,7 +175,7 @@ def test_resolve_multimodal_template_flattens_nested_content() -> None:
         "body": TextContent.of("reader"),
     }
 
-    result = resolve_multimodal_template(template, arguments=arguments)
+    result = resolve_multimodal_template(template, identifier="test", arguments=arguments)
 
     assert result.to_str() == "Hello there reader"
 
@@ -184,7 +186,7 @@ def test_resolve_multimodal_template_preserves_metadata_boundaries() -> None:
         "name": TextContent.of("Ada", meta={"tone": "warm"}),
     }
 
-    result = resolve_multimodal_template(template, arguments=arguments)
+    result = resolve_multimodal_template(template, identifier="test", arguments=arguments)
 
     assert len(result.parts) == 3
     hi_part, name_part, exclaim_part = result.parts
@@ -203,6 +205,6 @@ def test_resolve_multimodal_template_preserves_metadata_boundaries() -> None:
 
 
 def test_resolve_multimodal_template_returns_empty_content_for_empty_template() -> None:
-    result = resolve_multimodal_template("", arguments={})
+    result = resolve_multimodal_template("", identifier="test", arguments={})
 
     assert result is MultimodalContent.empty

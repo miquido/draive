@@ -35,15 +35,16 @@ a storage backend depending on your workflow:
 from pathlib import Path
 from draive import TemplatesRepository
 
-file_repository = TemplatesRepository.file(Path("templates"))
+file_repository = TemplatesRepository.file(Path("templates.json"))
 volatile_repository = TemplatesRepository.volatile(
     onboarding="Hello {%user%}!",
 )
 ```
 
-- `TemplatesRepository.file(...)` reads templates from `.tmpl` files on disk. It automatically
-    infers variables by scanning for `{%variable%}` markers.
+- `TemplatesRepository.file(...)` keeps every declaration and its content in a single JSON file at
+    the given path, created on first access and rewritten on each `define(...)`.
 - `TemplatesRepository.volatile(...)` keeps definitions in memory, ideal for tests or quick demos.
+    It infers variables by scanning the seeded content for `{%variable%}` markers.
 - Custom backends only need to provide the `listing`, `loading`, and `defining` callables. See
     `PostgresTemplatesRepository` for a production-ready example.
 
@@ -65,7 +66,7 @@ state.
 ## Resolving Templates at Runtime
 
 ```python
-from draive import TemplatesRepository
+from draive import Template, TemplatesRepository
 
 async def render_welcome(user_name: str) -> str:
     template = Template.of("welcome-email").with_arguments(user=user_name)
@@ -88,26 +89,64 @@ await TemplatesRepository.resolve_str(
 
 Custom arguments are merged on top of any defaults stored in the `Template` instance.
 
+- If the rendered source references a placeholder with no matching argument, `TemplateInvalid` is
+    raised naming the template and the missing argument.
+
+### Composing Templates
+
+An argument value can be another `Template`, which is resolved before the outer template renders:
+
+```python
+await TemplatesRepository.resolve_str(
+    Template.of(
+        "welcome-email",
+        arguments={"signature": Template.of("team-signature", arguments={"team": "Draive"})},
+    )
+)
+```
+
+- Nested templates inherit the arguments of the outer resolution, so shared values such as
+    `user` need to be provided only once.
+- Arguments bound by the nested `Template` itself take precedence over the inherited ones.
+- A template used as an argument of itself is reported as `TemplateInvalid` instead of recursing.
+
 ## Listing and Managing Templates
 
 ```python
-declarations = await TemplatesRepository.templates()
-for declaration in declarations:
+from draive import Pagination, TemplatesRepository
+
+page = await TemplatesRepository.templates(Pagination.of(limit=10))
+for declaration in page.items:
     print(declaration.identifier, declaration.variables)
 ```
 
-- `templates()` returns `TemplateDeclaration` objects containing the identifier, optional
-    description, discovered variables, and metadata.
-- `TemplatesRepository.define(...)` (available on custom backends) persists a new revision and
-    invalidates caches. File/volatile repositories expose it automatically through the state.
+- `templates()` returns a `Paginated[TemplateDeclaration]`. Each declaration carries the identifier,
+    optional description, declared variables, and metadata. Pass the returned `page.pagination` back
+    to fetch the next page.
+- `TemplatesRepository.define(declaration, content=...)` takes a `TemplateDeclaration` plus the raw
+    template body, persists a new revision, and invalidates caches.
 
-When defining templates programmatically, pass `variables={"user": "User name"}` to document
-expected arguments. This metadata is surfaced in listings and downstream tooling.
+```python
+from draive import TemplateDeclaration, TemplatesRepository
+
+await TemplatesRepository.define(
+    TemplateDeclaration.of(
+        "welcome-email",
+        description="Onboarding greeting",
+        variables={"user": "User name"},
+    ),
+    content="Hello {%user%}!",
+)
+```
+
+The declared `variables` document expected arguments and are surfaced in listings and downstream
+tooling. They have to match the placeholders found in `content` exactly - a mismatch raises
+`TemplateInvalid`.
 
 ## Migrating from InstructionsRepository
 
-`TemplatesRepository` fully supersedes the deprecated `InstructionsRepository`. When updating older
-code:
+`TemplatesRepository` fully supersedes `InstructionsRepository`, which has been removed. When
+updating older code:
 
 - Replace instruction names with template identifiers (`InstructionDeclaration` →
     `TemplateDeclaration`).

@@ -1,7 +1,9 @@
 from draive.models.generative import GenerativeModel, RealtimeGenerativeModel
 from draive.models.metrics import (
+    model_rate_limit,
     record_embedding_invocation,
     record_embedding_metrics,
+    record_guardrails_invocation,
     record_model_invocation,
     record_usage_metrics,
 )
@@ -50,6 +52,7 @@ from draive.models.types import (
     ModelToolSpecification,
     ModelToolsSelection,
     ModelToolStatus,
+    model_output_blocks,
 )
 
 __all__ = (
@@ -99,8 +102,11 @@ __all__ = (
     "ModelTools",
     "ModelToolsSelection",
     "RealtimeGenerativeModel",
+    "model_output_blocks",
+    "model_rate_limit",
     "record_embedding_invocation",
     "record_embedding_metrics",
+    "record_guardrails_invocation",
     "record_model_invocation",
     "record_usage_metrics",
 )

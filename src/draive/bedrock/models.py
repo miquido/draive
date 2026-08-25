@@ -1,9 +1,6 @@
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
 
 __all__ = (
-    "ChatCompletionResponse",
-    "ChatCompletionResponseOutput",
-    "ChatCompletionResponseUsage",
     "ChatMessage",
     "ChatMessageContent",
     "ChatMessageImage",
@@ -27,7 +24,7 @@ class ChatMessageImageContentSource(TypedDict):
 
 
 class ChatMessageImageContent(TypedDict):
-    format: Literal["png", "jpeg", "gif"]
+    format: Literal["png", "jpeg", "gif", "webp"]
     source: ChatMessageImageContentSource
 
 
@@ -65,30 +62,8 @@ class ChatMessage(TypedDict):
     content: list[ChatMessageContent]
 
 
-class ChatCompletionResponseUsage(TypedDict):
-    inputTokens: int
-    outputTokens: int
-    totalTokens: int
-
-
-class ChatCompletionResponseOutput(TypedDict):
-    message: ChatMessage
-
-
-class ChatCompletionResponse(TypedDict):
-    output: ChatCompletionResponseOutput
-    stopReason: Literal[
-        "end_turn",
-        "tool_use",
-        "max_tokens",
-        "stop_sequence",
-        "guardrail_intervened",
-        "content_filtered",
-    ]
-    usage: ChatCompletionResponseUsage
-
-
 class ChatTool(TypedDict):
     name: str
-    description: str
+    # empty description is not allowed, it has to be skipped when unavailable
+    description: NotRequired[str]
     inputSchema: Any

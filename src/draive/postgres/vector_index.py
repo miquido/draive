@@ -1,9 +1,13 @@
+import json
+import re
+import unicodedata
 from base64 import b64decode
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Collection, Iterable, MutableSequence, Sequence
 from datetime import UTC, datetime, timedelta
-from typing import Any, NoReturn, cast, final
+from typing import Any, Final, NoReturn, cast, final
 
 from haiway import AttributePath, AttributeRequirement, State, ctx
+from haiway.attributes import AttributesJSONEncoder
 from haiway.postgres import Postgres, PostgresRow, PostgresValue
 
 from draive.embedding import (
@@ -15,8 +19,16 @@ from draive.embedding import (
 )
 from draive.multimodal import TextContent
 from draive.resources import ResourceContent
+from draive.utils.attributes import attribute_path_segments
 
-__all__ = ("PostgresVectorIndex",)
+__all__ = (
+    "PostgresVectorIndex",
+    "postgres_identifier",
+)
+
+_IDENTIFIER_PATTERN: Final[re.Pattern[str]] = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_PATH_SEGMENT_PATTERN: Final[re.Pattern[str]] = re.compile(r"[A-Za-z0-9_]+")
+_WORD_TOKEN_PATTERN: Final[re.Pattern[str]] = re.compile(r"\b\w+\b", re.UNICODE)
 
 
 @final
@@ -158,7 +170,7 @@ class PostgresVectorIndex:
                     for idx, embedded in enumerate(embedded_values):
                         await connection.execute(
                             f"""
-                            INSERT INTO {model.__name__} (
+                            INSERT INTO {postgres_identifier(model.__name__)} (
                                 embedding,
                                 payload,
                                 meta,
@@ -172,7 +184,7 @@ class PostgresVectorIndex:
                                 $4::TIMESTAMPTZ
                             );
                             """,  # nosec: B608
-                            embedded.vector,
+                            postgres_vector(embedded.vector),
                             embedded.value.to_json(),
                             embedded.meta.to_json(),
                             created_timestamp + timedelta(microseconds=idx),
@@ -208,7 +220,7 @@ class PostgresVectorIndex:
                     SELECT
                         payload
 
-                    FROM {model.__name__}
+                    FROM {postgres_identifier(model.__name__)}
 
                     {where_clause}
                     ORDER BY created DESC
@@ -246,8 +258,14 @@ class PostgresVectorIndex:
                 assert isinstance(query, Sequence)  # nosec: B101
                 query_vector = query  # vector
 
-            arguments: Sequence[Sequence[PostgresValue] | PostgresValue] = (query_vector,)
-            similarity_expression: str = f"embedding <#> ${len(arguments)}"
+            # bound in the pgvector text form - `query_vector` itself stays numeric
+            # for the MMR reranking below
+            arguments: Sequence[Sequence[PostgresValue] | PostgresValue] = (
+                postgres_vector(query_vector),
+            )
+            # `<=>` is the cosine distance - matching both the `score_threshold`
+            # conversion below and the recommended `vector_cosine_ops` index
+            similarity_expression: str = f"embedding <=> ${len(arguments)}"
 
             where_clause, arguments = resolve_requirements(requirements, arguments=arguments)
 
@@ -267,10 +285,10 @@ class PostgresVectorIndex:
             results: Sequence[PostgresRow] = await Postgres.fetch(
                 f"""
                 SELECT
-                    embedding,
+                    embedding::REAL[] AS embedding,
                     payload
 
-                FROM {model.__name__}
+                FROM {postgres_identifier(model.__name__)}
 
                 {where_clause}
                 ORDER BY {similarity_expression}
@@ -282,6 +300,9 @@ class PostgresVectorIndex:
             if not rerank:
                 return tuple(model.from_json(cast(str, result["payload"])) for result in results)
 
+            # asyncpg has no codec for the pgvector `VECTOR` type - it is selected
+            # cast to `REAL[]` (pgvector stores float4, so the cast is exact) which
+            # decodes to the floats the reranking below computes on
             matching: list[Embedded[Model]] = [
                 Embedded[Model](
                     vector=cast(Sequence[float], result["embedding"]),
@@ -308,7 +329,7 @@ class PostgresVectorIndex:
             if requirements is None:
                 await Postgres.execute(
                     f"""
-                    DELETE FROM {model.__name__};
+                    DELETE FROM {postgres_identifier(model.__name__)};
                     """,  # nosec: B608
                 )
                 ctx.log_info(f"Removed all entries for {model.__name__}.")
@@ -323,7 +344,7 @@ class PostgresVectorIndex:
 
             await Postgres.execute(
                 f"""
-                DELETE FROM {model.__name__}
+                DELETE FROM {postgres_identifier(model.__name__)}
                 {where_clause};
                 """,  # nosec: B608
                 *arguments,
@@ -342,7 +363,7 @@ class PostgresVectorIndex:
         raise RuntimeError("PostgresVectorIndex instantiation is forbidden")
 
 
-def _resolve_requirement(  # noqa: PLR0911
+def _resolve_requirement(  # noqa: C901, PLR0911
     requirement: AttributeRequirement[Any],
     /,
     arguments: Sequence[Sequence[PostgresValue] | PostgresValue],
@@ -372,48 +393,73 @@ def _resolve_requirement(  # noqa: PLR0911
             return f"({left_sql} OR {right_sql})", resolved_arguments
 
         case "equal":
-            resolved_arguments = [*arguments, requirement.rhs]
+            accessor, resolved_arguments = _json_accessor(requirement.lhs, arguments)
+            resolved_arguments = [*resolved_arguments, _json_value(requirement.rhs)]
             return (
-                f"{_scalar_accessor(str(requirement.lhs))} = ${len(resolved_arguments)}",
+                f"{accessor} = ${len(resolved_arguments)}::JSONB",
                 resolved_arguments,
             )
 
         case "not_equal":
-            resolved_arguments = [*arguments, requirement.rhs]
+            accessor, resolved_arguments = _json_accessor(requirement.lhs, arguments)
+            resolved_arguments = [*resolved_arguments, _json_value(requirement.rhs)]
             return (
-                f"({_scalar_accessor(str(requirement.lhs))}"
-                f" IS DISTINCT FROM ${len(resolved_arguments)})",
+                f"({accessor} IS DISTINCT FROM ${len(resolved_arguments)}::JSONB)",
                 resolved_arguments,
             )
 
         case "contained_in":
-            resolved_arguments = [*arguments, requirement.rhs]
+            # haiway builds this operator with operands swapped - `lhs` holds the
+            # collection of allowed values while `rhs` holds the attribute path
+            accessor, resolved_arguments = _json_accessor(requirement.rhs, arguments)
+            resolved_arguments = [
+                *resolved_arguments,
+                _json_values(cast(Iterable[Any], requirement.lhs)),
+            ]
             return (
-                f"{_scalar_accessor(str(requirement.lhs))} = ANY(${len(resolved_arguments)})",
+                f"{accessor} = ANY(${len(resolved_arguments)}::JSONB[])",
                 resolved_arguments,
             )
 
         case "contains_any":
-            resolved_arguments = [*arguments, requirement.rhs]
+            accessor, resolved_arguments = _json_accessor(requirement.lhs, arguments)
+            resolved_arguments = [
+                *resolved_arguments,
+                _json_values(cast(Iterable[Any], requirement.rhs)),
+            ]
             return (
-                "EXISTS (SELECT 1 FROM jsonb_array_elements_text("  # nosec: B608
-                f"{_scalar_accessor(str(requirement.lhs))}) AS element"
-                f" WHERE element = ANY(${len(resolved_arguments)}))",
+                # the interpolated accessor is fully parameterized
+                f"EXISTS (SELECT 1 FROM jsonb_array_elements({accessor}) AS element"  # nosec: B608
+                f" WHERE element = ANY(${len(resolved_arguments)}::JSONB[]))",
                 resolved_arguments,
             )
 
         case "contains":
-            resolved_arguments = [*arguments, requirement.rhs]
+            accessor, resolved_arguments = _json_accessor(requirement.lhs, arguments)
+            resolved_arguments = [*resolved_arguments, _json_value(requirement.rhs)]
             return (
-                "EXISTS (SELECT 1 FROM jsonb_array_elements_text("  # nosec: B608
-                f"{_scalar_accessor(str(requirement.lhs))} AS element"
-                f" WHERE element = ${len(resolved_arguments)})",
+                # the interpolated accessor is fully parameterized
+                f"EXISTS (SELECT 1 FROM jsonb_array_elements({accessor}) AS element"  # nosec: B608
+                f" WHERE element = ${len(resolved_arguments)}::JSONB)",
                 resolved_arguments,
             )
 
         case "text_match":
-            # TODO: text match LIKE
-            raise NotImplementedError("Not implemented yet")
+            tokens: Sequence[str] = _text_tokens(str(requirement.rhs))
+            if not tokens:
+                return "TRUE", arguments  # nothing to match, same as haiway checks
+
+            accessor, resolved_arguments = _json_text_accessor(requirement.lhs, arguments)
+            clauses: MutableSequence[str] = []
+            for token in tokens:
+                resolved_arguments = [*resolved_arguments, token]
+                # `\y` anchors at word boundaries, matching whole tokens
+                # the same way the in memory requirement check does
+                clauses.append(
+                    f"{accessor} ~* ('\\y' || ${len(resolved_arguments)}::TEXT || '\\y')"
+                )
+
+            return f"({' AND '.join(clauses)})", resolved_arguments
 
 
 def resolve_requirements(
@@ -433,9 +479,93 @@ def resolve_requirements(
     return (where_clause, arguments)
 
 
-def _path_literal(path: str) -> str:
-    return f"'{{{','.join(path.lstrip('.').split('.'))}}}'"
+def postgres_vector(
+    vector: Sequence[float],
+    /,
+) -> str:
+    """Render an embedding vector in the pgvector text representation.
+
+    asyncpg has no codec for the pgvector `VECTOR` type, so a bound sequence is
+    rejected with `expected str`. The text form is what the type accepts on input.
+    """
+    return f"[{','.join(repr(float(element)) for element in vector)}]"
 
 
-def _scalar_accessor(path: str) -> str:
-    return f"payload #>> {_path_literal(path)}"
+def postgres_identifier(
+    value: str,
+    /,
+) -> str:
+    """Verify a table name before interpolating it into a statement.
+
+    Postgres has no parameter form for table names, they have to be inlined,
+    therefore each one has to be constrained to safe characters only.
+    """
+    if _IDENTIFIER_PATTERN.fullmatch(value):
+        return value
+
+    raise ValueError(f"Invalid Postgres identifier: {value!r}")
+
+
+def _path_segments(
+    path: Any,
+    /,
+) -> Sequence[str]:
+    # the payload is stored serialized, attribute aliases have to be applied
+    segments: Sequence[str] = attribute_path_segments(path)
+    if not segments or any(
+        _PATH_SEGMENT_PATTERN.fullmatch(segment) is None for segment in segments
+    ):
+        raise ValueError(f"Invalid Postgres attribute path: {path!r}")
+
+    return segments
+
+
+def _text_tokens(
+    value: str,
+    /,
+) -> Sequence[str]:
+    return tuple(_WORD_TOKEN_PATTERN.findall(unicodedata.normalize("NFC", value).casefold()))
+
+
+def _json_accessor(
+    path: Any,
+    /,
+    arguments: Sequence[Sequence[PostgresValue] | PostgresValue],
+) -> tuple[str, Sequence[Sequence[PostgresValue] | PostgresValue]]:
+    # The path is bound as a parameter instead of being inlined within a literal,
+    # additionally `#>` preserves the `jsonb` type - unlike the `#>>` text accessor
+    # which forces each compared argument to be `text`, allowing only strings.
+    resolved_arguments: Sequence[Sequence[PostgresValue] | PostgresValue] = [
+        *arguments,
+        _path_segments(path),
+    ]
+    return (f"payload #> ${len(resolved_arguments)}::TEXT[]", resolved_arguments)
+
+
+def _json_text_accessor(
+    path: Any,
+    /,
+    arguments: Sequence[Sequence[PostgresValue] | PostgresValue],
+) -> tuple[str, Sequence[Sequence[PostgresValue] | PostgresValue]]:
+    # `#>>` unwraps the stored json string into text required by regex matching
+    resolved_arguments: Sequence[Sequence[PostgresValue] | PostgresValue] = [
+        *arguments,
+        _path_segments(path),
+    ]
+    return (f"payload #>> ${len(resolved_arguments)}::TEXT[]", resolved_arguments)
+
+
+def _json_value(
+    value: Any,
+    /,
+) -> str:
+    # `jsonb` arguments are bound as their JSON representation, encoded exactly
+    # the way the compared payload was
+    return json.dumps(value, cls=AttributesJSONEncoder)
+
+
+def _json_values(
+    values: Iterable[Any],
+    /,
+) -> Sequence[str]:
+    return [_json_value(value) for value in values]

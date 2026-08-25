@@ -69,8 +69,7 @@ class Anthropic(
             self._features = (GenerativeModel,)
 
     async def __aenter__(self) -> Iterable[State]:
-        self._client = self._prepare_client()
-        await self._client.__aenter__()
+        await self._initialize_client()
         if GenerativeModel in self._features:
             return (GenerativeModel(generating=self.completion),)
 
@@ -82,9 +81,4 @@ class Anthropic(
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        await self._client.__aexit__(
-            exc_type,
-            exc_val,
-            exc_tb,
-        )
-        del self._client
+        await self._deinitialize_client()

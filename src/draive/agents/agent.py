@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Iterable, MutableSequence, Sequence
+from collections.abc import AsyncGenerator, Iterable, MutableSequence, Sequence
 from typing import Any, NoReturn, Self, final, overload
 from uuid import UUID, uuid4
 
@@ -15,14 +15,14 @@ from draive.models import (
     GenerativeModel,
     ModelInstructions,
     ModelOutput,
-    ModelOutputBlock,
+    ModelOutputChunk,
     ModelOutputSelection,
-    ModelReasoning,
     ModelReasoningChunk,
     ModelToolRequest,
     ModelToolResponse,
+    model_output_blocks,
 )
-from draive.models.types import ModelInput, ModelToolHandling
+from draive.models.types import ModelInput, ModelOutputStream, ModelToolHandling
 from draive.multimodal import (
     Multimodal,
     MultimodalContent,
@@ -100,7 +100,7 @@ class Agent:
 
         async def noop(
             message: AgentMessage,
-        ) -> AsyncIterable[MultimodalContentPart | ProcessingEvent]:
+        ) -> AsyncGenerator[MultimodalContentPart | ProcessingEvent]:
             return  # do not emit anything
             yield  # converts to AsyncGenerator
 
@@ -186,7 +186,8 @@ class Agent:
         Returns
         -------
         Self
-            Agent instance backed by ``Step.looping_completion(...)``.
+            Agent instance running a completion-and-tools loop step, with
+            memory applied around it.
         """
         identity: AgentIdentity
         if isinstance(agent, str):
@@ -239,59 +240,26 @@ class Agent:
                 while True:  # loop until we get ModelOutput without tools
                     async with ctx.scope(f"agent.generative.turn_{iteration}"):
                         ctx.log_debug("Generating completion...")
-                        content_accumulator: MutableSequence[MultimodalContentPart] = []
-                        reasoning_accumulator: MutableSequence[ModelReasoningChunk] = []
-                        output_accumulator: MutableSequence[ModelOutputBlock] = []
+                        chunks_accumulator: MutableSequence[ModelOutputChunk] = []
 
-                        async for chunk in GenerativeModel.completion(
+                        completion_stream: ModelOutputStream = GenerativeModel.completion(
                             instructions=resolved_instructions,
                             tools=agent_tools.model_tools(iteration=iteration),
                             context=state.context,
                             output=output,
-                        ):
-                            yield chunk
+                        )
+                        try:
+                            async for chunk in completion_stream:
+                                yield chunk
+                                # TODO: start handling tool requests immediately
+                                chunks_accumulator.append(chunk)
 
-                            if isinstance(chunk, ModelReasoningChunk):
-                                if content_accumulator:
-                                    output_accumulator.append(
-                                        MultimodalContent.of(*content_accumulator)
-                                    )
-                                    content_accumulator.clear()
+                        finally:
+                            await completion_stream.aclose()
 
-                                reasoning_accumulator.append(chunk)
-
-                            elif isinstance(chunk, ModelToolRequest):
-                                # TODO: start handling immediately
-                                if content_accumulator:
-                                    output_accumulator.append(
-                                        MultimodalContent.of(*content_accumulator)
-                                    )
-                                    content_accumulator.clear()
-
-                                if reasoning_accumulator:
-                                    output_accumulator.append(
-                                        ModelReasoning.of(reasoning_accumulator)
-                                    )
-                                    reasoning_accumulator.clear()
-
-                                output_accumulator.append(chunk)
-
-                            else:
-                                if reasoning_accumulator:
-                                    output_accumulator.append(
-                                        ModelReasoning.of(reasoning_accumulator)
-                                    )
-                                    reasoning_accumulator.clear()
-
-                                content_accumulator.append(chunk)
-
-                        if content_accumulator:
-                            output_accumulator.append(MultimodalContent.of(*content_accumulator))
-
-                        if reasoning_accumulator:
-                            output_accumulator.append(ModelReasoning.of(reasoning_accumulator))
-
-                        model_output: ModelOutput = ModelOutput.of(*output_accumulator)
+                        model_output: ModelOutput = ModelOutput.of(
+                            *model_output_blocks(chunks_accumulator)
+                        )
 
                         state = state.appending_context(model_output)
                         yield state
@@ -304,17 +272,22 @@ class Agent:
 
                         responses: MutableSequence[ModelToolResponse] = []
                         tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
-                        async for chunk in agent_tools.handle(*tool_requests):
-                            if isinstance(chunk, ModelToolResponse):
-                                responses.append(chunk)
-                                yield chunk
+                        tools_stream = agent_tools.handle(*tool_requests)
+                        try:
+                            async for chunk in tools_stream:
+                                if isinstance(chunk, ModelToolResponse):
+                                    responses.append(chunk)
+                                    yield chunk
 
-                            elif isinstance(chunk, ProcessingEvent):
-                                yield chunk
+                                elif isinstance(chunk, ProcessingEvent):
+                                    yield chunk
 
-                            else:
-                                tools_output_accumulator.append(chunk)
-                                yield chunk
+                                else:
+                                    tools_output_accumulator.append(chunk)
+                                    yield chunk
+
+                        finally:
+                            await tools_stream.aclose()
 
                         ctx.log_debug("...received tool responses...")
 
@@ -500,8 +473,8 @@ class Agent:
 
         async def execute(
             message: AgentMessage,
-        ) -> AsyncIterable[MultimodalContentPart | ProcessingEvent]:
-            async for chunk in Step.sequence(
+        ) -> AsyncGenerator[MultimodalContentPart | ProcessingEvent]:
+            steps_stream = Step.sequence(
                 step,
                 *steps,
             ).stream(
@@ -511,21 +484,26 @@ class Agent:
                         meta=message.meta,
                     ),
                 )
-            ):
-                if isinstance(chunk, ModelReasoningChunk):
-                    continue  # skip reasoning
+            )
+            try:
+                async for chunk in steps_stream:
+                    if isinstance(chunk, ModelReasoningChunk):
+                        continue  # skip reasoning
 
-                elif isinstance(chunk, ProcessingEvent):
-                    yield chunk  # pass events
+                    elif isinstance(chunk, ProcessingEvent):
+                        yield chunk  # pass events
 
-                elif isinstance(chunk, ModelToolRequest):
-                    continue  # skip tools within output
+                    elif isinstance(chunk, ModelToolRequest):
+                        continue  # skip tools within output
 
-                elif isinstance(chunk, ModelToolResponse):
-                    continue  # skip tools within output
+                    elif isinstance(chunk, ModelToolResponse):
+                        continue  # skip tools within output
 
-                else:
-                    yield chunk  # pass content
+                    else:
+                        yield chunk  # pass content
+
+            finally:
+                await steps_stream.aclose()
 
         identity: AgentIdentity
         if isinstance(agent, str):
@@ -584,7 +562,7 @@ class Agent:
         thread: UUID | None = None,
         input: Multimodal,  # noqa: A002
         meta: Meta | MetaValues | None = None,
-    ) -> AsyncIterable[MultimodalContentPart | ProcessingEvent]:
+    ) -> AsyncGenerator[MultimodalContentPart | ProcessingEvent]:
         """Call the agent with raw multimodal input.
 
         Parameters
@@ -599,7 +577,7 @@ class Agent:
 
         Returns
         -------
-        AsyncIterable[MultimodalContentPart | ProcessingEvent]
+        AsyncGenerator[MultimodalContentPart | ProcessingEvent]
             Stream of output chunks emitted by the agent.
         """
         current: AgentThread | None
@@ -630,7 +608,7 @@ class Agent:
     async def respond(
         self,
         message: AgentMessage,
-    ) -> AsyncIterable[MultimodalContentPart | ProcessingEvent]:
+    ) -> AsyncGenerator[MultimodalContentPart | ProcessingEvent]:
         """Execute the agent for an already prepared message.
 
         Parameters
@@ -640,7 +618,7 @@ class Agent:
 
         Returns
         -------
-        AsyncIterable[MultimodalContentPart | ProcessingEvent]
+        AsyncGenerator[MultimodalContentPart | ProcessingEvent]
             Stream of output chunks emitted while handling the message.
         """
         async with ctx.scope(
@@ -654,8 +632,13 @@ class Agent:
             ctx.log_info(
                 f"Agent {self.identity.name} responding to message within thread {message.thread}"
             )
-            async for chunk in self._executing(message):
-                yield chunk
+            execution_stream = self._executing(message)
+            try:
+                async for chunk in execution_stream:
+                    yield chunk
+
+            finally:
+                await execution_stream.aclose()
 
     def as_tool(  # noqa: C901
         self,
@@ -734,9 +717,14 @@ class Agent:
         )
         async def agent_request(
             task: str,
-        ) -> AsyncIterable[ToolOutputChunk]:
-            async for chunk in self.call(input=task):
-                yield chunk
+        ) -> AsyncGenerator[ToolOutputChunk]:
+            agent_stream = self.call(input=task)
+            try:
+                async for chunk in agent_stream:
+                    yield chunk
+
+            finally:
+                await agent_stream.aclose()
 
         return agent_request
 

@@ -13,6 +13,21 @@ __all__ = (
 
 
 class InstructionPreparationAmbiguity(Exception):
+    """Raised when instruction preparation needs clarification before proceeding.
+
+    Parameters
+    ----------
+    *args : object
+        Positional exception message arguments forwarded to ``Exception``.
+    questions : str
+        Clarification questions returned by the model.
+
+    Attributes
+    ----------
+    questions : str
+        Clarification questions to answer before retrying the preparation.
+    """
+
     def __init__(
         self,
         *args: object,
@@ -65,7 +80,11 @@ async def prepare_instructions(
 
         elif parsed := result.tag("QUESTIONS"):
             ctx.log_error("...instruction preparation requires clarification!")
-            raise InstructionPreparationAmbiguity(questions=parsed.content.to_str())
+            questions: str = parsed.content.to_str()
+            raise InstructionPreparationAmbiguity(
+                f"Instruction preparation requires clarification:\n{questions}",
+                questions=questions,
+            )
 
         else:
             ctx.log_error("...instruction preparation failed!")

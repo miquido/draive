@@ -24,7 +24,7 @@ class OllamaAPI:
             server_url or getenv_str("OLLAMA_SERVER_URL") or getenv_str("OLLAMA_HOST")
         )
         self._timeout: float | None = timeout
-        self._client = self._prepare_client()
+        self._client: AsyncClient  # initialized later
 
     def _prepare_client(self) -> AsyncClient:
         return AsyncClient(
@@ -33,18 +33,17 @@ class OllamaAPI:
         )
 
     async def _initialize_client(self) -> None:
-        # Recreate and enter async client lifecycle
-        try:
-            await self._client._client.aclose()  # pyright: ignore[reportUnknownMemberType, reportPrivateUsage, reportUnknownMemberType]
-        except Exception:
-            # Best-effort close; underlying client may not be initialized yet
-            pass  # nosec: B110
+        assert not hasattr(self, "_client")  # nosec: B101
         self._client = self._prepare_client()
-        await self._client._client.__aenter__()  # pyright: ignore[reportUnknownMemberType, reportPrivateUsage, reportUnknownMemberType]
+        await self._client.__aenter__()
 
     async def _deinitialize_client(self) -> None:
-        await self._client._client.__aexit__(  # pyright: ignore[reportUnknownMemberType, reportPrivateUsage, reportUnknownMemberType]
-            None,
-            None,
-            None,
-        )
+        try:
+            await self._client.__aexit__(  # pyright: ignore[reportUnknownMemberType]
+                None,
+                None,
+                None,
+            )
+
+        finally:
+            del self._client

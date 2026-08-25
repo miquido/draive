@@ -55,6 +55,24 @@ async def test_emitting_stream_and_run_collects_content() -> None:
 
 
 @pytest.mark.asyncio
+async def test_emitting_normalizes_multimodal_values() -> None:
+    # only content parts are recognized as emitted output, plain strings and
+    # content containers have to be normalized instead of passed through
+    step_obj = Step.emitting("a", MultimodalContent.of("b", "c"))
+
+    streamed = [part async for part in step_obj.stream()]
+    result = await step_obj.run()
+
+    assert all(isinstance(part, TextContent) for part in streamed)
+    assert _text_of(result) == "abc"
+
+
+@pytest.mark.asyncio
+async def test_emitting_empty_content_is_noop() -> None:
+    assert await Step.emitting(MultimodalContent.empty).run() == MultimodalContent.empty
+
+
+@pytest.mark.asyncio
 async def test_updating_artifacts_and_get() -> None:
     state = await Step.updating_artifacts(
         AlphaArtifact(value="alpha"),

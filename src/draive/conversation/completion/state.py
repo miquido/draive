@@ -72,14 +72,20 @@ class Conversation(State):
             if not isinstance(memory, ConversationMemory):
                 memory = ConversationMemory.constant(memory)
 
-            async for chunk in self._completing(
+            completion_stream: ConversationOutputStream = self._completing(
                 instructions=instructions,
                 toolbox=Toolbox.of(tools),
                 memory=memory,
                 message=message,
                 **extra,
-            ):
-                yield chunk
+            )
+            try:
+                async for chunk in completion_stream:
+                    yield chunk
+
+            finally:
+                # release the completion when the consumer stops before its end
+                await completion_stream.aclose()
 
     _completing: ConversationCompleting
 

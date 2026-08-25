@@ -25,18 +25,18 @@ class VLLMEmbedding(VLLMAPI):
         config: VLLMEmbeddingConfig | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
-        async with ctx.scope("vllm.embedding"):
+        async with ctx.scope("embedding.invocation"):
             embedding_config: VLLMEmbeddingConfig = config or ctx.state(VLLMEmbeddingConfig)
 
             record_embedding_invocation(
-                provider=f"vllm@{self._base_url}",
+                provider=self._provider,
                 model=embedding_config.model,
                 embedding_type="text",
                 batch_size=embedding_config.batch_size,
                 dimensions=embedding_config.dimensions,
             )
             record_embedding_metrics(
-                provider=f"vllm@{self._base_url}",
+                provider=self._provider,
                 model=embedding_config.model,
                 embedding_type="text",
                 items=len(values),
@@ -93,7 +93,12 @@ class VLLMEmbedding(VLLMAPI):
                     )
                     for value, embedding in zip(
                         values,
-                        chain.from_iterable(response.data for response in responses),
+                        # the api documents no ordering guarantee, the index within each
+                        # entry is what pairs it back with its input
+                        chain.from_iterable(
+                            sorted(response.data, key=lambda entry: entry.index)
+                            for response in responses
+                        ),
                         strict=True,
                     )
                 ],

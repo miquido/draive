@@ -1,6 +1,6 @@
 from asyncio import ALL_COMPLETED, Task, sleep, wait
 from collections.abc import (
-    AsyncIterable,
+    AsyncGenerator,
     AsyncIterator,
     Callable,
     Collection,
@@ -37,15 +37,16 @@ from draive.models import (
     ModelInput,
     ModelInstructions,
     ModelOutput,
-    ModelOutputBlock,
+    ModelOutputChunk,
     ModelOutputSelection,
-    ModelReasoning,
     ModelReasoningChunk,
     ModelToolRequest,
     ModelToolResponse,
     ModelTools,
     ModelToolSpecification,
+    model_output_blocks,
 )
+from draive.models.types import ModelOutputStream
 from draive.multimodal import (
     ArtifactContent,
     Multimodal,
@@ -97,20 +98,23 @@ class Step:
     @classmethod
     def emitting(
         cls,
-        *parts: StepOutputChunk,
+        *parts: StepOutputChunk | Multimodal,
     ) -> Self:
         """Create a step that emits fixed output parts and leaves state unchanged.
 
         Parameters
         ----------
-        *parts : StepOutputChunk
-            Output parts to emit in order.
+        *parts : StepOutputChunk | Multimodal
+            Output parts to emit in order. Multimodal values - including plain
+            ``str`` and ``MultimodalContent`` containers - are normalized into
+            individual content parts, since only those are recognized as
+            emitted output by stream consumers.
 
         Returns
         -------
         Self
-            A step emitting the provided parts, or ``Step.noop`` when no parts
-            are provided.
+            A step emitting the provided parts, or ``Step.noop`` when nothing
+            would be emitted.
 
         Notes
         -----
@@ -120,11 +124,25 @@ class Step:
         if not parts:
             return cls.noop
 
+        emitted: MutableSequence[StepOutputChunk] = []
+        for part in parts:
+            if isinstance(
+                part,
+                ModelReasoningChunk | ModelToolRequest | ModelToolResponse | ProcessingEvent,
+            ):
+                emitted.append(part)
+
+            else:  # normalize multimodal forms into individual content parts
+                emitted.extend(MultimodalContent.of(part).parts)
+
+        if not emitted:
+            return cls.noop
+
         async def step(
             state: StepState,
         ) -> StepStream:
-            for part in parts:
-                yield part
+            for chunk in emitted:
+                yield chunk
 
         return cls(step)
 
@@ -510,12 +528,17 @@ class Step:
             state: StepState,
         ) -> StepStream:
             for execution in executions:
-                async for chunk in execution(state=state):
-                    if isinstance(chunk, StepState):
-                        state = chunk
+                execution_stream: StepStream = execution(state=state)
+                try:
+                    async for chunk in execution_stream:
+                        if isinstance(chunk, StepState):
+                            state = chunk
 
-                    else:
-                        yield chunk
+                        else:
+                            yield chunk
+
+                finally:
+                    await execution_stream.aclose()
 
             yield state
 
@@ -565,12 +588,17 @@ class Step:
                 ):
                     async with ctx.scope(f"step.loop.iteration_{iteration}"):
                         for execution in executions:
-                            async for chunk in execution(state=state):
-                                if isinstance(chunk, StepState):
-                                    state = chunk
+                            execution_stream: StepStream = execution(state=state)
+                            try:
+                                async for chunk in execution_stream:
+                                    if isinstance(chunk, StepState):
+                                        state = chunk
 
-                                else:
-                                    yield chunk
+                                    else:
+                                        yield chunk
+
+                            finally:
+                                await execution_stream.aclose()
 
                         yield state
                         iteration += 1
@@ -616,12 +644,17 @@ class Step:
                     execution: StepExecuting,
                 ) -> StepState:
                     async with ctx.scope("step.concurrent.branch"):
-                        async for chunk in execution(state=state):
-                            if isinstance(chunk, StepState):
-                                state = chunk
+                        execution_stream: StepStream = execution(state=state)
+                        try:
+                            async for chunk in execution_stream:
+                                if isinstance(chunk, StepState):
+                                    state = chunk
 
-                            else:
-                                await output_stream.send(chunk)
+                                else:
+                                    await output_stream.send(chunk)
+
+                        finally:
+                            await execution_stream.aclose()
 
                         return state
 
@@ -645,6 +678,7 @@ class Step:
                         return await merge(branches=(branch.result() for branch in branches))
 
                     merged: Task[StepState] = ctx.spawn(merge_branches)
+                    # the branches feed the stream, it is finished along with them
                     async for chunk in output_stream:
                         yield chunk
 
@@ -653,7 +687,7 @@ class Step:
         return cls(step)
 
     @classmethod
-    def generating_completion(  # noqa: C901
+    def generating_completion(
         cls,
         /,
         *,
@@ -695,7 +729,7 @@ class Step:
         requests) in one reusable, strongly typed step.
         """
 
-        async def step(  # noqa: C901, PLR0912
+        async def step(
             state: StepState,
         ) -> StepStream:
             async with ctx.scope("step.completion"):
@@ -725,51 +759,26 @@ class Step:
                 else:
                     model_tools = ModelTools.of(*tools)
 
-                content_accumulator: MutableSequence[MultimodalContentPart] = []
-                reasoning_accumulator: MutableSequence[ModelReasoningChunk] = []
-                output_accumulator: MutableSequence[ModelOutputBlock] = []
+                chunks_accumulator: MutableSequence[ModelOutputChunk] = []
 
-                async for chunk in GenerativeModel.completion(
+                completion_stream: ModelOutputStream = GenerativeModel.completion(
                     instructions=resolved_instructions,
                     tools=model_tools,
                     context=state.context,
                     output=output,
                     **extra,
-                ):
-                    yield chunk
+                )
+                try:
+                    async for chunk in completion_stream:
+                        yield chunk
+                        chunks_accumulator.append(chunk)
 
-                    if isinstance(chunk, ModelReasoningChunk):
-                        if content_accumulator:
-                            output_accumulator.append(MultimodalContent.of(*content_accumulator))
-                            content_accumulator.clear()
+                finally:
+                    await completion_stream.aclose()
 
-                        reasoning_accumulator.append(chunk)
-
-                    elif isinstance(chunk, ModelToolRequest):
-                        if content_accumulator:
-                            output_accumulator.append(MultimodalContent.of(*content_accumulator))
-                            content_accumulator.clear()
-
-                        if reasoning_accumulator:
-                            output_accumulator.append(ModelReasoning.of(reasoning_accumulator))
-                            reasoning_accumulator.clear()
-
-                        output_accumulator.append(chunk)
-
-                    else:
-                        if reasoning_accumulator:
-                            output_accumulator.append(ModelReasoning.of(reasoning_accumulator))
-                            reasoning_accumulator.clear()
-
-                        content_accumulator.append(chunk)
-
-                if content_accumulator:
-                    output_accumulator.append(MultimodalContent.of(*content_accumulator))
-
-                if reasoning_accumulator:
-                    output_accumulator.append(ModelReasoning.of(reasoning_accumulator))
-
-                yield state.appending_context(ModelOutput.of(*output_accumulator))
+                yield state.appending_context(
+                    ModelOutput.of(*model_output_blocks(chunks_accumulator))
+                )
 
         return cls(step)
 
@@ -823,17 +832,24 @@ class Step:
             async with ctx.scope("step.tools.handling"):
                 responses: MutableSequence[ModelToolResponse] = []
                 tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
-                async for chunk in toolbox.handle(*tool_requests):
-                    if isinstance(chunk, ModelToolResponse):
-                        responses.append(chunk)
-                        yield chunk
+                tools_stream: AsyncGenerator[
+                    ModelToolResponse | ProcessingEvent | MultimodalContentPart
+                ] = toolbox.handle(*tool_requests)
+                try:
+                    async for chunk in tools_stream:
+                        if isinstance(chunk, ModelToolResponse):
+                            responses.append(chunk)
+                            yield chunk
 
-                    elif isinstance(chunk, ProcessingEvent):
-                        yield chunk
+                        elif isinstance(chunk, ProcessingEvent):
+                            yield chunk
 
-                    else:
-                        tools_output_accumulator.append(chunk)
-                        yield chunk
+                        else:
+                            tools_output_accumulator.append(chunk)
+                            yield chunk
+
+                finally:
+                    await tools_stream.aclose()
 
                 ctx.log_debug("...received tool responses...")
 
@@ -922,60 +938,27 @@ class Step:
                     async with ctx.scope(f"step.completion.loop.iteration_{iteration}"):
                         model_output: ModelOutput
                         ctx.log_debug("Generating completion...")
-                        content_accumulator: MutableSequence[MultimodalContentPart] = []
-                        reasoning_accumulator: MutableSequence[ModelReasoningChunk] = []
-                        output_accumulator: MutableSequence[ModelOutputBlock] = []
+                        chunks_accumulator: MutableSequence[ModelOutputChunk] = []
 
-                        async for chunk in GenerativeModel.completion(
+                        completion_stream: ModelOutputStream = GenerativeModel.completion(
                             instructions=resolved_instructions,
                             tools=toolbox.model_tools(iteration=iteration),
                             context=state.context,
                             output=output,
                             **extra,
-                        ):
-                            yield chunk
+                        )
+                        try:
+                            async for chunk in completion_stream:
+                                yield chunk
+                                # TODO: start handling tool requests immediately
+                                chunks_accumulator.append(chunk)
 
-                            if isinstance(chunk, ModelReasoningChunk):
-                                if content_accumulator:
-                                    output_accumulator.append(
-                                        MultimodalContent.of(*content_accumulator)
-                                    )
-                                    content_accumulator.clear()
+                        finally:
+                            await completion_stream.aclose()
 
-                                reasoning_accumulator.append(chunk)
-
-                            elif isinstance(chunk, ModelToolRequest):
-                                # TODO: start handling immediately
-                                if content_accumulator:
-                                    output_accumulator.append(
-                                        MultimodalContent.of(*content_accumulator)
-                                    )
-                                    content_accumulator.clear()
-
-                                if reasoning_accumulator:
-                                    output_accumulator.append(
-                                        ModelReasoning.of(reasoning_accumulator)
-                                    )
-                                    reasoning_accumulator.clear()
-
-                                output_accumulator.append(chunk)
-
-                            else:
-                                if reasoning_accumulator:
-                                    output_accumulator.append(
-                                        ModelReasoning.of(reasoning_accumulator)
-                                    )
-                                    reasoning_accumulator.clear()
-
-                                content_accumulator.append(chunk)
-
-                        if content_accumulator:
-                            output_accumulator.append(MultimodalContent.of(*content_accumulator))
-
-                        if reasoning_accumulator:
-                            output_accumulator.append(ModelReasoning.of(reasoning_accumulator))
-
-                        model_output: ModelOutput = ModelOutput.of(*output_accumulator)
+                        model_output: ModelOutput = ModelOutput.of(
+                            *model_output_blocks(chunks_accumulator)
+                        )
 
                         state = state.appending_context(model_output)
                         yield state
@@ -988,17 +971,24 @@ class Step:
 
                         responses: MutableSequence[ModelToolResponse] = []
                         tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
-                        async for chunk in toolbox.handle(*tool_requests):
-                            if isinstance(chunk, ModelToolResponse):
-                                responses.append(chunk)
-                                yield chunk
+                        tools_stream: AsyncGenerator[
+                            ModelToolResponse | ProcessingEvent | MultimodalContentPart
+                        ] = toolbox.handle(*tool_requests)
+                        try:
+                            async for chunk in tools_stream:
+                                if isinstance(chunk, ModelToolResponse):
+                                    responses.append(chunk)
+                                    yield chunk
 
-                            elif isinstance(chunk, ProcessingEvent):
-                                yield chunk
+                                elif isinstance(chunk, ProcessingEvent):
+                                    yield chunk
 
-                            else:
-                                tools_output_accumulator.append(chunk)
-                                yield chunk
+                                else:
+                                    tools_output_accumulator.append(chunk)
+                                    yield chunk
+
+                        finally:
+                            await tools_stream.aclose()
 
                         ctx.log_debug("...received tool responses...")
 
@@ -1048,8 +1038,13 @@ class Step:
         ) -> StepStream:
             selection: Step = await selecting(state=state)
 
-            async for chunk in selection._executing(state):
-                yield chunk
+            selection_stream = selection._executing(state)
+            try:
+                async for chunk in selection_stream:
+                    yield chunk
+
+            finally:
+                await selection_stream.aclose()
 
         return cls(step)
 
@@ -1110,16 +1105,27 @@ class Step:
                 ) -> StepStream:
                     async with Disposables(disposables) as disposable_state:
                         with ctx.updating(*disposable_state, *ctx_state):
-                            async for chunk in executing(state=state):
-                                yield chunk
+                            execution_stream = executing(state=state)
+                            try:
+                                async for chunk in execution_stream:
+                                    yield chunk
+
+                            finally:
+                                await execution_stream.aclose()
+
             else:
 
                 async def step(
                     state: StepState,
                 ) -> StepStream:
                     with ctx.updating(*ctx_state):
-                        async for chunk in executing(state=state):
-                            yield chunk
+                        execution_stream = executing(state=state)
+                        try:
+                            async for chunk in execution_stream:
+                                yield chunk
+
+                        finally:
+                            await execution_stream.aclose()
 
         elif disposables:
 
@@ -1127,8 +1133,13 @@ class Step:
                 state: StepState,
             ) -> StepStream:
                 async with ctx.disposables(*disposables):
-                    async for chunk in executing(state=state):
-                        yield chunk
+                    execution_stream = executing(state=state)
+                    try:
+                        async for chunk in execution_stream:
+                            yield chunk
+
+                    finally:
+                        await execution_stream.aclose()
 
         else:
             return self  # nothing to change...
@@ -1181,11 +1192,16 @@ class Step:
             attempt: int = 0
             while True:
                 try:
-                    async for chunk in executing(state=state):
-                        yield chunk
+                    execution_stream = executing(state=state)
+                    try:
+                        async for chunk in execution_stream:
+                            yield chunk
 
-                        if isinstance(chunk, StepState):
-                            state = chunk  # update local state in case of retry
+                            if isinstance(chunk, StepState):
+                                state = chunk  # update local state in case of retry
+
+                    finally:
+                        await execution_stream.aclose()
 
                 except Exception as exc:
                     if attempt < limit and catch_check(exc):
@@ -1253,17 +1269,27 @@ class Step:
             state: StepState,
         ) -> StepStream:
             try:
-                async for chunk in executing(state=state):
-                    yield chunk
+                execution_stream = executing(state=state)
+                try:
+                    async for chunk in execution_stream:
+                        yield chunk
 
-                    if isinstance(chunk, StepState):
-                        state = chunk  # update local state in case of fallback
+                        if isinstance(chunk, StepState):
+                            state = chunk  # update local state in case of fallback
+
+                finally:
+                    await execution_stream.aclose()
 
             except Exception as exc:
                 if any(isinstance(exc, exception) for exception in exceptions):
                     ctx.log_info(f"Using fallback Step for {type(exc)}")
-                    async for chunk in fallback_executing(state=state):
-                        yield chunk
+                    fallback_stream = fallback_executing(state=state)
+                    try:
+                        async for chunk in fallback_stream:
+                            yield chunk
+
+                    finally:
+                        await fallback_stream.aclose()
 
                 else:
                     raise  # reraise original
@@ -1300,24 +1326,34 @@ class Step:
             async def step(
                 state: StepState,
             ) -> StepStream:
-                async for chunk in executing(state=state.updating(context=await context())):
-                    if isinstance(chunk, StepState):
-                        yield chunk.updating(context=state.context)
+                execution_stream = executing(state=state.updating(context=await context()))
+                try:
+                    async for chunk in execution_stream:
+                        if isinstance(chunk, StepState):
+                            yield chunk.updating(context=state.context)
 
-                    else:
-                        yield chunk
+                        else:
+                            yield chunk
+
+                finally:
+                    await execution_stream.aclose()
 
         else:
 
             async def step(
                 state: StepState,
             ) -> StepStream:
-                async for chunk in executing(state=state.updating(context=context)):
-                    if isinstance(chunk, StepState):
-                        yield chunk.updating(context=state.context)
+                execution_stream = executing(state=state.updating(context=context))
+                try:
+                    async for chunk in execution_stream:
+                        if isinstance(chunk, StepState):
+                            yield chunk.updating(context=state.context)
 
-                    else:
-                        yield chunk
+                        else:
+                            yield chunk
+
+                finally:
+                    await execution_stream.aclose()
 
         return self.__class__(step)
 
@@ -1339,12 +1375,17 @@ class Step:
         async def step(
             state: StepState,
         ) -> StepStream:
-            async for chunk in executing(state=state):
-                if isinstance(chunk, StepState):
-                    yield chunk.updating(context=state.context)
+            execution_stream = executing(state=state)
+            try:
+                async for chunk in execution_stream:
+                    if isinstance(chunk, StepState):
+                        yield chunk.updating(context=state.context)
 
-                else:
-                    yield chunk
+                    else:
+                        yield chunk
+
+            finally:
+                await execution_stream.aclose()
 
         return self.__class__(step)
 
@@ -1367,16 +1408,21 @@ class Step:
         async def step(
             state: StepState,
         ) -> StepStream:
-            async for chunk in executing(state=state):
-                if isinstance(chunk, StepState):
-                    updated: ModelContext = tuple(  # remove context elements containing tools
-                        element for element in chunk.context if not element.contains_tools
-                    )
-                    if chunk.context != updated:
-                        yield chunk.updating(context=updated)
+            execution_stream = executing(state=state)
+            try:
+                async for chunk in execution_stream:
+                    if isinstance(chunk, StepState):
+                        updated: ModelContext = tuple(  # remove context elements containing tools
+                            element for element in chunk.context if not element.contains_tools
+                        )
+                        if chunk.context != updated:
+                            yield chunk.updating(context=updated)
 
-                else:
-                    yield chunk
+                    else:
+                        yield chunk
+
+            finally:
+                await execution_stream.aclose()
 
         return self.__class__(step)
 
@@ -1439,8 +1485,13 @@ class Step:
                 state: StepState,
             ) -> StepStream:
                 if await condition(state=state):
-                    async for chunk in executing(state=state):
-                        yield chunk
+                    execution_stream = executing(state=state)
+                    try:
+                        async for chunk in execution_stream:
+                            yield chunk
+
+                    finally:
+                        await execution_stream.aclose()
 
         else:
 
@@ -1448,12 +1499,22 @@ class Step:
                 state: StepState,
             ) -> StepStream:
                 if await condition(state=state):
-                    async for chunk in executing(state=state):
-                        yield chunk
+                    execution_stream = executing(state=state)
+                    try:
+                        async for chunk in execution_stream:
+                            yield chunk
+
+                    finally:
+                        await execution_stream.aclose()
 
                 else:
-                    async for chunk in alternative_executing(state=state):
-                        yield chunk
+                    alternative_stream = alternative_executing(state=state)
+                    try:
+                        async for chunk in alternative_stream:
+                            yield chunk
+
+                    finally:
+                        await alternative_stream.aclose()
 
         return self.__class__(step)
 
@@ -1474,11 +1535,16 @@ class Step:
         async def step(
             state: StepState,
         ) -> StepStream:
-            async for chunk in executing(state=state):
-                if not isinstance(chunk, StepState):
-                    continue  # skip output chunks
+            execution_stream = executing(state=state)
+            try:
+                async for chunk in execution_stream:
+                    if not isinstance(chunk, StepState):
+                        continue  # skip output chunks
 
-                yield chunk  # pass only state updates
+                    yield chunk  # pass only state updates
+
+            finally:
+                await execution_stream.aclose()
 
         return self.__class__(step)
 
@@ -1533,8 +1599,13 @@ class Step:
                         },
                     )
 
-            async for chunk in executing(state=state):
-                yield chunk
+            execution_stream = executing(state=state)
+            try:
+                async for chunk in execution_stream:
+                    yield chunk
+
+            finally:
+                await execution_stream.aclose()
 
         return self.__class__(step)
 
@@ -1579,27 +1650,34 @@ class Step:
             state: StepState,
         ) -> StepStream:
             accumulator: MutableSequence[StepOutputChunk] = []
-            async for chunk in executing(state=state):
-                yield chunk
+            execution_stream = executing(state=state)
+            try:
+                async for chunk in execution_stream:
+                    yield chunk
 
-                if isinstance(chunk, StepState):
-                    state = chunk  # update local state
-                    continue  # evaluate only output
+                    if isinstance(chunk, StepState):
+                        state = chunk  # update local state
+                        continue  # evaluate only output
 
-                accumulator.append(chunk)
+                    accumulator.append(chunk)
 
-                async with ctx.scope("step.evaluation.output"):
-                    result: EvaluatorScenarioResult | EvaluatorResult = await evaluator(accumulator)
-
-                    if raise_on_failure and not result.passed:
-                        raise StepException(
-                            "Output evaluation failed",
-                            state=state,
-                            meta={
-                                "performance": result.performance,
-                                "report": result.report(detailed=__debug__),
-                            },
+                    async with ctx.scope("step.evaluation.output"):
+                        result: EvaluatorScenarioResult | EvaluatorResult = await evaluator(
+                            accumulator
                         )
+
+                        if raise_on_failure and not result.passed:
+                            raise StepException(
+                                "Output evaluation failed",
+                                state=state,
+                                meta={
+                                    "performance": result.performance,
+                                    "report": result.report(detailed=__debug__),
+                                },
+                            )
+
+            finally:
+                await execution_stream.aclose()
 
         return self.__class__(step)
 
@@ -1667,9 +1745,13 @@ class Step:
                 ),
             )
 
-        async for chunk in stream:
-            if isinstance(chunk, MultimodalContentPart):
-                accumulator.append(chunk)
+        try:
+            async for chunk in stream:
+                if isinstance(chunk, MultimodalContentPart):
+                    accumulator.append(chunk)
+
+        finally:
+            await stream.aclose()
 
         return MultimodalContent.of(*accumulator)
 
@@ -1731,9 +1813,14 @@ class Step:
                 **keyed_artifacts,
             )
 
-        async for chunk in self._executing(state=state):
-            if isinstance(chunk, StepState):
-                state = chunk
+        stream: StepStream = self._executing(state=state)
+        try:
+            async for chunk in stream:
+                if isinstance(chunk, StepState):
+                    state = chunk
+
+        finally:
+            await stream.aclose()
 
         return state
 
@@ -1742,7 +1829,7 @@ class Step:
         self,
         state: StepState,
         /,
-    ) -> AsyncIterable[StepOutputChunk]: ...
+    ) -> AsyncGenerator[StepOutputChunk]: ...
 
     @overload
     def stream(
@@ -1751,7 +1838,7 @@ class Step:
         /,
         *artifacts: State,
         **keyed_artifacts: State,
-    ) -> AsyncIterable[StepOutputChunk]: ...
+    ) -> AsyncGenerator[StepOutputChunk]: ...
 
     async def stream(
         self,
@@ -1759,7 +1846,7 @@ class Step:
         /,
         *artifacts: State,
         **keyed_artifacts: State,
-    ) -> AsyncIterable[StepOutputChunk]:
+    ) -> AsyncGenerator[StepOutputChunk]:
         """Execute step and stream emitted non-state output chunks.
 
         Parameters
@@ -1773,7 +1860,7 @@ class Step:
 
         Returns
         -------
-        AsyncIterable[StepOutputChunk]
+        AsyncGenerator[StepOutputChunk]
             Async stream yielding emitted output chunks until completion.
 
         Raises
@@ -1785,6 +1872,10 @@ class Step:
         -----
         Rationale: exposes streaming execution for incremental consumers such as
         UIs and realtime pipelines.
+
+        Consumers stopping before the stream ends should close it explicitly,
+        i.e. through ``ctx.closing``. Leaving it to garbage collection
+        finalizes it within an unrelated context, breaking scoped state teardown.
         """
 
         stream: StepStream
@@ -1802,11 +1893,15 @@ class Step:
                 ),
             )
 
-        async for chunk in stream:
-            if isinstance(chunk, StepState):
-                continue  # skip state updates
+        try:
+            async for chunk in stream:
+                if isinstance(chunk, StepState):
+                    continue  # skip state updates
 
-            yield chunk  # provide the rest
+                yield chunk  # provide the rest
+
+        finally:
+            await stream.aclose()
 
     def __aiter__(self) -> AsyncIterator[StepOutputChunk]:
         return aiter(self.stream())

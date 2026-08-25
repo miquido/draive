@@ -3,6 +3,7 @@ from typing import Literal, overload
 from qdrant_client import AsyncQdrantClient
 
 from draive.qdrant.config import QDRANT_GRPC_PORT, QDRANT_HOST, QDRANT_PORT
+from draive.qdrant.utils import qdrant_operation
 
 __all__ = ("QdrantSession",)
 
@@ -53,7 +54,7 @@ class QdrantSession:
         self._ssl: bool = ssl
         self._timeout: int = timeout
         self._in_memory: bool = in_memory
-        self._client: AsyncQdrantClient | None = None
+        self._client: AsyncQdrantClient  # initialized later
 
     @property
     def client(self) -> AsyncQdrantClient:
@@ -61,8 +62,7 @@ class QdrantSession:
         return self._client
 
     async def _open_session(self) -> None:
-        if self._client is not None:
-            await self._client.close(grpc_grace=5)
+        assert not hasattr(self, "_client")  # nosec: B101
 
         if self._in_memory:
             self._client = AsyncQdrantClient(location=":memory:")
@@ -78,11 +78,9 @@ class QdrantSession:
             )
 
     async def _close_session(self) -> None:
-        if self._client is None:
-            return
-
         try:
-            await self._client.close(grpc_grace=5)  # 5 sec grace period
+            with qdrant_operation("session closing"):
+                await self._client.close(grpc_grace=5)  # 5 sec grace period
 
         finally:
-            self._client = None
+            del self._client

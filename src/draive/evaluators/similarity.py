@@ -1,4 +1,4 @@
-from base64 import urlsafe_b64decode
+from base64 import b64decode
 from collections.abc import Sequence
 
 from draive.embedding import Embedded, ImageEmbedding, TextEmbedding, vector_similarity_score
@@ -201,7 +201,7 @@ async def image_vector_similarity_evaluator(
     evaluated_data: bytes
     match evaluated:
         case ResourceContent() as media:
-            evaluated_data = urlsafe_b64decode(media.data.encode("utf-8"))
+            evaluated_data = b64decode(media.data.encode("utf-8"))
 
         case raw_data:
             evaluated_data = raw_data
@@ -209,7 +209,7 @@ async def image_vector_similarity_evaluator(
     reference_data: bytes
     match reference:
         case ResourceContent() as media:
-            reference_data = urlsafe_b64decode(media.data.encode("utf-8"))
+            reference_data = b64decode(media.data.encode("utf-8"))
 
         case raw_data:
             reference_data = raw_data

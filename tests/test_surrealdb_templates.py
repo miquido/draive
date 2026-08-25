@@ -15,7 +15,17 @@ from draive.surreal.types import SurrealObject
 async def test_surrealdb_templates_repository_templates_support_pagination(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    initial_rows: Sequence[SurrealObject] = cast(
+    identifier_rows: Sequence[SurrealObject] = cast(
+        Sequence[SurrealObject],
+        (
+            {"value": "closing"},
+            {"value": "summary"},
+            {"value": "welcome"},
+        ),
+    )
+    # revisions come back ordered by identifier and recency, only the latest
+    # revision of each identifier is expected within the listing
+    revision_rows: Sequence[SurrealObject] = cast(
         Sequence[SurrealObject],
         (
             {
@@ -51,8 +61,12 @@ async def test_surrealdb_templates_repository_templates_support_pagination(
         **variables: Any,
     ) -> Sequence[SurrealObject]:
         _ = statement
+        if "identifiers" in variables:
+            assert variables == {"identifiers": ["closing", "summary", "welcome"]}
+            return revision_rows
+
         assert variables == {"after_identifier": None, "limit": 3}
-        return initial_rows
+        return identifier_rows
 
     monkeypatch.setattr(surreal_templates.Surreal, "execute", fake_execute)
 
@@ -121,8 +135,12 @@ async def test_surrealdb_templates_repository_listing_defaults_missing_json_fiel
         **variables: Any,
     ) -> Sequence[SurrealObject]:
         _ = statement
+        if "identifiers" in variables:
+            assert variables == {"identifiers": ["welcome"]}
+            return rows
+
         assert variables == {"after_identifier": None, "limit": 2}
-        return rows
+        return cast(Sequence[SurrealObject], ({"value": "welcome"},))
 
     monkeypatch.setattr(surreal_templates.Surreal, "execute", fake_execute)
 

@@ -25,7 +25,7 @@ class OllamaEmbedding(OllamaAPI):
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
         embedding_config: OllamaEmbeddingConfig = config or ctx.state(OllamaEmbeddingConfig)
-        async with ctx.scope("ollama.text_embedding"):
+        async with ctx.scope("embedding.invocation"):
             attributes: list[str]
             if attribute is None:
                 attributes = cast(list[str], as_list(values))
@@ -89,6 +89,8 @@ class OllamaEmbedding(OllamaAPI):
                     )
                     for value, embedding in zip(
                         values,
+                        # the api reports no index, its results are documented to
+                        # correspond to the request order
                         chain.from_iterable([response.embeddings for response in responses]),
                         strict=True,
                     )

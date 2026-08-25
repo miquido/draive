@@ -82,8 +82,9 @@ class AWSSQS(State):
                 content_decoder=decode_event,
             ) as queue:
                 await queue.publish(event)
-                async for message in await queue.consume():
-                    ...
+                async with await queue.consume() as messages:
+                    async for message in messages:
+                        ...
 
         The encoder is invoked for every publish and the decoder for every consumed payload.
         Entering the context establishes queue access and ensures clean teardown when

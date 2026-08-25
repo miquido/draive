@@ -68,6 +68,38 @@ class GenerativeModel(State):
         output: ModelOutputSelection = "auto",
         **extra: Any,
     ) -> ModelOutputStream:
+        """Execute a single-turn completion returning a stream of output chunks.
+
+        Parameters
+        ----------
+        instructions : ModelInstructions, default=""
+            System-level instructions applied to the completion.
+        tools : ModelTools, default=ModelTools.none
+            Tooling configuration available to the model.
+        context : ModelContext
+            Conversation context supplied with the request.
+        output : ModelOutputSelection, default="auto"
+            Requested output modality or schema.
+        **extra : Any
+            Provider-specific keyword arguments forwarded unchanged.
+
+        Returns
+        -------
+        ModelOutputStream
+            Asynchronous stream of model output chunks.
+
+        Raises
+        ------
+        ModelException
+            Provider adapters translate their failures into typed model exceptions.
+
+        Notes
+        -----
+        Consumers stopping before the stream ends should close it explicitly,
+        i.e. through ``ctx.closing``. Leaving it to garbage collection
+        finalizes it within an unrelated context, breaking scoped state teardown
+        and delaying the release of the underlying connection.
+        """
         return self._generating(
             instructions=instructions,
             tools=tools,

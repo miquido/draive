@@ -17,7 +17,6 @@ from haiway import (
     ctx,
     execute_concurrently,
 )
-from haiway.attributes import AttributesJSONEncoder
 
 from draive.evaluation.evaluator import EvaluatorResult
 from draive.evaluation.scenario import EvaluatorScenarioResult
@@ -47,7 +46,7 @@ class EvaluatorSuiteCase[Parameters: State](State, serializable=True):
         Parameters specific to this test case
     """
 
-    identifier: str = Default(default_factory=lambda: str(uuid4()))
+    identifier: str = Default(factory=lambda: str(uuid4()))
     parameters: Parameters
 
 
@@ -381,6 +380,8 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         state: Sequence[State],
         meta: Meta,
     ) -> None:
+        assert concurrent_evaluations > 1  # nosec: B101
+
         object.__setattr__(
             self,
             "name",
@@ -945,9 +946,4 @@ class _EvaluatorSuiteFileStorage[Parameters: State](Immutable):
     ) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with open(self._path, mode="wb+") as file:
-            file.write(
-                json.dumps(
-                    [case.to_mapping() for case in cases],
-                    cls=AttributesJSONEncoder,
-                ).encode("utf-8")
-            )
+            file.write(json.dumps([case.to_basic_object() for case in cases]).encode("utf-8"))

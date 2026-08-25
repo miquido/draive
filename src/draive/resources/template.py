@@ -1,7 +1,7 @@
 import json
 import re
 from collections.abc import Callable, Collection, Coroutine, Mapping, Sequence, Set
-from typing import Any, Protocol, final, runtime_checkable
+from typing import Any, Protocol, cast, final, runtime_checkable
 from urllib.parse import ParseResult, parse_qs, quote, unquote, urlencode, urlparse
 
 from haiway import MISSING, Function, Meta, MetaValues, TypeSpecification
@@ -411,8 +411,8 @@ class ResourceTemplate[**Args](
         specification: TypeSpecification,
         value: str,
     ) -> tuple[Any, bool]:
-        if "oneOf" in specification:
-            for option in specification["oneOf"]:
+        if "anyOf" in specification:
+            for option in specification["anyOf"]:
                 converted, changed = self._coerce_from_specification(option, value)
                 if changed:
                     return converted, True
@@ -420,6 +420,23 @@ class ResourceTemplate[**Args](
             return value, False
 
         type_name: Any | None = specification.get("type")
+        if isinstance(type_name, Sequence) and not isinstance(type_name, str):
+            # alternatives of plain types are named by a list of types instead
+            # of a list of alternatives - each is tried in the declared order
+            for alternative in cast(Sequence[Any], type_name):
+                if not isinstance(alternative, str):
+                    continue
+
+                converted, changed = self._coerce_from_specification(
+                    # the remaining keys (`enum` especially) still apply to each alternative
+                    cast(TypeSpecification, {**specification, "type": alternative}),
+                    value,
+                )
+                if changed:
+                    return converted, True
+
+            return value, False
+
         if type_name == "integer":
             try:
                 return int(value), True

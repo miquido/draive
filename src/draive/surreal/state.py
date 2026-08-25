@@ -2,7 +2,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from types import TracebackType
-from typing import Literal, cast, overload
+from typing import Any, Literal, cast, overload
 from uuid import UUID, uuid4
 
 from haiway import (
@@ -14,7 +14,7 @@ from haiway import (
     ctx,
     statemethod,
 )
-from surrealdb import RecordID
+from surrealdb import RecordID, Table
 
 from draive.surreal.filters import prepare_filter
 from draive.surreal.schema import SurrealTableKind, surreal_field_definitions
@@ -28,7 +28,8 @@ from draive.surreal.types import (
     SurrealTransactionPreparing,
     SurrealValue,
 )
-from draive.surreal.utils import pagination_offset
+from draive.surreal.utils import pagination_offset, surreal_identifier
+from draive.utils.attributes import attribute_path_segments
 
 __all__ = (
     "Surreal",
@@ -120,7 +121,7 @@ class SurrealSession(State):
             "CREATE $_record CONTENT $_content;",
             variables={
                 "_record": RecordID(value.__class__.__name__, identifier),
-                "_content": value.to_mapping(),
+                "_content": _surreal_content(value),
             },
         )
 
@@ -163,7 +164,7 @@ class SurrealSession(State):
             "UPSERT $_record CONTENT $_content;",
             variables={
                 "_record": RecordID(value.__class__.__name__, identifier),
-                "_content": value.to_mapping(),
+                "_content": _surreal_content(value),
             },
         )
 
@@ -210,15 +211,18 @@ class SurrealSession(State):
             )
 
         start_at: int = pagination_offset(pagination)
+        ordering: str = _ordering_reference(order) if order is not None else ""
         filter_clause: str
         filter_variables: Mapping[str, SurrealValue]
         filter_clause, filter_variables = prepare_filter(requirements)
         fetch_limit: int = pagination.limit + 1
 
         records: Sequence[SurrealObject] = await self._statement_executing(
-            f"SELECT * FROM {model.__name__}"  # nosec: B608
+            # the implicit `id` is omitted, models do not declare it
+            # and declaring it would in turn break `create`
+            f"SELECT * OMIT id FROM {surreal_identifier(model.__name__)}"  # nosec: B608
             f"{f' WHERE {filter_clause}' if filter_clause else ''}"
-            f"{f' ORDER BY {order!s} DESC, id DESC' if order is not None else ''}"
+            f"{f' ORDER BY {ordering} DESC, id DESC' if ordering else ''}"
             " LIMIT $_limit START AT $_start;",
             variables={
                 **filter_variables,
@@ -288,7 +292,9 @@ class SurrealSession(State):
             await self._statement_executing(
                 f"DELETE $_table WHERE {filter_clause};",
                 variables={
-                    "_table": table if isinstance(table, str) else table.__name__,
+                    # SurrealDB refuses to DELETE using a plain string variable,
+                    # the table name has to be bound as a Table
+                    "_table": Table(table if isinstance(table, str) else table.__name__),
                     **filter_variables,
                 },
             )
@@ -297,7 +303,9 @@ class SurrealSession(State):
             await self._statement_executing(
                 "DELETE $_table;",
                 variables={
-                    "_table": table if isinstance(table, str) else table.__name__,
+                    # SurrealDB refuses to DELETE using a plain string variable,
+                    # the table name has to be bound as a Table
+                    "_table": Table(table if isinstance(table, str) else table.__name__),
                 },
             )
 
@@ -333,7 +341,7 @@ class SurrealSession(State):
     ) -> None:
         await self._statement_executing(
             f"DEFINE TABLE IF NOT EXISTS "
-            f"{table if isinstance(table, str) else table.__name__} "
+            f"{surreal_identifier(table if isinstance(table, str) else table.__name__)} "
             f"{'SCHEMAFULL' if schema else 'SCHEMALESS'} TYPE {kind};",
             variables={},
         )
@@ -381,9 +389,15 @@ class SurrealSession(State):
         to_table: type[Target] | str,
         schema: bool = False,
     ) -> None:
-        relation_name: str = relation if isinstance(relation, str) else relation.__name__
-        from_name: str = from_table if isinstance(from_table, str) else from_table.__name__
-        to_name: str = to_table if isinstance(to_table, str) else to_table.__name__
+        relation_name: str = surreal_identifier(
+            relation if isinstance(relation, str) else relation.__name__
+        )
+        from_name: str = surreal_identifier(
+            from_table if isinstance(from_table, str) else from_table.__name__
+        )
+        to_name: str = surreal_identifier(
+            to_table if isinstance(to_table, str) else to_table.__name__
+        )
         await self._statement_executing(
             f"DEFINE TABLE IF NOT EXISTS {relation_name} "
             f"{'SCHEMAFULL' if schema else 'SCHEMALESS'} "
@@ -437,7 +451,9 @@ class SurrealSession(State):
         *,
         content: Edge | Mapping[str, SurrealValue] | None = None,
     ) -> str | None:
-        relation_name: str = relation if isinstance(relation, str) else relation.__name__
+        relation_name: str = surreal_identifier(
+            relation if isinstance(relation, str) else relation.__name__
+        )
         rows: Sequence[SurrealObject]
         variables: dict[str, SurrealValue] = {
             "_source": RecordID(
@@ -524,7 +540,9 @@ class SurrealSession(State):
                 pagination=pagination.with_token(None),
             )
 
-        relation_name: str = relation if isinstance(relation, str) else relation.__name__
+        relation_name: str = surreal_identifier(
+            relation if isinstance(relation, str) else relation.__name__
+        )
         source_field: str
         target_field: str
         match direction:
@@ -539,7 +557,10 @@ class SurrealSession(State):
         start_at: int = pagination_offset(pagination)
         fetch_limit: int = pagination.limit + 1
         rows: Sequence[SurrealObject] = await self._statement_executing(
-            f"SELECT {target_field}.* AS value FROM {relation_name} "  # nosec: B608
+            # SurrealDB requires each ORDER BY idiom within the projection, while the
+            # related record's own implicit `id` has to be omitted - models do not declare it
+            f"SELECT {target_field}.* AS value, id OMIT value.id "  # nosec: B608
+            f"FROM {relation_name} "
             f"WHERE {source_field} = $_source "
             "ORDER BY id DESC LIMIT $_limit START AT $_start;",
             variables={
@@ -940,6 +961,27 @@ class _SurrealTransactionContext:
                     exc_val,
                     exc_tb,
                 )
+
+
+def _ordering_reference(
+    path: AttributePath[Any, object],
+    /,
+) -> str:
+    # stored documents use attribute aliases, ordering has to follow them
+    return ".".join(attribute_path_segments(path))
+
+
+def _surreal_content(
+    value: State,
+    /,
+) -> SurrealValue:
+    content: Mapping[str, Any] = value.to_mapping()
+    if "id" not in content:
+        return content
+
+    # `id` is implicit in SurrealDB and specifying it within CONTENT conflicts
+    # with the record identifier, it is omitted on reads as well
+    return {key: element for key, element in content.items() if key != "id"}
 
 
 def _surreal_record(

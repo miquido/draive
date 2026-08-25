@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, Literal, overload
 from uuid import UUID
 
@@ -8,7 +8,8 @@ from qdrant_client.http.models.models import QueryResponse
 
 from draive.qdrant.filters import prepare_filter
 from draive.qdrant.session import QdrantSession
-from draive.qdrant.types import QdrantResult
+from draive.qdrant.types import QdrantException, QdrantResult
+from draive.qdrant.utils import qdrant_arguments, qdrant_operation, qdrant_vector
 
 __all__ = ("QdrantSearchMixin",)
 
@@ -68,16 +69,19 @@ class QdrantSearchMixin(QdrantSession):
         include_vector: bool = False,
         **extra: Any,
     ) -> Sequence[QdrantResult[Model]] | Sequence[Model]:
-        response: QueryResponse = await self.client.query_points(
-            collection_name=model.__name__,
-            query=as_list(query_vector),
-            query_filter=prepare_filter(requirements=requirements),
-            score_threshold=score_threshold,
-            limit=limit,
-            with_payload=True,
-            with_vectors=include_vector,
-            **extra,
-        )
+        arguments: Mapping[str, Any] = qdrant_arguments(self.client.query_points, **extra)
+        response: QueryResponse
+        with qdrant_operation("searching", model.__name__):
+            response = await self.client.query_points(
+                collection_name=model.__name__,
+                query=as_list(query_vector),
+                query_filter=prepare_filter(requirements=requirements),
+                score_threshold=score_threshold,
+                limit=limit,
+                with_payload=True,
+                with_vectors=include_vector,
+                **arguments,
+            )
         results: list[ScoredPoint] = response.points
 
         if include_vector:
@@ -91,7 +95,9 @@ class QdrantSearchMixin(QdrantSession):
 
         else:
             return tuple(
-                model(**result.payload) for result in results if result.payload is not None
+                model.from_mapping(result.payload)
+                for result in results
+                if result.payload is not None
             )
 
 
@@ -101,7 +107,7 @@ def _qdrant_result[Content: State](
     data: ScoredPoint,
 ) -> QdrantResult[Content]:
     if data.payload is None:
-        raise ValueError("Missing qdrant data payload")
+        raise QdrantException("Missing Qdrant payload")
 
     identifier: UUID
     if isinstance(data.id, int):
@@ -113,23 +119,7 @@ def _qdrant_result[Content: State](
 
     return QdrantResult(
         identifier=identifier,
-        vector=_flat_vector(data.vector),
+        vector=qdrant_vector(data.vector),
         score=data.score,
         content=content.from_mapping(data.payload),
     )
-
-
-def _flat_vector(
-    vector: Any,
-    /,
-) -> Sequence[float]:
-    match vector:
-        case [*vector]:
-            assert all(isinstance(element, float) for element in vector)  # nosec: B101
-            return tuple(vector)
-
-        case None:
-            raise ValueError("Missing qdrant data vector")
-
-        case _:
-            raise ValueError("Unsupported qdrant data vector")

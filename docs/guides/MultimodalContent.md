@@ -25,7 +25,8 @@ report = MultimodalContent.of(
 - `ResourceContent` for inlined bytes (image/audio/video/documents)
 - `ResourceReference` for URI-based external resources
 - `ArtifactContent` for typed structured payloads
-- `MultimodalTag` for lightweight XML-style tagging
+- `MultimodalTag` for lightweight XML-style tagging - not a part itself, it renders into the
+    surrounding text parts
 
 ## Typed Artifacts
 
@@ -63,7 +64,7 @@ section_groups = content.split_by_meta(key="section")
 # Media and artifact extraction.
 images = content.images()
 resources = content.resources(mime_type="application/pdf")
-artifacts = content.artifacts(model=ProductSummary, category="product")
+artifacts = content.artifacts(ProductSummary, category="product")
 
 # Build filtered variant for downstream processing.
 clean = content.without_resources().without_artifacts()
@@ -94,7 +95,7 @@ from draive.openai import OpenAI, OpenAIResponsesConfig
 async def analyze_image(image_bytes: bytes) -> str:
     async with ctx.scope(
         "image_analysis",
-        OpenAIResponsesConfig(model="gpt-5"),
+        OpenAIResponsesConfig(model="gpt-5.5"),
         disposables=(OpenAI(),),
     ):
         prompt = MultimodalContent.of(

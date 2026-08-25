@@ -28,6 +28,7 @@ class VLLM(
     def __init__(
         self,
         base_url: str | None = None,
+        api_key: str | None = None,
         default_headers: Mapping[str, str] | None = None,
         features: Collection[type[State]] | None = None,
         timeout: float | None = None,
@@ -35,6 +36,7 @@ class VLLM(
     ) -> None:
         super().__init__(
             base_url=base_url,
+            api_key=api_key,
             default_headers=default_headers,
             timeout=timeout,
             **extra,
