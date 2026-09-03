@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import Literal
 
 from haiway import MISSING, Configuration, Missing
 
@@ -16,6 +17,8 @@ class OllamaChatConfig(Configuration):
     seed: int | Missing | None = MISSING
     max_output_tokens: int | Missing = MISSING
     stop_sequences: Sequence[str] | Missing = MISSING
+    # reasoning models require explicitly requesting thinking to report it
+    thinking: bool | Literal["low", "medium", "high"] | Missing = MISSING
 
 
 class OllamaEmbeddingConfig(Configuration):

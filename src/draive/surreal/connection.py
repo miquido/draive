@@ -17,7 +17,7 @@ from draive.surreal.types import (
     SurrealTransactionContext,
     SurrealValue,
 )
-from draive.surreal.utils import surreal_value
+from draive.surreal.utils import surreal_value, surreal_variable
 
 __all__ = ("SurrealConnection",)
 
@@ -57,7 +57,7 @@ class SurrealConnection:
         self._namespace: str = namespace
         self._database: str = database
         self._credentials: Mapping[str, str] = credentials
-        self._connection: AsyncWsSurrealConnection | None = None
+        self._connection: AsyncWsSurrealConnection  # initialized later
         # The embedded (in-process) engine is not safe under concurrent requests:
         # gathered writes into the same HNSW-indexed table (or a KNN search racing
         # such a write) nondeterministically panic its Rust runtime ("bytes ...
@@ -68,12 +68,11 @@ class SurrealConnection:
 
     @property
     def connection(self) -> AsyncWsSurrealConnection:
-        assert self._connection is not None  # nosec: B101
+        assert hasattr(self, "_connection")  # nosec: B101
         return self._connection
 
     async def _open_connection(self) -> None:
-        if self._connection is not None:
-            await self._close_connection()
+        assert not hasattr(self, "_connection")  # nosec: B101
 
         connection: AsyncWsSurrealConnection
         if self._url.startswith("ws") or self._url.startswith("wss"):
@@ -99,14 +98,11 @@ class SurrealConnection:
         self._connection = connection
 
     async def _close_connection(self) -> None:
-        if self._connection is None:
-            return  # no connection
-
         try:
             await self._connection.close()
 
         finally:
-            self._connection = None
+            del self._connection
 
     def prepare_session(
         self,
@@ -253,6 +249,16 @@ class _TransactionContext:
 
             case {"result": UUID() as id}:
                 self._transaction_id = id
+
+            case {"result": [raw_id]}:
+                # some servers wrap the transaction identifier within a single element list
+                self._transaction_id = UUID(str(raw_id))
+
+            case {"result": {"id": raw_id}} if raw_id is not None:
+                self._transaction_id = UUID(str(raw_id))
+
+            case {"result": {"txn": raw_id}} if raw_id is not None:
+                self._transaction_id = UUID(str(raw_id))
 
             case _:
                 raise SurrealException("Invalid Surreal response")
@@ -432,9 +438,6 @@ def _process_statement_result(  # noqa: C901, PLR0912
         case {"status": "OK", "result": None}:
             return  # no results to produce
 
-        case {"status": "OK", "time": str(), "result": _}:
-            return  # statement summary with scalar result, not an object row
-
         case {"status": "OK", "result": result}:
             # Some statements may return scalar values directly.
             yield {"value": surreal_value(result)}
@@ -487,13 +490,14 @@ async def _execute(
     transaction_id: UUID | None,
     variables: Mapping[str, SurrealValue],
 ) -> Sequence[SurrealObject]:
+    params: Mapping[str, Any] = surreal_variable(variables)
     response: Mapping[str, Any]
     try:
         response = await connection._send(  # pyright: ignore[reportPrivateUsage]
             RequestMessage(
                 RequestMethod.QUERY,
                 query=statement,
-                params=variables,
+                params=params,
                 session=session_id,
                 txn=transaction_id,
             )
@@ -501,7 +505,7 @@ async def _execute(
             else RequestMessage(
                 RequestMethod.QUERY,
                 query=statement,
-                params=variables,
+                params=params,
                 session=session_id,
             ),
             bypass=True,
@@ -527,7 +531,7 @@ async def _execute_embedded(
             RequestMessage(
                 RequestMethod.QUERY,
                 query=statement,
-                params=variables,
+                params=surreal_variable(variables),
             ),
             bypass=True,
             process="",  # it is more or less ignored by surreal

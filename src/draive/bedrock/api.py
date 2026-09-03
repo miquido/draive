@@ -26,10 +26,8 @@ class BedrockAPI:
             return  # already initialized
 
         # postponing import of boto3 as late as possible, it does a lot of stuff
-        import boto3  # pyright: ignore[reportMissingTypeStubs]
-
         try:
-            import boto3  # pyright: ignore[reportUnusedImport]
+            import boto3  # pyright: ignore[reportMissingTypeStubs]
         except ImportError as exc:  # pragma: no cover
             raise ImportError(
                 "draive.bedrock requires the 'bedrock' extra."
@@ -38,8 +36,10 @@ class BedrockAPI:
 
         self._client = boto3.Session(region_name=self._aws_region).client("bedrock-runtime")  # pyright: ignore[reportUnknownMemberType]
 
+    @asynchronous
     def _deinitialize_client(self) -> None:
         if not hasattr(self, "_client"):
             return  # already deinitialized
 
+        self._client.close()  # releases the underlying connection pool
         del self._client

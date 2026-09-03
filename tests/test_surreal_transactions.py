@@ -1,4 +1,5 @@
-from uuid import uuid4
+from collections.abc import Callable
+from uuid import UUID, uuid4
 
 import pytest
 from haiway import State
@@ -267,3 +268,71 @@ async def test_surreal_session_create_and_delete_use_surreal_record_ids(
     assert len(query_calls) == 2
     assert str(query_calls[0]["params"]["_record"]) == "_SurrealTransactionItem:created"
     assert str(query_calls[1]["params"]["_record"]) == "_SurrealTransactionItem:created"
+
+
+@pytest.mark.parametrize(
+    "response",
+    (
+        pytest.param(lambda identifier: {"result": str(identifier)}, id="string"),
+        pytest.param(lambda identifier: {"result": identifier}, id="uuid"),
+        pytest.param(lambda identifier: {"result": [str(identifier)]}, id="list"),
+        pytest.param(lambda identifier: {"result": {"id": str(identifier)}}, id="id_field"),
+        pytest.param(lambda identifier: {"result": {"txn": identifier}}, id="txn_field"),
+    ),
+)
+@pytest.mark.asyncio
+async def test_surreal_client_transaction_accepts_supported_identifier_shapes(
+    monkeypatch: pytest.MonkeyPatch,
+    response: Callable[[UUID], dict[str, object]],
+) -> None:
+    """Regression test: the server may report the transaction identifier as a bare
+    value, wrapped within a single element list or keyed within an object - the SDK's
+    own `begin()` accepts all of those shapes.
+    """
+    commit_txn: object | None = None
+    transaction_id = uuid4()
+
+    class _FakeConnection:
+        def __init__(self, url: str) -> None:
+            self.url = url
+
+        async def connect(self, url: str | None = None) -> None:
+            self.url = url or self.url
+
+        async def _send(
+            self,
+            message: object,
+            process: str,
+            bypass: bool = False,
+        ) -> dict[str, object]:
+            nonlocal commit_txn
+            _ = process, bypass
+            method = message.method
+
+            if method is RequestMethod.BEGIN:
+                return response(transaction_id)
+
+            if method is RequestMethod.QUERY:
+                return {"result": [{"status": "OK", "result": []}]}
+
+            if method is RequestMethod.COMMIT:
+                commit_txn = message.kwargs.get("txn")
+                return {"result": None}
+
+            return {"result": None}
+
+        async def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(surreal_connection, "AsyncWsSurrealConnection", _FakeConnection)
+
+    async with SurrealClient(
+        url="ws://example.test",
+        namespace="ns",
+        database="db",
+    ) as client:
+        async with client.prepare_session() as session:
+            async with session.transaction() as transaction_session:
+                await transaction_session.execute("RETURN [];")
+
+    assert commit_txn == transaction_id

@@ -56,3 +56,18 @@ async def test_resolve_from_uri_raises_for_mismatched_uri() -> None:
 
     with pytest.raises(ResourceCorrupted):
         await get_user.resolve_from_uri("https://api.example.com/projects/1")
+
+
+@pytest.mark.asyncio
+async def test_resolve_from_uri_coerces_alternative_parameter_types() -> None:
+    @resource(uri_template="https://api.example.com/items{?limit}")
+    async def items(limit: int | None = None) -> ResourceContent:
+        return ResourceContent.of(
+            f"{limit}:{type(limit).__name__}".encode(),
+            mime_type="text/plain",
+        )
+
+    resolved = await items.resolve_from_uri("https://api.example.com/items?limit=5")
+
+    assert isinstance(resolved.resource, ResourceContent)
+    assert resolved.resource.to_bytes() == b"5:int"

@@ -96,14 +96,15 @@ answer: str = await TextGeneration.generate(
 - `Agent` is a thin immutable wrapper over an async executor.
 - `Agent.call(...)` accepts multimodal input and streams `MultimodalContentPart | ProcessingEvent`.
 - `Agent.respond(...)` is the lower-level form when you already have an `AgentMessage`.
-- `AgentThread` carries the active thread identifier as `identifier` and merged `meta` through nested agent calls.
-- Import agent primitives from `draive` when possible: `Agent`, `AgentIdentity`, `AgentMessage`, `AgentsGroup`.
+- `AgentThread` carries the active thread identifier as `identifier`, the executing agent URI as `agent_uri`, and merged `meta` through nested agent calls.
+- `Agent.generative(...)` and `Agent.from_skill(...)` accept `memory=` (an `AgentMemory`) to keep model context across turns; the default `AgentMemory.disabled` scopes context to a single turn.
+- Import agent primitives from `draive` when possible: `Agent`, `AgentIdentity`, `AgentMemory`, `AgentMessage`, `AgentsGroup`.
 
 ### Build An Agent From A `Step`
 Use `Agent.steps(...)` when you already have a `Step` pipeline.
 
 ```python
-from collections.abc import AsyncIterable
+from collections.abc import AsyncGenerator
 
 from draive import Agent, ProcessingEvent
 from draive.multimodal import TextContent
@@ -112,7 +113,7 @@ from draive.steps import Step, StepState
 
 async def execute(
     state: StepState,
-) -> AsyncIterable[ProcessingEvent | TextContent | StepState]:
+) -> AsyncGenerator[ProcessingEvent | TextContent | StepState]:
     yield ProcessingEvent.of("progress", "Working...")
     yield TextContent.of("Done")
     yield state
@@ -126,10 +127,11 @@ worker: Agent = Agent.steps(
 ```
 
 Behavior of `Agent.steps(...)`:
-- prepends incoming message content with `Step.appending_input(...)`,
-- runs the provided step,
+- seeds the pipeline context with the incoming message content as `ModelInput`,
+- runs the provided steps in sequence,
 - filters out `ModelReasoningChunk`, `ModelToolRequest`, and `ModelToolResponse`,
-- exposes only visible content and `ProcessingEvent`s.
+- exposes only visible content and `ProcessingEvent`s,
+- applies no memory implicitly - compose `memory.recall_step()` / `memory.remember_step()` explicitly.
 
 ### Build A Generative Model Agent
 Use `Agent.generative(...)` for prompt-first agents backed by `GenerativeModel.completion(...)`.
@@ -150,13 +152,13 @@ assistant: Agent = Agent.generative(
 )
 ```
 
-Stateless agent loop:
-- start request-local model context with incoming `ModelInput`,
+Agent loop:
+- start model context with the incoming `ModelInput`, extended with `memory.recall(...)` when memory is used,
 - run `GenerativeModel.completion(...)`,
 - collect `ModelToolRequest`s,
 - execute them with `Toolbox.handle(...)`,
 - append `ModelToolResponse`s back as `ModelInput`,
-- continue until there are no more tool requests.
+- continue until there are no more tool requests, then `memory.remember(...)` the resulting context.
 
 If a tool uses `handling="output"`, its visible chunks are streamed directly and the loop stops.
 
@@ -178,24 +180,24 @@ researcher: Agent = Agent.steps(
 coordinator: Agent = Agent.generative(
     agent="coordinator",
     instructions="Delegate research before answering.",
-    tools=AgentsGroup.of(researcher).request_tool(),
+    tools=[AgentsGroup.of(researcher).as_tool()],
 )
 ```
 
-Delegation modes:
-- `request_tool()`: delegated result becomes a normal tool response and feeds back into caller reasoning.
-- `handover_tool()`: delegated agent streams output directly to the user as `handling="output"`.
+Delegation modes - both `Agent.as_tool(...)` and `AgentsGroup.as_tool(...)` take `handling=`:
+- `as_tool(handling="response")` (default): delegated result becomes a normal tool response and feeds back into caller reasoning.
+- `as_tool(handling="output")`: delegated agent streams output directly to the user.
 
 Practical defaults:
 - use `Agent.steps(...)` for deterministic typed orchestration,
 - use `Agent.generative(...)` for model-driven agents,
-- use `request_tool()` when the caller should keep reasoning after delegation,
-- use `handover_tool()` when the delegated agent should take over visible output.
+- use `handling="response"` when the caller should keep reasoning after delegation,
+- use `handling="output"` when the delegated agent should take over visible output.
 
 ## Conversation API (Streaming)
 - `Conversation.completion(...)` is chat-oriented and returns an async stream.
 - Use `message=...` (not `input=...`).
-- For conversation, tool parameter is `toolbox=...`.
+- Tools go through `tools=...`, same as the generation APIs (a `Toolbox` or an iterable of `Tool`).
 
 ```python
 from draive import Conversation
@@ -204,7 +206,7 @@ from draive.tools import Toolbox
 stream = Conversation.completion(
     instructions="You are helpful.",
     message="Hi, what time is it?",
-    toolbox=Toolbox.of([current_time]),
+    tools=Toolbox.of([current_time]),
 )
 
 async for chunk in stream:
@@ -288,8 +290,8 @@ results = await evaluate(
 - Use `State` (not `DataModel`) for typed domain models.
 - For structured generation, define `class X(State, serializable=True)` and call `ModelGeneration.generate(X, ...)`.
 - `Conversation.completion(...)` now uses `message=...` and returns an async stream of chunks.
-- In `Conversation.completion(...)`, pass tools via `toolbox=...`.
-- In `TextGeneration.generate(...)` / `ModelGeneration.generate(...)`, pass tools via `tools=...`.
+- Pass tools via `tools=...` everywhere - `Conversation.completion(...)`, `TextGeneration.generate(...)` and `ModelGeneration.generate(...)`; there is no `toolbox=` argument (it would silently land in `**extra`).
+- `AgentsGroup.request_tool()` / `handover_tool()` are gone - use `as_tool(handling=...)`.
 - Prefer `from draive import ...` imports for shared public symbols.
 
 ## Practical Defaults

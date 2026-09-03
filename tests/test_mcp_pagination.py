@@ -1,8 +1,9 @@
 from collections.abc import Mapping
-from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from mcp.types import ListResourcesResult
+from mcp.types import Resource as MCPResource
 
 from draive import Paginated, Pagination
 from draive.mcp.client import MCPClient, MCPClients
@@ -22,14 +23,6 @@ class _SessionManager:
         _ = (exc_type, exc_val, exc_tb)
 
 
-class _DummyURI:
-    def __init__(self, value: str) -> None:
-        self._value = value
-
-    def unicode_string(self) -> str:
-        return self._value
-
-
 class _DummySession:
     def __init__(
         self,
@@ -42,18 +35,18 @@ class _DummySession:
         cursor: str | None = params.cursor if params is not None else None
         self.cursors.append(cursor)
         names, next_cursor = self._pages[cursor]
-        resources = tuple(
-            SimpleNamespace(
-                uri=_DummyURI(f"mcp://source/{name}"),
+        resources = [
+            MCPResource(
+                uri=f"mcp://source/{name}",
                 name=name,
                 description=f"desc-{name}",
-                mimeType="text/plain",
+                mime_type="text/plain",
             )
             for name in names
-        )
-        return SimpleNamespace(
+        ]
+        return ListResourcesResult(
             resources=resources,
-            nextCursor=next_cursor,
+            next_cursor=next_cursor,
         )
 
 
@@ -181,3 +174,74 @@ async def test_mcp_clients_aggregate_listing_supports_continuation() -> None:
         "mcp://b-2",
     ]
     assert page_2.pagination.token is None
+
+
+class _FixedPageRepository:
+    """Repository serving a fixed page size regardless of the requested limit."""
+
+    def __init__(
+        self,
+        prefix: str,
+        *,
+        count: int,
+        page_size: int,
+    ) -> None:
+        self._prefix = prefix
+        self._count = count
+        self._page_size = page_size
+        self.requests: list[tuple[str | None, int]] = []
+
+    async def fetch_list(
+        self,
+        *,
+        pagination: Pagination | None = None,
+        **extra: Any,
+    ) -> Paginated[ResourceReference]:
+        _ = extra
+        assert pagination is not None
+        self.requests.append((cast(str | None, pagination.token), pagination.limit))
+        start: int = int(cast(str, pagination.token)) if pagination.token is not None else 0
+        end: int = min(start + self._page_size, self._count)
+        references = tuple(
+            ResourceReference.of(f"mcp://{self._prefix}/{index}", mime_type="text/plain")
+            for index in range(start, end)
+        )
+        return Paginated[ResourceReference].of(
+            references,
+            pagination=pagination.with_token(str(end) if end < self._count else None),
+        )
+
+
+@pytest.mark.asyncio
+async def test_mcp_clients_aggregate_listing_does_not_drop_overflowing_items() -> None:
+    clients = MCPClients.__new__(MCPClients)
+    clients._clients = {}
+    clients._prompts = {}
+    clients._tools = {}
+    clients._resources = {
+        "a": _FixedPageRepository("a", count=40, page_size=40),
+        "b": _FixedPageRepository("b", count=40, page_size=40),
+    }
+
+    collected: list[str] = []
+    pagination: Pagination | None = Pagination.of(limit=32)
+    for _ in range(16):  # bounded to fail instead of looping forever
+        page = await clients.resources_list(
+            mcp_server=None,
+            pagination=pagination,
+        )
+        assert len(page.items) <= 32
+        collected.extend(reference.uri for reference in page.items)
+        if page.pagination.token is None:
+            break
+
+        pagination = page.pagination
+
+    else:
+        raise AssertionError("aggregate listing did not complete")
+
+    expected: list[str] = [f"mcp://a/{index}" for index in range(40)]
+    expected.extend(f"mcp://b/{index}" for index in range(40))
+    # every resource stays reachable exactly once across the whole listing
+    assert len(collected) == len(set(collected))
+    assert sorted(collected) == sorted(expected)

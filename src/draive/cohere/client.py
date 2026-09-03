@@ -25,6 +25,7 @@ class Cohere(
         /,
         *,
         aws_region: str | None = None,
+        timeout: float | None = None,
         features: Collection[type[TextEmbedding | ImageEmbedding]] | None = None,
     ) -> None: ...
 
@@ -36,6 +37,7 @@ class Cohere(
         *,
         base_url: str | None = None,
         api_key: str | None = None,
+        timeout: float | None = None,
         features: Collection[type[TextEmbedding | ImageEmbedding]] | None = None,
     ) -> None: ...
 
@@ -47,6 +49,7 @@ class Cohere(
         base_url: str | None = None,
         api_key: str | None = None,
         aws_region: str | None = None,
+        timeout: float | None = None,
         features: Collection[type[TextEmbedding | ImageEmbedding]] | None = None,
     ) -> None:
         super().__init__(
@@ -54,6 +57,7 @@ class Cohere(
             base_url=base_url,
             api_key=api_key,
             aws_region=aws_region,
+            timeout=timeout,
         )
 
         self._features: frozenset[type[State]] = (
@@ -63,7 +67,9 @@ class Cohere(
         )
 
     async def __aenter__(self) -> Iterable[State]:
-        await self._initialize_client()
+        assert not hasattr(self, "_client")  # nosec: B101
+        self._client = self._prepare_client()
+        await self._client.__aenter__()  # pyright: ignore[reportUnknownMemberType]
         state: list[State] = []
 
         if TextEmbedding in self._features:
@@ -80,4 +86,7 @@ class Cohere(
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        await self._deinitialize_client()
+        try:
+            await self._client.__aexit__(None, None, None)  # pyright: ignore[reportUnknownMemberType]
+        finally:
+            del self._client

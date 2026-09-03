@@ -1,8 +1,8 @@
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, MutableSequence, Set
 from types import TracebackType
 from typing import Any, final
 
-from google.genai.client import HttpOptionsDict  # pyright: ignore[reportPrivateImportUsage]
+from google.genai.types import HttpOptionsDict
 from haiway import State
 
 from draive.embedding import TextEmbedding
@@ -44,14 +44,15 @@ class Gemini(
             **extra,
         )
 
-        self._features: frozenset[type[State]] = (
+        self._features: Set[type[State]] = (
             frozenset(features)
             if features is not None
             else frozenset((GenerativeModel, RealtimeGenerativeModel, TextEmbedding))
         )
 
     async def __aenter__(self) -> Iterable[State]:
-        state: list[State] = []
+        await self._initialize_client()
+        state: MutableSequence[State] = []
         if GenerativeModel in self._features:
             state.append(GenerativeModel(generating=self.completion))
 
@@ -69,5 +70,4 @@ class Gemini(
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        await self._client.aio.aclose()
-        self._client.close()
+        await self._deinitialize_client()

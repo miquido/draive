@@ -128,39 +128,41 @@ async def test_resolve_returns_raw_content_without_arguments() -> None:
 
 
 @pytest.mark.asyncio
-async def test_resolve_raises_for_nested_template_passed_in_runtime_arguments() -> None:
+async def test_resolve_renders_nested_template_passed_in_runtime_arguments() -> None:
     repository = TemplatesRepository.volatile(
         nested="dear reader",
     )
 
-    with pytest.raises(RecursionError):
-        await repository.resolve(
-            "Hello {%name%}!",
-            arguments={"name": Template.of("nested")},
-        )
+    result = await repository.resolve(
+        "Hello {%name%}!",
+        arguments={"name": Template.of("nested")},
+    )
+
+    assert result == MultimodalContent.of("Hello dear reader!")
 
 
 @pytest.mark.asyncio
-async def test_resolve_raises_when_nested_template_depends_on_outer_arguments() -> None:
+async def test_resolve_nested_template_inherits_outer_arguments() -> None:
     repository = TemplatesRepository.volatile(
         name="Dr. {%person%}",
     )
 
-    with pytest.raises(RecursionError):
-        await repository.resolve(
-            "Hello {%name%}",
-            arguments={
-                "name": Template.of("name"),
-                "person": "Ada",
-            },
-        )
+    result = await repository.resolve(
+        "Hello {%name%}",
+        arguments={
+            "name": Template.of("name"),
+            "person": "Ada",
+        },
+    )
+
+    assert result == MultimodalContent.of("Hello Dr. Ada")
 
 
 @pytest.mark.asyncio
 async def test_resolve_raw_template_raises_for_missing_argument_with_empty_mapping() -> None:
     repository = TemplatesRepository()
 
-    with pytest.raises(KeyError, match="Missing template argument: name"):
+    with pytest.raises(TemplateInvalid, match="missing argument `name`"):
         await repository.resolve("Hello {%name%}", arguments={})
 
 
@@ -193,22 +195,59 @@ async def test_resolve_uses_loaded_template_defaults_and_call_overrides() -> Non
 
 
 @pytest.mark.asyncio
-async def test_resolve_raises_for_nested_template_defaults() -> None:
+async def test_resolve_renders_nested_template_defaults() -> None:
     repository = TemplatesRepository.volatile(
         welcome="Hello {%name%}",
         name="Dr. {%person%}",
     )
 
-    with pytest.raises(RecursionError):
+    result = await repository.resolve(
+        Template.of(
+            "welcome",
+            arguments={
+                "name": Template.of(
+                    "name",
+                    arguments={"person": "Ada"},
+                )
+            },
+        )
+    )
+
+    assert result == MultimodalContent.of("Hello Dr. Ada")
+
+
+@pytest.mark.asyncio
+async def test_resolve_nested_arguments_take_precedence_over_inherited() -> None:
+    repository = TemplatesRepository.volatile(
+        welcome="Hello {%name%}",
+        name="Dr. {%person%}",
+    )
+
+    result = await repository.resolve(
+        Template.of(
+            "welcome",
+            arguments={
+                "name": Template.of("name", arguments={"person": "Ada"}),
+                # inherited by nested templates which do not bind it themselves
+                "person": "Bob",
+            },
+        )
+    )
+
+    assert result == MultimodalContent.of("Hello Dr. Ada")
+
+
+@pytest.mark.asyncio
+async def test_resolve_raises_for_template_requiring_itself() -> None:
+    repository = TemplatesRepository.volatile(
+        welcome="Hello {%name%}",
+    )
+
+    with pytest.raises(TemplateInvalid, match="recursive resolution is not supported"):
         await repository.resolve(
             Template.of(
                 "welcome",
-                arguments={
-                    "name": Template.of(
-                        "name",
-                        arguments={"person": "Ada"},
-                    )
-                },
+                arguments={"name": Template.of("welcome")},
             )
         )
 
@@ -245,41 +284,43 @@ async def test_resolve_str_returns_raw_string_without_arguments() -> None:
 
 
 @pytest.mark.asyncio
-async def test_resolve_str_raises_for_nested_template_passed_in_runtime_arguments() -> None:
+async def test_resolve_str_renders_nested_template_passed_in_runtime_arguments() -> None:
     repository = TemplatesRepository.volatile(
         nested="Ada",
         welcome="Hello {%name%}",
     )
 
-    with pytest.raises(RecursionError):
-        await repository.resolve_str(
-            Template.of("welcome"),
-            arguments={"name": Template.of("nested")},
-        )
+    result = await repository.resolve_str(
+        Template.of("welcome"),
+        arguments={"name": Template.of("nested")},
+    )
+
+    assert result == "Hello Ada"
 
 
 @pytest.mark.asyncio
-async def test_resolve_str_raises_when_nested_template_depends_on_outer_arguments() -> None:
+async def test_resolve_str_nested_template_inherits_outer_arguments() -> None:
     repository = TemplatesRepository.volatile(
         name="Dr. {%person%}",
         welcome="Hello {%name%}",
     )
 
-    with pytest.raises(RecursionError):
-        await repository.resolve_str(
-            Template.of("welcome"),
-            arguments={
-                "name": Template.of("name"),
-                "person": "Ada",
-            },
-        )
+    result = await repository.resolve_str(
+        Template.of("welcome"),
+        arguments={
+            "name": Template.of("name"),
+            "person": "Ada",
+        },
+    )
+
+    assert result == "Hello Dr. Ada"
 
 
 @pytest.mark.asyncio
 async def test_resolve_str_raw_template_raises_for_missing_argument_with_empty_mapping() -> None:
     repository = TemplatesRepository()
 
-    with pytest.raises(KeyError, match="Missing template argument: name"):
+    with pytest.raises(TemplateInvalid, match="missing argument `name`"):
         await repository.resolve_str("Hello {%name%}", arguments={})
 
 

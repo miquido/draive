@@ -39,16 +39,18 @@ async def generate_case_parameters[Parameters: State](
 ) -> Sequence[Parameters]:
     results: list[Parameters] = []
     example_pairs: list[tuple[str, Any]] = [(INPUT, example) for example in examples]
+    # keep curly braces of the guidelines escaped, schema injection formats the result again
+    instructions: str = INSTRUCTION.format(
+        guidelines=f"\n<GUIDELINES>\n{_escape_curly_braces(guidelines)}\n</GUIDELINES>\n"
+        if guidelines
+        else ""
+    )
 
     for _ in range(0, count):
         results.append(
             await ModelGeneration.generate(
                 parameters,
-                instructions=INSTRUCTION.format(
-                    guidelines=f"\n<GUIDELINES>\n{guidelines}\n</GUIDELINES>\n"
-                    if guidelines
-                    else ""
-                ),
+                instructions=instructions,
                 input=INPUT,
                 examples=example_pairs,
                 schema_injection="full",
@@ -59,3 +61,7 @@ async def generate_case_parameters[Parameters: State](
         example_pairs.append((INPUT, results[-1]))
 
     return results
+
+
+def _escape_curly_braces(value: str) -> str:
+    return value.replace("{", "{{").replace("}", "}}")

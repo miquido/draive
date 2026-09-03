@@ -42,6 +42,9 @@ class GeminiConfig(Configuration):
     thinking_budget: int | Missing = MISSING
     thinking_level: Literal["minimal", "low", "medium", "high"] | Missing = MISSING
     context_window_compression: bool | Missing = MISSING
+    # live sessions only - disable server side voice activity detection to take
+    # over turn segmentation through explicit ModelSessionEvent signals
+    automatic_activity_detection: bool | Missing = MISSING
     safety: GeminiSafetyConfig | Missing = MISSING
 
 

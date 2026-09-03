@@ -24,7 +24,16 @@ def test_parametrized_specification_specializes_type() -> None:
     class GenericModel[T](State):
         value: T
 
-    assert GenericModel.__SPECIFICATION__["properties"]["value"]["type"] == "object"
+    # an unspecialized parameter accepts any value, spelled out as all of the types
+    assert GenericModel.__SPECIFICATION__["properties"]["value"]["type"] == [
+        "string",
+        "number",
+        "integer",
+        "boolean",
+        "object",
+        "array",
+        "null",
+    ]
     assert GenericModel[str].__SPECIFICATION__["properties"]["value"]["type"] == "string"
     assert GenericModel[int].__SPECIFICATION__["properties"]["value"]["type"] == "integer"
 

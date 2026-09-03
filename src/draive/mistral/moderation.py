@@ -2,11 +2,12 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 from haiway import MISSING, ctx
-from mistralai import ModerationResponse
+from mistralai.client.models import ModerationResponse
 
 from draive.guardrails import GuardrailsModerationException
 from draive.mistral.api import MistralAPI
 from draive.mistral.config import MistralModerationConfig
+from draive.models import record_guardrails_invocation
 from draive.multimodal import Multimodal, MultimodalContent
 from draive.multimodal.artifact import ArtifactContent
 from draive.multimodal.text import TextContent
@@ -24,12 +25,10 @@ class MistralContentModeration(MistralAPI):
         **extra: Any,
     ) -> None:
         moderation_config: MistralModerationConfig = config or ctx.state(MistralModerationConfig)
-        async with ctx.scope("moderation"):
-            ctx.record_info(
-                attributes={
-                    "guardrails.provider": "mistral",
-                    "guardrails.model": moderation_config.model,
-                },
+        async with ctx.scope("guardrails.invocation"):
+            record_guardrails_invocation(
+                provider="mistral",
+                model=moderation_config.model,
             )
             content = MultimodalContent.of(content)
             moderated_content: list[str] = []

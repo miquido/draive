@@ -39,8 +39,8 @@ from draive.openai import OpenAIResponsesConfig, OpenAI
 
 async with ctx.scope(  # prepare new context
     "basics",
+    OpenAIResponsesConfig(model="gpt-5.5"),  # select used model
     disposables=(OpenAI(),),  # initialize OpenAI client
-    OpenAIResponsesConfig(model="gpt-5-mini"), # select used model
 ):
     result: str = await text_completion(
         text="Roses are red...",
@@ -49,7 +49,7 @@ async with ctx.scope(  # prepare new context
     print(result)
 ```
 
-```
+```text
 Violets are blue,
 Sugar is sweet,
 And so are you.
@@ -63,58 +63,57 @@ from draive.openai import OpenAIResponsesConfig
 
 async with ctx.scope(  # prepare the new context
     "basics",
-    disposables=(OpenAI(),),
     # define GPT model configuration as a context scope state
     OpenAIResponsesConfig(
-        model="gpt-5-mini",
-        temperature=0.4,
+        model="gpt-5.5",
+        reasoning="none",
     ),
+    disposables=(OpenAI(),),
 ):
-    # now we are using gpt-3.5-turbo with temperature of 0.4
+    # now we are using gpt-5.5 with reasoning disabled
     result: str = await text_completion(
         text="Roses are red...",
     )
 
-    print("RESULT GPT 3.5 | temperature 0.4:", result)
+    print("RESULT gpt-5.5 | reasoning none:", result)
 
     # we can update the configuration to change any parameter for nested context
     with ctx.updating(
         # we are updating the current context value instead of making a new one
         # this allows to preserve other elements of the configuration
         ctx.state(OpenAIResponsesConfig).updating(
-            model="gpt-5",
+            model="gpt-5.6-terra",
         ),
     ):
-        # now we are using gpt-5 with temperature of 0.4
+        # now we are using gpt-5.6-terra with reasoning disabled
         result = await text_completion(
             text="Roses are red...",
         )
 
-        print("RESULT GPT 4o | temperature 0.4:", result)
+        print("RESULT gpt-5.6-terra | reasoning none:", result)
 
     # we can also update the configuration for a single call
-    # when using TextGeneration.generate method directly
-    # here we are using gpt-3.5-turbo with temperature of 0.7
+    # by passing it explicitly to the provider
     result = await TextGeneration.generate(
         instructions="Prepare simplest completion of given text",
         input="Roses are red...",
-        temperature=0.7,
+        config=ctx.state(OpenAIResponsesConfig).updating(reasoning="low"),
     )
 
-    print("RESULT GPT 3.5 | temperature 0.7:", result)
+    print("RESULT gpt-5.5 | reasoning low:", result)
 ```
 
-```
-RESULT GPT 3.5 | temperature 0.4: Violets are blue.
+```text
+RESULT gpt-5.5 | reasoning none: Violets are blue.
 
-RESULT GPT 4o | temperature 0.4: Violets are blue.
+RESULT gpt-5.6-terra | reasoning none: Violets are blue.
 
-RESULT GPT 3.5 | temperature 0.7: Violets are blue.
+RESULT gpt-5.5 | reasoning low: Violets are blue.
 ```
 
 Since we know the basics, now we can examine the details of our execution to see what actually
-happened inside. We can setup the logger before execution and assign a logging metrics handler to
-see context metrics logs.
+happened inside. We can setup the logger before execution and assign a logger backed observability
+to see the recorded scopes, attributes and metrics.
 
 ```python
 from draive import setup_logging
@@ -124,11 +123,11 @@ setup_logging("basics")  # setup logger
 
 async with ctx.scope(  # prepare the context and see the execution metrics report
     "basics",
-    disposables=(OpenAI(),),
     OpenAIResponsesConfig(  # define model configuration for OpenAI Responses API
-        model="gpt-5-mini",
-        temperature=0.4,
+        model="gpt-5.5",
+        reasoning="none",
     ),
+    disposables=(OpenAI(),),
     observability=LoggerObservability(),
 ):
     await text_completion(
@@ -137,7 +136,7 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
 
     with ctx.updating(
         ctx.state(OpenAIResponsesConfig).updating(
-            model="gpt-5",
+            model="gpt-5.6-terra",
         ),
     ):
         await text_completion(
@@ -145,89 +144,94 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
         )
 ```
 
-```
-07/Mar/2025:13:40:51 +0000 [DEBUG] [basics] [8d198c3d552b48f1b7473f1e14ba50ed] [basics] [057c9032a45a48f38dcbb7861e4b172e] Entering context...
+```text
+07/Mar/2025:13:40:51 +0000 [DEBUG] [basics] [8d198c3d552b48f1b7473f1e14ba50ed] [basics] [057c9032-a45a-48f3-8dcb-b7861e4b172e] Entering scope: basics
 
-07/Mar/2025:13:40:52 +0000 [DEBUG] [basics] [8d198c3d552b48f1b7473f1e14ba50ed] [basics] [057c9032a45a48f38dcbb7861e4b172e] Metrics summary:
-⎡ @basics [057c9032a45a48f38dcbb7861e4b172e](1.38s):
-|
-|  ⎡ @generate_text [872ecd2b612e4fcbb19f4d6aa674e22d](0.63s):
-|  |
-|  |  ⎡ @model.completion [db5e56df44d2478ca1fcac959c29bdd3](0.63s):
-|  |  |  ⎡ •ArgumentsTrace:
-|  |  |  |  ├ kwargs:
-|  |  |  |  |  [instruction]: "Prepare the simplest completion of a given text"
-|  |  |  |  |  [context]:
-|  |  |  |  |  |  [0] content:
-|  |  |  |  |  |  |    parts:
-|  |  |  |  |  |  |      - text: Roses are red...
-|  |  |  |  |  |  |        meta: None
-|  |  |  |  |  |  |  meta: None
-|  |  |  |  |  [tool_selection]: "auto"
-|  |  |  |  |  [output]: "text"
-|  |  |  ⌊
-|  |  |  ⎡ •OpenAIResponsesConfig:
-|  |  |  |  ├ model: "gpt-3.5-turbo"
-|  |  |  |  ├ temperature: 0.4
-|  |  |  ⌊
-|  |  |  ⎡ •TokenUsage:
-|  |  |  |  ├ usage:
-|  |  |  |  |  [gpt-3.5-turbo-0125]:
-|  |  |  |  |  ├ input_tokens: 24
-|  |  |  |  |  ├ cached_tokens: 0
-|  |  |  |  |  ├ output_tokens: 7
-|  |  |  ⌊
-|  |  |  ⎡ •ResultTrace:
-|  |  |  |  ├ result: content:
-|  |  |  |  |    parts:
-|  |  |  |  |      - text: Violets are blue.
-|  |  |  |  |        meta: None
-|  |  |  |  |  meta: None
-|  |  |  ⌊
-|  |  ⌊
-|  ⌊
-|
-|  ⎡ @generate_text [38c8e1bd88a4444681f1bd2e61bce296](0.76s):
-|  |
-|  |  ⎡ @model.completion [f63a2825efa6406f8019635aa9892b2e](0.76s):
-|  |  |  ⎡ •ArgumentsTrace:
-|  |  |  |  ├ kwargs:
-|  |  |  |  |  [instruction]: "Prepare the simplest completion of a given text"
-|  |  |  |  |  [context]:
-|  |  |  |  |  |  [0] content:
-|  |  |  |  |  |  |    parts:
-|  |  |  |  |  |  |      - text: Roses are red...
-|  |  |  |  |  |  |        meta: None
-|  |  |  |  |  |  |  meta: None
-|  |  |  |  |  [tool_selection]: "auto"
-|  |  |  |  |  [output]: "text"
-|  |  |  ⌊
-|  |  |  ⎡ •OpenAIResponsesConfig:
-|  |  |  |  ├ model: "gpt-5"
-|  |  |  |  ├ temperature: 0.4
-|  |  |  ⌊
-|  |  |  ⎡ •TokenUsage:
-|  |  |  |  ├ usage:
-|  |  |  |  |  [gpt-5]:
-|  |  |  |  |  ├ input_tokens: 24
-|  |  |  |  |  ├ cached_tokens: 0
-|  |  |  |  |  ├ output_tokens: 7
-|  |  |  ⌊
-|  |  |  ⎡ •OpenAISystemFingerprint:
-|  |  |  |  ├ system_fingerprint: "fp_eb9dce56a8"
-|  |  |  ⌊
-|  |  |  ⎡ •ResultTrace:
-|  |  |  |  ├ result: content:
-|  |  |  |  |    parts:
-|  |  |  |  |      - text: Violets are blue.
-|  |  |  |  |        meta: None
-|  |  |  |  |  meta: None
-|  |  |  ⌊
-|  |  ⌊
-|  ⌊
-⌊
+07/Mar/2025:13:40:52 +0000 [DEBUG] [basics] [8d198c3d552b48f1b7473f1e14ba50ed] [basics] [057c9032-a45a-48f3-8dcb-b7861e4b172e] Exiting scope: basics
+07/Mar/2025:13:40:52 +0000 [DEBUG] [basics] [8d198c3d552b48f1b7473f1e14ba50ed] [basics] [057c9032-a45a-48f3-8dcb-b7861e4b172e] Metric - scope_time:1.383s
 
-07/Mar/2025:13:40:52 +0000 [DEBUG] [basics] [8d198c3d552b48f1b7473f1e14ba50ed] [basics] [057c9032a45a48f38dcbb7861e4b172e] ...exiting context after 1.38s
+07/Mar/2025:13:40:52 +0000 [DEBUG] [basics] Observability summary:
+┍━ basics [057c9032-a45a-48f3-8dcb-b7861e4b172e]:
+┝ Metric - scope_time:1.383s
+|  ┍━ text_generation [872ecd2b-612e-4fcb-b19f-4d6aa674e22d]:
+|  ┝ Metric - scope_time:0.628s
+|  |  ┍━ step.completion.loop [db5e56df-44d2-478c-a1fc-ac959c29bdd3]:
+|  |  ┝ Metric - scope_time:0.627s
+|  |  |  ┍━ step.completion.loop.iteration_0 [1cbd5f0e-85d5-4b88-a887-56b9f514a0eb]:
+|  |  |  ┝ Metric - scope_time:0.626s
+|  |  |  |  ┍━ model.invocation [136e0480-cf09-42f7-8450-d0feb8364310]:
+|  |  |  |  ┝ Attributes: {
+|  |  |  |  |    ["model.provider"]: "openai"
+|  |  |  |  |    ["model.name"]: "gpt-5.5"
+|  |  |  |  |    ["model.temperature"]: None
+|  |  |  |  |    ["model.tools"]:   []
+|  |  |  |  |    ["model.tools.selection"]: "none"
+|  |  |  |  |    ["model.output"]: "text"
+|  |  |  |  |    ["model.stop_sequences"]: None
+|  |  |  |  |    ["model.reasoning"]: "none"
+|  |  |  |  |    ["model.service_tier"]: "auto"
+|  |  |  |  |    ["model.truncation"]: "auto"
+|  |  |  |  |  }
+|  |  |  |  ┝ Metric: model.input_tokens = 24 tokens
+|  |  |  |  |  {
+|  |  |  |  |    ["model.provider"]: "openai"
+|  |  |  |  |    ["model.name"]: "gpt-5.5"
+|  |  |  |  |  }
+|  |  |  |  ┝ Metric: model.input_tokens.cached = 0 tokens
+|  |  |  |  |  {
+|  |  |  |  |    ["model.provider"]: "openai"
+|  |  |  |  |    ["model.name"]: "gpt-5.5"
+|  |  |  |  |  }
+|  |  |  |  ┝ Metric: model.output_tokens = 7 tokens
+|  |  |  |  |  {
+|  |  |  |  |    ["model.provider"]: "openai"
+|  |  |  |  |    ["model.name"]: "gpt-5.5"
+|  |  |  |  |  }
+|  |  |  |  ┝ Metric - scope_time:0.625s
+|  |  |  |  ┕━
+|  |  |  ┕━
+|  |  ┕━
+|  ┕━
+|  ┍━ text_generation [38c8e1bd-88a4-4446-81f1-bd2e61bce296]:
+|  ┝ Metric - scope_time:0.755s
+|  |  ┍━ step.completion.loop [f63a2825-efa6-406f-8019-635aa9892b2e]:
+|  |  ┝ Metric - scope_time:0.754s
+|  |  |  ┍━ step.completion.loop.iteration_0 [75d4e5de-3a68-4a6d-8f0c-d19c3cf63420]:
+|  |  |  ┝ Metric - scope_time:0.753s
+|  |  |  |  ┍━ model.invocation [56f8d4f0-3c12-421b-8877-3bbda703cb36]:
+|  |  |  |  ┝ Attributes: {
+|  |  |  |  |    ["model.provider"]: "openai"
+|  |  |  |  |    ["model.name"]: "gpt-5.6-terra"
+|  |  |  |  |    ["model.temperature"]: None
+|  |  |  |  |    ["model.tools"]:   []
+|  |  |  |  |    ["model.tools.selection"]: "none"
+|  |  |  |  |    ["model.output"]: "text"
+|  |  |  |  |    ["model.stop_sequences"]: None
+|  |  |  |  |    ["model.reasoning"]: "none"
+|  |  |  |  |    ["model.service_tier"]: "auto"
+|  |  |  |  |    ["model.truncation"]: "auto"
+|  |  |  |  |  }
+|  |  |  |  ┝ Metric: model.input_tokens = 24 tokens
+|  |  |  |  |  {
+|  |  |  |  |    ["model.provider"]: "openai"
+|  |  |  |  |    ["model.name"]: "gpt-5.6-terra"
+|  |  |  |  |  }
+|  |  |  |  ┝ Metric: model.input_tokens.cached = 0 tokens
+|  |  |  |  |  {
+|  |  |  |  |    ["model.provider"]: "openai"
+|  |  |  |  |    ["model.name"]: "gpt-5.6-terra"
+|  |  |  |  |  }
+|  |  |  |  ┝ Metric: model.output_tokens = 7 tokens
+|  |  |  |  |  {
+|  |  |  |  |    ["model.provider"]: "openai"
+|  |  |  |  |    ["model.name"]: "gpt-5.6-terra"
+|  |  |  |  |  }
+|  |  |  |  ┝ Metric - scope_time:0.752s
+|  |  |  |  ┕━
+|  |  |  ┕━
+|  |  ┕━
+|  ┕━
+┕━
 ```
 
 The more advanced usage and use cases can be explored in other notebooks.

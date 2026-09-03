@@ -45,6 +45,6 @@ class ProcessingEvent(State, serializable=True):
         )
 
     event: str
-    created: datetime = Default(default_factory=lambda: datetime.now(UTC))
+    created: datetime = Default(factory=lambda: datetime.now(UTC))
     content: MultimodalContent
     meta: Meta = Meta.empty

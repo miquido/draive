@@ -56,4 +56,4 @@ class Bedrock(
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        self._deinitialize_client()
+        await self._deinitialize_client()

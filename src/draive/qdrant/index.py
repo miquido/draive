@@ -1,7 +1,7 @@
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any, Literal, NoReturn, cast, final
 
-from haiway import AttributePath, AttributeRequirement, State
+from haiway import AttributePath, AttributeRequirement, Pagination, State
 
 from draive.embedding import (
     Embedded,
@@ -111,7 +111,7 @@ class QdrantVectorIndex:
                     await Qdrant.fetch(
                         model,
                         requirements=requirements,
-                        limit=limit or 32,
+                        pagination=Pagination.of(limit=limit or 32),
                         include_vector=False,
                         **extra,
                     )

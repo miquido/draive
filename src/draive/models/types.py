@@ -1,5 +1,6 @@
 from asyncio import sleep
 from collections.abc import (
+    AsyncGenerator,
     AsyncIterable,
     Collection,
     Iterable,
@@ -78,6 +79,7 @@ __all__ = (
     "ModelToolStatus",
     "ModelTools",
     "ModelToolsSelection",
+    "model_output_blocks",
 )
 
 
@@ -120,6 +122,8 @@ class ModelInputInvalid(ModelException):
         Provider identifier that rejected the input.
     model
         Provider model identifier used for the request.
+    reason
+        Human-readable rejection reason, when the provider adapter knows it.
     """
 
     __slots__ = ("reason",)
@@ -129,12 +133,16 @@ class ModelInputInvalid(ModelException):
         *,
         provider: str,
         model: str,
+        reason: str | None = None,
     ) -> None:
         super().__init__(
-            f"Invalid input for {model} by {provider}",
+            f"Invalid input for {model} by {provider}"
+            if reason is None
+            else f"Invalid input for {model} by {provider}, reason: {reason}",
             provider=provider,
             model=model,
         )
+        self.reason: str | None = reason
 
 
 @final
@@ -618,6 +626,8 @@ class ModelReasoningChunk(State, serializable=True):
     ----------
     reasoning_part
         Text fragment with model reasoning content.
+    final
+        Marks the last fragment of a provider reasoning block.
     meta
         Metadata associated with the fragment.
     """
@@ -628,6 +638,7 @@ class ModelReasoningChunk(State, serializable=True):
         /,
         reasoning_chunk: TextContent,
         *,
+        final: bool = False,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
         """Create a reasoning fragment.
@@ -636,6 +647,11 @@ class ModelReasoningChunk(State, serializable=True):
         ----------
         reasoning_chunk
             Reasoning text fragment.
+        final
+            When true, no further fragment belongs to the same reasoning block.
+            Providers set it on the fragment carrying the block identity, i.e. a
+            signature or an encrypted payload, so that identity stays paired with
+            the text it was produced for.
         meta
             Optional metadata attached to the fragment.
 
@@ -646,10 +662,12 @@ class ModelReasoningChunk(State, serializable=True):
         """
         return cls(
             reasoning_chunk=reasoning_chunk,
+            final=final,
             meta=Meta.of(meta),
         )
 
     reasoning_chunk: TextContent
+    final: bool = False
     meta: Meta = Meta.empty
 
 
@@ -705,6 +723,43 @@ class ModelReasoning(State, serializable=True):
                 meta=combined_meta,
             )
 
+    @classmethod
+    def blocks(
+        cls,
+        reasoning: Iterable[ModelReasoningChunk],
+        /,
+    ) -> Sequence[Self]:
+        """Split reasoning fragments into one block per provider reasoning block.
+
+        Fragment metadata is merged within a block, which collapses the identity
+        of distinct provider blocks - a signature or an encrypted payload would end
+        up attached to text it was not produced for. Splitting on fragments marked
+        ``final`` keeps each identity paired with its own text, so a context replay
+        reproduces the provider blocks as they were received.
+
+        Parameters
+        ----------
+        reasoning
+            Reasoning fragments in stream order.
+
+        Returns
+        -------
+        Sequence[Self]
+            Aggregated reasoning blocks, empty when no fragments were provided.
+        """
+        blocks: MutableSequence[Self] = []
+        pending: MutableSequence[ModelReasoningChunk] = []
+        for element in reasoning:
+            pending.append(element)
+            if element.final:
+                blocks.append(cls.of(pending))
+                pending = []
+
+        if pending:  # a block left unterminated by its provider
+            blocks.append(cls.of(pending))
+
+        return blocks
+
     reasoning: MultimodalContent
     meta: Meta = Meta.empty
 
@@ -727,12 +782,15 @@ class ModelOutputLimit(ModelException):
         Provider model identifier used for generation.
     max_output_tokens
         Maximum output token budget configured for the call.
+
+    Notes
+    -----
+    The truncated output is not carried here - it reaches the consumer through the
+    output stream before this is raised, so a caller iterating the stream already
+    holds every chunk produced before the limit was hit.
     """
 
-    __slots__ = (
-        "content",
-        "max_output_tokens",
-    )
+    __slots__ = ("max_output_tokens",)
 
     def __init__(
         self,
@@ -835,8 +893,70 @@ ModelInputChunk = MultimodalContentPart | ModelToolResponse
 """Single incremental input chunk for realtime sessions."""
 ModelOutputChunk = MultimodalContentPart | ModelReasoningChunk | ModelToolRequest
 """Single incremental output chunk emitted by providers."""
-ModelOutputStream = AsyncIterable[ModelOutputChunk]
-"""Asynchronous stream of model output chunks."""
+ModelOutputStream = AsyncGenerator[ModelOutputChunk]
+"""Asynchronous stream of model output chunks.
+
+Provider implementations release the underlying request within their own
+``try``/``finally``, so ending, closing or finalizing the stream releases it.
+"""
+
+
+def model_output_blocks(
+    chunks: Iterable[ModelOutputChunk],
+    /,
+) -> ModelOutputBlocks:
+    """Group output stream chunks into output blocks preserving their order.
+
+    Consecutive content parts collapse into a single ``MultimodalContent`` block
+    and reasoning fragments into their provider blocks, while tool requests stay
+    as they were received. Switching between the three flushes whatever was
+    accumulated so far, which keeps the resulting blocks in stream order.
+
+    Parameters
+    ----------
+    chunks
+        Output chunks in stream order.
+
+    Returns
+    -------
+    ModelOutputBlocks
+        Aggregated output blocks, empty when no chunks were provided.
+    """
+    blocks: MutableSequence[ModelOutputBlock] = []
+    content: MutableSequence[MultimodalContentPart] = []
+    reasoning: MutableSequence[ModelReasoningChunk] = []
+
+    def flush() -> None:
+        # only one of the two can be pending - accumulating either flushes the other
+        if content:
+            blocks.append(MultimodalContent.of(*content))
+            content.clear()
+
+        if reasoning:
+            blocks.extend(ModelReasoning.blocks(reasoning))
+            reasoning.clear()
+
+    for chunk in chunks:
+        match chunk:
+            case ModelReasoningChunk():
+                if content:
+                    flush()
+
+                reasoning.append(chunk)
+
+            case ModelToolRequest():
+                flush()
+                blocks.append(chunk)
+
+            case content_part:
+                if reasoning:
+                    flush()
+
+                content.append(content_part)
+
+    flush()
+
+    return tuple(blocks)
 
 
 @runtime_checkable

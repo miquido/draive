@@ -25,7 +25,7 @@ The agents API is intentionally built as a thin layer over existing Draive runti
     URI of the agent currently executing within it - agents bind a thread stamped with their own
     URI while handling a message.
 - `AgentExecuting` is the executor protocol:
-    `AgentMessage -> AsyncIterable[MultimodalContentPart | ProcessingEvent]`.
+    `AgentMessage -> AsyncGenerator[MultimodalContentPart | ProcessingEvent]`.
 
 In other words, `Agent` itself is not a stateful conversation object. It is an immutable wrapper
 that runs an executor inside a scoped agent context and streams output.
@@ -36,7 +36,7 @@ Use `Agent.steps(...)` when you already have a `Step` pipeline and want to expos
 agent.
 
 ```python
-from collections.abc import AsyncIterable
+from collections.abc import AsyncGenerator
 
 from draive import Agent, ProcessingEvent
 from draive.multimodal import TextContent
@@ -45,7 +45,7 @@ from draive.steps import Step, StepState
 
 async def execute(
     state: StepState,
-) -> AsyncIterable[ProcessingEvent | TextContent | StepState]:
+) -> AsyncGenerator[ProcessingEvent | TextContent | StepState]:
     yield ProcessingEvent.of("progress", "Analyzing request...")
     yield TextContent.of("Done")
     yield state
@@ -61,7 +61,7 @@ worker: Agent = Agent.steps(
 Call the agent inside a context scope and consume the stream.
 
 ```python
-from collections.abc import AsyncIterable
+from collections.abc import AsyncGenerator
 
 from draive import ctx
 from draive.multimodal import MultimodalContentPart
@@ -69,7 +69,7 @@ from draive.utils import ProcessingEvent
 
 
 async with ctx.scope("agents.step"):
-    stream: AsyncIterable[MultimodalContentPart | ProcessingEvent] = worker.call(
+    stream: AsyncGenerator[MultimodalContentPart | ProcessingEvent] = worker.call(
         input="Please help"
     )
     async for chunk in stream:
@@ -79,7 +79,7 @@ async with ctx.scope("agents.step"):
 If you need lower-level control, build `AgentMessage` yourself and call `respond(...)` directly.
 
 ```python
-from collections.abc import AsyncIterable
+from collections.abc import AsyncGenerator
 
 from draive import AgentMessage
 from draive.multimodal import MultimodalContentPart
@@ -89,7 +89,7 @@ from draive.utils import ProcessingEvent
 message: AgentMessage = AgentMessage.of("Please help")
 
 async with ctx.scope("agents.respond"):
-    stream: AsyncIterable[MultimodalContentPart | ProcessingEvent] = worker.respond(
+    stream: AsyncGenerator[MultimodalContentPart | ProcessingEvent] = worker.respond(
         message
     )
     async for chunk in stream:
@@ -98,19 +98,19 @@ async with ctx.scope("agents.respond"):
 
 ### What `steps(...)` Does
 
-- Prepends the incoming agent message into step state with `Step.appending_input(...)`.
-- Executes your step pipeline.
+- Seeds the initial pipeline context with the incoming agent message as a single `ModelInput`,
+    carrying over the message metadata.
+- Executes your steps as one `Step.sequence(...)` and streams it.
 - Filters out `ModelReasoningChunk`.
-- Treats leaked `ModelToolRequest` and `ModelToolResponse` chunks as an internal contract violation.
+- Filters out `ModelToolRequest` and `ModelToolResponse` chunks.
 - Streams only user-visible content and `ProcessingEvent`s.
 
 This makes step-backed agents a good fit when you want deterministic orchestration and typed state
 updates, but a clean public output stream.
 
-One important implication: if your step emits reasoning, callers of the agent will not see it. If
-your step emits tool protocol chunks, `Agent.steps(...)` will raise `AssertionError` in debug mode
-instead of exposing them to callers. `Agent.steps(...)` is intentionally a public-facing wrapper
-over a more verbose internal step stream.
+One important implication: if your step emits reasoning or tool protocol chunks, callers of the
+agent will not see them - those chunks are dropped from the public stream. `Agent.steps(...)` is
+intentionally a public-facing wrapper over a more verbose internal step stream.
 
 ## 2. Build A Generative Model-Backed Agent
 
@@ -118,7 +118,7 @@ Use `Agent.generative(...)` when the agent should directly call the configured
 `GenerativeModel.completion(...)`.
 
 ```python
-from collections.abc import AsyncIterable
+from collections.abc import AsyncGenerator
 
 from draive import Agent, ctx, load_env, tool
 from draive.multimodal import MultimodalContentPart
@@ -144,10 +144,10 @@ assistant: Agent = Agent.generative(
 
 async with ctx.scope(
     "agents.generative",
-    OpenAIResponsesConfig(model="gpt-5-mini"),
+    OpenAIResponsesConfig(model="gpt-5.5"),
     disposables=(OpenAI(),),
 ):
-    stream: AsyncIterable[MultimodalContentPart | ProcessingEvent] = assistant.call(
+    stream: AsyncGenerator[MultimodalContentPart | ProcessingEvent] = assistant.call(
         input="Check the current system status"
     )
     async for chunk in stream:
@@ -194,6 +194,37 @@ assistant: Agent = Agent.generative(
 )
 ```
 
+With `Agent.steps(...)` the same memory is composed explicitly - recall before the work, remember
+after it.
+
+```python
+from draive import Agent, AgentMemory, ModelOutput
+from draive.multimodal import MultimodalContent
+from draive.steps import StepState, step
+
+
+memory: AgentMemory = AgentMemory.volatile()
+
+
+@step
+async def reply(
+    state: StepState,
+) -> StepState:
+    return state.appending_context(ModelOutput.of(MultimodalContent.of("reply")))
+
+
+worker: Agent = Agent.steps(
+    memory.recall_step(),
+    reply,
+    memory.remember_step(),
+    agent="worker",
+)
+```
+
+`recall_step()` replaces `StepState.context` with the recalled context, `remember_step()` persists
+the current `StepState.context` and leaves state unchanged. Running recall twice within one
+pipeline duplicates stored history; that is a composition error.
+
 Memory operations receive the active `AgentThread` - the executing agent's URI together with the
 conversation thread identifier - so one memory instance can serve multiple agents and multiple
 concurrent conversation threads, as long as the implementation keys stored context by both (the
@@ -201,9 +232,10 @@ built-in ones do). Context is stored as the latest snapshot per agent and thread
 remembered after a turn becomes the next recalled context, exactly as provided, which allows steps
 to compact, summarize, or replace the context freely.
 
-- `AgentMemory.volatile(...)` keeps snapshots in-process, with optional LRU-like eviction via
-    `threads_limit`. An entry's usage is refreshed by `prepare` and `remember`, but not by
-    `recall`; intended for local development, tests, and single-process deployments.
+- `AgentMemory.volatile(...)` keeps snapshots in-process, optionally seeded with an `initial`
+    context for new agent-thread entries, and with optional LRU-like eviction via `threads_limit`.
+    An entry's usage is refreshed by `prepare` and `remember`, but not by `recall`; intended for
+    local development, tests, and single-process deployments.
 - `PostgresAgentMemory.instance()` (from `draive.postgres`) persists immutable snapshots in
     PostgreSQL, keyed by executing agent URI and thread; run `PostgresAgentMemory.migrate()` once
     to create its schema.
@@ -272,7 +304,7 @@ async def preparing(
 agent calls to share a logical thread and metadata.
 
 ```python
-from collections.abc import AsyncIterable
+from collections.abc import AsyncGenerator
 from uuid import uuid4
 
 from draive import Agent, AgentIdentity, AgentMessage, ctx
@@ -283,7 +315,7 @@ from draive.utils import ProcessingEvent
 
 async def echo(
     message: AgentMessage,
-) -> AsyncIterable[MultimodalContentPart | ProcessingEvent]:
+) -> AsyncGenerator[MultimodalContentPart | ProcessingEvent]:
     context = ctx.state(AgentThread)
     yield TextContent.of(
         f"thread={context.identifier} source={context.meta.get_str('source')}"
@@ -300,7 +332,7 @@ async with ctx.scope(
     "agents.context",
     AgentThread.of(identifier=uuid4(), agent_uri="agent://outer", meta={"source": "outer"}),
 ):
-    stream: AsyncIterable[MultimodalContentPart | ProcessingEvent] = agent.call(
+    stream: AsyncGenerator[MultimodalContentPart | ProcessingEvent] = agent.call(
         input="hello",
         meta={"request": "nested"},
     )
@@ -444,6 +476,8 @@ clear role and the coordinator can select among them by name from the generated 
 
 - Prefer `Agent.steps(...)` for deterministic pipelines, typed artifacts, and explicit control.
 - Try `Agent.generative(...)` for prompt-first, tool-aware model agents.
+- Use `Agent.from_skill(...)` to turn a loaded `Skill` into a model-backed agent with access to its
+    bundled resources - see [Skills](./Skills.md).
 - Expose one concrete agent via `Agent.as_tool(...)` when a model should call it directly.
 - Delegate using `AgentsGroup.as_tool(handling="response")` when the caller should continue reasoning after delegation.
 - Delegate using `AgentsGroup.as_tool(handling="output")` when the delegated agent should take over visible output.
@@ -457,18 +491,18 @@ recalled across requests.
 The public agents API exported from `draive` includes:
 
 - `Agent`
+- `AgentException`
 - `AgentExecuting`
 - `AgentIdentity`
 - `AgentMemory`
+- `AgentMessage`
+- `AgentThread`
+- `AgentUnavailable`
+- `AgentsGroup`
+- `ProcessingEvent`
+
+The memory protocols are exported from `draive.agents` only:
+
 - `AgentMemoryPreparing`
 - `AgentMemoryRecalling`
 - `AgentMemoryRemembering`
-- `AgentMessage`
-- `AgentThread`
-- `ProcessingEvent`
-- `AgentsGroup`
-
-Additional agent-specific exceptions are available from `draive.agents`:
-
-- `AgentException`
-- `AgentUnavailable`

@@ -1,269 +1,156 @@
-import base64
 import json
-import re
-import typing
+from collections.abc import Sequence
+from types import TracebackType
+from typing import Any, Literal
 
-import httpx
-from cohere import (
-    ApiMeta,
-    ApiMetaBilledUnits,
-    ApiMetaTokens,
-    EmbedResponse,
-    GenerateStreamedResponse,
-    Generation,
-    NonStreamedChatResponse,
-    RerankResponse,
-    StreamedChatResponse,
-)
-from cohere.client import ClientEnvironment  # pyright: ignore
-from cohere.client_v2 import AsyncClientV2
-from cohere.core import construct_type
-from cohere.manually_maintained.lazy_aws_deps import lazy_boto3, lazy_botocore
+from cohere import EmbedByTypeResponse
 from haiway import asynchronous
-from httpx import URL, AsyncByteStream, ByteStream
 
-__all__ = ("AsyncBedrockClientV2",)
-
-
-# it is a naive adjustment of cohere.BedrockClientV2 to work with async interfaces
-class AsyncAwsClientV2(AsyncClientV2):
-    def __init__(
-        self,
-        *,
-        aws_region: str | None = None,
-        service: typing.Literal["bedrock"] | typing.Literal["sagemaker"],
-    ):
-        AsyncClientV2.__init__(
-            self,
-            base_url="https://api.cohere.com",  # this url is unused for BedrockClient
-            environment=ClientEnvironment.PRODUCTION,
-            client_name="n/a",
-            api_key="n/a",
-            httpx_client=httpx.AsyncClient(
-                event_hooks=get_event_hooks(
-                    service=service,
-                    aws_region=aws_region,
-                ),
-            ),
-        )
+__all__ = ("CohereBedrock",)
 
 
-class AsyncBedrockClientV2(AsyncAwsClientV2):
-    def __init__(
-        self,
-        *,
-        aws_region: str | None = None,
-    ):
-        AsyncAwsClientV2.__init__(
-            self,
-            service="bedrock",
-            aws_region=aws_region,
-        )
+class CohereBedrock:
+    """Minimal Cohere client for models served through AWS Bedrock.
 
+    Bedrock exposes Cohere models through `bedrock-runtime.invoke_model`, where the
+    request body is the regular Cohere API body with `model` moved into the request
+    itself, and the response body is the regular Cohere API response. Only the
+    `embed` endpoint is provided, which is all the Cohere integration uses.
+    """
 
-EventHook = typing.Callable[..., typing.Any]
-
-
-def get_event_hooks(
-    service: str,
-    aws_region: str | None,
-) -> dict[str, list[EventHook]]:
-    return {
-        "request": [
-            map_request_to_bedrock(
-                service=service,
-                aws_region=aws_region,
-            ),
-        ],
-        "response": [map_response_from_bedrock()],
-    }
-
-
-class TextGeneration(typing.TypedDict):
-    text: str
-    is_finished: str
-    event_type: typing.Literal["text-generation"]
-
-
-class StreamEnd(typing.TypedDict):
-    is_finished: str
-    event_type: typing.Literal["stream-end"]
-    finish_reason: str
-
-
-class Streamer(AsyncByteStream):
-    lines: typing.AsyncIterator[bytes]
-
-    def __init__(self, lines: typing.AsyncIterator[bytes]):
-        self.lines = lines
-
-    def __aiter__(self) -> typing.AsyncIterator[bytes]:
-        return self.lines
-
-
-response_mapping: dict[str, typing.Any] = {
-    "chat": NonStreamedChatResponse,
-    "embed": EmbedResponse,
-    "generate": Generation,
-    "rerank": RerankResponse,
-}
-
-stream_response_mapping: dict[str, typing.Any] = {
-    "chat": StreamedChatResponse,
-    "generate": GenerateStreamedResponse,
-}
-
-
-async def stream_generator(response: httpx.Response, endpoint: str) -> typing.AsyncIterator[bytes]:
-    regex = r"{[^\}]*}"
-
-    async for _text in response.aiter_lines():
-        match = re.search(regex, _text)
-        if match:
-            obj = json.loads(match.group())
-            if "bytes" in obj:
-                base64_payload = base64.b64decode(obj["bytes"]).decode("utf-8")
-                streamed_obj = json.loads(base64_payload)
-                if "event_type" in streamed_obj:
-                    response_type = stream_response_mapping[endpoint]
-                    parsed = typing.cast(  # type: ignore
-                        response_type,  # type: ignore
-                        construct_type(type_=response_type, object_=streamed_obj),
-                    )
-                    yield (json.dumps(parsed.dict()) + "\n").encode("utf-8")  # type: ignore
-
-
-def map_token_counts(response: httpx.Response) -> ApiMeta:
-    input_tokens = int(response.headers.get("X-Amzn-Bedrock-Input-Token-Count", -1))
-    output_tokens = int(response.headers.get("X-Amzn-Bedrock-Output-Token-Count", -1))
-    return ApiMeta(
-        tokens=ApiMetaTokens(input_tokens=input_tokens, output_tokens=output_tokens),
-        billed_units=ApiMetaBilledUnits(input_tokens=input_tokens, output_tokens=output_tokens),
+    __slots__ = (
+        "_aws_region",
+        "_client",
     )
 
-
-def map_response_from_bedrock():
-    async def _hook(
-        response: httpx.Response,
+    def __init__(
+        self,
+        *,
+        aws_region: str | None = None,
     ) -> None:
-        stream = response.headers["content-type"] == "application/vnd.amazon.eventstream"
-        endpoint = response.request.extensions["endpoint"]
-        output: typing.AsyncIterator[bytes]
+        self._aws_region: str | None = aws_region
+        self._client: Any  # lazily initialized
 
-        if stream:
-            output = stream_generator(
-                httpx.Response(
-                    stream=response.stream,
-                    status_code=response.status_code,
-                ),
-                endpoint,
-            )
+    # preparing it lazily on demand, boto does a lot of stuff on initialization
+    @asynchronous
+    def _initialize_client(self) -> None:
+        if hasattr(self, "_client"):
+            return  # already initialized
 
-        else:
-            response_type = response_mapping[endpoint]
-            response_obj = json.loads(await response.aread())
-            response_obj["meta"] = map_token_counts(response).dict()
-            cast_obj: typing.Any = typing.cast(  # type: ignore
-                response_type,  # type: ignore
-                construct_type(
-                    type_=response_type,
-                    # type: ignore
-                    object_=response_obj,
-                ),
-            )
+        # postponing import of boto3 as late as possible, it does a lot of stuff
+        try:
+            import boto3  # pyright: ignore[reportMissingTypeStubs]
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError(
+                "draive.cohere with the 'bedrock' provider requires the 'cohere_bedrock' extra."
+                " Install via `pip install draive[cohere_bedrock]`."
+            ) from exc
 
-            async def output_generator() -> typing.AsyncIterator[bytes]:
-                yield json.dumps(cast_obj.dict()).encode("utf-8")  # type: ignore
-
-            output = output_generator()
-
-        response.stream = Streamer(output)
-
-        # reset response object to allow for re-reading
-        if hasattr(response, "_content"):
-            del response._content  # type: ignore
-        response.is_stream_consumed = False
-        response.is_closed = False
-
-    return _hook
-
-
-def map_request_to_bedrock(
-    service: str,
-    aws_region: str | None,
-) -> EventHook:
-    session = lazy_boto3().Session(region_name=aws_region)
-    aws_region = session.region_name  # type: ignore
-    credentials = session.get_credentials()  # type: ignore
-    signer = lazy_botocore().auth.SigV4Auth(credentials, service, aws_region)  # pyright: ignore
+        self._client = boto3.Session(region_name=self._aws_region).client("bedrock-runtime")  # pyright: ignore[reportUnknownMemberType]
 
     @asynchronous
-    def _event_hook(request: httpx.Request) -> None:
-        headers = request.headers.copy()
-        del headers["connection"]
+    def _deinitialize_client(self) -> None:
+        if not hasattr(self, "_client"):
+            return  # already deinitialized
 
-        api_version = request.url.path.split("/")[-2]
-        endpoint = request.url.path.split("/")[-1]
-        body = json.loads(request.read())
-        model = body["model"]
+        self._client.close()
+        del self._client
 
-        url = get_url(
-            platform=service,
-            aws_region=aws_region,  # type: ignore
-            model=model,  # type: ignore
-            stream="stream" in body and body["stream"],
+    async def __aenter__(self) -> None:
+        await self._initialize_client()
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        await self._deinitialize_client()
+
+    async def embed(
+        self,
+        *,
+        model: str,
+        input_type: Literal[
+            "search_document",
+            "search_query",
+            "classification",
+            "clustering",
+            "image",
+        ],
+        texts: Sequence[str] | None = None,
+        images: Sequence[str] | None = None,
+        embedding_types: Sequence[Literal["float", "int8", "uint8", "binary", "ubinary"]]
+        | None = None,
+        output_dimension: int | None = None,
+        truncate: Literal["NONE", "START", "END"] | None = None,
+    ) -> EmbedByTypeResponse:
+        # the body matches the regular Cohere API request without `model`,
+        # which Bedrock takes as a separate argument instead
+        body: dict[str, Any] = {"input_type": input_type}
+        if texts is not None:
+            body["texts"] = list(texts)
+
+        if images is not None:
+            body["images"] = list(images)
+
+        if embedding_types is not None:
+            body["embedding_types"] = list(embedding_types)
+
+        if output_dimension is not None:
+            body["output_dimension"] = output_dimension
+
+        if truncate is not None:
+            body["truncate"] = truncate
+
+        return EmbedByTypeResponse.model_validate(
+            await self._invoke_model(
+                model=model,
+                body=body,
+            )
         )
-        request.url = URL(url)
-        request.headers["host"] = request.url.host
 
-        if endpoint == "rerank":
-            body["api_version"] = get_api_version(version=api_version)
-
-        if "stream" in body:
-            del body["stream"]
-
-        if "model" in body:
-            del body["model"]
-
-        new_body = json.dumps(body).encode("utf-8")
-        request.stream = ByteStream(new_body)
-        request._content = new_body  # type: ignore
-        headers["content-length"] = str(len(new_body))
-
-        aws_request = lazy_botocore().awsrequest.AWSRequest(  # pyright: ignore
-            method=request.method,
-            url=url,
-            headers=headers,
-            data=request.read(),
+    @asynchronous
+    def _invoke_model(
+        self,
+        *,
+        model: str,
+        body: dict[str, Any],
+    ) -> dict[str, Any]:
+        response: Any = self._client.invoke_model(
+            modelId=model,
+            contentType="application/json",
+            accept="application/json",
+            body=json.dumps(body).encode("utf-8"),
         )
-        signer.add_auth(aws_request)  # type: ignore
 
-        request.headers = httpx.Headers(aws_request.prepare().headers)  # type: ignore
-        request.extensions["endpoint"] = endpoint
+        payload: dict[str, Any] = json.loads(response["body"].read())
+        # `id` is required by the Cohere response model but Bedrock does not always return it
+        if "id" not in payload:
+            payload["id"] = ""
 
-    return _event_hook
+        if (meta := _response_meta(response)) is not None:
+            payload["meta"] = meta
 
-
-def get_url(
-    *,
-    platform: str,
-    aws_region: str | None,
-    model: str,
-    stream: bool,
-) -> str:
-    if platform == "bedrock":
-        endpoint = "invoke" if not stream else "invoke-with-response-stream"
-        return f"https://{platform}-runtime.{aws_region}.amazonaws.com/model/{model}/{endpoint}"
-    elif platform == "sagemaker":
-        endpoint = "invocations" if not stream else "invocations-response-stream"
-        return f"https://runtime.sagemaker.{aws_region}.amazonaws.com/endpoints/{model}/{endpoint}"
-    return ""
+        return payload
 
 
-def get_api_version(*, version: str):
-    int_version = {
-        "v1": 1,
-        "v2": 2,
+def _response_meta(
+    response: Any,
+    /,
+) -> dict[str, Any] | None:
+    headers: Any = response.get("ResponseMetadata", {}).get("HTTPHeaders", {})
+    input_tokens: str | None = headers.get("x-amzn-bedrock-input-token-count")
+    output_tokens: str | None = headers.get("x-amzn-bedrock-output-token-count")
+    if input_tokens is None and output_tokens is None:
+        return None
+
+    tokens: dict[str, Any] = {
+        "input_tokens": int(input_tokens) if input_tokens is not None else None,
+        "output_tokens": int(output_tokens) if output_tokens is not None else None,
     }
 
-    return int_version.get(version, 1)
+    return {
+        "tokens": tokens,
+        "billed_units": tokens,
+    }

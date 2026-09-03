@@ -1,6 +1,6 @@
 from typing import Literal, cast
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, not_given
 
 __all__ = ("AnthropicAPI",)
 
@@ -39,17 +39,40 @@ class AnthropicAPI:
                     base_url=self._base_url,
                     api_key=self._api_key,
                     max_retries=0,  # disable library retries
-                    timeout=self._timeout,
+                    # `None` means "no timeout", omit it to keep the SDK default instead
+                    timeout=self._timeout if self._timeout is not None else not_given,
                 )
 
             case "bedrock":
-                from anthropic import AsyncAnthropicAWS
+                from anthropic.lib.bedrock import AsyncAnthropicBedrock
 
                 return cast(
-                    AsyncAnthropic,  # it is not actually the same but for our purpose it works
-                    AsyncAnthropicAWS(
+                    # Bedrock client does not inherit from AsyncAnthropic
+                    # while providing all of the API we are using
+                    AsyncAnthropic,
+                    AsyncAnthropicBedrock(
                         base_url=self._base_url,
                         aws_region=self._aws_region,
-                        timeout=self._timeout,
+                        max_retries=0,  # disable library retries
+                        # `None` means "no timeout", omit it to keep the SDK default instead
+                        timeout=self._timeout if self._timeout is not None else not_given,
                     ),
                 )
+
+    async def _initialize_client(self) -> None:
+        assert not hasattr(self, "_client")  # nosec: B101
+        self._client = self._prepare_client()
+        await self._client.__aenter__()
+
+    async def _deinitialize_client(self) -> None:
+        # closing keeps the instance usable - deleting it would break streams
+        # still held by a caller past the scope with an attribute error
+        try:
+            await self._client.__aexit__(
+                None,
+                None,
+                None,
+            )
+
+        finally:
+            del self._client

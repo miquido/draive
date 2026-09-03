@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Generator, MutableSequence, Sequence
+from collections.abc import AsyncGenerator, AsyncIterable, Generator, MutableSequence, Sequence
 from datetime import UTC, datetime
 from typing import Any, Literal, Protocol, Self, final, runtime_checkable
 from uuid import UUID, uuid4
@@ -101,7 +101,7 @@ class ConversationEvent(State, serializable=True):
         )
 
     event: str
-    created: datetime = Default(default_factory=lambda: datetime.now(UTC))
+    created: datetime = Default(factory=lambda: datetime.now(UTC))
     content: ArtifactContent | None = None
     meta: Meta = Meta.empty
 
@@ -125,7 +125,7 @@ class ConversationUserTurn(State, serializable=True):
         )
 
     identifier: UUID
-    created: datetime = Default(default_factory=lambda: datetime.now(UTC))
+    created: datetime = Default(factory=lambda: datetime.now(UTC))
     turn: Literal["user"] = "user"
     content: Sequence[MultimodalContent]
     meta: Meta = Meta.empty
@@ -159,7 +159,7 @@ class ConversationAssistantTurn(State, serializable=True):
         )
 
     identifier: UUID
-    created: datetime = Default(default_factory=lambda: datetime.now(UTC))
+    created: datetime = Default(factory=lambda: datetime.now(UTC))
     turn: Literal["assistant"] = "assistant"
     content: Sequence[MultimodalContent | ModelReasoning | ConversationEvent]
     meta: Meta = Meta.empty
@@ -219,7 +219,7 @@ ConversationTurn = ConversationUserTurn | ConversationAssistantTurn
 ConversationInputChunk = MultimodalContentPart | ConversationEvent
 ConversationInputStream = AsyncIterable[ConversationInputChunk]
 ConversationOutputChunk = MultimodalContentPart | ModelReasoningChunk | ConversationEvent
-ConversationOutputStream = AsyncIterable[ConversationOutputChunk]
+ConversationOutputStream = AsyncGenerator[ConversationOutputChunk]
 
 
 @runtime_checkable

@@ -1,7 +1,7 @@
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from time import time_ns
-from typing import Any
+from typing import Any, Final
 
 from botocore.exceptions import ClientError  # pyright: ignore[reportMissingModuleSource]
 from haiway import MISSING, ObservabilityAttribute, asynchronous
@@ -14,6 +14,47 @@ from draive.aws.types import (
 )
 
 __all__ = ("AWSCloudwatchMixin",)
+
+
+# CloudWatch accepts only its predefined units, anything else fails the whole request
+_STANDARD_METRIC_UNITS: Final[Sequence[str]] = (
+    "Seconds",
+    "Microseconds",
+    "Milliseconds",
+    "Bytes",
+    "Kilobytes",
+    "Megabytes",
+    "Gigabytes",
+    "Terabytes",
+    "Bits",
+    "Kilobits",
+    "Megabits",
+    "Gigabits",
+    "Terabits",
+    "Percent",
+    "Count",
+    "Bytes/Second",
+    "Kilobytes/Second",
+    "Megabytes/Second",
+    "Gigabytes/Second",
+    "Terabytes/Second",
+    "Bits/Second",
+    "Kilobits/Second",
+    "Megabits/Second",
+    "Gigabits/Second",
+    "Terabits/Second",
+    "Count/Second",
+    "None",
+)
+_METRIC_UNITS: Final[Mapping[str, str]] = {
+    **{unit.lower(): unit for unit in _STANDARD_METRIC_UNITS},
+    # unit names used within draive without a matching CloudWatch unit
+    "%": "Percent",
+    "tokens": "None",  # there is no unit suitable for tokens
+}
+_DIMENSIONS_LIMIT: Final[int] = 30
+_DIMENSION_NAME_LIMIT: Final[int] = 255
+_DIMENSION_VALUE_LIMIT: Final[int] = 1024
 
 
 class AWSCloudwatchMixin(AWSAPI):
@@ -154,8 +195,8 @@ class AWSCloudwatchMixin(AWSAPI):
             if dimensions:
                 metric_data["Dimensions"] = dimensions
 
-            if unit:
-                metric_data["Unit"] = unit
+            if metric_unit := format_metric_unit(unit):
+                metric_data["Unit"] = metric_unit
 
             self._cloudwatch_client.put_metric_data(
                 Namespace=namespace,
@@ -171,19 +212,37 @@ class AWSCloudwatchMixin(AWSAPI):
             ) from exc
 
 
+def format_metric_unit(
+    unit: str | None,
+) -> str | None:
+    """Convert a metric unit to its CloudWatch counterpart when available."""
+
+    if not unit:
+        return None
+
+    # unmapped units have to be skipped instead of failing the whole request
+    return _METRIC_UNITS.get(unit.strip().lower())
+
+
 def format_metric_dimensions(
     attributes: Mapping[str, ObservabilityAttribute],
 ) -> list[dict[str, str]]:
     dimensions: list[dict[str, str]] = []
     for key, value in _sanitize_attributes(attributes).items():
+        if len(dimensions) >= _DIMENSIONS_LIMIT:
+            break  # only a limited number of dimensions is allowed
+
+        if not key:
+            continue  # empty dimension names are not allowed
+
         rendered: str | None = _render_dimension_value(value)
-        if rendered is None:
-            continue
+        if not rendered:
+            continue  # empty dimension values are not allowed
 
         dimensions.append(
             {
-                "Name": _truncate_dimension(key),
-                "Value": _truncate_dimension(rendered),
+                "Name": _truncate_dimension(key, limit=_DIMENSION_NAME_LIMIT),
+                "Value": _truncate_dimension(rendered, limit=_DIMENSION_VALUE_LIMIT),
             }
         )
 
@@ -238,12 +297,12 @@ def _sanitize_attributes(
 def _truncate_dimension(
     value: str,
     *,
-    max_length: int = 255,
+    limit: int,
 ) -> str:
-    if len(value) <= max_length:
+    if len(value) <= limit:
         return value
 
-    return value[:max_length]
+    return value[:limit]
 
 
 def translate_cloudwatch_error(

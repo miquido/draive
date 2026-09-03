@@ -1,11 +1,11 @@
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import TracebackType
 from typing import TYPE_CHECKING, Protocol, final, runtime_checkable
 from uuid import UUID
 
 from haiway import State
-from surrealdb import RecordID
+from surrealdb import Duration, RecordID, Table
 
 if TYPE_CHECKING:
     from draive.surreal.state import SurrealSession
@@ -31,11 +31,24 @@ class SurrealException(Exception):
 @final
 class SurrealID(State):
     table: str
-    record: UUID | str
+    record: UUID | str | int
 
 
 SurrealBasicValue = (
-    SurrealID | RecordID | UUID | datetime | str | int | float | bytes | bytearray | bool | None
+    SurrealID
+    | RecordID
+    | Table
+    | Duration
+    | UUID
+    | datetime
+    | timedelta
+    | str
+    | int
+    | float
+    | bytes
+    | bytearray
+    | bool
+    | None
 )
 type SurrealValue = Mapping[str, SurrealValue] | Sequence[SurrealValue] | SurrealBasicValue
 SurrealObject = Mapping[str, SurrealValue]

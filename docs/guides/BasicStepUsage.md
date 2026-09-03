@@ -60,10 +60,36 @@ async for chunk in pipeline.stream():
     print(chunk)
 ```
 
+When stopping before the stream ends, close it explicitly (i.e. through `ctx.closing`).
+Leaving it to garbage collection finalizes it within an unrelated context and breaks scoped state
+teardown.
+
 ## Common Composition Helpers
 
 - `Step.sequence(...)` for deterministic pipelines.
 - `Step.loop(..., condition=...)` for iterative processing.
 - `Step.concurrent(..., merge=...)` for fan-out/fan-in branches.
+- `Step.selection(...)` for choosing the next step from the current state.
 - `Step.generating_completion(...)` for one model completion stage.
 - `Step.looping_completion(...)` for model + tool iterative loops.
+- `Step.handling_tools(...)` for executing tool requests of the latest model output.
+- `Step.appending_input(...)` / `Step.appending_output(...)` for injecting externally provided
+    content, including awaited providers and `Template` values.
+- `Step.appending_context(...)`, `Step.replacing_context(...)` and `Step.mutating_context(...)` for
+    working with the whole `ModelContext` - append elements, swap it for a fixed one (or an awaited
+    provider), or rewrite it through an async mutation.
+- `Step.preserving_state(...)` / `Step.restoring_state(...)` for snapshotting whole `StepState`.
+- `step` decorator for adapting a plain `StepState -> StepState` coroutine into a `Step`.
+
+## Modifiers
+
+Any step can be wrapped without breaking composition:
+
+- `step.with_ctx(...)` for scoped state and disposables.
+- `step.with_retry(...)` and `step.with_fallback(...)` for failure handling.
+- `step.with_condition(..., alternative=...)` for conditional execution.
+- `step.with_isolated_context(...)`, `step.with_volatile_context()`, `step.with_volatile_tools()`
+    for controlling what the step contributes back to context.
+- `step.with_suppressed_output()` for muting emitted chunks.
+- `step.with_context_evaluation(...)` and `step.with_output_evaluation(...)` for evaluating context
+    and emitted output.

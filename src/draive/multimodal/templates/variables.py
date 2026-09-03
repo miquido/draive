@@ -3,6 +3,7 @@ from collections.abc import Callable, Generator, Mapping, MutableSequence
 from typing import Final
 
 from draive.multimodal.content import Multimodal, MultimodalContent
+from draive.multimodal.templates.types import TemplateInvalid
 
 # Match `{%variable%}` where the name contains no whitespace.
 _VARIABLE_PATTERN: Final[re.Pattern[str]] = re.compile(r"{%([^\s%]+)%}")
@@ -24,6 +25,7 @@ def parse_template_variables(
 def resolve_text_template(
     template: str,
     *,
+    identifier: str,
     arguments: Mapping[str, Multimodal],
 ) -> str:
     parts: MutableSequence[str] = []
@@ -39,7 +41,14 @@ def resolve_text_template(
         variable_name: str = match.group(1)
         variable_value: Multimodal | None = get_argument(variable_name)
         if variable_value is None:
-            raise KeyError(f"Missing template argument: {variable_name}")
+            raise TemplateInvalid(
+                identifier=identifier,
+                description=f"missing argument `{variable_name}`",
+            )
+
+        if isinstance(variable_value, Exception):
+            # placeholder left by a nested resolution which requires itself
+            raise variable_value
 
         if isinstance(variable_value, str):
             append(variable_value)
@@ -58,6 +67,7 @@ def resolve_text_template(
 def resolve_multimodal_template(
     template: str,
     *,
+    identifier: str,
     arguments: Mapping[str, Multimodal],
 ) -> MultimodalContent:
     parts: MutableSequence[Multimodal] = []
@@ -73,7 +83,14 @@ def resolve_multimodal_template(
         variable_name: str = match.group(1)
         variable_value: Multimodal | None = get_argument(variable_name)
         if variable_value is None:
-            raise KeyError(f"Missing template argument: {variable_name}")
+            raise TemplateInvalid(
+                identifier=identifier,
+                description=f"missing argument `{variable_name}`",
+            )
+
+        if isinstance(variable_value, Exception):
+            # placeholder left by a nested resolution which requires itself
+            raise variable_value
 
         append(variable_value)
         cursor = end

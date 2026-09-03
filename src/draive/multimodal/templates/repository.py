@@ -239,10 +239,13 @@ class TemplatesRepository(State):
         ------
         TemplateMissing
             If neither repository content nor ``default`` is available.
+        TemplateInvalid
+            If a required argument is missing or a template requires itself.
         """
         if isinstance(content, str):
             return resolve_multimodal_template(
                 content,
+                identifier="<inline>",
                 arguments=await self._resolve_arguments(
                     arguments,
                     **extra,
@@ -258,6 +261,7 @@ class TemplatesRepository(State):
         if loaded is not None:
             return resolve_multimodal_template(
                 loaded,
+                identifier=content.identifier,
                 arguments=await self._resolve_arguments(
                     {**content.arguments, **arguments} if arguments else content.arguments,
                     **extra,
@@ -267,6 +271,7 @@ class TemplatesRepository(State):
         elif default is not None:
             return resolve_multimodal_template(
                 default,
+                identifier=content.identifier,
                 arguments=await self._resolve_arguments(
                     {**content.arguments, **arguments} if arguments else content.arguments,
                     **extra,
@@ -334,10 +339,13 @@ class TemplatesRepository(State):
         ------
         TemplateMissing
             If neither repository content nor ``default`` is available.
+        TemplateInvalid
+            If a required argument is missing or a template requires itself.
         """
         if isinstance(content, str):
             return resolve_text_template(
                 content,
+                identifier="<inline>",
                 arguments=await self._resolve_arguments(
                     arguments,
                     **extra,
@@ -353,6 +361,7 @@ class TemplatesRepository(State):
         if loaded is not None:
             return resolve_text_template(
                 loaded,
+                identifier=content.identifier,
                 arguments=await self._resolve_arguments(
                     {**content.arguments, **arguments} if arguments else content.arguments,
                     **extra,
@@ -362,6 +371,7 @@ class TemplatesRepository(State):
         elif default is not None:
             return resolve_text_template(
                 default,
+                identifier=content.identifier,
                 arguments=await self._resolve_arguments(
                     {**content.arguments, **arguments} if arguments else content.arguments,
                     **extra,
@@ -509,14 +519,23 @@ class TemplatesRepository(State):
 
         arguments = dict(arguments)
         for key, value in arguments.items():
-            if isinstance(value, Exception):
-                raise value
-
-            elif isinstance(value, Template):
-                arguments[key] = RecursionError("Recursive template resolution is not supported")  # pyright: ignore[reportArgumentType]
+            if isinstance(value, Template):
+                # placeholder detecting a template requiring itself - nested resolution
+                # inherits the arguments, the placeholder raises only when rendering
+                # actually requires this very argument
+                arguments[key] = TemplateInvalid(  # pyright: ignore[reportArgumentType]
+                    identifier=value.identifier,
+                    description="recursive resolution is not supported",
+                )
                 resolved: MultimodalContent = await self.resolve(
                     value,
-                    arguments=arguments,
+                    # nested templates inherit the arguments except the ones
+                    # they bind themselves - own declarations take precedence
+                    arguments={
+                        inherited_key: inherited
+                        for inherited_key, inherited in arguments.items()
+                        if inherited_key not in value.arguments
+                    },
                     **extra,
                 )
                 arguments[key] = resolved

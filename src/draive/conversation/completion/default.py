@@ -1,4 +1,4 @@
-from collections.abc import MutableSequence
+from collections.abc import AsyncGenerator, MutableSequence, Sequence
 from typing import Any
 
 from haiway import as_list, ctx
@@ -22,6 +22,7 @@ from draive.models import (
     ModelToolRequest,
     ModelToolResponse,
 )
+from draive.models.types import ModelOutputStream
 from draive.multimodal import Multimodal, MultimodalContent, MultimodalContentPart
 from draive.tools import Toolbox
 from draive.utils import ProcessingEvent
@@ -52,54 +53,63 @@ async def conversation_completion(  # noqa: C901, PLR0912, PLR0915
             output_accumulator: MutableSequence[ModelOutputBlock] = []
             tool_requests: MutableSequence[ModelToolRequest] = []
 
-            async for chunk in GenerativeModel.completion(
+            completion_stream: ModelOutputStream = GenerativeModel.completion(
                 instructions=instructions,
                 tools=toolbox.model_tools(iteration=iteration),
                 context=model_context,
                 output="auto",
                 **extra,
-            ):
-                if isinstance(chunk, ModelReasoningChunk):
-                    yield chunk
+            )
+            try:
+                async for chunk in completion_stream:
+                    if isinstance(chunk, ModelReasoningChunk):
+                        yield chunk
 
-                    if content_accumulator:
-                        content: MultimodalContent = MultimodalContent.of(*content_accumulator)
-                        output_accumulator.append(content)
-                        assistant_turn_accumulator.append(content)
-                        content_accumulator.clear()
+                        if content_accumulator:
+                            content: MultimodalContent = MultimodalContent.of(*content_accumulator)
+                            output_accumulator.append(content)
+                            assistant_turn_accumulator.append(content)
+                            content_accumulator.clear()
 
-                    reasoning_accumulator.append(chunk)
+                        reasoning_accumulator.append(chunk)
 
-                elif isinstance(chunk, ModelToolRequest):  # TODO: start handling immediately
-                    event: ConversationEvent = ConversationEvent.tool_request(chunk)
-                    yield event
+                    elif isinstance(chunk, ModelToolRequest):  # TODO: start handling immediately
+                        event: ConversationEvent = ConversationEvent.tool_request(chunk)
+                        yield event
 
-                    if content_accumulator:
-                        content: MultimodalContent = MultimodalContent.of(*content_accumulator)
-                        output_accumulator.append(content)
-                        assistant_turn_accumulator.append(content)
-                        content_accumulator.clear()
+                        if content_accumulator:
+                            content: MultimodalContent = MultimodalContent.of(*content_accumulator)
+                            output_accumulator.append(content)
+                            assistant_turn_accumulator.append(content)
+                            content_accumulator.clear()
 
-                    if reasoning_accumulator:
-                        reasoning: ModelReasoning = ModelReasoning.of(reasoning_accumulator)
-                        output_accumulator.append(reasoning)
-                        assistant_turn_accumulator.append(reasoning)
-                        reasoning_accumulator.clear()
+                        if reasoning_accumulator:
+                            reasoning: Sequence[ModelReasoning] = ModelReasoning.blocks(
+                                reasoning_accumulator
+                            )
+                            output_accumulator.extend(reasoning)
+                            assistant_turn_accumulator.extend(reasoning)
+                            reasoning_accumulator.clear()
 
-                    output_accumulator.append(chunk)
-                    tool_requests.append(chunk)
-                    assistant_turn_accumulator.append(event)
+                        output_accumulator.append(chunk)
+                        tool_requests.append(chunk)
+                        assistant_turn_accumulator.append(event)
 
-                else:
-                    yield chunk
+                    else:
+                        yield chunk
 
-                    if reasoning_accumulator:
-                        reasoning: ModelReasoning = ModelReasoning.of(reasoning_accumulator)
-                        output_accumulator.append(reasoning)
-                        assistant_turn_accumulator.append(reasoning)
-                        reasoning_accumulator.clear()
+                        if reasoning_accumulator:
+                            reasoning: Sequence[ModelReasoning] = ModelReasoning.blocks(
+                                reasoning_accumulator
+                            )
+                            output_accumulator.extend(reasoning)
+                            assistant_turn_accumulator.extend(reasoning)
+                            reasoning_accumulator.clear()
 
-                    content_accumulator.append(chunk)
+                        content_accumulator.append(chunk)
+
+            finally:
+                await completion_stream.aclose()
 
             if content_accumulator:
                 content: MultimodalContent = MultimodalContent.of(*content_accumulator)
@@ -107,9 +117,9 @@ async def conversation_completion(  # noqa: C901, PLR0912, PLR0915
                 assistant_turn_accumulator.append(content)
 
             if reasoning_accumulator:
-                reasoning: ModelReasoning = ModelReasoning.of(reasoning_accumulator)
-                output_accumulator.append(reasoning)
-                assistant_turn_accumulator.append(reasoning)
+                reasoning: Sequence[ModelReasoning] = ModelReasoning.blocks(reasoning_accumulator)
+                output_accumulator.extend(reasoning)
+                assistant_turn_accumulator.extend(reasoning)
 
             model_context.append(ModelOutput.of(*output_accumulator))
 
@@ -118,21 +128,28 @@ async def conversation_completion(  # noqa: C901, PLR0912, PLR0915
 
             responses: MutableSequence[ModelToolResponse] = []
             tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
-            async for chunk in toolbox.handle(*tool_requests):
-                if isinstance(chunk, ModelToolResponse):
-                    responses.append(chunk)
-                    event: ConversationEvent = ConversationEvent.tool_response(chunk)
-                    assistant_turn_accumulator.append(event)
-                    yield event
+            tools_stream: AsyncGenerator[
+                ModelToolResponse | ProcessingEvent | MultimodalContentPart
+            ] = toolbox.handle(*tool_requests)
+            try:
+                async for chunk in tools_stream:
+                    if isinstance(chunk, ModelToolResponse):
+                        responses.append(chunk)
+                        event: ConversationEvent = ConversationEvent.tool_response(chunk)
+                        assistant_turn_accumulator.append(event)
+                        yield event
 
-                elif isinstance(chunk, ProcessingEvent):
-                    event: ConversationEvent = ConversationEvent.tool_event(chunk)
-                    assistant_turn_accumulator.append(event)
-                    yield event
+                    elif isinstance(chunk, ProcessingEvent):
+                        event: ConversationEvent = ConversationEvent.tool_event(chunk)
+                        assistant_turn_accumulator.append(event)
+                        yield event
 
-                else:
-                    tools_output_accumulator.append(chunk)
-                    yield chunk
+                    else:
+                        tools_output_accumulator.append(chunk)
+                        yield chunk
+
+            finally:
+                await tools_stream.aclose()
 
             ctx.log_debug("...received tool responses...")
 

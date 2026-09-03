@@ -31,7 +31,7 @@ content = MultimodalContent.of(
 
 Useful helpers include:
 
-- `texts()`, `images()`, `audio()`, `resources()` for part extraction
+- `texts()`, `images()`, `audio()`, `video()`, `resources()` for part extraction
 - `artifacts(...)`, `tags(...)` for structured component retrieval
 - `matching_meta(...)`, `split_by_meta(...)` for metadata-aware filtering
 - `without_resources()`, `without_artifacts()` for creating reduced variants

@@ -1,7 +1,6 @@
 """Ollama chat adapter for GenerativeModel with tools and streaming."""
 
-import json
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Iterable, Mapping, Sequence
 from typing import Any, Final, Literal, cast
 from uuid import uuid4
 
@@ -12,13 +11,14 @@ from draive.models import (
     ModelContext,
     ModelException,
     ModelInput,
+    ModelInputInvalid,
     ModelInstructions,
     ModelOutput,
-    ModelOutputBlock,
     ModelOutputFailed,
-    ModelOutputInvalid,
+    ModelOutputLimit,
     ModelOutputSelection,
     ModelOutputStream,
+    ModelReasoning,
     ModelReasoningChunk,
     ModelToolRequest,
     ModelTools,
@@ -26,8 +26,7 @@ from draive.models import (
     ModelToolsSelection,
 )
 from draive.models.metrics import record_model_invocation, record_usage_metrics
-from draive.multimodal import Multimodal, MultimodalContent, TextContent
-from draive.multimodal.content import MultimodalContentPart
+from draive.multimodal import MultimodalContent, TextContent
 from draive.ollama.api import OllamaAPI
 from draive.ollama.config import OllamaChatConfig
 from draive.ollama.utils import unwrap_missing
@@ -45,7 +44,6 @@ class OllamaChat(OllamaAPI):
         context: ModelContext,
         output: ModelOutputSelection,
         config: OllamaChatConfig | None = None,
-        prefill: Multimodal | None = None,
         **extra: Any,
     ) -> ModelOutputStream:
         return self._completion_stream(
@@ -54,11 +52,10 @@ class OllamaChat(OllamaAPI):
             context=context,
             output=output,
             config=config or ctx.state(OllamaChatConfig),
-            prefill=prefill,
             **extra,
         )
 
-    async def _completion(
+    async def _completion_stream(  # noqa: C901, PLR0912
         self,
         *,
         instructions: ModelInstructions,
@@ -66,9 +63,8 @@ class OllamaChat(OllamaAPI):
         context: ModelContext,
         output: ModelOutputSelection,
         config: OllamaChatConfig,
-        prefill: Multimodal | None,
         **extra: Any,
-    ) -> ModelOutput:
+    ) -> ModelOutputStream:
         async with ctx.scope("model.invocation"):
             record_model_invocation(
                 provider="ollama",
@@ -78,64 +74,87 @@ class OllamaChat(OllamaAPI):
                 tools=tools,
                 output=output,
                 stop_sequences=config.stop_sequences,
+                top_p=config.top_p,
+                top_k=config.top_k,
+                seed=config.seed,
+                thinking=config.thinking,
             )
 
-            messages: list[Message] = list(
-                _context_messages(
-                    instructions=instructions,
-                    context=context,
-                )
-            )
-
-            if prefill:
-                messages.append(_assistant_message_from_content(MultimodalContent.of(prefill)))
-
-            elif output == "json" or isinstance(output, type):
-                messages.append(_assistant_message_from_content(MultimodalContent.of("{")))
-
+            messages: list[Message]
             try:
-                completion: ChatResponse = await self._client.chat(  # pyright: ignore[reportUnknownMemberType]
-                    model=config.model,
-                    messages=messages,
-                    format=_response_format(output),
-                    tools=_tools_as_tool_config(
-                        tools.specification,
-                        tool_selection=tools.selection,
-                    ),
-                    options=Options(
-                        temperature=unwrap_missing(config.temperature),
-                        num_predict=unwrap_missing(config.max_output_tokens),
-                        top_k=unwrap_missing(config.top_k),
-                        top_p=unwrap_missing(config.top_p),
-                        seed=unwrap_missing(config.seed),
-                        stop=unwrap_missing(config.stop_sequences),
-                    ),
-                    stream=False,
-                )
-
-                blocks: list[ModelOutputBlock] = []
-                # Convert message content into content and reasoning blocks
-                blocks.extend(_message_to_blocks(completion.message))
-
-                blocks.extend(
-                    _tool_calls_to_requests(
-                        completion.message.tool_calls,
-                        model=config.model,
+                # eagerly materialize to convert context errors to ModelInputInvalid here
+                messages = list(
+                    _context_messages(
+                        instructions=instructions,
+                        context=context,
                     )
                 )
-                record_usage_metrics(
+
+            except Exception as exc:
+                raise ModelInputInvalid(
                     provider="ollama",
                     model=config.model,
-                    input_tokens=completion.prompt_eval_count,
-                    output_tokens=completion.eval_count,
+                    reason=str(exc),
+                ) from exc
+
+            input_tokens: int | None = None
+            output_tokens: int | None = None
+            # the client declares a plain iterator while always producing an async
+            # generator for streamed requests, the narrower type allows releasing it
+            stream: AsyncGenerator[ChatResponse] | None = None
+            try:
+                stream = cast(
+                    AsyncGenerator[ChatResponse],
+                    await self._client.chat(  # pyright: ignore[reportUnknownMemberType]
+                        model=config.model,
+                        messages=messages,
+                        format=_response_format(output),
+                        tools=_tools_as_tool_config(
+                            tools.specification,
+                            tool_selection=tools.selection,
+                        ),
+                        options=Options(
+                            temperature=unwrap_missing(config.temperature),
+                            num_predict=unwrap_missing(config.max_output_tokens),
+                            top_k=unwrap_missing(config.top_k),
+                            top_p=unwrap_missing(config.top_p),
+                            seed=unwrap_missing(config.seed),
+                            stop=unwrap_missing(config.stop_sequences),
+                        ),
+                        think=unwrap_missing(config.thinking),
+                        stream=True,
+                    ),
                 )
 
-                return ModelOutput.of(
-                    *blocks,
-                    meta={
-                        "model": config.model,
-                    },
-                )
+                async for chunk in stream:
+                    # usage counters arrive within the terminal chunk
+                    if chunk.prompt_eval_count is not None:
+                        input_tokens = chunk.prompt_eval_count
+
+                    if chunk.eval_count is not None:
+                        output_tokens = chunk.eval_count
+
+                    message: Message = chunk.message
+                    if thinking := message.thinking:
+                        yield ModelReasoningChunk.of(
+                            TextContent.of(thinking),
+                            meta={"kind": "thinking"},
+                        )
+
+                    # streaming chunks carry content fragments, images are never included
+                    if content := message.content:
+                        yield TextContent.of(content)
+
+                    # ollama delivers each tool call complete within a single chunk
+                    for request in _tool_calls_to_requests(message.tool_calls):
+                        yield request
+
+                    if chunk.done and chunk.done_reason == "length":
+                        raise ModelOutputLimit(
+                            provider="ollama",
+                            model=config.model,
+                            max_output_tokens=unwrap_missing(config.max_output_tokens) or 0,
+                        )
 
             except ModelException as exc:
                 raise exc
@@ -147,112 +166,64 @@ class OllamaChat(OllamaAPI):
                     reason=str(exc),
                 ) from exc
 
-    async def _completion_stream(
-        self,
-        *,
-        instructions: ModelInstructions,
-        tools: ModelTools,
-        context: ModelContext,
-        output: ModelOutputSelection,
-        config: OllamaChatConfig,
-        prefill: Multimodal | None,
-        **extra: Any,
-    ) -> ModelOutputStream:
-        async with ctx.scope("ollama.chat"):
-            ctx.log_warning(
-                "ollama completion streaming is not supported yet, using regular response instead."
-            )
+            finally:
+                if input_tokens is not None or output_tokens is not None:
+                    record_usage_metrics(
+                        provider="ollama",
+                        model=config.model,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                    )
 
-            model_output: ModelOutput = await self._completion(
-                instructions=instructions,
-                context=context,
-                tools=tools,
-                output=output,
-                config=config,
-                prefill=prefill,
-            )
-
-            for block in model_output.output:
-                if isinstance(block, MultimodalContent):
-                    for part in block.parts:
-                        yield part
-
-                else:
-                    assert isinstance(block, ModelToolRequest | ModelReasoningChunk)  # nosec: B101
-                    yield block
+                if stream is not None:
+                    # release the http stream, iteration may have ended
+                    # before the response was completed
+                    await stream.aclose()
 
 
-def _assistant_message_from_content(
+def _message_text(
     content: MultimodalContent,
-) -> Message:
-    return Message(
-        role="assistant",
-        content=content.without_resources().to_str(),
-        images=[
-            # Prefer URLs for references; use data URIs for inline content
-            Image(value=image.uri)
-            if isinstance(image, ResourceReference)
-            else Image(value=image.to_data_uri())
-            for image in content.images()
-        ]
-        or None,
-    )
+    /,
+) -> str:
+    # images travel through a dedicated field, text resources have no representation
+    # of their own - inlining keeps them within the message instead of dropping them
+    return MultimodalContent.of(
+        *(
+            TextContent.of(part.to_bytes().decode())
+            if isinstance(part, ResourceContent) and part.mime_type.startswith("text")
+            else part
+            for part in content.parts
+            if not isinstance(part, ResourceReference | ResourceContent)
+            or part.mime_type.startswith("text")
+        )
+    ).to_str()
 
 
-def _message_to_blocks(  # noqa: C901
-    message: Message,
-) -> list[MultimodalContent]:
-    blocks: list[MultimodalContent] = []
+def _content_images(
+    content: MultimodalContent,
+    /,
+) -> list[Image] | None:
+    images: list[Image] = []
+    for resource in content.resources():
+        mime_type: str = resource.mime_type or ""
+        if mime_type.startswith("text"):
+            continue  # inlined into the message text
 
-    def flush(acc: list[MultimodalContentPart]) -> None:
-        if acc:
-            blocks.append(MultimodalContent.of(*acc))
-            acc.clear()
+        if not mime_type.startswith("image"):
+            raise ValueError(f"Unsupported message content mime type: {mime_type}")
 
-    def _convert_chunk(
-        chunk: object,
-    ) -> MultimodalContentPart | None:
-        if isinstance(chunk, dict):
-            ctype: str | None = cast(dict[str, Any], chunk).get("type")
-            if ctype == "text":
-                text: Any = cast(dict[str, Any], chunk).get("text")
-                if isinstance(text, str) and text:
-                    return TextContent.of(text)
+        if isinstance(resource, ResourceReference):
+            # ollama accepts only raw base64 image data - neither urls nor data uris
+            # the uri is omitted, it can carry credentials within its userinfo or query
+            raise ValueError(
+                f"Unsupported message content image reference ({resource.mime_type}),"
+                " ollama accepts only inline image data"
+            )
 
-            if ctype in ("image", "image_url"):
-                image: dict[str, Any] = (
-                    cast(dict[str, Any], chunk).get("image")
-                    or cast(dict[str, Any], chunk).get("image_url")
-                    or {}
-                )
-                url = image.get("url")
-                if isinstance(url, str) and url:
-                    return ResourceReference.of(url, mime_type="image/*")
+        # ResourceContent.data is already base64 encoded which is exactly what ollama expects
+        images.append(Image(value=resource.data))
 
-        # Fallback: stringify any unknown object deterministically
-        return TextContent.of(json.dumps(chunk, default=str))
-
-    accumulator: list[MultimodalContentPart] = []
-    content = message.content
-    if isinstance(content, str) and content:
-        accumulator.append(TextContent.of(content))
-
-    elif isinstance(content, list):
-        for chunk in content:
-            converted = _convert_chunk(chunk)
-            if isinstance(converted, TextContent | ResourceReference | ResourceContent):
-                accumulator.append(converted)
-
-    # Include images if present on message (some SDKs expose them separately)
-    if getattr(message, "images", None):
-        for img in message.images or []:
-            if isinstance(img, bytes | bytearray):
-                accumulator.append(ResourceContent.of(bytes(img), mime_type="image/*"))
-            elif isinstance(img, str):
-                accumulator.append(ResourceReference.of(img, mime_type="image/*"))
-
-    flush(accumulator)
-    return blocks
+    return images or None
 
 
 def _context_messages(
@@ -271,14 +242,8 @@ def _context_messages(
             if content := element.content:
                 yield Message(
                     role="user",
-                    content=content.without_resources().to_str(),
-                    images=[
-                        Image(value=image.uri)
-                        if isinstance(image, ResourceReference)
-                        else Image(value=image.to_data_uri())
-                        for image in content.images()
-                    ]
-                    or None,
+                    content=_message_text(content),
+                    images=_content_images(content),
                 )
 
             if responses := element.tool_responses:
@@ -287,22 +252,24 @@ def _context_messages(
                     yield Message(
                         role="tool",
                         tool_name=tool_resp.tool,
-                        content=tool_resp.content.without_resources().to_str(),
+                        content=_message_text(tool_resp.content),
                     )
 
         else:
             assert isinstance(element, ModelOutput)  # nosec: B101
             content = element.content
+            # reasoning travels through a dedicated field, dropping it would break
+            # the thinking continuity across turns
+            reasoning: str = "".join(
+                block.reasoning.to_str()
+                for block in element.output
+                if isinstance(block, ModelReasoning)
+            )
             yield Message(
                 role="assistant",
-                content=content.without_resources().to_str(),
-                images=[
-                    Image(value=image.uri)
-                    if isinstance(image, ResourceReference)
-                    else Image(value=image.to_data_uri())
-                    for image in content.images()
-                ]
-                or None,
+                content=_message_text(content),
+                thinking=reasoning or None,
+                images=_content_images(content),
                 tool_calls=[
                     Message.ToolCall(
                         function=Message.ToolCall.Function(
@@ -318,76 +285,54 @@ def _context_messages(
 def _tool_specification_as_tool(
     tool: ModelToolSpecification,
 ) -> Tool:
-    return Tool(
+    # `Tool.Function.Parameters` is a closed model dropping everything but a handful of
+    # keywords, erasing nested schemas - `model_construct` skips that lossy validation
+    # and the client passes such an instance through `Tool.model_validate` unchanged
+    return Tool.model_construct(
         type="function",
-        function=Tool.Function(
+        function=Tool.Function.model_construct(
             name=tool.name,
             description=tool.description,
-            parameters=(
-                cast(Tool.Function.Parameters, tool.parameters)  # type: ignore[arg-type]
-                if tool.parameters
-                else {
+            parameters=cast(
+                Any,
+                tool.parameters
+                or {
                     "type": "object",
                     "properties": {},
                     "additionalProperties": False,
-                }
+                },
             ),
         ),
-    )
-
-
-def _tool_call_arguments(
-    arguments: object,
-    /,
-    *,
-    model: str,
-) -> dict[str, Any]:
-    if isinstance(arguments, Mapping):
-        return cast(dict[str, Any], arguments)
-
-    if isinstance(arguments, str):
-        try:
-            loaded: object = json.loads(arguments)
-        except Exception as exc:
-            raise ModelOutputInvalid(
-                provider="ollama",
-                model=model,
-                reason=f"Tool arguments decoding error - {type(exc).__name__}: {exc}",
-            ) from exc
-
-        if isinstance(loaded, Mapping):
-            return cast(dict[str, Any], loaded)
-
-        raise ModelOutputInvalid(
-            provider="ollama",
-            model=model,
-            reason="Tool arguments should be a JSON object",
-        )
-
-    raise ModelOutputInvalid(
-        provider="ollama",
-        model=model,
-        reason="Tool arguments should be a mapping or JSON object string",
     )
 
 
 def _tool_calls_to_requests(
     tool_calls: Sequence[Message.ToolCall] | None,
     /,
-    *,
-    model: str,
 ) -> list[ModelToolRequest]:
     if not tool_calls:
         return []
+
+    # ollama reports no identifier and its tool messages carry only a tool name,
+    # so results are correlated by name - repeating a tool within one response
+    # leaves the model matching them positionally
+    repeated: set[str] = {
+        call.function.name
+        for index, call in enumerate(tool_calls)
+        if any(other.function.name == call.function.name for other in tool_calls[index + 1 :])
+    }
+    if repeated:
+        ctx.log_warning(
+            f"ollama requested {sorted(repeated)} more than once within a single response,"
+            " their results can only be correlated by order"
+        )
 
     return [
         ModelToolRequest(
             identifier=str(uuid4()),  # ollama does not return an id
             tool=call.function.name,
-            arguments=_tool_call_arguments(
-                call.function.arguments,
-                model=model,
-            ),
+            # arguments are always delivered as an already decoded mapping
+            arguments=call.function.arguments,
             meta=Meta.empty,
         )
         for call in tool_calls
@@ -412,9 +357,16 @@ def _tools_as_tool_config(
 
     if tool_selection == "required":
         # Ollama doesn't support hard-required tool selection
+        ctx.log_warning(
+            "ollama does not support required tool selection, using automatic selection instead",
+        )
         return tools_list
 
     # specific tool suggestion is not supported by Ollama
+    ctx.log_warning(
+        f"ollama does not support selecting the {tool_selection.name} tool,"
+        " using automatic selection instead",
+    )
     return tools_list
 
 
@@ -470,7 +422,7 @@ def _collapse_ollama_type_union(schema_types: Sequence[Any]) -> str | None:  # n
 
 def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, Any] | None, bool]:  # noqa: C901, PLR0911, PLR0912, PLR0915
     # Remove metadata fields that Ollama rejects
-    disallowed_root_keys: set[str] = {"$schema", "$id"}
+    disallowed_root_keys: set[str] = {"$schema", "$id", "$anchor"}
     changed: bool = any(key in schema for key in disallowed_root_keys)
 
     schema_type: Any = schema.get("type")
@@ -607,7 +559,7 @@ def _normalize_schema_for_ollama(schema: Mapping[str, Any]) -> tuple[dict[str, A
                 }
                 return normalized_schema, True
 
-    if "$ref" in schema or any(key in schema for key in ("oneOf", "anyOf", "allOf", "not")):
+    if "$ref" in schema or any(key in schema for key in ("anyOf", "allOf", "not")):
         return None, changed
 
     return None, changed
@@ -631,4 +583,8 @@ def _response_format(
 
         return schema
 
-    return None
+    if output == "auto" or output == "text" or "text" in output:  # noqa: PLR1714
+        return None
+
+    # silently answering with text would not match the requested modality
+    raise NotImplementedError(f"{output} output is not supported by Ollama")

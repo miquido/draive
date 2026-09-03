@@ -59,12 +59,9 @@ class AWS(
             profile_name=profile_name,
         )
 
-        self._features: Collection[type[ResourcesRepository | AWSSQS | AWSCloudwatch]]
-        if features is not None:
-            self._features = features
-
-        else:
-            self._features = ()
+        self._features: Collection[type[ResourcesRepository | AWSSQS | AWSCloudwatch]] = (
+            features if features is not None else (ResourcesRepository, AWSSQS, AWSCloudwatch)
+        )
 
     async def __aenter__(self) -> Iterable[State]:
         features: list[State] = []
@@ -105,4 +102,4 @@ class AWS(
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        pass
+        await self._dispose_clients()

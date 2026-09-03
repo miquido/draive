@@ -1,7 +1,8 @@
+from collections.abc import MutableMapping
 from typing import Any
 
 from boto3 import Session  # pyright: ignore[reportMissingTypeStubs]
-from haiway import asynchronous
+from haiway import asynchronous, ctx
 
 __all__ = ("AWSAPI",)
 
@@ -17,6 +18,7 @@ class AWSAPI:
         "_cloudwatch_client",
         "_cloudwatch_logs_client",
         "_eventbridge_client",
+        "_queue_cache",
         "_s3_client",
         "_session",
         "_sqs_client",
@@ -66,6 +68,8 @@ class AWSAPI:
         self._eventbridge_client: Any
         self._s3_client: Any
         self._sqs_client: Any
+        # sqs queue urls resolved with the prepared client
+        self._queue_cache: MutableMapping[str, str] = {}
 
     @asynchronous
     def _prepare_s3_client(self) -> None:
@@ -90,6 +94,32 @@ class AWSAPI:
         self._eventbridge_client = self._session.client(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             service_name="events",
         )
+
+    @asynchronous
+    def _dispose_clients(self) -> None:
+        """Close every prepared client releasing its connection pool."""
+
+        for attribute in (
+            "_cloudwatch_client",
+            "_cloudwatch_logs_client",
+            "_eventbridge_client",
+            "_s3_client",
+            "_sqs_client",
+        ):
+            client: Any = getattr(self, attribute, None)
+            if client is None:
+                continue  # not prepared
+
+            delattr(self, attribute)
+            try:
+                client.close()
+
+            except Exception as exc:
+                # every remaining client still has to be released
+                ctx.log_error(f"Failed to close AWS {attribute} client", exception=exc)
+
+        # cached queue urls are bound to the disposed client
+        self._queue_cache.clear()
 
     @property
     def region(self) -> str | None:

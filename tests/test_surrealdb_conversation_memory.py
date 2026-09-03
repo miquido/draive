@@ -93,7 +93,7 @@ async def test_surrealdb_conversation_memory_fetch_uses_cursor_lookup_without_mu
 
     monkeypatch.setattr(surreal_memory.Surreal, "execute", fake_execute)
 
-    memory = SurrealConversationMemory(thread="thread-1")
+    memory = SurrealConversationMemory.prepare(thread="thread-1")
 
     page_1 = await memory.fetch(Pagination.of(limit=2))
     assert [turn.content[0].to_str() for turn in page_1.items] == ["second", "third"]

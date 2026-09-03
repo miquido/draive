@@ -46,8 +46,14 @@ uv sync --all-groups --all-extras --frozen
     LLMs.
 - `draive[bedrock]`, `draive[aws]` for AWS model/runtime integrations.
 - `draive[ollama]`, `draive[vllm]` for local or self-hosted deployments.
-- `draive[qdrant]`, `draive[postgres]` for vector/storage backends; add `pgvector` separately where
-    needed.
+- `draive[qdrant]`, `draive[postgres]`, `draive[surrealdb]` for vector/storage backends; the
+    Postgres index requires the `pgvector` server extension, while a remote SurrealDB connection
+    requires a SurrealDB 3.x server with its namespace and database already defined. SurrealDB
+    tables have to be defined upfront as well - each feature provides a static `migrate()`
+    (`SurrealConversationMemory`, `SurrealTemplatesRepository`, `SurrealVectorIndex`), while
+    custom models are defined with `Surreal.define_table`.
+- `draive[rabbitmq]` for message-queue integrations.
+- `draive[starlette]`, `draive[fastapi]` for serving draive applications over HTTP.
 - `draive[httpx]`, `draive[mcp]`, `draive[opentelemetry]`, `draive[docs]` for HTTP utilities, MCP,
     tracing, and docs site builds.
 

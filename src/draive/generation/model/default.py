@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterable
 from typing import Any
 
@@ -16,6 +17,41 @@ from draive.tools import Toolbox
 __all__ = ("generate_model",)
 
 
+def _json_payload(
+    content: MultimodalContent,
+    /,
+) -> str:
+    unwrapped: str = _without_code_fence(content.to_str().strip())
+    try:
+        # models occasionally continue past the requested object, appending prose
+        # or even a second object - only the first complete value is the result
+        _, payload_end = json.JSONDecoder().raw_decode(unwrapped)
+
+    except ValueError:
+        return unwrapped  # leave decoding errors to the caller
+
+    return unwrapped[:payload_end]
+
+
+def _without_code_fence(
+    content: str,
+    /,
+) -> str:
+    # models without a native json output mode tend to wrap the payload
+    # within a markdown code fence despite being asked not to
+    if not content.startswith("```"):
+        return content
+
+    opening_end: int = content.find("\n")
+    if opening_end < 0:
+        return content
+
+    body: str = content[opening_end + 1 :]
+    closing_start: int = body.rfind("```")
+
+    return body[:closing_start].strip() if closing_start >= 0 else body.strip()
+
+
 async def generate_model[Generated: State](
     generated: type[Generated],
     /,
@@ -30,7 +66,7 @@ async def generate_model[Generated: State](
     completion: MultimodalContent = await Step.looping_completion(
         instructions=instructions,
         tools=toolbox,
-        output="json" if decoder is not None else generated,
+        output=generated,
         **extra,
     ).run(
         (
@@ -57,7 +93,7 @@ async def generate_model[Generated: State](
 
         else:  # fallback to default decoding
             ctx.log_debug("...decoding result...")
-            return generated.from_json(completion.to_str())
+            return generated.from_json(_json_payload(completion))
 
     except Exception as exc:
         ctx.log_error(

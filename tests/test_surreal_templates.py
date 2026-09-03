@@ -1,12 +1,14 @@
+from asyncio import sleep
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, cast
 
 import pytest
-from haiway import Meta, Pagination
+from haiway import Meta, Pagination, ctx
 
 import draive.surreal.templates as surreal_templates
-from draive.multimodal.templates import Template, TemplateDeclaration
+from draive.multimodal.templates import Template, TemplateDeclaration, TemplatesRepository
+from draive.surreal import SurrealClient
 from draive.surreal.templates import SurrealTemplatesRepository
 from draive.surreal.types import SurrealObject
 
@@ -15,7 +17,17 @@ from draive.surreal.types import SurrealObject
 async def test_surreal_templates_repository_templates_support_pagination(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    initial_rows: Sequence[SurrealObject] = cast(
+    identifier_rows: Sequence[SurrealObject] = cast(
+        Sequence[SurrealObject],
+        (
+            {"value": "closing"},
+            {"value": "summary"},
+            {"value": "welcome"},
+        ),
+    )
+    # revisions come back ordered by identifier and recency, only the latest
+    # revision of each identifier is expected within the listing
+    revision_rows: Sequence[SurrealObject] = cast(
         Sequence[SurrealObject],
         (
             {
@@ -51,8 +63,12 @@ async def test_surreal_templates_repository_templates_support_pagination(
         **variables: Any,
     ) -> Sequence[SurrealObject]:
         _ = statement
+        if "identifiers" in variables:
+            assert variables == {"identifiers": ["closing", "summary", "welcome"]}
+            return revision_rows
+
         assert variables == {"after_identifier": None, "limit": 3}
-        return initial_rows
+        return identifier_rows
 
     monkeypatch.setattr(surreal_templates.Surreal, "execute", fake_execute)
 
@@ -121,8 +137,12 @@ async def test_surreal_templates_repository_listing_defaults_missing_json_fields
         **variables: Any,
     ) -> Sequence[SurrealObject]:
         _ = statement
+        if "identifiers" in variables:
+            assert variables == {"identifiers": ["welcome"]}
+            return rows
+
         assert variables == {"after_identifier": None, "limit": 2}
-        return rows
+        return cast(Sequence[SurrealObject], ({"value": "welcome"},))
 
     monkeypatch.setattr(surreal_templates.Surreal, "execute", fake_execute)
 
@@ -229,3 +249,89 @@ async def test_surreal_templates_repository_define_creates_new_history_entry(
     assert "identifier" in execute_calls[0]
     assert "identifier" in execute_calls[1]
     assert "identifier" in execute_calls[2]
+
+
+@pytest.mark.asyncio
+async def test_surreal_embedded_templates_listing_keeps_every_identifier() -> None:
+    """Live regression test: selecting the latest revision of each identifier used to
+    rely on a `$parent`-correlated subquery, which a SurrealDB server evaluates
+    unreliably - it silently dropped a varying subset of the templates on each run.
+    """
+    async with SurrealClient(
+        url="mem://",
+        namespace="test_surreal_templates",
+        database="embedded_templates",
+    ) as surreal:
+        repository: TemplatesRepository = SurrealTemplatesRepository.prepare(cache_expiration=0.001)
+        async with ctx.scope("test.surreal.templates", surreal, repository):
+            await SurrealTemplatesRepository.migrate()
+            for identifier in ("greeting", "farewell", "summary"):
+                await repository.define(
+                    TemplateDeclaration(
+                        identifier=identifier,
+                        description=f"{identifier} template",
+                        variables={"name": "recipient"},
+                        meta=Meta.empty,
+                    ),
+                    content=f"{identifier} {{%name%}}",
+                )
+
+            await sleep(0.01)  # revisions are ordered by their timestamp
+            await repository.define(
+                TemplateDeclaration(
+                    identifier="greeting",
+                    description="greeting revision",
+                    variables={"name": "recipient"},
+                    meta=Meta.empty,
+                ),
+                content="hello {%name%}",
+            )
+
+            listed = await repository.templates()
+            assert [declaration.identifier for declaration in listed.items] == [
+                "farewell",
+                "greeting",
+                "summary",
+            ]
+            greeting = next(
+                declaration for declaration in listed.items if declaration.identifier == "greeting"
+            )
+            assert greeting.description == "greeting revision"
+            assert await repository.load(Template.of("greeting")) == "hello {%name%}"
+
+            first_page = await repository.templates(Pagination.of(limit=2))
+            assert [declaration.identifier for declaration in first_page.items] == [
+                "farewell",
+                "greeting",
+            ]
+            assert first_page.pagination.token == "greeting"
+
+            second_page = await repository.templates(first_page.pagination)
+            assert [declaration.identifier for declaration in second_page.items] == ["summary"]
+            assert second_page.pagination.token is None
+
+
+@pytest.mark.asyncio
+async def test_surreal_templates_repository_migration_defines_table_and_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    statements: list[str] = []
+
+    async def fake_execute(
+        statement: str,
+        /,
+        **variables: Any,
+    ) -> Sequence[SurrealObject]:
+        _ = variables
+        statements.append(statement)
+        return ()
+
+    monkeypatch.setattr(surreal_templates.Surreal, "execute", fake_execute)
+
+    await SurrealTemplatesRepository.migrate()
+
+    assert statements == [
+        "DEFINE TABLE IF NOT EXISTS templates SCHEMALESS TYPE NORMAL;",
+        "DEFINE INDEX IF NOT EXISTS templates_identifier_idx "
+        "ON TABLE templates FIELDS identifier, updated;",
+    ]

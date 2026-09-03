@@ -71,8 +71,8 @@ class PostgresConversationMemory:
             Raised when PostgreSQL command execution fails, for example due to
             connection or database-level errors.
         """
-        # split into separate statements - `PostgresConnection.execute` runs through
-        # asyncpg's prepared-statement path, which rejects multi-statement strings
+        # split into separate statements - asyncpg would run a whole script through
+        # its simple-query path, yet one statement per call keeps failures attributable
         await PostgresConnection.execute(
             """
             CREATE TABLE IF NOT EXISTS conversation_memory (

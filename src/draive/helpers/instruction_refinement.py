@@ -35,7 +35,7 @@ async def refine_instructions[Parameters: State](
     candidates_limit: int = 3,
     performance_drop_threshold: float = 0.5,
     quality_threshold: float = 0.99,
-    concurrent_nodes: int = 1,
+    concurrent_nodes: int = 2,
 ) -> ModelInstructions:
     """
     Refine instructions using binary tree exploration with performance pruning.
@@ -52,7 +52,7 @@ async def refine_instructions[Parameters: State](
         candidates_limit: Number of top candidates to fully evaluate
         performance_drop_threshold: Prune branches with score drop > this threshold
         quality_threshold: Stop if score reaches this threshold
-        concurrent_nodes: How many nodes explored concurrently
+        concurrent_nodes: How many nodes explored concurrently, at least 2
     """
 
     assert rounds_limit > 0  # nosec: B101
@@ -60,7 +60,7 @@ async def refine_instructions[Parameters: State](
     assert candidates_limit > 0  # nosec: B101
     assert 1 >= performance_drop_threshold > 0  # nosec: B101
     assert 1 >= quality_threshold >= 0  # nosec: B101
-    assert concurrent_nodes > 0  # nosec: B101
+    assert concurrent_nodes > 1  # nosec: B101
     assert len(evaluator_cases) > 0  # nosec: B101
 
     ctx.log_info(
@@ -70,7 +70,8 @@ async def refine_instructions[Parameters: State](
         f"performance_drop_threshold={performance_drop_threshold}"
     )
 
-    result: MultimodalContent = await Step.sequence(
+    # the refinement result is carried within artifacts, steps emit no content on their own
+    result: StepState = await Step.sequence(
         _tree_initialization_step(
             instructions=instructions,
             instructions_content=instructions_content,
@@ -92,10 +93,13 @@ async def refine_instructions[Parameters: State](
             quality_threshold=quality_threshold,
             candidates_limit=candidates_limit,
         ),
-    ).run()
+    ).process()
 
     ctx.log_info("...instructions refinement finished!")
-    return result.to_str()
+    return result.get(
+        _RefinementState,
+        required=True,
+    ).instructions
 
 
 class _RefinementTreeNode(State):
@@ -343,7 +347,7 @@ def _tree_exploration_step[Parameters: State](
             required=True,
         )
         if any(
-            (
+            _normalized_performance(
                 node.complete_evaluation_performance
                 if node.complete_evaluation_performance is not None
                 else node.focused_evaluation_performance
@@ -417,11 +421,11 @@ async def _explore_node[Parameters: State](
         with ctx.updating(child_node.patched_instructions_repository):
             focused_evaluation = await evaluator_suite(focused_suite_cases)
 
-        # Check for performance drop
+        # Check for performance drop - nothing can drop below a parent scoring none
         performance_ratio = (
             focused_evaluation.performance / node.focused_evaluation_performance
             if node.focused_evaluation_performance > 0
-            else 0
+            else 1
         )
         pruned: bool = performance_ratio < performance_drop_threshold
 
@@ -444,7 +448,11 @@ async def _explore_node[Parameters: State](
                 f" ({performance_ratio:.1%} of parent)"
             )
 
-    return children
+    return {
+        **children,
+        # link children back to the parent, it is no longer a leaf to explore
+        node.identifier: node.updating(children=tuple(children.keys())),
+    }
 
 
 async def _generate_strategy_metadata(
@@ -719,7 +727,10 @@ def _find_best_candidates(
             continue
 
         # Include if it's a leaf or has exceptional performance
-        if node.is_leaf or node.focused_evaluation_performance > quality_threshold:
+        if (
+            node.is_leaf
+            or _normalized_performance(node.focused_evaluation_performance) > quality_threshold
+        ):
             candidates.append(node)
 
     # Sort by focused score and depth (prefer deeper nodes with same score)
@@ -765,3 +776,8 @@ def _log_tree_statistics(
         f"- Max depth reached: {max_depth}\n"
         f"- Best path: {' -> '.join(best_path) if best_path else 'None'}"
     )
+
+
+def _normalized_performance(performance: float) -> float:
+    # suite performance is a percentage while thresholds are 0-1 fractions
+    return performance / 100

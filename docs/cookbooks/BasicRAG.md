@@ -91,7 +91,7 @@ async def index_search_tool(query: str) -> str:
 async with ctx.scope(
     "rag",
     index,
-    OpenAIResponsesConfig(model="gpt-5-mini"),
+    OpenAIResponsesConfig(model="gpt-5.5"),
     OpenAIEmbeddingConfig(model="text-embedding-3-small"),
     disposables=(OpenAI(),),
 ):

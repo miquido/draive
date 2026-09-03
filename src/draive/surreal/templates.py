@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, NoReturn, cast, final
 
@@ -14,6 +14,52 @@ __all__ = ("SurrealTemplatesRepository",)
 
 @final
 class SurrealTemplatesRepository:
+    """SurrealDB-backed templates repository factory.
+
+    Exposes static helpers for schema migration and for creating a
+    :class:`~draive.multimodal.templates.repository.TemplatesRepository`
+    persisted in SurrealDB.
+
+    Examples
+    --------
+    ```python
+    from draive import ctx
+    from draive.surreal import SurrealClient, SurrealTemplatesRepository
+
+    async def bootstrap_templates() -> None:
+        async with SurrealClient(url="ws://localhost:8000/rpc") as surreal:
+            async with ctx.scope("templates", surreal):
+                await SurrealTemplatesRepository.migrate()
+                repository = SurrealTemplatesRepository.prepare()
+    ```
+    """
+
+    @staticmethod
+    async def migrate() -> None:
+        """Define the database structures required by the templates repository.
+
+        Defines the `templates` table and its supporting index when not already
+        defined. A SurrealDB server refuses to read from a table which was never
+        defined nor written to, therefore it has to be defined upfront.
+
+        Returns
+        -------
+        None
+            Completes when the schema definition statements finish.
+
+        Raises
+        ------
+        SurrealException
+            Raised when SurrealDB statement execution fails.
+        """
+        # one statement per call - a multi-statement query reports its errors
+        # per statement, executing them separately keeps failures attributable
+        await Surreal.execute("DEFINE TABLE IF NOT EXISTS templates SCHEMALESS TYPE NORMAL;")
+        await Surreal.execute(
+            "DEFINE INDEX IF NOT EXISTS templates_identifier_idx "
+            "ON TABLE templates FIELDS identifier, updated;"
+        )
+
     @staticmethod
     def prepare(  # noqa: C901
         cache_limit: int = 32,
@@ -185,7 +231,36 @@ async def _fetch_template_rows(
     after_identifier: str | None,
     limit: int,
 ) -> Sequence[SurrealObject]:
-    return await Surreal.execute(
+    # Selecting the latest revision of each identifier within a single statement
+    # would require a `$parent`-correlated subquery, which a SurrealDB server
+    # evaluates unreliably - it silently dropped a varying subset of the rows on
+    # each run (verified live). The page of identifiers and their revisions are
+    # fetched separately instead, keeping the latest revision of each here.
+    identifiers: Sequence[SurrealObject] = await Surreal.execute(
+        """
+        -- `SELECT VALUE identifier ... GROUP BY identifier` yields a single
+        -- NONE instead of the distinct values, the grouping has to be nested
+        SELECT VALUE identifier FROM (
+            SELECT identifier
+            FROM templates
+            WHERE
+                $after_identifier = NONE
+                OR identifier > $after_identifier
+            GROUP BY
+                identifier
+            ORDER BY
+                identifier ASC
+            LIMIT $limit
+        );
+        """,
+        after_identifier=after_identifier,
+        limit=limit,
+    )
+
+    if not identifiers:
+        return ()
+
+    revisions: Sequence[SurrealObject] = await Surreal.execute(
         """
         SELECT
             id,
@@ -199,35 +274,19 @@ async def _fetch_template_rows(
             templates
 
         WHERE
-            identifier IN (
-                SELECT VALUE identifier
-                FROM templates
-                WHERE
-                    $after_identifier = NONE
-                    OR identifier > $after_identifier
-                GROUP BY
-                    identifier
-                ORDER BY
-                    identifier ASC
-                LIMIT $limit
-            )
-            AND id IN (
-                SELECT VALUE id
-                FROM templates
-                WHERE
-                    identifier = $parent.identifier
-                ORDER BY
-                    updated DESC,
-                    id DESC
-                LIMIT 1
-            )
+            identifier IN $identifiers
 
         ORDER BY
             identifier ASC,
             updated DESC,
-            id DESC
-        LIMIT $limit;
+            id DESC;
         """,
-        after_identifier=after_identifier,
-        limit=limit,
+        identifiers=[cast(str, row["value"]) for row in identifiers],
     )
+
+    latest: MutableMapping[str, SurrealObject] = {}
+    for revision in revisions:
+        # rows are ordered by identifier and revision, the first one wins
+        latest.setdefault(cast(str, revision["identifier"]), revision)
+
+    return tuple(latest.values())

@@ -15,6 +15,10 @@ class BedrockChatConfig(Configuration):
     top_p: float | Missing = MISSING
     max_output_tokens: int | Missing = MISSING
     stop_sequences: Sequence[str] | Missing = MISSING
+    # a guardrail enforced inline by the generation request itself, which avoids the
+    # extra round trip of verifying the content through a separate call
+    guardrail_identifier: str | Missing = MISSING
+    guardrail_version: str | Missing = MISSING
 
 
 class BedrockInputGuardraisConfig(Configuration):

@@ -1,22 +1,45 @@
 import json
-from base64 import urlsafe_b64decode, urlsafe_b64encode
-from collections.abc import AsyncGenerator, Collection, Iterable, Mapping, Sequence
+from base64 import b64decode, b64encode
+from collections.abc import (
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    Collection,
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from contextlib import asynccontextmanager
 from typing import Any, final
 
-from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from haiway import Disposable, Disposables, State, as_dict, ctx
-from mcp.server import NotificationOptions, Server
-from mcp.server.lowlevel.helper_types import ReadResourceContents
+from mcp.server import NotificationOptions, Server, ServerRequestContext
+
+# private module - the only route to the stream protocols in mcp 2.1, fragile across patches
+from mcp.shared._stream_protocols import (  # pyright: ignore[reportPrivateUsage]
+    ReadStream,
+    WriteStream,
+)
 from mcp.shared.message import SessionMessage
 from mcp.types import AudioContent as MCPAudioContent
-from mcp.types import BlobResourceContents, EmbeddedResource
+from mcp.types import (
+    BlobResourceContents,
+    CallToolRequestParams,
+    CallToolResult,
+    EmbeddedResource,
+    ListResourcesResult,
+    ListResourceTemplatesResult,
+    ListToolsResult,
+    PaginatedRequestParams,
+    ReadResourceRequestParams,
+    ReadResourceResult,
+    TextResourceContents,
+)
 from mcp.types import ImageContent as MCPImageContent
 from mcp.types import Resource as MCPResource
 from mcp.types import ResourceTemplate as MCPResourceTemplate
 from mcp.types import TextContent as MCPTextContent
 from mcp.types import Tool as MCPTool
-from pydantic import AnyUrl
 from starlette.types import ASGIApp
 
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
@@ -24,6 +47,29 @@ from draive.resources import Resource, ResourceContent, ResourceReference, Resou
 from draive.tools import Tool, Toolbox
 
 __all__ = ("MCPServer",)
+
+type _LifespanState = Iterable[State]
+type _RequestContext = ServerRequestContext[_LifespanState]
+type _ListResourcesHandler = Callable[
+    [_RequestContext, PaginatedRequestParams | None],
+    Awaitable[ListResourcesResult],
+]
+type _ListResourceTemplatesHandler = Callable[
+    [_RequestContext, PaginatedRequestParams | None],
+    Awaitable[ListResourceTemplatesResult],
+]
+type _ReadResourceHandler = Callable[
+    [_RequestContext, ReadResourceRequestParams],
+    Awaitable[ReadResourceResult],
+]
+type _ListToolsHandler = Callable[
+    [_RequestContext, PaginatedRequestParams | None],
+    Awaitable[ListToolsResult],
+]
+type _CallToolHandler = Callable[
+    [_RequestContext, CallToolRequestParams],
+    Awaitable[CallToolResult],
+]
 
 
 @final
@@ -45,18 +91,36 @@ class MCPServer:
             async with Disposables(disposables) as state:
                 yield state
 
+        # handlers are constructor arguments since mcp 2.0, they can't be registered after
+        on_list_resources: _ListResourcesHandler | None = None
+        on_list_resource_templates: _ListResourceTemplatesHandler | None = None
+        on_read_resource: _ReadResourceHandler | None = None
+        available_resources: Sequence[ResourceTemplate[Any] | Resource] = tuple(resources)
+        if available_resources:
+            (
+                on_list_resources,
+                on_list_resource_templates,
+                on_read_resource,
+            ) = self._resource_handlers(available_resources)
+
+        on_list_tools: _ListToolsHandler | None = None
+        on_call_tool: _CallToolHandler | None = None
+        # an empty Toolbox is truthy, actual contents have to be verified
+        toolbox: Toolbox = tools if isinstance(tools, Toolbox) else Toolbox.of(*tools)
+        if toolbox.tools:
+            on_list_tools, on_call_tool = self._tool_handlers(toolbox)
+
         self._server = Server[Iterable[State]](
             name=name,
-            version=version,
+            version=version if version is not None else "",
             instructions=instructions,
             lifespan=lifspan,
+            on_list_resources=on_list_resources,
+            on_list_resource_templates=on_list_resource_templates,
+            on_read_resource=on_read_resource,
+            on_list_tools=on_list_tools,
+            on_call_tool=on_call_tool,
         )
-
-        if resources:
-            self._expose_resources(resources)
-
-        if tools:
-            self._expose_tools(tools)
 
     async def run_stdio(
         self,
@@ -73,11 +137,52 @@ class MCPServer:
                 experimental_capabilities=as_dict(experimental_capabilities),
             )
 
+    def prepare_streamable_http_asgi(
+        self,
+        *,
+        path: str = "/mcp",
+        json_response: bool = False,
+        stateless: bool = False,
+    ) -> ASGIApp:
+        """Prepare an ASGI app serving the Streamable HTTP transport.
+
+        This is the current remote transport, `prepare_asgi` (SSE) is deprecated
+        by the protocol. Initialization options are derived from the server itself,
+        the transport does not allow customizing them.
+        """
+
+        from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+        from starlette.applications import Starlette
+        from starlette.routing import Mount
+
+        session_manager = StreamableHTTPSessionManager(
+            app=self._server,
+            json_response=json_response,
+            stateless=stateless,
+        )
+
+        @asynccontextmanager
+        async def lifespan(app: Starlette) -> AsyncGenerator[None]:
+            # the manager requires its own task group to be running
+            async with session_manager.run():
+                yield
+
+        return Starlette(
+            debug=__debug__,
+            routes=[Mount(path, app=session_manager.handle_request)],
+            lifespan=lifespan,
+        )
+
     def prepare_asgi(
         self,
         notification_options: NotificationOptions | None = None,
         experimental_capabilities: Mapping[str, dict[str, Any]] | None = None,
     ) -> ASGIApp:
+        """Prepare an ASGI app serving the deprecated SSE transport.
+
+        Prefer `prepare_streamable_http_asgi` for new deployments.
+        """
+
         from mcp.server.sse import SseServerTransport
         from starlette.applications import Starlette
         from starlette.routing import Mount, Route
@@ -103,8 +208,8 @@ class MCPServer:
 
     async def run(
         self,
-        read_stream: MemoryObjectReceiveStream[SessionMessage | Exception],
-        write_stream: MemoryObjectSendStream[SessionMessage],
+        read_stream: ReadStream[SessionMessage | Exception],
+        write_stream: WriteStream[SessionMessage],
         notification_options: NotificationOptions | None = None,
         experimental_capabilities: dict[str, dict[str, Any]] | None = None,
     ) -> None:
@@ -118,11 +223,15 @@ class MCPServer:
             raise_exceptions=False,
         )
 
-    def _expose_resources(  # noqa: C901
+    def _resource_handlers(  # noqa: C901
         self,
         resources: Iterable[ResourceTemplate[...] | Resource],
         /,
-    ) -> None:
+    ) -> tuple[
+        _ListResourcesHandler,
+        _ListResourceTemplatesHandler | None,
+        _ReadResourceHandler,
+    ]:
         resource_declarations: list[MCPResource] = []
         resource_template_declarations: list[MCPResourceTemplate] = []
         available_resources: dict[str, ResourceTemplate[...] | Resource] = {}
@@ -135,8 +244,8 @@ class MCPServer:
                         case ResourceContent() as content:
                             resource_declarations.append(
                                 MCPResource(
-                                    uri=AnyUrl(resource.uri),
-                                    mimeType=content.mime_type,
+                                    uri=resource.uri,
+                                    mime_type=content.mime_type,
                                     name=resource.resource.meta.name or resource.uri,
                                     description=resource.resource.meta.description,
                                 )
@@ -151,8 +260,8 @@ class MCPServer:
                     if resource.has_args:
                         resource_template_declarations.append(
                             MCPResourceTemplate(
-                                uriTemplate=resource.declaration.template_uri,
-                                mimeType=resource.declaration.mime_type,
+                                uri_template=resource.declaration.template_uri,
+                                mime_type=resource.declaration.mime_type,
                                 name=resource.declaration.meta.name
                                 or resource.declaration.template_uri,
                                 description=resource.declaration.meta.description,
@@ -164,8 +273,8 @@ class MCPServer:
                     else:
                         resource_declarations.append(
                             MCPResource(
-                                uri=AnyUrl(resource.declaration.template_uri),
-                                mimeType=resource.declaration.mime_type,
+                                uri=resource.declaration.template_uri,
+                                mime_type=resource.declaration.mime_type,
                                 name=resource.declaration.meta.name
                                 or resource.declaration.template_uri,
                                 description=resource.declaration.meta.description,
@@ -174,34 +283,45 @@ class MCPServer:
                         # we treat it as a regular resource if template has no arguments
                         available_resources[resource.declaration.template_uri] = resource
 
-        if resource_declarations:
+        # the resources capability is derived from the `resources/list` handler registration,
+        # it has to be always available to let clients discover resource templates as well
+        async def list_resources(
+            context: _RequestContext,
+            params: PaginatedRequestParams | None,
+        ) -> ListResourcesResult:
+            async with ctx.scope(
+                "list_resources",
+                *context.lifespan_context,
+            ):
+                return ListResourcesResult(resources=resource_declarations)
 
-            @self._server.list_resources()
-            async def list_resources() -> list[MCPResource]:  # pyright: ignore[reportUnusedFunction]
-                async with ctx.scope(
-                    "list_resources",
-                    *self._server.request_context.lifespan_context,
-                ):
-                    return resource_declarations
-
+        list_template_resources: _ListResourceTemplatesHandler | None = None
         if resource_template_declarations:
 
-            @self._server.list_resource_templates()
-            async def list_template_resources() -> list[MCPResourceTemplate]:  # pyright: ignore[reportUnusedFunction]
+            async def handle_list_resource_templates(
+                context: _RequestContext,
+                params: PaginatedRequestParams | None,
+            ) -> ListResourceTemplatesResult:
                 async with ctx.scope(
                     "list_template_resources",
-                    *self._server.request_context.lifespan_context,
+                    *context.lifespan_context,
                 ):
-                    return resource_template_declarations
+                    return ListResourceTemplatesResult(
+                        resource_templates=resource_template_declarations
+                    )
 
-        @self._server.read_resource()
-        async def read_resource(uri: AnyUrl) -> Iterable[ReadResourceContents]:  # pyright: ignore[reportUnusedFunction]
+            list_template_resources = handle_list_resource_templates
+
+        async def read_resource(
+            context: _RequestContext,
+            params: ReadResourceRequestParams,
+        ) -> ReadResourceResult:
             async with ctx.scope(
                 "read_resource",
-                *self._server.request_context.lifespan_context,
+                *context.lifespan_context,
             ):
                 resource: Resource
-                uri_string: str = uri.unicode_string()
+                uri_string: str = params.uri
                 # First check for exact match in available_resources
                 match available_resources.get(uri_string):
                     case Resource() as available_resource:
@@ -218,70 +338,97 @@ class MCPServer:
                                 break
 
                         else:
-                            raise ValueError(f"Resource '{uri}' is not defined")
+                            raise ValueError(f"Resource '{uri_string}' is not defined")
 
-                return _resource_content(resource)
+                return ReadResourceResult(
+                    contents=list(_resource_content(resource, uri=uri_string))
+                )
 
-    def _expose_tools(
+        return (list_resources, list_template_resources, read_resource)
+
+    def _tool_handlers(
         self,
-        tools: Toolbox | Iterable[Tool],
+        toolbox: Toolbox,
         /,
-    ) -> None:
-        toolbox: Toolbox
-        match tools:
-            case Toolbox() as tools:
-                toolbox = tools
-
-            case tools:
-                toolbox = Toolbox.of(*tools)
-
-        @self._server.list_tools()
-        async def list_tools() -> list[MCPTool]:  # pyright: ignore[reportUnusedFunction]
+    ) -> tuple[_ListToolsHandler, _CallToolHandler]:
+        async def list_tools(
+            context: _RequestContext,
+            params: PaginatedRequestParams | None,
+        ) -> ListToolsResult:
             async with ctx.scope(
                 "list_tools",
-                *self._server.request_context.lifespan_context,
+                *context.lifespan_context,
             ):
-                return [
-                    MCPTool(
-                        name=tool.name,
-                        description=tool.description,
-                        inputSchema=as_dict(tool.parameters) or {},
-                    )
-                    for tool in (tool.specification for tool in toolbox.tools.values())
-                ]
+                return ListToolsResult(
+                    tools=[
+                        MCPTool(
+                            name=tool.name,
+                            description=tool.description,
+                            input_schema=_json_schema(tool.parameters),
+                        )
+                        for tool in (tool.specification for tool in toolbox.tools.values())
+                    ]
+                )
 
-        @self._server.call_tool()
-        async def call_tool(  # pyright: ignore[reportUnusedFunction]
-            name: str,
-            arguments: Mapping[str, Any],
-        ) -> Sequence[MCPTextContent | MCPImageContent | MCPAudioContent | EmbeddedResource]:
+        async def call_tool(
+            context: _RequestContext,
+            params: CallToolRequestParams,
+        ) -> CallToolResult:
             async with ctx.scope(
                 "call_tool",
-                *self._server.request_context.lifespan_context,
+                *context.lifespan_context,
             ):
-                return _convert_multimodal_content(
-                    await toolbox.call(
-                        name,
-                        arguments=arguments,
+                # the lowlevel server no longer converts exceptions to an error result
+                try:
+                    return CallToolResult(
+                        content=list(
+                            _convert_multimodal_content(
+                                await toolbox.call(
+                                    params.name,
+                                    arguments=params.arguments or {},
+                                )
+                            )
+                        ),
+                        is_error=False,
                     )
-                )
+
+                except Exception as exc:
+                    ctx.log_error(f"MCP tool '{params.name}' call failed", exception=exc)
+                    # the reason is reported back to let the model correct its call
+                    return CallToolResult(
+                        content=[
+                            MCPTextContent(
+                                type="text",
+                                text=str(exc),
+                            )
+                        ],
+                        is_error=True,
+                    )
+
+        return (list_tools, call_tool)
 
 
 def _resource_content(
     resource: Resource,
-) -> Iterable[ReadResourceContents]:
+    /,
+    *,
+    uri: str,
+) -> Iterable[TextResourceContents | BlobResourceContents]:
     if isinstance(resource.resource, ResourceContent):
         match resource.resource.mime_type:
             case "text/plain" | "application/json":
-                yield ReadResourceContents(
-                    content=urlsafe_b64decode(resource.resource.data).decode(),
+                yield TextResourceContents(
+                    uri=uri,
                     mime_type=resource.resource.mime_type,
+                    text=b64decode(resource.resource.data).decode(),
                 )
 
             case _:
-                yield ReadResourceContents(
-                    content=urlsafe_b64decode(resource.resource.data),
+                yield BlobResourceContents(
+                    uri=uri,
                     mime_type=resource.resource.mime_type,
+                    # blob carries the base64 payload, which is what we already hold
+                    blob=resource.resource.data,
                 )
 
     else:
@@ -309,7 +456,7 @@ def _convert_multimodal_content(
                     MCPImageContent(
                         type="image",
                         data=part.data,
-                        mimeType=mime,
+                        mime_type=mime,
                     )
                 )
 
@@ -318,7 +465,7 @@ def _convert_multimodal_content(
                     MCPAudioContent(
                         type="audio",
                         data=part.data,
-                        mimeType=mime,
+                        mime_type=mime,
                     )
                 )
 
@@ -326,20 +473,20 @@ def _convert_multimodal_content(
                 converted.append(
                     MCPTextContent(
                         type="text",
-                        text=urlsafe_b64decode(part.data).decode(),
+                        text=b64decode(part.data).decode(),
                     )
                 )
 
             elif mime == "application/json":
                 encoded: str = part.data
-                # Provide a data URI to satisfy required AnyUrl
-                uri = AnyUrl(f"data:{mime};base64,{encoded}")
+                # a data URI stands in for the required uri field
+                uri: str = f"data:{mime};base64,{encoded}"
                 converted.append(
                     EmbeddedResource(
                         type="resource",
                         resource=BlobResourceContents(
                             uri=uri,
-                            mimeType=mime,
+                            mime_type=mime,
                             blob=encoded,
                         ),
                     )
@@ -348,13 +495,13 @@ def _convert_multimodal_content(
             else:
                 # Unknown blob types: embed as a resource blob
                 encoded: str = part.data
-                uri = AnyUrl(f"data:{mime};base64,{encoded}")
+                uri: str = f"data:{mime};base64,{encoded}"
                 converted.append(
                     EmbeddedResource(
                         type="resource",
                         resource=BlobResourceContents(
                             uri=uri,
-                            mimeType=mime,
+                            mime_type=mime,
                             blob=encoded,
                         ),
                     )
@@ -369,17 +516,50 @@ def _convert_multimodal_content(
 
         else:
             assert isinstance(part, ArtifactContent)  # nosec: B101
-            encoded: str = urlsafe_b64encode(json.dumps(part.artifact).encode()).decode()
-            uri = AnyUrl(f"data:application/json;base64,{encoded}")
+            encoded: str = b64encode(json.dumps(part.artifact).encode()).decode()
+            uri: str = f"data:application/json;base64,{encoded}"
             converted.append(
                 EmbeddedResource(
                     type="resource",
                     resource=BlobResourceContents(
                         uri=uri,
-                        mimeType="application/json",
+                        mime_type="application/json",
                         blob=encoded,
                     ),
                 )
             )
 
     return converted
+
+
+def _json_schema(
+    schema: Mapping[str, Any] | None,
+    /,
+) -> dict[str, Any]:
+    """Convert a schema to plain JSON types.
+
+    The lowlevel server does not validate call arguments, however it serializes the schema
+    with `model_dump(mode="json")` which does not handle nested haiway collections
+    (`Map`, tuples) reliably.
+    """
+
+    if not schema:
+        return {}
+
+    return {key: _json_value(value) for key, value in schema.items()}
+
+
+def _json_value(
+    value: Any,
+    /,
+) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _json_value(element) for key, element in value.items()}  # pyright: ignore[reportUnknownVariableType]
+
+    if isinstance(value, str | bytes):
+        return value
+
+    if isinstance(value, Sequence):
+        return [_json_value(element) for element in value]  # pyright: ignore[reportUnknownVariableType]
+
+    return value

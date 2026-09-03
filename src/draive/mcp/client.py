@@ -1,6 +1,6 @@
 import json
-from asyncio import gather
-from base64 import urlsafe_b64decode, urlsafe_b64encode
+from asyncio import AbstractEventLoop, Event, Future, Task, gather, get_running_loop
+from base64 import b64decode, urlsafe_b64decode, urlsafe_b64encode
 from collections.abc import AsyncGenerator, Callable, Collection, Coroutine, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from itertools import chain
@@ -21,9 +21,11 @@ from haiway import (
     as_tuple,
     ctx,
 )
+from httpx2 import AsyncClient, Timeout
 from mcp import ClientSession, ListToolsResult, StdioServerParameters, stdio_client
 from mcp import Tool as MCPTool
 from mcp.client.sse import sse_client
+from mcp.client.streamable_http import streamable_http_client
 from mcp.types import AudioContent as MCPAudioContent
 from mcp.types import (
     BlobResourceContents,
@@ -35,16 +37,14 @@ from mcp.types import (
 )
 from mcp.types import EmbeddedResource as MCPEmbeddedResource
 from mcp.types import ImageContent as MCPImageContent
+from mcp.types import Resource as MCPResource
 from mcp.types import ResourceLink as MCPResourceLink
 from mcp.types import TextContent as MCPTextContent
-from pydantic import AnyUrl
 
-from draive.models import (
-    ModelToolParametersSpecification,
-)
+from draive.models import ModelToolParametersSpecification
 from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
 from draive.resources import ResourceContent, ResourceReference, ResourcesRepository
-from draive.tools import CoroutineTool, Tool, ToolsProvider
+from draive.tools import CoroutineTool, Tool, ToolException, ToolsProvider
 
 __all__ = (
     "MCPClient",
@@ -52,15 +52,19 @@ __all__ = (
 )
 
 DEFAULT_PAGINATION_LIMIT = 32
-_LOCAL_PAGINATION_TOKEN_PREFIX = "draive:mcp:"  # nosec B105
+_LOCAL_PAGINATION_TOKEN_PREFIX = "mcp:"  # nosec B105
 
 
-def _encode_pagination_token(data: Mapping[str, Any]) -> str:
+def _encode_pagination_token(
+    data: Mapping[str, Any],
+) -> str:
     encoded: str = urlsafe_b64encode(json.dumps(data).encode()).decode()
     return f"{_LOCAL_PAGINATION_TOKEN_PREFIX}{encoded}"
 
 
-def _decode_pagination_token(token: PaginationToken | None) -> dict[str, Any] | None:
+def _decode_pagination_token(
+    token: PaginationToken | None,
+) -> dict[str, Any] | None:
     if not isinstance(token, str) or not token.startswith(_LOCAL_PAGINATION_TOKEN_PREFIX):
         return None
 
@@ -69,13 +73,17 @@ def _decode_pagination_token(token: PaginationToken | None) -> dict[str, Any] | 
         decoded: Any = json.loads(urlsafe_b64decode(encoded.encode()).decode())
         if isinstance(decoded, dict):
             return cast(dict[str, Any], decoded)
+
         else:
             return None
+
     except Exception:
         return None
 
 
-def _decode_single_page_cursor(token: PaginationToken | None) -> tuple[str | None, int]:
+def _decode_single_page_cursor(
+    token: PaginationToken | None,
+) -> tuple[str | None, int]:
     cursor: str | None = token if isinstance(token, str) else None
     offset: int = 0
     decoded = _decode_pagination_token(token)
@@ -99,7 +107,12 @@ def _decode_aggregate_state(
     server_ids: Sequence[str],
 ) -> dict[str, dict[str, Any]]:
     state: dict[str, dict[str, Any]] = {
-        server_id: {"cursor": None, "done": False} for server_id in server_ids
+        server_id: {
+            "cursor": None,
+            "offset": 0,
+            "done": False,
+        }
+        for server_id in server_ids
     }
     decoded = _decode_pagination_token(token)
     if decoded is None or decoded.get("kind") != "aggregate":
@@ -114,11 +127,17 @@ def _decode_aggregate_state(
         server_state: Any = state_mapping.get(server_id)
         if not isinstance(server_state, Mapping):
             continue
+
         server_state_mapping: Mapping[str, Any] = cast(Mapping[str, Any], server_state)
 
         cursor_value: Any = server_state_mapping.get("cursor")
         if isinstance(cursor_value, str | None):
             state[server_id]["cursor"] = cursor_value
+
+        # offset is absent in tokens produced before it was introduced
+        offset_value: Any = server_state_mapping.get("offset")
+        if isinstance(offset_value, int):
+            state[server_id]["offset"] = max(offset_value, 0)
 
         done_value: Any = server_state_mapping.get("done")
         if isinstance(done_value, bool):
@@ -189,10 +208,53 @@ class MCPClient:
             tags=tags if tags is not None else (),
         )
 
+    @classmethod
+    def streamable_http(
+        cls,
+        identifier: str | None = None,
+        *,
+        url: str,
+        headers: Mapping[str, Any] | None = None,
+        timeout: float = 30,
+        sse_read_timeout: float = 60 * 5,
+        terminate_on_close: bool = True,
+        features: Collection[type[ResourcesRepository] | type[ToolsProvider]] | None = None,
+        tags: MetaTags | None = None,
+    ) -> Self:
+        """Prepare a client using the Streamable HTTP transport.
+
+        This is the current remote transport, `sse` is deprecated by the protocol.
+        """
+
+        @asynccontextmanager
+        async def mcp_streamable_http_session() -> AsyncGenerator[ClientSession]:
+            async with AsyncClient(
+                # part of the recommended MCP client defaults
+                follow_redirects=True,
+                headers=as_dict(headers),
+                timeout=Timeout(timeout, read=sse_read_timeout),
+            ) as http_client:
+                async with streamable_http_client(
+                    url,
+                    http_client=http_client,
+                    terminate_on_close=terminate_on_close,
+                ) as (read, write):
+                    async with ClientSession(read, write) as session:
+                        yield session
+
+        return cls(
+            identifier or str(uuid4()),
+            session_manager=mcp_streamable_http_session(),
+            features=features if features is not None else (ResourcesRepository, ToolsProvider),
+            tags=tags if tags is not None else (),
+        )
+
     __slots__ = (
         "_features",
         "_session",
+        "_session_closing",
         "_session_manager",
+        "_session_owner",
         "identifier",
         "tags",
     )
@@ -208,6 +270,8 @@ class MCPClient:
         self.identifier: str = identifier
         self._session_manager: AbstractAsyncContextManager[ClientSession] = session_manager
         self._session: ClientSession
+        self._session_owner: Task[None]  # created on enter
+        self._session_closing: Event  # created on enter
         self._features: Collection[type[ResourcesRepository] | type[ToolsProvider]] = features
         self.tags: MetaTags = tags
 
@@ -262,6 +326,7 @@ class MCPClient:
             request_params: PaginatedRequestParams | None
             if cursor is not None:
                 request_params = PaginatedRequestParams(cursor=cursor)
+
             else:
                 request_params = None
 
@@ -273,11 +338,11 @@ class MCPClient:
             if offset >= len(current_resources):
                 # Keep walking pages when stale/local offset points past current data.
                 offset -= len(current_resources)
-                if result.nextCursor is None or result.nextCursor == cursor:
+                if result.next_cursor is None or result.next_cursor == cursor:
                     next_token = None
                     break
 
-                cursor = result.nextCursor
+                cursor = result.next_cursor
                 continue
 
             available = current_resources[offset:]
@@ -296,11 +361,11 @@ class MCPClient:
                 )
                 break
 
-            if result.nextCursor is None or result.nextCursor == cursor:
+            if result.next_cursor is None or result.next_cursor == cursor:
                 next_token = None
                 break
 
-            cursor = result.nextCursor
+            cursor = result.next_cursor
             offset = 0
             next_token = cursor
 
@@ -311,12 +376,13 @@ class MCPClient:
 
     def _resource_reference(
         self,
-        resource: Any,
+        resource: MCPResource,
     ) -> ResourceReference:
         return ResourceReference(
-            uri=self._with_uri_identifier(resource.uri.unicode_string()),
-            mime_type=resource.mimeType
-            if resource.mimeType is not None
+            # uri is a plain str since mcp 2.0
+            uri=self._with_uri_identifier(resource.uri),
+            mime_type=resource.mime_type
+            if resource.mime_type is not None
             else "application/octet-stream",
             meta=self._meta(
                 name=resource.name,
@@ -335,7 +401,7 @@ class MCPClient:
         ), "MCPClient has to be initialized through async context entering"
 
         result: ReadResourceResult = await self._session.read_resource(
-            uri=AnyUrl(self._without_uri_identifier(uri))
+            uri=self._without_uri_identifier(uri)
         )
 
         match result.contents:
@@ -347,9 +413,10 @@ class MCPClient:
                 # otherwise convert to references ignoring content
                 return [
                     ResourceReference(
-                        uri=resource.uri.unicode_string(),
-                        mime_type=resource.mimeType
-                        if resource.mimeType is not None
+                        # the identifier is required to resolve the reference back to this client
+                        uri=self._with_uri_identifier(resource.uri),
+                        mime_type=resource.mime_type
+                        if resource.mime_type is not None
                         else "application/octet-stream",
                         meta=self._meta(),
                     )
@@ -375,7 +442,27 @@ class MCPClient:
         self,
         **extra: Any,
     ) -> Sequence[Tool]:
-        tools: ListToolsResult = await self._session.list_tools()
+        assert hasattr(  # nosec: B101
+            self,
+            "_session",
+        ), "MCPClient has to be initialized through async context entering"
+
+        mcp_tools: list[MCPTool] = []
+        cursor: str | None = None
+        while True:
+            request_params: PaginatedRequestParams | None
+            if cursor is not None:
+                request_params = PaginatedRequestParams(cursor=cursor)
+
+            else:
+                request_params = None
+
+            result: ListToolsResult = await self._session.list_tools(params=request_params)
+            mcp_tools.extend(result.tools)
+            if result.next_cursor is None or result.next_cursor == cursor:
+                break
+
+            cursor = result.next_cursor
 
         return tuple(
             _convert_tool(
@@ -384,7 +471,7 @@ class MCPClient:
                 source=self.identifier,
                 tags=self.tags,
             )
-            for tool in tools.tools
+            for tool in mcp_tools
         )
 
     async def _tool_call(
@@ -396,16 +483,22 @@ class MCPClient:
             name=name,
             arguments=as_dict(arguments),
         )
-        content: MultimodalContent = MultimodalContent.of(
-            *await gather(*(_convert_content(part) for part in result.content))
-        )
 
-        if result.isError:
-            raise Exception(  # TODO: FIXME: raise an exception
-                f"Remote tool {name} failed",
+        if result.is_error:
+            # tool errors are reported within the result to let the model correct its call,
+            # content is converted defensively to not hide the failure behind a conversion error
+            error_content: MultimodalContent = MultimodalContent.of(
+                *await gather(*(_convert_error_content(part) for part in result.content))
+            )
+            raise ToolException(
+                f"Remote tool {name} failed: {error_content.to_str()}",
+                tool=name,
+                meta=self._meta(),
             )
 
-        return content
+        return MultimodalContent.of(
+            *await gather(*(_convert_content(part) for part in result.content))
+        )
 
     def _with_uri_identifier(
         self,
@@ -427,6 +520,7 @@ class MCPClient:
                     parsed.fragment,
                 )
             )
+
         else:
             # Ensure path starts with /
             path: str = parsed.path
@@ -493,22 +587,49 @@ class MCPClient:
     ) -> ResourceContent:
         match resource:
             case TextResourceContents() as text_resource:
-                return ResourceContent(
-                    data=urlsafe_b64decode(text_resource.text.encode()).decode(),
-                    mime_type=text_resource.mimeType or "text/plain",
+                # `text` carries the already decoded content, it has to be encoded back
+                return ResourceContent.of(
+                    text_resource.text.encode(),
+                    mime_type=text_resource.mime_type or "text/plain",
                     meta=self._meta(),
                 )
 
             case BlobResourceContents() as blob_resource:
                 return ResourceContent(
                     data=blob_resource.blob,
-                    mime_type=blob_resource.mimeType or "application/octet-stream",
+                    mime_type=blob_resource.mime_type or "application/octet-stream",
                     meta=self._meta(),
                 )
 
     async def __aenter__(self) -> Sequence[ResourcesRepository | ToolsProvider]:
-        self._session = await self._session_manager.__aenter__()
-        await self._session.initialize()
+        # the transports are built out of anyio task groups, which are task affine -
+        # entering and exiting one from different tasks raises, and context teardown
+        # does not generally run within the task which performed the setup.
+        # a dedicated task owns the whole lifetime of the session instead.
+        loop: AbstractEventLoop = get_running_loop()
+        prepared: Future[ClientSession] = loop.create_future()
+        self._session_closing = Event()
+
+        async def session_owner() -> None:
+            try:
+                async with self._session_manager as session:
+                    prepared.set_result(session)
+                    await self._session_closing.wait()
+
+            except BaseException as exc:
+                if prepared.done():
+                    raise  # surfaces when awaiting the task on exit
+
+                prepared.set_exception(exc)
+
+        self._session_owner = loop.create_task(session_owner())
+        self._session = await prepared
+        try:
+            await self._session.initialize()
+
+        except BaseException:
+            await self._close_session()
+            raise
 
         features: list[ResourcesRepository | ToolsProvider] = []
         if ResourcesRepository in self._features:
@@ -532,18 +653,24 @@ class MCPClient:
 
         return features
 
+    async def _close_session(self) -> None:
+        self._session_closing.set()
+        try:
+            # the owner task performs the actual transport teardown
+            await self._session_owner
+
+        finally:
+            del self._session
+
     async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        await self._session_manager.__aexit__(
-            exc_type,
-            exc_val,
-            exc_tb,
-        )
-        del self._session
+        # the transport is closed regularly instead of being thrown into - it only
+        # has to release the connection, while the cause propagates through the scope
+        await self._close_session()
 
 
 async def _convert_content(  # noqa: C901, PLR0911
@@ -561,16 +688,16 @@ async def _convert_content(  # noqa: C901, PLR0911
         case MCPImageContent() as image:
             return MultimodalContent.of(
                 ResourceContent.of(
-                    urlsafe_b64decode(image.data),
-                    mime_type=image.mimeType,
+                    b64decode(image.data),
+                    mime_type=image.mime_type,
                 )
             )
 
         case MCPAudioContent() as audio:
             return MultimodalContent.of(
                 ResourceContent.of(
-                    urlsafe_b64decode(audio.data),
-                    mime_type=audio.mimeType,
+                    b64decode(audio.data),
+                    mime_type=audio.mime_type,
                 )
             )
 
@@ -580,7 +707,7 @@ async def _convert_content(  # noqa: C901, PLR0911
                     return MultimodalContent.of(TextContent(text=text.text))
 
                 case BlobResourceContents() as blob:
-                    match blob.mimeType:
+                    match blob.mime_type:
                         case None:
                             raise NotImplementedError(
                                 "Unsupported embedded resource - missing mime!"
@@ -588,13 +715,13 @@ async def _convert_content(  # noqa: C901, PLR0911
 
                         case "text/plain":
                             return MultimodalContent.of(
-                                TextContent(text=urlsafe_b64decode(blob.blob).decode())
+                                TextContent(text=b64decode(blob.blob).decode())
                             )
 
                         case "application/json":
                             return MultimodalContent.of(
                                 ArtifactContent.of(
-                                    json.loads(urlsafe_b64decode(blob.blob)),
+                                    json.loads(b64decode(blob.blob)),
                                     category="json",
                                 )
                             )
@@ -603,13 +730,37 @@ async def _convert_content(  # noqa: C901, PLR0911
                             # try to match supported media or raise an exception
                             return MultimodalContent.of(
                                 ResourceContent.of(
-                                    urlsafe_b64decode(blob.blob),
+                                    b64decode(blob.blob),
                                     mime_type=other,
                                 )
                             )
 
         case MCPResourceLink():
             raise NotImplementedError("MCP resource links are not supported yet")
+
+
+async def _convert_error_content(
+    content: MCPTextContent
+    | MCPImageContent
+    | MCPAudioContent
+    | MCPResourceLink
+    | MCPEmbeddedResource,
+    /,
+) -> MultimodalContent:
+    """Convert error result content without ever raising.
+
+    Unsupported parts are replaced with a placeholder to not shadow the actual failure.
+    """
+
+    try:
+        return await _convert_content(content)
+
+    except Exception as exc:
+        ctx.log_warning(
+            f"Unsupported MCP tool error content ({content.type})",
+            exception=exc,
+        )
+        return MultimodalContent.of(f"<{content.type}/>")
 
 
 def _convert_tool(
@@ -634,7 +785,7 @@ def _convert_tool(
         parameters=cast(
             ModelToolParametersSpecification,
             {
-                **mcp_tool.inputSchema,
+                **mcp_tool.input_schema,
                 "additionalProperties": False,
             },
         ),
@@ -727,7 +878,8 @@ class MCPClients:
                     self._resources[server_id].fetch_list(
                         pagination=Pagination.of(
                             token=cast(str | None, aggregate_state[server_id]["cursor"]),
-                            limit=remaining,
+                            # already delivered items are requested again to be skipped below
+                            limit=cast(int, aggregate_state[server_id]["offset"]) + remaining,
                         ),
                         **extra,
                     )
@@ -737,19 +889,38 @@ class MCPClients:
 
             progress_made: bool = False
             for server_id, page in zip(pending_ids, pages, strict=True):
-                if page.items:
-                    references.extend(page.items)
-                    remaining = max(0, pagination.limit - len(references))
-                    progress_made = True
-
-                next_cursor = page.pagination.token
-                aggregate_state[server_id]["cursor"] = next_cursor
-                aggregate_state[server_id]["done"] = next_cursor is None
-                if next_cursor is not None:
-                    progress_made = True
-
                 if remaining <= 0:
+                    # remaining pages are discarded without advancing their cursors
                     break
+
+                state: dict[str, Any] = aggregate_state[server_id]
+                current_cursor: str | None = cast(str | None, state["cursor"])
+                offset: int = cast(int, state["offset"])
+                available: Sequence[ResourceReference] = tuple(page.items)[offset:]
+                consumed: int = min(len(available), remaining)
+                if consumed > 0:
+                    references.extend(available[:consumed])
+                    remaining -= consumed
+                    progress_made = True
+
+                if consumed < len(available):
+                    # keep the overflow reachable through the same cursor with a larger offset
+                    state["offset"] = offset + consumed
+                    continue
+
+                page_token: PaginationToken | None = page.pagination.token
+                # the state is serialized into the token, only plain strings can be carried over
+                next_cursor: str | None = str(page_token) if page_token is not None else None
+                state["offset"] = 0
+                if next_cursor is None or next_cursor == current_cursor:
+                    # a repeated cursor means the source can't advance any further
+                    state["cursor"] = None
+                    state["done"] = True
+
+                else:
+                    state["cursor"] = next_cursor
+                    state["done"] = False
+                    progress_made = True
 
             if not progress_made:
                 break

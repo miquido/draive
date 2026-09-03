@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Callable, Coroutine, MutableMapping, MutableSequence
+from collections.abc import AsyncGenerator, Callable, Coroutine, MutableMapping, MutableSequence
 from inspect import isasyncgenfunction, iscoroutinefunction, unwrap
 from typing import Protocol, Self, final, overload
 
@@ -42,7 +42,7 @@ class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
         name: str,
         description: str | None,
         parameters: ModelToolParametersSpecification | None,
-        handling: ModelToolHandling = "response",
+        handling: ModelToolHandling,
         meta: Meta,
     ) -> None:
         """Initialize a coroutine-backed tool.
@@ -155,7 +155,7 @@ class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
     async def call(
         self,
         **arguments: BasicValue,
-    ) -> AsyncIterable[ToolOutputChunk]:
+    ) -> AsyncGenerator[ToolOutputChunk]:
         """Execute the wrapped coroutine and stream its content parts.
 
         Parameters
@@ -175,8 +175,13 @@ class CoroutineTool[**Args, Result: Multimodal = MultimodalContent](
 
 
 @final
-class GeneratorTool[**Args](Function[Args, AsyncIterable[ToolOutputChunk]]):
-    """Tool adapter wrapping an async generator of tool output chunks."""
+class GeneratorTool[**Args](Function[Args, AsyncGenerator[ToolOutputChunk]]):
+    """Tool adapter wrapping an async generator of tool output chunks.
+
+    The wrapped function has to be an async generator. Only a generator can hold a
+    ``try/finally`` spanning the whole stream, which is what allows scoped state and
+    nested streams to be released deterministically when a consumer closes it early.
+    """
 
     __slots__ = (
         "description",
@@ -189,19 +194,19 @@ class GeneratorTool[**Args](Function[Args, AsyncIterable[ToolOutputChunk]]):
     def __init__(
         self,
         /,
-        function: Callable[Args, AsyncIterable[ToolOutputChunk]],
+        function: Callable[Args, AsyncGenerator[ToolOutputChunk]],
         *,
         name: str,
         description: str | None,
         parameters: ModelToolParametersSpecification | None,
-        handling: ModelToolHandling = "response",
+        handling: ModelToolHandling,
         meta: Meta,
     ) -> None:
         """Initialize a generator-backed tool.
 
         Parameters
         ----------
-        function : Callable[Args, AsyncIterable[ToolOutputChunk]]
+        function : Callable[Args, AsyncGenerator[ToolOutputChunk]]
             Async generator callable executed when the tool is invoked.
         name : str
             Public tool name exposed to model tool selection.
@@ -268,7 +273,7 @@ class GeneratorTool[**Args](Function[Args, AsyncIterable[ToolOutputChunk]]):
         *,
         name: str | None = None,
         description: str | None = None,
-        function: Callable[Args, AsyncIterable[ToolOutputChunk]] | None = None,
+        function: Callable[Args, AsyncGenerator[ToolOutputChunk]] | None = None,
         parameters: ModelToolParametersSpecification | None = None,
         handling: ModelToolHandling | None = None,
         meta: Meta | None = None,
@@ -281,7 +286,7 @@ class GeneratorTool[**Args](Function[Args, AsyncIterable[ToolOutputChunk]]):
             Replacement tool name.
         description : str | None, default=None
             Replacement description. Passing ``None`` keeps the current value.
-        function : Callable[Args, AsyncIterable[ToolOutputChunk]] | None, default=None
+        function : Callable[Args, AsyncGenerator[ToolOutputChunk]] | None, default=None
             Replacement callable. When omitted, the current callable is reused.
         parameters : ModelToolParametersSpecification | None, default=None
             Replacement parameter schema. When omitted, the current schema is reused.
@@ -307,7 +312,7 @@ class GeneratorTool[**Args](Function[Args, AsyncIterable[ToolOutputChunk]]):
     def call(
         self,
         **arguments: BasicValue,
-    ) -> AsyncIterable[ToolOutputChunk]:
+    ) -> AsyncGenerator[ToolOutputChunk]:
         """Execute the wrapped async generator.
 
         Parameters
@@ -317,8 +322,9 @@ class GeneratorTool[**Args](Function[Args, AsyncIterable[ToolOutputChunk]]):
 
         Returns
         -------
-        AsyncIterable[ToolOutputChunk]
-            Original stream emitted by the wrapped tool function.
+        AsyncGenerator[ToolOutputChunk]
+            Original stream emitted by the wrapped tool function. Consumers stopping
+            before the stream ends have to close it explicitly.
         """
         return super().__call__(**arguments)  # pyright: ignore[reportCallIssue]
 
@@ -329,7 +335,7 @@ class FunctionToolWrapper(Protocol):
     @overload
     def __call__[**Args](
         self,
-        function: Callable[Args, AsyncIterable[ToolOutputChunk]],
+        function: Callable[Args, AsyncGenerator[ToolOutputChunk]],
     ) -> GeneratorTool[Args]: ...
 
     @overload
@@ -340,7 +346,7 @@ class FunctionToolWrapper(Protocol):
 
     def __call__[**Args, Result: Multimodal = MultimodalContent](
         self,
-        function: Callable[Args, AsyncIterable[ToolOutputChunk]]
+        function: Callable[Args, AsyncGenerator[ToolOutputChunk]]
         | Callable[Args, Coroutine[None, None, Result]],
     ) -> CoroutineTool[Args, Result] | GeneratorTool[Args]:
         """Wrap a single callable as a configured tool."""
@@ -349,14 +355,14 @@ class FunctionToolWrapper(Protocol):
 
 @overload
 def tool[**Args](
-    function: Callable[Args, AsyncIterable[ToolOutputChunk]],
+    function: Callable[Args, AsyncGenerator[ToolOutputChunk]],
     /,
 ) -> GeneratorTool[Args]:
     """Wrap a callable into a tool adapter with default settings.
 
     Parameters
     ----------
-    function : Callable[Args, AsyncIterable[ToolOutputChunk]]
+    function : Callable[Args, AsyncGenerator[ToolOutputChunk]]
         Callable to expose as a tool.
 
     Returns
@@ -397,7 +403,7 @@ def tool(
 
 
 def tool[**Args, Result: Multimodal = MultimodalContent](
-    function: Callable[Args, AsyncIterable[ToolOutputChunk]]
+    function: Callable[Args, AsyncGenerator[ToolOutputChunk]]
     | Callable[Args, Coroutine[None, None, Result]]
     | None = None,
     *,
@@ -411,7 +417,7 @@ def tool[**Args, Result: Multimodal = MultimodalContent](
 
     Parameters
     ----------
-    function : Callable[Args, AsyncIterable[ToolOutputChunk]]
+    function : Callable[Args, AsyncGenerator[ToolOutputChunk]]
         | Callable[Args, Coroutine[None, None, Multimodal]]
         | None, default=None
         Callable to wrap immediately. When omitted, a configured decorator is
@@ -438,12 +444,14 @@ def tool[**Args, Result: Multimodal = MultimodalContent](
     ------
     TypeError
         If the provided callable is neither an async coroutine function nor an
-        async generator function.
+        async generator function. Streaming tools have to be async generators -
+        an arbitrary async iterable cannot release its resources deterministically
+        when a consumer closes the stream early.
     """
 
     @overload
     def wrap[**Arg](
-        function: Callable[Arg, AsyncIterable[ToolOutputChunk]],
+        function: Callable[Arg, AsyncGenerator[ToolOutputChunk]],
     ) -> GeneratorTool[Arg]: ...
 
     @overload
@@ -452,7 +460,7 @@ def tool[**Args, Result: Multimodal = MultimodalContent](
     ) -> CoroutineTool[Arg, Res]: ...
 
     def wrap[**Arg, Res: Multimodal = MultimodalContent](
-        function: Callable[Arg, AsyncIterable[ToolOutputChunk]]
+        function: Callable[Arg, AsyncGenerator[ToolOutputChunk]]
         | Callable[Arg, Coroutine[None, None, Res]],
     ) -> CoroutineTool[Arg, Res] | GeneratorTool[Arg]:
         if iscoroutinefunction(unwrap(function)):
@@ -475,7 +483,10 @@ def tool[**Args, Result: Multimodal = MultimodalContent](
                 meta=Meta.of(meta),
             )
 
-        raise TypeError("Unsupported tool function")
+        raise TypeError(
+            f"Unsupported tool function `{getattr(function, '__name__', function)}`,"
+            " tool functions have to be async functions or async generators"
+        )
 
     if function is None:
         return wrap

@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Iterable
+from collections.abc import AsyncGenerator, Iterable
 from typing import Protocol, runtime_checkable
 
 from haiway import Meta, MetaValues
@@ -86,7 +86,7 @@ StepOutputChunk = (
     | ModelToolResponse
     | ProcessingEvent
 )
-StepStream = AsyncIterable[StepOutputChunk | StepState]
+StepStream = AsyncGenerator[StepOutputChunk | StepState]
 
 
 @runtime_checkable

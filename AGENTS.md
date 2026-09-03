@@ -13,8 +13,8 @@ Draive is a python framework helping to build high-quality Gen-AI applications. 
 Top-level code lives under `src/draive/`, with key packages:
 
 - `draive/models/` — core model abstractions (`GenerativeModel`, context/input/output types, session and tool-related model types)
-- `draive/tools/` — tool abstractions and orchestration (`Tool`, `FunctionTool`, `Toolbox`, providers)
-- `draive/agents/` — lightweight async agent wrappers and delegation (`Agent`, `AgentsGroup`, agent message/identity types)
+- `draive/tools/` — tool abstractions and orchestration (`tool`, `Tool`, `CoroutineTool`, `GeneratorTool`, `Toolbox`, `ToolsProvider`)
+- `draive/agents/` — lightweight async agent wrappers and delegation (`Agent`, `AgentsGroup`, `AgentMemory`, agent message/identity types)
 - `draive/generation/` — typed generation facades (`text/`, `image/`, `audio/`, `model/`) with `state.py`, `types.py`, and `default.py`
 - `draive/conversation/` — higher-level chat/realtime flows (`completion/`, `realtime/`)
 - `draive/multimodal/` — multimodal content and templates (`MultimodalContent`, `TextContent`, `ArtifactContent`, template helpers)
@@ -22,15 +22,16 @@ Top-level code lives under `src/draive/`, with key packages:
 - `draive/embedding/` — embeddings, similarity/search/mmr, and typed embedding/vector index state
 - `draive/guardrails/` — moderation, privacy, quality, and safety guardrail states/types
 - `draive/steps/` — pipeline step abstractions (`Step`, `StepState`, composition/execution helpers)
+- `draive/skills/` — skill abstractions (`Skill`, `SkillResource`) used by agents and tools
 - `draive/evaluation/` — evaluation primitives (evaluators, scenarios, suites, scores)
 - `draive/evaluators/` — ready-to-use evaluator catalog (coherence, relevance, safety, jailbreak, etc.)
 - `draive/splitters/` — text splitting helpers
-- `draive/helpers/` — high-level utilities (instruction preparation/refinement, volatile vector index)
+- `draive/helpers/` — high-level utilities (instruction preparation/refinement, evaluation case generation, volatile vector index)
 - `draive/utils/` — shared low-level utility helpers
 - Provider adapters (feature-specific modules per provider):
   - `draive/openai/`, `draive/anthropic/`, `draive/mistral/`, `draive/gemini/`, `draive/vllm/`, `draive/ollama/`, `draive/bedrock/`, `draive/cohere/`
 - Integrations (opt-in extras):
-  - `draive/httpx/`, `draive/aws/`, `draive/qdrant/`, `draive/mcp/`, `draive/postgres/`, `draive/opentelemetry/`, `draive/rabbitmq/`
+  - `draive/httpx/`, `draive/aws/`, `draive/qdrant/`, `draive/surreal/`, `draive/mcp/`, `draive/postgres/`, `draive/opentelemetry/`, `draive/rabbitmq/`, `draive/starlette/`, `draive/fastapi/`
 
 Public exports are centralized in `src/draive/__init__.py`.
 
@@ -66,7 +67,7 @@ Public exports are centralized in `src/draive/__init__.py`.
 
 ### Logging & Observability
 
-- Use `ctx` observability helpers (`ctx.log_*`, `ctx.record`) instead of `print`/`logging`
+- Use `ctx` observability helpers (`ctx.log_*`, `ctx.record_*`) instead of `print`/`logging`
 - Surface user-facing failures via structured events before raising typed exceptions
 
 ## Testing & CI
@@ -75,7 +76,7 @@ Public exports are centralized in `src/draive/__init__.py`.
 - Keep tests fast and specific to changed code
 - Use fixtures from `tests/` or add focused ones; avoid heavy integration scaffolding for unit coverage
 - Linting/type gates: `make format` then `make lint`
-- Mirror package layout in `tests/`; prefer parametrization over loops
+- Add tests as flat `tests/test_<area>_<feature>.py` modules (or into existing groups like `tests/evaluators/`, `tests/ollama/`); prefer parametrization over loops
 - Test async flows with `pytest.mark.asyncio`; use `ctx.scope` in tests to isolate state
 - Keep `reveal_type`-style type assertions local and remove before committing
 
@@ -98,7 +99,7 @@ Public exports are centralized in `src/draive/__init__.py`.
 
 - Site is built with MkDocs + Material; PlantUML diagrams are built via `mkdocs-build-plantuml-plugin`
 - Register navigation in `mkdocs.yml` (`nav:` section)
-- Lint docs with `make docs-lint` and format with `make docs-format` after edits
+- Lint docs with `make docs-lint` and format with `make docs-format` after edits; `make docs` builds the site with `--strict`
 - Keep docstrings high-quality and aligned with public APIs
 
 ## Security & Secrets

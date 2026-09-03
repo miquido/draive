@@ -4,7 +4,7 @@ from itertools import chain
 from typing import Any, cast
 
 from google.genai.types import EmbedContentConfigDict, EmbedContentResponse
-from haiway import State, as_list, ctx, not_missing
+from haiway import State, as_list, as_tuple, ctx, not_missing
 
 from draive.embedding import Embedded
 from draive.gemini.api import GeminiAPI
@@ -24,14 +24,14 @@ class GeminiEmbedding(GeminiAPI):
         config: GeminiEmbeddingConfig | None = None,
         **extra: Any,
     ) -> Sequence[Embedded[Value]] | Sequence[Embedded[str]]:
-        async with ctx.scope("gemini.text_embedding"):
+        async with ctx.scope("embedding.invocation"):
             config = config or ctx.state(GeminiEmbeddingConfig)
-            attributes: list[str]
+            attributes: Sequence[str]
             if attribute is None:
-                attributes = cast(list[str], as_list(values))
+                attributes = cast(Sequence[str], as_tuple(values))
 
             else:
-                attributes = [attribute(cast(Value, value)) for value in values]
+                attributes = tuple(attribute(cast(Value, value)) for value in values)
 
             assert all(isinstance(element, str) for element in attributes)  # nosec: B101
 
@@ -64,7 +64,7 @@ class GeminiEmbedding(GeminiAPI):
             else:
                 config_dict = None
 
-            responses: list[EmbedContentResponse] = await gather(
+            responses: Sequence[EmbedContentResponse] = await gather(
                 *[
                     self._client.aio.models.embed_content(  # pyright: ignore[reportUnknownMemberType]
                         model=config.model,
@@ -77,22 +77,33 @@ class GeminiEmbedding(GeminiAPI):
                 ]
             )
 
+            vectors: Sequence[Sequence[float]] = [
+                embedding.values
+                for embedding in chain.from_iterable(
+                    [response.embeddings for response in responses if response.embeddings]
+                )
+                if embedding.values
+            ]
+            # some models silently return a single embedding for a batched request,
+            # dropping the rest - refusing to guess which input each vector belongs to
+            if len(vectors) != len(attributes):
+                raise ValueError(
+                    f"Gemini embedding using {config.model} returned {len(vectors)} embeddings"
+                    f" for {len(attributes)} inputs, the model may not support batching"
+                    f" - try using a smaller batch_size (currently {config.batch_size})"
+                )
+
             return cast(
                 Sequence[Embedded[Value]] | Sequence[Embedded[str]],
                 [
                     Embedded(
                         value=value,
-                        vector=embedding.values,
+                        vector=vector,
                     )
-                    for value, embedding in zip(
+                    for value, vector in zip(
                         values,
-                        chain.from_iterable(
-                            # filter out missing embeddings, although all should be available
-                            [response.embeddings for response in responses if response.embeddings]
-                        ),
+                        vectors,
                         strict=True,
                     )
-                    # filter out missing embeddings, although all should be available
-                    if embedding.values
                 ],
             )

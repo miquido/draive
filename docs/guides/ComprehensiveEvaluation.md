@@ -7,11 +7,15 @@ building end-to-end evaluation flows.
 ## Evaluator Basics
 
 - Evaluators are async callables decorated with `@evaluator` that return an `EvaluationScore` or a
-    compatible numeric value.
-- Thresholds determine whether an evaluation passes; named levels (`"perfect"`, `"excellent"`,
-    `"good"`, `"fair"`, `"poor"`) are easier to reason about than raw floats.
+    compatible score value (`float`, `bool`, or a level name).
+- Thresholds determine whether an evaluation passes; named levels are easier to reason about than
+    raw floats: `"none"` (0.0), `"poor"` (0.2), `"fair"` (0.4), `"good"` (0.6), `"excellent"` (0.8),
+    `"perfect"` (1.0). The default threshold is `1` - the strictest one.
+- `EvaluatorResult` carries `score`, `threshold`, `meta` and derives `passed` (`score >= threshold`).
 - `EvaluatorResult.performance` is reported as a percentage and can exceed 100 when a score
     comfortably beats its threshold.
+- An evaluator that raises is not propagated: the failure is logged and turned into a `0.0` score
+    with the exception recorded in the result metadata.
 
 ### Working with `EvaluationScore`
 
@@ -21,7 +25,11 @@ from draive.evaluation import EvaluationScore
 score_from_float = EvaluationScore.of(0.85)
 score_from_label = EvaluationScore.of("good")
 score_from_boolean = EvaluationScore.of(True)
+score_with_meta = EvaluationScore.of(0.85, meta={"comment": "minor omissions"})
 ```
+
+`EvaluationScore` holds only `value` and `meta` - comments and any other explanation belong in
+`meta`, conventionally under the `"comment"` key.
 
 ### Defining an evaluator
 
@@ -40,7 +48,7 @@ async def check_response_length(value: str, min_length: int = 100) -> float:
 # Prepared evaluators freeze arguments for reuse
 strict_length_check = check_response_length.prepared(min_length=200)
 result = await strict_length_check("This is a test response...")
-assert result.passed  # True when score >= excellent (0.7)
+assert result.passed  # True when score >= excellent (0.8)
 ```
 
 ## Combining Evaluators with Scenarios
@@ -63,6 +71,11 @@ async def evaluate_response_quality(value: str, context: str) -> Sequence[Evalua
     )
 ```
 
+The scenario definition returns a sequence of `EvaluatorResult`, while calling the scenario returns
+an `EvaluatorScenarioResult` exposing `scenario`, `results`, `passed`, `performance` and
+`report(...)`. Scenarios and plain evaluators can be mixed in one `evaluate(...)` call and in one
+suite definition.
+
 `evaluate` can run evaluators concurrently. Limit concurrency when evaluators hit rate-limited
 services.
 
@@ -83,8 +96,8 @@ async def evaluate_response_quality_parallel(value: str, context: str) -> Sequen
 Suites persist test cases, run them in bulk, and expose reporting helpers.
 
 ```python
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 from draive import State
 from draive.evaluation import evaluator_suite
@@ -131,6 +144,18 @@ specific_results = await qa_test_suite(["case-1", "case-2"])
 report = full_results.report(detailed=True, include_passed=False)
 ```
 
+Case selection follows the argument type: `None` (or no argument) runs every stored case, an `int`
+runs that many random cases, a `float` in `(0, 1]` runs that fraction, and a sequence selects
+specific cases by identifier, by parameters, or by `EvaluatorSuiteCase` instances. An unknown
+identifier raises `ValueError`.
+
+`storage` accepts a `Path`/`str` JSON file, a sequence of `EvaluatorSuiteCase` values for in-memory
+cases, or a custom `EvaluatorSuiteCasesStorage` implementation; omitting it starts with empty
+in-memory storage. File storage expects the file to exist - create it (`[]` for no cases) before the
+first run. `with_storage(...)`, `with_name(...)`, `with_meta(...)`, `with_state(...)` and
+`with_concurrent_evaluations(...)` produce reconfigured copies of a suite, and `prepared(...)` binds
+extra arguments of the definition.
+
 ## Composing and Transforming Evaluators
 
 ```python
@@ -145,13 +170,101 @@ optimistic_eval = Evaluator.highest(
     evaluator1.prepared(),
     evaluator2.prepared(),
 )
+mean_eval = Evaluator.average(
+    evaluator1.prepared(),
+    evaluator2.prepared(),
+    threshold="good",  # required - it replaces the combined thresholds
+)
 ```
+
+`lowest` and `highest` compare `performance` (score relative to each threshold) and return the
+winning `EvaluatorResult` as is; `average` returns a new result named `average` carrying the mean
+score. All three accept `concurrent_tasks` (2 by default).
 
 ```python
 # Transform inputs before delegation
-field_evaluator = my_evaluator.contra_map(MyModel._.attribute.path)
+field_evaluator = my_evaluator.contra_map(MyModel._.attribute)
 normalized = my_evaluator.contra_map(lambda data: data["response"].strip().lower())
 ```
+
+## Reference-Based Scoring
+
+When you have ground-truth ratings, score the evaluator itself: `Evaluator.referenced(...)` runs the
+wrapped evaluation and replaces its score with how well that score conforms to an accepted window
+pulled from the evaluated value. This keeps the ground truth in the value (e.g. a field of the suite
+case parameters) instead of adding another argument.
+
+```python
+from draive import State
+from draive.evaluation import EvaluationReference, evaluator
+
+
+class ReviewCase(State, serializable=True):
+    content: str
+    expected: EvaluationReference
+
+
+@evaluator(name="review_quality", threshold="good")
+async def review_quality(case: ReviewCase) -> float:
+    return await score_content(case.content)
+
+
+# resolve the window per value - callable, attribute path, or a constant reference
+referenced = review_quality.referenced(reference=ReviewCase._.expected)
+nominal = review_quality.referenced(
+    reference=EvaluationReference(lower=0.6, upper=1.0),
+    weighting="nominal",
+)
+```
+
+`EvaluationReference` describes the accepted window:
+
+- `EvaluationReference.of("good")` - exact single point (0.6).
+- `EvaluationReference.of("good", tolerance=0.2)` - `±20%` of the target, so `[0.48, 0.72]`.
+- `EvaluationReference(lower=0.6, upper=1.0)` - explicit bounds.
+- A bare score value (`"good"`, `0.6`, `True`) is accepted anywhere a reference is expected and
+    treated as an exact single-point window.
+
+`weighting` controls the falloff outside the window: `"quadratic"` (default) grants partial credit
+that decays with the squared distance to the nearest bound, `"nominal"` scores a miss as `0.0`. The
+result keeps the original evaluator name and threshold and records `predicted_score`,
+`predicted_level`, `reference_lower`, `reference_upper`, `within_reference` and `reference_weighting`
+in its metadata. `reference_conformance(score, reference, weighting=...)` exposes the same math
+directly.
+
+## Rater Agreement
+
+To compare an automatic evaluator against human labels, use Cohen's kappa. The functional variants
+work on level labels, while `cohen_kappa_evaluator` accepts score values, `EvaluationScore` or
+`EvaluatorResult` instances on both sides and bins them into levels.
+
+```python
+from draive.evaluation import cohen_kappa, quadratic_weighted_kappa
+from draive.evaluators import cohen_kappa_evaluator
+
+nominal = cohen_kappa(["good", "excellent"], ["good", "good"])
+ordinal = quadratic_weighted_kappa(["good", "excellent"], ["good", "good"])
+
+agreement = await cohen_kappa_evaluator(
+    automatic_results,  # Sequence of scores, EvaluationScore or EvaluatorResult
+    reference=human_labels,
+    weighting="quadratic",  # or "nominal"
+)
+```
+
+The evaluator score is the selected kappa clamped to `[0, 1]`, with both variants plus
+`exact_agreement`, `sample_count` and `weighting` reported in metadata. The `tools/evals/` suite in
+the repository uses exactly this evaluator to verify the shipped evaluators against labeled
+baselines.
+
+## Evaluating Conversation Context
+
+Every built-in content evaluator has a `*_context_evaluator` twin operating on a `ModelContext` - the
+sequence of `ModelInput`/`ModelOutput` elements produced by a conversation - so multi-turn behaviour
+can be judged as a whole. Their reference-style arguments are optional: when omitted the evaluator
+judges the outputs on their own (for example internal consistency instead of consistency with a
+reference). `tool_usage_context_evaluator` is context-only and checks the tool calls recorded in the
+timeline.
 
 ## Stateful Evaluation with Haiway
 
@@ -230,12 +343,12 @@ from draive.evaluation import EvaluationScore, evaluator
 async def evaluate_with_context(response: str) -> EvaluationScore:
     score, issues = await analyze_response(response)
 
-    return EvaluationScore(
-        value=score,
+    return EvaluationScore.of(
+        score,
         meta={
             "timestamp": datetime.now().isoformat(),
             "issues_found": issues,
-            "evaluation_model": "gpt-5",
+            "evaluation_model": "gpt-5.5",
             "confidence": 0.85,
         },
     )
@@ -243,21 +356,24 @@ async def evaluate_with_context(response: str) -> EvaluationScore:
 
 ## Generating Test Cases
 
+`generate_cases` asks a model to synthesize new case parameters of the suite's own parameters type.
+All arguments are keyword-only; `examples` defaults to the currently available cases and `persist`
+controls whether the extended set is written back to storage.
+
 ```python
 examples = [
-    TestCase(
-        input="Complex technical scenario",
-        expected_behavior="Detailed technical response",
-        edge_cases=["unicode", "special chars", "empty input"],
+    QATestCase(
+        question="What is machine learning?",
+        expected_topics=["algorithms", "data", "training"],
+        min_length=150,
     ),
-    TestCase(
-        input="Simple query",
-        expected_behavior="Concise response",
-        edge_cases=["typos", "ambiguity"],
+    QATestCase(
+        question="Explain overfitting",
+        expected_topics=["generalization", "validation"],
     ),
 ]
 
-cases = await suite.generate_cases(
+cases = await qa_test_suite.generate_cases(
     count=20,
     examples=examples,
     guidelines="""
@@ -271,6 +387,10 @@ cases = await suite.generate_cases(
 )
 ```
 
+Generation runs a model call per case, so it has to happen inside a scope providing a model. The
+returned sequence contains only the newly generated cases; they are appended to the suite's cases
+either way.
+
 ## Summary
 
 - Flexible scoring with normalized values and named levels
@@ -278,6 +398,7 @@ cases = await suite.generate_cases(
 - Scenario grouping for related checks
 - Suite management with persistent storage and generation tools
 - Reporting helpers for insight into failures and regressions
+- Reference windows and Cohen's kappa for validating evaluators against ground truth
 - Concurrent execution to balance latency and throughput
 
 Use evaluators for quick checks, scenarios for logical groupings, and suites for comprehensive

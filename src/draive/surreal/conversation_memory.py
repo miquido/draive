@@ -2,7 +2,7 @@ import json
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from itertools import chain
-from typing import Any, cast
+from typing import Any, NoReturn, cast, final
 from uuid import UUID
 
 from haiway import Paginated, Pagination, ctx
@@ -20,66 +20,154 @@ from draive.surreal.types import SurrealObject
 __all__ = ("SurrealConversationMemory",)
 
 
-def SurrealConversationMemory(
-    *,
-    thread: UUID | str,
-) -> ConversationMemory:
-    thread_id: str = str(thread)
+@final
+class SurrealConversationMemory:
+    """SurrealDB-backed conversation memory factory.
 
-    async def fetch(
-        pagination: Pagination,
-        **extra: Any,
-    ) -> Paginated[ConversationTurn]:
-        return await _fetch_turns(
-            thread_id=thread_id,
-            pagination=pagination,
+    Exposes static helpers for schema migration and for creating thread-scoped
+    :class:`~draive.conversation.state.ConversationMemory` instances persisted
+    in SurrealDB.
+
+    Examples
+    --------
+    ```python
+    from uuid import uuid4
+
+    from draive import ctx
+    from draive.surreal import SurrealClient, SurrealConversationMemory
+
+    async def bootstrap_memory() -> None:
+        async with SurrealClient(url="ws://localhost:8000/rpc") as surreal:
+            async with ctx.scope("conversation-memory", surreal):
+                await SurrealConversationMemory.migrate()
+                memory = SurrealConversationMemory.prepare(thread=uuid4())
+                await memory.recall()
+    ```
+    """
+
+    @staticmethod
+    async def migrate() -> None:
+        """Define the database structures required by conversation memory.
+
+        Defines the `conversation_memory` table and its supporting indexes when
+        not already defined. A SurrealDB server refuses to read from a table
+        which was never defined nor written to, therefore it has to be defined
+        upfront.
+
+        Returns
+        -------
+        None
+            Completes when the schema definition statements finish.
+
+        Raises
+        ------
+        SurrealException
+            Raised when SurrealDB statement execution fails.
+        """
+        # one statement per call - a multi-statement query reports its errors
+        # per statement, executing them separately keeps failures attributable
+        await Surreal.execute(
+            "DEFINE TABLE IF NOT EXISTS conversation_memory SCHEMALESS TYPE NORMAL;"
+        )
+        await Surreal.execute(
+            "DEFINE INDEX IF NOT EXISTS conversation_memory_thread_idx "
+            "ON TABLE conversation_memory FIELDS thread_id, created;"
+        )
+        await Surreal.execute(
+            # recalling a page resolves its cursor by identifier within a thread
+            "DEFINE INDEX IF NOT EXISTS conversation_memory_cursor_idx "
+            "ON TABLE conversation_memory FIELDS thread_id, identifier;"
         )
 
-    async def recall(
-        pagination: Pagination | None = None,
-        **extra: Any,
-    ) -> ModelContext:
-        turns: Sequence[ConversationTurn]
-        if pagination is None:
-            turns = await _recall(thread_id=thread_id)
+    @staticmethod
+    def prepare(
+        *,
+        thread: UUID | str,
+    ) -> ConversationMemory:
+        """Prepare thread-scoped conversation memory operations.
 
-        else:
-            turns = (await _fetch_turns(thread_id=thread_id, pagination=pagination)).items
+        Requires the database structures to be defined with :meth:`migrate`
+        beforehand.
 
-        return tuple(chain.from_iterable(turn.to_model_context() for turn in turns))
+        Parameters
+        ----------
+        thread
+            Conversation thread identifier used to isolate persisted turns.
 
-    async def remember(
-        turns: Sequence[ConversationTurn],
-        **extra: Any,
-    ) -> None:
-        _ = extra
-        if not turns:
-            return
+        Returns
+        -------
+        ConversationMemory
+            A configured conversation memory instance with fetch, recall, and
+            remember handlers bound to the provided thread.
 
-        for turn in turns:
-            await Surreal.execute(
-                """
-                CREATE conversation_memory SET
-                    thread_id = $thread_id,
-                    turn = $turn,
-                    identifier = $identifier,
-                    payload = $payload,
-                    created = $created;
-                """,
+        Raises
+        ------
+        ValueError
+            Raised by memory operations if pagination token validation fails.
+        SurrealException
+            Raised by memory operations when SurrealDB interactions fail.
+        """
+        thread_id: str = str(thread)
+
+        async def fetch(
+            pagination: Pagination,
+            **extra: Any,
+        ) -> Paginated[ConversationTurn]:
+            return await _fetch_turns(
                 thread_id=thread_id,
-                turn=turn.turn,
-                identifier=str(turn.identifier),
-                payload=turn.to_json(),
-                created=turn.created,
+                pagination=pagination,
             )
 
-        ctx.log_debug("...conversation memory persisted in SurrealDB.")
+        async def recall(
+            pagination: Pagination | None = None,
+            **extra: Any,
+        ) -> ModelContext:
+            turns: Sequence[ConversationTurn]
+            if pagination is None:
+                turns = await _recall(thread_id=thread_id)
 
-    return ConversationMemory(
-        fetching=fetch,
-        recalling=recall,
-        remembering=remember,
-    )
+            else:
+                turns = (await _fetch_turns(thread_id=thread_id, pagination=pagination)).items
+
+            return tuple(chain.from_iterable(turn.to_model_context() for turn in turns))
+
+        async def remember(
+            turns: Sequence[ConversationTurn],
+            **extra: Any,
+        ) -> None:
+            _ = extra
+            if not turns:
+                return
+
+            for turn in turns:
+                await Surreal.execute(
+                    """
+                    CREATE conversation_memory SET
+                        thread_id = $thread_id,
+                        turn = $turn,
+                        identifier = $identifier,
+                        payload = $payload,
+                        created = $created;
+                    """,
+                    thread_id=thread_id,
+                    turn=turn.turn,
+                    identifier=str(turn.identifier),
+                    payload=turn.to_json(),
+                    created=turn.created,
+                )
+
+            ctx.log_debug("...conversation memory persisted in SurrealDB.")
+
+        return ConversationMemory(
+            fetching=fetch,
+            recalling=recall,
+            remembering=remember,
+        )
+
+    __slots__ = ()
+
+    def __init__(self) -> NoReturn:
+        raise RuntimeError("SurrealConversationMemory instantiation is forbidden")
 
 
 def _turn_from_record(

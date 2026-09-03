@@ -16,8 +16,8 @@ __all__ = ("PostgresTemplatesRepository",)
 class PostgresTemplatesRepository:
     @staticmethod
     async def migrate() -> None:
-        # split into separate statements - `PostgresConnection.execute` runs through
-        # asyncpg's prepared-statement path, which rejects multi-statement strings
+        # split into separate statements - asyncpg would run a whole script through
+        # its simple-query path, yet one statement per call keeps failures attributable
         await PostgresConnection.execute(
             """
             CREATE TABLE IF NOT EXISTS templates (
@@ -26,7 +26,7 @@ class PostgresTemplatesRepository:
                 content TEXT NOT NULL,
                 variables JSONB NOT NULL DEFAULT '{}'::jsonb,
                 meta JSONB NOT NULL DEFAULT '{}'::jsonb,
-                created TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
                 PRIMARY KEY (identifier, created)
             );
             """
@@ -132,7 +132,8 @@ class PostgresTemplatesRepository:
                         description,
                         content,
                         variables,
-                        meta
+                        meta,
+                        created
                     )
 
                 VALUES
@@ -141,7 +142,8 @@ class PostgresTemplatesRepository:
                         $2::TEXT,
                         $3::TEXT,
                         $4::JSONB,
-                        $5::JSONB
+                        $5::JSONB,
+                        clock_timestamp()
                     );
                 """,
                 identifier,

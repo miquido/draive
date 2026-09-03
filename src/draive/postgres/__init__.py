@@ -3,8 +3,10 @@ from haiway.postgres import (
     PostgresConfigurationRepository,
     PostgresConnection,
     PostgresConnectionPool,
+    PostgresErrorCode,
     PostgresException,
     PostgresRow,
+    PostgresTransactionIsolation,
     PostgresValue,
 )
 
@@ -20,9 +22,11 @@ __all__ = (
     "PostgresConnection",
     "PostgresConnectionPool",
     "PostgresConversationMemory",
+    "PostgresErrorCode",
     "PostgresException",
     "PostgresRow",
     "PostgresTemplatesRepository",
+    "PostgresTransactionIsolation",
     "PostgresValue",
     "PostgresVectorIndex",
 )
