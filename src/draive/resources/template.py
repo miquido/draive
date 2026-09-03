@@ -158,15 +158,28 @@ class ResourceTemplate[**Args](
 
         return params
 
+    def _declared_query_parameters(self) -> Set[str]:
+        return {
+            name.strip()
+            for declaration in re.findall(r"\{\?([^}]+)\}", self.declaration.template_uri)
+            for name in declaration.split(",")
+            if name.strip()
+        }
+
     def _extract_query_parameters(
         self,
         parsed_uri: ParseResult,
     ) -> dict[str, str]:
         params: dict[str, str] = {}
         if parsed_uri.query:
+            # `matches_uri` verifies the URI with its query stripped, so any query element is
+            # accepted. Only the ones declared within the template belong to the resource
+            # though - binding the others would let the caller supply arguments which the
+            # template does not expose at all.
+            declared: Set[str] = self._declared_query_parameters()
             query_params = parse_qs(parsed_uri.query)
             for key, values in query_params.items():
-                if values:
+                if values and key in declared:
                     params[key] = values[0]  # Take first value
 
         return params
@@ -279,8 +292,9 @@ class ResourceTemplate[**Args](
         return params
 
     def _extract_path_template(self) -> str:
-        if "://" in self.declaration.template_uri:
-            reminder = self.declaration.template_uri.split("://", 1)[1]
+        template_uri: str = _without_query_expressions(self.declaration.template_uri)
+        if "://" in template_uri:
+            reminder = template_uri.split("://", 1)[1]
             # Find where the netloc ends (first occurrence of {, /, ?, or #)
             netloc_end = len(reminder)
             for char in ["/", "{", "?", "#"]:
@@ -291,41 +305,17 @@ class ResourceTemplate[**Args](
             return reminder[netloc_end:]
 
         else:
-            return self.declaration.template_uri
+            return template_uri
 
     def _extract_path_parameters_with_slash(
         self,
         actual_path: str,
     ) -> dict[str, str]:
-        params: dict[str, str] = {}
-        slash_params: list[str] = re.findall(r"\{/([^}]+)\}", self.declaration.template_uri)
-        path_template: str = self._extract_path_template()
-
-        # Create regex pattern
-        template_for_regex: str = path_template
-        for param in slash_params:
-            template_for_regex = template_for_regex.replace(f"{{/{param}}}", "/([^/]+)")
-
-        # Handle regular {var} patterns
-        regular_params: list[str] = re.findall(r"\{([^}]+)\}", template_for_regex)
-        for param in regular_params:
-            if not param.startswith("/"):  # Skip already handled slash patterns
-                template_for_regex = template_for_regex.replace(f"{{{param}}}", "([^/]+)")
-
-        # Match against the actual path
-        match: re.Match[str] | None = re.match(f"^{template_for_regex}$", actual_path)
-        if match:
-            positional_params: list[str] = [
-                *slash_params,
-                *(param for param in regular_params if not param.startswith("/")),
-            ]
-            groups: tuple[str | None, ...] = match.groups()
-            for param, value in zip(positional_params, groups, strict=False):
-                if value is None:
-                    continue
-                params[param] = unquote(value)
-
-        return params
+        # query and fragment expressions are already stripped from the path template
+        return _extract_expression_parameters(
+            self._extract_path_template(),
+            actual_path,
+        )
 
     def _extract_simple_path_parameters(
         self,
@@ -343,7 +333,7 @@ class ResourceTemplate[**Args](
                 if param_name.startswith("?") or param_name.startswith("#"):
                     continue
 
-                params[param_name] = unquote(actual_part)
+                params[param_name] = _decoded_uri_parameter(actual_part)
 
         return params
 
@@ -354,14 +344,27 @@ class ResourceTemplate[**Args](
     ) -> Mapping[str, str]:
         params: dict[str, str] = {}
         parsed_uri: ParseResult = urlparse(uri)
-        parsed_template: ParseResult = urlparse(self.declaration.template_uri)
+        parsed_template: ParseResult = urlparse(
+            _without_query_expressions(self.declaration.template_uri)
+        )
 
         # Extract different types of parameters
         params.update(self._extract_query_parameters(parsed_uri))
         params.update(self._extract_fragment_parameters(parsed_uri))
 
         # Handle path parameters
-        if "{/" in self.declaration.template_uri:
+        if _authority_contains_variables(self.declaration.template_uri):
+            # a variable within the authority makes the split into netloc and path ambiguous,
+            # so neither can be extracted on its own - the whole URI is matched against the
+            # template instead, exactly the way `matches_uri` verifies it
+            params.update(
+                _extract_expression_parameters(
+                    _without_query_expressions(self.declaration.template_uri),
+                    parsed_uri._replace(query="", fragment="").geturl(),
+                )
+            )
+
+        elif "{/" in self.declaration.template_uri:
             params.update(self._extract_path_parameters_with_slash(parsed_uri.path))
 
         else:
@@ -571,14 +574,10 @@ class ResourceTemplate[**Args](
             return self.declaration.template_uri == uri
 
         try:
+            # the match pattern is anchored and keeps the scheme and the netloc of the
+            # template as escaped literals, so it verifies both on its own - parsing them
+            # out of the template separately only risks misreading its expressions
             parsed_uri: ParseResult = urlparse(uri)
-            parsed_template: ParseResult = urlparse(self.declaration.template_uri)
-            if parsed_template.scheme and parsed_uri.scheme != parsed_template.scheme:
-                return False
-
-            if parsed_template.netloc and parsed_uri.netloc != parsed_template.netloc:
-                return False
-
             stripped_uri: str = parsed_uri._replace(query="", fragment="").geturl()
             return bool(re.match(self._match_pattern, stripped_uri))
 
@@ -611,13 +610,21 @@ class ResourceTemplate[**Args](
             raise ResourceCorrupted(uri=uri) from exc
 
 
+_SEGMENT: str = r"[^/?#]+"
+# a variable within the authority stands for a host label, never for the user-info
+# delimiter - allowing `@` there would let `https://evil.com@acme.example.com/lib` match
+# `https://{tenant}.example.com{/repo}` and hand the resource `evil.com@acme` in place of
+# the host label the URI actually addresses
+_AUTHORITY_SEGMENT: str = r"[^/?#@]+"
+
+
 def _prepare_match_pattern(uri_template: str) -> str:
     # Handle RFC 6570 URI template patterns
     tokens: list[str] = []
-    for part in re.split(r"(\{[^}]+\})", uri_template):
+    for part, authority in _split_template(uri_template):
         if re.fullmatch(r"\{/([^}]+)\}", part):
-            # slash-prefixed, multi-segment
-            tokens.append(r"(?:/[^/?#]+)+")
+            # slash-prefixed, single-segment
+            tokens.append(rf"/{_SEGMENT}")
 
         elif re.fullmatch(r"\{\?[^}]+\}", part) or re.fullmatch(r"\{#[^}]+\}", part):
             # query/fragment - drop entirely
@@ -625,7 +632,7 @@ def _prepare_match_pattern(uri_template: str) -> str:
 
         elif re.fullmatch(r"\{([^}]+)\}", part):
             # single-segment variable
-            tokens.append(r"[^/?#]+")
+            tokens.append(_AUTHORITY_SEGMENT if authority else _SEGMENT)
 
         else:
             # literal text
@@ -633,6 +640,107 @@ def _prepare_match_pattern(uri_template: str) -> str:
 
     pattern = "".join(tokens)
     return f"^{pattern}$"
+
+
+def _extract_expression_parameters(
+    template: str,
+    value: str,
+) -> dict[str, str]:
+    # names and capture groups are collected within a single pass to keep them in
+    # template order - deriving either separately pairs them up the wrong way around.
+    # each name is kept along with whether it stands within the authority, where the
+    # capture is narrower and its decoded value is verified against the same boundary
+    variables: list[tuple[str, bool]] = []
+    pattern: list[str] = []
+    for part, authority in _split_template(template):
+        if match := re.fullmatch(r"\{/([^}]+)\}", part):
+            # a slash-prefixed expression always begins the path
+            variables.append((match.group(1), False))
+            pattern.append(rf"/({_SEGMENT})")
+
+        elif match := re.fullmatch(r"\{([^}]+)\}", part):
+            variables.append((match.group(1), authority))
+            pattern.append(f"({_AUTHORITY_SEGMENT if authority else _SEGMENT})")
+
+        else:
+            pattern.append(re.escape(part))
+
+    matched: re.Match[str] | None = re.fullmatch("".join(pattern), value)
+    if matched is None:
+        return {}
+
+    return {
+        name: _decoded_uri_parameter(captured, authority=authority)
+        for (name, authority), captured in zip(variables, matched.groups(), strict=True)
+        if captured is not None
+    }
+
+
+def _split_template(uri_template: str) -> list[tuple[str, bool]]:
+    # pairs every template part with whether it lies within the URI authority, so that a
+    # variable standing for a host label can be held to narrower rules than a path one
+    parts: list[tuple[str, bool]] = []
+    pending_authority: bool = "://" in uri_template
+    authority: bool = False
+    for part in re.split(r"(\{[^}]+\})", uri_template):
+        if match := re.fullmatch(r"\{([^}]+)\}", part):
+            if authority and match.group(1)[0] in "/?#":
+                # a path, query or fragment expression ends the authority
+                authority = False
+
+            parts.append((part, authority))
+
+        else:
+            parts.append((part, authority))
+            if pending_authority and "://" in part:
+                pending_authority = False
+                # the authority begins after the scheme and ends at the first delimiter
+                authority = not re.search(r"[/?#]", part.split("://", 1)[1])
+
+            elif authority and re.search(r"[/?#]", part):
+                # the authority ends within a literal, ahead of any variable
+                authority = False
+
+    return parts
+
+
+def _authority_contains_variables(uri_template: str) -> bool:
+    return any(
+        authority and re.fullmatch(r"\{[^}]+\}", part)
+        for part, authority in _split_template(uri_template)
+    )
+
+
+def _without_query_expressions(uri_template: str) -> str:
+    # `{?var}` and `{#var}` expressions contain a literal `?`/`#` which `urlparse` would
+    # mistake for the beginning of the query or fragment, truncating the template before
+    # any path parameter declared ahead of them.
+    return re.sub(r"\{[?#][^}]*\}", "", uri_template)
+
+
+def _decoded_uri_parameter(
+    value: str,
+    /,
+    *,
+    authority: bool = False,
+) -> str:
+    # `matches_uri` verifies the raw URI, where the pattern of each path parameter spans
+    # exactly one segment. Decoding happens only afterwards, so a capture like `..%2Fsecret`
+    # would reach the resource function as `../secret` - crossing the very boundary the
+    # pattern had already verified. Reject decoded values breaking that guarantee instead.
+    decoded: str = unquote(value)
+    if "/" in decoded or "\\" in decoded:
+        raise ValueError(f"Resource URI path parameter contains a path separator: {value}")
+
+    if decoded in (".", ".."):
+        raise ValueError(f"Resource URI path parameter contains a relative segment: {value}")
+
+    if authority and "@" in decoded:
+        # the raw capture already excludes `@`, so only an encoded `%40` reaches here - it
+        # would turn a host label into user-info the matched URI never addressed
+        raise ValueError(f"Resource URI authority parameter contains user-info: {value}")
+
+    return decoded
 
 
 def resource[**Args](
