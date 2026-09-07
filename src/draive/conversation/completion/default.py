@@ -130,7 +130,7 @@ async def conversation_completion(  # noqa: C901, PLR0912, PLR0915
             tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
             tools_stream: AsyncGenerator[
                 ModelToolResponse | ProcessingEvent | MultimodalContentPart
-            ] = toolbox.handle(*tool_requests)
+            ] = toolbox.handle(tool_requests)
             try:
                 async for chunk in tools_stream:
                     if isinstance(chunk, ModelToolResponse):

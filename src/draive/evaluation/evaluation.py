@@ -38,7 +38,7 @@ async def evaluate[Value](
     *evaluators: PreparedEvaluatorScenario[Value] | PreparedEvaluator[Value],
     concurrent_tasks: int = 2,
 ) -> Sequence[EvaluatorScenarioResult | EvaluatorResult]:
-    assert concurrent_tasks > 1  # nosec: B101
+    assert concurrent_tasks > 0  # nosec: B101
 
     return await concurrently(
         (evaluator(value) for evaluator in evaluators),

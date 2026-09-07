@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncIterable, Iterable, Sequence
 from typing import Any
 
@@ -403,3 +404,122 @@ async def test_volatile_context_and_evaluation_wrappers() -> None:
             )
             .run()
         )
+
+
+async def _merge_first(branches: Iterable[StepState]) -> StepState:
+    return next(iter(branches))
+
+
+@pytest.mark.asyncio
+async def test_concurrent_single_branch_failure_propagates_unwrapped() -> None:
+    # branches run as tasks, so a failure arrives wrapped in the joining task
+    # group's exception group - reporting a group of one would defeat every
+    # caller catching the branch error, `with_retry` and `with_fallback` included
+    @step
+    async def failing(state: StepState) -> StepState:
+        raise ValueError("branch boom")
+
+    concurrent_step = Step.concurrent(
+        Step.updating_artifacts(left=AlphaArtifact(value="L")),
+        failing,
+        merge=_merge_first,
+    )
+
+    with pytest.raises(ValueError, match="branch boom"):
+        await concurrent_step.process()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_branch_failure_is_catchable_by_wrappers() -> None:
+    @step
+    async def failing(state: StepState) -> StepState:
+        raise ValueError("branch boom")
+
+    @step
+    async def fallback(state: StepState) -> StepState:
+        return state.appending_context(ModelInput.of(MultimodalContent.of("fallback")))
+
+    recovered = Step.concurrent(
+        Step.updating_artifacts(left=AlphaArtifact(value="L")),
+        failing,
+        merge=_merge_first,
+    ).with_fallback(fallback, catching=ValueError)
+
+    state = await recovered.process()
+
+    assert _text_of(state.context[-1].content) == "fallback"
+
+
+@pytest.mark.asyncio
+async def test_concurrent_multiple_branch_failures_raise_the_first_one() -> None:
+    # the first branch failure ends the remaining branches and is raised on its own
+    barrier = asyncio.Barrier(2)
+
+    @step
+    async def failing_value(state: StepState) -> StepState:
+        await barrier.wait()
+        raise ValueError("a")
+
+    @step
+    async def failing_key(state: StepState) -> StepState:
+        await barrier.wait()
+        raise KeyError("b")
+
+    with pytest.raises((ValueError, KeyError)) as caught:
+        await Step.concurrent(failing_value, failing_key, merge=_merge_first).process()
+
+    assert not isinstance(caught.value, BaseExceptionGroup)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_cancellation_stays_a_cancellation() -> None:
+    # the task group cancels the branches on teardown - collecting those into a
+    # group would turn a cancellation passing through into an ordinary failure
+    @step
+    async def slow(state: StepState) -> StepState:
+        await asyncio.sleep(5)
+        return state
+
+    task = asyncio.ensure_future(
+        Step.concurrent(slow, slow, merge=_merge_first).process(),
+    )
+    await asyncio.sleep(0.01)
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+
+@pytest.mark.asyncio
+async def test_concurrent_group_raised_by_merge_keeps_its_own_identity() -> None:
+    # only the task group's own wrapper is unwrapped - a group raised by `merge`
+    # is an error in its own right and keeps the message it was raised with
+    async def group_merge(branches: Iterable[StepState]) -> StepState:
+        raise ExceptionGroup("merge group", [ValueError("m1"), KeyError("m2")])
+
+    with pytest.raises(BaseExceptionGroup) as caught:
+        await Step.concurrent(
+            Step.updating_artifacts(left=AlphaArtifact(value="L")),
+            Step.updating_artifacts(right=BetaArtifact(value="R")),
+            merge=group_merge,
+        ).process()
+
+    assert "merge group" in str(caught.value)
+    assert {type(error) for error in caught.value.exceptions} == {ValueError, KeyError}
+
+
+@pytest.mark.asyncio
+async def test_concurrent_group_raised_by_branch_keeps_its_own_identity() -> None:
+    @step
+    async def failing(state: StepState) -> StepState:
+        raise ExceptionGroup("branch group", [ValueError("b1"), KeyError("b2")])
+
+    with pytest.raises(BaseExceptionGroup) as caught:
+        await Step.concurrent(
+            Step.updating_artifacts(left=AlphaArtifact(value="L")),
+            failing,
+            merge=_merge_first,
+        ).process()
+
+    assert "branch group" in str(caught.value)
+    assert {type(error) for error in caught.value.exceptions} == {ValueError, KeyError}

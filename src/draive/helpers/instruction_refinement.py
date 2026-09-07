@@ -52,7 +52,7 @@ async def refine_instructions[Parameters: State](
         candidates_limit: Number of top candidates to fully evaluate
         performance_drop_threshold: Prune branches with score drop > this threshold
         quality_threshold: Stop if score reaches this threshold
-        concurrent_nodes: How many nodes explored concurrently, at least 2
+        concurrent_nodes: How many nodes explored concurrently, at least 1
     """
 
     assert rounds_limit > 0  # nosec: B101
@@ -60,7 +60,7 @@ async def refine_instructions[Parameters: State](
     assert candidates_limit > 0  # nosec: B101
     assert 1 >= performance_drop_threshold > 0  # nosec: B101
     assert 1 >= quality_threshold >= 0  # nosec: B101
-    assert concurrent_nodes > 1  # nosec: B101
+    assert concurrent_nodes > 0  # nosec: B101
     assert len(evaluator_cases) > 0  # nosec: B101
 
     ctx.log_info(

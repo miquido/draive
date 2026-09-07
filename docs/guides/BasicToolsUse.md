@@ -93,8 +93,8 @@ result = await TextGeneration.generate(
 
 - `name=...` and `description=...` to override the model facing tool identity
 - `parameters=...` to provide an explicit arguments JSON schema instead of the inferred one
-- `handling="response" | "output" | "output_stream"` to control whether the tool result only goes
-    back to the model or is also surfaced in the output stream
+- `handling="response" | "output"` to control whether the tool result only goes back to the
+    model or is also streamed to the output as it is produced
 - `meta=...` to attach metadata to the tool specification
 - `meta={"strict_parameters": True}` to have the provider enforce the argument schema, which
     makes the model always pass every argument rather than relying on its default. A tool taking

@@ -80,7 +80,7 @@ def realtime_conversation_preparing(  # noqa: C901, PLR0915
         ) -> None:
             handling_stream: AsyncGenerator[
                 ModelToolResponse | ProcessingEvent | MultimodalContentPart
-            ] = toolbox.handle(tool_request)
+            ] = toolbox.handle((tool_request,))
             try:
                 ctx.log_debug(f"Requested tool ({tool_request.identifier}) handling...")
                 async for chunk in handling_stream:

@@ -1,4 +1,7 @@
-from collections.abc import Sequence
+import asyncio
+from collections.abc import Mapping, Sequence
+from contextlib import suppress
+from typing import Any
 
 import pytest
 from haiway import Meta
@@ -10,6 +13,7 @@ from draive import (
     MultimodalContent,
     MultimodalContentPart,
     ProcessingEvent,
+    TextContent,
     Toolbox,
     ToolsProvider,
     ctx,
@@ -36,7 +40,7 @@ async def test_empty_toolbox_model_tools_returns_model_tools_none() -> None:
 @pytest.mark.asyncio
 async def test_handle_without_requests_yields_no_chunks() -> None:
     async with ctx.scope("test"):
-        chunks = [chunk async for chunk in Toolbox.empty.handle()]
+        chunks = [chunk async for chunk in Toolbox.empty.handle(())]
 
     assert chunks == []
 
@@ -47,7 +51,7 @@ async def test_handle_returns_error_response_for_unknown_tool() -> None:
         chunks = [
             chunk
             async for chunk in Toolbox.empty.handle(
-                ModelToolRequest.of("r1", tool="missing", arguments={})
+                (ModelToolRequest.of("r1", tool="missing", arguments={}),)
             )
         ]
 
@@ -67,13 +71,13 @@ async def test_handle_response_tool_streams_events_and_returns_accumulated_respo
         @tool
         async def lookup(value: str):
             yield ProcessingEvent.of("progress", f"checking:{value}")
-            yield "A:"
-            yield value
+            yield TextContent.of("A:")
+            yield TextContent.of(value)
 
         chunks = [
             chunk
             async for chunk in Toolbox.of(lookup).handle(
-                ModelToolRequest.of("r1", tool="lookup", arguments={"value": "x"})
+                (ModelToolRequest.of("r1", tool="lookup", arguments={"value": "x"}),)
             )
         ]
 
@@ -97,13 +101,13 @@ async def test_handle_response_tool_returns_error_response_with_partial_result()
         @tool
         async def unstable():
             yield ProcessingEvent.of("progress", "started")
-            yield "partial"
+            yield TextContent.of("partial")
             raise RuntimeError("boom")
 
         chunks = [
             chunk
             async for chunk in Toolbox.of(unstable).handle(
-                ModelToolRequest.of("r1", tool="unstable", arguments={})
+                (ModelToolRequest.of("r1", tool="unstable", arguments={}),)
             )
         ]
 
@@ -124,13 +128,13 @@ async def test_handle_output_tool_yields_event_then_output_parts_then_response()
         @tool(handling="output")
         async def amplify(value: str):
             yield ProcessingEvent.of("progress", "starting")
-            yield "OUT:"
-            yield value
+            yield TextContent.of("OUT:")
+            yield TextContent.of(value)
 
         chunks = [
             chunk
             async for chunk in Toolbox.of(amplify).handle(
-                ModelToolRequest.of("r1", tool="amplify", arguments={"value": "x"})
+                (ModelToolRequest.of("r1", tool="amplify", arguments={"value": "x"}),)
             )
         ]
 
@@ -154,13 +158,13 @@ async def test_handle_output_tool_returns_error_response_with_partial_result() -
 
         @tool(handling="output")
         async def unstable_output():
-            yield "OUT:"
+            yield TextContent.of("OUT:")
             raise RuntimeError("boom")
 
         chunks = [
             chunk
             async for chunk in Toolbox.of(unstable_output).handle(
-                ModelToolRequest.of("r1", tool="unstable_output", arguments={})
+                (ModelToolRequest.of("r1", tool="unstable_output", arguments={}),)
             )
         ]
 
@@ -259,3 +263,119 @@ async def test_tool_updating_allows_clearing_meta() -> None:
 
     assert ping.meta == Meta.of({"tag": "value"})
     assert updated.meta == Meta.empty
+
+
+@pytest.mark.asyncio
+async def test_handle_abandoned_mid_stream_leaves_no_pending_callback_errors() -> None:
+    # cancelling the tool tasks fires their done callback, which must not ask a
+    # cancelled task for its exception - doing so raises into the event loop
+    loop_errors: list[str] = []
+
+    def record_loop_error(loop: object, context: Mapping[str, Any]) -> None:
+        loop_errors.append(str(context.get("message")))
+
+    @tool(name="slow")
+    async def slow() -> str:
+        await asyncio.sleep(5)
+        return "done"
+
+    loop = asyncio.get_running_loop()
+    previous_handler = loop.get_exception_handler()
+    loop.set_exception_handler(record_loop_error)
+    try:
+        async with ctx.scope("test"):
+            stream = Toolbox.of(slow).handle(
+                (
+                    ModelToolRequest.of("r1", tool="slow", arguments={}),
+                    ModelToolRequest.of("r2", tool="slow", arguments={}),
+                )
+            )
+            pending = asyncio.ensure_future(anext(stream))
+            await asyncio.sleep(0.01)  # let the tool tasks start
+            pending.cancel()
+            with suppress(asyncio.CancelledError):
+                await pending
+
+            await stream.aclose()
+
+        await asyncio.sleep(0)  # let any pending callback run
+
+    finally:
+        loop.set_exception_handler(previous_handler)
+
+    assert loop_errors == []
+
+
+@pytest.mark.asyncio
+async def test_handle_waits_for_every_request_to_respond() -> None:
+    # the merged stream must not end with the first finished tool - every request
+    # has to deliver its response, including the ones still running at that time
+    async with ctx.scope("test"):
+
+        @tool(name="fast", handling="output")
+        async def fast():
+            yield TextContent.of("fast-out")
+
+        @tool(name="slow", handling="output")
+        async def slow():
+            await asyncio.sleep(0.05)
+            yield TextContent.of("slow-out")
+
+        chunks = [
+            chunk
+            async for chunk in Toolbox.of(fast, slow).handle(
+                (
+                    ModelToolRequest.of("r1", tool="fast", arguments={}),
+                    ModelToolRequest.of("r2", tool="slow", arguments={}),
+                )
+            )
+        ]
+
+    responses = [chunk for chunk in chunks if isinstance(chunk, ModelToolResponse)]
+    assert [response.identifier for response in responses] == ["r1", "r2"]
+    assert all(response.status == "success" for response in responses)
+
+    outputs = [chunk for chunk in chunks if isinstance(chunk, MultimodalContentPart)]
+    assert [chunk.meta["request"] for chunk in outputs] == ["r1", "r2"]
+    assert _text_of(outputs) == "fast-outslow-out"
+
+
+@pytest.mark.asyncio
+async def test_handle_keeps_output_contiguous_per_request() -> None:
+    # the first request producing output streams it directly, the output of the
+    # others is accumulated and appended once the streaming one finishes
+    async with ctx.scope("test"):
+        first_started = asyncio.Event()
+        second_started = asyncio.Event()
+
+        @tool(name="first", handling="output")
+        async def first():
+            yield TextContent.of("f1")
+            first_started.set()
+            await second_started.wait()
+            yield TextContent.of("f2")
+
+        @tool(name="second", handling="output")
+        async def second():
+            await first_started.wait()
+            yield TextContent.of("s1")
+            second_started.set()
+            yield TextContent.of("s2")
+
+        chunks = [
+            chunk
+            async for chunk in Toolbox.of(first, second).handle(
+                (
+                    ModelToolRequest.of("r1", tool="first", arguments={}),
+                    ModelToolRequest.of("r2", tool="second", arguments={}),
+                )
+            )
+        ]
+
+    outputs = [chunk for chunk in chunks if isinstance(chunk, MultimodalContentPart)]
+    assert [chunk.to_str() for chunk in outputs] == ["f1", "f2", "s1", "s2"]
+    assert [chunk.meta["request"] for chunk in outputs] == ["r1", "r1", "r2", "r2"]
+
+    responses = [chunk for chunk in chunks if isinstance(chunk, ModelToolResponse)]
+    assert {response.identifier for response in responses} == {"r1", "r2"}
+    assert all(response.status == "success" for response in responses)

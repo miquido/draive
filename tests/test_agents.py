@@ -162,10 +162,12 @@ async def test_agents_group_request_tool_returns_response_tool_output() -> None:
         chunks = [
             chunk
             async for chunk in Toolbox.of(tool).handle(
-                ModelToolRequest.of(
-                    "r1",
-                    tool="agent_request",
-                    arguments={"agent": agent.identity.name, "task": "perform task"},
+                (
+                    ModelToolRequest.of(
+                        "r1",
+                        tool="agent_request",
+                        arguments={"agent": agent.identity.name, "task": "perform task"},
+                    ),
                 )
             )
         ]
@@ -192,10 +194,12 @@ async def test_agents_group_handover_tool_streams_direct_output() -> None:
         chunks = [
             chunk
             async for chunk in Toolbox.of(tool).handle(
-                ModelToolRequest.of(
-                    "r1",
-                    tool="agent_handover",
-                    arguments={"agent": agent.identity.name, "task": "perform task"},
+                (
+                    ModelToolRequest.of(
+                        "r1",
+                        tool="agent_handover",
+                        arguments={"agent": agent.identity.name, "task": "perform task"},
+                    ),
                 )
             )
         ]

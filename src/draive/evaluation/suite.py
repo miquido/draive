@@ -380,7 +380,7 @@ class EvaluatorSuite[**Args, Parameters: State](Immutable):
         state: Sequence[State],
         meta: Meta,
     ) -> None:
-        assert concurrent_evaluations > 1  # nosec: B101
+        assert concurrent_evaluations > 0  # nosec: B101
 
         object.__setattr__(
             self,
