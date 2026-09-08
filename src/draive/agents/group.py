@@ -287,7 +287,7 @@ class AgentsGroup:
                 case "response":
                     name = "agent_request"
 
-                case "output" | "output_stream":
+                case "output":
                     name = "agent_handover"
 
         if description is None:
@@ -299,7 +299,7 @@ class AgentsGroup:
                         for identity in self._declared
                     )
 
-                case "output" | "output_stream":
+                case "output":
                     description = "Hand over your task to the selected agent.\n"
                     description += "\n".join(
                         f'<agent name="{identity.name}">{identity.description}</agent>'
@@ -311,7 +311,7 @@ class AgentsGroup:
             case "response":
                 task_description = "Task to be performed by the agent"
 
-            case "output" | "output_stream":
+            case "output":
                 task_description = "Task to be handed over to the agent"
 
         @tool(

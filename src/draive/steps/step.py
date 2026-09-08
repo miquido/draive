@@ -1,4 +1,4 @@
-from asyncio import ALL_COMPLETED, Task, sleep, wait
+from asyncio import sleep
 from collections.abc import (
     AsyncGenerator,
     AsyncIterator,
@@ -14,15 +14,14 @@ from inspect import iscoroutinefunction
 from typing import Any, ClassVar, NoReturn, Protocol, Self, final, overload, runtime_checkable
 
 from haiway import (
-    AsyncStream,
     Disposable,
     Disposables,
     Meta,
     MetaValues,
     State,
     ctx,
+    stream_concurrently,
 )
-from haiway.context.tasks import ContextTaskGroup
 
 from draive.evaluation import (
     EvaluatorResult,
@@ -637,52 +636,43 @@ class Step:
             state: StepState,
         ) -> StepStream:
             async with ctx.scope("step.concurrent"):
-                output_stream: AsyncStream[StepOutputChunk] = AsyncStream()
+                # final states of the branches, keyed by their position
+                results: dict[int, StepState] = {}
 
                 async def branch(
-                    state: StepState,
+                    index: int,
                     execution: StepExecuting,
-                ) -> StepState:
+                ) -> StepStream:
                     async with ctx.scope("step.concurrent.branch"):
+                        branch_state: StepState = state
                         execution_stream: StepStream = execution(state=state)
                         try:
                             async for chunk in execution_stream:
                                 if isinstance(chunk, StepState):
-                                    state = chunk
+                                    branch_state = chunk
 
                                 else:
-                                    await output_stream.send(chunk)
+                                    yield chunk
 
                         finally:
                             await execution_stream.aclose()
 
-                        return state
+                        results[index] = branch_state
 
-                async with ContextTaskGroup():  # local task group for more granular management
-                    branches: Sequence[Task[StepState]] = [
-                        ctx.spawn(branch, state, execution) for execution in executions
-                    ]
-
-                    async def merge_branches() -> StepState:
-                        try:
-                            await wait(
-                                branches,
-                                return_when=ALL_COMPLETED,
-                            )
-                            output_stream.finish()
-
-                        except BaseException as exc:
-                            output_stream.finish(exc)
-                            raise  # reraise original
-
-                        return await merge(branches=(branch.result() for branch in branches))
-
-                    merged: Task[StepState] = ctx.spawn(merge_branches)
-                    # the branches feed the stream, it is finished along with them
-                    async for chunk in output_stream:
+                # branches run concurrently, their output is delivered as it comes and
+                # the first branch failure ends the rest
+                branches_stream: StepStream = stream_concurrently(
+                    *(branch(index, execution) for index, execution in enumerate(executions)),
+                    exhaustive=True,
+                )
+                try:
+                    async for chunk in branches_stream:
                         yield chunk
 
-                    yield await merged
+                finally:
+                    await branches_stream.aclose()
+
+                yield await merge(branches=(results[index] for index in range(len(executions))))
 
         return cls(step)
 
@@ -834,7 +824,7 @@ class Step:
                 tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
                 tools_stream: AsyncGenerator[
                     ModelToolResponse | ProcessingEvent | MultimodalContentPart
-                ] = toolbox.handle(*tool_requests)
+                ] = toolbox.handle(tool_requests)
                 try:
                     async for chunk in tools_stream:
                         if isinstance(chunk, ModelToolResponse):
@@ -973,7 +963,7 @@ class Step:
                         tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
                         tools_stream: AsyncGenerator[
                             ModelToolResponse | ProcessingEvent | MultimodalContentPart
-                        ] = toolbox.handle(*tool_requests)
+                        ] = toolbox.handle(tool_requests)
                         try:
                             async for chunk in tools_stream:
                                 if isinstance(chunk, ModelToolResponse):

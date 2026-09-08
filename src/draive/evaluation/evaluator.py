@@ -306,7 +306,7 @@ class Evaluator[Value, **Args](Immutable):
             Evaluator that returns the result with lowest performance percentage
         """
 
-        assert concurrent_tasks > 1  # nosec: B101
+        assert concurrent_tasks > 0  # nosec: B101
 
         async def evaluate(
             value: Value,
@@ -356,7 +356,7 @@ class Evaluator[Value, **Args](Immutable):
             Evaluator that returns the result with highest performance percentage
         """
 
-        assert concurrent_tasks > 1  # nosec: B101
+        assert concurrent_tasks > 0  # nosec: B101
 
         async def evaluate(
             value: Value,
@@ -409,7 +409,7 @@ class Evaluator[Value, **Args](Immutable):
             Evaluator that returns the result with average score value
         """
 
-        assert concurrent_tasks > 1  # nosec: B101
+        assert concurrent_tasks > 0  # nosec: B101
 
         async def evaluate(
             value: Value,

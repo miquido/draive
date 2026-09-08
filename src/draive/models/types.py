@@ -389,8 +389,12 @@ ModelTools.none = ModelTools(
 )
 
 
-ModelToolHandling = Literal["response", "output", "output_stream"]
-"""Routing policy describing how tool results are handled."""
+ModelToolHandling = Literal["response", "output"]
+"""Routing policy describing how tool results are handled.
+
+``response`` delivers the tool content only to the model as the tool response, while
+``output`` additionally streams it to the output as it is produced.
+"""
 
 
 @final

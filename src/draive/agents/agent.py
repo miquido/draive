@@ -272,7 +272,7 @@ class Agent:
 
                         responses: MutableSequence[ModelToolResponse] = []
                         tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
-                        tools_stream = agent_tools.handle(*tool_requests)
+                        tools_stream = agent_tools.handle(tool_requests)
                         try:
                             async for chunk in tools_stream:
                                 if isinstance(chunk, ModelToolResponse):
@@ -673,7 +673,7 @@ class Agent:
                 case "response":
                     name = f"agent_{self.identity.name}_request"
 
-                case "output" | "output_stream":
+                case "output":
                     name = f"agent_{self.identity.name}_handover"
 
         if description is None:
@@ -684,7 +684,7 @@ class Agent:
                         f"\n{self.identity.description}"
                     )
 
-                case "output" | "output_stream":
+                case "output":
                     description = (
                         f"Hand over your task to the {self.identity.name} agent.\n"
                         f"\n{self.identity.description}"
@@ -695,7 +695,7 @@ class Agent:
             case "response":
                 task_description = "Task to be performed by the agent"
 
-            case "output" | "output_stream":
+            case "output":
                 task_description = "Task to be handed over to the agent"
 
         @tool(

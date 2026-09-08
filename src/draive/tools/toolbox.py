@@ -1,4 +1,3 @@
-from asyncio import Lock, Task
 from collections.abc import (
     AsyncGenerator,
     Collection,
@@ -10,8 +9,15 @@ from collections.abc import (
 )
 from typing import ClassVar, Self, final, overload
 
-from haiway import AsyncQueue, BasicValue, Meta, MetaTags, MetaValues, State, ctx
-from haiway.context.tasks import ContextTaskGroup
+from haiway import (
+    BasicValue,
+    Meta,
+    MetaTags,
+    MetaValues,
+    State,
+    ctx,
+    stream_concurrently,
+)
 
 from draive.models import (
     ModelToolHandling,
@@ -230,18 +236,26 @@ class Toolbox(State):
             if arguments is None:
                 arguments = {}
 
-            selected_tool: Tool | None = self.tools.get(tool)
-            if selected_tool is None:
+            requested_tool: Tool | None = self.tools.get(tool)
+            if requested_tool is None:
                 raise ToolException(
                     f"Requested unknown tool {tool}",
                     tool=tool,
                 )
 
             accumulator: MutableSequence[MultimodalContentPart] = []
-            # argument validation happens on call, keep it within error handling
-            tool_stream: AsyncGenerator[ToolOutputChunk] | None = None
+
+            tool_stream: AsyncGenerator[ToolOutputChunk]
             try:
-                tool_stream = selected_tool.call(**arguments)
+                tool_stream = requested_tool.call(**arguments)
+
+            except Exception as exc:
+                raise ToolException(
+                    f"Tool {tool} call failed due to an error: {exc}",
+                    tool=tool,
+                ) from exc
+
+            try:
                 async for chunk in tool_stream:
                     if isinstance(chunk, ProcessingEvent):
                         continue  # skip events
@@ -255,20 +269,24 @@ class Toolbox(State):
                 ) from exc
 
             finally:
-                if tool_stream is not None:
-                    await tool_stream.aclose()  # release the tool stream
+                await tool_stream.aclose()  # release the tool stream
 
             return MultimodalContent.of(*accumulator)
 
-    async def handle(  # noqa: C901
+    def handle(
         self,
-        *requests: ModelToolRequest,
+        requests: Collection[ModelToolRequest],
     ) -> AsyncGenerator[ModelToolResponse | ProcessingEvent | MultimodalContentPart]:
         """Execute model tool requests and stream responses, events, and output.
 
+        Requests are executed concurrently. Events and responses are delivered as they
+        come, while tool output is kept contiguous per request - the first request
+        producing output streams it directly, the output of the others is accumulated
+        and appended in arrival order once the streaming one ends.
+
         Parameters
         ----------
-        *requests : ModelToolRequest
+        requests : Collection[ModelToolRequest]
             Tool requests to execute. Each request is dispatched according to the
             matched tool handling mode.
 
@@ -278,117 +296,105 @@ class Toolbox(State):
             Tool events and output chunks emitted during execution, followed by tool
             responses describing final status and aggregated results.
         """
-        if not requests:
-            return  # nothing to be done
+        return _merging_output(
+            stream_concurrently(
+                *(self.response_stream(request) for request in requests),
+                exhaustive=True,
+            )
+        )
 
-        async with ContextTaskGroup():  # ensure proper task joins through local task group
-            output_stream: AsyncQueue[
-                ModelToolResponse | ProcessingEvent | MultimodalContentPart
-            ] = AsyncQueue()
-            tasks: MutableSet[Task[None]] = set()
-            lock: Lock = Lock()  # synchronize outputs
-
-            def task_finish(task: Task[None]) -> None:
-                exc: BaseException | None = task.exception()
-                if exc is not None:
-                    # fail with first exception
-                    output_stream.finish(exc)
-
-                elif all(task.done() for task in tasks):
-                    # finish when all done
-                    output_stream.finish()
-
-            for request in requests:
-                tool: Tool | None = self.tools.get(request.tool)
-                handling: ModelToolHandling
-                if request.handling is None:
-                    if tool is None:
-                        handling = "response"
-
-                    else:
-                        handling = tool.handling
-
-                else:
-                    handling = request.handling
-
-                match handling:
-                    case "response":
-                        task: Task[None] = ctx.spawn(
-                            self._response_execute(
-                                tool,
-                                request=request,
-                                output_stream=output_stream,
-                            )
-                        )
-                        tasks.add(task)
-                        task.add_done_callback(task_finish)
-
-                    case "output" | "output_stream":
-                        task: Task[None] = ctx.spawn(
-                            self._output_stream_execute(
-                                tool,
-                                request=request,
-                                lock=lock,
-                                output_stream=output_stream,
-                            )
-                        )
-                        tasks.add(task)
-                        task.add_done_callback(task_finish)
-
-            async for chunk in output_stream:
-                yield chunk
-
-            assert all(task.done() for task in tasks)  # nosec: B101
-
-    async def _execute(
+    async def response_stream(  # noqa: C901, PLR0912
         self,
-        tool: Tool | None,
-        *,
         request: ModelToolRequest,
     ) -> AsyncGenerator[ModelToolResponse | ProcessingEvent | MultimodalContentPart]:
+        tool: Tool | None = self.tools.get(request.tool)
+        if tool is None:
+            ctx.log_error(f"Requested unknown tool `{request.tool}` [{request.identifier}]")
+            yield ModelToolResponse(
+                identifier=request.identifier,
+                tool=request.tool,
+                status="error",
+                content=MultimodalContent.of(
+                    f"<error>Requested unknown tool `{request.tool}`</error>"
+                ),
+            )
+            return  # finished handling
+
         async with ctx.scope(f"tool.{request.tool}", request):
-            if tool is None:
-                ctx.log_error(f"Requested unknown tool `{request.tool}` [{request.identifier}]")
+            tool_stream: AsyncGenerator[ToolOutputChunk]
+            try:
+                tool_stream = tool.call(**request.arguments)
+
+            except Exception as exc:
+                ctx.log_error(
+                    f"Tool `{request.tool}` request [{request.identifier}] failed"
+                    f" due to a call error: {exc}",
+                    exception=exc,
+                )
                 yield ModelToolResponse(
                     identifier=request.identifier,
                     tool=request.tool,
                     status="error",
                     content=MultimodalContent.of(
-                        f"<error>Requested unknown tool `{request.tool}`</error>"
+                        "<error>Tool execution failed due to a call error</error>",
                     ),
                 )
-                return  # execution finished
+                return  # finished handling
+
+            handling: ModelToolHandling
+            if request.handling is None:
+                handling = tool.handling
+
+            else:
+                handling = request.handling
 
             accumulator: MutableSequence[MultimodalContentPart] = []
-            # argument validation happens on call, keep it within error handling
-            tool_stream: AsyncGenerator[ToolOutputChunk] | None = None
             try:
-                tool_stream = tool.call(**request.arguments)
-                async for chunk in tool_stream:
-                    if isinstance(chunk, ProcessingEvent):
-                        ctx.record_info(event=chunk.event)
-                        yield chunk.updating(
-                            meta=chunk.meta.updating(
-                                tool=request.tool,
-                                request=request.identifier,
-                            )
-                        )
+                match handling:
+                    case "response":
+                        async for chunk in tool_stream:
+                            if isinstance(chunk, ProcessingEvent):
+                                ctx.record_info(event=chunk.event)
+                                yield chunk.updating(
+                                    meta=chunk.meta.updating(
+                                        tool=request.tool,
+                                        request=request.identifier,
+                                    )
+                                )
 
-                    else:
-                        accumulator.append(chunk)
-                        yield chunk  # stream content to output
+                            else:
+                                accumulator.append(chunk)
+
+                    case "output":
+                        async for chunk in tool_stream:
+                            if isinstance(chunk, ProcessingEvent):
+                                ctx.record_info(event=chunk.event)
+                                yield chunk.updating(
+                                    meta=chunk.meta.updating(
+                                        tool=request.tool,
+                                        request=request.identifier,
+                                    )
+                                )
+
+                            else:
+                                accumulator.append(chunk)
+                                yield chunk.updating(
+                                    meta=chunk.meta.updating(
+                                        tool=request.tool,
+                                        request=request.identifier,
+                                    )
+                                )
 
                 yield ModelToolResponse(
                     identifier=request.identifier,
                     tool=request.tool,
                     status="success",
-                    # TODO: perhaps we should replace final response content for direct outputs?
                     content=MultimodalContent.of(*accumulator),
                 )
 
             except Exception as exc:
                 ctx.log_error(
-                    f"Tool `{request.tool}` execution [{request.identifier}] failed"
+                    f"Tool `{request.tool}` request [{request.identifier}] failed"
                     f" due to an error: {exc}",
                     exception=exc,
                 )
@@ -404,81 +410,7 @@ class Toolbox(State):
                 )
 
             finally:
-                if tool_stream is not None:
-                    await tool_stream.aclose()  # release the tool stream
-
-    async def _response_execute(
-        self,
-        tool: Tool | None,
-        *,
-        request: ModelToolRequest,
-        output_stream: AsyncQueue[ModelToolResponse | ProcessingEvent | MultimodalContentPart],
-    ) -> None:
-        execution_stream: AsyncGenerator[
-            ModelToolResponse | ProcessingEvent | MultimodalContentPart
-        ] = self._execute(
-            tool,
-            request=request,
-        )
-        try:
-            async for chunk in execution_stream:
-                if isinstance(chunk, ProcessingEvent | ModelToolResponse):
-                    output_stream.enqueue(chunk)
-
-        finally:
-            await execution_stream.aclose()  # release the execution stream
-
-    async def _output_execute(
-        self,
-        tool: Tool | None,
-        *,
-        request: ModelToolRequest,
-        lock: Lock,
-        output_stream: AsyncQueue[ModelToolResponse | ProcessingEvent | MultimodalContentPart],
-    ) -> None:
-        accumulator: MutableSequence[MultimodalContentPart] = []
-        execution_stream: AsyncGenerator[
-            ModelToolResponse | ProcessingEvent | MultimodalContentPart
-        ] = self._execute(
-            tool,
-            request=request,
-        )
-        try:
-            async for chunk in execution_stream:
-                if isinstance(chunk, ProcessingEvent | ModelToolResponse):
-                    output_stream.enqueue(chunk)
-
-                else:
-                    accumulator.append(chunk)
-
-        finally:
-            await execution_stream.aclose()  # release the execution stream
-
-        async with lock:  # synchronize outputs so only one streams at the same time
-            for chunk in accumulator:
-                output_stream.enqueue(chunk)
-
-    async def _output_stream_execute(
-        self,
-        tool: Tool | None,
-        *,
-        request: ModelToolRequest,
-        lock: Lock,
-        output_stream: AsyncQueue[ModelToolResponse | ProcessingEvent | MultimodalContentPart],
-    ) -> None:
-        async with lock:  # synchronize outputs so only one streams at the same time
-            execution_stream: AsyncGenerator[
-                ModelToolResponse | ProcessingEvent | MultimodalContentPart
-            ] = self._execute(
-                tool,
-                request=request,
-            )
-            try:
-                async for chunk in execution_stream:
-                    output_stream.enqueue(chunk)
-
-            finally:
-                await execution_stream.aclose()  # release the execution stream
+                await tool_stream.aclose()  # release the tool stream
 
     def with_tools(
         self,
@@ -672,3 +604,54 @@ Toolbox.empty = Toolbox(
     suggesting=_no_suggestion,
     meta=Meta.empty,
 )
+
+
+async def _merging_output(  # noqa: C901, PLR0912
+    stream: AsyncGenerator[ModelToolResponse | ProcessingEvent | MultimodalContentPart],
+    /,
+) -> AsyncGenerator[ModelToolResponse | ProcessingEvent | MultimodalContentPart]:
+    # request streaming its output directly - the first one which produced any
+    streaming: str | None = None
+    finished: MutableSet[str] = set()
+    # output of the other requests waiting for their turn, keyed in arrival order
+    pending: dict[str, MutableSequence[MultimodalContentPart]] = {}
+    try:
+        async for chunk in stream:
+            if isinstance(chunk, ProcessingEvent):
+                yield chunk  # events are delivered as they come
+
+            elif isinstance(chunk, ModelToolResponse):
+                yield chunk  # responses are delivered as they come
+                finished.add(chunk.identifier)
+                if chunk.identifier != streaming:
+                    continue  # the streaming request goes on
+
+                # the streaming request ended - deliver the waiting output in order,
+                # the first request still running takes over the streaming
+                streaming = None
+                while pending and streaming is None:
+                    request: str = next(iter(pending))
+                    for part in pending.pop(request):
+                        yield part
+
+                    if request not in finished:
+                        streaming = request
+
+            else:
+                request: str = chunk.meta.get_str("request", default="")
+                if streaming is None:
+                    streaming = request
+
+                if streaming == request:
+                    yield chunk  # stream directly
+
+                else:
+                    pending.setdefault(request, []).append(chunk)
+
+    finally:
+        await stream.aclose()  # release the merged stream
+
+    # everything ended - deliver whatever output is still waiting
+    for output in pending.values():
+        for part in output:
+            yield part

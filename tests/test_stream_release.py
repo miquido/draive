@@ -91,19 +91,21 @@ async def test_tools_handling_releases_pending_tool_when_closed_early() -> None:
 
     async with ctx.scope("test"):
 
-        @tool(handling="output_stream")
+        @tool(handling="output")
         async def endless():
             try:
                 index: int = 0
                 while True:
-                    yield f"chunk-{index}"
+                    yield TextContent.of(f"chunk-{index}")
                     index += 1
                     await sleep(0)
 
             finally:
                 released.append("released")
 
-        stream = Toolbox.of(endless).handle(ModelToolRequest.of("r1", tool="endless", arguments={}))
+        stream = Toolbox.of(endless).handle(
+            (ModelToolRequest.of("r1", tool="endless", arguments={}),)
+        )
 
         received: int = 0
         async for _ in stream:
@@ -136,7 +138,9 @@ async def test_tools_handling_releases_pending_response_tool_when_closed_early()
             finally:
                 released.append("released")
 
-        stream = Toolbox.of(endless).handle(ModelToolRequest.of("r1", tool="endless", arguments={}))
+        stream = Toolbox.of(endless).handle(
+            (ModelToolRequest.of("r1", tool="endless", arguments={}),)
+        )
 
         received: int = 0
         async for _ in stream:
