@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import Any, cast, overload
 from uuid import UUID
 
-from haiway import AttributeRequirement, State
+from haiway import AttributePath, AttributeRequirement, State
 from qdrant_client.models import (
     Condition,
     DatetimeRange,
@@ -15,9 +15,12 @@ from qdrant_client.models import (
     Range,
 )
 
-from draive.utils.attributes import attribute_path_segments
+from draive.utils.attributes import attribute_path_components
 
-__all__ = ("prepare_filter",)
+__all__ = (
+    "prepare_filter",
+    "qdrant_payload_key",
+)
 
 
 @overload
@@ -55,7 +58,7 @@ def _convert[Model: State](  # noqa: PLR0911
             return Filter(
                 must=[
                     _match_condition(
-                        _payload_key(requirements.lhs),
+                        qdrant_payload_key(requirements.lhs),
                         requirements.rhs,
                     )
                 ]
@@ -65,7 +68,7 @@ def _convert[Model: State](  # noqa: PLR0911
             return Filter(
                 must=[
                     FieldCondition(
-                        key=_payload_key(requirements.lhs),
+                        key=qdrant_payload_key(requirements.lhs),
                         match=MatchText(text=requirements.rhs),
                     )
                 ]
@@ -75,7 +78,7 @@ def _convert[Model: State](  # noqa: PLR0911
             return Filter(
                 must_not=[
                     _match_condition(
-                        _payload_key(requirements.lhs),
+                        qdrant_payload_key(requirements.lhs),
                         requirements.rhs,
                     )
                 ]
@@ -85,13 +88,13 @@ def _convert[Model: State](  # noqa: PLR0911
             # 'contained_in' is the only operator built with its operands swapped -
             # `lhs` holds the collection of allowed values, `rhs` holds the path
             return _any_filter(
-                _payload_key(requirements.rhs),
+                qdrant_payload_key(requirements.rhs),
                 cast(Iterable[Any], requirements.lhs),
             )
 
         case "contains_any":
             return _any_filter(
-                _payload_key(requirements.lhs),
+                qdrant_payload_key(requirements.lhs),
                 cast(Iterable[Any], requirements.rhs),
             )
 
@@ -117,19 +120,43 @@ def _convert[Model: State](  # noqa: PLR0911
             return Filter(
                 must=[
                     _match_condition(
-                        _payload_key(requirements.lhs),
+                        qdrant_payload_key(requirements.lhs),
                         requirements.rhs,
                     )
                 ]
             )
 
 
-def _payload_key(
-    path: object,
+def qdrant_payload_key(
+    path: AttributePath[Any, Any],
     /,
 ) -> str:
-    # payloads are stored serialized, attribute aliases have to be applied
-    return ".".join(attribute_path_segments(path))
+    """Render a typed path using Qdrant's payload key syntax.
+
+    Parameters
+    ----------
+    path : AttributePath
+        Model path to resolve against the serialized payload.
+
+    Returns
+    -------
+    str
+        Aliased field names with bracketed sequence indices.
+
+    Raises
+    ------
+    AssertionError
+        If the argument is not an AttributePath.
+    """
+    resolved: str = ""
+    for component in attribute_path_components(path):
+        if isinstance(component, int):
+            resolved += f"[{component}]"
+
+        else:
+            resolved += f".{component}" if resolved else component
+
+    return resolved
 
 
 def _match_condition(

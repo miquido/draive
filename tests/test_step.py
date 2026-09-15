@@ -406,6 +406,70 @@ async def test_volatile_context_and_evaluation_wrappers() -> None:
         )
 
 
+@pytest.mark.asyncio
+async def test_volatile_tools_preserves_state_without_tool_context() -> None:
+    state = (
+        await Step.updating_artifacts(AlphaArtifact(value="kept")).with_volatile_tools().process()
+    )
+
+    assert state.get(AlphaArtifact, required=True).value == "kept"
+
+
+@pytest.mark.asyncio
+async def test_volatile_tools_only_strips_tools_from_added_context() -> None:
+    existing = ModelOutput.of(
+        MultimodalContent.of("existing"),
+        ModelToolRequest.of("existing", tool="lookup", arguments={}),
+    )
+    added = ModelOutput.of(
+        MultimodalContent.of("added"),
+        ModelToolRequest.of("added", tool="lookup", arguments={}),
+    )
+
+    state = await Step.appending_context(added).with_volatile_tools().process((existing,))
+
+    assert state.context[0] is existing
+    assert state.context[0].contains_tools
+    assert isinstance(state.context[1], ModelOutput)
+    assert not state.context[1].contains_tools
+    assert _text_of(state.context[1].content) == "added"
+
+
+@pytest.mark.asyncio
+async def test_context_replacement_accepts_async_callable_instance() -> None:
+    replacement = (ModelInput.of(MultimodalContent.of("replacement")),)
+
+    class ContextProvider:
+        async def __call__(self) -> Sequence[ModelContextElement]:
+            return replacement
+
+    state = await Step.replacing_context(ContextProvider()).process()
+
+    assert state.context == replacement
+
+
+@pytest.mark.asyncio
+async def test_isolated_context_accepts_async_callable_instance() -> None:
+    initial = (ModelInput.of(MultimodalContent.of("initial")),)
+    isolated = (ModelInput.of(MultimodalContent.of("isolated")),)
+    calls = 0
+
+    class ContextProvider:
+        async def __call__(self) -> Sequence[ModelContextElement]:
+            nonlocal calls
+            calls += 1
+            return isolated
+
+    state = (
+        await Step.appending_context(ModelOutput.of(MultimodalContent.of("temporary")))
+        .with_isolated_context(ContextProvider())
+        .process(initial)
+    )
+
+    assert calls == 1
+    assert state.context == initial
+
+
 async def _merge_first(branches: Iterable[StepState]) -> StepState:
     return next(iter(branches))
 
@@ -523,3 +587,65 @@ async def test_concurrent_group_raised_by_branch_keeps_its_own_identity() -> Non
 
     assert "branch group" in str(caught.value)
     assert {type(error) for error in caught.value.exceptions} == {ValueError, KeyError}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("looping", [False, True])
+async def test_tool_output_context_groups_interleaved_requests(
+    monkeypatch: pytest.MonkeyPatch,
+    looping: bool,
+) -> None:
+    from collections.abc import AsyncGenerator, Collection
+
+    from draive.tools import Toolbox
+
+    requests = (
+        ModelToolRequest.of("r1", tool="shared", arguments={}),
+        ModelToolRequest.of("r2", tool="shared", arguments={}),
+    )
+
+    async def handle(
+        self: Toolbox,
+        pending: Collection[ModelToolRequest],
+    ) -> AsyncGenerator[TextContent | ModelToolResponse]:
+        assert tuple(pending) == requests
+        yield TextContent.of("a1", meta={"request": "r2", "tool": "shared"})
+        yield TextContent.of("b1", meta={"request": "r1", "tool": "shared"})
+        yield TextContent.of("a2", meta={"request": "r2", "tool": "shared"})
+        yield TextContent.of("b2", meta={"request": "r1", "tool": "shared"})
+        for request in requests:
+            yield ModelToolResponse(
+                identifier=request.identifier,
+                tool=request.tool,
+                status="success",
+                content=MultimodalContent.empty,
+            )
+
+    monkeypatch.setattr(Toolbox, "handle", handle)
+
+    def generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: Sequence[ModelContextElement],
+        output: Any,
+        **extra: Any,
+    ) -> AsyncIterable[ModelOutputChunk]:
+        return _stream_of(*requests)
+
+    if looping:
+        state = (
+            await Step.looping_completion()
+            .with_ctx(GenerativeModel(generating=generating))
+            .process()
+        )
+    else:
+        state = await Step.handling_tools([]).process((ModelOutput.of(*requests),))
+
+    assert len(state.context) == 3
+    responses = state.context[-2]
+    assert isinstance(responses, ModelInput)
+    assert len(responses.tool_responses) == 2
+    output = state.context[-1]
+    assert isinstance(output, ModelOutput)
+    assert _text_of(output.content) == "a1a2b1b2"

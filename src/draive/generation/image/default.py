@@ -23,7 +23,7 @@ async def generate_image(
         **extra,
     ).run((ModelInput.of(MultimodalContent.of(input)),))
 
-    for image in completion.images():
-        return image  # TODO: consider resource content chunks requiring content merge
+    if images := completion.images():
+        return images[-1]
 
     raise ValueError("Failed to generate a valid image")

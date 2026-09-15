@@ -7,10 +7,10 @@ from collections.abc import (
     Coroutine,
     Iterable,
     Mapping,
+    MutableMapping,
     MutableSequence,
     Sequence,
 )
-from inspect import iscoroutinefunction
 from typing import Any, ClassVar, NoReturn, Protocol, Self, final, overload, runtime_checkable
 
 from haiway import (
@@ -73,6 +73,7 @@ from draive.utils import ProcessingEvent
 
 __all__ = (
     "Step",
+    "StepSelecting",
     "step",
 )
 
@@ -251,7 +252,7 @@ class Step:
         Rationale: explicit context rewrite logic.
         """
 
-        if iscoroutinefunction(context):
+        if callable(context):
 
             async def step(
                 state: StepState,
@@ -637,7 +638,7 @@ class Step:
         ) -> StepStream:
             async with ctx.scope("step.concurrent"):
                 # final states of the branches, keyed by their position
-                results: dict[int, StepState] = {}
+                results: MutableMapping[int, StepState] = {}
 
                 async def branch(
                     index: int,
@@ -821,7 +822,9 @@ class Step:
 
             async with ctx.scope("step.tools.handling"):
                 responses: MutableSequence[ModelToolResponse] = []
-                tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
+                tools_output_accumulator: MutableMapping[
+                    str, MutableSequence[MultimodalContentPart]
+                ] = {}
                 tools_stream: AsyncGenerator[
                     ModelToolResponse | ProcessingEvent | MultimodalContentPart
                 ] = toolbox.handle(tool_requests)
@@ -835,7 +838,9 @@ class Step:
                             yield chunk
 
                         else:
-                            tools_output_accumulator.append(chunk)
+                            tools_output_accumulator.setdefault(
+                                chunk.meta.get_str("request", default=""), []
+                            ).append(chunk)
                             yield chunk
 
                 finally:
@@ -847,7 +852,15 @@ class Step:
                     ctx.log_debug("...tools generated output...")
                     yield state.appending_context(
                         ModelInput.of(*responses),
-                        ModelOutput.of(MultimodalContent.of(*tools_output_accumulator)),
+                        ModelOutput.of(
+                            MultimodalContent.of(
+                                *(
+                                    part
+                                    for parts in tools_output_accumulator.values()
+                                    for part in parts
+                                )
+                            )
+                        ),
                     )
 
                 else:  # regular tools result
@@ -960,7 +973,9 @@ class Step:
                         ctx.log_debug("...handling tool requests...")
 
                         responses: MutableSequence[ModelToolResponse] = []
-                        tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
+                        tools_output_accumulator: MutableMapping[
+                            str, MutableSequence[MultimodalContentPart]
+                        ] = {}
                         tools_stream: AsyncGenerator[
                             ModelToolResponse | ProcessingEvent | MultimodalContentPart
                         ] = toolbox.handle(tool_requests)
@@ -974,7 +989,9 @@ class Step:
                                     yield chunk
 
                                 else:
-                                    tools_output_accumulator.append(chunk)
+                                    tools_output_accumulator.setdefault(
+                                        chunk.meta.get_str("request", default=""), []
+                                    ).append(chunk)
                                     yield chunk
 
                         finally:
@@ -986,7 +1003,15 @@ class Step:
                             ctx.log_debug("...tools generated output...")
                             yield state.appending_context(
                                 ModelInput.of(*responses),
-                                ModelOutput.of(MultimodalContent.of(*tools_output_accumulator)),
+                                ModelOutput.of(
+                                    MultimodalContent.of(
+                                        *(
+                                            part
+                                            for parts in tools_output_accumulator.values()
+                                            for part in parts
+                                        )
+                                    )
+                                ),
                             )
                             break  # end of loop
 
@@ -1311,7 +1336,7 @@ class Step:
         """
         executing: StepExecuting = self._executing
 
-        if iscoroutinefunction(context):
+        if callable(context):
 
             async def step(
                 state: StepState,
@@ -1402,11 +1427,29 @@ class Step:
             try:
                 async for chunk in execution_stream:
                     if isinstance(chunk, StepState):
-                        updated: ModelContext = tuple(  # remove context elements containing tools
-                            element for element in chunk.context if not element.contains_tools
+                        common_prefix_length: int = 0
+                        for previous, current in zip(
+                            state.context,
+                            chunk.context,
+                            strict=False,
+                        ):
+                            if previous != current:
+                                break
+
+                            common_prefix_length += 1
+
+                        updated: ModelContext = (
+                            *chunk.context[:common_prefix_length],
+                            *(
+                                element.without_tools() if element.contains_tools else element
+                                for element in chunk.context[common_prefix_length:]
+                            ),
                         )
                         if chunk.context != updated:
                             yield chunk.updating(context=updated)
+
+                        else:
+                            yield chunk
 
                     else:
                         yield chunk

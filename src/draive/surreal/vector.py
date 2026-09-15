@@ -19,7 +19,6 @@ from draive.surreal.filters import prepare_filter
 from draive.surreal.state import Surreal
 from draive.surreal.types import SurrealException, SurrealObject, SurrealValue
 from draive.surreal.utils import surreal_identifier
-from draive.utils.attributes import attribute_path_segments
 
 __all__ = ("SurrealVectorIndex",)
 
@@ -248,10 +247,7 @@ class SurrealVectorIndex:
                 if score_threshold < -1.0 or score_threshold > 1.0:
                     raise ValueError("COSINE score_threshold has to be within [-1.0, 1.0]")
 
-            scoped_requirements: AttributeRequirement[Model] | None = _content_scoped_requirements(
-                requirements
-            )
-            filter_clause, filter_variables = prepare_filter(scoped_requirements)
+            filter_clause, filter_variables = prepare_filter(requirements, scoped=True)
             where_clause: str = f" WHERE {filter_clause}" if filter_clause else ""
 
             result_limit: int = limit if limit is not None else 8
@@ -376,10 +372,7 @@ class SurrealVectorIndex:
             **extra: Any,
         ) -> None:
             _ = extra
-            scoped_requirements: AttributeRequirement[Model] | None = _content_scoped_requirements(
-                requirements
-            )
-            filter_clause, filter_variables = prepare_filter(scoped_requirements)
+            filter_clause, filter_variables = prepare_filter(requirements, scoped=True)
             await Surreal.execute(
                 f"DELETE {surreal_identifier(model.__name__)}"
                 f"{f' WHERE {filter_clause}' if filter_clause else ''};",
@@ -454,65 +447,3 @@ def _embedding_input(
         raise ValueError(f"{value.mime_type} embedding is not supported")
 
     return value.to_bytes()
-
-
-def _content_scoped_requirements[Model: State](
-    requirements: AttributeRequirement[Model] | None,
-    /,
-) -> AttributeRequirement[Model] | None:
-    if requirements is None:
-        return None
-
-    return _content_scoped_requirement(requirements)
-
-
-def _content_scoped_requirement[Model: State](
-    requirement: AttributeRequirement[Model],
-    /,
-) -> AttributeRequirement[Model]:
-    match requirement.operator:
-        case "and":
-            return _content_scoped_requirement(
-                cast(AttributeRequirement[Model], requirement.lhs)
-            ) & _content_scoped_requirement(cast(AttributeRequirement[Model], requirement.rhs))
-
-        case "or":
-            return _content_scoped_requirement(
-                cast(AttributeRequirement[Model], requirement.lhs)
-            ) | _content_scoped_requirement(cast(AttributeRequirement[Model], requirement.rhs))
-
-        case "contained_in":
-            # 'contained_in' is the only operator built with its operands swapped -
-            # `lhs` holds the collection of allowed values, `rhs` holds the path
-            return cast(
-                AttributeRequirement[Model],
-                AttributeRequirement(
-                    lhs=requirement.lhs,
-                    operator=requirement.operator,
-                    rhs=_content_scoped_path(requirement.rhs),
-                    check=lambda _value: None,
-                ),
-            )
-
-        case _:
-            return cast(
-                AttributeRequirement[Model],
-                AttributeRequirement(
-                    lhs=_content_scoped_path(requirement.lhs),
-                    operator=requirement.operator,
-                    rhs=requirement.rhs,
-                    check=lambda _value: None,
-                ),
-            )
-
-
-def _content_scoped_path(
-    path: Any,
-    /,
-) -> str:
-    # stored documents keep the model under `content` using its serialized keys
-    resolved: str = ".".join(attribute_path_segments(path))
-    if resolved.startswith("content."):
-        return resolved
-
-    return f"content.{resolved}"

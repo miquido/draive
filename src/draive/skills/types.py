@@ -5,7 +5,18 @@ from pathlib import Path, PurePosixPath
 from typing import Annotated, Self, final
 
 import yaml
-from haiway import Directory, Files, Map, Meta, MetaValues, State, Verifier
+from haiway import (
+    Alias,
+    Directory,
+    FileException,
+    Files,
+    Map,
+    Meta,
+    MetaValues,
+    State,
+    ValidationError,
+    Verifier,
+)
 
 from draive.models import ModelInstructions
 from draive.resources import ResourceContent
@@ -15,6 +26,7 @@ from draive.tools.types import Tool
 __all__ = (
     "Skill",
     "SkillException",
+    "SkillLoadingFailed",
     "SkillResource",
     "SkillResourceMissing",
 )
@@ -40,6 +52,30 @@ class SkillException(Exception):
     ) -> None:
         super().__init__(*args)
         self.skill: str = skill
+
+
+@final
+class SkillLoadingFailed(SkillException):
+    """Raised when a skill directory cannot be accessed.
+
+    Parameters
+    ----------
+    source : Path
+        Skill directory that could not be loaded.
+    """
+
+    __slots__ = ("source",)
+
+    def __init__(
+        self,
+        source: Path,
+        /,
+    ) -> None:
+        super().__init__(
+            f"Failed to load skill directory: {source}",
+            skill=source.name or source.absolute().name,
+        )
+        self.source: Path = source
 
 
 @final
@@ -201,46 +237,53 @@ class Skill(State, serializable=True):
 
         Raises
         ------
+        SkillLoadingFailed
+            If the directory or one of its files cannot be accessed.
         ValueError
-            If `path` is not a directory, if `SKILL.md` is missing, or when
-            frontmatter is malformed.
+            If `SKILL.md` is missing or its contents are invalid.
         """
         root_path: Path = Path(path)
         skill_file_path: Path = root_path / "SKILL.md"
         try:
             root_entries = await Files.traverse(root_path)
+            root_files: tuple[Path, ...] = tuple(
+                entry.path for entry in root_entries if not isinstance(entry, Directory)
+            )
+            if skill_file_path not in root_files:
+                raise ValueError(f"Missing SKILL.md in skill directory: {root_path}")
 
-        except NotADirectoryError as exc:
-            raise ValueError(f"Skill path is not a directory: {root_path}") from exc
+            parsed_skill: ParsedSkillFile
+            async with Files.access(skill_file_path) as file:
+                parsed_skill = ParsedSkillFile.from_file((await file.read()).decode("utf-8"))
 
-        root_files: tuple[Path, ...] = tuple(
-            entry.path for entry in root_entries if not isinstance(entry, Directory)
-        )
-        if skill_file_path not in root_files:
-            raise ValueError(f"Missing SKILL.md in skill directory: {root_path}")
-
-        parsed_skill: ParsedSkillFile
-        async with Files.access(skill_file_path) as file:
-            parsed_skill = ParsedSkillFile.from_file((await file.read()).decode("utf-8"))
-
-        resources: MutableSequence[SkillResource] = []
-        for entry in await Files.traverse(root_path, recursive=True):
-            if isinstance(entry, Directory):
-                continue
-
-            file_path: Path = entry.path
-            async with Files.access(file_path) as file:
-                mime_type: str | None
-                mime_type, _ = mimetypes.guess_type(file_path.name)
-                resources.append(
-                    SkillResource.of(
-                        file_path.relative_to(root_path).as_posix(),
-                        content=ResourceContent.of(
-                            await file.read(),
-                            mime_type=mime_type or "application/octet-stream",
-                        ),
-                    )
+            directory_name: str = root_path.name or root_path.absolute().name
+            if parsed_skill.frontmatter.name != directory_name:
+                raise ValueError(
+                    "SKILL.md frontmatter name must match its parent directory: "
+                    f"{parsed_skill.frontmatter.name} != {directory_name}"
                 )
+
+            resources: MutableSequence[SkillResource] = []
+            for entry in await Files.traverse(root_path, recursive=True):
+                if isinstance(entry, Directory):
+                    continue
+
+                file_path: Path = entry.path
+                async with Files.access(file_path) as file:
+                    mime_type: str | None
+                    mime_type, _ = mimetypes.guess_type(file_path.name)
+                    resources.append(
+                        SkillResource.of(
+                            file_path.relative_to(root_path).as_posix(),
+                            content=ResourceContent.of(
+                                await file.read(),
+                                mime_type=mime_type or "application/octet-stream",
+                            ),
+                        )
+                    )
+
+        except FileException as exc:
+            raise SkillLoadingFailed(root_path) from exc
 
         return cls.of(
             name=parsed_skill.frontmatter.name,
@@ -250,6 +293,7 @@ class Skill(State, serializable=True):
             meta=Meta.of(
                 {
                     **parsed_skill.frontmatter.metadata,
+                    **parsed_skill.frontmatter.optional_metadata,
                     "skill_source": str(root_path),
                 }
             ),
@@ -337,8 +381,16 @@ class Skill(State, serializable=True):
         )
         async def load_resource(
             path: str,
-        ) -> str:
-            return self.resource(path).content.to_bytes().decode("utf-8", errors="replace")
+        ) -> str | ResourceContent:
+            content: ResourceContent = self.resource(path).content
+            if _is_textual_mime_type(content.mime_type):
+                try:
+                    return content.to_bytes().decode("utf-8")
+
+                except UnicodeDecodeError:
+                    pass
+
+            return content
 
         return load_resource
 
@@ -359,11 +411,38 @@ def _verified_name(value: str) -> str:
     return value
 
 
+def _verified_description(value: str) -> str:
+    if not (1 <= len(value) <= 1024):  # noqa: PLR2004
+        raise ValueError("SKILL.md frontmatter description must be 1-1024 characters long")
+
+    return value
+
+
+def _verified_compatibility(value: str | None) -> str | None:
+    if value is not None and not (1 <= len(value) <= 500):  # noqa: PLR2004
+        raise ValueError("SKILL.md frontmatter compatibility must be 1-500 characters long")
+
+    return value
+
+
 @final
 class ParsedFrontmatter(State):
     name: Annotated[str, Verifier(_verified_name)]
-    description: str
-    metadata: Meta = Meta.empty
+    description: Annotated[str, Verifier(_verified_description)]
+    license: str | None = None
+    compatibility: Annotated[str | None, Verifier(_verified_compatibility)] = None
+    metadata: Mapping[str, str] = Map()
+    allowed_tools: Annotated[str | None, Alias("allowed-tools")] = None
+
+    @property
+    def optional_metadata(self) -> Meta:
+        return Meta.of(
+            {
+                **({"license": self.license} if self.license is not None else {}),
+                **({"compatibility": self.compatibility} if self.compatibility is not None else {}),
+                **({"allowed-tools": self.allowed_tools} if self.allowed_tools is not None else {}),
+            }
+        )
 
 
 @final
@@ -396,15 +475,21 @@ class ParsedSkillFile(State):
             raise ValueError("SKILL.md frontmatter is not closed")
 
         try:
-            return ParsedSkillFile(
-                frontmatter=ParsedFrontmatter.from_mapping(
-                    yaml.safe_load("\n".join(frontmatter_lines))
-                ),
-                instructions="\n".join(iterator),
-            )
+            frontmatter = yaml.safe_load("\n".join(frontmatter_lines))
 
-        except Exception as exc:
+        except yaml.YAMLError as exc:
             raise ValueError("SKILL.md frontmatter is malformed") from exc
+
+        try:
+            parsed_frontmatter = ParsedFrontmatter.from_mapping(frontmatter)
+
+        except (TypeError, ValueError, ValidationError) as exc:
+            raise ValueError(f"SKILL.md frontmatter is malformed: {exc}") from exc
+
+        return ParsedSkillFile(
+            frontmatter=parsed_frontmatter,
+            instructions="\n".join(iterator),
+        )
 
     frontmatter: ParsedFrontmatter
     instructions: ModelInstructions
@@ -424,3 +509,19 @@ def _normalize_path(path: str) -> str:
             raise ValueError(f"Invalid resource path: {path}")
 
     return str(normalized_path)
+
+
+def _is_textual_mime_type(mime_type: str) -> bool:
+    normalized: str = mime_type.partition(";")[0].lower()
+    return (
+        normalized.startswith("text/")
+        or normalized
+        in {
+            "application/javascript",
+            "application/json",
+            "application/sql",
+            "application/xml",
+            "application/yaml",
+        }
+        or normalized.endswith(("+json", "+xml"))
+    )

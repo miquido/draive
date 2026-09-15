@@ -34,6 +34,7 @@ from draive.gemini.content import (
 from draive.gemini.utils import (
     RATE_LIMIT_STATUS_CODE,
     combined_input_tokens,
+    quota_limit,
     speech_config,
     thinking_config,
     unwrap_missing,
@@ -177,6 +178,7 @@ class GeminiLive(GeminiAPI):
                                 provider="gemini",
                                 model=config.model,
                                 retry_after=None,
+                                quota_limit=quota_limit(exc),
                             ) from exc
 
                         raise ModelOutputFailed(

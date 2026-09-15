@@ -235,3 +235,51 @@ async with ctx.scope(  # prepare the context and see the execution metrics repor
 ```
 
 The more advanced usage and use cases can be explored in other notebooks.
+
+## Rate limits and model quota
+
+Generation adapters distinguish temporary throttling (`ModelRateLimit`) from explicit quota or
+access restrictions (`ModelQuotaLimit`). `ModelQuotaLimit` is a separate `ModelException`, so a
+handler that catches `ModelRateLimit` will not retry it. It carries `provider`, `model`, and `reason`
+and records a `model.quota_limit` warning event without a retry delay.
+
+Mistral chat completions classify HTTP 429 with `x-ratelimit-limit-req-minute: 0` as a quota limit.
+Check the affected model's access and quota, or explicitly select another model. A successful model
+listing does not establish that every listed model is usable. A zero *remaining* count with a
+positive limit is ordinary throttling. Ordinary Mistral 429 responses honor a numeric `Retry-After`
+header, with a short randomized delay when the header is absent or unparseable.
+
+OpenAI and vLLM also recognize `insufficient_quota` and `billing_hard_limit_reached` error codes.
+Their request/token capacity headers, and Anthropic's request/token capacity headers, are checked
+for explicit zero limits. Responses without a recognized quota signal remain `ModelRateLimit`;
+HTTP 429 alone cannot establish an entitlement restriction. Gemini generation and live sessions
+also recognize explicit zero `quotaValue` capacity in structured `QuotaFailure` details; missing
+values and unstructured messages do not establish zero capacity. Other provider paths retain their
+existing error classification.
+
+Retry throttling a bounded number of times and let quota failures reach the caller:
+
+```python
+from draive import ModelRateLimit, TextGeneration, ctx
+from draive.mistral import Mistral, MistralChatConfig
+
+async def generate_with_retry(model: str) -> str:
+    async with ctx.scope(
+        "generation",
+        MistralChatConfig(model=model),
+        disposables=(Mistral(),),
+    ):
+        # Retry once; ModelQuotaLimit propagates directly to the caller.
+        try:
+            return await TextGeneration.generate(
+                instructions="Answer briefly.", input="What is structured concurrency?"
+            )
+        except ModelRateLimit as exc:
+            await exc.wait()
+            return await TextGeneration.generate(
+                instructions="Answer briefly.", input="What is structured concurrency?"
+            )
+```
+
+Choose fallback models explicitly and validate their output against your application's schemas.
+Draive does not automatically switch Mistral model families when a quota failure occurs.

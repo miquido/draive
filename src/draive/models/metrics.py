@@ -1,10 +1,10 @@
 import random
-from collections.abc import Sequence
 
 from haiway import Missing, ObservabilityAttribute, ctx
 
 from draive.models.types import (
     ModelOutputSelection,
+    ModelQuotaLimit,
     ModelRateLimit,
     ModelTools,
     ModelToolSpecification,
@@ -26,10 +26,7 @@ def record_model_invocation(
     model: str,
     tools: ModelTools,
     output: ModelOutputSelection,
-    temperature: float | Missing | None = None,
-    max_output_tokens: int | Missing | None = None,
-    stop_sequences: Sequence[str] | Missing | None = None,
-    **other: ObservabilityAttribute,
+    **other: ObservabilityAttribute | Missing | None,
 ) -> None:
     model_output: str
     if isinstance(output, type):
@@ -49,12 +46,9 @@ def record_model_invocation(
         attributes={
             "model.provider": provider,
             "model.name": model,
-            "model.temperature": temperature,
-            "model.max_output_tokens": max_output_tokens,
             "model.tools": [tool.name for tool in tools.specification],
             "model.tools.selection": model_tools_selection,
             "model.output": model_output,
-            "model.stop_sequences": stop_sequences,
             **{f"model.{key}": value for key, value in other.items()},
         }
     )
@@ -65,7 +59,9 @@ def model_rate_limit(
     provider: str,
     model: str,
     retry_after: str | float | None,
-) -> ModelRateLimit:
+    error_code: str | None = None,
+    quota_limit: int | None = None,
+) -> ModelRateLimit | ModelQuotaLimit:
     """Record a rate limit event and build the matching exception.
 
     Every provider reports rate limiting differently, recording it through a single
@@ -73,34 +69,65 @@ def model_rate_limit(
 
     Parameters
     ----------
-    provider
+    provider : str
         Provider identifier that applied the limit.
-    model
+    model : str
         Provider model identifier affected by the limit.
-    retry_after
+    retry_after : str | float | None
         Delay before a retry, either already resolved or as reported by the provider.
         A missing or unparseable value falls back to a randomized short delay, which
         spreads retries of concurrent requests instead of aligning them.
+    error_code : str | None, default=None
+        Structured provider error code, used to recognize exhausted quota.
+    quota_limit : int | None, default=None
+        Enforced capacity from structured quota failure details, when available.
+        An explicit zero is a quota failure regardless of a reported retry delay.
 
     Returns
     -------
-    ModelRateLimit
-        Exception to raise for the recorded limit.
+    ModelRateLimit | ModelQuotaLimit
+        Exception to raise for the recorded limit. Explicit quota failures have no
+        retry delay and are not subclasses of ``ModelRateLimit``.
     """
-    delay: float
+    reason: str | None = None
+    if quota_limit == 0:
+        reason = "Provider reported zero quota capacity"
+
+    elif error_code in ("insufficient_quota", "billing_hard_limit_reached"):
+        reason = f"Provider reported {error_code}"
+
+    if reason is not None:
+        ctx.record_warning(
+            event="model.quota_limit",
+            attributes={
+                "model.provider": provider,
+                "model.name": model,
+                "model.quota_limit.reason": reason,
+            },
+        )
+        return ModelQuotaLimit(
+            provider=provider,
+            model=model,
+            reason=reason,
+        )
+
+    delay: float | None
     match retry_after:
-        case None:
-            delay = random.uniform(0.3, 3.0)  # nosec: B311
+        case float() as retry_delay:
+            delay = retry_delay
 
-        case float() | int() as resolved:
-            delay = float(resolved)
+        case int() as convertable:
+            delay = float(convertable)
 
-        case reported:
+        case str() as described:
             try:
-                delay = float(reported)
+                delay = float(described)
 
             except ValueError:
-                delay = random.uniform(0.3, 3.0)  # nosec: B311
+                delay = None
+
+        case _:
+            delay = None
 
     ctx.record_warning(
         event="model.rate_limit",
@@ -114,7 +141,7 @@ def model_rate_limit(
     return ModelRateLimit(
         provider=provider,
         model=model,
-        retry_after=delay,
+        retry_after=delay if delay is not None else random.uniform(0.3, 3.0),  # nosec: B311
     )
 
 

@@ -416,15 +416,14 @@ class AgentMemory(State):
 
 
 def _current_thread() -> AgentThread:
-    # absence is checked explicitly to raise a domain-specific error instead of
-    # whatever ctx.state raises for a type without defaultable fields
-    if not ctx.contains_state(AgentThread):
+    try:
+        return ctx.state(AgentThread)
+
+    except Exception:
         raise AgentException(
             "AgentThread is not available in the current context - memory operations require"
             " an active agent thread bound in scope, e.g. by running within an Agent."
-        )
-
-    return ctx.state(AgentThread)
+        ) from None
 
 
 async def _prepare(

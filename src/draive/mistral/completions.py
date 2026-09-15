@@ -3,6 +3,7 @@ from collections.abc import Generator, Iterable
 from typing import Any, cast
 
 from haiway import Meta, ctx, unwrap_missing
+from mistralai.client.errors import MistralError
 from mistralai.client.models import (
     ChatCompletionStreamRequestMessageTypedDict,
     ChatCompletionStreamRequestToolChoiceTypedDict,
@@ -244,11 +245,26 @@ class MistralCompletions(MistralAPI):
                 raise exc
 
             except Exception as exc:
-                if getattr(exc, "status_code", None) == RATE_LIMIT_STATUS_CODE:
+                if isinstance(exc, MistralError) and exc.status_code == RATE_LIMIT_STATUS_CODE:
+                    quota_capacity: int | None = None
+                    for header in ("x-ratelimit-limit-req-minute",):
+                        value = exc.headers.get(header)
+                        if value is None:
+                            continue
+
+                        try:
+                            if float(value) == 0:
+                                quota_capacity = 0
+                                break
+
+                        except ValueError:
+                            continue
+
                     raise model_rate_limit(
                         provider="mistral",
                         model=config.model,
-                        retry_after=None,
+                        retry_after=exc.headers.get("Retry-After"),
+                        quota_limit=quota_capacity,
                     ) from exc
 
                 raise ModelOutputFailed(

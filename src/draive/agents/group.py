@@ -1,18 +1,15 @@
 from collections.abc import (
     AsyncGenerator,
-    Collection,
     Mapping,
     MutableMapping,
-    MutableSet,
-    Set,
 )
 from typing import Any, NoReturn, Self, final
 from uuid import UUID
 
-from haiway import Meta, MetaValues
+from haiway import Map, Meta, MetaValues
 
 from draive.agents.agent import Agent
-from draive.agents.types import AgentException, AgentIdentity, AgentUnavailable
+from draive.agents.types import AgentException, AgentIdentity, AgentMessage, AgentUnavailable
 from draive.models.types import ModelToolHandling
 from draive.multimodal import Multimodal, MultimodalContentPart
 from draive.tools import Tool, ToolOutputChunk, tool
@@ -23,7 +20,7 @@ __all__ = ("AgentsGroup",)
 
 @final
 class AgentsGroup:
-    """Immutable registry of declared and bound agents.
+    """Registry of agents indexed by stable URI, supporting replacement.
 
     The group provides direct lookup by agent name or URI and can expose the
     registered agents as tools for model-driven delegation.
@@ -35,7 +32,7 @@ class AgentsGroup:
         *agents: Agent | AgentIdentity,
         meta: Meta | MetaValues | None = None,
     ) -> Self:
-        """Create an agent group indexed by agent name.
+        """Create an agent group indexed by agent URI.
 
         Parameters
         ----------
@@ -52,98 +49,70 @@ class AgentsGroup:
         Raises
         ------
         ValueError
-            Raised when duplicate agent names are provided.
+            Raised when duplicate or ambiguous agent names or URIs are provided.
         """
 
-        declared: MutableSet[AgentIdentity] = set()
         available: MutableMapping[str, Agent] = {}
-        for agent in agents:
-            if isinstance(agent, AgentIdentity):
-                if agent in declared:
-                    raise ValueError(f"Agent `{agent}` is already defined")
-
-                if agent.uri in available:
-                    raise ValueError(f"Agent `{agent.uri}` is already defined")
-
-                if agent.name in available:
-                    raise ValueError(f"Agent `{agent.name}` is already defined")
-
-                declared.add(agent)
+        for agent_or_identity in agents:
+            agent: Agent
+            if isinstance(agent_or_identity, AgentIdentity):
+                agent = Agent(
+                    identity=agent_or_identity,
+                    executing=_undefined_agent,
+                )
 
             else:
-                if agent.identity in declared:
-                    raise ValueError(f"Agent `{agent}` is already defined")
+                assert isinstance(agent_or_identity, Agent)  # nosec: B101
+                agent = agent_or_identity
 
-                if agent.identity.uri in available:
-                    raise ValueError(f"Agent `{agent.identity.uri}` is already defined")
+            if agent.identity.uri in available:
+                raise ValueError(f"Agent `{agent.identity.uri}` is already defined")
 
-                if agent.identity.name in available:
-                    raise ValueError(f"Agent `{agent.identity.name}` is already defined")
-
-                declared.add(agent.identity)
-                # associate both uri and name with the agent
-                available[agent.identity.uri] = agent
-                available[agent.identity.name] = agent
+            available[agent.identity.uri] = agent
 
         return cls(
-            declared=declared,
-            available=available,
+            agents=available,
             meta=Meta.of(meta),
         )
 
     __slots__ = (
-        "_available",
-        "_declared",
+        "_agents",
+        "_names",
         "meta",
     )
 
     def __init__(
         self,
-        available: Mapping[str, Agent],
-        declared: Set[AgentIdentity] | None = None,
+        agents: Mapping[str, Agent],
         meta: Meta = Meta.empty,
     ) -> None:
-        """Initialize an agent group from explicit declarations and bindings.
+        """Initialize an agent group from agents indexed by URI.
 
         Parameters
         ----------
-        available : Mapping[str, Agent]
-            Concrete agents indexed by agent URI and/or name.
-        declared : Set[AgentIdentity] | None, default=None
-            Full set of identities allowed in this group. When omitted, the
-            identities are inferred from ``available``.
+        agents : Mapping[str, Agent]
+            Concrete or placeholder agents indexed by their identity URI.
         meta : Meta, default=Meta.empty
             Metadata attached to the group itself.
 
         Raises
         ------
-        AssertionError
-            Raised in debug mode when any bound agent identity is missing from
-            the declared set.
+        ValueError
+            Raised when keys differ from identity URIs or names are ambiguous.
         """
-        self._declared: Collection[AgentIdentity]
-        if declared is None:
-            object.__setattr__(
-                self,
-                "_declared",
-                frozenset(element.identity for element in available.values()),
-            )
-
-        else:
-            object.__setattr__(
-                self,
-                "_declared",
-                frozenset(declared),
-            )
-
-        assert all(element.identity in self._declared for element in available.values())  # nosec: B101
-
-        self._available: Mapping[str, Agent]
+        self._agents: Mapping[str, Agent]
         object.__setattr__(
             self,
-            "_available",
-            available,
+            "_agents",
+            Map(agents),  # make a copy
         )
+        self._names: Mapping[str, str]
+        object.__setattr__(
+            self,
+            "_names",
+            Map({agent.identity.name: agent.identity.uri for agent in agents.values()}),
+        )
+        assert len(self._agents) == len(self._names)  # nosec: B101
         self.meta: Meta
         object.__setattr__(
             self,
@@ -155,48 +124,64 @@ class AgentsGroup:
         self,
         agent: Agent,
     ) -> None:
-        """Bind a concrete agent to an existing placeholder entry.
+        """Bind a concrete agent to an existing entry.
 
         Parameters
         ----------
         agent : Agent
-            Agent instance whose name must match a placeholder defined when the
-            group was created.
+            Agent instance whose URI must match an existing entry. Both
+            placeholders and concrete agents can be replaced.
 
         Returns
         -------
         None
-            This method updates the internal placeholder mapping in place.
+            This method replaces the registered agent in place.
 
         Raises
         ------
         AgentException
-            Raised when the agent name was not predeclared in the group or when
-            a concrete agent is already bound under that name.
+            Raised when the URI was not declared or the name conflicts with
+            another registered agent's name or URI.
         """
-        if agent.identity not in self._declared:
+        if agent.identity.uri not in self._agents:
             raise AgentException("AgentGroup agents can't be extended")
 
-        matching: Agent | None = self._available.get(
-            agent.identity.uri,
-            self._available.get(
-                agent.identity.name,
-            ),
-        )
+        matching = self._resolve(agent.identity.name)
+        if matching is not None and matching.identity.uri != agent.identity.uri:
+            raise AgentException(f"Agent `{agent.identity.name}` is already defined")
 
-        if matching is not None:
-            raise AgentException("AgentGroup agents can't be redefined")
+        names = dict(self._names)
+        del names[self._agents[agent.identity.uri].identity.name]
+        names[agent.identity.name] = agent.identity.uri
 
         object.__setattr__(
             self,
-            "_available",
-            {
-                **self._available,
-                # associate both uri and name with the agent
-                agent.identity.uri: agent,
-                agent.identity.name: agent,
-            },
+            "_agents",
+            Map(
+                {
+                    **self._agents,
+                    agent.identity.uri: agent,
+                }
+            ),
         )
+        object.__setattr__(
+            self,
+            "_names",
+            Map(names),
+        )
+        assert len(self._agents) == len(self._names)  # nosec: B101
+
+    def _resolve(
+        self,
+        reference: str,
+    ) -> Agent | None:
+        if selected := self._agents.get(reference):
+            return selected
+
+        if uri := self._names.get(reference):
+            return self._agents[uri]
+
+        return None
 
     async def call(
         self,
@@ -229,7 +214,7 @@ class AgentsGroup:
         AgentUnavailable
             Raised when the referenced agent name is not defined in the group.
         """
-        if selected := self._available.get(agent):
+        if selected := self._resolve(agent):
             agent_stream: AsyncGenerator[MultimodalContentPart | ProcessingEvent] = selected.call(
                 thread=thread,
                 input=input,
@@ -293,26 +278,26 @@ class AgentsGroup:
         if description is None:
             match handling:
                 case "response":
-                    description = "Request the selected agent to perform a task for you.\n"
+                    description = "Request one of available agents to perform a task for you:\n"
                     description += "\n".join(
-                        f'<agent name="{identity.name}">{identity.description}</agent>'
-                        for identity in self._declared
+                        f'<agent name="{agent.identity.name}">{agent.identity.description}</agent>'
+                        for agent in self._agents.values()
                     )
 
                 case "output":
-                    description = "Hand over your task to the selected agent.\n"
+                    description = "Hand over your task to one of available agents:\n"
                     description += "\n".join(
-                        f'<agent name="{identity.name}">{identity.description}</agent>'
-                        for identity in self._declared
+                        f'<agent name="{agent.identity.name}">{agent.identity.description}</agent>'
+                        for agent in self._agents.values()
                     )
 
         task_description: str
         match handling:
             case "response":
-                task_description = "Task to be performed by the agent"
+                task_description = "Task to be performed by the selected agent"
 
             case "output":
-                task_description = "Task to be handed over to the agent"
+                task_description = "Task to be handed over to the selected agent"
 
         @tool(
             name=name,
@@ -322,7 +307,7 @@ class AgentsGroup:
                 "properties": {
                     "agent": {
                         "type": "string",
-                        "enum": tuple(identity.name for identity in self._declared),
+                        "enum": tuple(agent.identity.name for agent in self._agents.values()),
                         "description": "Selected agent name",
                     },
                     "task": {
@@ -343,7 +328,7 @@ class AgentsGroup:
             agent: str,
             task: str,
         ) -> AsyncGenerator[ToolOutputChunk]:
-            if selected := self._available.get(agent):
+            if selected := self._resolve(agent):
                 agent_stream: AsyncGenerator[MultimodalContentPart | ProcessingEvent] = (
                     selected.call(input=task)
                 )
@@ -377,3 +362,10 @@ class AgentsGroup:
             f"Can't modify immutable {self.__class__.__qualname__},"
             f" attribute - '{name}' cannot be deleted"
         )
+
+
+async def _undefined_agent(
+    message: AgentMessage,
+) -> AsyncGenerator[MultimodalContentPart | ProcessingEvent]:
+    raise AgentUnavailable("Agent execution method undefined!")
+    yield  # converts to AsyncGenerator

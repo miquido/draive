@@ -54,6 +54,7 @@ __all__ = (
     "ModelOutputLimit",
     "ModelOutputSelection",
     "ModelOutputStream",
+    "ModelQuotaLimit",
     "ModelRateLimit",
     "ModelReasoning",
     "ModelReasoningChunk",
@@ -177,8 +178,43 @@ class ModelOutputInvalid(ModelException):
 
 
 @final
+class ModelQuotaLimit(ModelException):
+    """Raised when model access or quota requires intervention before retrying.
+
+    This exception is separate from ``ModelRateLimit`` so retry handlers do not
+    repeatedly wait for capacity that the provider has not allocated.
+
+    Parameters
+    ----------
+    provider
+        Provider identifier that rejected the request.
+    model
+        Provider model identifier affected by the quota.
+    reason
+        Safe description of the explicit quota or entitlement signal.
+    """
+
+    __slots__ = ("reason",)
+
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model: str,
+        reason: str,
+    ) -> None:
+        super().__init__(
+            f"Quota limit for {model} by {provider}: {reason}; "
+            "check model access, billing, or quota before retrying",
+            provider=provider,
+            model=model,
+        )
+        self.reason: str = reason
+
+
+@final
 class ModelRateLimit(ModelException):
-    """Raised when a provider applies rate limiting.
+    """Raised when a provider applies retryable rate limiting.
 
     Parameters
     ----------

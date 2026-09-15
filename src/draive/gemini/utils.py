@@ -1,14 +1,16 @@
 from collections.abc import Callable
-from typing import cast, overload
+from typing import Any, cast, overload
 
+from google.genai.errors import APIError
 from google.genai.types import SpeechConfigDict, ThinkingConfigDict, ThinkingLevel
-from haiway import MISSING, Missing
+from haiway import MISSING, BasicValue, Missing
 
 from draive.gemini.config import GeminiConfig
 
 __all__ = (
     "RATE_LIMIT_STATUS_CODE",
     "combined_input_tokens",
+    "quota_limit",
     "speech_config",
     "thinking_config",
     "unwrap_missing",
@@ -145,3 +147,55 @@ def _resolve_thinking_level(
 
         case _:
             raise ValueError(f"Unsupported thinking level: {level}")
+
+
+def quota_limit(error: APIError) -> int | None:
+    """Read the smallest enforced capacity from a Gemini quota failure.
+
+    Parameters
+    ----------
+    error
+        SDK error containing decoded JSON details.
+
+    Returns
+    -------
+    int | None
+        Smallest explicitly reported nonnegative quota, or None when unavailable.
+        Missing values are not interpreted as zero.
+    """
+    # The SDK exposes decoded JSON as Any; only structured QuotaFailure entries
+    # establish capacity. Missing quotaValue must never be interpreted as zero.
+    details: BasicValue = cast(Any, error).details
+    match details:
+        case {"error": {"details": list() as entries}} | {"details": list() as entries}:
+            pass
+
+        case _:
+            return None
+
+    limit: int | None = None
+    for entry in entries:
+        match entry:
+            case {
+                "@type": "type.googleapis.com/google.rpc.QuotaFailure" | "google.rpc.QuotaFailure",
+                "violations": list() as violations,
+            }:
+                for violation in violations:
+                    match violation:
+                        case {"quotaValue": str() | int() as value} if not isinstance(value, bool):
+                            try:
+                                resolved = int(value)
+
+                            except ValueError:
+                                continue
+
+                            if resolved >= 0:
+                                limit = resolved if limit is None else min(limit, resolved)
+
+                        case _:
+                            continue
+
+            case _:
+                continue
+
+    return limit

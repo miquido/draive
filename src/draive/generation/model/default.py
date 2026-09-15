@@ -89,7 +89,7 @@ async def generate_model[Generated: State](
 
         elif artifacts := completion.artifacts(category="json"):
             ctx.log_debug("...direct artifact found!")
-            return artifacts[0].to_state(generated)
+            return artifacts[-1].to_state(generated)
 
         else:  # fallback to default decoding
             ctx.log_debug("...decoding result...")

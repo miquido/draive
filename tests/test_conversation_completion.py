@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable, Sequence
+from collections.abc import AsyncGenerator, AsyncIterable, Collection, Sequence
 from typing import Any
 
 import pytest
@@ -14,10 +14,11 @@ from draive.models import (
     ModelOutput,
     ModelOutputChunk,
     ModelToolRequest,
+    ModelToolResponse,
     ModelTools,
 )
 from draive.multimodal import MultimodalContent, TextContent
-from draive.tools import tool
+from draive.tools import Toolbox, tool
 
 
 async def _single_text_chunk(text: str) -> AsyncIterable[ModelOutputChunk]:
@@ -165,6 +166,71 @@ async def test_conversation_completion_output_tool_stops_loop_and_persists_outpu
     assert context[2].tool_responses[0].identifier == "call-1"
     assert isinstance(context[3], ModelOutput)
     assert context[3].content.to_str() == "OUT:x"
+
+
+@pytest.mark.asyncio
+async def test_conversation_completion_groups_interleaved_tool_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requests = (
+        ModelToolRequest.of("r1", tool="shared", arguments={}),
+        ModelToolRequest.of("r2", tool="shared", arguments={}),
+    )
+
+    async def handle(
+        self: Toolbox,
+        pending: Collection[ModelToolRequest],
+    ) -> AsyncGenerator[TextContent | ModelToolResponse]:
+        assert tuple(pending) == requests
+        yield TextContent.of("a1", meta={"request": "r2"})
+        yield TextContent.of("b1", meta={"request": "r1"})
+        yield TextContent.of("a2", meta={"request": "r2"})
+        yield TextContent.of("b2", meta={"request": "r1"})
+        for request in requests:
+            yield ModelToolResponse(
+                identifier=request.identifier,
+                tool=request.tool,
+                status="success",
+                content=MultimodalContent.empty,
+            )
+
+    monkeypatch.setattr(Toolbox, "handle", handle)
+
+    def mock_generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: Sequence[ModelContextElement],
+        output: str | type | Sequence[str],
+        **extra: Any,
+    ) -> AsyncIterable[ModelOutputChunk]:
+        return _stream_of(*requests)
+
+    memory = ConversationMemory.volatile()
+    async with ctx.scope(
+        "test",
+        GenerativeModel(generating=mock_generating),
+        Conversation(),
+    ):
+        chunks = [
+            chunk
+            async for chunk in Conversation.completion(
+                message="Hi",
+                tools=Toolbox.empty,
+                memory=memory,
+            )
+        ]
+
+    assert (
+        MultimodalContent.of(
+            *(chunk for chunk in chunks if isinstance(chunk, TextContent))
+        ).to_str()
+        == "a1b1a2b2"
+    )
+    context = await memory.recall()
+    output = context[-1]
+    assert isinstance(output, ModelOutput)
+    assert output.content.to_str() == "a1a2b1b2"
 
 
 @pytest.mark.asyncio
