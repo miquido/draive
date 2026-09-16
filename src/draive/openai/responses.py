@@ -312,10 +312,29 @@ class OpenAIResponses(OpenAIAPI):
                                 continue  # skip other events
 
             except OpenAIRateLimitError as exc:
+                quota_capacity: int | None = None
+                for header in (
+                    "x-ratelimit-limit-requests",
+                    "x-ratelimit-limit-tokens",
+                ):
+                    value = exc.response.headers.get(header)
+                    if value is None:
+                        continue
+
+                    try:
+                        if float(value) == 0:
+                            quota_capacity = 0
+                            break
+
+                    except ValueError:
+                        continue
+
                 raise model_rate_limit(
                     provider="openai",
                     model=config.model,
                     retry_after=exc.response.headers.get("Retry-After"),
+                    quota_limit=quota_capacity,
+                    error_code=exc.code or exc.type,
                 ) from exc
 
             except ModelException as exc:

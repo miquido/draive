@@ -93,3 +93,20 @@ Any step can be wrapped without breaking composition:
 - `step.with_suppressed_output()` for muting emitted chunks.
 - `step.with_context_evaluation(...)` and `step.with_output_evaluation(...)` for evaluating context
     and emitted output.
+
+`with_volatile_tools()` preserves the context passed into the wrapped step. In context added or
+replaced by the step, it removes tool request and response blocks while retaining any ordinary
+content stored in the same context elements.
+
+## Extending Steps
+
+The callable protocols used by `Step` are public when custom orchestration needs explicit type
+annotations. Import them from `draive` (or `draive.steps`):
+
+```python
+from draive import StepExecuting, StepMerging, StepProcessing, StepSelecting
+```
+
+`StepExecuting` describes the low-level streaming interface accepted by `Step(...)`.
+`StepProcessing` describes state-only functions accepted by the `@step` decorator. The remaining
+protocols describe the callbacks accepted by composition and modifier methods.

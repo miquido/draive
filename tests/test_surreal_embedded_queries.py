@@ -10,10 +10,7 @@ from draive.surreal import SurrealClient
 from draive.surreal.filters import prepare_filter
 from draive.surreal.state import Surreal, SurrealSession
 from draive.surreal.templates import _fetch_template_rows  # pyright: ignore[reportPrivateUsage]
-from draive.surreal.types import SurrealObject, SurrealValue
-from draive.surreal.vector import (
-    _content_scoped_requirements,  # pyright: ignore[reportPrivateUsage]
-)
+from draive.surreal.types import SurrealObject
 
 """Regression tests running against the bundled embedded SurrealDB engine.
 
@@ -241,16 +238,10 @@ async def test_vector_index_requirements_are_scoped_to_the_content_field() -> No
     turned the collection of values into a path string and made the whole
     requirement unusable.
     """
-    scoped: AttributeRequirement[_Item] | None = _content_scoped_requirements(
-        AttributeRequirement[_Item].contained_in((1, 2), _Item._.amount)
+    filter_clause, filter_variables = prepare_filter(
+        AttributeRequirement[_Item].contained_in((1, 2), _Item._.amount),
+        scoped=True,
     )
-    assert scoped is not None
-    assert scoped.lhs == (1, 2)
-    assert str(scoped.rhs) == "content.amount"
-
-    filter_clause: str
-    filter_variables: Mapping[str, SurrealValue]
-    filter_clause, filter_variables = prepare_filter(scoped)
     assert filter_clause == "content.amount INSIDE $_f0"
 
     async with _embedded_session() as session:

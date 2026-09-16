@@ -23,7 +23,7 @@ async def generate_audio(
         **extra,
     ).run((ModelInput.of(MultimodalContent.of(input)),))
 
-    for audio in completion.audio():
-        return audio  # TODO: consider resource content chunks requiring content merge
+    if audio := completion.audio():
+        return audio[-1]
 
     raise ValueError("Failed to generate a valid audio")

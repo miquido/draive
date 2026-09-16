@@ -44,26 +44,20 @@ Current Draive parsing behavior:
 
 - `name` is required and must match `^[a-z0-9]+(?:-[a-z0-9]+)*$` with length `1..64`.
 - `description` is required.
-- `metadata` is optional and merged into `skill.meta`.
+- `description` must contain `1..1024` characters.
+- `metadata` is optional, must map string keys to string values, and is merged into
+    `skill.meta`.
+- `license`, `compatibility`, and `allowed-tools` are accepted and exposed through
+    `skill.meta` under their original field names. `compatibility`, when provided, must
+    contain `1..500` characters.
 - Unknown top-level frontmatter fields raise an error.
-
-This means optional Agent Skills spec fields like `license`, `compatibility`, and `allowed-tools` are currently not accepted by Draive's parser.
 
 ## Spec Compatibility Notes
 
-Compared to the Agent Skills spec, Draive currently enforces a strict subset:
-
-- Strictly required: `name`, `description`.
-- Supported optional field: `metadata`.
-- Not supported as top-level fields: `license`, `compatibility`, `allowed-tools`.
-- `name` character constraints are enforced.
-- `name` matching parent directory is not enforced.
-
-If you need maximum Draive compatibility today, keep frontmatter limited to:
-
-- `name`
-- `description`
-- `metadata`
+Draive validates the standard `name`, `description`, `compatibility`, and `metadata`
+constraints. The frontmatter `name` has to match the parent directory name. Optional
+`license`, `compatibility`, and experimental `allowed-tools` fields are retained as metadata;
+Draive does not otherwise interpret them.
 
 ## Loading Skills
 
@@ -88,10 +82,12 @@ print(skill.meta["skill_source"])  # path the skill was loaded from
 - the provided path is a directory,
 - `SKILL.md` exists,
 - frontmatter structure and required fields are valid,
+- the frontmatter name matches the skill directory name,
 - resource paths stay within the skill root.
 
-Besides the frontmatter `metadata` entries, `skill.meta` carries `skill_source` - the directory the
-skill was loaded from.
+Besides the frontmatter `metadata` and supported optional entries, `skill.meta` carries
+`skill_source` - the directory the skill was loaded from. Filesystem access failures raise
+`SkillLoadingFailed`, with the source directory and derived skill identifier attached.
 
 ## Accessing Bundled Resources
 
@@ -131,7 +127,9 @@ async with ctx.scope(
 
 `Agent.from_skill(...)` uses the skill instructions as agent instructions, derives the agent
 identity from the skill `name`, `description` and `meta`, and automatically adds a
-`read_resource(path)` tool that lets the model read bundled files by relative path during execution.
+`read_resource(path)` tool that lets the model read bundled files by relative path during
+execution. UTF-8 text resources are returned as text; binary resources are returned as typed
+`ResourceContent` so their original bytes and media type are preserved.
 
 It also accepts the remaining `Agent.generative(...)` configuration:
 

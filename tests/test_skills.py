@@ -4,7 +4,7 @@ import pytest
 
 from draive import ctx
 from draive.resources import ResourceContent
-from draive.skills import Skill, SkillResource, SkillResourceMissing
+from draive.skills import Skill, SkillLoadingFailed, SkillResource, SkillResourceMissing
 
 
 def test_skill_resource_lookup_uses_normalized_paths() -> None:
@@ -73,6 +73,9 @@ async def test_skill_from_directory_loads_frontmatter_and_resources(
         "metadata:\n"
         "  author: example-org\n"
         '  version: "1.0"\n'
+        "license: Apache-2.0\n"
+        "compatibility: Requires Python 3.14 or newer.\n"
+        "allowed-tools: Read Bash(git:*)\n"
         "---\n"
         "# CSV Analysis\n"
         "\n"
@@ -90,6 +93,9 @@ async def test_skill_from_directory_loads_frontmatter_and_resources(
     assert skill.description == "Use this skill when analyzing csv files."
     assert skill.meta["author"] == "example-org"
     assert skill.meta["version"] == "1.0"
+    assert skill.meta["license"] == "Apache-2.0"
+    assert skill.meta["compatibility"] == "Requires Python 3.14 or newer."
+    assert skill.meta["allowed-tools"] == "Read Bash(git:*)"
     assert skill.instructions is not None
     assert "Quick Start" in skill.instructions
     assert skill.has_resource("SKILL.md")
@@ -105,8 +111,20 @@ async def test_skill_from_directory_raises_when_skill_manifest_is_missing(
     skill_root.mkdir(parents=True)
 
     async with ctx.scope("test"):
-        with pytest.raises((ValueError, FileNotFoundError)):
+        with pytest.raises(ValueError):
             await Skill.from_directory(skill_root)
+
+
+@pytest.mark.asyncio
+async def test_skill_from_directory_translates_file_access_failures(tmp_path: Path) -> None:
+    skill_root = tmp_path / "missing-skill"
+
+    async with ctx.scope("test"):
+        with pytest.raises(SkillLoadingFailed) as exc_info:
+            await Skill.from_directory(skill_root)
+
+    assert exc_info.value.skill == "missing-skill"
+    assert exc_info.value.source == skill_root
 
 
 @pytest.mark.asyncio
@@ -126,7 +144,7 @@ async def test_skill_from_directory_requires_frontmatter(
 async def test_skill_from_directory_supports_crlf_frontmatter(
     tmp_path: Path,
 ) -> None:
-    skill_root = tmp_path / "crlf-frontmatter"
+    skill_root = tmp_path / "crlf-skill"
     skill_root.mkdir(parents=True)
     (skill_root / "SKILL.md").write_text(
         "---\r\nname: crlf-skill\r\ndescription: Works with Windows newlines.\r\n---\r\n# Body\r\n",
@@ -174,7 +192,7 @@ async def test_skill_from_directory_raises_value_error_for_empty_frontmatter(
 
 
 @pytest.mark.asyncio
-async def test_skill_from_directory_does_not_require_name_matching_directory(
+async def test_skill_from_directory_requires_name_matching_directory(
     tmp_path: Path,
 ) -> None:
     skill_root = tmp_path / "csv-analysis"
@@ -189,9 +207,8 @@ async def test_skill_from_directory_does_not_require_name_matching_directory(
     )
 
     async with ctx.scope("test"):
-        skill = await Skill.from_directory(skill_root)
-
-    assert skill.name == "other-name"
+        with pytest.raises(ValueError, match="must match its parent directory"):
+            await Skill.from_directory(skill_root)
 
 
 @pytest.mark.asyncio
@@ -215,8 +232,10 @@ async def test_skill_from_directory_rejects_invalid_name_format(
 
 
 @pytest.mark.asyncio
-async def test_skill_from_directory_allows_non_string_metadata_values(
+@pytest.mark.parametrize("metadata", ("  version: 1\n", "  1: version\n"))
+async def test_skill_from_directory_rejects_non_string_metadata_values(
     tmp_path: Path,
+    metadata: str,
 ) -> None:
     skill_root = tmp_path / "csv-analysis"
     skill_root.mkdir(parents=True)
@@ -225,13 +244,64 @@ async def test_skill_from_directory_allows_non_string_metadata_values(
         "name: csv-analysis\n"
         "description: Use this skill when analyzing csv files.\n"
         "metadata:\n"
-        "  version: 1\n"
+        f"{metadata}"
         "---\n"
         "# CSV Analysis\n",
         encoding="utf-8",
     )
 
     async with ctx.scope("test"):
-        skill = await Skill.from_directory(skill_root)
+        with pytest.raises(ValueError, match="metadata"):
+            await Skill.from_directory(skill_root)
 
-    assert skill.meta["version"] == 1
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("description", ("", "x" * 1025))
+async def test_skill_from_directory_validates_description(
+    tmp_path: Path,
+    description: str,
+) -> None:
+    skill_root = tmp_path / "description-validation"
+    skill_root.mkdir(parents=True)
+    (skill_root / "SKILL.md").write_text(
+        f"---\nname: description-validation\ndescription: {description!r}\n---\n# Body\n",
+        encoding="utf-8",
+    )
+
+    async with ctx.scope("test"):
+        with pytest.raises(ValueError, match="description must be 1-1024 characters"):
+            await Skill.from_directory(skill_root)
+
+
+@pytest.mark.asyncio
+async def test_skill_from_directory_validates_compatibility(tmp_path: Path) -> None:
+    skill_root = tmp_path / "compatibility-validation"
+    skill_root.mkdir(parents=True)
+    (skill_root / "SKILL.md").write_text(
+        "---\n"
+        "name: compatibility-validation\n"
+        "description: Valid description.\n"
+        f"compatibility: {'x' * 501}\n"
+        "---\n"
+        "# Body\n",
+        encoding="utf-8",
+    )
+
+    async with ctx.scope("test"):
+        with pytest.raises(ValueError, match="compatibility must be 1-500 characters"):
+            await Skill.from_directory(skill_root)
+
+
+@pytest.mark.asyncio
+async def test_skill_resources_tool_preserves_binary_content() -> None:
+    content = ResourceContent.of(b"\x89PNG\r\n\x1a\n", mime_type="image/png")
+    skill = Skill.of(
+        "image-skill",
+        description="Provides an image.",
+        instructions="Read the image.",
+        resources=(SkillResource.of("assets/image.png", content=content),),
+    )
+
+    chunks = [chunk async for chunk in skill.resources_tool().call(path="assets/image.png")]
+
+    assert chunks == [content]

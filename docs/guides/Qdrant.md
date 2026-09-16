@@ -88,6 +88,12 @@ When the stored payload should be deleted use `Qdrant.delete(...)` with the same
 
 ### Requirement translation
 
+Filter and payload-index paths must be `AttributePath` objects, for example
+`Document._.text`; strings such as `"text"` are not supported. Nested paths resolve
+serialized aliases, including fields reached through optional values, mappings,
+and indexed sequences (`Document._.sections[0].title`). Index creation uses the
+same path resolution as filtering.
+
 `AttributeRequirement` operators map onto Qdrant filters as follows:
 
 - `equal` / `not_equal` become a `must` / `must_not` field condition. Booleans and strings match

@@ -1,4 +1,5 @@
-from collections.abc import AsyncGenerator, Iterable, MutableSequence, Sequence
+from collections.abc import AsyncGenerator, Iterable, MutableMapping, MutableSequence, Sequence
+from re import sub
 from typing import Any, NoReturn, Self, final, overload
 from uuid import UUID, uuid4
 
@@ -271,7 +272,9 @@ class Agent:
                         ctx.log_debug("...handling tool requests...")
 
                         responses: MutableSequence[ModelToolResponse] = []
-                        tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
+                        tools_output_accumulator: MutableMapping[
+                            str, MutableSequence[MultimodalContentPart]
+                        ] = {}
                         tools_stream = agent_tools.handle(tool_requests)
                         try:
                             async for chunk in tools_stream:
@@ -283,7 +286,9 @@ class Agent:
                                     yield chunk
 
                                 else:
-                                    tools_output_accumulator.append(chunk)
+                                    tools_output_accumulator.setdefault(
+                                        chunk.meta.get_str("request", default=""), []
+                                    ).append(chunk)
                                     yield chunk
 
                         finally:
@@ -295,7 +300,15 @@ class Agent:
                             ctx.log_debug("...tools generated output...")
                             state = state.appending_context(
                                 ModelInput.of(*responses),
-                                ModelOutput.of(MultimodalContent.of(*tools_output_accumulator)),
+                                ModelOutput.of(
+                                    MultimodalContent.of(
+                                        *(
+                                            part
+                                            for parts in tools_output_accumulator.values()
+                                            for part in parts
+                                        )
+                                    )
+                                ),
                             )
                             yield state
                             break  # end of loop
@@ -640,7 +653,7 @@ class Agent:
             finally:
                 await execution_stream.aclose()
 
-    def as_tool(  # noqa: C901
+    def as_tool(
         self,
         *,
         name: str | None = None,
@@ -669,12 +682,10 @@ class Agent:
             Tool forwarding its ``task`` input to the agent.
         """
         if name is None:
-            match handling:
-                case "response":
-                    name = f"agent_{self.identity.name}_request"
-
-                case "output":
-                    name = f"agent_{self.identity.name}_handover"
+            name = _agent_tool_name(
+                self.identity.name,
+                handling=handling,
+            )
 
         if description is None:
             match handling:
@@ -746,3 +757,16 @@ class Agent:
             f"Can't modify immutable {self.__class__.__qualname__},"
             f" attribute - '{name}' cannot be deleted"
         )
+
+
+def _agent_tool_name(
+    agent_name: str,
+    *,
+    handling: ModelToolHandling,
+) -> str:
+    match handling:
+        case "response":
+            return f"agent_{sub(r'[^A-Za-z0-9_-]+', '_', agent_name).strip('_-')}_request"
+
+        case "output":
+            return f"agent_{sub(r'[^A-Za-z0-9_-]+', '_', agent_name).strip('_-')}_handover"

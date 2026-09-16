@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
@@ -27,6 +27,7 @@ class _Document(State):
     identifier: UUID
     created: datetime
     tags: Sequence[str]
+    meta: Mapping[str, Mapping[str, str]]
 
 
 def test_equal_uses_parameterized_json_accessor() -> None:
@@ -171,7 +172,7 @@ def test_nested_attribute_paths_become_path_segments() -> None:
     where_clause: str
     arguments: Sequence[Sequence[PostgresValue] | PostgresValue]
     where_clause, arguments = resolve_requirements(
-        AttributeRequirement[_Document]("meta.origin.name", "equal", "draive", check=lambda _: None)
+        AttributeRequirement[_Document].equal("draive", _Document._.meta["origin"]["name"])
     )
 
     assert where_clause == "payload #> $1::TEXT[] = $2::JSONB"
@@ -193,7 +194,7 @@ def test_unsafe_attribute_paths_are_rejected() -> None:
     for path in unsafe_paths:
         with pytest.raises(ValueError, match="Invalid Postgres attribute path"):
             resolve_requirements(
-                AttributeRequirement[_Document](path, "equal", "draive", check=lambda _: None)
+                AttributeRequirement[_Document].equal("draive", _Document._.meta[path]["name"])
             )
 
 

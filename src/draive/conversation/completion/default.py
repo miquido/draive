@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator, MutableSequence, Sequence
+from collections.abc import AsyncGenerator, MutableMapping, MutableSequence, Sequence
 from typing import Any
 
 from haiway import as_list, ctx
@@ -127,7 +127,9 @@ async def conversation_completion(  # noqa: C901, PLR0912, PLR0915
                 break  # end of loop
 
             responses: MutableSequence[ModelToolResponse] = []
-            tools_output_accumulator: MutableSequence[MultimodalContentPart] = []
+            tools_output_accumulator: MutableMapping[
+                str, MutableSequence[MultimodalContentPart]
+            ] = {}
             tools_stream: AsyncGenerator[
                 ModelToolResponse | ProcessingEvent | MultimodalContentPart
             ] = toolbox.handle(tool_requests)
@@ -145,7 +147,9 @@ async def conversation_completion(  # noqa: C901, PLR0912, PLR0915
                         yield event
 
                     else:
-                        tools_output_accumulator.append(chunk)
+                        tools_output_accumulator.setdefault(
+                            chunk.meta.get_str("request", default=""), []
+                        ).append(chunk)
                         yield chunk
 
             finally:
@@ -155,7 +159,9 @@ async def conversation_completion(  # noqa: C901, PLR0912, PLR0915
 
             if tools_output_accumulator:  # tools direct result
                 ctx.log_debug("...tools generated output...")
-                tools_output = MultimodalContent.of(*tools_output_accumulator)
+                tools_output = MultimodalContent.of(
+                    *(part for parts in tools_output_accumulator.values() for part in parts)
+                )
                 model_context.append(ModelInput.of(*responses))
                 model_context.append(ModelOutput.of(tools_output))
                 assistant_turn_accumulator.append(tools_output)

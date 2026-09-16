@@ -265,6 +265,12 @@ pgvector. Set `rerank=False` to return rows ordered solely by the database simil
 
 ### Payload filtering and requirements
 
+Build requirements with typed `AttributePath` objects, for example
+`AttributeRequirement.equal("doc-1", Chunk._.identifier)`. String paths are not
+supported. Aliases are resolved through nested models, optional fields, mapping
+values, and sequence elements such as `Chunk._.sections[0].title`. The same typed
+path convention applies to Qdrant and SurrealDB filters.
+
 Search and deletion accept `AttributeRequirement` instances which are evaluated against the stored
 payload JSON. Requirements are translated to SQL expressions with both the attribute path and the
 compared value bound as parameters, so `AttributeRequirement.equal` becomes

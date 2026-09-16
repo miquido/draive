@@ -380,8 +380,31 @@ The generated tool takes:
 - `agent`: selected agent name,
 - `task`: plain-text request sent to that agent.
 
-Agent names must be unique inside a group. `AgentsGroup.of(...)` raises `ValueError` if duplicate
-names are provided.
+Agents are stored once, indexed by their identity URI. Direct `group.call(...)` accepts either a
+URI or a name; generated tools select agents by name. Names and URIs must be unique, and a name
+cannot match another agent's URI. `AgentsGroup.of(...)` raises `ValueError` for these conflicts.
+The `AgentsGroup(agents)` constructor requires a mapping keyed by identity URI.
+
+Pass an `AgentIdentity` to reserve an entry with a placeholder. Calling it raises `AgentUnavailable`
+until `group.bind(agent)` supplies an implementation with the same URI. Binding also replaces an
+existing concrete agent, including for tools already created from the group. An unknown URI raises
+`AgentException`; matching only a name is insufficient.
+
+```python
+from draive import Agent, AgentIdentity, AgentsGroup, ctx
+
+
+identity = AgentIdentity.of(name="worker")
+group = AgentsGroup.of(identity)
+group.bind(Agent.noop(identity))
+
+async with ctx.scope("delegation"):
+    async for chunk in group.call("worker", input="Hello"):
+        ctx.log_info("Received agent output")
+```
+
+Replacement may update the agent's name if it remains unambiguous. Recreate generated tools after
+changing names or descriptions to refresh their schemas and descriptions.
 
 You can also expose a single agent directly as a tool when you do not need a group registry.
 

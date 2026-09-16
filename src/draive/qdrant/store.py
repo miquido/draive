@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import Any, Literal, overload
+from typing import Any, Literal, cast, overload
 from uuid import uuid4
 
 from haiway import (
@@ -26,10 +26,9 @@ from qdrant_client.models import (
 )
 
 from draive.embedding import Embedded
-from draive.qdrant.filters import prepare_filter
+from draive.qdrant.filters import prepare_filter, qdrant_payload_key
 from draive.qdrant.session import QdrantSession
 from draive.qdrant.utils import qdrant_arguments, qdrant_operation, qdrant_vector
-from draive.utils.attributes import attribute_path_segments
 
 __all__ = ("QdrantStoreMixin",)
 
@@ -101,6 +100,7 @@ class QdrantStoreMixin(QdrantSession):
         ],
         **extra: Any,
     ) -> bool:
+        assert isinstance(path, AttributePath)  # nosec: B101
         # verified eagerly - unrecognized arguments are an error even when skipping
         arguments: Mapping[str, Any] = qdrant_arguments(self.client.create_payload_index, **extra)
 
@@ -110,7 +110,7 @@ class QdrantStoreMixin(QdrantSession):
 
             await self.client.create_payload_index(
                 collection_name=model.__name__,
-                field_name=".".join(attribute_path_segments(path)),
+                field_name=qdrant_payload_key(cast(AttributePath[Model, Attribute], path)),
                 field_schema=PayloadSchemaType(index_type),
                 wait=True,
                 **arguments,

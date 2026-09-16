@@ -7,8 +7,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Final, NoReturn, cast, final
 
 from haiway import AttributePath, AttributeRequirement, State, ctx
-from haiway.attributes import AttributesJSONEncoder
 from haiway.postgres import Postgres, PostgresRow, PostgresValue
+from haiway.types.basic import basic_value
 
 from draive.embedding import (
     Embedded,
@@ -507,7 +507,7 @@ def postgres_identifier(
 
 
 def _path_segments(
-    path: Any,
+    path: AttributePath[Any, Any],
     /,
 ) -> Sequence[str]:
     # the payload is stored serialized, attribute aliases have to be applied
@@ -528,7 +528,7 @@ def _text_tokens(
 
 
 def _json_accessor(
-    path: Any,
+    path: AttributePath[Any, Any],
     /,
     arguments: Sequence[Sequence[PostgresValue] | PostgresValue],
 ) -> tuple[str, Sequence[Sequence[PostgresValue] | PostgresValue]]:
@@ -543,7 +543,7 @@ def _json_accessor(
 
 
 def _json_text_accessor(
-    path: Any,
+    path: AttributePath[Any, Any],
     /,
     arguments: Sequence[Sequence[PostgresValue] | PostgresValue],
 ) -> tuple[str, Sequence[Sequence[PostgresValue] | PostgresValue]]:
@@ -561,7 +561,7 @@ def _json_value(
 ) -> str:
     # `jsonb` arguments are bound as their JSON representation, encoded exactly
     # the way the compared payload was
-    return json.dumps(value, cls=AttributesJSONEncoder)
+    return json.dumps(basic_value(value, strict=False))
 
 
 def _json_values(
