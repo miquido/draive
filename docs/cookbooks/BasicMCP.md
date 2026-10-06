@@ -64,6 +64,69 @@ MCPClient.streamable_http(
 )
 ```
 
+## Example: Parallel Web Search
+
+[Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp) exposes `web_search`
+and `web_fetch` over Streamable HTTP. Its anonymous tier is free, requires no API key, and uses
+Fast search mode with rate limits. This example calls the search tool directly, so it doesn't
+need a model provider or inference credentials.
+
+Install the MCP extra in a Python 3.14+ environment:
+
+```bash
+pip install 'draive[mcp]'
+```
+
+Save the following as `parallel_search.py` and run `python parallel_search.py`:
+
+```python
+import asyncio
+from importlib.metadata import version
+from uuid import uuid4
+
+from draive import ToolsProvider, ctx
+from draive.mcp import MCPClient
+
+
+async def main() -> None:
+    session_id = uuid4().hex
+    async with ctx.scope(
+        "parallel-search",
+        disposables=(
+            MCPClient.streamable_http(
+                "parallel-search",
+                url="https://search.parallel.ai/mcp",
+                headers={"User-Agent": f"draive/{version('draive')}"},
+                features=(ToolsProvider,),
+            ),
+        ),
+    ):
+        toolbox = await ToolsProvider.toolbox()
+        result = await toolbox.call(
+            "web_search",
+            arguments={
+                "objective": "Find the Python documentation for asyncio TaskGroup.",
+                "search_queries": ["Python asyncio TaskGroup documentation"],
+                "session_id": session_id,
+            },
+        )
+        print(result.to_str())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+The output contains search results with source URLs and excerpts. Reuse `session_id` for later
+`web_search` or `web_fetch` calls in the same conversation. The client discovers tools through
+`ToolsProvider` and converts their results to Draive's `MultimodalContent`; leaving the scope closes
+the connection. No environment files or Parallel credentials are loaded. Add the toolbox to
+`Conversation.completion(..., tools=toolbox)` inside the same scope if you want a configured model
+provider to use these tools; that provider still needs its own setup and may incur inference costs.
+Existing provider configurations stay unchanged unless you explicitly add this client to a scope.
+
+## Exposing Draive Tools
+
 Exposing Draive tools and resources the other way around works through `MCPServer`, which serves
 either stdio or an ASGI app:
 
