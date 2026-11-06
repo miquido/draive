@@ -143,7 +143,7 @@ wheels = [
 
 [[package]]
 name = "anthropic"
-version = "1.17.0"
+version = "2.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -155,9 +155,9 @@ dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4e/66/4ec271f7607460005276bb09b0d1c749a9ed0cead35a488a8676f15ed6d5/anthropic-1.17.0.tar.gz", hash = "sha256:dcf77a74dde89a9fd12405fca798b012725a107f7c9488454234a74e275c2163", size = 1756371, upload-time = "2026-10-20T22:13:35.117Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4a/a8/0e50326e4c408f4b4ee3aae4c3bbd60012570b88bc5887effc8542509068/anthropic-2.6.0.tar.gz", hash = "sha256:a38d8698258a4cb33a9bc9d2f0ced1d96b71010870e5ed703807d21021a0da24", size = 1958763, upload-time = "2026-11-05T18:59:09.557Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/98/9d/b4d4e46ec05bf19bcfd46c1417337e7cf42b9ecb95c3c63f295e2e9fee4b/anthropic-1.17.0-py3-none-any.whl", hash = "sha256:ccb98b85e1a14f81cf1e2ba348393f341f342bad9e07e014f96c9b69f853aaa7", size = 2094718, upload-time = "2026-10-20T22:13:32.585Z" },
+    { url = "https://files.pythonhosted.org/packages/38/0b/705a05ab68558914e725cf1143d7e409fa3bb596c35bca1eceab42402abe/anthropic-2.6.0-py3-none-any.whl", hash = "sha256:4325cdf9346fa29183674b6ee6289ebad5b2b0a935758f7350fa504032da1d9b", size = 2445307, upload-time = "2026-11-05T18:59:11.474Z" },
 ]
 
 [package.optional-dependencies]
@@ -758,6 +758,9 @@ starlette = [
 surrealdb = [
     { name = "surrealdb" },
 ]
+surrealdb-embedded = [
+    { name = "surrealdb", extra = ["embedded"] },
+]
 vllm = [
     { name = "openai" },
 ]
@@ -765,7 +768,7 @@ vllm = [
 [package.dev-dependencies]
 dev = [
     { name = "bandit" },
-    { name = "draive", extra = ["anthropic", "anthropic-bedrock", "aws", "bedrock", "cohere", "cohere-bedrock", "fastapi", "gemini", "httpx", "mcp", "mistral", "ollama", "openai", "openai-realtime", "opentelemetry", "postgres", "qdrant", "rabbitmq", "starlette", "surrealdb", "vllm"] },
+    { name = "draive", extra = ["anthropic", "anthropic-bedrock", "aws", "bedrock", "cohere", "cohere-bedrock", "fastapi", "gemini", "httpx", "mcp", "mistral", "ollama", "openai", "openai-realtime", "opentelemetry", "postgres", "qdrant", "rabbitmq", "starlette", "surrealdb", "surrealdb-embedded", "vllm"] },
     { name = "jsonschema" },
     { name = "pyright" },
     { name = "pytest" },
@@ -774,7 +777,7 @@ dev = [
     { name = "ruff" },
 ]
 docs = [
-    { name = "draive", extra = ["anthropic", "anthropic-bedrock", "aws", "bedrock", "cohere", "cohere-bedrock", "fastapi", "gemini", "httpx", "mcp", "mistral", "ollama", "openai", "openai-realtime", "opentelemetry", "postgres", "qdrant", "rabbitmq", "starlette", "surrealdb", "vllm"] },
+    { name = "draive", extra = ["anthropic", "anthropic-bedrock", "aws", "bedrock", "cohere", "cohere-bedrock", "fastapi", "gemini", "httpx", "mcp", "mistral", "ollama", "openai", "openai-realtime", "opentelemetry", "postgres", "qdrant", "rabbitmq", "starlette", "surrealdb", "surrealdb-embedded", "vllm"] },
     { name = "mdformat" },
     { name = "mdformat-gfm" },
     { name = "mdformat-mkdocs" },
@@ -787,8 +790,8 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", marker = "extra == 'anthropic'", specifier = "~=1.0" },
-    { name = "anthropic", extras = ["bedrock"], marker = "extra == 'anthropic-bedrock'", specifier = "~=1.0" },
+    { name = "anthropic", marker = "extra == 'anthropic'", specifier = "~=2.6" },
+    { name = "anthropic", extras = ["bedrock"], marker = "extra == 'anthropic-bedrock'", specifier = "~=2.6" },
     { name = "asyncpg", marker = "extra == 'postgres'" },
     { name = "boto3", marker = "extra == 'aws'", specifier = "~=1.43" },
     { name = "boto3", marker = "extra == 'bedrock'", specifier = "~=1.43" },
@@ -796,7 +799,7 @@ requires-dist = [
     { name = "cohere", marker = "extra == 'cohere'", specifier = "~=7.0" },
     { name = "cohere", marker = "extra == 'cohere-bedrock'", specifier = "~=7.0" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = "~=0.162" },
-    { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=2.18" },
+    { name = "google-genai", marker = "extra == 'gemini'", specifier = "~=3.0" },
     { name = "haiway", specifier = "~=0.59.0" },
     { name = "haiway", extras = ["fastapi"], marker = "extra == 'fastapi'" },
     { name = "haiway", extras = ["httpx"], marker = "extra == 'httpx'" },
@@ -806,7 +809,7 @@ requires-dist = [
     { name = "haiway", extras = ["starlette"], marker = "extra == 'starlette'" },
     { name = "httpx2", marker = "extra == 'mcp'", specifier = "~=2.16" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = "~=2.1" },
-    { name = "mistralai", marker = "extra == 'mistral'", specifier = "~=2.9" },
+    { name = "mistralai", marker = "extra == 'mistral'", specifier = "~=3.7" },
     { name = "numpy", specifier = "~=2.5" },
     { name = "ollama", marker = "extra == 'ollama'", specifier = "~=0.6.2" },
     { name = "openai", marker = "extra == 'openai'", specifier = "~=3.2" },
@@ -820,14 +823,15 @@ requires-dist = [
     { name = "qdrant-client", marker = "extra == 'qdrant'", specifier = "~=1.19" },
     { name = "starlette", marker = "extra == 'fastapi'", specifier = "~=1.10" },
     { name = "starlette", marker = "extra == 'starlette'", specifier = "~=1.10" },
-    { name = "surrealdb", marker = "extra == 'surrealdb'", specifier = "~=2.0" },
+    { name = "surrealdb", marker = "extra == 'surrealdb'", specifier = "~=3.0" },
+    { name = "surrealdb", extras = ["embedded"], marker = "extra == 'surrealdb-embedded'", specifier = "~=3.0" },
 ]
-provides-extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "aws", "vllm", "mcp", "opentelemetry", "httpx", "starlette", "fastapi", "postgres", "rabbitmq", "qdrant", "surrealdb"]
+provides-extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "aws", "vllm", "mcp", "opentelemetry", "httpx", "starlette", "fastapi", "postgres", "rabbitmq", "qdrant", "surrealdb", "surrealdb-embedded"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "bandit", specifier = "~=1.9" },
-    { name = "draive", extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "aws", "vllm", "mcp", "opentelemetry", "httpx", "starlette", "fastapi", "postgres", "rabbitmq", "qdrant", "surrealdb"] },
+    { name = "draive", extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "aws", "vllm", "mcp", "opentelemetry", "httpx", "starlette", "fastapi", "postgres", "rabbitmq", "qdrant", "surrealdb", "surrealdb-embedded"] },
     { name = "jsonschema", specifier = "~=4.26" },
     { name = "pyright", specifier = "~=1.1" },
     { name = "pytest", specifier = "~=9.2" },
@@ -836,12 +840,12 @@ dev = [
     { name = "ruff", specifier = "~=0.17" },
 ]
 docs = [
-    { name = "draive", extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "aws", "vllm", "mcp", "opentelemetry", "httpx", "starlette", "fastapi", "postgres", "rabbitmq", "qdrant", "surrealdb"] },
+    { name = "draive", extras = ["cohere", "cohere-bedrock", "openai", "openai-realtime", "anthropic", "anthropic-bedrock", "mistral", "gemini", "ollama", "bedrock", "aws", "vllm", "mcp", "opentelemetry", "httpx", "starlette", "fastapi", "postgres", "rabbitmq", "qdrant", "surrealdb", "surrealdb-embedded"] },
     { name = "mdformat", specifier = "~=1.0" },
     { name = "mdformat-gfm", specifier = "~=1.0" },
     { name = "mdformat-mkdocs", specifier = "~=5.3" },
     { name = "mkdocs", specifier = "~=1.6" },
-    { name = "mkdocs-build-plantuml-plugin", specifier = "~=1.11" },
+    { name = "mkdocs-build-plantuml-plugin", specifier = "~=2.1" },
     { name = "mkdocs-material", specifier = "~=9.8" },
     { name = "mkdocstrings", extras = ["python"], specifier = "~=1.0" },
     { name = "pymarkdownlnt", specifier = "~=0.9" },
@@ -990,13 +994,13 @@ requests = [
 
 [[package]]
 name = "google-genai"
-version = "2.34.0"
+version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
     { name = "distro" },
     { name = "google-auth", extra = ["requests"] },
-    { name = "httpx" },
+    { name = "httpx2" },
     { name = "pydantic" },
     { name = "requests" },
     { name = "sniffio" },
@@ -1004,9 +1008,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/22/89/4621aee9cb183efa5b8a187f0e315c49fddcfb8cd7f238b4a3bf4946dcd0/google_genai-2.34.0.tar.gz", hash = "sha256:8e182cf3f73384167b96861cf0aef5102b5070f2db1ea11002879e913806ef37", size = 791853, upload-time = "2026-10-29T06:43:23.706Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/50/ed/f7ab2f658e832063cb9910fb540b7cf43b9eeefee89c98837d5aeee5a2bd/google_genai-3.0.0.tar.gz", hash = "sha256:f3e1a05a464a39cb6caf59a69824d3c54ef20dc5e403ff8fab1f4662cb18edf9", size = 818794, upload-time = "2026-11-06T02:29:07.929Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2e/42/c24db865d9231b1c672ea26242a4dcf340e200bb1a9823dce4aa9c4c07a4/google_genai-2.34.0-py3-none-any.whl", hash = "sha256:a4cb02aebc4c357f863d2938132f0e3f7967fc5e00b8a4078673f68aad340665", size = 1258155, upload-time = "2026-10-29T06:43:21.121Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/fd/9f4050322c8e024fd7af77f67af97db858725e35988e0c61b31c1de4a4d0/google_genai-3.0.0-py3-none-any.whl", hash = "sha256:af56a7754312c3a4a562e100160d05b701d03d5f49101e6c85796694a789ae07", size = 1336765, upload-time = "2026-11-06T02:29:05.297Z" },
 ]
 
 [[package]]
@@ -1612,11 +1616,11 @@ wheels = [
 
 [[package]]
 name = "mistralai"
-version = "2.10.1"
+version = "3.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "eval-type-backport" },
-    { name = "httpx" },
+    { name = "httpx2" },
     { name = "jsonpath-python" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-semantic-conventions" },
@@ -1624,9 +1628,9 @@ dependencies = [
     { name = "python-dateutil" },
     { name = "typing-inspection" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ca/db/a80c4ab96b1fec9529115dafaa3f14b28d0407fe1cb9b051ec2df9336fb7/mistralai-2.10.1.tar.gz", hash = "sha256:43b61643ba4f120463e5faf7305a6f40eb29f8e3a21321893969e56c20ed3fbc", size = 590127, upload-time = "2026-09-15T08:12:30.79Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3f/ca/10a0515ded34170e1ea451a6d1c7124361e4fab8ba5d5024db34db1fb9d3/mistralai-3.7.0.tar.gz", hash = "sha256:97cc525b8ddc96fb8b5bb08f466dd3d22f904f21ddfe45103da76c25fe601bf2", size = 773897, upload-time = "2026-11-01T20:07:28.894Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ec/98/f64b54166a607ece4e5c8494c843ac1f9c7c0af6f1014272cc420fe1d519/mistralai-2.10.1-py3-none-any.whl", hash = "sha256:443b306392ae1e86edaec39dbafcf79deb735799a00abef4611531004e22b1b2", size = 1392946, upload-time = "2026-09-15T08:12:28.704Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/c3/428b852ffffcf6b35d046124121e75824827d222d8ada3cb19c32a47f92e/mistralai-3.7.0-py3-none-any.whl", hash = "sha256:23ceda7ae52557578427af5a9caffb2222cd11dd7d43eb1792ded35b2a84d939", size = 1818807, upload-time = "2026-11-01T20:07:26.562Z" },
 ]
 
 [[package]]
@@ -1669,15 +1673,15 @@ wheels = [
 
 [[package]]
 name = "mkdocs-build-plantuml-plugin"
-version = "1.11.0"
+version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httplib2" },
     { name = "mkdocs" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a8/f8/e00b685ad5390a617a2e5325ebd14103fdfbd35c3d8a74810752f306d086/mkdocs-build-plantuml-plugin-1.11.0.tar.gz", hash = "sha256:3e894ab71e75f37f8c5236dbe4e63d938312bfa7a5fc2489cf9347a659db41f8", size = 8933, upload-time = "2024-03-25T13:36:34.376Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c3/82/b2b32ff84488d0b9b31ea266c21fc6c04518a2afe7fb3c146e04d7fccc0c/mkdocs_build_plantuml_plugin-2.1.0.tar.gz", hash = "sha256:8843652ba58e431f5414e011ab6ac12d5549891171e7958d93ac3e3e834d6751", size = 21448, upload-time = "2026-02-24T10:54:12.689Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/23/c3/4e670e59e5edf8c4c136bee1604dd149e2b4c393b4266cdb10c7a93aefac/mkdocs_build_plantuml_plugin-1.11.0-py3-none-any.whl", hash = "sha256:528e883a7e5485576b60a51e22dc0232d31e5ae7c19640f9dc201f655e9ce0f5", size = 9318, upload-time = "2024-03-25T13:36:32.702Z" },
+    { url = "https://files.pythonhosted.org/packages/62/5b/aa16b8875d2983e107bf19fba6c111baf9d9644ff582ea5b0f7a10befe5b/mkdocs_build_plantuml_plugin-2.1.0-py3-none-any.whl", hash = "sha256:00496f6c23e928d5ae2c5e41a7d2bf3b929ebaf47feaa322f7206c142038ab43", size = 10097, upload-time = "2026-02-24T10:54:11.314Z" },
 ]
 
 [[package]]
@@ -2799,7 +2803,7 @@ wheels = [
 
 [[package]]
 name = "surrealdb"
-version = "2.0.0"
+version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2807,15 +2811,29 @@ dependencies = [
     { name = "requests" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/55/b3/231444479bd065b5d29c151296dd8aa4591f399039ffd39c45d1ea0b3906/surrealdb-2.0.0.tar.gz", hash = "sha256:70a2656bf5b6d844cf4c029d6e0a7309ca95b9ba282663f31c8b6e642fc8463a", size = 303740, upload-time = "2026-04-23T17:21:47.74Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ac/63/1ee871aeb62c77206bcb7e78ed58bb8df38b2df970b88a885812e7bb53de/surrealdb-3.0.0.tar.gz", hash = "sha256:1b885704ac871de5d5eb8fac476a746b26fe2f2cd3e833c4c91abd11d2bdb615", size = 604948, upload-time = "2026-11-04T15:09:22.323Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/86/47/85b04ef0224cb1538d8b0154a16c222e1e4174016ad3c7833e4b00cc6382/surrealdb-2.0.0-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:5ade2dfd53fedd7c7ddb3b102d6223ccefa30ad8a1df1cde261ce8004e97aa2f", size = 5148243, upload-time = "2026-04-23T17:21:34.666Z" },
-    { url = "https://files.pythonhosted.org/packages/d3/8c/137e6d3e1ff0b2990dcf56c80920e2d64855ffdd16fe8195fa6c5c4adcf9/surrealdb-2.0.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:8b0b24ea230a53ea6c67c51c8e45332d9383b4b8f42246b64c034a2b26d0cc2a", size = 5010874, upload-time = "2026-04-23T17:21:37.32Z" },
-    { url = "https://files.pythonhosted.org/packages/18/1d/d05be5d682b10ac8b2af74f93b374c43109585b7e6be3d9d2b4790960f20/surrealdb-2.0.0-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e3a4e9c35964af1dc6ce01fe2aa553d6c3fcd0a8bd02c05e38fc88433395ba74", size = 5789187, upload-time = "2026-04-23T17:21:38.963Z" },
-    { url = "https://files.pythonhosted.org/packages/4c/55/463e429e85e41c0941b3daa878b6005f76fcabaab9a09beab02d2852c4b3/surrealdb-2.0.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1e0d61545611cf86f13825932315e65c79a9f1bfb1c0fe3b40b0e48562b8673c", size = 5697268, upload-time = "2026-04-23T17:21:40.896Z" },
-    { url = "https://files.pythonhosted.org/packages/20/2e/1d02a9c1d6cbeea1dae079320c7baaf89c0d465b204eaeb5fe8a543ee53a/surrealdb-2.0.0-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:d5dd4df823b407f58077a9dddc4f4bff938e365d091df56d2fe4108e980f8b87", size = 5967299, upload-time = "2026-04-23T17:21:42.441Z" },
-    { url = "https://files.pythonhosted.org/packages/1d/a4/d1259c9437e12bbe8e54416f610b9a4300791e655d8784e51c087394cce8/surrealdb-2.0.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:e7163637c813e2e6daec7660c4d83462509c1c77ecb4086bdb3766af6fdfb571", size = 5941482, upload-time = "2026-04-23T17:21:44.714Z" },
-    { url = "https://files.pythonhosted.org/packages/3c/6b/522f48258c2f1cefacfe55cb772e14e1c28b4973f63ba5baffc4998e9cc9/surrealdb-2.0.0-cp39-abi3-win_amd64.whl", hash = "sha256:ba43f1156b2a6d00e8e595764505156db2f7fd5d023e189c59e9673fa9949fe8", size = 5068184, upload-time = "2026-04-23T17:21:46.371Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/bf/fc43cd57e40955458853c9eab71040d93f7c20496403341561bc56de1def/surrealdb-3.0.0-py3-none-any.whl", hash = "sha256:b7478f7093e7996ed3854f61affa62566fb8541d5a388a56c624ad3ffd1bc0fe", size = 298303, upload-time = "2026-11-04T15:09:20.738Z" },
+]
+
+[package.optional-dependencies]
+embedded = [
+    { name = "surrealdb-embedded" },
+]
+
+[[package]]
+name = "surrealdb-embedded"
+version = "3.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/73/f1/13726f06f92cde5f3fb42857d55505a173a5519c12a68aac36242476d658/surrealdb_embedded-3.0.0.tar.gz", hash = "sha256:af2bd8adb84601d166683660e3d895a2c69ef9f512bcd69cf6e5fb6f91f66631", size = 40775, upload-time = "2026-11-04T15:46:02.537Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/62/9c/51b8aeaa40d0d7d7d16305b20754d04b84e470c2d39652c6570414cd09d5/surrealdb_embedded-3.0.0-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:db98601f554d312cf1012b0f1bfc1948193fd32ea17973be2c49a946db7273b8", size = 13230480, upload-time = "2026-11-04T15:45:41.515Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/d9/8eee66463d72c1ba0c959a0f6ce722f8121b4723e8307928a1586e98f740/surrealdb_embedded-3.0.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:2175bec5bbf219a13209356d84080833b0c040b268d49c523ab9178b5029cbef", size = 11866915, upload-time = "2026-11-04T15:45:44.672Z" },
+    { url = "https://files.pythonhosted.org/packages/96/c1/ca118456fb5613004492f13574f359af5b79862fc6a08120ce12b495f40b/surrealdb_embedded-3.0.0-cp39-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:f71c341b32033e9580d1fc589acee8c031b52693ddfb0a370df1c1d56c015e70", size = 14372585, upload-time = "2026-11-04T15:45:47.384Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/7b/1816b153d54648a631e8b8136727c6ec9660d90cf9e7fc0989dfe7f1fbf9/surrealdb_embedded-3.0.0-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:5011d7e9179a27b21e0a82da43a761d61a94daf35f91192a9dd8c772381a6f14", size = 14629757, upload-time = "2026-11-04T15:45:50.498Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/3e/531f81e90569dcecbf41d78ae460d36c0cd7adc5913f7e43f872b0ecb405/surrealdb_embedded-3.0.0-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:36d86cb113d1ad8e548a2bad207ed5b104c1299f6b486409d057e0933000e9da", size = 14557816, upload-time = "2026-11-04T15:45:53.819Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/fd/703363599f646cadbe5780b2abcd3c6f4d5041f09796e53a75af8afaa470/surrealdb_embedded-3.0.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:54291a4de6782e060b7d2cb7089f9f31a15d8a68130bd44470b5e90630bf7a9b", size = 14908747, upload-time = "2026-11-04T15:45:57.375Z" },
+    { url = "https://files.pythonhosted.org/packages/f6/74/844975bd55a370ce53a3f5c2a66c42da9b388778b84aa84b30282070e8ea/surrealdb_embedded-3.0.0-cp39-abi3-win_amd64.whl", hash = "sha256:ddd3702b24907e5a709016de4874b1f9d0946a3282520528dc199730c9fb7714", size = 12880587, upload-time = "2026-11-04T15:46:00.57Z" },
 ]
 
 [[package]]

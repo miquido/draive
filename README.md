@@ -216,6 +216,10 @@ Use SurrealDB integration, including vector index, templates and conversation me
 pip install 'draive[surrealdb]'
 ```
 
+For in-process connections (`mem://`, `file://`, `surrealkv://`) install the embedded engine as
+well with `pip install 'draive[surrealdb_embedded]'`. When no url is given, `SurrealClient` uses
+`mem://` if the embedded engine is installed and requires an explicit url otherwise.
+
 Remote connections require a SurrealDB 3.x server - the session handling relies on RPC methods
 older servers do not provide. Namespaces and databases are not created implicitly, they have to be
 defined before use.

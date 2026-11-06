@@ -36,10 +36,10 @@ cohere = ["cohere~=7.0"]
 cohere_bedrock = ["cohere~=7.0", "boto3~=1.43"]
 openai = ["openai~=3.2"]
 openai_realtime = ["openai[realtime]~=3.2"]
-anthropic = ["anthropic~=1.0"]
-anthropic_bedrock = ["anthropic[bedrock]~=1.0"]
-mistral = ["mistralai~=2.9"]
-gemini = ["google-genai~=2.18"]
+anthropic = ["anthropic~=2.6"]
+anthropic_bedrock = ["anthropic[bedrock]~=2.6"]
+mistral = ["mistralai~=3.7"]
+gemini = ["google-genai~=3.0"]
 ollama = ["ollama~=0.6.2"]
 bedrock = ["boto3~=1.43"]
 aws = ["boto3~=1.43"]
@@ -57,13 +57,14 @@ fastapi = ["haiway[fastapi]", "fastapi~=0.162", "starlette~=1.10"]
 postgres = ["haiway[postgres]", "asyncpg"]
 rabbitmq = ["haiway[rabbitmq]", "pika"]
 qdrant = ["qdrant-client~=1.19"]
-surrealdb = ["surrealdb~=2.0"]
+surrealdb = ["surrealdb~=3.0"]
+surrealdb_embedded = ["surrealdb[embedded]~=3.0"]
 
 [dependency-groups]
 # development tooling lives in dependency groups (synced by default, never published)
 # while the integration extras stay optional dependencies of the package itself
 dev = [
-  "draive[cohere,cohere_bedrock,openai,openai_realtime,anthropic,anthropic_bedrock,mistral,gemini,ollama,bedrock,aws,vllm,mcp,opentelemetry,httpx,starlette,fastapi,postgres,rabbitmq,qdrant,surrealdb]",
+  "draive[cohere,cohere_bedrock,openai,openai_realtime,anthropic,anthropic_bedrock,mistral,gemini,ollama,bedrock,aws,vllm,mcp,opentelemetry,httpx,starlette,fastapi,postgres,rabbitmq,qdrant,surrealdb,surrealdb_embedded]",
   "bandit~=1.9",
   "jsonschema~=4.26",
   "pyright~=1.1",
@@ -73,14 +74,14 @@ dev = [
   "ruff~=0.17",
 ]
 docs = [
-  "draive[cohere,cohere_bedrock,openai,openai_realtime,anthropic,anthropic_bedrock,mistral,gemini,ollama,bedrock,aws,vllm,mcp,opentelemetry,httpx,starlette,fastapi,postgres,rabbitmq,qdrant,surrealdb]",
+  "draive[cohere,cohere_bedrock,openai,openai_realtime,anthropic,anthropic_bedrock,mistral,gemini,ollama,bedrock,aws,vllm,mcp,opentelemetry,httpx,starlette,fastapi,postgres,rabbitmq,qdrant,surrealdb,surrealdb_embedded]",
   "mkdocs~=1.6",
   "mkdocs-material~=9.8",
   "mkdocstrings[python]~=1.0",
   "mdformat~=1.0",
   "mdformat-gfm~=1.0",
   "pymarkdownlnt~=0.9",
-  "mkdocs-build-plantuml-plugin~=1.11",
+  "mkdocs-build-plantuml-plugin~=2.1",
   "mdformat-mkdocs~=5.3",
 ]
 

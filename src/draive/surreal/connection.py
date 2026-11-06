@@ -1,10 +1,11 @@
 from asyncio import Lock
 from collections.abc import Generator, Mapping, MutableMapping, Sequence
+from importlib.util import find_spec
 from types import TracebackType
 from typing import Any, final
 from uuid import UUID, uuid4
 
-from surrealdb import AsyncEmbeddedSurrealConnection, AsyncWsSurrealConnection
+from surrealdb import AsyncWsSurrealConnection
 from surrealdb.errors import parse_query_error, parse_rpc_error
 from surrealdb.request_message.message import RequestMessage
 from surrealdb.request_message.methods import RequestMethod
@@ -21,12 +22,15 @@ from draive.surreal.utils import surreal_value, surreal_variable
 
 __all__ = ("SurrealConnection",)
 
+_EMBEDDED_URL_PREFIXES: tuple[str, ...] = ("mem", "file", "surrealkv")
+
 
 class SurrealConnection:
     __slots__ = (
         "_connection",
         "_credentials",
         "_database",
+        "_embedded",
         "_embedded_lock",
         "_namespace",
         "_url",
@@ -35,14 +39,25 @@ class SurrealConnection:
     def __init__(
         self,
         *,
-        url: str = "mem://",
+        url: str | None = None,
         namespace: str = "surrealdb",
         database: str = "surrealdb",
         user: str | None = None,
         password: str | None = None,
         access: str | None = None,
     ) -> None:
+        if url is None:
+            # embedded engine is optional (`draive[surrealdb_embedded]`), use it only when present
+            if find_spec("surrealdb_embedded") is None:
+                raise ValueError(
+                    "SurrealDB url is required unless the embedded engine is installed,"
+                    " use `draive[surrealdb_embedded]` or provide an explicit url"
+                )
+
+            url = "mem://"
+
         self._url: str = url
+        self._embedded: bool = url.startswith(_EMBEDDED_URL_PREFIXES)
         credentials: MutableMapping[str, str] = {}
 
         if user:
@@ -78,11 +93,15 @@ class SurrealConnection:
         if self._url.startswith("ws") or self._url.startswith("wss"):
             connection = AsyncWsSurrealConnection(url=self._url)
 
-        elif (
-            self._url.startswith("mem")
-            or self._url.startswith("file")
-            or self._url.startswith("surrealkv")
-        ):
+        elif self._embedded:
+            try:
+                from surrealdb import AsyncEmbeddedSurrealConnection
+
+            except ImportError as exc:
+                raise ValueError(
+                    f"Embedded SurrealDB url {self._url} requires `draive[surrealdb_embedded]`"
+                ) from exc
+
             connection = AsyncEmbeddedSurrealConnection(url=self._url)
 
         else:
@@ -123,7 +142,7 @@ class SurrealConnection:
         if access:
             credentials["access"] = access
 
-        if isinstance(self._connection, AsyncEmbeddedSurrealConnection):
+        if self._embedded:
             return _EmbeddedSessionContext(
                 connection=self._connection,
                 namespace=namespace or self._namespace,
@@ -154,13 +173,13 @@ class _EmbeddedSessionContext:
 
     def __init__(
         self,
-        connection: AsyncEmbeddedSurrealConnection,
+        connection: AsyncWsSurrealConnection,
         namespace: str,
         database: str,
         credentials: Mapping[str, str],
         lock: Lock,
     ) -> None:
-        self._connection: AsyncEmbeddedSurrealConnection = connection
+        self._connection: AsyncWsSurrealConnection = connection
         self._namespace: str = namespace
         self._database: str = database
         self._credentials: Mapping[str, str] = credentials
@@ -519,7 +538,7 @@ async def _execute(
 
 
 async def _execute_embedded(
-    connection: AsyncEmbeddedSurrealConnection,
+    connection: AsyncWsSurrealConnection,
     /,
     statement: str,
     *,
