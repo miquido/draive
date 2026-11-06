@@ -40,5 +40,10 @@ jobs:
         run: uv run pytest --rootdir= ./tests --doctest-modules
           --junitxml=junit/test-results.xml
 
+      - name: Test (native State)
+        run: uv run pytest --rootdir= ./tests --doctest-modules
+        env:
+          HAIWAY_NATIVE: "1"
+
       - name: Build
         run: uv build
