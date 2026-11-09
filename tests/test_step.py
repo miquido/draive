@@ -18,8 +18,15 @@ from draive.models import (
     ModelToolResponse,
     ModelTools,
 )
-from draive.multimodal import MultimodalContent, TextContent
-from draive.steps import Step, StepException, StepState, step
+from draive.multimodal import ArtifactContent, MultimodalContent, TextContent
+from draive.steps import (
+    Step,
+    StepException,
+    StepRetriesExhausted,
+    StepState,
+    StepTimeout,
+    step,
+)
 from draive.tools import tool
 
 
@@ -894,3 +901,346 @@ async def test_updating_artifacts_replaces_existing_artifacts() -> None:
 
     assert state.get(AlphaArtifact, required=True).value == "new"
     assert state.get(BetaArtifact, key="other", required=True).value == "extra"
+
+
+class ReportArtifact(State):
+    title: str
+    score: int
+
+
+@pytest.mark.asyncio
+async def test_loop_stops_with_exception_at_max_iterations() -> None:
+    async def always(state: StepState, iteration: int) -> bool:
+        return True
+
+    executed = 0
+
+    @step
+    async def counting(state: StepState) -> StepState:
+        nonlocal executed
+        executed += 1
+        return state
+
+    with pytest.raises(StepException) as exc_info:
+        await Step.loop(counting, condition=always, max_iterations=3).process()
+
+    assert executed == 3
+    assert exc_info.value.meta.get("max_iterations") == 3
+
+
+@pytest.mark.asyncio
+async def test_loop_ending_exactly_at_max_iterations_does_not_raise() -> None:
+    async def twice(state: StepState, iteration: int) -> bool:
+        return iteration < 2
+
+    await Step.loop(Step.noop, condition=twice, max_iterations=2).process()
+
+
+@pytest.mark.asyncio
+async def test_loop_default_limit_is_32_and_can_be_disabled() -> None:
+    async def always(state: StepState, iteration: int) -> bool:
+        return True
+
+    executed = 0
+
+    @step
+    async def counting(state: StepState) -> StepState:
+        nonlocal executed
+        executed += 1
+        return state
+
+    with pytest.raises(StepException):
+        await Step.loop(counting, condition=always).process()
+
+    assert executed == 32
+
+    async def many(state: StepState, iteration: int) -> bool:
+        return iteration < 40
+
+    await Step.loop(Step.noop, condition=many, max_iterations=None).process()
+
+
+@pytest.mark.parametrize("limit", [0, -1])
+def test_max_iterations_must_be_positive(limit: int) -> None:
+    async def never(state: StepState, iteration: int) -> bool:
+        return False
+
+    with pytest.raises(ValueError, match="max_iterations"):
+        Step.loop(Step.noop, condition=never, max_iterations=limit)
+
+    with pytest.raises(ValueError, match="max_iterations"):
+        Step.looping_completion(max_iterations=limit)
+
+
+@pytest.mark.asyncio
+async def test_looping_completion_stops_at_max_iterations() -> None:
+    @tool(description="Lookup")
+    async def lookup() -> str:
+        return "result"
+
+    calls = 0
+
+    def generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: Sequence[ModelContextElement],
+        output: Any,
+        **extra: Any,
+    ) -> AsyncIterable[ModelOutputChunk]:
+        nonlocal calls
+        calls += 1
+        return _stream_of(ModelToolRequest.of(f"call-{calls}", tool="lookup", arguments={}))
+
+    with pytest.raises(StepException) as exc_info:
+        await (
+            Step.looping_completion(tools=[lookup], max_iterations=2)
+            .with_ctx(GenerativeModel(generating=generating))
+            .process((ModelInput.of(MultimodalContent.of("go")),))
+        )
+
+    assert calls == 2
+    assert isinstance(exc_info.value.state.context[-1], ModelInput)  # tool responses appended
+
+
+@pytest.mark.asyncio
+async def test_with_timeout_raises_step_timeout() -> None:
+    async def slow(state: StepState) -> Any:
+        await asyncio.sleep(1)
+        yield state
+
+    with pytest.raises(StepTimeout) as exc_info:
+        await Step(slow).with_timeout(0.05).process()
+
+    assert exc_info.value.timeout == 0.05
+    assert isinstance(exc_info.value, StepException)
+
+
+@pytest.mark.asyncio
+async def test_with_timeout_excludes_consumer_time() -> None:
+    async def emitting(state: StepState) -> Any:
+        yield TextContent.of("a")
+        yield TextContent.of("b")
+        yield state
+
+    received: list[str] = []
+    async for chunk in Step(emitting).with_timeout(0.2).stream():
+        await asyncio.sleep(0.3)  # slower than the limit, but outside of the step
+        if isinstance(chunk, TextContent):
+            received.append(chunk.text)
+
+    assert received == ["a", "b"]
+
+
+@pytest.mark.asyncio
+async def test_with_timeout_accumulates_across_chunks() -> None:
+    async def trickling(state: StepState) -> Any:
+        for _ in range(10):
+            await asyncio.sleep(0.05)
+            yield TextContent.of("tick")
+
+    with pytest.raises(StepTimeout):
+        await Step(trickling).with_timeout(0.15).run()
+
+
+@pytest.mark.asyncio
+async def test_with_timeout_passes_through_fast_step_and_validates() -> None:
+    result = await Step.emitting(TextContent.of("ok")).with_timeout(1).run()
+    assert _text_of(result) == "ok"
+
+    with pytest.raises(ValueError, match="positive"):
+        Step.noop.with_timeout(0)
+
+
+@pytest.mark.asyncio
+async def test_timeout_is_retryable() -> None:
+    attempts = 0
+
+    async def sometimes_slow(state: StepState) -> Any:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            await asyncio.sleep(1)
+
+        yield TextContent.of("done")
+
+    result = await Step(sometimes_slow).with_timeout(0.05).with_retry(limit=1).run()
+
+    assert attempts == 2
+    assert _text_of(result) == "done"
+
+
+@pytest.mark.asyncio
+async def test_retry_exhaustion_raises_dedicated_exception() -> None:
+    attempts = 0
+
+    @step
+    async def failing(state: StepState) -> StepState:
+        nonlocal attempts
+        attempts += 1
+        raise ValueError(f"failure {attempts}")
+
+    initial = StepState.of((ModelInput.of(MultimodalContent.of("start")),))
+    with pytest.raises(StepRetriesExhausted) as exc_info:
+        await failing.with_retry(limit=2).process(initial)
+
+    assert attempts == 3
+    assert exc_info.value.attempts == 3
+    assert exc_info.value.state == initial
+    assert isinstance(exc_info.value.__cause__, ValueError)
+    assert str(exc_info.value.__cause__) == "failure 3"
+
+
+@pytest.mark.asyncio
+async def test_retry_without_retries_or_match_raises_original_error() -> None:
+    @step
+    async def failing(state: StepState) -> StepState:
+        raise ValueError("boom")
+
+    with pytest.raises(ValueError, match="boom"):
+        await failing.with_retry(limit=0).process()
+
+    with pytest.raises(ValueError, match="boom"):
+        await failing.with_retry(limit=3, catching=KeyError).process()
+
+
+@pytest.mark.asyncio
+async def test_retry_delay_variants() -> None:
+    delays: list[tuple[int, str]] = []
+
+    def delaying(attempt: int, exc: Exception) -> float:
+        delays.append((attempt, str(exc)))
+        return 0.0
+
+    @step
+    async def failing(state: StepState) -> StepState:
+        raise ValueError("x")
+
+    with pytest.raises(StepRetriesExhausted):
+        await failing.with_retry(limit=2, delay=delaying).process()
+
+    assert delays == [(1, "x"), (2, "x")]
+
+    with pytest.raises(StepRetriesExhausted):
+        await failing.with_retry(limit=1, delay=0.01).process()
+
+
+@pytest.mark.asyncio
+async def test_removing_artifacts() -> None:
+    state = StepState.of(
+        (),
+        AlphaArtifact(value="a"),
+        BetaArtifact(value="b"),
+        custom=AlphaArtifact(value="c"),
+    )
+
+    by_type = state.removing_artifacts(AlphaArtifact)
+    assert by_type.get(AlphaArtifact) is None
+    assert by_type.get(BetaArtifact, required=True).value == "b"
+    assert by_type.get(AlphaArtifact, key="custom", required=True).value == "c"
+
+    by_key = state.removing_artifacts("custom", BetaArtifact, "missing")
+    assert set(by_key.artifacts) == {"AlphaArtifact"}
+
+    assert state.removing_artifacts("missing") is state
+    assert state.removing_artifacts() is state
+
+    stepped = await Step.removing_artifacts(AlphaArtifact).process(state)
+    assert set(stepped.artifacts) == {"BetaArtifact", "custom"}
+    assert Step.removing_artifacts() is Step.noop
+
+
+@pytest.mark.asyncio
+async def test_then_and_rshift_compose_sequences() -> None:
+    first = Step.appending_context(ModelInput.of(MultimodalContent.of("1")))
+    second = Step.appending_context(ModelOutput.of(MultimodalContent.of("2")))
+    third = Step.emitting(TextContent.of("3"))
+
+    via_then = first.then(second, third)
+    via_operator = first >> second >> third
+
+    for composed in (via_then, via_operator):
+        state = await composed.process()
+        assert [_text_of(element.content) for element in state.context] == ["1", "2"]
+        assert _text_of(await composed.run()) == "3"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "build",
+    [
+        pytest.param(
+            lambda: ModelOutput.of(
+                MultimodalContent.of('{"title": "Q3", "score": 7}'),
+            ),
+            id="json-text",
+        ),
+        pytest.param(
+            lambda: ModelOutput.of(
+                MultimodalContent.of('```json\n{"title": "Q3", "score": 7}\n```'),
+            ),
+            id="code-fence",
+        ),
+        pytest.param(
+            lambda: ModelOutput.of(
+                MultimodalContent.of(ArtifactContent.of(ReportArtifact(title="Q3", score=7))),
+            ),
+            id="artifact",
+        ),
+    ],
+)
+async def test_decoding_artifact_from_model_output(build: Any) -> None:
+    state = await Step.decoding_artifact(ReportArtifact).process((build(),))
+
+    assert state.get(ReportArtifact, required=True) == ReportArtifact(title="Q3", score=7)
+
+
+@pytest.mark.asyncio
+async def test_decoding_artifact_uses_explicit_key() -> None:
+    output = ModelOutput.of(MultimodalContent.of('{"title": "Q3", "score": 7}'))
+
+    state = await Step.decoding_artifact(ReportArtifact, key="report").process((output,))
+
+    assert state.get(ReportArtifact, key="report", required=True).score == 7
+    assert state.get(ReportArtifact) is None
+
+
+@pytest.mark.asyncio
+async def test_decoding_artifact_failures_raise_step_exception() -> None:
+    with pytest.raises(StepException, match="ending with model output"):
+        await Step.decoding_artifact(ReportArtifact).process()
+
+    with pytest.raises(StepException, match="ending with model output"):
+        await Step.decoding_artifact(ReportArtifact).process(
+            (ModelInput.of(MultimodalContent.of("{}")),)
+        )
+
+    with pytest.raises(StepException, match="Failed to decode") as exc_info:
+        await Step.decoding_artifact(ReportArtifact).process(
+            (ModelOutput.of(MultimodalContent.of("not json")),)
+        )
+
+    assert exc_info.value.__cause__ is not None
+
+
+@pytest.mark.asyncio
+async def test_completion_with_typed_output_decodes_into_artifact() -> None:
+    def generating(
+        *,
+        instructions: str,
+        tools: ModelTools,
+        context: Sequence[ModelContextElement],
+        output: Any,
+        **extra: Any,
+    ) -> AsyncIterable[ModelOutputChunk]:
+        assert output is ReportArtifact
+        return _stream_of(TextContent.of('{"title": "Q3", "score": 7}'))
+
+    pipeline = Step.looping_completion(output=ReportArtifact) >> Step.decoding_artifact(
+        ReportArtifact
+    )
+    state = await pipeline.with_ctx(GenerativeModel(generating=generating)).process(
+        (ModelInput.of(MultimodalContent.of("report")),)
+    )
+
+    assert state.get(ReportArtifact, required=True).title == "Q3"

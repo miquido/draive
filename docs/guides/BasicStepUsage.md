@@ -66,8 +66,11 @@ teardown.
 
 ## Common Composition Helpers
 
-- `Step.sequence(...)` for deterministic pipelines.
-- `Step.loop(..., condition=...)` for iterative processing.
+- `Step.sequence(...)` for deterministic pipelines, also available as `first.then(second)` or
+    `first >> second`.
+- `Step.loop(..., condition=...)` for iterative processing. `Step.loop` and
+    `Step.looping_completion` stop with a `StepException` after `max_iterations` (32 by default,
+    `None` disables the limit).
 - `Step.concurrent(..., merge=...)` for fan-out/fan-in branches.
 - `Step.selection(...)` for choosing the next step from the current state.
 - `Step.generating_completion(...)` for one model completion stage.
@@ -81,12 +84,31 @@ teardown.
 - `Step.preserving_state(...)` / `Step.restoring_state(...)` for snapshotting whole `StepState`.
 - `step` decorator for adapting a plain `StepState -> StepState` coroutine into a `Step`.
 
+## Structured Output
+
+Request typed output from a completion and decode it into an artifact with
+`Step.decoding_artifact(...)`:
+
+```python
+report = await (
+    Step.looping_completion(instructions="Summarize...", output=Report)
+    >> Step.decoding_artifact(Report)
+).process(context)
+report.get(Report, required=True)
+```
+
+Use `Step.removing_artifacts(...)` or `StepState.removing_artifacts(...)` to drop artifacts that
+should not be passed further.
+
 ## Modifiers
 
 Any step can be wrapped without breaking composition:
 
 - `step.with_ctx(...)` for scoped state and disposables.
-- `step.with_retry(...)` and `step.with_fallback(...)` for failure handling.
+- `step.with_retry(...)` and `step.with_fallback(...)` for failure handling. A step failing after
+    retries raises `StepRetriesExhausted` chained to the last error.
+- `step.with_timeout(seconds)` limiting step execution time, raising `StepTimeout`. Time the
+    consumer spends between emitted chunks is not counted.
 - `step.with_condition(..., alternative=...)` for conditional execution.
 - `step.with_isolated_context(...)`, `step.with_volatile_context()`, `step.with_volatile_tools()`
     for controlling what the step contributes back to context.

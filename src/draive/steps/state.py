@@ -210,6 +210,31 @@ class StepState(State, serializable=True):
             }
         )
 
+    def removing_artifacts(
+        self,
+        *keys: str | type[State],
+    ) -> Self:
+        """Return a copy of state without the selected artifacts.
+
+        Parameters
+        ----------
+        *keys : str | type[State]
+            Artifact keys to remove. A state type selects the artifact stored
+            under its class name. Keys that are not present are ignored.
+
+        Returns
+        -------
+        Self
+            Updated state instance. Returns ``self`` when nothing is removed.
+        """
+        removed: set[str] = {key if isinstance(key, str) else key.__name__ for key in keys}
+        if not removed.intersection(self.artifacts):
+            return self
+
+        return self.updating(
+            artifacts={key: value for key, value in self.artifacts.items() if key not in removed}
+        )
+
     def appending_context(
         self,
         *elements: ModelContextElement,

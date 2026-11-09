@@ -9,9 +9,11 @@ from draive.steps.types import (
     StepMerging,
     StepOutputChunk,
     StepProcessing,
+    StepRetriesExhausted,
     StepStatePreserving,
     StepStateRestoring,
     StepStream,
+    StepTimeout,
 )
 
 __all__ = (
@@ -24,10 +26,12 @@ __all__ = (
     "StepMerging",
     "StepOutputChunk",
     "StepProcessing",
+    "StepRetriesExhausted",
     "StepSelecting",
     "StepState",
     "StepStatePreserving",
     "StepStateRestoring",
     "StepStream",
+    "StepTimeout",
     "step",
 )

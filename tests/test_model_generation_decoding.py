@@ -4,8 +4,8 @@ import pytest
 from haiway import State, ctx
 
 from draive import GenerativeModel, ModelGeneration, ModelOutputChunk, TextContent
-from draive.generation.model.default import _json_payload
 from draive.multimodal import MultimodalContent
+from draive.steps.decoding import json_payload
 
 
 class Example(State, serializable=True):
@@ -28,8 +28,8 @@ class Example(State, serializable=True):
         ("not json at all", "not json at all"),
     ],
 )
-def test_json_payload_unwraps_code_fences(raw: str, expected: str) -> None:
-    assert _json_payload(MultimodalContent.of(raw)) == expected
+def testjson_payload_unwraps_code_fences(raw: str, expected: str) -> None:
+    assert json_payload(MultimodalContent.of(raw)) == expected
 
 
 @pytest.mark.parametrize(
@@ -42,8 +42,8 @@ def test_json_payload_unwraps_code_fences(raw: str, expected: str) -> None:
         ((), ""),
     ],
 )
-def test_json_payload_joins_content_parts(parts: tuple[str, ...], expected: str) -> None:
-    assert _json_payload(MultimodalContent.of(*parts)) == expected
+def testjson_payload_joins_content_parts(parts: tuple[str, ...], expected: str) -> None:
+    assert json_payload(MultimodalContent.of(*parts)) == expected
 
 
 @pytest.mark.asyncio

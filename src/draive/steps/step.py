@@ -1,4 +1,4 @@
-from asyncio import sleep
+from asyncio import sleep, timeout
 from collections.abc import (
     AsyncGenerator,
     AsyncIterator,
@@ -11,6 +11,7 @@ from collections.abc import (
     MutableSequence,
     Sequence,
 )
+from time import monotonic
 from typing import Any, ClassVar, NoReturn, Protocol, Self, final, overload, runtime_checkable
 
 from haiway import (
@@ -54,6 +55,7 @@ from draive.multimodal import (
     Template,
     TemplatesRepository,
 )
+from draive.steps.decoding import decode_content
 from draive.steps.state import StepState, artifacts_mapping
 from draive.steps.types import (
     StepConditionVerifying,
@@ -64,9 +66,11 @@ from draive.steps.types import (
     StepMerging,
     StepOutputChunk,
     StepProcessing,
+    StepRetriesExhausted,
     StepStatePreserving,
     StepStateRestoring,
     StepStream,
+    StepTimeout,
 )
 from draive.tools import Tool, Toolbox
 from draive.utils import ProcessingEvent
@@ -194,6 +198,89 @@ class Step:
                     **merged_artifacts,
                 }
             )
+
+        return cls(step)
+
+    @classmethod
+    def removing_artifacts(
+        cls,
+        *keys: str | type[State],
+    ) -> Self:
+        """Create a step that removes artifacts from ``StepState``.
+
+        Parameters
+        ----------
+        *keys : str | type[State]
+            Artifact keys to remove. A state type selects the artifact stored
+            under its class name. Missing keys are ignored.
+
+        Returns
+        -------
+        Self
+            A step removing selected artifacts, or ``Step.noop`` when no keys
+            are provided.
+        """
+        if not keys:
+            return cls.noop
+
+        async def step(
+            state: StepState,
+        ) -> StepStream:
+            yield state.removing_artifacts(*keys)
+
+        return cls(step)
+
+    @classmethod
+    def decoding_artifact[Artifact: State](
+        cls,
+        artifact: type[Artifact],
+        /,
+        *,
+        key: str | None = None,
+    ) -> Self:
+        """Create a step decoding the latest model output into a typed artifact.
+
+        Intended to follow a completion step requesting structured output, i.e.
+        ``Step.looping_completion(output=Report)``. A direct JSON artifact of
+        the output is preferred, otherwise the JSON text of the output is decoded.
+
+        Parameters
+        ----------
+        artifact : type[Artifact]
+            State type to decode.
+        key : str | None
+            Artifact key. Defaults to the class name of ``artifact``.
+
+        Returns
+        -------
+        Self
+            A step storing the decoded artifact in ``StepState``.
+
+        Raises
+        ------
+        StepException
+            If context does not end with a model output or decoding fails.
+        """
+
+        async def step(
+            state: StepState,
+        ) -> StepStream:
+            if not state.context or not isinstance(state.context[-1], ModelOutput):
+                raise StepException(
+                    f"Decoding {artifact.__name__} requires context ending with model output",
+                    state=state,
+                )
+
+            try:
+                decoded: Artifact = decode_content(state.context[-1].content, artifact)
+
+            except Exception as exc:
+                raise StepException(
+                    f"Failed to decode {artifact.__name__} from model output",
+                    state=state,
+                ) from exc
+
+            yield state.updating_artifacts(**{key or artifact.__name__: decoded})
 
         return cls(step)
 
@@ -532,20 +619,21 @@ class Step:
         async def step(
             state: StepState,
         ) -> StepStream:
-            for execution in executions:
-                execution_stream: StepStream = execution(state=state)
-                try:
-                    async for chunk in execution_stream:
-                        if isinstance(chunk, StepState):
-                            state = chunk
+            async with ctx.scope("step.sequence"):
+                for execution in executions:
+                    execution_stream: StepStream = execution(state=state)
+                    try:
+                        async for chunk in execution_stream:
+                            if isinstance(chunk, StepState):
+                                state = chunk
 
-                        else:
-                            yield chunk
+                            else:
+                                yield chunk
 
-                finally:
-                    await execution_stream.aclose()
+                    finally:
+                        await execution_stream.aclose()
 
-            yield state
+                yield state
 
         return cls(step)
 
@@ -554,6 +642,7 @@ class Step:
         cls,
         *steps: Self | StepExecuting,
         condition: StepLoopConditionVerifying,
+        max_iterations: int | None = 32,
     ) -> Self:
         """Compose steps in a loop controlled by an async loop condition.
 
@@ -563,17 +652,28 @@ class Step:
             Steps or raw step callables executed in each iteration.
         condition : StepLoopConditionVerifying
             Async predicate deciding whether next iteration should run.
+        max_iterations : int | None
+            Safety limit of iterations, ``None`` disables it. Defaults to 32.
 
         Returns
         -------
         Self
             A looping step, or ``Step.noop`` when no steps are provided.
 
+        Raises
+        ------
+        StepException
+            When the condition still requests another iteration after
+            ``max_iterations`` were executed.
+        ValueError
+            When ``max_iterations`` is lower than 1.
+
         Notes
         -----
         Rationale: enables iterative workflows while preserving structured
         context scoping per iteration.
         """
+        _validate_max_iterations(max_iterations)
         if not steps:
             return cls.noop
 
@@ -591,6 +691,13 @@ class Step:
                     state=state,
                     iteration=iteration,
                 ):
+                    if max_iterations is not None and iteration >= max_iterations:
+                        raise StepException(
+                            f"Step loop exceeded the limit of {max_iterations} iterations",
+                            state=state,
+                            meta={"max_iterations": max_iterations},
+                        )
+
                     async with ctx.scope(f"step.loop.iteration_{iteration}"):
                         for execution in executions:
                             execution_stream: StepStream = execution(state=state)
@@ -851,6 +958,7 @@ class Step:
         tools: Toolbox | Iterable[Tool] = Toolbox.empty,
         input: Template | Multimodal | None = None,  # noqa: A002
         output: ModelOutputSelection = "auto",
+        max_iterations: int | None = 32,
         **extra: Any,
     ) -> Self:
         """Create a step looping between completion and tool execution.
@@ -870,6 +978,8 @@ class Step:
             Optional input content appended to context before generating completion.
         output : ModelOutputSelection
             Output selection mode passed to model completion.
+        max_iterations : int | None
+            Safety limit of completion rounds, ``None`` disables it. Defaults to 32.
         **extra : Any
             Additional provider options forwarded to completion.
 
@@ -880,6 +990,10 @@ class Step:
 
         Raises
         ------
+        StepException
+            When the model keeps requesting tools after ``max_iterations`` rounds.
+        ValueError
+            When ``max_iterations`` is lower than 1.
         Exception
             Propagates model and tool execution failures.
 
@@ -888,9 +1002,10 @@ class Step:
         Rationale: packages completion-and-tool loop logic into a reusable
         typed primitive.
         """
+        _validate_max_iterations(max_iterations)
         toolbox: Toolbox = Toolbox.of(tools)
 
-        async def step(  # noqa: PLR0912
+        async def step(  # noqa: C901, PLR0912
             state: StepState,
         ) -> StepStream:
             async with ctx.scope("step.completion.loop"):
@@ -912,6 +1027,13 @@ class Step:
 
                 iteration: int = 0
                 while True:  # loop until we get ModelOutput without tools
+                    if max_iterations is not None and iteration >= max_iterations:
+                        raise StepException(
+                            f"Completion loop exceeded the limit of {max_iterations} iterations",
+                            state=state,
+                            meta={"max_iterations": max_iterations},
+                        )
+
                     async with ctx.scope(f"step.completion.loop.iteration_{iteration}"):
                         model_output: ModelOutput
                         ctx.log_debug("Generating completion...")
@@ -1130,6 +1252,9 @@ class Step:
             A step retried according to provided policy. Every attempt starts from the
             original input state, partial state emitted by a failed attempt is discarded.
             Output chunks already emitted by a failed attempt cannot be retracted.
+            Failing after at least one retry raises ``StepRetriesExhausted`` chained
+            to the last error, uncaught errors and failures without any retry
+            are raised as they are.
 
         Notes
         -----
@@ -1177,15 +1302,16 @@ class Step:
                             exception=exc,
                         )
 
-                        match delay:
-                            case None:
-                                continue
+                        retry_delay: float = _retry_delay(delay, attempt, exc)
+                        if retry_delay > 0:
+                            await sleep(retry_delay)
 
-                            case float(strict) | int(strict):
-                                await sleep(float(strict))
-
-                            case make_delay:
-                                await sleep(make_delay(attempt, exc))  # pyright: ignore[reportCallIssue, reportUnknownArgumentType]
+                    elif attempt > 0 and catch_check(exc):
+                        raise StepRetriesExhausted(
+                            f"Step failed after {attempt + 1} attempts",
+                            state=state,
+                            attempts=attempt + 1,
+                        ) from exc
 
                     else:
                         raise  # uncatched exception
@@ -1194,6 +1320,93 @@ class Step:
                     return  # end the loop
 
         return self.__class__(step)
+
+    def with_timeout(
+        self,
+        seconds: float,
+        /,
+    ) -> Self:
+        """Limit the execution time of this step.
+
+        Only time spent executing the step counts, time the consumer takes to
+        process emitted chunks between them is excluded.
+
+        Parameters
+        ----------
+        seconds : float
+            Maximum execution time in seconds, must be positive.
+
+        Returns
+        -------
+        Self
+            A step raising ``StepTimeout`` when the limit is exceeded.
+
+        Raises
+        ------
+        ValueError
+            When ``seconds`` is not positive.
+        """
+        if seconds <= 0:
+            raise ValueError("Step timeout has to be positive")
+
+        executing: StepExecuting = self._executing
+
+        async def step(
+            state: StepState,
+        ) -> StepStream:
+            remaining: float = seconds
+            execution_stream: StepStream = executing(state=state)
+            try:
+                while True:
+                    started: float = monotonic()
+                    try:
+                        async with timeout(max(remaining, 0)):
+                            chunk: StepOutputChunk | StepState = await anext(execution_stream)
+
+                    except StopAsyncIteration:
+                        return
+
+                    except TimeoutError as exc:
+                        raise StepTimeout(
+                            f"Step timed out after {seconds} seconds",
+                            state=state,
+                            timeout=seconds,
+                        ) from exc
+
+                    remaining -= monotonic() - started
+                    if isinstance(chunk, StepState):
+                        state = chunk
+
+                    yield chunk
+
+            finally:
+                await execution_stream.aclose()
+
+        return self.__class__(step)
+
+    def then(
+        self,
+        *steps: Self | StepExecuting,
+    ) -> Self:
+        """Compose this step with following steps into a sequence.
+
+        Parameters
+        ----------
+        *steps : Self | StepExecuting
+            Steps executed after this one, in order.
+
+        Returns
+        -------
+        Self
+            A sequential step, equivalent to ``Step.sequence(self, *steps)``.
+        """
+        return self.__class__.sequence(self, *steps)
+
+    def __rshift__(
+        self,
+        other: Self | StepExecuting,
+    ) -> Self:
+        return self.then(other)
 
     def with_fallback(
         self,
@@ -1953,6 +2166,31 @@ def step(
         yield await processing(state)
 
     return Step(executing)
+
+
+def _retry_delay(
+    delay: Callable[[int, Exception], float] | float | None,
+    attempt: int,
+    exception: Exception,
+    /,
+) -> float:
+    match delay:
+        case None:
+            return 0
+
+        case float(strict) | int(strict):
+            return float(strict)
+
+        case make_delay:
+            return make_delay(attempt, exception)  # pyright: ignore[reportCallIssue, reportUnknownArgumentType]
+
+
+def _validate_max_iterations(
+    max_iterations: int | None,
+    /,
+) -> None:
+    if max_iterations is not None and max_iterations < 1:
+        raise ValueError("max_iterations has to be at least 1")
 
 
 async def _handling_tool_requests(
