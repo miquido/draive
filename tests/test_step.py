@@ -3,7 +3,7 @@ from collections.abc import AsyncIterable, Iterable, Sequence
 from typing import Any
 
 import pytest
-from haiway import State
+from haiway import State, ctx
 
 from draive.evaluation import EvaluatorResult
 from draive.models import (
@@ -649,3 +649,248 @@ async def test_tool_output_context_groups_interleaved_requests(
     output = state.context[-1]
     assert isinstance(output, ModelOutput)
     assert _text_of(output.content) == "a1a2b1b2"
+
+
+@pytest.mark.asyncio
+async def test_retry_restarts_from_original_state() -> None:
+    seen_context_sizes: list[int] = []
+
+    async def flaky(state: StepState) -> Any:
+        seen_context_sizes.append(len(state.context))
+        yield state.appending_context(ModelInput.of(MultimodalContent.of("partial")))
+        if len(seen_context_sizes) == 1:
+            raise ValueError("boom")
+
+        yield state.appending_context(ModelInput.of(MultimodalContent.of("done")))
+
+    result = await Step(flaky).with_retry(limit=1).process()
+
+    assert seen_context_sizes == [0, 0]
+    assert len(result.context) == 1
+    assert _text_of(result.context[0].content) == "done"
+
+
+@pytest.mark.asyncio
+async def test_retry_without_state_output_discards_failed_attempt_state() -> None:
+    attempts = 0
+
+    async def flaky(state: StepState) -> Any:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            yield state.appending_context(ModelInput.of(MultimodalContent.of("partial")))
+            raise ValueError("boom")
+
+    result = await Step(flaky).with_retry(limit=1).process()
+
+    assert attempts == 2
+    assert result.context == ()
+
+
+@pytest.mark.asyncio
+async def test_fallback_runs_from_original_state() -> None:
+    seen: list[int] = []
+
+    async def failing(state: StepState) -> Any:
+        yield state.appending_context(ModelInput.of(MultimodalContent.of("partial")))
+        raise ValueError("boom")
+
+    async def fallback(state: StepState) -> Any:
+        seen.append(len(state.context))
+        yield state.appending_context(ModelInput.of(MultimodalContent.of("fallback")))
+
+    result = await Step(failing).with_fallback(Step(fallback)).process()
+
+    assert seen == [0]
+    assert len(result.context) == 1
+    assert _text_of(result.context[0].content) == "fallback"
+
+
+@pytest.mark.asyncio
+async def test_fallback_without_state_output_discards_failed_step_state() -> None:
+    async def failing(state: StepState) -> Any:
+        yield state.appending_context(ModelInput.of(MultimodalContent.of("partial")))
+        raise ValueError("boom")
+
+    initial = StepState.of((ModelInput.of(MultimodalContent.of("start")),))
+    result = await Step(failing).with_fallback(Step.noop).process(initial)
+
+    assert result == initial
+
+
+@pytest.mark.asyncio
+async def test_concurrent_merge_receives_reiterable_branches() -> None:
+    counts: list[tuple[int, int]] = []
+
+    async def merge(branches: Iterable[StepState]) -> StepState:
+        counts.append((len(list(branches)), len(list(branches))))
+        return StepState.of()
+
+    await Step.concurrent(Step.noop, Step.noop, merge=merge).process()
+
+    assert counts == [(2, 2)]
+
+
+@pytest.mark.asyncio
+async def test_volatile_tools_drops_elements_left_empty() -> None:
+    tool_only = ModelOutput.of(ModelToolRequest.of("call", tool="lookup", arguments={}))
+    mixed = ModelOutput.of(
+        MultimodalContent.of("text"),
+        ModelToolRequest.of("call2", tool="lookup", arguments={}),
+    )
+
+    state = await Step.appending_context(tool_only, mixed).with_volatile_tools().process()
+
+    assert len(state.context) == 1
+    assert _text_of(state.context[0].content) == "text"
+
+
+@pytest.mark.asyncio
+async def test_loop_with_false_initial_condition_keeps_state() -> None:
+    async def never(state: StepState, iteration: int) -> bool:
+        return False
+
+    initial = (ModelInput.of(MultimodalContent.of("start")),)
+    state = await Step.loop(Step.noop, condition=never).process(initial)
+
+    assert state.context == initial
+
+
+@pytest.mark.asyncio
+async def test_process_rejects_artifacts_with_explicit_state() -> None:
+    with pytest.raises(TypeError):
+        await Step.noop.process(StepState.of(), AlphaArtifact(value="x"))
+
+    with pytest.raises(TypeError):
+        await Step.noop.run(StepState.of(), AlphaArtifact(value="x"))
+
+    with pytest.raises(TypeError):
+        stream = Step.noop.stream(StepState.of(), alpha=AlphaArtifact(value="x"))
+        _ = [chunk async for chunk in stream]
+
+
+@pytest.mark.asyncio
+async def test_state_get_uses_explicit_key_even_when_empty() -> None:
+    state = StepState.of((), **{"": AlphaArtifact(value="empty-key")})
+
+    assert state.get(AlphaArtifact, key="") == AlphaArtifact(value="empty-key")
+    assert state.get(AlphaArtifact) is None
+
+
+class CtxMarker(State):
+    value: str = "default"
+
+
+class _MarkerDisposable:
+    def __init__(self, events: list[str]) -> None:
+        self._events = events
+
+    async def __aenter__(self) -> CtxMarker:
+        self._events.append("enter")
+        return CtxMarker(value="disposed")
+
+    async def __aexit__(self, *_: Any) -> None:
+        self._events.append("exit")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("with_state", [False, True])
+async def test_with_ctx_disposables_are_entered_and_released(with_state: bool) -> None:
+    events: list[str] = []
+    observed: list[str] = []
+
+    @step
+    async def observing(state: StepState) -> StepState:
+        observed.append(ctx.state(CtxMarker).value)
+        events.append("run")
+        return state
+
+    wrapped = observing.with_ctx(
+        *((CtxMarker(value="explicit"),) if with_state else ()),
+        disposables=(_MarkerDisposable(events),),
+    )
+    await wrapped.process()
+
+    assert events == ["enter", "run", "exit"]
+    assert observed == ["explicit" if with_state else "disposed"]
+
+
+@pytest.mark.asyncio
+async def test_output_evaluation_runs_once_with_complete_output() -> None:
+    calls: list[int] = []
+
+    async def evaluator(output: Sequence[Any]) -> EvaluatorResult:
+        calls.append(len(output))
+        return EvaluatorResult.of("output", score=1.0, threshold=0.5)
+
+    await (
+        Step.emitting(TextContent.of("a"), TextContent.of("b"), TextContent.of("c"))
+        .with_output_evaluation(evaluator)
+        .run()
+    )
+
+    assert calls == [3]
+
+
+@pytest.mark.asyncio
+async def test_output_evaluation_failure_carries_final_state() -> None:
+    async def failing(_: Sequence[Any]) -> EvaluatorResult:
+        return EvaluatorResult.of("output", score=0.0, threshold=1.0)
+
+    delivered: list[Any] = []
+    pipeline = Step.sequence(
+        Step.emitting(TextContent.of("x")),
+        Step.updating_artifacts(AlphaArtifact(value="final")),
+    ).with_output_evaluation(failing, raise_on_failure=True)
+
+    with pytest.raises(StepException) as exc_info:
+        async for chunk in pipeline.stream():
+            delivered.append(chunk)
+
+    assert len(delivered) == 1  # output delivered before the evaluation failed
+    assert exc_info.value.state.get(AlphaArtifact, required=True).value == "final"
+
+
+@pytest.mark.asyncio
+async def test_output_evaluation_not_run_when_step_fails() -> None:
+    calls = 0
+
+    async def evaluator(_: Sequence[Any]) -> EvaluatorResult:
+        nonlocal calls
+        calls += 1
+        return EvaluatorResult.of("output", score=1.0, threshold=0.5)
+
+    @step
+    async def failing(state: StepState) -> StepState:
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError):
+        await failing.with_output_evaluation(evaluator).process()
+
+    assert calls == 0
+
+
+@pytest.mark.asyncio
+async def test_duplicate_artifact_keys_are_rejected() -> None:
+    with pytest.raises(ValueError, match="AlphaArtifact"):
+        StepState.of((), AlphaArtifact(value="1"), AlphaArtifact(value="2"))
+
+    with pytest.raises(ValueError, match="AlphaArtifact"):
+        StepState.of((), AlphaArtifact(value="1"), AlphaArtifact=AlphaArtifact(value="2"))
+
+    with pytest.raises(ValueError, match="AlphaArtifact"):
+        StepState.of().updating_artifacts(AlphaArtifact(value="1"), AlphaArtifact(value="2"))
+
+    with pytest.raises(ValueError, match="AlphaArtifact"):
+        Step.updating_artifacts(AlphaArtifact(value="1"), AlphaArtifact(value="2"))
+
+
+@pytest.mark.asyncio
+async def test_updating_artifacts_replaces_existing_artifacts() -> None:
+    state = StepState.of((), AlphaArtifact(value="old")).updating_artifacts(
+        AlphaArtifact(value="new"),
+        other=BetaArtifact(value="extra"),
+    )
+
+    assert state.get(AlphaArtifact, required=True).value == "new"
+    assert state.get(BetaArtifact, key="other", required=True).value == "extra"

@@ -92,7 +92,14 @@ Any step can be wrapped without breaking composition:
     for controlling what the step contributes back to context.
 - `step.with_suppressed_output()` for muting emitted chunks.
 - `step.with_context_evaluation(...)` and `step.with_output_evaluation(...)` for evaluating context
-    and emitted output.
+    and emitted output. Output evaluation runs once, after the wrapped step completes, over all
+    emitted chunks.
+- `step.with_retry(...)` and `step.with_fallback(...)` restart from the original input state,
+    partial state of a failed attempt is discarded.
+
+Artifacts given to `StepState.of`, `StepState.updating_artifacts` or `Step.updating_artifacts` must
+resolve to unique keys within a single call (a `ValueError` is raised otherwise); artifacts already
+stored in state are replaced.
 
 `with_volatile_tools()` preserves the context passed into the wrapped step. In context added or
 replaced by the step, it removes tool request and response blocks while retaining any ordinary
