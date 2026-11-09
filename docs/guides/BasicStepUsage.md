@@ -66,12 +66,16 @@ teardown.
 
 ## Common Composition Helpers
 
-- `Step.sequence(...)` for deterministic pipelines.
-- `Step.loop(..., condition=...)` for iterative processing.
+- `Step.sequence(...)` for deterministic pipelines, also available as `first.then(second)` or
+    `first >> second`.
+- `Step.loop(..., condition=...)` for iterative processing. `Step.loop` and
+    `Step.looping_completion` stop with a `StepException` after `max_iterations` (32 by default,
+    `None` disables the limit).
 - `Step.concurrent(..., merge=...)` for fan-out/fan-in branches.
 - `Step.selection(...)` for choosing the next step from the current state.
 - `Step.generating_completion(...)` for one model completion stage.
 - `Step.looping_completion(...)` for model + tool iterative loops.
+- `Step.decoding_artifact(...)` for decoding structured model output into an artifact.
 - `Step.handling_tools(...)` for executing tool requests of the latest model output.
 - `Step.appending_input(...)` / `Step.appending_output(...)` for injecting externally provided
     content, including awaited providers and `Template` values.
@@ -79,14 +83,35 @@ teardown.
     working with the whole `ModelContext` - append elements, swap it for a fixed one (or an awaited
     provider), or rewrite it through an async mutation.
 - `Step.preserving_state(...)` / `Step.restoring_state(...)` for snapshotting whole `StepState`.
+- `Step.updating_artifacts(...)` / `Step.removing_artifacts(...)` for changing artifacts.
 - `step` decorator for adapting a plain `StepState -> StepState` coroutine into a `Step`.
+
+## Structured Output
+
+Request typed output from a completion and decode it into an artifact with
+`Step.decoding_artifact(...)`:
+
+```python
+report = await (
+    Step.looping_completion(instructions="Summarize...", output=Report)
+    >> Step.decoding_artifact(Report)
+).process(context)
+report.get(Report, required=True)
+```
+
+Use `Step.removing_artifacts(...)` or `StepState.removing_artifacts(...)` to drop artifacts that
+should not be passed further.
 
 ## Modifiers
 
 Any step can be wrapped without breaking composition:
 
 - `step.with_ctx(...)` for scoped state and disposables.
-- `step.with_retry(...)` and `step.with_fallback(...)` for failure handling.
+- `step.with_retry(...)` and `step.with_fallback(...)` for failure handling. Every attempt (and the
+    fallback) starts from the original input state, partial state of a failed attempt is discarded.
+    Output chunks already emitted cannot be retracted.
+- `step.with_timeout(seconds)` limiting step execution time, raising `StepTimeout`. Time the
+    consumer spends between emitted chunks is not counted.
 - `step.with_condition(..., alternative=...)` for conditional execution.
 - `step.with_isolated_context(...)`, `step.with_volatile_context()`, `step.with_volatile_tools()`
     for controlling what the step contributes back to context.
@@ -94,8 +119,20 @@ Any step can be wrapped without breaking composition:
 - `step.with_context_evaluation(...)` and `step.with_output_evaluation(...)` for evaluating context
     and emitted output. Output evaluation runs once, after the wrapped step completes, over all
     emitted chunks.
-- `step.with_retry(...)` and `step.with_fallback(...)` restart from the original input state,
-    partial state of a failed attempt is discarded.
+
+## Failures and Limits
+
+Step failures carry the `StepState` they happened with (`exception.state`):
+
+| Exception              | Raised when                                                                                         |
+| ---------------------- | --------------------------------------------------------------------------------------------------- |
+| `StepException`        | evaluation fails with `raise_on_failure`, decoding fails, or a loop exceeds `max_iterations`        |
+| `StepTimeout`          | `with_timeout(...)` limit is exceeded (`exception.timeout`)                                         |
+| `StepRetriesExhausted` | `with_retry(...)` failed after at least one retry (`exception.attempts`, last error as `__cause__`) |
+
+Errors that are not matched by `catching`, or that happen with `limit=0`, are raised unchanged.
+
+## Artifacts
 
 Artifacts given to `StepState.of`, `StepState.updating_artifacts` or `Step.updating_artifacts` must
 resolve to unique keys within a single call (a `ValueError` is raised otherwise); artifacts already
