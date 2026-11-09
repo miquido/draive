@@ -1,5 +1,5 @@
 [build-system]
-requires = ["uv_build>=0.12.0,<0.13.0"]
+requires = ["uv_build>=0.13.7,<0.14.0"]
 build-backend = "uv_build"
 
 [project]
@@ -17,6 +17,7 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
   "Typing :: Typed",
   "Topic :: Software Development",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
@@ -24,7 +25,7 @@ classifiers = [
 ]
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["numpy~=2.5", "haiway~=0.59.0", "pyyaml~=6.0"]
+dependencies = ["numpy~=2.5", "haiway~=0.60.0", "pyyaml~=6.0"]
 
 [project.urls]
 Homepage = "https://miquido.com"
@@ -35,15 +36,15 @@ cohere = ["cohere~=7.0"]
 cohere_bedrock = ["cohere~=7.0", "boto3~=1.43"]
 openai = ["openai~=3.2"]
 openai_realtime = ["openai[realtime]~=3.2"]
-anthropic = ["anthropic~=1.0"]
-anthropic_bedrock = ["anthropic[bedrock]~=1.0"]
-mistral = ["mistralai~=2.9"]
-gemini = ["google-genai~=2.18"]
+anthropic = ["anthropic~=2.6"]
+anthropic_bedrock = ["anthropic[bedrock]~=2.6"]
+mistral = ["mistralai~=3.7"]
+gemini = ["google-genai~=3.0"]
 ollama = ["ollama~=0.6.2"]
 bedrock = ["boto3~=1.43"]
 aws = ["boto3~=1.43"]
 vllm = ["openai~=3.2"]
-mcp = ["mcp~=2.1", "httpx2~=2.10"]
+mcp = ["mcp~=2.1", "httpx2~=2.16"]
 opentelemetry = [
   "haiway[opentelemetry]",
   "opentelemetry-api",
@@ -51,31 +52,42 @@ opentelemetry = [
   "opentelemetry-exporter-otlp-proto-grpc",
 ]
 httpx = ["haiway[httpx]"]
-starlette = ["haiway[starlette]", "starlette~=1.6"]
-fastapi = ["haiway[fastapi]", "fastapi~=0.141", "starlette~=1.6"]
+starlette = ["haiway[starlette]", "starlette~=1.10"]
+fastapi = ["haiway[fastapi]", "fastapi~=0.162", "starlette~=1.10"]
 postgres = ["haiway[postgres]", "asyncpg"]
 rabbitmq = ["haiway[rabbitmq]", "pika"]
 qdrant = ["qdrant-client~=1.19"]
-surrealdb = ["surrealdb~=2.0"]
+surrealdb = ["surrealdb~=3.0"]
+surrealdb_embedded = ["surrealdb[embedded]~=3.0"]
+
+[dependency-groups]
+# development tooling lives in dependency groups (synced by default, never published)
+# while the integration extras stay optional dependencies of the package itself
 dev = [
+  "draive[cohere,cohere_bedrock,openai,openai_realtime,anthropic,anthropic_bedrock,mistral,gemini,ollama,bedrock,aws,vllm,mcp,opentelemetry,httpx,starlette,fastapi,postgres,rabbitmq,qdrant,surrealdb,surrealdb_embedded]",
   "bandit~=1.9",
   "jsonschema~=4.26",
   "pyright~=1.1",
-  "pytest~=9.1",
+  "pytest~=9.2",
   "pytest-asyncio~=1.4",
   "pytest-cov~=7.1",
-  "ruff~=0.16",
+  "ruff~=0.17",
 ]
 docs = [
+  "draive[cohere,cohere_bedrock,openai,openai_realtime,anthropic,anthropic_bedrock,mistral,gemini,ollama,bedrock,aws,vllm,mcp,opentelemetry,httpx,starlette,fastapi,postgres,rabbitmq,qdrant,surrealdb,surrealdb_embedded]",
   "mkdocs~=1.6",
-  "mkdocs-material~=9.7",
-  "mkdocstrings[python]~=0.30",
-  "mdformat~=0.7",
-  "mdformat-gfm~=0.4",
+  "mkdocs-material~=9.8",
+  "mkdocstrings[python]~=1.0",
+  "mdformat~=1.0",
+  "mdformat-gfm~=1.0",
   "pymarkdownlnt~=0.9",
-  "mkdocs-build-plantuml-plugin~=1.11",
-  "mdformat-mkdocs>=5.2.1",
+  "mkdocs-build-plantuml-plugin~=2.1",
+  "mdformat-mkdocs~=5.3",
 ]
+
+[tool.uv]
+required-version = "==0.13.7"
+default-groups = "all"
 
 [tool.ruff]
 target-version = "py314"

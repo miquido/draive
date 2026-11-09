@@ -192,6 +192,10 @@ Export traces/metrics to your observability stack.
 pip install 'draive[opentelemetry]'
 ```
 
+Events and exception details are exported as OpenTelemetry log records correlated with the active
+span, not as span events. Make sure your collector and backend ingest the logs signal, and move any
+dashboards or queries based on span events to logs.
+
 - Postgres:
 
 Use Postgres-backed persistence helpers.
@@ -215,6 +219,10 @@ Use SurrealDB integration, including vector index, templates and conversation me
 ```bash
 pip install 'draive[surrealdb]'
 ```
+
+For in-process connections (`mem://`, `file://`, `surrealkv://`) install the embedded engine as
+well with `pip install 'draive[surrealdb_embedded]'`. When no url is given, `SurrealClient` uses
+`mem://` if the embedded engine is installed and requires an explicit url otherwise.
 
 Remote connections require a SurrealDB 3.x server - the session handling relies on RPC methods
 older servers do not provide. Namespaces and databases are not created implicitly, they have to be

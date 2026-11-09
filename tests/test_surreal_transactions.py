@@ -2,6 +2,7 @@ from collections.abc import Callable
 from uuid import UUID, uuid4
 
 import pytest
+import surrealdb
 from haiway import State
 from surrealdb.request_message.methods import RequestMethod
 
@@ -151,9 +152,7 @@ async def test_surreal_session_transaction_is_unavailable_for_embedded_connectio
         async def close(self) -> None:
             return None
 
-    monkeypatch.setattr(
-        surreal_connection, "AsyncEmbeddedSurrealConnection", _FakeEmbeddedConnection
-    )
+    monkeypatch.setattr(surrealdb, "AsyncEmbeddedSurrealConnection", _FakeEmbeddedConnection)
 
     async with SurrealClient(
         url="mem://",
@@ -203,9 +202,7 @@ async def test_surreal_embedded_execute_supports_inline_sql_transactions(
         async def close(self) -> None:
             return None
 
-    monkeypatch.setattr(
-        surreal_connection, "AsyncEmbeddedSurrealConnection", _FakeEmbeddedConnection
-    )
+    monkeypatch.setattr(surrealdb, "AsyncEmbeddedSurrealConnection", _FakeEmbeddedConnection)
 
     async with SurrealClient(
         url="mem://",
@@ -247,9 +244,7 @@ async def test_surreal_session_create_and_delete_use_surreal_record_ids(
         async def close(self) -> None:
             return None
 
-    monkeypatch.setattr(
-        surreal_connection, "AsyncEmbeddedSurrealConnection", _FakeEmbeddedConnection
-    )
+    monkeypatch.setattr(surrealdb, "AsyncEmbeddedSurrealConnection", _FakeEmbeddedConnection)
 
     async with SurrealClient(
         url="mem://",
