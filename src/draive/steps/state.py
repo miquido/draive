@@ -10,6 +10,29 @@ from draive.multimodal import ArtifactContent
 __all__ = ("StepState",)
 
 
+def artifacts_mapping(
+    artifacts: tuple[State, ...],
+    keyed_artifacts: Mapping[str, State],
+) -> Mapping[str, ArtifactContent]:
+    mapping: dict[str, ArtifactContent] = {}
+    for artifact in artifacts:
+        key: str = artifact.__class__.__name__
+        if key in mapping:
+            raise ValueError(
+                f"Duplicate artifact key '{key}', use keyword arguments to provide explicit keys"
+            )
+
+        mapping[key] = ArtifactContent.of(artifact)
+
+    for key, value in keyed_artifacts.items():
+        if key in mapping:
+            raise ValueError(f"Duplicate artifact key '{key}'")
+
+        mapping[key] = ArtifactContent.of(value)
+
+    return mapping
+
+
 @final
 class StepState(State, serializable=True):
     """Immutable state container used by step pipelines.
@@ -52,13 +75,15 @@ class StepState(State, serializable=True):
         -------
         Self
             Newly constructed step state instance.
+
+        Raises
+        ------
+        ValueError
+            If artifacts resolve to the same key within a single call.
         """
         return cls(
             context=context,
-            artifacts={
-                **{item.__class__.__name__: ArtifactContent.of(item) for item in artifacts},
-                **{key: ArtifactContent.of(value) for key, value in keyed_artifacts.items()},
-            },
+            artifacts=artifacts_mapping(artifacts, keyed_artifacts),
         )
 
     context: ModelContext = ()
@@ -133,7 +158,7 @@ class StepState(State, serializable=True):
         KeyError
             If the artifact is missing and ``required`` is ``True``.
         """
-        lookup_key: str = key or content.__name__
+        lookup_key: str = content.__name__ if key is None else key
         current: ArtifactContent | None = self.artifacts.get(lookup_key)
         if current is not None:
             return current.to_state(content)
@@ -168,6 +193,12 @@ class StepState(State, serializable=True):
         -------
         Self
             Updated state instance. Returns ``self`` when no updates are given.
+
+        Raises
+        ------
+        ValueError
+            If provided artifacts resolve to the same key within a single call.
+            Artifacts already stored in state are replaced.
         """
         if not artifacts and not keyed_artifacts:
             return self
@@ -175,11 +206,7 @@ class StepState(State, serializable=True):
         return self.updating(
             artifacts={
                 **self.artifacts,
-                **{
-                    artifact.__class__.__name__: ArtifactContent.of(artifact)
-                    for artifact in artifacts
-                },
-                **{key: ArtifactContent.of(value) for key, value in keyed_artifacts.items()},
+                **artifacts_mapping(artifacts, keyed_artifacts),
             }
         )
 
