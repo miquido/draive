@@ -707,6 +707,18 @@ async def test_fallback_runs_from_original_state() -> None:
 
 
 @pytest.mark.asyncio
+async def test_fallback_without_state_output_discards_failed_step_state() -> None:
+    async def failing(state: StepState) -> Any:
+        yield state.appending_context(ModelInput.of(MultimodalContent.of("partial")))
+        raise ValueError("boom")
+
+    initial = StepState.of((ModelInput.of(MultimodalContent.of("start")),))
+    result = await Step(failing).with_fallback(Step.noop).process(initial)
+
+    assert result == initial
+
+
+@pytest.mark.asyncio
 async def test_concurrent_merge_receives_reiterable_branches() -> None:
     counts: list[tuple[int, int]] = []
 
