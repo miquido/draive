@@ -39,9 +39,14 @@ uv_check:
 	@CURRENT_VERSION=$$(uv --version | head -n1 | cut -d" " -f2); \
 	if [ "$$CURRENT_VERSION" != "$(UV_VERSION)" ]; then \
 		echo "...switching uv $$CURRENT_VERSION to $(UV_VERSION)..."; \
-		uv self update $(UV_VERSION) || curl -fLsS https://astral.sh/uv/$(UV_VERSION)/install.sh | sh; \
-		if [ $$? -ne 0 ]; then \
-			echo "...updating uv failed!"; \
+		if ! uv self update $(UV_VERSION); then \
+			INSTALLER=$$(curl -fLsS https://astral.sh/uv/$(UV_VERSION)/install.sh) \
+				&& printf '%s' "$$INSTALLER" | sh \
+				|| { echo "...updating uv failed!"; exit 1; }; \
+		fi; \
+		ACTIVE_VERSION=$$(uv --version | head -n1 | cut -d" " -f2); \
+		if [ "$$ACTIVE_VERSION" != "$(UV_VERSION)" ]; then \
+			echo "...uv $$ACTIVE_VERSION is still first on PATH, expected $(UV_VERSION)!"; \
 			exit 1; \
 		fi; \
 	else \

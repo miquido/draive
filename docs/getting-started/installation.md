@@ -55,8 +55,7 @@ uv sync --all-groups --all-extras --frozen
     custom models are defined with `Surreal.define_table`.
 - `draive[rabbitmq]` for message-queue integrations.
 - `draive[starlette]`, `draive[fastapi]` for serving draive applications over HTTP.
-- `draive[httpx]`, `draive[mcp]`, `draive[opentelemetry]`, `draive[docs]` for HTTP utilities, MCP,
-    tracing, and docs site builds.
+- `draive[httpx]`, `draive[mcp]`, `draive[opentelemetry]` for HTTP utilities, MCP, and tracing.
 
 ## Verify your environment
 

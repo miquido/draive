@@ -192,6 +192,10 @@ Export traces/metrics to your observability stack.
 pip install 'draive[opentelemetry]'
 ```
 
+Events and exception details are exported as OpenTelemetry log records correlated with the active
+span, not as span events. Make sure your collector and backend ingest the logs signal, and move any
+dashboards or queries based on span events to logs.
+
 - Postgres:
 
 Use Postgres-backed persistence helpers.
