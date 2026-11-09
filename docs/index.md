@@ -169,7 +169,9 @@ single-call generation is no longer enough.
 Common patterns include:
 
 - sequential orchestration (`Step.sequence(...)`),
-- guarded loops (`Step.loop(...)`),
+- guarded loops (`Step.loop(...)`, limited by `max_iterations`),
+- resilience wrappers (`with_retry`, `with_fallback`, `with_timeout`),
+- typed output decoding into artifacts (`Step.decoding_artifact(...)`),
 - explicit state preservation/restoration across phases.
 
 For complete walkthroughs, see the dedicated step guides.
