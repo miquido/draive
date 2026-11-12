@@ -52,8 +52,8 @@ can load MCP tools dynamically and keep all dependencies lifecycle-managed by co
 
 ## Example: Remote MCP Server
 
-For remote servers use the Streamable HTTP transport. `MCPClient.sse` is still available but the
-SSE transport is deprecated by the protocol, prefer Streamable HTTP for new integrations.
+For remote servers use the Streamable HTTP transport. `MCPClient.sse` is still available but the SSE
+transport is deprecated by the protocol, prefer Streamable HTTP for new integrations.
 
 ```python
 from draive.mcp import MCPClient

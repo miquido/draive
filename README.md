@@ -1,16 +1,16 @@
 # 🏎️ draive 🏁
 
 [![PyPI](https://img.shields.io/pypi/v/draive)](https://pypi.org/project/draive/)
-![Python Version](https://img.shields.io/badge/Python-3.14+-blue)
+![Python Version](https://img.shields.io/badge/Python-3.15+-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 [![Docs](https://img.shields.io/badge/Documentation-yellow)](https://miquido.github.io/draive/)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/miquido/draive?utm_source=oss&utm_medium=github&utm_campaign=miquido%2Fdraive&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 🏎️ Build production-ready GenAI systems with strict typing, clean architecture, and fast iteration.
 
-Draive helps teams move from prompt experiments to dependable AI features:
-typed outputs, tool orchestration, multimodal workflows, evaluation, guardrails, and observability
-in one cohesive framework.
+Draive helps teams move from prompt experiments to dependable AI features: typed outputs, tool
+orchestration, multimodal workflows, evaluation, guardrails, and observability in one cohesive
+framework.
 
 If you want AI code that stays maintainable as your product grows, Draive is built for that.
 
@@ -78,8 +78,8 @@ documents, handling audio or images — Draive has your back.
 - **Instruction Optimization**: Draive gives you clean ways to write and refine prompts, including
     metaprompts, instruction helpers, and optimizers. You can go from raw prompt text to reusable,
     structured config in no time.
-- **Composable Workflows**: Build modular flows using `Step`, tools, and context-scoped state.
-    Every piece is reusable, testable, and fits together cleanly.
+- **Composable Workflows**: Build modular flows using `Step`, tools, and context-scoped state. Every
+    piece is reusable, testable, and fits together cleanly.
 - **Tooling = Just Python**: Define a tool by writing a function. Annotate it. That’s it. Draive
     handles the rest — serialization, context, and integration with LLMs.
 - **Structured Outputs** - decode to typed Python `State` models with schema-aware generation.
@@ -91,7 +91,7 @@ documents, handling audio or images — Draive has your back.
 
 ## 🖥️ Install
 
-Draive requires Python 3.14 or newer.
+Draive requires Python 3.15 or newer.
 
 With pip:
 
@@ -220,13 +220,13 @@ Use SurrealDB integration, including vector index, templates and conversation me
 pip install 'draive[surrealdb]'
 ```
 
-For in-process connections (`mem://`, `file://`, `surrealkv://`) install the embedded engine as
-well with `pip install 'draive[surrealdb_embedded]'`. When no url is given, `SurrealClient` uses
-`mem://` if the embedded engine is installed and requires an explicit url otherwise.
+For in-process connections (`mem://`, `file://`, `surrealkv://`) install the embedded engine as well
+with `pip install 'draive[surrealdb_embedded]'`. When no url is given, `SurrealClient` uses `mem://`
+if the embedded engine is installed and requires an explicit url otherwise.
 
-Remote connections require a SurrealDB 3.x server - the session handling relies on RPC methods
-older servers do not provide. Namespaces and databases are not created implicitly, they have to be
-defined before use.
+Remote connections require a SurrealDB 3.x server - the session handling relies on RPC methods older
+servers do not provide. Namespaces and databases are not created implicitly, they have to be defined
+before use.
 
 - RabbitMQ:
 
@@ -237,8 +237,8 @@ pip install 'draive[rabbitmq]'
 ```
 
 Variant extras are available for provider-specific setups: `openai_realtime` (OpenAI Realtime API),
-`anthropic_bedrock` and `cohere_bedrock` (those providers accessed through AWS Bedrock), and
-`httpx` (shared HTTP client).
+`anthropic_bedrock` and `cohere_bedrock` (those providers accessed through AWS Bedrock), and `httpx`
+(shared HTTP client).
 
 ## 👷 Contributing
 

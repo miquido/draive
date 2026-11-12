@@ -26,9 +26,8 @@ updated_state = basic_state.updating(value=21)
 
 ## Serializable State
 
-Add `serializable=True` when you rely on JSON conversion, schema generation, and structured
-decoding - the class then fails to define instead of silently losing a field which can't be
-represented.
+Add `serializable=True` when you rely on JSON conversion, schema generation, and structured decoding
+\- the class then fails to define instead of silently losing a field which can't be represented.
 
 ```python
 from collections.abc import Sequence

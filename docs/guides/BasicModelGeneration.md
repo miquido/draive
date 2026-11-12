@@ -7,7 +7,7 @@ require explicit shape guarantees.
 
 ## Prerequisites
 
-- Python 3.14+
+- Python 3.15+
 - OpenAI credentials loaded via `load_env()`
 
 ```python
@@ -19,8 +19,8 @@ load_env()
 
 ## 1. Define Output Schema As Serializable State
 
-`serializable=True` makes the JSON schema requirement explicit - the class fails to define when
-any of its fields can't be represented in the schema used for decoding.
+`serializable=True` makes the JSON schema requirement explicit - the class fails to define when any
+of its fields can't be represented in the schema used for decoding.
 
 ```python
 from draive import State
@@ -74,16 +74,16 @@ The return value is already validated and typed as `InterestingPlace`.
 
 ## Schema Enforcement
 
-Providers enforce the requested schema whenever they can. OpenAI responses request their
-strict structured output mode, which is what makes the API - rather than the prompt - guarantee
-the shape, so decoding cannot fail on a well formed response.
+Providers enforce the requested schema whenever they can. OpenAI responses request their strict
+structured output mode, which is what makes the API - rather than the prompt - guarantee the shape,
+so decoding cannot fail on a well formed response.
 
 Strict mode demands a value for every field, so a field with a default is filled by the model
-instead of being left out. Declare a field as optional (`str | None = None`) when "not present"
-is a meaningful answer, and the model can report it as `null`.
+instead of being left out. Declare a field as optional (`str | None = None`) when "not present" is a
+meaningful answer, and the model can report it as `null`.
 
-A few shapes have no strict equivalent and fall back to delivering the schema as a hint, where
-the model may answer with content that fails decoding:
+A few shapes have no strict equivalent and fall back to delivering the schema as a hint, where the
+model may answer with content that fails decoding:
 
 - `Any` valued fields, including `Meta` and `Mapping[str, Any]`
 - `tuple[...]` fields and unparameterized sequences

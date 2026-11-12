@@ -12,9 +12,9 @@ model state exposes a few helpers that flatten structured content into printable
 | `x.to_str()`                            | Model-defined string, defaults to `str(x)`         |
 | `str(x)`                                | `ClassName(field: value)` for typed `State` models |
 
-Different model instances implement `.to_str()` in their own way, so the rendered view varies
-by content type. The sections below walk through the most common multimodal classes and show how
-their printing helpers behave.
+Different model instances implement `.to_str()` in their own way, so the rendered view varies by
+content type. The sections below walk through the most common multimodal classes and show how their
+printing helpers behave.
 
 ## TextContent
 
@@ -148,7 +148,8 @@ return f"<{self.name}{_tag_attributes(self.meta)}>{self.content.to_str()}</{self
 
 !!! Important
 
-    `MultimodalTag` is the only multimodal element that exposes metadata inline. Values stored in `meta` appear as quoted XML-style tag attributes.
+    `MultimodalTag` is the only multimodal element that exposes metadata inline. Values stored in `meta`
+    appear as quoted XML-style tag attributes.
 
 ## MultimodalContent
 

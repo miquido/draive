@@ -8,8 +8,8 @@ alongside your workflows without wiring the SDK yourself.
 
 Start by binding `QdrantClient` inside a `ctx.scope(...)`. The client lazily opens an
 `AsyncQdrantClient` using the `QDRANT_HOST`/`QDRANT_PORT` environment variables (defaults:
-`localhost:6333`, with gRPC on `QDRANT_GRPC_PORT`, default `6334`) and exposes a `Qdrant` state
-that wraps all collection, storage, search, and delete helpers.
+`localhost:6333`, with gRPC on `QDRANT_GRPC_PORT`, default `6334`) and exposes a `Qdrant` state that
+wraps all collection, storage, search, and delete helpers.
 
 ```python
 from draive import ctx, Pagination, State
@@ -88,11 +88,10 @@ When the stored payload should be deleted use `Qdrant.delete(...)` with the same
 
 ### Requirement translation
 
-Filter and payload-index paths must be `AttributePath` objects, for example
-`Document._.text`; strings such as `"text"` are not supported. Nested paths resolve
-serialized aliases, including fields reached through optional values, mappings,
-and indexed sequences (`Document._.sections[0].title`). Index creation uses the
-same path resolution as filtering.
+Filter and payload-index paths must be `AttributePath` objects, for example `Document._.text`;
+strings such as `"text"` are not supported. Nested paths resolve serialized aliases, including
+fields reached through optional values, mappings, and indexed sequences
+(`Document._.sections[0].title`). Index creation uses the same path resolution as filtering.
 
 `AttributeRequirement` operators map onto Qdrant filters as follows:
 
@@ -145,8 +144,8 @@ so you can correlate results across stores.
 
 Every operation translates client failures into `QdrantException`, naming the operation and the
 collection it was executed for and keeping the original SDK error as its `__cause__`. The client
-communicates over gRPC by default, so untranslated failures would otherwise surface as `grpc`
-errors carrying no indication of what failed. Argument verification is not a client failure - an
+communicates over gRPC by default, so untranslated failures would otherwise surface as `grpc` errors
+carrying no indication of what failed. Argument verification is not a client failure - an
 unsupported `**extra` name still raises `ValueError`.
 
 ## High-level QdrantVectorIndex helper
